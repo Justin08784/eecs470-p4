@@ -240,7 +240,8 @@ CPU_SOURCES = verilog/cpu.sv \
 			  verilog/p3/stage_mem.sv \
 			  verilog/p3/stage_wb.sv \
 			  verilog/mult.sv \
-			  verilog/rs.sv
+			  verilog/rs.sv \
+			  verilog/psel_gen.sv
 
 build/cpu.simv: $(CPU_SOURCES) $(CPU_HEADERS) $(CPU_TESTBENCH)
 synth/cpu.vg: $(CPU_SOURCES) $(CPU_HEADERS)
