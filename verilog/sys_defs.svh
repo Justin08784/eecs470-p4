@@ -60,9 +60,9 @@ typedef logic [4:0] REG_IDX;
 
 /* 
 NEED CLARIFICATION:
-NOTE: We will use PHYS_REG_IDX = 0 as a sentinel (to denote "no register" or "always ready/zero").
+NOTE: We will use PHYS_REG_IDX = 0 as a sentinel (to denote "no register" / "is immediate operand").
 While we lose out on a single physical register, this greatly simplifies logic 
-(the alternative is to pipe around 'valid/in-use' bit signals everywhere).
+(the alternative is to pipe around 'is valid src_reg' bit signals everywhere).
 */
 typedef logic [$clog2(`PHYS_REG_SZ_R10K)-1:0] PHYS_REG_IDX;
 

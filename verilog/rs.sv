@@ -43,6 +43,8 @@ module rs (
     input   PHYS_REG_IDX    [`N-1:0] d_ts,
     input   PHYS_REG_IDX    [`N-1:0] d_t1s,
     input   PHYS_REG_IDX    [`N-1:0] d_t2s,
+    input   PHYS_REG_IDX    [`N-1:0] d_t1_rdys,
+    input   PHYS_REG_IDX    [`N-1:0] d_t2_rdys,
 
     // issue
     output  logic           [`N-1:0] s_req,  // which issues do we request?
@@ -112,26 +114,6 @@ module rs (
         end
     end
 
-    // typedef struct packed {
-    //     logic           busy;
-    //     logic [31:0]    inst; // debugging
-    //     logic [6:0]     op;
-    //     PHYS_REG_IDX    t;
-    //     PHYS_REG_IDX    t1;
-    //     PHYS_REG_IDX    t2;
-    //     logic           t1_rdy; // ready in ROB?
-    //     logic           t2_rdy;
-    // } RS_ENTRY;
-
-    // */
-    // input   logic           [`N-1:0] d_req,  // which dispatches are being requested?
-    // output  logic           [`N-1:0] d_gnt,  // which dispatches we accept?
-    // input   [31:0]          [`N-1:0] d_inst, // debugging
-    // input   [6:0]           [`N-1:0] d_op,
-    // input   PHYS_REG_IDX    [`N-1:0] d_ts,
-    // input   PHYS_REG_IDX    [`N-1:0] d_t1s,
-    // input   PHYS_REG_IDX    [`N-1:0] d_t2s,
-
 
     always_ff @(posedge clock) begin
         if (reset || flush) begin
@@ -139,14 +121,14 @@ module rs (
         end else begin
             foreach (d_gnt_bus[i, j]) begin
                 if (d_gnt_bus[i][j]) begin
-                    entries[i].busy     = 1;
-                    entries[i].inst     = d_inst[j];
-                    entries[i].op       = d_op[j];
-                    entries[i].t        = d_ts[i];
-                    entries[i].t1       = d_t1s[i];
-                    entries[i].t2       = d_t2s[i];
-                    entries[i].t1_rdy   = 1;
-                    entries[i].t2_rdy   = 1;
+                    entries[i].busy     <= 1;
+                    entries[i].inst     <= d_inst[j];
+                    entries[i].op       <= d_op[j];
+                    entries[i].t        <= d_ts[i];
+                    entries[i].t1       <= d_t1s[i];
+                    entries[i].t2       <= d_t2s[i];
+                    entries[i].t1_rdy   <= d_t1_rdys[i];
+                    entries[i].t2_rdy   <= d_t2_rdys[i];
                 end
             end
         end
