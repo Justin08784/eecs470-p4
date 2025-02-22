@@ -9,7 +9,7 @@ typedef struct packed {
     PHYS_REG_IDX    t;
     PHYS_REG_IDX    t1;
     PHYS_REG_IDX    t2;
-    logic           t1_rdy;
+    logic           t1_rdy; // ready in ROB?
     logic           t2_rdy;
 } RS_ENTRY;
 
@@ -82,14 +82,15 @@ module rs (
     endgenerate
 
 
-    logic [`RS_SZ-1:0][`RS_SZ-1:0] entries_gnt_bus;
+    logic [`RS_SZ-1:0][`N-1:0]  entries_free_bus;
+    logic [`RS_SZ-1:0]          entries_free;
     psel_gen #(
         .WIDTH(`RS_SZ),
         .REQS(`N)
     ) entries_psel (
-        .req(~busy_vec),
-        .gnt(entries_gnt)
-        // .gnt_bus(),
+        .req    (~busy_vec),
+        .gnt    (entries_free),
+        .gnt_bus(entries_free_bus)
         // .empty()
     );
 
@@ -100,17 +101,56 @@ module rs (
     be too big of a deal. But possible room for optimization 
     by making it a lowest-index first priority encoder?
     */
-    logic [`N-1:0][`N-1:0] d_gnt_bus;
-    psel_gen #(
-        .WIDTH(`N),
-        .REQS(`N)
-    ) dispatch_psel (
-        .req(d_req),
-        .gnt(d_gnt_bus)
-        // .gnt_bus(),
-        // .empty()
-    );
+    logic [`RS_SZ-1:0][`N-1:0]  d_gnt_bus;
+    always_comb begin
+        d_gnt_bus = '0;
+        for (int i = 0; i < `N; ++i) begin
+            if (d_req[i]) begin
+                d_gnt[i]  = |entries_free_bus[i]; 
+                d_gnt_bus |= entries_free_bus[i];
+            end
+        end
+    end
 
+    // typedef struct packed {
+    //     logic           busy;
+    //     logic [31:0]    inst; // debugging
+    //     logic [6:0]     op;
+    //     PHYS_REG_IDX    t;
+    //     PHYS_REG_IDX    t1;
+    //     PHYS_REG_IDX    t2;
+    //     logic           t1_rdy; // ready in ROB?
+    //     logic           t2_rdy;
+    // } RS_ENTRY;
+
+    // */
+    // input   logic           [`N-1:0] d_req,  // which dispatches are being requested?
+    // output  logic           [`N-1:0] d_gnt,  // which dispatches we accept?
+    // input   [31:0]          [`N-1:0] d_inst, // debugging
+    // input   [6:0]           [`N-1:0] d_op,
+    // input   PHYS_REG_IDX    [`N-1:0] d_ts,
+    // input   PHYS_REG_IDX    [`N-1:0] d_t1s,
+    // input   PHYS_REG_IDX    [`N-1:0] d_t2s,
+
+
+    always_ff @(posedge clock) begin
+        if (reset || flush) begin
+            entries <= '0;
+        end else begin
+            foreach (d_gnt_bus[i, j]) begin
+                if (d_gnt_bus[i][j]) begin
+                    entries[i].busy     = 1;
+                    entries[i].inst     = d_inst[j];
+                    entries[i].op       = d_op[j];
+                    entries[i].t        = d_ts[i];
+                    entries[i].t1       = d_t1s[i];
+                    entries[i].t2       = d_t2s[i];
+                    entries[i].t1_rdy   = 1;
+                    entries[i].t2_rdy   = 1;
+                end
+            end
+        end
+    end
 
 
 endmodule
