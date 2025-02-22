@@ -4,6 +4,7 @@
 
 typedef struct packed {
     logic           busy;
+    logic           issued;
     logic [31:0]    inst; // debugging
     logic [6:0]     op;
     PHYS_REG_IDX    t;
@@ -36,6 +37,8 @@ module rs (
     make dispatch logic (i.e. dispatch or not?)a separate module 
     (cuz you need to check struct hazards in ROB as well)
     */
+
+    output  logic           [$clog2(`N)-1:0] rs_free_cnt;
     input   logic           [`N-1:0] d_req,  // which dispatches are being requested?
     output  logic           [`N-1:0] d_gnt,  // which dispatches we accept?
     input   [31:0]          [`N-1:0] d_inst, // debugging
@@ -77,22 +80,29 @@ module rs (
     RS_ENTRY [`RS_SZ-1:0] entries;
 
     logic [`RS_SZ-1:0] busy_vec;
+    logic [`RS_SZ-1:0] issued_vec;
     generate
-    for (genvar i = 0; i < `RS_SZ; i++) begin : gen_busy
-        assign busy_vec[i] = entries[i].busy;
+    for (genvar i = 0; i < `RS_SZ; i++) begin : gen_vecs
+        assign busy_vec[i]      = entries[i].busy;
+        assign issued_vec[i]    = entries[i].issued;
     end
     endgenerate
 
+    logic [`RS_SZ-1:0] free_entries;
+    assign free_entries = 
+        ~busy_vec
+        | issued_vec; // an issued insn will go to EX and free its entry
 
-    logic [`RS_SZ-1:0][`N-1:0]  entries_free_bus;
-    logic [`RS_SZ-1:0]          entries_free;
+
+    logic [`RS_SZ-1:0][`N-1:0]  entries_gnt_bus;
+    logic [`RS_SZ-1:0]          entries_gnt;
     psel_gen #(
         .WIDTH(`RS_SZ),
         .REQS(`N)
     ) entries_psel (
-        .req    (~busy_vec),
-        .gnt    (entries_free),
-        .gnt_bus(entries_free_bus)
+        .req    (free_entries),
+        .gnt    (entries_gnt),
+        .gnt_bus(entries_gnt_bus)
         // .empty()
     );
 
@@ -108,8 +118,8 @@ module rs (
         d_gnt_bus = '0;
         for (int i = 0; i < `N; ++i) begin
             if (d_req[i]) begin
-                d_gnt[i]  = |entries_free_bus[i]; 
-                d_gnt_bus |= entries_free_bus[i];
+                d_gnt[i]        = (entries_gnt_bus[i] != 0); 
+                d_gnt_bus[i]    |= entries_gnt_bus[i];
             end
         end
     end
@@ -122,6 +132,7 @@ module rs (
             foreach (d_gnt_bus[i, j]) begin
                 if (d_gnt_bus[i][j]) begin
                     entries[i].busy     <= 1;
+                    entries[i].issued   <= 0;
                     entries[i].inst     <= d_inst[j];
                     entries[i].op       <= d_op[j];
                     entries[i].t        <= d_ts[i];
@@ -129,6 +140,8 @@ module rs (
                     entries[i].t2       <= d_t2s[i];
                     entries[i].t1_rdy   <= d_t1_rdys[i];
                     entries[i].t2_rdy   <= d_t2_rdys[i];
+                end else if (issued_vec[i]) begin
+                    entries[i]          <= '0;
                 end
             end
         end
