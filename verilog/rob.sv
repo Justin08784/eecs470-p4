@@ -14,16 +14,16 @@ typedef struct packed {
 } robItem;
 
 module FIFO #(
-    parameter DEPTH = 16, // num elements
+    parameter DEPTH = 32, // num elements
     parameter WIDTH = $bits(robItem);//32, // num bits per element
-    parameter MAX_CNT = 3,
-    localparam CNT_BITS = $clog2(MAX_CNT+1)
+    localparam CNT_BITS = $clog2(DEPTH)
 ) (
     input                       clock, 
     input                       reset,
     input                       wr_en,
     input                       rd_en,
     input           [WIDTH-1:0] wr_data,
+    input                       err,
     output logic                wr_valid,
     output logic                rd_valid,
     output logic    [WIDTH-1:0] rd_data,
@@ -31,26 +31,16 @@ module FIFO #(
     output logic                full
 );
 
-    // LAB5 TODO: Make the FIFO, see other TODOs below
-    // Some things you will need to do:
-    // - Define the sizes for your head (read) and tail (write) pointer
-    // - Increment the pointers when needed (hint: try using the modulo operator: '%')
-    // - Write to the tail when wr_en == 1 and the fifo isn't full
-    // - Read from the head when rd_en == 1 and the fifo isn't empty
-
-    // LAB5 TODO: how wide is a pointer to DEPTH elements?
-    logic [$clog2(DEPTH)-1:0] head, next_head;
+    logic [$clog2(DEPTH)-1:0] head, next_head, old_head;
     logic [$clog2(DEPTH)-1:0] tail, next_tail;
+    logic exception;
 
-    // If you're using one-hot head and tail pointers, feel free to use your own
-    // 2D flop array instead
     memDP #(
         .WIDTH     (WIDTH),
         .DEPTH     (DEPTH),
         .READ_PORTS(1),
         .BYPASS_EN (0))
     fifo_mem (
-        // LAB 5 TODO: complete the port wiring for this module
         .clock  (clock),
         .reset  (reset),
 
@@ -63,34 +53,24 @@ module FIFO #(
         .wdata  (wr_data)
     );
 
-    // LAB5 TODO: Use one of three ways to track if full/empty:
-    //  1. (easiest) Keep a count of the number of entries
-    //  2. (easy)    Make your memory 1 entry larger so head never equals tail
-    //  2. (medium)  Use a valid bit for each entry
-    //  3. (hardest) Use head == tail and keep a state of empty vs. full in always_ff
-
-    // These have to be (log_2(D)) instead of (log_2(D)-1) so they can fit max value DEPTH.
-    // This is because they are counts, unlike pointers like head and tail.
     logic [$clog2(DEPTH):0] cnt, next_cnt, free;
 
-    // LAB5 TODO: Determine a way to calculate spots
     logic empty;
     assign empty    = cnt == '0;
     assign full     = cnt == DEPTH;
-    // assign spots    = |cnt[$clog2(DEPTH)-1:CNT_BITS] ? '1 : cnt;
-    assign free     = DEPTH - cnt;
-    assign spots    = free > MAX_CNT ? MAX_CNT : free[CNT_BITS-1:0];
+    assign spots     = DEPTH - cnt;
+    assign old_head  = next_ex ? old_head : head;
 
     always_comb begin
-        rd_valid    = rd_en && !empty;
-        next_head   = rd_valid ? (head + 1) % DEPTH : head;
+        next_ex     = err || (old_head != head);
+
+        rd_valid    = next_ex ? 1 : (rd_en && !empty);
+        next_head   = next_ex ? head - 1 : (next_ex ? tail : (rd_valid ? (head + 1) % DEPTH : head));
 
         wr_valid    = wr_en && (!full || rd_valid);
-        next_tail   = wr_valid ? (tail + 1) % DEPTH : tail;
+        next_tail   = next_ex ? tail - 1 : (wr_valid ? (tail + 1) % DEPTH : tail);
 
         next_cnt    = cnt + wr_valid - rd_valid;
-        // LAB5 TODO: Add logic for the next state
-        // (also feel free to use assign statements)
     end
 
 
@@ -99,12 +79,12 @@ module FIFO #(
             cnt  <= '0;
             head <= '0;
             tail <= '0;
-            // LAB5 TODO: Initialize state variables
+            exception <= '0;
         end else begin
             cnt  <= next_cnt;
             head <= next_head;
             tail <= next_tail;
-            // LAB5 TODO: Update on each cycle
+            exception <= next_ex;
         end
     end
 
@@ -112,24 +92,36 @@ endmodule
 
 
 module rob #(
-    parameter DEPTH = 16, // num elements
-    parameter WIDTH = 32, // num bits per element
-    parameter MAX_CNT = 3,
-    localparam CNT_BITS = $clog2(MAX_CNT+1)
+    parameter DEPTH = 32, // num elements
+    parameter WIDTH = 44, // num bits per element 
+                          //(32 bits per insn + log2(64) = 6 bits each for T & Told)
+    localparam CNT_BITS = $clog2(WIDTH)
 ) (
     input                       clock, 
     input                       reset,
-    input                       wr_en,
-    input                       rd_en,
-    input           [WIDTH-1:0] wr_data,
+    input                       dispatch_en,
+    input                       retire_en,
+    input                       err,
+    input           [WIDTH-1:0] next_insn,
     output logic                wr_valid,
     output logic                rd_valid,
-    //output logic    [WIDTH-1:0] rd_data,
-    output logic [CNT_BITS-1:0] spots,
+    output logic    [WIDTH-1:0] completed_insn,
+    output logic [CNT_BITS-1:0] free_spots,
     output logic                full
 );
 
-FIFO myfifo (.clock(), .reset(), .wr_en(), .rd_en(), .wr_data(), .wr_valid(), .rd_valid(), .rd_data(), .spots(), .full());
+    FIFO myfifo (
+        .clock(clock), 
+        .reset(reset), 
+        .wr_en(insn_dispatch), 
+        .rd_en(insn_retire), 
+        .wr_data(next_insn), 
+        .wr_valid(wr_valid), 
+        .rd_valid(rd_valid), 
+        .rd_data(completed_insn), 
+        .spots(free_spots), 
+        .full(full)
+    );
 
 
 
