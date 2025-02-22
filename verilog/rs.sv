@@ -31,26 +31,26 @@ module rs (
     input flush,
 
     // dispatch
-    input   logic           ['N-1:0] d_req;  // which dispatches are being requested?
-    output  logic           ['N-1:0] d_gnt;  // which dispatches we accept?
-    input   [31:0]          ['N-1:0] d_inst; // debugging
-    input   [6:0]           ['N-1:0] d_op;
-    input   PHYS_REG_IDX    ['N-1:0] d_ts;
-    input   PHYS_REG_IDX    ['N-1:0] d_t1s;
-    input   PHYS_REG_IDX    ['N-1:0] d_t2s;
+    input   logic           [`N-1:0] d_req,  // which dispatches are being requested?
+    output  logic           [`N-1:0] d_gnt,  // which dispatches we accept?
+    input   [31:0]          [`N-1:0] d_inst, // debugging
+    input   [6:0]           [`N-1:0] d_op,
+    input   PHYS_REG_IDX    [`N-1:0] d_ts,
+    input   PHYS_REG_IDX    [`N-1:0] d_t1s,
+    input   PHYS_REG_IDX    [`N-1:0] d_t2s,
 
     // issue
-    output  logic           ['N-1:0] s_req;  // which issues do we request?
-    input   logic           ['N-1:0] s_gnt;  // which issues are accepted?
-    output  [31:0]          ['N-1:0] s_inst; // debugging
-    input   [6:0]           ['N-1:0] s_op;
-    output  PHYS_REG_IDX    ['N-1:0] s_ts;
-    output  PHYS_REG_IDX    ['N-1:0] s_t1s;
-    output  PHYS_REG_IDX    ['N-1:0] s_t2s;
+    output  logic           [`N-1:0] s_req,  // which issues do we request?
+    input   logic           [`N-1:0] s_gnt,  // which issues are accepted?
+    output  [31:0]          [`N-1:0] s_inst, // debugging
+    input   [6:0]           [`N-1:0] s_op,
+    output  PHYS_REG_IDX    [`N-1:0] s_ts,
+    output  PHYS_REG_IDX    [`N-1:0] s_t1s,
+    output  PHYS_REG_IDX    [`N-1:0] s_t2s,
 
     // complete (CDB)
-    input   logic           ['N-1:0] c_en;
-    input   PHYS_REG_IDX    ['N-1:0] c_ts;
+    input   logic           [`N-1:0] c_en,
+    input   PHYS_REG_IDX    [`N-1:0] c_ts
 
     // input allocate_en,
     // input [$bits(RS_ENTRY)-1:0] rd_allocate,
@@ -64,7 +64,7 @@ module rs (
 );
 
 
-RS_ENTRY [RS_SZ-1:0] entries;
+RS_ENTRY [`RS_SZ-1:0] entries;
 
 
 endmodule
