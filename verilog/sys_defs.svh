@@ -25,8 +25,8 @@
 `define CDB_SZ `N // This MUST match your superscalar width
 
 // sizes
-`define ROB_SZ xx
-`define RS_SZ xx
+`define ROB_SZ 96
+`define RS_SZ  16
 `define PHYS_REG_SZ_P6 32
 `define PHYS_REG_SZ_R10K (32 + `ROB_SZ)
 
@@ -57,6 +57,14 @@
 typedef logic [31:0] ADDR;
 typedef logic [31:0] DATA;
 typedef logic [4:0] REG_IDX;
+
+/* 
+NEED CLARIFICATION:
+NOTE: We will use PHYS_REG_IDX = 0 as a sentinel (to denote "no register" or "always ready/zero").
+While we lose out on a single physical register, this greatly simplifies logic 
+(the alternative is to pipe around 'valid/in-use' bit signals everywhere).
+*/
+typedef logic [$clog2(`PHYS_REG_SZ_R10K)-1:0] PHYS_REG_IDX;
 
 // the zero register
 // In RISC-V, any read of this register returns zero and any writes are thrown away
