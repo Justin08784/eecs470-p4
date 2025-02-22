@@ -31,6 +31,11 @@ module rs (
     input flush,
 
     // dispatch
+    /*
+    Mustafa, Tip:
+    make dispatch logic (i.e. dispatch or not?)a separate module 
+    (cuz you need to check struct hazards in ROB as well)
+    */
     input   logic           [`N-1:0] d_req,  // which dispatches are being requested?
     output  logic           [`N-1:0] d_gnt,  // which dispatches we accept?
     input   [31:0]          [`N-1:0] d_inst, // debugging
@@ -49,6 +54,11 @@ module rs (
     output  PHYS_REG_IDX    [`N-1:0] s_t2s,
 
     // complete (CDB)
+    /*
+    Mustafa:
+    implement backpressure from the CDB (one of tips in slides apparently?)
+    (make a rdy-vld handshake between FUs and reservation stations)
+    */
     input   logic           [`N-1:0] c_en,
     input   PHYS_REG_IDX    [`N-1:0] c_ts
 
@@ -62,9 +72,45 @@ module rs (
     // output logic [$bits(RS_ENTRY)-1:0] wr_free,
     // output logic [$bits(ID_EX_PACKET)-1:0] inst
 );
+    RS_ENTRY [`RS_SZ-1:0] entries;
+
+    logic [`RS_SZ-1:0] busy_vec;
+    generate
+    for (genvar i = 0; i < `RS_SZ; i++) begin : gen_busy
+        assign busy_vec[i] = entries[i].busy;
+    end
+    endgenerate
 
 
-RS_ENTRY [`RS_SZ-1:0] entries;
+    logic [`RS_SZ-1:0][`RS_SZ-1:0] entries_gnt_bus;
+    psel_gen #(
+        .WIDTH(`RS_SZ),
+        .REQS(`N)
+    ) entries_psel (
+        .req(~busy_vec),
+        .gnt(entries_gnt)
+        // .gnt_bus(),
+        // .empty()
+    );
+
+    /*
+    Mustafa:
+    if you make it alternating it might dispatch younger insns
+    so just make it a dependent for-loop (i.e. serial); it shouldnt
+    be too big of a deal. But possible room for optimization 
+    by making it a lowest-index first priority encoder?
+    */
+    logic [`N-1:0][`N-1:0] d_gnt_bus;
+    psel_gen #(
+        .WIDTH(`N),
+        .REQS(`N)
+    ) dispatch_psel (
+        .req(d_req),
+        .gnt(d_gnt_bus)
+        // .gnt_bus(),
+        // .empty()
+    );
+
 
 
 endmodule
