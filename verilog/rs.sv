@@ -93,7 +93,7 @@ module rs (
     */
 
     // issue
-    input   logic           [$clog2(`N):0][`FU_IDX_NUM-1:0] fu_scnt, // functional unit availability; saturating counters that cap at N
+    input   logic           [`FU_IDX_NUM-1:0][$clog2(`N):0] fu_scnt, // functional unit availability; saturating counters that cap at N
     output  logic           [`N-1:0] s_vld,     // which issue lines are valid? (dep. on fu_scnt)
     output  ID_RESULT       [`N-1:0] s_dat,
     /* Ditto CONCERN 1 */
@@ -114,7 +114,6 @@ module rs (
     NEED CORRECTIONS.
     */
     RS_ENTRY [`RS_SZ-1:0]       entries, entries_n;
-    logic    [$clog2(`RS_SZ):0] rs_cnt;
 
     logic [`RS_SZ-1:0] busy_vec;
     logic [`RS_SZ-1:0] issd_vec;
@@ -235,6 +234,7 @@ module rs (
     // end
 
     // compute free entries
+    logic [$clog2(`RS_SZ):0] rs_cnt;
     logic [`RS_SZ-1:0] free_entries;
     assign free_entries = 
         ~busy_vec
@@ -243,7 +243,7 @@ module rs (
     assign rs_scnt = rs_cnt > `N ? `N : rs_cnt;
 
 
-    logic [`RS_SZ-1:0][`N-1:0]  free_gnt_bus;
+    logic [`N-1:0][`RS_SZ-1:0]  free_gnt_bus;
     logic [`RS_SZ-1:0]          free_gnt;
     psel_gen #(
         .WIDTH(`RS_SZ),
@@ -262,7 +262,7 @@ module rs (
     be too big of a deal. But possible room for optimization 
     by making it a lowest-index first priority encoder?
     */
-    logic [`RS_SZ-1:0][`N-1:0]  d_gnt_bus;
+    logic [`N-1:0][`RS_SZ-1:0]  d_gnt_bus;
     always_comb begin
         d_gnt_bus = '0;
         for (int i = 0; i < `N; ++i) begin
