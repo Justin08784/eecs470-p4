@@ -11,16 +11,42 @@ typedef enum logic [1:0] {
 `define FU_IDX_NUM 4
 
 typedef struct packed {
-    logic           busy;
-    logic           issued;
-    logic [31:0]    inst; // debugging
-    logic [6:0]     op;
-    FU_IDX          fu_idx;
     PHYS_REG_IDX    t;
     PHYS_REG_IDX    t1;
     PHYS_REG_IDX    t2;
     logic           t1_rdy; // ready in ROB?
     logic           t2_rdy;
+    FU_IDX          fu_idx;
+
+    /* from ID_EX_PACKET */
+    INST inst;
+    ADDR PC;
+    ADDR NPC; // PC + 4
+
+    // DATA rs1_value; // reg A value
+    // DATA rs2_value; // reg B value
+
+    ALU_OPA_SELECT opa_select; // ALU opa mux select (ALU_OPA_xxx *)
+    ALU_OPB_SELECT opb_select; // ALU opb mux select (ALU_OPB_xxx *)
+
+    // REG_IDX  dest_reg_idx;  // destination (writeback) register index
+    ALU_FUNC alu_func;      // ALU function select (ALU_xxx *)
+    logic    mult;          // Is inst a multiply instruction?
+    logic    rd_mem;        // Does inst read memory?
+    logic    wr_mem;        // Does inst write memory?
+    logic    cond_branch;   // Is inst a conditional branch?
+    logic    uncond_branch; // Is inst an unconditional branch?
+    logic    halt;          // Is this a halt?
+    logic    illegal;       // Is this instruction illegal?
+    logic    csr_op;        // Is this a CSR operation? (we only used this as a cheap way to get return code)
+
+    // logic    valid;
+} ID_RESULT;
+
+typedef struct packed {
+    logic           busy;
+    logic           issued;
+    ID_RESULT       dat;
 } RS_ENTRY;
 
 // functional unit availability
@@ -30,7 +56,7 @@ typedef struct packed {
     logic [$clog2(`N):0] mult_cnt;
     logic [$clog2(`N):0] load_cnt;
     logic [$clog2(`N):0] stor_cnt;
-} FU_AVAIL;
+} fu_cnt;
 
 /*
 NEED CLARIFICATION:
@@ -57,40 +83,28 @@ module rs (
     */
 
     /*
-    rs_free_cnt saturates at N (Why? A: even if we have more free RS entries 
+    rs_cnt saturates at N (Why? A: even if we have more free RS entries 
     than N, we can only dispatch at most N each cycle anyways).
 
     e.g. N = 2
-    logic [1:0] rs_free_cnt;
+    logic [1:0] rs_cnt;
     b00 +> b01 +> b10 (cannot increment further)
     0      1      2 
     */
-    output  logic           [$clog2(`N):0] rs_free_cnt, // to dispatcher
-    input   logic           [`N-1:0] d_vld,     // which dispatch lines are valid? (from dispatcher; dep. on rs_free_cnt)
-    input   [31:0]          [`N-1:0] d_inst,    // debugging
-    input   [6:0]           [`N-1:0] d_op,
-    input   FU_IDX          [`N-1:0] d_fu_idx,
+    output  logic           [$clog2(`N):0] rs_cnt, // to dispatcher
+    input   logic           [`N-1:0] d_vld,     // which dispatch lines are valid? (from dispatcher; dep. on rs_cnt)
+    input   ID_RESULT       [`N-1:0] d_dat,
     /* CONCERN 1:
     What data do we actually need to store in the RS so that it can immediately
     execute after issue to an FU? Like I'm looking at the fields of ID_EX_PACKET
     and they are considerable?
     */
-    input   PHYS_REG_IDX    [`N-1:0] d_ts,
-    input   PHYS_REG_IDX    [`N-1:0] d_t1s,
-    input   PHYS_REG_IDX    [`N-1:0] d_t2s,
-    input   PHYS_REG_IDX    [`N-1:0] d_t1_rdys,
-    input   PHYS_REG_IDX    [`N-1:0] d_t2_rdys,
 
     // issue
-    input   logic           [$clog2(`N):0][`FU_IDX_NUM-1:0] fu_avail,
-    output  logic           [`N-1:0] s_vld,     // which issue lines are valid? (dep. on fu_avail)
-    output  [31:0]          [`N-1:0] s_inst,    // debugging
-    output  [6:0]           [`N-1:0] s_op,
-    output  FU_IDX          [`N-1:0] s_fu_idx,
+    input   logic           [$clog2(`N):0][`FU_IDX_NUM-1:0] fu_cnt,
+    output  logic           [`N-1:0] s_vld,     // which issue lines are valid? (dep. on fu_cnt)
+    output  ID_RESULT       [`N-1:0] s_dat,
     /* Ditto CONCERN 1 */
-    output  PHYS_REG_IDX    [`N-1:0] s_ts,
-    output  PHYS_REG_IDX    [`N-1:0] s_t1s,
-    output  PHYS_REG_IDX    [`N-1:0] s_t2s,
 
     // complete (CDB)
     /*
@@ -115,7 +129,7 @@ module rs (
 
     logic [`RS_SZ-1:0] to_issue;
     always_comb begin
-        logic [$clog2(`N):0][`FU_IDX_NUM-1:0] fu_cnts = fu_avail;
+        logic [$clog2(`N):0][`FU_IDX_NUM-1:0] fu_cnts = fu_cnt;
         s_vld = '0;
         to_issue = '0;
 
@@ -125,18 +139,15 @@ module rs (
                 break;
 
             // not ready to issue
-            if (fu_cnts[entries[i].fu_idx] == 0
-                || !entries[i].t1_rdy
-                || !entries[i].t2_rdy)
+            if (fu_cnts[entries[i].dat.fu_idx] == 0
+                || !entries[i].dat.t1_rdy
+                || !entries[i].dat.t2_rdy)
                 continue;
 
-            to_issue[i]     = 1;
-            s_vld[cnt]      = 1;
-            s_fu_idx[cnt]   = entries[i].fu_idx;
-            s_ts[cnt]       = entries[i].t;
-            s_t1s[cnt]      = entries[i].t1;
-            s_t2s[cnt]      = entries[i].t2;
-            ++fu_cnts[entries[i].fu_idx];
+            to_issue[i] = 1;
+            s_vld[cnt]  = 1;
+            s_dat[cnt]  = entries[i].dat;
+            ++fu_cnts[entries[i].dat.fu_idx];
             ++cnt;
         end
     end
@@ -184,14 +195,7 @@ module rs (
                 if (d_gnt_bus[i][j]) begin
                     entries[i].busy     <= 1;
                     entries[i].issued   <= 0;
-                    entries[i].inst     <= d_inst[j];
-                    entries[i].op       <= d_op[j];
-                    entries[i].fu_idx   <= d_fu_idx[j];
-                    entries[i].t        <= d_ts[j];
-                    entries[i].t1       <= d_t1s[j];
-                    entries[i].t2       <= d_t2s[j];
-                    entries[i].t1_rdy   <= d_t1_rdys[j];
-                    entries[i].t2_rdy   <= d_t2_rdys[j];
+                    entries[i].dat      <= d_dat[j];
                 end else if (issd_vec[i]) begin
                     entries[i]          <= '0;
                 end
