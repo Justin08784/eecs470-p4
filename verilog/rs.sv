@@ -128,15 +128,18 @@ module rs (
     logic [`RS_SZ-1:0] to_t1_rdy;
     logic [`RS_SZ-1:0] to_t2_rdy;
     always_comb begin
-        to_t1_rdy = t1_rdy_vec;
-        to_t2_rdy = t2_rdy_vec;
         for (int i = 0; i < `RS_SZ; ++i) begin
+            logic [`N-1:0] match_t1;
+            logic [`N-1:0] match_t2;
+
             for (int j = 0; j < `N; ++j) begin
-                if (!c_en[j])
-                    continue;
-                to_t1_rdy[i] |= entries[i].dat.t1 == c_ts[j];
-                to_t2_rdy[i] |= entries[i].dat.t2 == c_ts[j];
+                // match any tag in CDB?
+                match_t1[j] |= (c_en[j] && entries[i].dat.t1 == c_ts[j]);
+                match_t1[j] |= (c_en[j] && entries[i].dat.t2 == c_ts[j]);
             end
+
+            to_t1_rdy[i] = t1_rdy_vec[i] || |match_t1;
+            to_t2_rdy[i] = t2_rdy_vec[i] || |match_t2;
         end
     end
 
