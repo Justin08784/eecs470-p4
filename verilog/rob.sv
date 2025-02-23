@@ -18,17 +18,17 @@ module FIFO #(
     parameter WIDTH = $bits(robItem),  //32, // num bits per element
     localparam CNT_BITS = $clog2(DEPTH)
 ) (
-    input                       clock,
-    input                       reset,
-    input                       wr_en,
-    input                       rd_en,
-    input        [   WIDTH-1:0] wr_data,
-    input                       err,
-    output logic                wr_valid,
-    output logic                rd_valid,
-    output logic [   WIDTH-1:0] rd_data,
-    output logic [CNT_BITS-1:0] spots,
-    output logic                full
+    input                     clock,
+    input                     reset,
+    input                     wr_en,
+    input                     rd_en,
+    input        [ WIDTH-1:0] wr_data,
+    input                     err,
+    output logic              wr_valid,
+    output logic              rd_valid,
+    output logic [ WIDTH-1:0] rd_data,
+    output logic [CNT_BITS:0] spots,
+    output logic              full
 );
 
   logic [$clog2(DEPTH)-1:0] head, next_head, old_head;
@@ -59,16 +59,16 @@ module FIFO #(
   assign empty    = cnt == '0;
   assign full     = cnt == DEPTH;
   assign spots    = DEPTH - cnt;
-  assign old_head = next_ex ? old_head : head;
+  assign old_head = exception ? old_head : head;
 
   always_comb begin
     next_ex   = err || (old_head != head);
 
-    rd_valid  = next_ex ? 1 : (rd_en && !empty);
-    next_head = next_ex ? head - 1 : (next_ex ? tail : (rd_valid ? (head + 1) % DEPTH : head));
+    rd_valid  = exception ? 1 : (rd_en && !empty);
+    next_head = exception ? head - 1 : (next_ex ? tail : (rd_valid ? (head + 1) % DEPTH : head));
 
     wr_valid  = wr_en && (!full || rd_valid);
-    next_tail = next_ex ? tail - 1 : (wr_valid ? (tail + 1) % DEPTH : tail);
+    next_tail = exception ? tail - 1 : (wr_valid ? (tail + 1) % DEPTH : tail);
 
     next_cnt  = cnt + wr_valid - rd_valid;
   end
@@ -97,17 +97,17 @@ module rob #(
                            //(32 bits per insn + log2(64) = 6 bits each for T & Told)
     localparam CNT_BITS = $clog2(DEPTH)
 ) (
-    input                       clock,
-    input                       reset,
-    input                       dispatch_en,
-    input                       retire_en,
-    input                       err,
-    input        [   WIDTH-1:0] next_insn,
-    output logic                wr_valid,
-    output logic                rd_valid,
-    output logic [   WIDTH-1:0] completed_insn,
-    output logic [CNT_BITS-1:0] free_spots,
-    output logic                full
+    input                     clock,
+    input                     reset,
+    input                     dispatch_en,
+    input                     retire_en,
+    input                     err,
+    input        [ WIDTH-1:0] next_insn,
+    output logic              wr_valid,
+    output logic              rd_valid,
+    output logic [ WIDTH-1:0] completed_insn,
+    output logic [CNT_BITS:0] free_spots,
+    output logic              full
 );
 
   FIFO myfifo (
@@ -115,6 +115,7 @@ module rob #(
       .reset(reset),
       .wr_en(dispatch_en),
       .rd_en(retire_en),
+      .err(err),
       .wr_data(next_insn),
       .wr_valid(wr_valid),
       .rd_valid(rd_valid),

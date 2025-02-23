@@ -11,16 +11,16 @@ module FIFO_sva #(
     //parameter MAX_CNT = 3,
     localparam CNT_BITS = $clog2(DEPTH)
 ) (
-    input                clock,
+    input              clock,
     reset,
-    input                wr_en,
-    input [   WIDTH-1:0] wr_data,
-    input                rd_en,
-    input [   WIDTH-1:0] rd_data,
-    input                rd_valid,
-    input                wr_valid,
-    input [CNT_BITS-1:0] spots,
-    input                full
+    input              wr_en,
+    input [ WIDTH-1:0] wr_data,
+    input              rd_en,
+    input [ WIDTH-1:0] rd_data,
+    input              rd_valid,
+    input              wr_valid,
+    input [CNT_BITS:0] spots,
+    input              full
 );
 
   logic [$clog2(DEPTH+1)-1:0] entries;  // how full the buffer should be

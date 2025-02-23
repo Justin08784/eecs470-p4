@@ -41,7 +41,7 @@ module FIFO_test();
     logic   [`WIDTH-1:0] rd_data;
     logic                rd_valid;
     logic                wr_valid;
-    logic [CNT_BITS-1:0] spots;
+    logic [CNT_BITS:0] spots;
     logic                full;
 
     // variable to count values written to FIFO
@@ -82,12 +82,16 @@ module FIFO_test();
     end
 
     initial begin
+
+        $dumpfile("../ROB.vcd");
+        $dumpvars(0, FIFO_test.dut);
         $display("\nStart Testbench");
 
         clock = 1;
         reset = 1;
         wr_en = 0;
         rd_en = 0;
+        err = 0;
 
         $monitor("  %3d | d_in: %h   wr: %b  rd: %b  |  wr_vld: %b  rd_vld: %b   d_out: %h   full: %b  spots: %2d",
                   $time,  wr_data,   wr_en, rd_en,      wr_valid,  rd_valid,     rd_data,    full,     spots);
