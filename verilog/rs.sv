@@ -40,7 +40,6 @@ module rs (
 
     output  logic           [$clog2(`N)-1:0] rs_free_cnt;
     input   logic           [`N-1:0] d_req,  // which dispatches are being requested?
-    output  logic           [`N-1:0] d_gnt,  // which dispatches we accept?
     input   [31:0]          [`N-1:0] d_inst, // debugging
     input   [6:0]           [`N-1:0] d_op,
     input   PHYS_REG_IDX    [`N-1:0] d_ts,
@@ -48,15 +47,16 @@ module rs (
     input   PHYS_REG_IDX    [`N-1:0] d_t2s,
     input   PHYS_REG_IDX    [`N-1:0] d_t1_rdys,
     input   PHYS_REG_IDX    [`N-1:0] d_t2_rdys,
+    output  logic           [`N-1:0] d_gnt,  // which dispatches we accept?
 
     // issue
-    output  logic           [`N-1:0] s_req,  // which issues do we request?
-    input   logic           [`N-1:0] s_gnt,  // which issues are accepted?
-    output  [31:0]          [`N-1:0] s_inst, // debugging
-    input   [6:0]           [`N-1:0] s_op,
-    output  PHYS_REG_IDX    [`N-1:0] s_ts,
-    output  PHYS_REG_IDX    [`N-1:0] s_t1s,
-    output  PHYS_REG_IDX    [`N-1:0] s_t2s,
+    output  logic           [`RS_SZ-1:0] s_req,  // which issues do we request?
+    output  [31:0]          [`RS_SZ-1:0] s_inst, // debugging
+    output  [6:0]           [`RS_SZ-1:0] s_op,
+    output  PHYS_REG_IDX    [`RS_SZ-1:0] s_ts,
+    output  PHYS_REG_IDX    [`RS_SZ-1:0] s_t1s,
+    output  PHYS_REG_IDX    [`RS_SZ-1:0] s_t2s,
+    input   [`RS_SZ-1:0]    [`N-1:0] s_gnt,      // which issues are accepted?
 
     // complete (CDB)
     /*
@@ -135,11 +135,11 @@ module rs (
                     entries[i].issued   <= 0;
                     entries[i].inst     <= d_inst[j];
                     entries[i].op       <= d_op[j];
-                    entries[i].t        <= d_ts[i];
-                    entries[i].t1       <= d_t1s[i];
-                    entries[i].t2       <= d_t2s[i];
-                    entries[i].t1_rdy   <= d_t1_rdys[i];
-                    entries[i].t2_rdy   <= d_t2_rdys[i];
+                    entries[i].t        <= d_ts[j];
+                    entries[i].t1       <= d_t1s[j];
+                    entries[i].t2       <= d_t2s[j];
+                    entries[i].t1_rdy   <= d_t1_rdys[j];
+                    entries[i].t2_rdy   <= d_t2_rdys[j];
                 end else if (issued_vec[i]) begin
                     entries[i]          <= '0;
                 end
