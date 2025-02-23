@@ -62,15 +62,15 @@ module FIFO #(
   assign old_head = exception ? old_head : head;
 
   always_comb begin
-    next_ex   = err || (old_head != head);
+    next_ex = err || (old_head != head);
 
-    rd_valid  = exception ? 1 : (rd_en && !empty);
-    next_head = exception ? head - 1 : (next_ex ? tail : (rd_valid ? (head + 1) % DEPTH : head));
+    rd_valid = next_ex ? !empty : (rd_en && !empty);
+    next_head = next_ex && (old_head!=head) ? head - 1 : (next_ex ? tail : (rd_valid ? (head + 1) % DEPTH : head));
 
-    wr_valid  = wr_en && (!full || rd_valid);
-    next_tail = exception ? tail - 1 : (wr_valid ? (tail + 1) % DEPTH : tail);
+    wr_valid = next_ex ? 1'b0 : wr_en && (!full || rd_valid);
+    next_tail = next_ex && (old_head!=head)? tail - 1 : (wr_valid ? (tail + 1) % DEPTH : tail);
 
-    next_cnt  = cnt + wr_valid - rd_valid;
+    next_cnt = cnt + wr_valid - rd_valid;
   end
 
 
