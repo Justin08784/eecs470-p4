@@ -1,13 +1,37 @@
 // FIFO module testbench
 // This module generates the test vectors
 // Correctness checking is in FIFO_sva.svh
-
 `include "sys_defs.svh"
 `include "FIFO_sva.svh"
 
+`ifndef SYS_DEFS_SVH
+`define SYS_DEFS_SVH
+
+`ifdef SYNTH
+// Rename "FIFO" to "FIFO_svsim" if in synthesis
+// The synthesis script produces this extra module in order to allow parameters
+`define INSTANCE(mod) ``mod``_svsim
+`else
+// If not in synthesis, can just instantiate like normal
+`define INSTANCE(mod) mod
+`endif
+
+`endif // SYS_DEFS_SVH
+
+
+`ifndef WIDTH
+  `define WIDTH 44
+`endif
+
+`ifndef DEPTH
+  `define DEPTH 32
+`endif
+
+
+
 module FIFO_test();
 
-    localparam CNT_BITS = $clog2(WIDTH);
+    localparam CNT_BITS = $clog2(`DEPTH);
 
     logic                clock, reset;
     logic                wr_en;
@@ -28,8 +52,7 @@ module FIFO_test();
     // order to rename the module to FIFO_svsim
     `INSTANCE(FIFO) #(
         .DEPTH(`DEPTH),
-        .WIDTH(`WIDTH),
-        .MAX_CNT(`MAX_CNT))
+        .WIDTH(`WIDTH))
     dut (
         .clock    (clock),
         .reset    (reset),
@@ -46,8 +69,7 @@ module FIFO_test();
 
     bind dut FIFO_sva #(
         .DEPTH(`DEPTH),
-        .WIDTH(`WIDTH),
-        .MAX_CNT(`MAX_CNT)
+        .WIDTH(`WIDTH)
     ) DUT_sva (.*);
 
     always begin
