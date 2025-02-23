@@ -116,18 +116,39 @@ module rs (
     input   PHYS_REG_IDX    [`N-1:0] c_ts
 
 );
-    RS_ENTRY [`RS_SZ-1:0] entries, entries;
+    RS_ENTRY [`RS_SZ-1:0] entries, entries_n;
 
     logic [`RS_SZ-1:0] busy_vec;
     logic [`RS_SZ-1:0] issd_vec;
+    logic [`RS_SZ-1:0] t1_rdy_vec;
+    logic [`RS_SZ-1:0] t2_rdy_vec;
     generate
     for (genvar i = 0; i < `RS_SZ; i++) begin : gen_vecs
         assign busy_vec[i] = entries[i].busy;
         assign issd_vec[i] = entries[i].issued;
+        assign t1_rdy_vec[i] = entries[i].dat.t1_rdy;
+        assign t2_rdy_vec[i] = entries[i].dat.t2_rdy;
     end
     endgenerate
 
+    logic [`RS_SZ-1:0] to_t1_rdy;
+    logic [`RS_SZ-1:0] to_t2_rdy;
+    always_comb begin
+        to_t1_rdy = t1_rdy_vec;
+        to_t2_rdy = t2_rdy_vec;
+        for (int i = 0; i < `RS_SZ; ++i) begin
+            for (int j = 0; j < `N; ++j) begin
+                if (!c_en[j])
+                    continue;
+                to_t1_rdy[i] |= entries[i].dat.t1 == c_ts[j];
+                to_t2_rdy[i] |= entries[i].dat.t2 == c_ts[j];
+            end
+        end
+    end
+
+
     logic [`RS_SZ-1:0] to_issue;
+    logic can_issue;
     always_comb begin
         logic [$clog2(`N):0][`FU_IDX_NUM-1:0] fu_cnts = fu_cnt;
         s_vld = '0;
@@ -139,10 +160,12 @@ module rs (
                 break;
 
             // not ready to issue
-            if (!busy_vec[i]
-                || fu_cnts[entries[i].dat.fu_idx] == 0
-                || !entries[i].dat.t1_rdy
-                || !entries[i].dat.t2_rdy)
+            can_issue = busy_vec[i]
+                && fu_cnts[entries[i].dat.fu_idx] > 0
+                && (entries[i].dat.t1_rdy || to_t1_rdy[i])
+                && (entries[i].dat.t2_rdy || to_t2_rdy[i]);
+
+            if (!can_issue)
                 continue;
 
             to_issue[i] = 1;
@@ -182,25 +205,40 @@ module rs (
     always_comb begin
         d_gnt_bus = '0;
         for (int i = 0; i < `N; ++i) begin
-            if (d_vld[i])
-                d_gnt_bus[i] |= free_gnt_bus[i];
+            if (!d_vld[i])
+                continue;
+            d_gnt_bus[i] |= free_gnt_bus[i];
         end
     end
 
+
+    always_comb begin
+        entries_n = entries;
+        for (int i = 0; i < `RS_SZ; ++i) begin
+            entries_n[i].dat.t1_rdy |= to_t1_rdy[i];
+            entries_n[i].dat.t2_rdy |= to_t2_rdy[i];
+
+            if (to_issue[i]) begin
+                entries_n[i].issued = 1;
+                continue;
+            end
+
+            for (int j = 0; j < `N; ++j) begin
+                if (!d_gnt_bus[i][j])
+                    continue;
+                entries_n[i].busy   = 1;
+                entries_n[i].issued = 0;
+                entries_n[i].dat    = d_dat[j];
+                break;
+            end
+        end
+    end
 
     always_ff @(posedge clock) begin
         if (reset || flush) begin
             entries <= '0;
         end else begin
-            foreach (d_gnt_bus[i, j]) begin
-                if (d_gnt_bus[i][j]) begin
-                    entries[i].busy     <= 1;
-                    entries[i].issued   <= 0;
-                    entries[i].dat      <= d_dat[j];
-                end else if (issd_vec[i]) begin
-                    entries[i]          <= '0;
-                end
-            end
+            entries <= entries_n;
         end
     end
 
