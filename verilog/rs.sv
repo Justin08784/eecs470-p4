@@ -14,6 +14,15 @@ typedef struct packed {
     logic           t2_rdy;
 } RS_ENTRY;
 
+// functional unit availability
+// saturating counters that cap at N
+typedef struct packed {
+    logic [$clog2(`N):0] alu_cnt;
+    logic [$clog2(`N):0] mult_cnt;
+    logic [$clog2(`N):0] load_cnt;
+    logic [$clog2(`N):0] store_cnt;
+} FU_AVAIL;
+
 /*
 NEED CLARIFICATION:
 - Is it preferrable to have a gnt_cnt (count) instead of gnt (bus) if we force
@@ -22,7 +31,7 @@ was 2, that would mean request 0 and 1 were granted). Should we expect requests
 to come in with holes (e.g. [1,0,1,0,...])?
 - Should we hoist the req, gnt logic out into a backpressure slice as discussed
 in the midterm system verilog question?
-- Is there any circular dep./ordering issues in d_req going in, d_gnt going out,
+- Is there any circular dep./ordering issues in d_vld going in, d_gnt going out,
 s_req going out, s_gnt going in etc...?
 */
 
@@ -38,25 +47,33 @@ module rs (
     (cuz you need to check struct hazards in ROB as well)
     */
 
-    output  logic           [$clog2(`N)-1:0] rs_free_cnt;
-    input   logic           [`N-1:0] d_req,  // which dispatches are being requested?
-    input   [31:0]          [`N-1:0] d_inst, // debugging
+    /*
+    rs_free_cnt saturates at N (Why? A: even if we have more free RS entries 
+    than N, we can only dispatch at most N each cycle anyways).
+
+    e.g. N = 2
+    logic [1:0] rs_free_cnt;
+    b00 +> b01 +> b10 (cannot increment further)
+    0      1      2 
+    */
+    output  logic           [$clog2(`N):0] rs_free_cnt,
+    input   logic           [`N-1:0] d_vld,     // which dispatch lines are valid? (from dispatcher; dep. on rs_free_cnt)
+    input   [31:0]          [`N-1:0] d_inst,    // debugging
     input   [6:0]           [`N-1:0] d_op,
     input   PHYS_REG_IDX    [`N-1:0] d_ts,
     input   PHYS_REG_IDX    [`N-1:0] d_t1s,
     input   PHYS_REG_IDX    [`N-1:0] d_t2s,
     input   PHYS_REG_IDX    [`N-1:0] d_t1_rdys,
     input   PHYS_REG_IDX    [`N-1:0] d_t2_rdys,
-    output  logic           [`N-1:0] d_gnt,  // which dispatches we accept?
 
     // issue
-    output  logic           [`RS_SZ-1:0] s_req,  // which issues do we request?
-    output  [31:0]          [`RS_SZ-1:0] s_inst, // debugging
-    output  [6:0]           [`RS_SZ-1:0] s_op,
-    output  PHYS_REG_IDX    [`RS_SZ-1:0] s_ts,
-    output  PHYS_REG_IDX    [`RS_SZ-1:0] s_t1s,
-    output  PHYS_REG_IDX    [`RS_SZ-1:0] s_t2s,
-    input   [`RS_SZ-1:0]    [`N-1:0] s_gnt,      // which issues are accepted?
+    input   FU_AVAIL                 fu_avail,  // from EX stage
+    output  logic           [`N-1:0] s_vld,     // which issue lines are valid? (dep. on fu_avail)
+    output  [31:0]          [`N-1:0] s_inst,    // debugging
+    output  [6:0]           [`N-1:0] s_op,
+    output  PHYS_REG_IDX    [`N-1:0] s_ts,
+    output  PHYS_REG_IDX    [`N-1:0] s_t1s,
+    output  PHYS_REG_IDX    [`N-1:0] s_t2s,
 
     // complete (CDB)
     /*
@@ -94,15 +111,15 @@ module rs (
         | issued_vec; // an issued insn will go to EX and free its entry
 
 
-    logic [`RS_SZ-1:0][`N-1:0]  entries_gnt_bus;
-    logic [`RS_SZ-1:0]          entries_gnt;
+    logic [`RS_SZ-1:0][`N-1:0]  free_gnt_bus;
+    logic [`RS_SZ-1:0]          free_gnt;
     psel_gen #(
         .WIDTH(`RS_SZ),
         .REQS(`N)
     ) entries_psel (
         .req    (free_entries),
-        .gnt    (entries_gnt),
-        .gnt_bus(entries_gnt_bus)
+        .gnt    (free_gnt),
+        .gnt_bus(free_gnt_bus)
         // .empty()
     );
 
@@ -117,10 +134,8 @@ module rs (
     always_comb begin
         d_gnt_bus = '0;
         for (int i = 0; i < `N; ++i) begin
-            if (d_req[i]) begin
-                d_gnt[i]        = (entries_gnt_bus[i] != 0); 
-                d_gnt_bus[i]    |= entries_gnt_bus[i];
-            end
+            if (d_vld[i])
+                d_gnt_bus[i] |= free_gnt_bus[i];
         end
     end
 
