@@ -49,14 +49,6 @@ typedef struct packed {
     ID_RESULT       dat;
 } RS_ENTRY;
 
-// functional unit availability
-// saturating counters that cap at N
-typedef struct packed {
-    logic [$clog2(`N):0] alu_cnt;
-    logic [$clog2(`N):0] mult_cnt;
-    logic [$clog2(`N):0] load_cnt;
-    logic [$clog2(`N):0] stor_cnt;
-} fu_cnt;
 
 /*
 NEED CLARIFICATION:
@@ -83,16 +75,16 @@ module rs (
     */
 
     /*
-    rs_cnt saturates at N (Why? A: even if we have more free RS entries 
+    rs_scnt saturates at N (Why? A: even if we have more free RS entries 
     than N, we can only dispatch at most N each cycle anyways).
 
     e.g. N = 2
-    logic [1:0] rs_cnt;
+    logic [1:0] rs_scnt;
     b00 +> b01 +> b10 (cannot increment further)
     0      1      2 
     */
-    output  logic           [$clog2(`N):0] rs_cnt, // to dispatcher
-    input   logic           [`N-1:0] d_vld,     // which dispatch lines are valid? (from dispatcher; dep. on rs_cnt)
+    output  logic           [$clog2(`N):0] rs_scnt, // to dispatcher
+    input   logic           [`N-1:0] d_vld,     // which dispatch lines are valid? (from dispatcher; dep. on rs_scnt)
     input   ID_RESULT       [`N-1:0] d_dat,
     /* CONCERN 1:
     What data do we actually need to store in the RS so that it can immediately
@@ -101,8 +93,8 @@ module rs (
     */
 
     // issue
-    input   logic           [$clog2(`N):0][`FU_IDX_NUM-1:0] fu_cnt,
-    output  logic           [`N-1:0] s_vld,     // which issue lines are valid? (dep. on fu_cnt)
+    input   logic           [$clog2(`N):0][`FU_IDX_NUM-1:0] fu_scnt, // functional unit availability; saturating counters that cap at N
+    output  logic           [`N-1:0] s_vld,     // which issue lines are valid? (dep. on fu_scnt)
     output  ID_RESULT       [`N-1:0] s_dat,
     /* Ditto CONCERN 1 */
 
@@ -116,7 +108,8 @@ module rs (
     input   PHYS_REG_IDX    [`N-1:0] c_ts
 
 );
-    RS_ENTRY [`RS_SZ-1:0] entries, entries_n;
+    RS_ENTRY [`RS_SZ-1:0]       entries, entries_n;
+    logic    [$clog2(`RS_SZ):0] rs_cnt;
 
     logic [`RS_SZ-1:0] busy_vec;
     logic [`RS_SZ-1:0] issd_vec;
@@ -131,6 +124,7 @@ module rs (
     end
     endgenerate
 
+    // cdb completion
     logic [`RS_SZ-1:0] to_t1_rdy;
     logic [`RS_SZ-1:0] to_t2_rdy;
     always_comb begin
@@ -146,11 +140,11 @@ module rs (
         end
     end
 
-
+    // issue
     logic [`RS_SZ-1:0] to_issue;
     logic can_issue;
     always_comb begin
-        logic [$clog2(`N):0][`FU_IDX_NUM-1:0] fu_cnts = fu_cnt;
+        logic [$clog2(`N):0][`FU_IDX_NUM-1:0] fu_scnts = fu_scnt;
         s_vld = '0;
         to_issue = '0;
 
@@ -161,7 +155,7 @@ module rs (
 
             // not ready to issue
             can_issue = busy_vec[i]
-                && fu_cnts[entries[i].dat.fu_idx] > 0
+                && fu_scnts[entries[i].dat.fu_idx] > 0
                 && (entries[i].dat.t1_rdy || to_t1_rdy[i])
                 && (entries[i].dat.t2_rdy || to_t2_rdy[i]);
 
@@ -171,15 +165,18 @@ module rs (
             to_issue[i] = 1;
             s_vld[cnt]  = 1;
             s_dat[cnt]  = entries[i].dat;
-            --fu_cnts[entries[i].dat.fu_idx];
+            --fu_scnts[entries[i].dat.fu_idx];
             ++cnt;
         end
     end
 
+    // compute free entries
     logic [`RS_SZ-1:0] free_entries;
     assign free_entries = 
         ~busy_vec
         | issd_vec; // an issued insn will go to EX and free its entry
+    assign rs_cnt = $countones(free_entries);
+    assign rs_scnt = rs_cnt > `N ? `N : rs_cnt;
 
 
     logic [`RS_SZ-1:0][`N-1:0]  free_gnt_bus;
