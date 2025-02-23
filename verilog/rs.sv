@@ -108,6 +108,11 @@ module rs (
     input   PHYS_REG_IDX    [`N-1:0] c_ts
 
 );
+    /*
+    BUG:
+    I ASSUMED DIMENSIONS ARE ORDERED RIGHT TO LEFT. THIS IS WRONG!!!!
+    NEED CORRECTIONS.
+    */
     RS_ENTRY [`RS_SZ-1:0]       entries, entries_n;
     logic    [$clog2(`RS_SZ):0] rs_cnt;
 
@@ -143,35 +148,91 @@ module rs (
         end
     end
 
-    // issue
-    logic [`RS_SZ-1:0] to_issue;
-    logic can_issue;
+    // Issue V2: somewhat more parallelized
+    // operand readiness
+    logic [`RS_SZ-1:0] can_issue;                   
+    // operand readiness per FU type
+    logic [`FU_IDX_NUM-1:0][`RS_SZ-1:0] can_issues;
     always_comb begin
-        logic [$clog2(`N):0][`FU_IDX_NUM-1:0] fu_scnts = fu_scnt;
-        s_vld = '0;
-        to_issue = '0;
-
-        for (int i = 0, int cnt = 0; i < `RS_SZ; ++i) begin
-            // issued up to width
-            if (cnt >= `N)
-                break;
-
-            // not ready to issue
-            can_issue = busy_vec[i]
-                && fu_scnts[entries[i].dat.fu_idx] > 0
+        can_issues = '0;
+        for (int i = 0; i < `RS_SZ; ++i) begin
+            can_issue[i] = busy_vec[i]
+                && !entries[i].issued
                 && (entries[i].dat.t1_rdy || to_t1_rdy[i])
                 && (entries[i].dat.t2_rdy || to_t2_rdy[i]);
 
-            if (!can_issue)
-                continue;
-
-            to_issue[i] = 1;
-            s_vld[cnt]  = 1;
-            s_dat[cnt]  = entries[i].dat;
-            --fu_scnts[entries[i].dat.fu_idx];
-            ++cnt;
+            can_issues[entries[i].dat.fu_idx][i] = can_issue[i];
         end
     end
+
+    // select at most N issue lines per FU type
+    logic [`FU_IDX_NUM-1:0][`N-1:0][`RS_SZ-1:0] sel_issues_gnt_bus;
+    generate
+        for (genvar fu = 0; fu < `FU_IDX_NUM; ++fu) begin : gen_sel_issues
+            psel_gen #(
+                .WIDTH(`RS_SZ),
+                .REQS(`N)
+            ) psel_inst (
+                .req    (can_issues[fu]),
+                // .gnt    (),
+                .gnt_bus(sel_issues_gnt_bus[fu])
+            );
+        end
+    endgenerate
+
+    // how many (≤N) issue lines can be gnt'd per FU type
+    logic [`FU_IDX_NUM-1:0][`N-1:0] fu_can_rcv;
+    always_comb begin
+        fu_can_rcv = '0;
+        for (int fu = 0; fu < `FU_IDX_NUM; ++fu) begin
+            for (int i = 0; i < `N; ++i) begin
+                fu_can_rcv[fu][i] = i < fu_scnt[fu];
+            end
+        end
+    end
+
+    logic [`RS_SZ-1:0] to_issue_cands;
+    always_comb begin
+        to_issue_cands = '0;
+        for (int fu = 0; fu < `FU_IDX_NUM; ++fu) begin
+            for (int i = 0; i < `N; ++i) begin
+                to_issue_cands |= fu_can_rcv[fu][i] ? sel_issues_gnt_bus[fu][i] : '0;
+            end
+        end
+    end
+
+    logic [`RS_SZ-1:0] to_issue;
+    psel_gen #(
+        .WIDTH(`RS_SZ),
+        .REQS(`N)
+    ) sel_to_issue (
+        .req    (to_issue_cands),
+        .gnt    (to_issue)
+        // .gnt_bus(sel_issues_gnt_bus[fu])
+    );
+
+    // Issue V1: strictly serial
+    // always_comb begin
+    //     logic [$clog2(`N):0][`FU_IDX_NUM-1:0] fu_scnts = fu_scnt;
+    //     s_vld = '0;
+    //     to_issue = '0;
+
+    //     for (int i = 0, int cnt = 0; i < `RS_SZ; ++i) begin
+    //         // issued up to width
+    //         if (cnt >= `N)
+    //             break;
+
+    //         // not ready to issue
+    //         if (!(can_issue[i] && fu_scnts[entries[i].dat.fu_idx] > 0))
+    //             continue;
+
+    //         to_issue[i] = 1;
+    //         s_vld[cnt]  = 1;
+    //         s_dat[cnt]  = entries[i].dat;
+    //         --fu_scnts[entries[i].dat.fu_idx];
+    //         ++cnt;
+    //     end
+    // end
 
     // compute free entries
     logic [`RS_SZ-1:0] free_entries;
