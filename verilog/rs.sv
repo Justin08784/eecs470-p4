@@ -116,7 +116,7 @@ module rs (
     input   PHYS_REG_IDX    [`N-1:0] c_ts
 
 );
-    RS_ENTRY [`RS_SZ-1:0] entries;
+    RS_ENTRY [`RS_SZ-1:0] entries, entries;
 
     logic [`RS_SZ-1:0] busy_vec;
     logic [`RS_SZ-1:0] issd_vec;
@@ -135,11 +135,12 @@ module rs (
 
         for (int i = 0, int cnt = 0; i < `RS_SZ; ++i) begin
             // issued up to width
-            if (cnt > `N)
+            if (cnt >= `N)
                 break;
 
             // not ready to issue
-            if (fu_cnts[entries[i].dat.fu_idx] == 0
+            if (!busy_vec[i]
+                || fu_cnts[entries[i].dat.fu_idx] == 0
                 || !entries[i].dat.t1_rdy
                 || !entries[i].dat.t2_rdy)
                 continue;
@@ -147,7 +148,7 @@ module rs (
             to_issue[i] = 1;
             s_vld[cnt]  = 1;
             s_dat[cnt]  = entries[i].dat;
-            ++fu_cnts[entries[i].dat.fu_idx];
+            --fu_cnts[entries[i].dat.fu_idx];
             ++cnt;
         end
     end
