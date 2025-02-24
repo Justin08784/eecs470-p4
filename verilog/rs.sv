@@ -86,25 +86,34 @@ module rs #(parameter N=`N, RS_SZ=`RS_SZ, FU_IDX_NUM=`FU_IDX_NUM) (
     endgenerate
 
     // cdb completion
+    /* Potential optimization:
+    Keep a "scoreboard" of physical register ready statuses i.e.
+    logic [PHYS_REG_IDX-1:0] preg_rdy;
+    ...then have each RS entry index their source tags in this preg_rdy table
+    every cycle to check for readiness. (But isn't this just the map
+    table / architectural map? confused...)
+    */
     logic [RS_SZ-1:0] to_t1_rdy;
     logic [RS_SZ-1:0] to_t2_rdy;
     always_comb begin
         to_t1_rdy = '0;
         to_t2_rdy = '0;
         for (int rs = 0; rs < RS_SZ; ++rs) begin
-            logic [N-1:0] match_t1;
-            logic [N-1:0] match_t2;
-            assign match_t1 = '0;
-            assign match_t2 = '0;
+            logic match_t1;
+            logic match_t2;
+            match_t1 = t1_rdy_vec[rs];
+            match_t2 = t2_rdy_vec[rs];
 
+            // match any tag in CDB?
             for (int n = 0; n < N; ++n) begin
-                // match any tag in CDB?
-                match_t1[n] = (c_en[n] && entries[rs].dat.t1 == c_ts[n]);
-                match_t2[n] = (c_en[n] && entries[rs].dat.t2 == c_ts[n]);
+                if (c_en[n]) begin
+                    match_t1 |= entries[rs].dat.t1 == c_ts[n];
+                    match_t2 |= entries[rs].dat.t2 == c_ts[n];
+                end
             end
 
-            to_t1_rdy[rs] = t1_rdy_vec[rs] || |match_t1;
-            to_t2_rdy[rs] = t2_rdy_vec[rs] || |match_t2;
+            to_t1_rdy[rs] = match_t1;
+            to_t2_rdy[rs] = match_t2;
         end
     end
 
