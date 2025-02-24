@@ -32,132 +32,110 @@ endmodule // correct_mult
 
 
 module rs_testbench;
+    // constants
+    localparam int N = 1;
+    localparam int RS_SZ = 4;
+    localparam int FU_IDX_NUM = 2;
 
-    logic clock, start, reset, done, failed;
-    DATA r1, r2, correct_r, mul_r;
-    MULT_FUNC f;
+    // signals
+    logic clock;
+    logic reset;
+    logic flush;
+    RS_ENTRY [RS_SZ-1:0] entries_dbg;
 
+    logic           [$clog2(N):0] rs_scnt; // to dispatcher
+    logic           [N-1:0] d_vld;     // which dispatch lines are valid? (from dispatcher; dep. on rs_scnt)
+    ID_RESULT       [N-1:0] d_dat;
+    // issue
+    logic           [FU_IDX_NUM-1:0][$clog2(N):0] fu_scnt; // functional unit availability; saturating counters that cap at N
+    logic           [N-1:0] s_vld;     // which issue lines are valid? (dep. on fu_scnt)
+    ID_RESULT       [N-1:0] s_dat;
+    // complete (CDB)
+    logic           [N-1:0] c_en;
+    PHYS_REG_IDX    [N-1:0] c_t;
+
+    logic failed;
+    // DATA r1, r2, correct_r, mul_r;
     string fmt;
 
-    // rs rs_dut(
-    //     .clock(clock),
-    //     .reset(reset),
-    //     .flush(1'b0),
-
-    //     .rs_scnt(),
-    //     .d_vld(),
-    //     .d_dat(),
-
-    //     .fu_scnt(),
-    //     .s_vld(),
-    //     .s_dat(),
-
-    //     .c_en(),
-    //     .c_ts(),
-    // );
-
-    mult dut(
+    rs # (
+        .N(N),
+        .RS_SZ(RS_SZ),
+        .FU_IDX_NUM(FU_IDX_NUM)
+    ) rs_dut(
         .clock(clock),
         .reset(reset),
-        .start(start),
-        .rs1(r1),
-        .rs2(r2),
-        .func(f),
-        .result(mul_r),
-        .done(done)
+        .flush(1'b0),
+        .entries_dbg(entries_dbg),
+
+        .rs_scnt(rs_scnt),
+        .d_vld(d_vld),
+        .d_dat(d_dat),
+
+        .fu_scnt(fu_scnt),
+        .s_vld(s_vld),
+        .s_dat(s_dat),
+
+        .c_en(c_en),
+        .c_ts(c_t)
     );
 
-    correct_mult not_dut(
-        .rs1(r1),
-        .rs2(r2),
-        .func(f),
-        .result(correct_r)
+    task dispatch(
+        input int i,
+        input ID_RESULT inst
     );
+        begin
+            // Set up a valid dispatch line; adjust as needed.
+            d_vld[i] = 1;
+            d_dat[i] = '1;
+        end
+    endtask
 
+    task print_entries();
+        for (int i = 0; i < RS_SZ; ++i) begin
+            $display("Entry [%0d]: busy=%b, issued=%b, t=%0d, t1=%0d, t2=%0d, t1_rdy=%b, t2_rdy=%b, fu_idx=%0d",
+                i, 
+                entries_dbg[i].busy, 
+                entries_dbg[i].issued, 
+                entries_dbg[i].dat.t, 
+                entries_dbg[i].dat.t1, 
+                entries_dbg[i].dat.t2, 
+                entries_dbg[i].dat.t1_rdy, 
+                entries_dbg[i].dat.t2_rdy, 
+                entries_dbg[i].dat.fu_idx
+                // entries_dbg[i].dat.PC, 
+                // entries_dbg[i].dat.NPC, 
+                // entries_dbg[i].dat.alu_func, 
+                // entries_dbg[i].dat.mult, 
+                // entries_dbg[i].dat.rd_mem, 
+                // entries_dbg[i].dat.wr_mem, 
+                // entries_dbg[i].dat.cond_branch, 
+                // entries_dbg[i].dat.uncond_branch, 
+                // entries_dbg[i].dat.halt, 
+                // entries_dbg[i].dat.illegal, 
+                // entries_dbg[i].dat.csr_op
+            );
+        end
+    endtask
 
     always begin
         #(`CLOCK_PERIOD/2.0);
         clock = ~clock;
     end
 
-
-    task wait_until_done;
-        forever begin : wait_loop
-            @(posedge done);
-            @(negedge clock);
-            if (done) begin
-                disable wait_until_done;
-            end
-        end
-    endtask
-
-
-    task test;
-        input MULT_FUNC func;
-        input DATA reg_1, reg_2;
-        begin
-            @(negedge clock);
-            start = 1;
-            r1 = reg_1;
-            r2 = reg_2;
-            f = func;
-            @(negedge clock);
-            start = 0;
-            wait_until_done();
-            $display(fmt, f.name(), r1, r2, correct_r, mul_r);
-            if (correct_r != mul_r) begin
-                $display("NOT EQUAL");
-                failed = 1;
-            end
-            @(negedge clock);
-        end
-    endtask
-
-
     initial begin
         clock = 0;
         reset = 1;
         failed = 0;
+
         @(negedge clock);
         @(negedge clock);
         reset = 0;
         @(negedge clock);
 
-        fmt = "%-8s | %3d * %3d = correct: %3d | mul: %3d";
-        $display("");
-        test(M_MUL, 0, 0);
-        test(M_MUL, 1, 0);
-        test(M_MUL, 0, 1);
-        test(M_MUL, 3, 4);
-        test(M_MUL, 2, 15);
-        test(M_MUL, 15, 2);
-        test(M_MUL, 30, 30);
-
-        fmt = "%-8s | %h * %h = correct: %h | mul: %h";
-        $display("");
-        test(M_MUL,    32'hff12_3456, 32'hfffff888);
-        test(M_MULH,   32'hff12_3456, 32'hfffff888);
-        test(M_MULHU,  32'hff12_3456, 32'hfffff888);
-        test(M_MULHSU, 32'hff12_3456, 32'hfffff888);
-
-        fmt = "%-8s | %d * %d = correct: %d | mul: %d";
-        $display("");
-        test(M_MUL,    32'h3 << 30, 4);
-        test(M_MULH,   32'h3 << 30, 4);
-        test(M_MULHU,  32'h3 << 30, 4);
-        test(M_MULHSU, 32'h3 << 30, 4);
-        test(M_MUL,    4, 32'h3 << 30);
-        test(M_MULH,   4, 32'h3 << 30);
-        test(M_MULHU,  4, 32'h3 << 30);
-        test(M_MULHSU, 4, 32'h3 << 30);
-
-        fmt = "%-8s | %d * %d = correct: %d | mul: %d";
-        $display(""); repeat (10) test(M_MUL,    $random, $random);
-        $display(""); repeat (10) test(M_MULH,   $random, $random);
-        $display(""); repeat (10) test(M_MULHU,  $random, $random);
-        $display(""); repeat (10) test(M_MULHSU, $random, $random);
-
-        $display("");
+        dispatch(0, '0);
+        @(negedge clock);
+        print_entries();
 
         if (failed)
             $display("@@@ Failed\n");
