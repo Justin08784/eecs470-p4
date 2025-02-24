@@ -62,7 +62,7 @@ in the midterm system verilog question?
 s_req going out, s_gnt going in etc...?
 */
 
-module rs (
+module rs #(parameter N=`N, RS_SZ=`RS_SZ, FU_IDX_NUM=`FU_IDX_NUM) (
     input clock,
     input reset,
     input flush,
@@ -83,9 +83,9 @@ module rs (
     b00 +> b01 +> b10 (cannot increment further)
     0      1      2 
     */
-    output  logic           [$clog2(`N):0] rs_scnt, // to dispatcher
-    input   logic           [`N-1:0] d_vld,     // which dispatch lines are valid? (from dispatcher; dep. on rs_scnt)
-    input   ID_RESULT       [`N-1:0] d_dat,
+    output  logic           [$clog2(N):0] rs_scnt, // to dispatcher
+    input   logic           [N-1:0] d_vld,     // which dispatch lines are valid? (from dispatcher; dep. on rs_scnt)
+    input   ID_RESULT       [N-1:0] d_dat,
     /* CONCERN 1:
     What data do we actually need to store in the RS so that it can immediately
     execute after issue to an FU? Like I'm looking at the fields of ID_EX_PACKET
@@ -93,9 +93,9 @@ module rs (
     */
 
     // issue
-    input   logic           [`FU_IDX_NUM-1:0][$clog2(`N):0] fu_scnt, // functional unit availability; saturating counters that cap at N
-    output  logic           [`N-1:0] s_vld,     // which issue lines are valid? (dep. on fu_scnt)
-    output  ID_RESULT       [`N-1:0] s_dat,
+    input   logic           [FU_IDX_NUM-1:0][$clog2(N):0] fu_scnt, // functional unit availability; saturating counters that cap at N
+    output  logic           [N-1:0] s_vld,     // which issue lines are valid? (dep. on fu_scnt)
+    output  ID_RESULT       [N-1:0] s_dat,
     /* Ditto CONCERN 1 */
 
     // complete (CDB)
@@ -104,8 +104,8 @@ module rs (
     implement backpressure from the CDB (one of tips in slides apparently?)
     (make a rdy-vld handshake between FUs and reservation stations)
     */
-    input   logic           [`N-1:0] c_en,
-    input   PHYS_REG_IDX    [`N-1:0] c_ts
+    input   logic           [N-1:0] c_en,
+    input   PHYS_REG_IDX    [N-1:0] c_ts
 
 );
     /*
@@ -113,14 +113,14 @@ module rs (
     I ASSUMED DIMENSIONS ARE ORDERED RIGHT TO LEFT. THIS IS WRONG!!!!
     NEED CORRECTIONS.
     */
-    RS_ENTRY [`RS_SZ-1:0]       entries, entries_n;
+    RS_ENTRY [RS_SZ-1:0]       entries, entries_n;
 
-    logic [`RS_SZ-1:0] busy_vec;
-    logic [`RS_SZ-1:0] issd_vec;
-    logic [`RS_SZ-1:0] t1_rdy_vec;
-    logic [`RS_SZ-1:0] t2_rdy_vec;
+    logic [RS_SZ-1:0] busy_vec;
+    logic [RS_SZ-1:0] issd_vec;
+    logic [RS_SZ-1:0] t1_rdy_vec;
+    logic [RS_SZ-1:0] t2_rdy_vec;
     generate
-    for (genvar i = 0; i < `RS_SZ; i++) begin : gen_vecs
+    for (genvar i = 0; i < RS_SZ; i++) begin : gen_vecs
         assign busy_vec[i] = entries[i].busy;
         assign issd_vec[i] = entries[i].issued;
         assign t1_rdy_vec[i] = entries[i].dat.t1_rdy;
@@ -129,14 +129,14 @@ module rs (
     endgenerate
 
     // cdb completion
-    logic [`RS_SZ-1:0] to_t1_rdy;
-    logic [`RS_SZ-1:0] to_t2_rdy;
+    logic [RS_SZ-1:0] to_t1_rdy;
+    logic [RS_SZ-1:0] to_t2_rdy;
     always_comb begin
-        for (int i = 0; i < `RS_SZ; ++i) begin
-            logic [`N-1:0] match_t1;
-            logic [`N-1:0] match_t2;
+        for (int i = 0; i < RS_SZ; ++i) begin
+            logic [N-1:0] match_t1;
+            logic [N-1:0] match_t2;
 
-            for (int j = 0; j < `N; ++j) begin
+            for (int j = 0; j < N; ++j) begin
                 // match any tag in CDB?
                 match_t1[j] |= (c_en[j] && entries[i].dat.t1 == c_ts[j]);
                 match_t1[j] |= (c_en[j] && entries[i].dat.t2 == c_ts[j]);
@@ -149,12 +149,12 @@ module rs (
 
     // Issue V2: somewhat more parallelized
     // operand readiness
-    logic [`RS_SZ-1:0] can_issue;                   
+    logic [RS_SZ-1:0] can_issue;                   
     // operand readiness per FU type
-    logic [`FU_IDX_NUM-1:0][`RS_SZ-1:0] can_issues;
+    logic [FU_IDX_NUM-1:0][RS_SZ-1:0] can_issues;
     always_comb begin
         can_issues = '0;
-        for (int i = 0; i < `RS_SZ; ++i) begin
+        for (int i = 0; i < RS_SZ; ++i) begin
             can_issue[i] = busy_vec[i]
                 && !entries[i].issued
                 && (entries[i].dat.t1_rdy || to_t1_rdy[i])
@@ -165,12 +165,12 @@ module rs (
     end
 
     // select at most N issue lines per FU type
-    logic [`FU_IDX_NUM-1:0][`N-1:0][`RS_SZ-1:0] sel_issues_gnt_bus;
+    logic [FU_IDX_NUM-1:0][N-1:0][RS_SZ-1:0] sel_issues_gnt_bus;
     generate
-        for (genvar fu = 0; fu < `FU_IDX_NUM; ++fu) begin : gen_sel_issues
+        for (genvar fu = 0; fu < FU_IDX_NUM; ++fu) begin : gen_sel_issues
             psel_gen #(
-                .WIDTH(`RS_SZ),
-                .REQS(`N)
+                .WIDTH(RS_SZ),
+                .REQS(N)
             ) psel_inst (
                 .req    (can_issues[fu]),
                 // .gnt    (),
@@ -180,30 +180,30 @@ module rs (
     endgenerate
 
     // how many (≤N) issue lines can be gnt'd per FU type
-    logic [`FU_IDX_NUM-1:0][`N-1:0] fu_can_rcv;
+    logic [FU_IDX_NUM-1:0][N-1:0] fu_can_rcv;
     always_comb begin
         fu_can_rcv = '0;
-        for (int fu = 0; fu < `FU_IDX_NUM; ++fu) begin
-            for (int i = 0; i < `N; ++i) begin
+        for (int fu = 0; fu < FU_IDX_NUM; ++fu) begin
+            for (int i = 0; i < N; ++i) begin
                 fu_can_rcv[fu][i] = i < fu_scnt[fu];
             end
         end
     end
 
-    logic [`RS_SZ-1:0] to_issue_cands;
+    logic [RS_SZ-1:0] to_issue_cands;
     always_comb begin
         to_issue_cands = '0;
-        for (int fu = 0; fu < `FU_IDX_NUM; ++fu) begin
-            for (int i = 0; i < `N; ++i) begin
+        for (int fu = 0; fu < FU_IDX_NUM; ++fu) begin
+            for (int i = 0; i < N; ++i) begin
                 to_issue_cands |= fu_can_rcv[fu][i] ? sel_issues_gnt_bus[fu][i] : '0;
             end
         end
     end
 
-    logic [`RS_SZ-1:0] to_issue;
+    logic [RS_SZ-1:0] to_issue;
     psel_gen #(
-        .WIDTH(`RS_SZ),
-        .REQS(`N)
+        .WIDTH(RS_SZ),
+        .REQS(N)
     ) sel_to_issue (
         .req    (to_issue_cands),
         .gnt    (to_issue)
@@ -212,13 +212,13 @@ module rs (
 
     // Issue V1: strictly serial
     // always_comb begin
-    //     logic [$clog2(`N):0][`FU_IDX_NUM-1:0] fu_scnts = fu_scnt;
+    //     logic [$clog2(N):0][FU_IDX_NUM-1:0] fu_scnts = fu_scnt;
     //     s_vld = '0;
     //     to_issue = '0;
 
-    //     for (int i = 0, int cnt = 0; i < `RS_SZ; ++i) begin
+    //     for (int i = 0, int cnt = 0; i < RS_SZ; ++i) begin
     //         // issued up to width
-    //         if (cnt >= `N)
+    //         if (cnt >= N)
     //             break;
 
     //         // not ready to issue
@@ -234,20 +234,20 @@ module rs (
     // end
 
     // compute free entries
-    logic [$clog2(`RS_SZ):0] rs_cnt;
-    logic [`RS_SZ-1:0] free_entries;
+    logic [$clog2(RS_SZ):0] rs_cnt;
+    logic [RS_SZ-1:0] free_entries;
     assign free_entries = 
         ~busy_vec
         | issd_vec; // an issued insn will go to EX and free its entry
     assign rs_cnt = $countones(free_entries);
-    assign rs_scnt = rs_cnt > `N ? `N : rs_cnt;
+    assign rs_scnt = rs_cnt > N ? N : rs_cnt;
 
 
-    logic [`N-1:0][`RS_SZ-1:0]  free_gnt_bus;
-    logic [`RS_SZ-1:0]          free_gnt;
+    logic [N-1:0][RS_SZ-1:0]  free_gnt_bus;
+    logic [RS_SZ-1:0]          free_gnt;
     psel_gen #(
-        .WIDTH(`RS_SZ),
-        .REQS(`N)
+        .WIDTH(RS_SZ),
+        .REQS(N)
     ) entries_psel (
         .req    (free_entries),
         .gnt    (free_gnt),
@@ -262,10 +262,10 @@ module rs (
     be too big of a deal. But possible room for optimization 
     by making it a lowest-index first priority encoder?
     */
-    logic [`N-1:0][`RS_SZ-1:0]  d_gnt_bus;
+    logic [N-1:0][RS_SZ-1:0]  d_gnt_bus;
     always_comb begin
         d_gnt_bus = '0;
-        for (int i = 0; i < `N; ++i) begin
+        for (int i = 0; i < N; ++i) begin
             if (!d_vld[i])
                 continue;
             d_gnt_bus[i] |= free_gnt_bus[i];
@@ -275,7 +275,7 @@ module rs (
 
     always_comb begin
         entries_n = entries;
-        for (int i = 0; i < `RS_SZ; ++i) begin
+        for (int i = 0; i < RS_SZ; ++i) begin
             entries_n[i].dat.t1_rdy |= to_t1_rdy[i];
             entries_n[i].dat.t2_rdy |= to_t2_rdy[i];
 
@@ -284,7 +284,7 @@ module rs (
                 continue;
             end
 
-            for (int j = 0; j < `N; ++j) begin
+            for (int j = 0; j < N; ++j) begin
                 if (!d_gnt_bus[i][j])
                     continue;
                 entries_n[i].busy   = 1;
