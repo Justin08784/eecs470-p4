@@ -236,7 +236,7 @@ module rs #(parameter
     );
 
     // assign FUs to issuables
-    logic [RS_SZ-1:0] to_issue
+    logic [RS_SZ-1:0] to_issue;
     logic [NUM_FU_ALU-1:0]  [RS_SZ-1:0] fu2issuer_alu;
     logic [NUM_FU_MULT-1:0] [RS_SZ-1:0] fu2issuer_mult;
     logic [NUM_FU_LOAD-1:0] [RS_SZ-1:0] fu2issuer_load;
@@ -283,28 +283,6 @@ module rs #(parameter
         end
     end
 
-    // how many (≤N) issue lines can be gnt'd per FU type
-    logic [FU_IDX_NUM-1:0][N-1:0] fu_can_rcv;
-    always_comb begin
-        fu_can_rcv = '0;
-        for (int fu = 0; fu < FU_IDX_NUM; ++fu) begin
-            for (int n = 0; n < N; ++n) begin
-                fu_can_rcv[fu][n] = n < fu_scnt[fu];
-            end
-        end
-    end
-
-    logic [RS_SZ-1:0] to_issue_cands;
-    always_comb begin
-        to_issue_cands = '0;
-        for (int fu = 0; fu < FU_IDX_NUM; ++fu) begin
-            for (int n = 0; n < N; ++n) begin
-                to_issue_cands |= fu_can_rcv[fu][n] ? sel_issues_gnt_bus[fu][n] : '0;
-            end
-        end
-    end
-
-    logic [RS_SZ-1:0] to_issue;
     /*
     TODO: 
     - 1. THERE IS NO ISSUE LIMIT (i.e. you can issue as many FUs as there
@@ -313,31 +291,6 @@ module rs #(parameter
     - 2. Expose the FU array DIRECTLY to the rs module and allow rs to DIRECTLY
     ASSIGN new issues to FUs (dont mess around with fu_scnt crap)
     */
-    logic [N-1:0][RS_SZ-1:0] to_issue_gnt_bus;
-    psel_gen #(
-        .WIDTH(RS_SZ),
-        .REQS(N)
-    ) sel_to_issue (
-        .req    (to_issue_cands),
-        .gnt    (to_issue),
-        .gnt_bus(to_issue_gnt_bus)
-    );
-    always_comb begin
-        s_vld = '0;
-        s_dat = '0;
-        for (int n = 0; n < N; ++n) begin
-            s_vld[n] = |to_issue_gnt_bus[n];
-            for (int rs = 0; rs < RS_SZ; ++rs) begin
-                if (!to_issue_gnt_bus[n][rs])
-                    continue;
-                s_dat[n] |= entries[rs].dat;
-
-                // this break should not be necessary if psel_gen guarantees at most 1 per row
-                // adding it may confuse compiler into making it dependent too...
-                // break;
-            end
-        end
-    end
 
     // Issue V1: strictly serial
     // always_comb begin
@@ -438,10 +391,8 @@ module rs #(parameter
     always_ff @(posedge clock) begin
         if (reset || flush) begin
             entries <= '0;
-            fus_alu <= '0;
         end else begin
             entries <= entries_n;
-            fus_alu <= '0;
         end
     end
 

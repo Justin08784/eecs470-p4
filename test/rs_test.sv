@@ -11,7 +11,11 @@ module rs_testbench;
     // constants
     localparam int N = 2;
     localparam int RS_SZ = 8;
-    localparam int FU_IDX_NUM = 2;
+    localparam int FU_IDX_NUM = 4;
+    localparam int NUM_FU_ALU = 1;
+    localparam int NUM_FU_MULT = 2;
+    localparam int NUM_FU_STORE = 4;
+    localparam int NUM_FU_LOAD = 4;
 
     // signals
     logic clock;
@@ -23,9 +27,19 @@ module rs_testbench;
     logic           [N-1:0] d_vld;     // which dispatch lines are valid? (from dispatcher; dep. on rs_scnt)
     ID_RESULT       [N-1:0] d_dat;
     // issue
-    logic           [FU_IDX_NUM-1:0][$clog2(N):0] fu_scnt; // functional unit availability; saturating counters that cap at N
-    logic           [N-1:0] s_vld;     // which issue lines are valid? (dep. on fu_scnt)
-    ID_RESULT       [N-1:0] s_dat;
+    logic           [NUM_FU_ALU-1:0]    fu_rdy_alu;
+    logic           [NUM_FU_MULT-1:0]   fu_rdy_mult;
+    logic           [NUM_FU_STORE-1:0]  fu_rdy_store;
+    logic           [NUM_FU_LOAD-1:0]   fu_rdy_load;
+
+    logic           [NUM_FU_ALU-1:0]    fu_vld_alu;
+    logic           [NUM_FU_MULT-1:0]   fu_vld_mult;
+    logic           [NUM_FU_STORE-1:0]  fu_vld_store;
+    logic           [NUM_FU_LOAD-1:0]   fu_vld_load;
+    ID_RESULT       [NUM_FU_ALU-1:0]    fu_dat_alu;
+    ID_RESULT       [NUM_FU_MULT-1:0]   fu_dat_mult;
+    ID_RESULT       [NUM_FU_STORE-1:0]  fu_dat_store;
+    ID_RESULT       [NUM_FU_LOAD-1:0]   fu_dat_load;
     // complete (CDB)
     logic           [N-1:0] c_en;
     PHYS_REG_IDX    [N-1:0] c_ts;
@@ -40,7 +54,11 @@ module rs_testbench;
     rs # (
         .N(N),
         .RS_SZ(RS_SZ),
-        .FU_IDX_NUM(FU_IDX_NUM)
+        .FU_IDX_NUM(FU_IDX_NUM),
+        .NUM_FU_ALU(NUM_FU_ALU),
+        .NUM_FU_MULT(NUM_FU_MULT),
+        .NUM_FU_STORE(NUM_FU_STORE),
+        .NUM_FU_LOAD(NUM_FU_LOAD)
     ) rs_dut(
         .clock(clock),
         .reset(reset),
@@ -53,9 +71,21 @@ module rs_testbench;
         .d_vld(d_vld),
         .d_dat(d_dat),
 
-        .fu_scnt(fu_scnt),
-        .s_vld(s_vld),
-        .s_dat(s_dat),
+
+        .fu_rdy_alu(fu_rdy_alu),
+        .fu_rdy_mult(fu_rdy_mult),
+        .fu_rdy_store(fu_rdy_store),
+        .fu_rdy_load(fu_rdy_load),
+
+        .fu_vld_alu(fu_vld_alu),
+        .fu_vld_mult(fu_vld_mult),
+        .fu_vld_store(fu_vld_store),
+        .fu_vld_load(fu_vld_load),
+        .fu_dat_alu(fu_dat_alu),
+        .fu_dat_mult(fu_dat_mult),
+        .fu_dat_store(fu_dat_store),
+        .fu_dat_load(fu_dat_load),
+
 
         .c_en(c_en),
         .c_ts(c_ts)
@@ -102,12 +132,12 @@ module rs_testbench;
         c_ts[i]  = '0;
     endtask
 
-    task set_fu(
-        input int rs,
-        input int scnt
-    );
-        fu_scnt[rs] = scnt;
-    endtask
+    // task set_fu(
+    //     input int rs,
+    //     input int scnt
+    // );
+    //     fu_scnt[rs] = scnt;
+    // endtask
 
     task marker();
         static int i = 0;
@@ -161,7 +191,6 @@ module rs_testbench;
         failed  = 0;
         d_vld   = '0;
         d_dat   = '0;
-        fu_scnt = '0;
         c_en    = '0;
         c_ts    = '0;
 
@@ -175,7 +204,7 @@ module rs_testbench;
         set_dispatch(0, 1, 2, 0, 0, 0);
         set_dispatch(1, 2, 4, 0, 0, 1);
         @(posedge clock);
-        $display("s_vld: %b", s_vld);
+        // $display("s_vld: %b", s_vld);
         @(negedge clock);
         marker();
         print_entries();
@@ -185,7 +214,7 @@ module rs_testbench;
         set_cdb(0, 1);
         set_cdb(1, 2);
         @(posedge clock);
-        $display("s_vld: %b", s_vld);
+        // $display("s_vld: %b", s_vld);
         @(negedge clock);
         marker();
         print_entries();
@@ -193,15 +222,15 @@ module rs_testbench;
         // ask about timing; why does s_vld display need to be after posedge?
         clr_cdb(0);
         clr_cdb(1);
-        set_fu(0, 1);
+        // set_fu(0, 1);
         @(posedge clock);
-        $display("s_vld: %b", s_vld);
+        // $display("s_vld: %b", s_vld);
         @(negedge clock);
         marker();
         print_entries();
 
         @(posedge clock);
-        $display("s_vld: %b", s_vld);
+        // $display("s_vld: %b", s_vld);
         @(negedge clock);
         marker();
         print_entries();
