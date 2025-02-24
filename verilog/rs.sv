@@ -38,6 +38,15 @@ module rs #(parameter N=`N, RS_SZ=`RS_SZ, FU_IDX_NUM=`FU_IDX_NUM) (
     logic [1:0] rs_scnt;
     b00 +> b01 +> b10 (cannot increment further)
     0      1      2 
+
+    Questions: 
+    - 1. Is it better to directly expose the RS to the dispatcher and have it
+    assign directly to the entries array?
+    - 2. In general, maybe we should ferry around buses instead of saturating
+    counts so we can do direct assignment without additional combo logic to
+    decode the counts etc.
+    - 3. Only the CDB has to be width N. I believe EVERYTHING ELSE (including
+    fetch, dispatch, issue, writeback) can do ARBITRARILIY MANY ops.
     */
     output  logic           [$clog2(N):0] rs_scnt, // to dispatcher
     input   logic           [N-1:0] d_vld,     // which dispatch lines are valid? (from dispatcher; dep. on rs_scnt)
