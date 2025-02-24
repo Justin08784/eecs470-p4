@@ -71,7 +71,6 @@ module rs_testbench;
         .d_vld(d_vld),
         .d_dat(d_dat),
 
-
         .fu_rdy_alu(fu_rdy_alu),
         .fu_rdy_mult(fu_rdy_mult),
         .fu_rdy_store(fu_rdy_store),
@@ -85,7 +84,6 @@ module rs_testbench;
         .fu_dat_mult(fu_dat_mult),
         .fu_dat_store(fu_dat_store),
         .fu_dat_load(fu_dat_load),
-
 
         .c_en(c_en),
         .c_ts(c_ts)
@@ -132,12 +130,29 @@ module rs_testbench;
         c_ts[i]  = '0;
     endtask
 
-    // task set_fu(
-    //     input int rs,
-    //     input int scnt
-    // );
-    //     fu_scnt[rs] = scnt;
-    // endtask
+    task set_fu(
+        input FU_IDX fu,
+        input int i
+    );
+        case (fu)
+            FU_ALU:     fu_rdy_alu[i]   = 1;
+            FU_MULT:    fu_rdy_mult[i]  = 1;
+            FU_LOAD:    fu_rdy_load[i]  = 1;
+            FU_STORE:   fu_rdy_store[i] = 1;
+        endcase
+    endtask
+
+    task clr_fu(
+        input FU_IDX fu,
+        input int i
+    );
+        case (fu)
+            FU_ALU:     fu_rdy_alu[i]   = 0;
+            FU_MULT:    fu_rdy_mult[i]  = 0;
+            FU_LOAD:    fu_rdy_load[i]  = 0;
+            FU_STORE:   fu_rdy_store[i] = 0;
+        endcase
+    endtask
 
     task marker();
         static int i = 0;
@@ -232,7 +247,6 @@ module rs_testbench;
         set_cdb(0, 1);
         set_cdb(1, 2);
         @(posedge clock);
-        // $display("s_vld: %b", s_vld);
         @(negedge clock);
         marker();
         print_entries();
@@ -240,16 +254,13 @@ module rs_testbench;
         // ask about timing; why does s_vld display need to be after posedge?
         clr_cdb(0);
         clr_cdb(1);
-        // set_fu(0, 1);
-        fu_rdy_alu[0] = 1;
+        set_fu(FU_ALU, 0);
         @(posedge clock);
-        // $display("s_vld: %b", s_vld);
         @(negedge clock);
         marker();
         print_entries();
 
         @(posedge clock);
-        // $display("s_vld: %b", s_vld);
         @(negedge clock);
         marker();
         print_entries();
