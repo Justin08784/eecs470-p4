@@ -35,10 +35,10 @@
 `define LSQ_SZ xx
 
 // functional units (you should decide if you want more or fewer types of FUs)
-`define NUM_FU_ALU xx
-`define NUM_FU_MULT xx
-`define NUM_FU_LOAD xx
-`define NUM_FU_STORE xx
+`define NUM_FU_ALU 2
+`define NUM_FU_MULT 2
+`define NUM_FU_LOAD 4
+`define NUM_FU_STORE 4
 
 // number of mult stages (2, 4) (you likely don't need 8)
 `define MULT_STAGES 4
@@ -445,5 +445,17 @@ typedef struct packed {
     logic           issued;
     ID_RESULT       dat;
 } RS_ENTRY;
+
+typedef struct packed {
+    logic       busy;
+
+    /*
+    NOTE: This is a generic struct which could hold the execute-necessary data
+    for ANY operation type, but a lot of the fields may go wasted. Might be
+    better to define FU-specific structs to hold only the data necessary for
+    that specific FU group. (Jonah says not to; dont overcomplicate things)
+    */
+    ID_RESULT   dat;
+} FU_ENTRY;
 
 `endif // __SYS_DEFS_SVH__

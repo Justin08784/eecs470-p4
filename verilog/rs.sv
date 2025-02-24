@@ -15,7 +15,15 @@ in the midterm system verilog question?
 s_req going out, s_gnt going in etc...?
 */
 
-module rs #(parameter N=`N, RS_SZ=`RS_SZ, FU_IDX_NUM=`FU_IDX_NUM) (
+module rs #(parameter 
+    N=`N,
+    RS_SZ=`RS_SZ,
+    FU_IDX_NUM=`FU_IDX_NUM,
+    NUM_FU_ALU=`NUM_FU_ALU,
+    NUM_FU_MULT=`NUM_FU_MULT,
+    NUM_FU_LOAD=`NUM_FU_LOAD,
+    NUM_FU_STORE=`NUM_FU_STORE
+) (
     input clock,
     input reset,
     input flush,
@@ -59,6 +67,10 @@ module rs #(parameter N=`N, RS_SZ=`RS_SZ, FU_IDX_NUM=`FU_IDX_NUM) (
 
     // issue
     input   logic           [FU_IDX_NUM-1:0][$clog2(N):0] fu_scnt, // functional unit availability; saturating counters that cap at N
+    input   FU_ENTRY        [NUM_FU_ALU-1:0]    fus_alu,
+    input   FU_ENTRY        [NUM_FU_MULT-1:0]   fus_mult,
+    input   FU_ENTRY        [NUM_FU_STORE-1:0]  fus_store,
+    input   FU_ENTRY        [NUM_FU_LOAD-1:0]   fus_load,
     output  logic           [N-1:0] s_vld,     // which issue lines are valid? (dep. on fu_scnt)
     output  ID_RESULT       [N-1:0] s_dat,
     /* Ditto CONCERN 1 */
