@@ -11,7 +11,7 @@ module rs_testbench;
     // constants
     localparam int N = 2;
     localparam int RS_SZ = 8;
-    localparam int FU_IDX_NUM = 4;
+    localparam int FU_IDX_NUM = `FU_IDX_NUM;
     localparam int NUM_FU_ALU = 1;
     localparam int NUM_FU_MULT = 2;
     localparam int NUM_FU_STORE = 4;
@@ -201,16 +201,16 @@ module rs_testbench;
         // end
 
         /* initialize */
-        clock   = 0;
-        failed  = 0;
-        d_vld   = '0;
-        d_dat   = '0;
+        clock           = 0;
+        failed          = 0;
+        d_vld           = '0;
+        d_dat           = '0;
         fu_rdy_alu      = '0;
         fu_rdy_mult     = '0;
         fu_rdy_store    = '0;
         fu_rdy_load     = '0;
-        c_en    = '0;
-        c_ts    = '0;
+        c_en            = '0;
+        c_ts            = '0;
 
         reset   = 1;
         @(negedge clock);
