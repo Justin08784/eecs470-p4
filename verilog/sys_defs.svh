@@ -398,4 +398,52 @@ typedef struct packed {
 } COMMIT_PACKET;
 
 
+// Reservation station stuff
+typedef enum logic [1:0] {
+    FU_ALU  = 2'b00,
+    FU_MULT = 2'b01,
+    FU_LOAD = 2'b10,
+    FU_STOR = 2'b11
+} FU_IDX;
+`define FU_IDX_NUM 4
+
+typedef struct packed {
+    PHYS_REG_IDX    t;
+    PHYS_REG_IDX    t1;
+    PHYS_REG_IDX    t2;
+    logic           t1_rdy; // ready in ROB?
+    logic           t2_rdy;
+    FU_IDX          fu_idx;
+
+    /* from ID_EX_PACKET */
+    INST inst;
+    ADDR PC;
+    ADDR NPC; // PC + 4
+
+    // DATA rs1_value; // reg A value
+    // DATA rs2_value; // reg B value
+
+    ALU_OPA_SELECT opa_select; // ALU opa mux select (ALU_OPA_xxx *)
+    ALU_OPB_SELECT opb_select; // ALU opb mux select (ALU_OPB_xxx *)
+
+    // REG_IDX  dest_reg_idx;  // destination (writeback) register index
+    ALU_FUNC alu_func;      // ALU function select (ALU_xxx *)
+    logic    mult;          // Is inst a multiply instruction?
+    logic    rd_mem;        // Does inst read memory?
+    logic    wr_mem;        // Does inst write memory?
+    logic    cond_branch;   // Is inst a conditional branch?
+    logic    uncond_branch; // Is inst an unconditional branch?
+    logic    halt;          // Is this a halt?
+    logic    illegal;       // Is this instruction illegal?
+    logic    csr_op;        // Is this a CSR operation? (we only used this as a cheap way to get return code)
+
+    // logic    valid;
+} ID_RESULT;
+
+typedef struct packed {
+    logic           busy;
+    logic           issued;
+    ID_RESULT       dat;
+} RS_ENTRY;
+
 `endif // __SYS_DEFS_SVH__

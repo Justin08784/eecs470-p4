@@ -2,53 +2,6 @@
 
 `include "sys_defs.svh"
 
-typedef enum logic [1:0] {
-    FU_ALU  = 2'b00,
-    FU_MULT = 2'b01,
-    FU_LOAD = 2'b10,
-    FU_STOR = 2'b11
-} FU_IDX;
-`define FU_IDX_NUM 4
-
-typedef struct packed {
-    PHYS_REG_IDX    t;
-    PHYS_REG_IDX    t1;
-    PHYS_REG_IDX    t2;
-    logic           t1_rdy; // ready in ROB?
-    logic           t2_rdy;
-    FU_IDX          fu_idx;
-
-    /* from ID_EX_PACKET */
-    INST inst;
-    ADDR PC;
-    ADDR NPC; // PC + 4
-
-    // DATA rs1_value; // reg A value
-    // DATA rs2_value; // reg B value
-
-    ALU_OPA_SELECT opa_select; // ALU opa mux select (ALU_OPA_xxx *)
-    ALU_OPB_SELECT opb_select; // ALU opb mux select (ALU_OPB_xxx *)
-
-    // REG_IDX  dest_reg_idx;  // destination (writeback) register index
-    ALU_FUNC alu_func;      // ALU function select (ALU_xxx *)
-    logic    mult;          // Is inst a multiply instruction?
-    logic    rd_mem;        // Does inst read memory?
-    logic    wr_mem;        // Does inst write memory?
-    logic    cond_branch;   // Is inst a conditional branch?
-    logic    uncond_branch; // Is inst an unconditional branch?
-    logic    halt;          // Is this a halt?
-    logic    illegal;       // Is this instruction illegal?
-    logic    csr_op;        // Is this a CSR operation? (we only used this as a cheap way to get return code)
-
-    // logic    valid;
-} ID_RESULT;
-
-typedef struct packed {
-    logic           busy;
-    logic           issued;
-    ID_RESULT       dat;
-} RS_ENTRY;
-
 
 /*
 NEED CLARIFICATION:
@@ -66,6 +19,7 @@ module rs #(parameter N=`N, RS_SZ=`RS_SZ, FU_IDX_NUM=`FU_IDX_NUM) (
     input clock,
     input reset,
     input flush,
+    output RS_ENTRY [RS_SZ-1:0] entries_dbg,
 
     // dispatch
     /*
@@ -114,6 +68,7 @@ module rs #(parameter N=`N, RS_SZ=`RS_SZ, FU_IDX_NUM=`FU_IDX_NUM) (
     NEED CORRECTIONS.
     */
     RS_ENTRY [RS_SZ-1:0]       entries, entries_n;
+    assign entries_dbg = entries;
 
     logic [RS_SZ-1:0] busy_vec;
     logic [RS_SZ-1:0] issd_vec;
