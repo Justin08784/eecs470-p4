@@ -81,6 +81,28 @@ module rs_testbench;
         d_dat[i] = '0;
     endtask
 
+    task set_cdb(
+        input int i,
+        input int t
+    );
+        c_en[i] = 1;
+        c_ts[i]  = t;
+    endtask
+
+    task clr_cdb(
+        input int i
+    );
+        c_en[i] = 0;
+        c_ts[i]  = '0;
+    endtask
+
+    task set_fu(
+        input int rs,
+        input int scnt
+    );
+        fu_scnt[rs] = scnt;
+    endtask
+
     task marker();
         static int i = 0;
         $display("~~~~ %d !!!!", i++);
@@ -133,7 +155,7 @@ module rs_testbench;
         failed  = 0;
         d_vld   = '0;
         d_dat   = '0;
-        fu_scnt = '1;
+        fu_scnt = '0;
         c_en    = '0;
         c_ts    = '0;
 
@@ -152,15 +174,26 @@ module rs_testbench;
 
         clr_dispatch(0);
         clr_dispatch(1);
+        set_cdb(0, 1);
+        set_cdb(1, 2);
         @(negedge clock);
         marker();
         print_entries();
 
-        for (int i = 0; i < 10; ++i) begin
-            @(negedge clock);
-            marker();
-            print_entries();
-        end
+        clr_cdb(0);
+        clr_cdb(1);
+        set_fu(0, 1);
+        @(negedge clock);
+        marker();
+        print_entries();
+
+        @(negedge clock);
+        marker();
+        print_entries();
+
+        // @(negedge clock);
+        // marker();
+        // print_entries();
 
         if (failed)
             $display("@@@ Failed\n");
