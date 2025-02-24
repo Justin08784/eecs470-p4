@@ -50,6 +50,7 @@ module rs #(parameter N=`N, RS_SZ=`RS_SZ, FU_IDX_NUM=`FU_IDX_NUM) (
 
     // issue
     input   logic           [FU_IDX_NUM-1:0][$clog2(N):0] fu_scnt, // functional unit availability; saturating counters that cap at N
+    // TODO: actually set s_vld, s_dat
     output  logic           [N-1:0] s_vld,     // which issue lines are valid? (dep. on fu_scnt)
     output  ID_RESULT       [N-1:0] s_dat,
     /* Ditto CONCERN 1 */
