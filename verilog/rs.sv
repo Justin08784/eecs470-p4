@@ -66,13 +66,19 @@ module rs #(parameter
     */
 
     // issue
-    input   logic           [FU_IDX_NUM-1:0][$clog2(N):0] fu_scnt, // functional unit availability; saturating counters that cap at N
-    input   FU_ENTRY        [NUM_FU_ALU-1:0]    fus_alu,
-    input   FU_ENTRY        [NUM_FU_MULT-1:0]   fus_mult,
-    input   FU_ENTRY        [NUM_FU_STORE-1:0]  fus_store,
-    input   FU_ENTRY        [NUM_FU_LOAD-1:0]   fus_load,
-    output  logic           [N-1:0] s_vld,     // which issue lines are valid? (dep. on fu_scnt)
-    output  ID_RESULT       [N-1:0] s_dat,
+    input   logic       [NUM_FU_ALU-1:0]    fu_rdy_alu,
+    input   logic       [NUM_FU_MULT-1:0]   fu_rdy_mult,
+    input   logic       [NUM_FU_STORE-1:0]  fu_rdy_store,
+    input   logic       [NUM_FU_LOAD-1:0]   fu_rdy_load,
+
+    output  logic       [NUM_FU_ALU-1:0]    fu_vld_alu,
+    output  logic       [NUM_FU_MULT-1:0]   fu_vld_mult,
+    output  logic       [NUM_FU_STORE-1:0]  fu_vld_store,
+    output  logic       [NUM_FU_LOAD-1:0]   fu_vld_load,
+    output  ID_RESULT   [NUM_FU_ALU-1:0]    fu_dat_alu,
+    output  ID_RESULT   [NUM_FU_MULT-1:0]   fu_dat_mult,
+    output  ID_RESULT   [NUM_FU_STORE-1:0]  fu_dat_store,
+    output  ID_RESULT   [NUM_FU_LOAD-1:0]   fu_dat_load,
     /* Ditto CONCERN 1 */
 
     // complete (CDB)
@@ -331,8 +337,10 @@ module rs #(parameter
     always_ff @(posedge clock) begin
         if (reset || flush) begin
             entries <= '0;
+            fus_alu <= '0;
         end else begin
             entries <= entries_n;
+            fus_alu <= '0;
         end
     end
 
