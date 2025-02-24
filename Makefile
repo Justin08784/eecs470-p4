@@ -226,7 +226,8 @@ CPU_HEADERS = verilog/sys_defs.svh \
 # test/cpu_test.sv is implicit
 CPU_TESTBENCH = test/pipeline_print.c \
 			    test/decode_inst.c \
-                test/mem.sv 
+                test/mem.sv \
+				test/rs_test.sv
 # NOTE: you CANNOT alter the given memory module
 
 # verilog/cpu.sv is implicit
