@@ -252,8 +252,14 @@ module rs #(parameter N=`N, RS_SZ=`RS_SZ, FU_IDX_NUM=`FU_IDX_NUM) (
             entries_n[rs].dat.t2_rdy |= to_t2_rdy[rs];
 
             if (to_issue[rs]) begin
+                // issuing
                 entries_n[rs].issued = 1;
                 continue;
+            end
+
+            if (entries_n[rs].issued) begin
+                // going to EX; clear entry
+                entries_n[rs] = '0; // optimize later: only clear busy bit
             end
 
             for (int n = 0; n < N; ++n) begin
