@@ -20,6 +20,8 @@ module rs #(parameter N=`N, RS_SZ=`RS_SZ, FU_IDX_NUM=`FU_IDX_NUM) (
     input reset,
     input flush,
     output RS_ENTRY [RS_SZ-1:0] entries_dbg,
+    output logic [N-1:0][RS_SZ-1:0] free_gnt_bus_dbg,
+    output [N-1:0][RS_SZ-1:0] d_gnt_bus_dbg,
 
     // dispatch
     /*
@@ -87,18 +89,18 @@ module rs #(parameter N=`N, RS_SZ=`RS_SZ, FU_IDX_NUM=`FU_IDX_NUM) (
     logic [RS_SZ-1:0] to_t1_rdy;
     logic [RS_SZ-1:0] to_t2_rdy;
     always_comb begin
-        for (int i = 0; i < RS_SZ; ++i) begin
+        for (int rs = 0; rs < RS_SZ; ++rs) begin
             logic [N-1:0] match_t1;
             logic [N-1:0] match_t2;
 
-            for (int j = 0; j < N; ++j) begin
+            for (int n = 0; n < N; ++n) begin
                 // match any tag in CDB?
-                match_t1[j] |= (c_en[j] && entries[i].dat.t1 == c_ts[j]);
-                match_t1[j] |= (c_en[j] && entries[i].dat.t2 == c_ts[j]);
+                match_t1[n] |= (c_en[n] && entries[rs].dat.t1 == c_ts[n]);
+                match_t1[n] |= (c_en[n] && entries[rs].dat.t2 == c_ts[n]);
             end
 
-            to_t1_rdy[i] = t1_rdy_vec[i] || |match_t1;
-            to_t2_rdy[i] = t2_rdy_vec[i] || |match_t2;
+            to_t1_rdy[rs] = t1_rdy_vec[rs] || |match_t1;
+            to_t2_rdy[rs] = t2_rdy_vec[rs] || |match_t2;
         end
     end
 
@@ -109,13 +111,13 @@ module rs #(parameter N=`N, RS_SZ=`RS_SZ, FU_IDX_NUM=`FU_IDX_NUM) (
     logic [FU_IDX_NUM-1:0][RS_SZ-1:0] can_issues;
     always_comb begin
         can_issues = '0;
-        for (int i = 0; i < RS_SZ; ++i) begin
-            can_issue[i] = busy_vec[i]
-                && !entries[i].issued
-                && (entries[i].dat.t1_rdy || to_t1_rdy[i])
-                && (entries[i].dat.t2_rdy || to_t2_rdy[i]);
+        for (int rs = 0; rs < RS_SZ; ++rs) begin
+            can_issue[rs] = busy_vec[rs]
+                && !entries[rs].issued
+                && (entries[rs].dat.t1_rdy || to_t1_rdy[rs])
+                && (entries[rs].dat.t2_rdy || to_t2_rdy[rs]);
 
-            can_issues[entries[i].dat.fu_idx][i] = can_issue[i];
+            can_issues[entries[rs].dat.fu_idx][rs] = can_issue[rs];
         end
     end
 
@@ -139,8 +141,8 @@ module rs #(parameter N=`N, RS_SZ=`RS_SZ, FU_IDX_NUM=`FU_IDX_NUM) (
     always_comb begin
         fu_can_rcv = '0;
         for (int fu = 0; fu < FU_IDX_NUM; ++fu) begin
-            for (int i = 0; i < N; ++i) begin
-                fu_can_rcv[fu][i] = i < fu_scnt[fu];
+            for (int n = 0; n < N; ++n) begin
+                fu_can_rcv[fu][n] = n < fu_scnt[fu];
             end
         end
     end
@@ -149,8 +151,8 @@ module rs #(parameter N=`N, RS_SZ=`RS_SZ, FU_IDX_NUM=`FU_IDX_NUM) (
     always_comb begin
         to_issue_cands = '0;
         for (int fu = 0; fu < FU_IDX_NUM; ++fu) begin
-            for (int i = 0; i < N; ++i) begin
-                to_issue_cands |= fu_can_rcv[fu][i] ? sel_issues_gnt_bus[fu][i] : '0;
+            for (int n = 0; n < N; ++n) begin
+                to_issue_cands |= fu_can_rcv[fu][n] ? sel_issues_gnt_bus[fu][n] : '0;
             end
         end
     end
@@ -209,6 +211,7 @@ module rs #(parameter N=`N, RS_SZ=`RS_SZ, FU_IDX_NUM=`FU_IDX_NUM) (
         .gnt_bus(free_gnt_bus)
         // .empty()
     );
+    assign free_gnt_bus_dbg = free_gnt_bus;
 
     /*
     Mustafa:
@@ -220,31 +223,32 @@ module rs #(parameter N=`N, RS_SZ=`RS_SZ, FU_IDX_NUM=`FU_IDX_NUM) (
     logic [N-1:0][RS_SZ-1:0]  d_gnt_bus;
     always_comb begin
         d_gnt_bus = '0;
-        for (int i = 0; i < N; ++i) begin
-            if (!d_vld[i])
+        for (int n = 0; n < N; ++n) begin
+            if (!d_vld[n])
                 continue;
-            d_gnt_bus[i] |= free_gnt_bus[i];
+            d_gnt_bus[n] |= free_gnt_bus[n];
         end
     end
+    assign d_gnt_bus_dbg = d_gnt_bus;
 
 
     always_comb begin
         entries_n = entries;
-        for (int i = 0; i < RS_SZ; ++i) begin
-            entries_n[i].dat.t1_rdy |= to_t1_rdy[i];
-            entries_n[i].dat.t2_rdy |= to_t2_rdy[i];
+        for (int rs = 0; rs < RS_SZ; ++rs) begin
+            entries_n[rs].dat.t1_rdy |= to_t1_rdy[rs];
+            entries_n[rs].dat.t2_rdy |= to_t2_rdy[rs];
 
-            if (to_issue[i]) begin
-                entries_n[i].issued = 1;
+            if (to_issue[rs]) begin
+                entries_n[rs].issued = 1;
                 continue;
             end
 
-            for (int j = 0; j < N; ++j) begin
-                if (!d_gnt_bus[i][j])
+            for (int n = 0; n < N; ++n) begin
+                if (!d_gnt_bus[n][rs])
                     continue;
-                entries_n[i].busy   = 1;
-                entries_n[i].issued = 0;
-                entries_n[i].dat    = d_dat[j];
+                entries_n[rs].busy   = 1;
+                entries_n[rs].issued = 0;
+                entries_n[rs].dat    = d_dat[n];
                 break;
             end
         end
