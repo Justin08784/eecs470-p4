@@ -55,15 +55,35 @@ module rs_testbench;
         .c_ts(c_ts)
     );
 
-    task dispatch(
+    task set_dispatch(
         input int i,
-        input ID_RESULT inst
+        input int t1,
+        input int t2,
+        input int t1_rdy,
+        input int t2_rdy,
+        input int fu_idx
     );
-        begin
-            // Set up a valid dispatch line; adjust as needed.
-            d_vld[i] = 1;
-            d_dat[i] = '1;
-        end
+        // Set up a valid dispatch line
+        d_vld[i]        = 1;
+
+        d_dat[i]        = '0;
+        d_dat[i].t1     = t1;
+        d_dat[i].t2     = t2;
+        d_dat[i].t1_rdy = t1_rdy;
+        d_dat[i].t1_rdy = t2_rdy;
+        d_dat[i].fu_idx = fu_idx;
+    endtask
+
+    task clr_dispatch(
+        input int i
+    );
+        d_vld[i] = 0;
+        d_dat[i] = '0;
+    endtask
+
+    task marker();
+        static int i = 0;
+        $display("~~~~ %d !!!!", i++);
     endtask
 
     task print_entries();
@@ -99,6 +119,15 @@ module rs_testbench;
     end
 
     initial begin
+        /* some unused debugs */
+        // $display("rs_scnt: %b", rs_scnt);
+        // for (int i = 0; i < N; ++i) begin
+        //     $display("%b", free_gnt_bus_dbg[i]);
+        // end
+        // for (int i = 0; i < N; ++i) begin
+        //     $display("d_gnt_bus: %b", d_gnt_bus_dbg[i]);
+        // end
+
         /* initialize */
         clock   = 0;
         failed  = 0;
@@ -111,53 +140,21 @@ module rs_testbench;
         reset   = 1;
         @(negedge clock);
         @(negedge clock);
-        $display("**0");
-        print_entries();
-        $display("rs_scnt: %b", rs_scnt);
-        for (int i = 0; i < N; ++i) begin
-            $display("%b", free_gnt_bus_dbg[i]);
-        end
-        for (int i = 0; i < N; ++i) begin
-            $display("d_gnt_bus: %b", d_gnt_bus_dbg[i]);
-        end
 
         reset = 0;
         @(negedge clock);
 
-        $display("**1");
-        print_entries();
-        $display("rs_scnt: %b", rs_scnt);
-        for (int i = 0; i < N; ++i) begin
-            $display("%b", free_gnt_bus_dbg[i]);
-        end
-        for (int i = 0; i < N; ++i) begin
-            $display("d_gnt_bus: %b", d_gnt_bus_dbg[i]);
-        end
-
-        // dispatch(0, '0);
-        // dispatch(1, '0);
-
+        set_dispatch(0, 1, 2, 0, 0, 0);
+        set_dispatch(1, 2, 4, 0, 0, 1);
         @(negedge clock);
-        $display("**2");
+        marker();
         print_entries();
-        $display("rs_scnt: %b", rs_scnt);
-        for (int i = 0; i < N; ++i) begin
-            $display("%b", free_gnt_bus_dbg[i]);
-        end
-        for (int i = 0; i < N; ++i) begin
-            $display("d_gnt_bus: %b", d_gnt_bus_dbg[i]);
-        end
 
+        clr_dispatch(0);
+        clr_dispatch(1);
         @(negedge clock);
-        $display("**3");
+        marker();
         print_entries();
-        $display("rs_scnt: %b", rs_scnt);
-        for (int i = 0; i < N; ++i) begin
-            $display("%b", free_gnt_bus_dbg[i]);
-        end
-        for (int i = 0; i < N; ++i) begin
-            $display("d_gnt_bus: %b", d_gnt_bus_dbg[i]);
-        end
 
         if (failed)
             $display("@@@ Failed\n");
