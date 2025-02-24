@@ -25,8 +25,8 @@
 `define CDB_SZ `N // This MUST match your superscalar width
 
 // sizes
-`define ROB_SZ xx
-`define RS_SZ xx
+`define ROB_SZ 96
+`define RS_SZ  16
 `define PHYS_REG_SZ_P6 32
 `define PHYS_REG_SZ_R10K (32 + `ROB_SZ)
 
@@ -35,10 +35,10 @@
 `define LSQ_SZ xx
 
 // functional units (you should decide if you want more or fewer types of FUs)
-`define NUM_FU_ALU xx
-`define NUM_FU_MULT xx
-`define NUM_FU_LOAD xx
-`define NUM_FU_STORE xx
+`define NUM_FU_ALU 2
+`define NUM_FU_MULT 2
+`define NUM_FU_LOAD 4
+`define NUM_FU_STORE 4
 
 // number of mult stages (2, 4) (you likely don't need 8)
 `define MULT_STAGES 4
@@ -57,6 +57,14 @@
 typedef logic [31:0] ADDR;
 typedef logic [31:0] DATA;
 typedef logic [4:0] REG_IDX;
+
+/* 
+NEED CLARIFICATION:
+NOTE: We will use PHYS_REG_IDX = 0 as a sentinel (to denote "no register" / "is immediate operand").
+While we lose out on a single physical register, this greatly simplifies logic 
+(the alternative is to pipe around 'is valid src_reg' bit signals everywhere).
+*/
+typedef logic [$clog2(`PHYS_REG_SZ_R10K)-1:0] PHYS_REG_IDX;
 
 // the zero register
 // In RISC-V, any read of this register returns zero and any writes are thrown away
@@ -389,5 +397,65 @@ typedef struct packed {
     logic   valid;
 } COMMIT_PACKET;
 
+
+// Reservation station stuff
+typedef enum logic [1:0] {
+    FU_ALU  = 2'b00,
+    FU_MULT = 2'b01,
+    FU_LOAD = 2'b10,
+    FU_STOR = 2'b11
+} FU_IDX;
+`define FU_IDX_NUM 4
+
+typedef struct packed {
+    PHYS_REG_IDX    t;
+    PHYS_REG_IDX    t1;
+    PHYS_REG_IDX    t2;
+    logic           t1_rdy; // ready in ROB?
+    logic           t2_rdy;
+    FU_IDX          fu_idx;
+
+    /* from ID_EX_PACKET */
+    INST inst;
+    ADDR PC;
+    ADDR NPC; // PC + 4
+
+    // DATA rs1_value; // reg A value
+    // DATA rs2_value; // reg B value
+
+    ALU_OPA_SELECT opa_select; // ALU opa mux select (ALU_OPA_xxx *)
+    ALU_OPB_SELECT opb_select; // ALU opb mux select (ALU_OPB_xxx *)
+
+    // REG_IDX  dest_reg_idx;  // destination (writeback) register index
+    ALU_FUNC alu_func;      // ALU function select (ALU_xxx *)
+    logic    mult;          // Is inst a multiply instruction?
+    logic    rd_mem;        // Does inst read memory?
+    logic    wr_mem;        // Does inst write memory?
+    logic    cond_branch;   // Is inst a conditional branch?
+    logic    uncond_branch; // Is inst an unconditional branch?
+    logic    halt;          // Is this a halt?
+    logic    illegal;       // Is this instruction illegal?
+    logic    csr_op;        // Is this a CSR operation? (we only used this as a cheap way to get return code)
+
+    // logic    valid;
+} ID_RESULT;
+
+typedef struct packed {
+    logic           busy;
+    logic           issued;
+    ID_RESULT       dat;
+} RS_ENTRY;
+
+typedef struct packed {
+    logic       busy;
+
+    /*
+    NOTE: This is a generic struct which could hold the execute-necessary data
+    for ANY operation type, but a lot of the fields may go wasted. Might be
+    better to define FU-specific structs to hold only the data necessary for
+    that specific FU group. (Jonah says not to; dont overcomplicate things)
+    */
+    ID_RESULT   dat;
+} FU_ENTRY;
 
 `endif // __SYS_DEFS_SVH__
