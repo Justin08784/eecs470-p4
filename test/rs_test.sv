@@ -1,36 +1,6 @@
 
 `include "sys_defs.svh"
 
-// Compute the correct mult output similar to project 3
-module correct_mult (
-    input DATA rs1,
-    input DATA rs2,
-    MULT_FUNC   func,
-
-    output DATA result
-);
-
-    logic signed [63:0] signed_mul, mixed_mul;
-    logic        [63:0] unsigned_mul;
-
-    assign signed_mul = signed'(rs1) * signed'(rs2);
-    assign unsigned_mul = rs1 * rs2;
-    // Verilog only does signed multiplication if both arguments are signed :/
-    assign mixed_mul = signed'(rs1) * signed'({1'b0, rs2});
-
-    always_comb begin
-        case (func)
-            M_MUL:    result = signed_mul[31:0];
-            M_MULH:   result = signed_mul[63:32];
-            M_MULHU:  result = unsigned_mul[63:32];
-            M_MULHSU: result = mixed_mul[63:32];
-            default:  result = 0;
-        endcase
-    end
-
-endmodule // correct_mult
-
-
 module rs_testbench;
     // constants
     localparam int N = 1;
