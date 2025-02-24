@@ -167,20 +167,86 @@ module rs #(parameter
         end
     end
 
-    // select at most N issue lines per FU type
-    logic [FU_IDX_NUM-1:0][N-1:0][RS_SZ-1:0] sel_issues_gnt_bus;
-    generate
-        for (genvar fu = 0; fu < FU_IDX_NUM; ++fu) begin : gen_sel_issues
-            psel_gen #(
-                .WIDTH(RS_SZ),
-                .REQS(N)
-            ) psel_inst (
-                .req    (can_issues[fu]),
-                // .gnt    (),
-                .gnt_bus(sel_issues_gnt_bus[fu])
-            );
-        end
-    endgenerate
+    // select issue lines per FU type
+    logic [NUM_FU_ALU-1:0]  [RS_SZ-1:0] gbus_can_issue_alu; // gbus = grant bus
+    logic [NUM_FU_MULT-1:0] [RS_SZ-1:0] gbus_can_issue_mult;
+    logic [NUM_FU_LOAD-1:0] [RS_SZ-1:0] gbus_can_issue_load;
+    logic [NUM_FU_STORE-1:0][RS_SZ-1:0] gbus_can_issue_store;
+    psel_gen #(
+        .WIDTH  (RS_SZ),
+        .REQS   (NUM_FU_ALU)
+    ) sel_iss_alu (
+        .req    (can_issues[FU_ALU]),
+        .gnt_bus(gbus_can_issue_alu)
+    );
+    psel_gen #(
+        .WIDTH  (RS_SZ),
+        .REQS   (NUM_FU_MULT)
+    ) sel_iss_mult (
+        .req    (can_issues[FU_MULT]),
+        .gnt_bus(gbus_can_issue_mult)
+    );
+    psel_gen #(
+        .WIDTH  (RS_SZ),
+        .REQS   (NUM_FU_LOAD)
+    ) sel_iss_load (
+        .req    (can_issues[FU_LOAD]),
+        .gnt_bus(gbus_can_issue_load)
+    );
+    psel_gen #(
+        .WIDTH  (RS_SZ),
+        .REQS   (NUM_FU_STORE)
+    ) sel_iss_store (
+        .req    (can_issues[FU_STORE]),
+        .gnt_bus(gbus_can_issue_store)
+    );
+
+    // select available FUs
+    logic [NUM_FU_ALU-1:0]  [NUM_FU_ALU-1:0]    gbus_fu_rdy_alu;
+    logic [NUM_FU_MULT-1:0] [NUM_FU_MULT-1:0]   gbus_fu_rdy_mult;
+    logic [NUM_FU_LOAD-1:0] [NUM_FU_LOAD-1:0]   gbus_fu_rdy_load;
+    logic [NUM_FU_STORE-1:0][NUM_FU_STORE-1:0]  gbus_fu_rdy_store;
+    psel_gen #(
+        .WIDTH  (NUM_FU_ALU),
+        .REQS   (NUM_FU_ALU)
+    ) sel_rdy_alu (
+        .req    (fu_rdy_alu),
+        .gnt_bus(gbus_fu_rdy_alu)
+    );
+    psel_gen #(
+        .WIDTH  (NUM_FU_MULT),
+        .REQS   (NUM_FU_MULT)
+    ) sel_rdy_mult (
+        .req    (fu_rdy_mult),
+        .gnt_bus(gbus_fu_rdy_mult)
+    );
+    psel_gen #(
+        .WIDTH  (NUM_FU_LOAD),
+        .REQS   (NUM_FU_LOAD)
+    ) sel_rdy_load (
+        .req    (fu_rdy_load),
+        .gnt_bus(gbus_fu_rdy_load)
+    );     
+    psel_gen #(
+        .WIDTH  (NUM_FU_STORE),
+        .REQS   (NUM_FU_STORE)
+    ) sel_rdy_store (
+        .req    (fu_rdy_store),
+        .gnt_bus(gbus_fu_rdy_store)
+    );
+
+    // assign FUs to issuables
+    logic [NUM_FU_ALU-1:0]  [RS_SZ-1:0] fu2issuer_alu;
+    logic [NUM_FU_MULT-1:0] [RS_SZ-1:0] fu2issuer_mult;
+    logic [NUM_FU_LOAD-1:0] [RS_SZ-1:0] fu2issuer_load;
+    logic [NUM_FU_STORE-1:0][RS_SZ-1:0] fu2issuer_store;
+    // always_comb begin
+    //     foreach (incoming_gnt_bus[i, j]) begin
+    //         if (incoming_gnt_bus[i][j]) begin
+    //             car_assigned_spot[j] |= lot_gnt_bus[i];
+    //         end
+    //     end
+    // end
 
     // how many (≤N) issue lines can be gnt'd per FU type
     logic [FU_IDX_NUM-1:0][N-1:0] fu_can_rcv;
