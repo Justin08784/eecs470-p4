@@ -144,9 +144,21 @@ module rs_testbench;
         $display("~~~~ %d !!!!", i++);
     endtask
 
+    task get_fu_name(input FU_IDX fu_idx, output string name);
+        case (fu_idx)
+            FU_ALU:     name = "ALU";
+            FU_MULT:    name = "MULT";
+            FU_LOAD:    name = "LOAD";
+            FU_STORE:   name = "STORE";
+            default:    name = "Unknown FU";
+        endcase
+    endtask
+
     task print_entries();
         for (int i = 0; i < RS_SZ; ++i) begin
-            $display("Entry [%0d]: busy=%b, issued=%b, t=%0d, t1=%0d, t2=%0d, t1_rdy=%b, t2_rdy=%b, fu_idx=%0d",
+            string fu_name;
+            get_fu_name(entries_dbg[i].dat.fu_idx, fu_name);
+            $display("Entry [%0d]: busy=%b, issued=%b, t=%0d, t1=%0d, t2=%0d, t1_rdy=%b, t2_rdy=%b, fu=%s(%0d)",
                 i, 
                 entries_dbg[i].busy, 
                 entries_dbg[i].issued, 
@@ -155,6 +167,8 @@ module rs_testbench;
                 entries_dbg[i].dat.t2, 
                 entries_dbg[i].dat.t1_rdy, 
                 entries_dbg[i].dat.t2_rdy, 
+                
+                entries_dbg[i].busy ? fu_name : "*",
                 entries_dbg[i].dat.fu_idx
                 // entries_dbg[i].dat.PC, 
                 // entries_dbg[i].dat.NPC, 
@@ -191,6 +205,10 @@ module rs_testbench;
         failed  = 0;
         d_vld   = '0;
         d_dat   = '0;
+        fu_rdy_alu      = '0;
+        fu_rdy_mult     = '0;
+        fu_rdy_store    = '0;
+        fu_rdy_load     = '0;
         c_en    = '0;
         c_ts    = '0;
 
@@ -223,6 +241,7 @@ module rs_testbench;
         clr_cdb(0);
         clr_cdb(1);
         // set_fu(0, 1);
+        fu_rdy_alu[0] = 1;
         @(posedge clock);
         // $display("s_vld: %b", s_vld);
         @(negedge clock);
