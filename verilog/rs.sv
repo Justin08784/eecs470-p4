@@ -91,11 +91,6 @@ module rs #(parameter
     input   PHYS_REG_IDX    [N-1:0] c_ts
 
 );
-    /*
-    BUG:
-    I ASSUMED DIMENSIONS ARE ORDERED RIGHT TO LEFT. THIS IS WRONG!!!!
-    NEED CORRECTIONS.
-    */
     RS_ENTRY [RS_SZ-1:0]       entries, entries_n;
     assign entries_dbg = entries;
 
@@ -112,7 +107,7 @@ module rs #(parameter
     end
     endgenerate
 
-    // cdb completion
+    // SECTION: cdb completion
     /* Potential optimization:
     Keep a "scoreboard" of physical register ready statuses i.e.
     logic [PHYS_REG_IDX-1:0] preg_rdy;
@@ -146,11 +141,7 @@ module rs #(parameter
         end
     end
 
-    // Issue V2: somewhat more parallelized
-    /* We're essentially stacking two psels here
-    Consider this for single-pass / double-pass:
-    https://chatgpt.com/c/67bc023b-8b84-8007-b945-2caedf5919c4
-     */
+    // SECTION: Issue 
     // operand readiness
     logic [RS_SZ-1:0] can_issue;                   
     // operand readiness per FU type
@@ -241,13 +232,6 @@ module rs #(parameter
     logic [NUM_FU_MULT-1:0] [RS_SZ-1:0] fu2issuer_mult;
     logic [NUM_FU_LOAD-1:0] [RS_SZ-1:0] fu2issuer_load;
     logic [NUM_FU_STORE-1:0][RS_SZ-1:0] fu2issuer_store;
-    // always_comb begin
-    //     foreach (incoming_gnt_bus[i, j]) begin
-    //         if (incoming_gnt_bus[i][j]) begin
-    //             car_assigned_spot[j] |= lot_gnt_bus[i];
-    //         end
-    //     end
-    // end
 
     always_comb begin
         to_issue        = '0;
@@ -292,29 +276,8 @@ module rs #(parameter
     ASSIGN new issues to FUs (dont mess around with fu_scnt crap)
     */
 
-    // Issue V1: strictly serial
-    // always_comb begin
-    //     logic [$clog2(N):0][FU_IDX_NUM-1:0] fu_scnts = fu_scnt;
-    //     s_vld = '0;
-    //     to_issue = '0;
 
-    //     for (int i = 0, int cnt = 0; i < RS_SZ; ++i) begin
-    //         // issued up to width
-    //         if (cnt >= N)
-    //             break;
-
-    //         // not ready to issue
-    //         if (!(can_issue[i] && fu_scnts[entries[i].dat.fu_idx] > 0))
-    //             continue;
-
-    //         to_issue[i] = 1;
-    //         s_vld[cnt]  = 1;
-    //         s_dat[cnt]  = entries[i].dat;
-    //         --fu_scnts[entries[i].dat.fu_idx];
-    //         ++cnt;
-    //     end
-    // end
-
+    // SECTION: Dispatch
     // compute free entries
     logic [$clog2(RS_SZ):0] rs_cnt;
     logic [RS_SZ-1:0] free_entries;
@@ -357,6 +320,7 @@ module rs #(parameter
     assign d_gnt_bus_dbg = d_gnt_bus;
 
 
+    // SECTION: Compute next state
     always_comb begin
         entries_n = entries;
         for (int rs = 0; rs < RS_SZ; ++rs) begin
