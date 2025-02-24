@@ -1,5 +1,11 @@
 
 `include "sys_defs.svh"
+/*
+CLARIFICATION NEEDED:
+Ok, checking the accuracy of FF state like entries_dbg seems pretty
+straightforward. But how to check correctness of combinational stuff like
+s_vld, rs_scnt? Aren't there timing issues?
+*/
 
 module rs_testbench;
     // constants
@@ -168,6 +174,8 @@ module rs_testbench;
 
         set_dispatch(0, 1, 2, 0, 0, 0);
         set_dispatch(1, 2, 4, 0, 0, 1);
+        @(posedge clock);
+        $display("s_vld: %b", s_vld);
         @(negedge clock);
         marker();
         print_entries();
@@ -176,17 +184,24 @@ module rs_testbench;
         clr_dispatch(1);
         set_cdb(0, 1);
         set_cdb(1, 2);
+        @(posedge clock);
+        $display("s_vld: %b", s_vld);
         @(negedge clock);
         marker();
         print_entries();
 
+        // ask about timing; why does s_vld display need to be after posedge?
         clr_cdb(0);
         clr_cdb(1);
         set_fu(0, 1);
+        @(posedge clock);
+        $display("s_vld: %b", s_vld);
         @(negedge clock);
         marker();
         print_entries();
 
+        @(posedge clock);
+        $display("s_vld: %b", s_vld);
         @(negedge clock);
         marker();
         print_entries();

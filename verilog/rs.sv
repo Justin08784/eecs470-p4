@@ -119,6 +119,10 @@ module rs #(parameter N=`N, RS_SZ=`RS_SZ, FU_IDX_NUM=`FU_IDX_NUM) (
     end
 
     // Issue V2: somewhat more parallelized
+    /* We're essentially stacking two psels here
+    Consider this for single-pass / double-pass:
+    https://chatgpt.com/c/67bc023b-8b84-8007-b945-2caedf5919c4
+     */
     // operand readiness
     logic [RS_SZ-1:0] can_issue;                   
     // operand readiness per FU type
@@ -172,14 +176,31 @@ module rs #(parameter N=`N, RS_SZ=`RS_SZ, FU_IDX_NUM=`FU_IDX_NUM) (
     end
 
     logic [RS_SZ-1:0] to_issue;
+    logic [N-1:0][RS_SZ-1:0] to_issue_gnt_bus;
     psel_gen #(
         .WIDTH(RS_SZ),
         .REQS(N)
     ) sel_to_issue (
         .req    (to_issue_cands),
-        .gnt    (to_issue)
-        // .gnt_bus(sel_issues_gnt_bus[fu])
+        .gnt    (to_issue),
+        .gnt_bus(to_issue_gnt_bus)
     );
+    always_comb begin
+        s_vld = '0;
+        s_dat = '0;
+        for (int n = 0; n < N; ++n) begin
+            s_vld[n] = |to_issue_gnt_bus[n];
+            for (int rs = 0; rs < RS_SZ; ++rs) begin
+                if (!to_issue_gnt_bus[n][rs])
+                    continue;
+                s_dat[n] |= entries[rs].dat;
+
+                // this break should not be necessary if psel_gen guarantees at most 1 per row
+                // adding it may confuse compiler into making it dependent too...
+                // break;
+            end
+        end
+    end
 
     // Issue V1: strictly serial
     // always_comb begin
@@ -269,6 +290,9 @@ module rs #(parameter N=`N, RS_SZ=`RS_SZ, FU_IDX_NUM=`FU_IDX_NUM) (
                 entries_n[rs].busy   = 1;
                 entries_n[rs].issued = 0;
                 entries_n[rs].dat    = d_dat[n];
+
+                // this break should not be necessary if psel_gen guarantees at most 1 per row
+                // adding it may confuse compiler into making it dependent too...
                 break;
             end
         end
