@@ -70,7 +70,7 @@ module rs_testbench;
         d_dat[i].t1     = t1;
         d_dat[i].t2     = t2;
         d_dat[i].t1_rdy = t1_rdy;
-        d_dat[i].t1_rdy = t2_rdy;
+        d_dat[i].t2_rdy = t2_rdy;
         d_dat[i].fu_idx = fu_idx;
     endtask
 
@@ -155,6 +155,12 @@ module rs_testbench;
         @(negedge clock);
         marker();
         print_entries();
+
+        for (int i = 0; i < 10; ++i) begin
+            @(negedge clock);
+            marker();
+            print_entries();
+        end
 
         if (failed)
             $display("@@@ Failed\n");
