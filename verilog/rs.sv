@@ -236,6 +236,7 @@ module rs #(parameter
     );
 
     // assign FUs to issuables
+    logic [RS_SZ-1:0] to_issue
     logic [NUM_FU_ALU-1:0]  [RS_SZ-1:0] fu2issuer_alu;
     logic [NUM_FU_MULT-1:0] [RS_SZ-1:0] fu2issuer_mult;
     logic [NUM_FU_LOAD-1:0] [RS_SZ-1:0] fu2issuer_load;
@@ -247,6 +248,40 @@ module rs #(parameter
     //         end
     //     end
     // end
+
+    always_comb begin
+        to_issue        = '0;
+        fu2issuer_alu   = '0;
+        fu2issuer_mult  = '0;
+        fu2issuer_load  = '0;
+        fu2issuer_store = '0;
+
+        foreach (gbus_fu_rdy_alu[i, j]) begin
+            if (gbus_fu_rdy_alu[i][j]) begin
+                fu2issuer_alu[j]    |= gbus_can_issue_alu[i];
+                to_issue            |= gbus_can_issue_alu[i];
+            end
+        end
+        foreach (gbus_fu_rdy_mult[i, j]) begin
+            if (gbus_fu_rdy_mult[i][j]) begin
+                fu2issuer_mult[j]   |= gbus_can_issue_mult[i];
+                to_issue            |= gbus_can_issue_mult[i];
+            end
+        end
+        foreach (gbus_fu_rdy_load[i, j]) begin
+            if (gbus_fu_rdy_load[i][j]) begin
+                fu2issuer_load[j]   |= gbus_can_issue_load[i];
+                to_issue            |= gbus_can_issue_load[i];
+
+            end
+        end
+        foreach (gbus_fu_rdy_store[i, j]) begin
+            if (gbus_fu_rdy_store[i][j]) begin
+                fu2issuer_store[j]  |= gbus_can_issue_store[i];
+                to_issue            |= gbus_can_issue_store[i];
+            end
+        end
+    end
 
     // how many (≤N) issue lines can be gnt'd per FU type
     logic [FU_IDX_NUM-1:0][N-1:0] fu_can_rcv;
