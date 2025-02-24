@@ -89,14 +89,18 @@ module rs #(parameter N=`N, RS_SZ=`RS_SZ, FU_IDX_NUM=`FU_IDX_NUM) (
     logic [RS_SZ-1:0] to_t1_rdy;
     logic [RS_SZ-1:0] to_t2_rdy;
     always_comb begin
+        to_t1_rdy = '0;
+        to_t2_rdy = '0;
         for (int rs = 0; rs < RS_SZ; ++rs) begin
             logic [N-1:0] match_t1;
             logic [N-1:0] match_t2;
+            assign match_t1 = '0;
+            assign match_t2 = '0;
 
             for (int n = 0; n < N; ++n) begin
                 // match any tag in CDB?
-                match_t1[n] |= (c_en[n] && entries[rs].dat.t1 == c_ts[n]);
-                match_t1[n] |= (c_en[n] && entries[rs].dat.t2 == c_ts[n]);
+                match_t1[n] = (c_en[n] && entries[rs].dat.t1 == c_ts[n]);
+                match_t2[n] = (c_en[n] && entries[rs].dat.t2 == c_ts[n]);
             end
 
             to_t1_rdy[rs] = t1_rdy_vec[rs] || |match_t1;
