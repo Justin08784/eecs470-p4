@@ -3,8 +3,8 @@
 
 module rs_testbench;
     // constants
-    localparam int N = 1;
-    localparam int RS_SZ = 4;
+    localparam int N = 2;
+    localparam int RS_SZ = 8;
     localparam int FU_IDX_NUM = 2;
 
     // signals
@@ -28,6 +28,9 @@ module rs_testbench;
     // DATA r1, r2, correct_r, mul_r;
     string fmt;
 
+    logic [N-1:0][RS_SZ-1:0] free_gnt_bus_dbg;
+    logic [N-1:0][RS_SZ-1:0] d_gnt_bus_dbg;
+
     rs # (
         .N(N),
         .RS_SZ(RS_SZ),
@@ -37,6 +40,8 @@ module rs_testbench;
         .reset(reset),
         .flush(1'b0),
         .entries_dbg(entries_dbg),
+        .free_gnt_bus_dbg(free_gnt_bus_dbg),
+        .d_gnt_bus_dbg(d_gnt_bus_dbg),
 
         .rs_scnt(rs_scnt),
         .d_vld(d_vld),
@@ -97,15 +102,47 @@ module rs_testbench;
         clock = 0;
         reset = 1;
         failed = 0;
+        d_vld = '0;
 
         @(negedge clock);
         @(negedge clock);
+        $display("**0");
+        print_entries();
+        $display("rs_scnt: %b", rs_scnt);
+        for (int i = 0; i < N; ++i) begin
+            $display("%b", free_gnt_bus_dbg[i]);
+        end
+        for (int i = 0; i < N; ++i) begin
+            $display("d_gnt_bus: %b", d_gnt_bus_dbg[i]);
+        end
         reset = 0;
         @(negedge clock);
 
-        dispatch(0, '0);
-        @(negedge clock);
+        $display("**1");
         print_entries();
+        $display("rs_scnt: %b", rs_scnt);
+        for (int i = 0; i < N; ++i) begin
+            $display("%b", free_gnt_bus_dbg[i]);
+        end
+        for (int i = 0; i < N; ++i) begin
+            $display("d_gnt_bus: %b", d_gnt_bus_dbg[i]);
+        end
+
+        // dispatch(0, '0);
+        // dispatch(1, '0);
+
+        @(negedge clock);
+        $display("**2");
+        print_entries();
+        $display("rs_scnt: %b", rs_scnt);
+        for (int i = 0; i < N; ++i) begin
+            $display("%b", free_gnt_bus_dbg[i]);
+        end
+        for (int i = 0; i < N; ++i) begin
+            $display("d_gnt_bus: %b", d_gnt_bus_dbg[i]);
+        end
+
+        @(negedge clock);
 
         if (failed)
             $display("@@@ Failed\n");
