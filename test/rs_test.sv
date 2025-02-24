@@ -22,7 +22,7 @@ module rs_testbench;
     ID_RESULT       [N-1:0] s_dat;
     // complete (CDB)
     logic           [N-1:0] c_en;
-    PHYS_REG_IDX    [N-1:0] c_t;
+    PHYS_REG_IDX    [N-1:0] c_ts;
 
     logic failed;
     // DATA r1, r2, correct_r, mul_r;
@@ -52,7 +52,7 @@ module rs_testbench;
         .s_dat(s_dat),
 
         .c_en(c_en),
-        .c_ts(c_t)
+        .c_ts(c_ts)
     );
 
     task dispatch(
@@ -99,11 +99,16 @@ module rs_testbench;
     end
 
     initial begin
-        clock = 0;
-        reset = 1;
-        failed = 0;
-        d_vld = '0;
+        /* initialize */
+        clock   = 0;
+        failed  = 0;
+        d_vld   = '0;
+        d_dat   = '0;
+        fu_scnt = '1;
+        c_en    = '0;
+        c_ts    = '0;
 
+        reset   = 1;
         @(negedge clock);
         @(negedge clock);
         $display("**0");
@@ -115,6 +120,7 @@ module rs_testbench;
         for (int i = 0; i < N; ++i) begin
             $display("d_gnt_bus: %b", d_gnt_bus_dbg[i]);
         end
+
         reset = 0;
         @(negedge clock);
 
@@ -143,6 +149,15 @@ module rs_testbench;
         end
 
         @(negedge clock);
+        $display("**3");
+        print_entries();
+        $display("rs_scnt: %b", rs_scnt);
+        for (int i = 0; i < N; ++i) begin
+            $display("%b", free_gnt_bus_dbg[i]);
+        end
+        for (int i = 0; i < N; ++i) begin
+            $display("d_gnt_bus: %b", d_gnt_bus_dbg[i]);
+        end
 
         if (failed)
             $display("@@@ Failed\n");
