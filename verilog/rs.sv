@@ -50,7 +50,6 @@ module rs #(parameter N=`N, RS_SZ=`RS_SZ, FU_IDX_NUM=`FU_IDX_NUM) (
 
     // issue
     input   logic           [FU_IDX_NUM-1:0][$clog2(N):0] fu_scnt, // functional unit availability; saturating counters that cap at N
-    // TODO: actually set s_vld, s_dat
     output  logic           [N-1:0] s_vld,     // which issue lines are valid? (dep. on fu_scnt)
     output  ID_RESULT       [N-1:0] s_dat,
     /* Ditto CONCERN 1 */
@@ -93,6 +92,8 @@ module rs #(parameter N=`N, RS_SZ=`RS_SZ, FU_IDX_NUM=`FU_IDX_NUM) (
     ...then have each RS entry index their source tags in this preg_rdy table
     every cycle to check for readiness. (But isn't this just the map
     table / architectural map? confused...)
+    Bradley said this could have lower complexity than the current approach
+    (but it seems more complicated).
     */
     logic [RS_SZ-1:0] to_t1_rdy;
     logic [RS_SZ-1:0] to_t2_rdy;
@@ -176,6 +177,14 @@ module rs #(parameter N=`N, RS_SZ=`RS_SZ, FU_IDX_NUM=`FU_IDX_NUM) (
     end
 
     logic [RS_SZ-1:0] to_issue;
+    /*
+    TODO: 
+    - 1. THERE IS NO ISSUE LIMIT (i.e. you can issue as many FUs as there
+    are available and instructions with operands ready). i.e. the 2nd level
+    psel_gen is no longer necessary!
+    - 2. Expose the FU array DIRECTLY to the rs module and allow rs to DIRECTLY
+    ASSIGN new issues to FUs (dont mess around with fu_scnt crap)
+    */
     logic [N-1:0][RS_SZ-1:0] to_issue_gnt_bus;
     psel_gen #(
         .WIDTH(RS_SZ),
