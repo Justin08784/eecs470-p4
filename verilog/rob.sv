@@ -9,91 +9,78 @@ make -B syn CLOCK_PERIOD=1.9
 typedef struct packed {
   INST inst;
   // logic [4:0] rob_num;
+  ADDR NPC;
   logic [5:0] tag;
   logic [5:0] t_old;
 } robItem;
 
 module FIFO #(
-    parameter DEPTH = 32,  // num elements
-    parameter WIDTH = $bits(robItem),  //32, // num bits per element
+    parameter DEPTH = 32, // num elements
+    parameter WIDTH = $bits(robItem),//32, // num bits per element
     localparam CNT_BITS = $clog2(DEPTH)
 ) (
-    input                     clock,
-    input                     reset,
-    input                     wr_en,
-    input                     rd_en,
-    input        [ WIDTH-1:0] wr_data,
-    input                     err,
-    output logic              wr_valid,
-    output logic              rd_valid,
-    output logic [ WIDTH-1:0] rd_data,
+    input                       clock, 
+    input                       reset,
+    input                       wr_en,
+    input                       rd_en,
+    input           [WIDTH-1:0] wr_data,
+    input                       err,
+    output logic                wr_valid,
+    output logic                rd_valid,
+    output logic    [WIDTH-1:0] rd_data,
     output logic [CNT_BITS:0] spots,
-    output logic              full
+    output logic                full
 );
 
-  logic [$clog2(DEPTH)-1:0] head, next_head, old_head;
-  logic [$clog2(DEPTH)-1:0] tail, next_tail;
-  logic exception, next_ex;
+    logic [$clog2(DEPTH)-1:0] head, next_head;
+    logic [$clog2(DEPTH)-1:0] tail, next_tail;
+    logic [DEPTH-1:0] [WIDTH-1:0] buffer;
+    logic [$clog2(DEPTH):0] cnt, next_cnt;
+    logic empty;
+    //logic head_overwritten;
 
-  memDP #(
-      .WIDTH     (WIDTH),
-      .DEPTH     (DEPTH),
-      .READ_PORTS(1),
-      .BYPASS_EN (0)
-  ) fifo_mem (
-      .clock(clock),
-      .reset(reset),
+    assign empty    = cnt == '0;
+    assign full     = cnt == DEPTH;
+    assign spots     = DEPTH - cnt;
 
-      .re   (rd_valid),
-      .raddr(head),
-      .rdata(rd_data),
+    always_comb begin
+        rd_valid    = rd_en && !empty;
+        next_head   = rd_valid ? (head + 1) % DEPTH : head;
 
-      .we   (wr_valid),
-      .waddr(tail),
-      .wdata(wr_data)
-  );
+        wr_valid    = wr_en && (!full || rd_valid);
+        next_tail   = (wr_valid ? (tail + 1) % DEPTH : tail);
 
-  logic [$clog2(DEPTH):0] cnt, next_cnt, free;
+        next_cnt    = cnt + wr_valid - rd_valid;
 
-  logic empty;
-  assign empty    = cnt == '0;
-  assign full     = cnt == DEPTH;
-  assign spots    = DEPTH - cnt;
-  assign old_head = exception ? old_head : head;
-
-  always_comb begin
-    next_ex = err || (old_head != head);
-
-    rd_valid = next_ex ? !empty : (rd_en && !empty);
-    next_head = next_ex && (old_head!=head) ? head - 1 : (next_ex ? tail : (rd_valid ? (head + 1) % DEPTH : head));
-
-    wr_valid = next_ex ? 1'b0 : wr_en && (!full || rd_valid);
-    next_tail = next_ex && (old_head!=head)? tail - 1 : (wr_valid ? (tail + 1) % DEPTH : tail);
-
-    next_cnt = cnt + wr_valid - rd_valid;
-  end
-
-
-  always_ff @(posedge clock) begin
-    if (reset) begin
-      cnt <= '0;
-      head <= '0;
-      tail <= '0;
-      exception <= '0;
-    end else begin
-      cnt <= next_cnt;
-      head <= next_head;
-      tail <= next_tail;
-      exception <= next_ex;
+        if(rd_valid) begin
+          rd_data = buffer[head];
+          //buffer[head] = '0;
+          //head_overwritten = 0'b1;;
+        end
+        if(wr_valid) begin
+          buffer[tail] = wr_data;
+          //next_tail = tail+1;
+        end
     end
-  end
+
+    always_ff @(posedge clock) begin
+        if (reset) begin
+            cnt  <= '0;
+            head <= '0;
+            tail <= '0;
+        end else begin
+            cnt  <= next_cnt;
+            head <= next_head;
+            tail <= next_tail;
+        end
+    end
 
 endmodule
 
 
 module rob #(
     parameter DEPTH = 32,  // num elements
-    parameter WIDTH = 44,  // num bits per element 
+    parameter WIDTH = $bits(robItem),  // num bits per element 
                            //(32 bits per insn + log2(64) = 6 bits each for T & Told)
     localparam CNT_BITS = $clog2(DEPTH)
 ) (
@@ -109,6 +96,8 @@ module rob #(
     output logic [CNT_BITS:0] free_spots,
     output logic              full
 );
+
+  
 
   FIFO myfifo (
       .clock(clock),

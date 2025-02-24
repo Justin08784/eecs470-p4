@@ -107,10 +107,10 @@ module FIFO_test();
         rd_en = 0;
 
         // ---------- Test 1.5 ---------- //
-        $display("\nTest 1.5: error on empty");
-        err = 1;
-        @(negedge clock);
-        err = 0;
+        // $display("\nTest 1.5: error on empty");
+        // err = 1;
+        // @(negedge clock);
+        // err = 0;
 
         // ---------- Test 2 ---------- //
         $display("\nTest 2: Write and read with one cycle wait");
@@ -127,7 +127,7 @@ module FIFO_test();
         @(negedge clock);
         rd_en = 0;
 
-        // ---------- Test 3 ---------- //
+        // // ---------- Test 3 ---------- //
         $display("\nTest 3: Write and read with no wait");
         $display("Write 1 value");
         wr_en = 1;
@@ -199,44 +199,44 @@ module FIFO_test();
         end
 
         // // ---------- Test 11.5 ---------- //
-        $display("\nTest 11.5: Error on full");
-        rd_en = 0;
-        wr_en = 1;
-        //cnt = 1;
-        while (!full) begin
-            cnt++;
-            @(negedge clock);
-        end
-        wr_en = 0;
-        @(negedge clock);
-        err = 1;
-        @(negedge clock);
-        err = 0;
-        while (cnt > 0) begin
-            cnt--;
-            @(negedge clock);
-        end
-
-        // // ---------- Test 12 ---------- //
-        // $display("\nTest 12: Invalid read");
-        // rd_en = 1;
-        // @(negedge clock);
+        // $display("\nTest 11.5: Error on full");
         // rd_en = 0;
-
-        // // ---------- Test 13 ---------- //
-        // $display("\nTest 13: Four simultaneous reads and writes");
-        // rd_en = 1;
         // wr_en = 1;
-        // repeat (4) @(negedge clock);
+        // //cnt = 1;
+        // while (!full) begin
+        //     cnt++;
+        //     @(negedge clock);
+        // end
         // wr_en = 0;
+        // @(negedge clock);
+        // err = 1;
+        // @(negedge clock);
+        // err = 0;
+        // while (cnt > 0) begin
+        //     cnt--;
+        //     @(negedge clock);
+        // end
 
-        // // ---------- Test 14 ---------- //
-        // $display("\nTest 14: Read last item");
-        // @(negedge clock);
-        // rd_en = 0;
+        // ---------- Test 12 ---------- //
+        $display("\nTest 12: Invalid read");
+        rd_en = 1;
+        @(negedge clock);
+        rd_en = 0;
 
-        // @(negedge clock);
-        // @(negedge clock);
+        // ---------- Test 13 ---------- //
+        $display("\nTest 13: Four simultaneous reads and writes");
+        rd_en = 1;
+        wr_en = 1;
+        repeat (4) @(negedge clock);
+        wr_en = 0;
+
+        // ---------- Test 14 ---------- //
+        $display("\nTest 14: Read last item");
+        @(negedge clock);
+        rd_en = 0;
+
+        @(negedge clock);
+        @(negedge clock);
 
         $display("\n\033[32m@@@ Passed\033[0m\n");
 
