@@ -57,10 +57,7 @@ module FIFO #(
           //buffer[head] = '0;
           //head_overwritten = 0'b1;;
         end
-        if(wr_valid) begin
-          buffer[tail] = wr_data;
-          //next_tail = tail+1;
-        end
+
     end
 
     always_ff @(posedge clock) begin
@@ -72,6 +69,11 @@ module FIFO #(
             cnt  <= next_cnt;
             head <= next_head;
             tail <= next_tail;
+
+            if(wr_valid) begin
+            buffer[tail] <= wr_data;
+            //next_tail = tail+1;
+            end
         end
     end
 
