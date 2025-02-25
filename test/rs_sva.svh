@@ -1,3 +1,5 @@
+`include "sys_defs.svh"
+
 `ifndef RS_SVA_SVH
 `define RS_SVA_SVH
 
@@ -40,7 +42,9 @@ module rs_sva #(parameter
     input   logic           [N-1:0] c_en,
     input   PHYS_REG_IDX    [N-1:0] c_ts
 );
-    RS_ENTRY [RS_SZ-1:0] entries, entries_n;
+    RS_ENTRY [RS_SZ-1:0] entries;
+    int num_free_fus [int];
+    int cdb_tags [int];
 
     // always_ff @(posedge clock) begin
     //     if (reset || flush) begin
@@ -52,11 +56,60 @@ module rs_sva #(parameter
 
     initial begin forever begin
         @(posedge clock);
+        // clear (insn going to ex)
+        for (int rs = 0; rs < RS_SZ; ++rs) begin
+            if (entries[rs].issued) begin
+                entries[rs] = '0;
+            end
+        end
+
+        // ready insns (cdb)
+        for (int rs = 0; rs < RS_SZ; ++rs) begin
+            for (int n = 0; n < N; ++n) begin
+                if (entries[rs].dat.t1 == c_ts[n]) begin
+                    entries[rs].dat.t1_rdy = 1;
+                end
+
+                if (entries[rs].dat.t2 == c_ts[n]) begin
+                    entries[rs].dat.t2_rdy = 1;
+                end
+            end
+        end
+
+        // issue
+        num_free_fus[FU_ALU] = $countones(fu_rdy_alu);
+        num_free_fus[FU_MULT] = $countones(fu_rdy_mult);
+        num_free_fus[FU_STORE] = $countones(fu_rdy_store);
+        num_free_fus[FU_LOAD] = $countones(fu_rdy_load);
+
+        for (int rs = 0, int fu = 0; rs < RS_SZ; ++rs) begin
+            fu = entries[rs].dat.fu_idx;
+            if (entries[rs].dat.t1_rdy 
+                && entries[rs].dat.t2_rdy
+                && num_free_fus[fu] > 0
+            ) begin
+                num_free_fus[fu] -= 1;
+                entries[rs].issued = 1;
+            end
+        end
+
+        for (int n = 0, int rs = 0; n < N; ++n) begin
+            if (!d_vld[n])
+                continue;
+            
+            for (; rs < RS_SZ; ++rs) begin
+                if (!entries[rs].busy)
+                    continue;
+                entries[rs].busy   = 1;
+                entries[rs].issued = 0;
+                entries[rs].dat    = d_dat[n];
+                break;
+            end
+        end
+
 
         if (reset || flush) begin
             entries = '0;
-        end else begin
-            // entries = entries_n;
         end
     end end
 
