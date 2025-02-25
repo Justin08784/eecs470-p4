@@ -67,7 +67,6 @@ module rs_testbench;
     logic clock;
     logic reset;
     logic flush;
-    RS_ENTRY [RS_SZ-1:0] entries_dbg;
 
     logic           [$clog2(N):0] rs_scnt; // to dispatcher
     logic           [N-1:0] d_vld;     // which dispatch lines are valid? (from dispatcher; dep. on rs_scnt)
@@ -94,8 +93,6 @@ module rs_testbench;
     // DATA r1, r2, correct_r, mul_r;
     string fmt;
 
-    logic [N-1:0][RS_SZ-1:0] gbus_free_dbg;
-
     rs # (
         .N(N),
         .RS_SZ(RS_SZ),
@@ -108,8 +105,6 @@ module rs_testbench;
         .clock(clock),
         .reset(reset),
         .flush(1'b0),
-        .entries_dbg(entries_dbg),
-        .gbus_free_dbg(gbus_free_dbg),
 
         .rs_scnt(rs_scnt),
         .d_vld(d_vld),
@@ -145,8 +140,7 @@ module rs_testbench;
         .clock(clock),
         .reset(reset),
         .flush(1'b0),
-        .entries_dbg(entries_dbg),
-        .gbus_free_dbg(gbus_free_dbg),
+        .entries_dut(rs_dut.entries),
 
         .rs_scnt(rs_scnt),
         .d_vld(d_vld),
@@ -255,8 +249,6 @@ module rs_testbench;
         @(posedge clock);
         // $display("s_vld: %b", s_vld);
         @(negedge clock);
-        marker();
-        print_entries(entries_dbg);
 
         clr_dispatch(0);
         clr_dispatch(1);
@@ -264,8 +256,6 @@ module rs_testbench;
         set_cdb(1, 2);
         @(posedge clock);
         @(negedge clock);
-        marker();
-        print_entries(entries_dbg);
 
         // ask about timing; why does s_vld display need to be after posedge?
         clr_cdb(0);
@@ -273,26 +263,13 @@ module rs_testbench;
         set_fu(FU_ALU, 0);
         @(posedge clock);
         @(negedge clock);
-        marker();
-        print_entries(entries_dbg);
 
         @(posedge clock);
         @(negedge clock);
-        marker();
-        print_entries(entries_dbg);
 
 
     endtask
     initial begin
-        /* some unused debugs */
-        // $display("rs_scnt: %b", rs_scnt);
-        // for (int i = 0; i < N; ++i) begin
-        //     $display("%b", gbus_free_dbg[i]);
-        // end
-        // for (int i = 0; i < N; ++i) begin
-        //     $display("d_gnt_bus: %b", d_gnt_bus_dbg[i]);
-        // end
-
         /* initialize */
         clock           = 0;
         failed          = 0;
@@ -321,14 +298,26 @@ module rs_testbench;
 
         for (int i = 0; i < 10; ++i) begin
             @(negedge clock);
-            // marker();
-            // print_entries(entries_dbg);
         end
 
 
-        // @(negedge clock);
-        // marker();
-        // print_entries(entries_dbg);
+        clr_dispatch(1);
+        set_cdb(0, 2);
+        @(negedge clock);
+
+        clr_cdb(0);
+        set_cdb(1, 4);
+        @(negedge clock);
+
+        clr_cdb(1);
+        set_fu(FU_MULT, 0);
+        set_fu(FU_MULT, 1);
+        @(negedge clock);
+
+        @(negedge clock);
+        @(negedge clock);
+        @(negedge clock);
+        @(negedge clock);
 
         if (failed)
             $display("@@@ Failed\n");

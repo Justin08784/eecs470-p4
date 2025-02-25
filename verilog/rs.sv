@@ -27,8 +27,6 @@ module rs #(parameter
     input clock,
     input reset,
     input flush,
-    output RS_ENTRY [RS_SZ-1:0] entries_dbg,
-    output logic [N-1:0][RS_SZ-1:0] gbus_free_dbg,
 
     // dispatch
     /*
@@ -91,7 +89,6 @@ module rs #(parameter
 
 );
     RS_ENTRY [RS_SZ-1:0]       entries, entries_n;
-    assign entries_dbg = entries;
 
     logic [RS_SZ-1:0] busy_vec;
     logic [RS_SZ-1:0] issd_vec;
@@ -306,7 +303,6 @@ module rs #(parameter
         .req    (free_entries),
         .gnt_bus(gbus_free)
     );
-    assign gbus_free_dbg = gbus_free;
 
     // select valid dispatches
     logic [N-1:0][N-1:0] gbus_d_vld;

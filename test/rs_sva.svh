@@ -69,7 +69,7 @@ module rs_sva #(parameter
     input clock,
     input reset,
     input flush,
-    input RS_ENTRY [RS_SZ-1:0] entries_dbg,
+    input RS_ENTRY [RS_SZ-1:0] entries_dut,
     input logic [N-1:0][RS_SZ-1:0] gbus_free_dbg,
 
     // dispatch
@@ -170,7 +170,7 @@ module rs_sva #(parameter
         print_entries(entries);
         @(posedge clock);
         $display("<><><><><>");
-        print_entries(entries_dbg);
+        print_entries(entries_dut);
     end end
 
     // always_ff @(posedge clock) begin
@@ -186,7 +186,7 @@ module rs_sva #(parameter
     generate
     for (genvar i = 0; i < RS_SZ; i++) begin : gen_vecs
         assign busy_sva[i] = entries[i].busy;
-        assign busy_dut[i] = entries_dbg[i].busy;
+        assign busy_dut[i] = entries_dut[i].busy;
     end
     endgenerate
 
@@ -194,7 +194,6 @@ module rs_sva #(parameter
         property same_num_busy;
             disable iff (reset || flush)
             $countones(busy_sva) == $countones(busy_dut);
-            // entries == entries_dbg;
         endproperty
     endclocking
 
@@ -204,7 +203,7 @@ module rs_sva #(parameter
             $display("\n\033[31m@@@ Failed at time %4d\033[0m", $time);
             $display("\033[31mError: %0s\033[0m\n\n", msg);
             print_entries(entries);
-            print_entries(entries_dbg);
+            print_entries(entries_dut);
             $finish;
         end
     endtask
