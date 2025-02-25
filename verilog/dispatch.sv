@@ -5,14 +5,41 @@
 module dispatch (
     input clock,
     input reset,
+
+    //incoming instructions from decode to dispatch
     input ID_EX_PACKET inst_fetched [`N-1:0],
+
+    //incoming state of the rs_table
     input RS_ENTRY rs_table [`RS_SZ-1:0],
+
+    //counts of how many free entries in rob and lsq
     input [$clog(`ROB_SZ):0] rob_free,
     input [$clog(`LSQ_SZ):0] lsq_free,
+
+    //incoming state of the map table
+    input PHYS_REG_IDX map_table [`PHYS_REG_SZ_R10K-1:0], //NOT SURE IF THIS IS THE RIGHT SIZE TO DECLARE
+
+    //current free list
+    input PHYS_REG_IDX free_list [`PHYS_REG_SZ_R10K-1:0], //NOT SURE IF THIS IS THE RIGHT SIZE TO DECLARE
+
+    //updated state of the rs_table back to rs.sv
     output [$bits(`RS_ENTRY)-1:0] next_rs [RS_SZ-1:0],
-    output [$clog(`N):0] dispatch_cnt, //tells stage_if how many insts to dispatch
-    output dispatch_vld //will be used to set if_valid to false if cnt == 0
-    output INST ROB_isnts [`N:0]
+
+    //tells stage_if/id how many insts to dispatch
+    output [$clog(`N):0] dispatch_cnt, 
+    //sets if_valid to false if cnt == 0
+    output dispatch_vld,
+
+    //output instructions to enter into the ROB
+    output INST ROB_isnts [`N:0],
+    output PHYS_REG_IDX ROB_tags [`N:0],
+    output [`N:0] ROB_vld,
+
+    //updated state of the map table
+    output PHYS_REG_IDX next_map [`PHYS_REG_SZ_R10K-1:0], //NOT SURE IF THIS IS THE RIGHT SIZE TO DECLARE
+
+    //new free list
+    output PHYS_REG_IDX free_list [`PHYS_REG_SZ_R10K-1:0], //NOT SURE IF THIS IS THE RIGHT SIZE TO DECLARE
 );
 
 logic [`RS_SZ-1:0] pos_vld;
@@ -64,14 +91,6 @@ always_comb begin
     end
 end
 
-// always_ff(@posedge clock) begin
-//     if (reset) begin
-//         rs_table <= '0;
-//     end
-//     else begin
-//         rs_table <= next_rs;
-//     end
-// end
 
 endmodule
 
