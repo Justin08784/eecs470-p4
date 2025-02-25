@@ -208,7 +208,7 @@ build/rs.cov: $(RS_FILES)
 synth/rs.vg: $(RS_FILES)
 
 # TODO: add any files required for the ROB here (besides test/rob_test.sv and verilog/rob.sv)
-ROB_FILES = verilog/sys_defs.svh
+ROB_FILES = verilog/sys_defs.svh verilog/memDP.sv
 build/rob.simv: $(ROB_FILES)
 build/rob.cov: $(ROB_FILES)
 synth/rob.vg: $(ROB_FILES)
