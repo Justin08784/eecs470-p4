@@ -318,37 +318,12 @@ module rs_testbench;
         // set_dispatch(0, 3, 6, 0, 0, 1);
         @(posedge clock);
         // $display("s_vld: %b", s_vld);
-        @(negedge clock);
-        marker();
-        print_entries(entries_dbg);
 
-        @(negedge clock);
-        marker();
-        print_entries(entries_dbg);
-        @(negedge clock);
-        marker();
-        print_entries(entries_dbg);
-        @(negedge clock);
-        marker();
-        print_entries(entries_dbg);
-        @(negedge clock);
-        marker();
-        print_entries(entries_dbg);
-        @(negedge clock);
-        marker();
-        print_entries(entries_dbg);
-        @(negedge clock);
-        marker();
-        print_entries(entries_dbg);
-        @(negedge clock);
-        marker();
-        print_entries(entries_dbg);
-        @(negedge clock);
-        marker();
-        print_entries(entries_dbg);
-        @(negedge clock);
-        marker();
-        print_entries(entries_dbg);
+        for (int i = 0; i < 10; ++i) begin
+            @(negedge clock);
+            // marker();
+            // print_entries(entries_dbg);
+        end
 
 
         // @(negedge clock);

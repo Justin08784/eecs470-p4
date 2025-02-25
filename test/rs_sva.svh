@@ -161,18 +161,16 @@ module rs_sva #(parameter
             end
         end
 
-        @(posedge clock);
         if (reset || flush) begin
             entries = '0;
         end else begin
             entries = entries_n;
         end
-        // marker();
-        // print_entries(entries);
-        // $display("<><><><><>");
-        // print_entries(entries_dbg);
-        // print_entries(entries_n);
-        // $display("x val!: %d", x);
+        marker();
+        print_entries(entries);
+        @(posedge clock);
+        $display("<><><><><>");
+        print_entries(entries_dbg);
     end end
 
     // always_ff @(posedge clock) begin
@@ -183,10 +181,20 @@ module rs_sva #(parameter
     //     end
     // end
 
+    logic [RS_SZ-1:0] busy_sva;
+    logic [RS_SZ-1:0] busy_dut;
+    generate
+    for (genvar i = 0; i < RS_SZ; i++) begin : gen_vecs
+        assign busy_sva[i] = entries[i].busy;
+        assign busy_dut[i] = entries_dbg[i].busy;
+    end
+    endgenerate
+
     clocking cb @(posedge clock);
-        property fuck;
-            disable iff (reset || flush || 1)
-            entries == entries_dbg;
+        property same_num_busy;
+            disable iff (reset || flush)
+            $countones(busy_sva) == $countones(busy_dut);
+            // entries == entries_dbg;
         endproperty
     endclocking
 
@@ -195,15 +203,15 @@ module rs_sva #(parameter
             // print_failure();
             $display("\n\033[31m@@@ Failed at time %4d\033[0m", $time);
             $display("\033[31mError: %0s\033[0m\n\n", msg);
-            $display("shit fest: %b", entries);
-            $display("shit fest: %b", entries_dbg);
+            print_entries(entries);
+            print_entries(entries_dbg);
             $finish;
         end
     endtask
 
 
-    AssignedSpotOneHot:  assert property(cb.fuck)     
-        else exit_on_error ("fuck!");
+    Same_Num_Busy:  assert property(cb.same_num_busy)
+        else exit_on_error ("diff num busy");
 
 endmodule
 
