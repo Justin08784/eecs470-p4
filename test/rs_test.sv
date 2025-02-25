@@ -151,14 +151,10 @@ module rs_testbench;
         .fu_rdy_store(fu_rdy_store),
         .fu_rdy_load(fu_rdy_load),
 
-        .fu_vld_alu(fu_vld_alu),
-        .fu_vld_mult(fu_vld_mult),
-        .fu_vld_store(fu_vld_store),
-        .fu_vld_load(fu_vld_load),
-        .fu_dat_alu(fu_dat_alu),
-        .fu_dat_mult(fu_dat_mult),
-        .fu_dat_store(fu_dat_store),
-        .fu_dat_load(fu_dat_load),
+        .fu_vld_alu_dut(rs_dut.fu_vld_alu),
+        .fu_vld_mult_dut(rs_dut.fu_vld_mult),
+        .fu_vld_store_dut(rs_dut.fu_vld_store),
+        .fu_vld_load_dut(rs_dut.fu_vld_load),
 
         .c_en(c_en),
         .c_ts(c_ts)

@@ -69,6 +69,11 @@ module rs_sva #(parameter
     input clock,
     input reset,
     input flush,
+
+    input   logic       [NUM_FU_ALU-1:0]    fu_vld_alu_dut,
+    input   logic       [NUM_FU_MULT-1:0]   fu_vld_mult_dut,
+    input   logic       [NUM_FU_STORE-1:0]  fu_vld_store_dut,
+    input   logic       [NUM_FU_LOAD-1:0]   fu_vld_load_dut,
     input RS_ENTRY [RS_SZ-1:0] entries_dut,
     input logic [N-1:0][RS_SZ-1:0] gbus_free_dbg,
 
@@ -83,20 +88,12 @@ module rs_sva #(parameter
     input   logic       [NUM_FU_STORE-1:0]  fu_rdy_store,
     input   logic       [NUM_FU_LOAD-1:0]   fu_rdy_load,
 
-    input   logic       [NUM_FU_ALU-1:0]    fu_vld_alu,
-    input   logic       [NUM_FU_MULT-1:0]   fu_vld_mult,
-    input   logic       [NUM_FU_STORE-1:0]  fu_vld_store,
-    input   logic       [NUM_FU_LOAD-1:0]   fu_vld_load,
-    input   ID_RESULT   [NUM_FU_ALU-1:0]    fu_dat_alu,
-    input   ID_RESULT   [NUM_FU_MULT-1:0]   fu_dat_mult,
-    input   ID_RESULT   [NUM_FU_STORE-1:0]  fu_dat_store,
-    input   ID_RESULT   [NUM_FU_LOAD-1:0]   fu_dat_load,
-
     input   logic           [N-1:0] c_en,
     input   PHYS_REG_IDX    [N-1:0] c_ts
 );
     RS_ENTRY [RS_SZ-1:0] entries, entries_n;
     int num_free_fus [int];
+    int num_issue_fus [int];
     int cdb_tags [int];
 
     logic [RS_SZ-1:0] busy_sva;
@@ -110,6 +107,7 @@ module rs_sva #(parameter
         assign issd_sva[i] = entries[i].issued;
     end
     endgenerate
+    int rs_scnt_sva;
 
     // always_ff @(posedge clock) begin
     //     if (reset || flush) begin
@@ -147,6 +145,10 @@ module rs_sva #(parameter
         num_free_fus[FU_MULT] = $countones(fu_rdy_mult);
         num_free_fus[FU_STORE] = $countones(fu_rdy_store);
         num_free_fus[FU_LOAD] = $countones(fu_rdy_load);
+        num_issue_fus[FU_ALU]   = 0;
+        num_issue_fus[FU_MULT]  = 0;
+        num_issue_fus[FU_STORE] = 0;
+        num_issue_fus[FU_LOAD]  = 0;
 
         for (int rs = 0, int fu = 0; rs < RS_SZ; ++rs) begin
             fu = entries_n[rs].dat.fu_idx;
@@ -156,9 +158,11 @@ module rs_sva #(parameter
             ) begin
                 num_free_fus[fu] -= 1;
                 entries_n[rs].issued = 1;
+                num_issue_fus[fu] += 1;
             end
         end
 
+        // dispatch
         for (int n = 0, int rs = 0; n < N; ++n) begin
             if (!d_vld[n])
                 continue;
@@ -172,6 +176,7 @@ module rs_sva #(parameter
                 break;
             end
         end
+        assign rs_scnt_sva = $min($countones(~busy_sva | issd_sva), N);
 
         // if (reset || flush) begin
         //     entries = '0;
@@ -204,7 +209,13 @@ module rs_sva #(parameter
 
         property same_rs_scnt;
             disable iff (reset || flush)
-            rs_scnt == $min($countones(~busy_sva | issd_sva), N);
+            rs_scnt == rs_scnt_sva;
+        endproperty
+
+        property issue_cnts;
+            disable iff (reset || flush)
+            /*TODO*/
+            1;
         endproperty
     endclocking
 
