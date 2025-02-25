@@ -364,8 +364,8 @@ module rs_testbench;
         @(negedge clock);
         @(negedge clock);
         reset = 0;
-        @(negedge clock);
-        @(negedge clock);
+        // @(negedge clock);
+        // @(negedge clock);
 
 
         // @(negedge clock);

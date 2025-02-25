@@ -42,7 +42,7 @@ module rs_sva #(parameter
     input   logic           [N-1:0] c_en,
     input   PHYS_REG_IDX    [N-1:0] c_ts
 );
-    RS_ENTRY [RS_SZ-1:0] entries;
+    RS_ENTRY [RS_SZ-1:0] entries, entries_n;
     int num_free_fus [int];
     int cdb_tags [int];
 
@@ -55,23 +55,24 @@ module rs_sva #(parameter
     // end
 
     initial begin forever begin
-        @(posedge clock);
+        entries_n = entries;
+
         // clear (insn going to ex)
         for (int rs = 0; rs < RS_SZ; ++rs) begin
-            if (entries[rs].issued) begin
-                entries[rs] = '0;
+            if (entries_n[rs].issued) begin
+                entries_n[rs] = '0;
             end
         end
 
         // ready insns (cdb)
         for (int rs = 0; rs < RS_SZ; ++rs) begin
             for (int n = 0; n < N; ++n) begin
-                if (entries[rs].dat.t1 == c_ts[n]) begin
-                    entries[rs].dat.t1_rdy = 1;
+                if (entries_n[rs].dat.t1 == c_ts[n]) begin
+                    entries_n[rs].dat.t1_rdy = 1;
                 end
 
-                if (entries[rs].dat.t2 == c_ts[n]) begin
-                    entries[rs].dat.t2_rdy = 1;
+                if (entries_n[rs].dat.t2 == c_ts[n]) begin
+                    entries_n[rs].dat.t2_rdy = 1;
                 end
             end
         end
@@ -83,13 +84,13 @@ module rs_sva #(parameter
         num_free_fus[FU_LOAD] = $countones(fu_rdy_load);
 
         for (int rs = 0, int fu = 0; rs < RS_SZ; ++rs) begin
-            fu = entries[rs].dat.fu_idx;
-            if (entries[rs].dat.t1_rdy 
-                && entries[rs].dat.t2_rdy
+            fu = entries_n[rs].dat.fu_idx;
+            if (entries_n[rs].dat.t1_rdy 
+                && entries_n[rs].dat.t2_rdy
                 && num_free_fus[fu] > 0
             ) begin
                 num_free_fus[fu] -= 1;
-                entries[rs].issued = 1;
+                entries_n[rs].issued = 1;
             end
         end
 
@@ -98,20 +99,25 @@ module rs_sva #(parameter
                 continue;
             
             for (; rs < RS_SZ; ++rs) begin
-                if (!entries[rs].busy)
+                if (!entries_n[rs].busy)
                     continue;
-                entries[rs].busy   = 1;
-                entries[rs].issued = 0;
-                entries[rs].dat    = d_dat[n];
+                entries_n[rs].busy   = 1;
+                entries_n[rs].issued = 0;
+                entries_n[rs].dat    = d_dat[n];
                 break;
             end
         end
 
-
-        if (reset || flush) begin
-            entries = '0;
-        end
+        @(posedge clock);
     end end
+
+    always_ff @(posedge clock) begin
+        if (reset || flush) begin
+            entries <= '0;
+        end else begin
+            entries <= entries_n;
+        end
+    end
 
     clocking cb @(posedge clock);
         property fuck;
