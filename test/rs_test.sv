@@ -7,16 +7,68 @@ Ok, checking the accuracy of FF state like entries_dbg seems pretty
 straightforward. But how to check correctness of combinational stuff like
 s_vld, rs_scnt? Aren't there timing issues?
 */
+localparam int N = 2;
+localparam int RS_SZ = 8;
+localparam int FU_IDX_NUM = `FU_IDX_NUM;
+localparam int NUM_FU_ALU = 1;
+localparam int NUM_FU_MULT = 2;
+localparam int NUM_FU_STORE = 4;
+localparam int NUM_FU_LOAD = 4;
+
+
+typedef struct packed {
+    logic       [$clog2(N):0]       rs_scnt; // to dispatcher
+    logic       [NUM_FU_ALU-1:0]    fu_vld_alu;
+    logic       [NUM_FU_MULT-1:0]   fu_vld_mult;
+    logic       [NUM_FU_STORE-1:0]  fu_vld_store;
+    logic       [NUM_FU_LOAD-1:0]   fu_vld_load;
+    ID_RESULT   [NUM_FU_ALU-1:0]    fu_dat_alu;
+    ID_RESULT   [NUM_FU_MULT-1:0]   fu_dat_mult;
+    ID_RESULT   [NUM_FU_STORE-1:0]  fu_dat_store;
+    ID_RESULT   [NUM_FU_LOAD-1:0]   fu_dat_load;
+} RS_OUTS;
+
+RS_OUTS model_out;
+function int model_update(
+    // input   clock,
+    input   reset,
+    input   flush,
+
+    // dispatch
+    input   logic       [$clog2(N):0]       rs_scnt, // to dispatcher
+    input   logic       [N-1:0]             d_vld,     // which dispatch lines are valid? (from dispatcher; dep. on rs_scnt)
+    input   ID_RESULT   [N-1:0]             d_dat,
+
+    // issue
+    input   logic       [NUM_FU_ALU-1:0]    fu_rdy_alu,
+    input   logic       [NUM_FU_MULT-1:0]   fu_rdy_mult,
+    input   logic       [NUM_FU_STORE-1:0]  fu_rdy_store,
+    input   logic       [NUM_FU_LOAD-1:0]   fu_rdy_load,
+
+    input   logic       [NUM_FU_ALU-1:0]    fu_vld_alu,
+    input   logic       [NUM_FU_MULT-1:0]   fu_vld_mult,
+    input   logic       [NUM_FU_STORE-1:0]  fu_vld_store,
+    input   logic       [NUM_FU_LOAD-1:0]   fu_vld_load,
+    input   ID_RESULT   [NUM_FU_ALU-1:0]    fu_dat_alu,
+    input   ID_RESULT   [NUM_FU_MULT-1:0]   fu_dat_mult,
+    input   ID_RESULT   [NUM_FU_STORE-1:0]  fu_dat_store,
+    input   ID_RESULT   [NUM_FU_LOAD-1:0]   fu_dat_load,
+
+    input   logic           [N-1:0] c_en,
+    input   PHYS_REG_IDX    [N-1:0] c_ts
+
+);
+    static RS_ENTRY [RS_SZ-1:0] entries;
+
+    if (reset || flush) begin
+        entries = '0;
+    end
+
+endfunction
+
 
 module rs_testbench;
     // constants
-    localparam int N = 2;
-    localparam int RS_SZ = 8;
-    localparam int FU_IDX_NUM = `FU_IDX_NUM;
-    localparam int NUM_FU_ALU = 1;
-    localparam int NUM_FU_MULT = 2;
-    localparam int NUM_FU_STORE = 4;
-    localparam int NUM_FU_LOAD = 4;
 
     // signals
     logic clock;
@@ -306,6 +358,14 @@ module rs_testbench;
         fu_rdy_load     = '0;
         c_en            = '0;
         c_ts            = '0;
+
+        // test_1inst();
+        reset = 1;
+        @(negedge clock);
+        @(negedge clock);
+        reset = 0;
+        @(negedge clock);
+        @(negedge clock);
 
 
         // @(negedge clock);

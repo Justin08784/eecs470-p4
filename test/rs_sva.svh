@@ -40,6 +40,47 @@ module rs_sva #(parameter
     input   logic           [N-1:0] c_en,
     input   PHYS_REG_IDX    [N-1:0] c_ts
 );
+    RS_ENTRY [RS_SZ-1:0] entries, entries_n;
+
+    // always_ff @(posedge clock) begin
+    //     if (reset || flush) begin
+    //         entries <= '0;
+    //     end else begin
+    //         entries <= entries_n;
+    //     end
+    // end
+
+    initial begin forever begin
+        @(posedge clock);
+
+        if (reset || flush) begin
+            entries = '0;
+        end else begin
+            // entries = entries_n;
+        end
+    end end
+
+    clocking cb @(posedge clock);
+        property fuck;
+            disable iff (reset || flush)
+            entries == entries_dbg;
+        endproperty
+    endclocking
+
+    task exit_on_error(input string msg);
+        begin
+            // print_failure();
+            $display("\n\033[31m@@@ Failed at time %4d\033[0m", $time);
+            $display("\033[31mError: %0s\033[0m\n\n", msg);
+            $display("shit fest: %b", entries);
+            $display("shit fest: %b", entries_dbg);
+            $finish;
+        end
+    endtask
+
+
+    AssignedSpotOneHot:  assert property(cb.fuck)     
+        else exit_on_error ("fuck!");
 
 endmodule
 
