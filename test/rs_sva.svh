@@ -66,30 +66,29 @@ module rs_sva #(parameter
     NUM_FU_LOAD=`NUM_FU_LOAD,
     NUM_FU_STORE=`NUM_FU_STORE
 ) (
+    // ==== input lines so we can do our own parallel computation
     input clock,
     input reset,
     input flush,
-
-    input   logic       [NUM_FU_ALU-1:0]    fu_vld_alu_dut,
-    input   logic       [NUM_FU_MULT-1:0]   fu_vld_mult_dut,
-    input   logic       [NUM_FU_STORE-1:0]  fu_vld_store_dut,
-    input   logic       [NUM_FU_LOAD-1:0]   fu_vld_load_dut,
-    input RS_ENTRY [RS_SZ-1:0] entries_dut,
-    input logic [N-1:0][RS_SZ-1:0] gbus_free_dbg,
-
     // dispatch
     input   logic           [$clog2(N):0] rs_scnt, // to dispatcher
     input   logic           [N-1:0] d_vld,     // which dispatch lines are valid? (from dispatcher; dep. on rs_scnt)
     input   ID_RESULT       [N-1:0] d_dat,
-
     // issue
     input   logic       [NUM_FU_ALU-1:0]    fu_rdy_alu,
     input   logic       [NUM_FU_MULT-1:0]   fu_rdy_mult,
     input   logic       [NUM_FU_STORE-1:0]  fu_rdy_store,
     input   logic       [NUM_FU_LOAD-1:0]   fu_rdy_load,
-
+    // complete
     input   logic           [N-1:0] c_en,
-    input   PHYS_REG_IDX    [N-1:0] c_ts
+    input   PHYS_REG_IDX    [N-1:0] c_ts,
+
+    // ==== dut lines for comparison
+    input   logic       [NUM_FU_ALU-1:0]    fu_vld_alu_dut,
+    input   logic       [NUM_FU_MULT-1:0]   fu_vld_mult_dut,
+    input   logic       [NUM_FU_STORE-1:0]  fu_vld_store_dut,
+    input   logic       [NUM_FU_LOAD-1:0]   fu_vld_load_dut,
+    input   RS_ENTRY    [RS_SZ-1:0]         entries_dut
 );
     RS_ENTRY [RS_SZ-1:0] entries, entries_n;
     int num_free_fus [int];
@@ -256,8 +255,8 @@ module rs_sva #(parameter
         else exit_on_error ("diff num busy");
     Same_Rs_Scnt:  assert property(cb.same_rs_scnt)
         else exit_on_error ("diff rs scnt");
-    // Issue_Cnts:  assert property(cb.issue_cnts)
-    //     else exit_on_error ("diff issue cnts");
+    Issue_Cnts:  assert property(cb.issue_cnts)
+        else exit_on_error ("diff issue cnts");
 
 endmodule
 

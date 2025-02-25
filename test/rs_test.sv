@@ -140,7 +140,6 @@ module rs_testbench;
         .clock(clock),
         .reset(reset),
         .flush(1'b0),
-        .entries_dut(rs_dut.entries),
 
         .rs_scnt(rs_scnt),
         .d_vld(d_vld),
@@ -151,13 +150,15 @@ module rs_testbench;
         .fu_rdy_store(fu_rdy_store),
         .fu_rdy_load(fu_rdy_load),
 
+        .c_en(c_en),
+        .c_ts(c_ts),
+
+
+        .entries_dut(rs_dut.entries),
         .fu_vld_alu_dut(rs_dut.fu_vld_alu),
         .fu_vld_mult_dut(rs_dut.fu_vld_mult),
         .fu_vld_store_dut(rs_dut.fu_vld_store),
-        .fu_vld_load_dut(rs_dut.fu_vld_load),
-
-        .c_en(c_en),
-        .c_ts(c_ts)
+        .fu_vld_load_dut(rs_dut.fu_vld_load)
     );
 
     task set_dispatch(
