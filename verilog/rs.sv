@@ -239,10 +239,6 @@ module rs #(parameter
         fu_vld_mult     = '0;
         fu_vld_store    = '0;
         fu_vld_load     = '0;
-        // fu_dat_alu      = '0;
-        // fu_dat_mult     = '0;
-        // fu_dat_store    = '0;
-        // fu_dat_load     = '0;
 
         foreach (gbus_fu_rdy_alu[i, j]) begin
             if (gbus_fu_rdy_alu[i][j]) begin
@@ -284,6 +280,33 @@ module rs #(parameter
         /*
         TODO: We're not actually doing anything fu2issuer_Xs?
         Should we not set fu_dat_Xs? */
+    end
+
+    always_comb begin
+        fu_dat_alu      = '0;
+        fu_dat_mult     = '0;
+        fu_dat_store    = '0;
+        fu_dat_load     = '0;
+        foreach (fu2issuer_alu[fu, rs]) begin
+            if (!fu2issuer_alu[fu][rs]) begin
+                fu_dat_alu |= entries[rs].dat;
+            end
+        end
+        foreach (fu2issuer_mult[fu, rs]) begin
+            if (!fu2issuer_mult[fu][rs]) begin
+                fu_dat_mult |= entries[rs].dat;
+            end
+        end
+        foreach (fu2issuer_load[fu, rs]) begin
+            if (!fu2issuer_load[fu][rs]) begin
+                fu_dat_load |= entries[rs].dat;
+            end
+        end
+        foreach (fu2issuer_store[fu, rs]) begin
+            if (!fu2issuer_store[fu][rs]) begin
+                fu_dat_store |= entries[rs].dat;
+            end
+        end
     end
 
     /*
