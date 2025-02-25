@@ -1,6 +1,5 @@
 `include "sys_defs.svh"
 
-// `define fetch_cnt 19
 
 module dispatch (
     input clock,
@@ -17,7 +16,7 @@ module dispatch (
     input [$clog(`LSQ_SZ):0] lsq_free,
 
     //incoming state of the map table
-    input PHYS_REG_IDX map_table [`PHYS_REG_SZ_R10K-1:0], //NOT SURE IF THIS IS THE RIGHT SIZE TO DECLARE
+    input PHYS_REG_IDX map_table [31:0], //NOT SURE IF THIS IS THE RIGHT SIZE TO DECLARE
 
     //current free list
     input PHYS_REG_IDX free_list [`PHYS_REG_SZ_R10K-1:0], //NOT SURE IF THIS IS THE RIGHT SIZE TO DECLARE
@@ -36,10 +35,10 @@ module dispatch (
     output [`N:0] ROB_vld,
 
     //updated state of the map table
-    output PHYS_REG_IDX next_map [`PHYS_REG_SZ_R10K-1:0], //NOT SURE IF THIS IS THE RIGHT SIZE TO DECLARE
-
+    output PHYS_REG_IDX changed_map_tags [31:0],
+    output map_tag_vld [31:0],
     //new free list
-    output PHYS_REG_IDX free_list [`PHYS_REG_SZ_R10K-1:0], //NOT SURE IF THIS IS THE RIGHT SIZE TO DECLARE
+    output PHYS_REG_IDX changed_free_tags [`PHYS_REG_SZ_R10K-1:0]
 );
 
 logic [`RS_SZ-1:0] pos_vld;
