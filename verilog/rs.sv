@@ -28,8 +28,7 @@ module rs #(parameter
     input reset,
     input flush,
     output RS_ENTRY [RS_SZ-1:0] entries_dbg,
-    output logic [N-1:0][RS_SZ-1:0] free_gnt_bus_dbg,
-    output [N-1:0][RS_SZ-1:0] d_gnt_bus_dbg,
+    output logic [N-1:0][RS_SZ-1:0] gbus_free_dbg,
 
     // dispatch
     /*
@@ -291,18 +290,45 @@ module rs #(parameter
     assign rs_scnt = rs_cnt > N ? N : rs_cnt;
 
 
-    logic [N-1:0][RS_SZ-1:0]  free_gnt_bus;
-    logic [RS_SZ-1:0]          free_gnt;
+    // select free entries
+    /*
+    NOTE: The second psel, sel_d_vld, is not necessary if we assume dispatches
+    will compactly fill from the lowest indices. However, I am too lazy to
+    remember that when crafting tests. In addition, we will move this dispatch
+    logic to the dispatcher module which shall directly assign dispatches to
+    RS entries without this compressed intermediate d_vld, d_dat line crap.
+    */
+    logic [N-1:0][RS_SZ-1:0] gbus_free;
     psel_gen #(
         .WIDTH(RS_SZ),
         .REQS(N)
-    ) entries_psel (
+    ) sel_free_entries (
         .req    (free_entries),
-        .gnt    (free_gnt),
-        .gnt_bus(free_gnt_bus)
+        .gnt_bus(gbus_free)
+    );
+    assign gbus_free_dbg = gbus_free;
+
+    // select valid dispatches
+    logic [N-1:0][N-1:0] gbus_d_vld;
+    psel_gen #(
+        .WIDTH(N),
+        .REQS(N)
+    ) sel_d_vld (
+        .req    (d_vld),
+        .gnt_bus(gbus_d_vld)
         // .empty()
     );
-    assign free_gnt_bus_dbg = free_gnt_bus;
+
+    logic [N-1:0][RS_SZ-1:0] d2entry;
+    always_comb begin
+        d2entry = '0;
+        foreach (gbus_d_vld[i, j]) begin
+            if (gbus_d_vld[i][j]) begin
+                d2entry[j] |= gbus_free[i];
+                // to_issue   |= gbus_can_issue_alu[i];
+            end
+        end
+    end
 
     /*
     Mustafa:
@@ -311,17 +337,6 @@ module rs #(parameter
     be too big of a deal. But possible room for optimization 
     by making it a lowest-index first priority encoder?
     */
-    logic [N-1:0][RS_SZ-1:0]  d_gnt_bus;
-    always_comb begin
-        d_gnt_bus = '0;
-        for (int n = 0; n < N; ++n) begin
-            if (!d_vld[n])
-                continue;
-            d_gnt_bus[n] |= free_gnt_bus[n];
-        end
-    end
-    assign d_gnt_bus_dbg = d_gnt_bus;
-
 
     // SECTION: Compute next state
     always_comb begin
@@ -342,7 +357,7 @@ module rs #(parameter
             end
 
             for (int n = 0; n < N; ++n) begin
-                if (!d_gnt_bus[n][rs])
+                if (!d2entry[n][rs])
                     continue;
                 entries_n[rs].busy   = 1;
                 entries_n[rs].issued = 0;

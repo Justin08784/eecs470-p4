@@ -70,8 +70,7 @@ module rs_sva #(parameter
     input reset,
     input flush,
     input RS_ENTRY [RS_SZ-1:0] entries_dbg,
-    input logic [N-1:0][RS_SZ-1:0] free_gnt_bus_dbg,
-    input [N-1:0][RS_SZ-1:0] d_gnt_bus_dbg,
+    input logic [N-1:0][RS_SZ-1:0] gbus_free_dbg,
 
     // dispatch
     input   logic           [$clog2(N):0] rs_scnt, // to dispatcher
@@ -168,10 +167,10 @@ module rs_sva #(parameter
         end else begin
             entries = entries_n;
         end
-        marker();
-        print_entries(entries);
-        $display("<><><><><>");
-        print_entries(entries_dbg);
+        // marker();
+        // print_entries(entries);
+        // $display("<><><><><>");
+        // print_entries(entries_dbg);
         // print_entries(entries_n);
         // $display("x val!: %d", x);
     end end

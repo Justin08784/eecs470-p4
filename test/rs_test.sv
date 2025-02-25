@@ -94,8 +94,7 @@ module rs_testbench;
     // DATA r1, r2, correct_r, mul_r;
     string fmt;
 
-    logic [N-1:0][RS_SZ-1:0] free_gnt_bus_dbg;
-    logic [N-1:0][RS_SZ-1:0] d_gnt_bus_dbg;
+    logic [N-1:0][RS_SZ-1:0] gbus_free_dbg;
 
     rs # (
         .N(N),
@@ -110,8 +109,7 @@ module rs_testbench;
         .reset(reset),
         .flush(1'b0),
         .entries_dbg(entries_dbg),
-        .free_gnt_bus_dbg(free_gnt_bus_dbg),
-        .d_gnt_bus_dbg(d_gnt_bus_dbg),
+        .gbus_free_dbg(gbus_free_dbg),
 
         .rs_scnt(rs_scnt),
         .d_vld(d_vld),
@@ -148,8 +146,7 @@ module rs_testbench;
         .reset(reset),
         .flush(1'b0),
         .entries_dbg(entries_dbg),
-        .free_gnt_bus_dbg(free_gnt_bus_dbg),
-        .d_gnt_bus_dbg(d_gnt_bus_dbg),
+        .gbus_free_dbg(gbus_free_dbg),
 
         .rs_scnt(rs_scnt),
         .d_vld(d_vld),
@@ -290,7 +287,7 @@ module rs_testbench;
         /* some unused debugs */
         // $display("rs_scnt: %b", rs_scnt);
         // for (int i = 0; i < N; ++i) begin
-        //     $display("%b", free_gnt_bus_dbg[i]);
+        //     $display("%b", gbus_free_dbg[i]);
         // end
         // for (int i = 0; i < N; ++i) begin
         //     $display("d_gnt_bus: %b", d_gnt_bus_dbg[i]);
@@ -318,20 +315,40 @@ module rs_testbench;
         // @(negedge clock);
 
         set_dispatch(1, 2, 4, 0, 0, 1);
+        // set_dispatch(0, 3, 6, 0, 0, 1);
         @(posedge clock);
         // $display("s_vld: %b", s_vld);
         @(negedge clock);
-        @(posedge clock);
+        marker();
+        print_entries(entries_dbg);
 
         @(negedge clock);
+        marker();
+        print_entries(entries_dbg);
         @(negedge clock);
+        marker();
+        print_entries(entries_dbg);
         @(negedge clock);
+        marker();
+        print_entries(entries_dbg);
         @(negedge clock);
+        marker();
+        print_entries(entries_dbg);
         @(negedge clock);
+        marker();
+        print_entries(entries_dbg);
         @(negedge clock);
+        marker();
+        print_entries(entries_dbg);
         @(negedge clock);
+        marker();
+        print_entries(entries_dbg);
         @(negedge clock);
+        marker();
+        print_entries(entries_dbg);
         @(negedge clock);
+        marker();
+        print_entries(entries_dbg);
 
 
         // @(negedge clock);
