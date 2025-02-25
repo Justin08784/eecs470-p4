@@ -173,29 +173,30 @@ module rs_sva #(parameter
             end
         end
 
-        if (reset || flush) begin
-            entries = '0;
-        end else begin
-            entries = entries_n;
-        end
+        // if (reset || flush) begin
+        //     entries = '0;
+        // end else begin
+        //     entries = entries_n;
+        // end
+        // @(negedge clock);
+        // marker();
+        // print_entries(entries);
+        // $display("<><><><><>");
+        // print_entries(entries_dut);
+        // @(posedge clock);
         @(negedge clock);
-        marker();
-        print_entries(entries);
-        $display("<><><><><>");
-        print_entries(entries_dut);
-        @(posedge clock);
     end end
 
-    // always_ff @(posedge clock) begin
-    //     if (reset || flush) begin
-    //         entries <= '0;
-    //     end else begin
-    //         entries <= entries_n;
-    //     end
-    // end
+    always_ff @(posedge clock) begin
+        if (reset || flush) begin
+            entries <= '0;
+        end else begin
+            entries <= entries_n;
+        end
+    end
 
 
-    clocking cb @(negedge clock);
+    clocking cb @(posedge clock);
         property same_num_busy;
             disable iff (reset || flush)
             $countones(busy_sva) == $countones(busy_dut);
