@@ -75,29 +75,31 @@ module rs_sva #(parameter
     input   logic           [N-1:0] d_vld,     // which dispatch lines are valid? (from dispatcher; dep. on rs_scnt)
     input   ID_RESULT       [N-1:0] d_dat,
     // issue
-    input   logic       [NUM_FU_ALU-1:0]    fu_rdy_alu,
-    input   logic       [NUM_FU_MULT-1:0]   fu_rdy_mult,
-    input   logic       [NUM_FU_STORE-1:0]  fu_rdy_store,
-    input   logic       [NUM_FU_LOAD-1:0]   fu_rdy_load,
+    input   logic           [NUM_FU_ALU-1:0]    fu_rdy_alu,
+    input   logic           [NUM_FU_MULT-1:0]   fu_rdy_mult,
+    input   logic           [NUM_FU_STORE-1:0]  fu_rdy_store,
+    input   logic           [NUM_FU_LOAD-1:0]   fu_rdy_load,
     // complete
     input   logic           [N-1:0] c_en,
     input   PHYS_REG_IDX    [N-1:0] c_ts,
 
     // ==== dut lines for comparison
-    input   logic       [NUM_FU_ALU-1:0]    fu_vld_alu_dut,
-    input   logic       [NUM_FU_MULT-1:0]   fu_vld_mult_dut,
-    input   logic       [NUM_FU_STORE-1:0]  fu_vld_store_dut,
-    input   logic       [NUM_FU_LOAD-1:0]   fu_vld_load_dut,
-    input   RS_ENTRY    [RS_SZ-1:0]         entries_dut
+    input   logic           [NUM_FU_ALU-1:0]    fu_vld_alu_dut,
+    input   logic           [NUM_FU_MULT-1:0]   fu_vld_mult_dut,
+    input   logic           [NUM_FU_STORE-1:0]  fu_vld_store_dut,
+    input   logic           [NUM_FU_LOAD-1:0]   fu_vld_load_dut,
+    input   RS_ENTRY        [RS_SZ-1:0]         entries_dut
 );
     RS_ENTRY [RS_SZ-1:0] entries, entries_n;
-    int num_free_fus [int];
-    int num_issue_fus [FU_IDX_NUM];
+    int num_free_fus    [FU_IDX_NUM];
+    int num_issue_fus   [FU_IDX_NUM];
     int cdb_tags [int];
 
     logic [RS_SZ-1:0] busy_sva;
     logic [RS_SZ-1:0] busy_dut;
     logic [RS_SZ-1:0] issd_sva;
+    logic [FU_IDX_NUM-1:0][RS_SZ-1:0] issd_sva_by_fu;
+    logic [FU_IDX_NUM-1:0][RS_SZ-1:0] issd_dut_by_fu;
     generate
     for (genvar i = 0; i < RS_SZ; i++) begin : gen_vecs
         assign busy_sva[i] = entries[i].busy;
@@ -106,6 +108,14 @@ module rs_sva #(parameter
         assign issd_sva[i] = entries[i].issued;
     end
     endgenerate
+    always_comb begin
+        issd_sva_by_fu = '0;
+        issd_dut_by_fu = '0;
+        foreach(issd_sva_by_fu[fu, rs]) begin
+            issd_sva_by_fu[fu][rs] |= (entries[rs].issued && entries[rs].dat.fu_idx == fu);
+            issd_dut_by_fu[fu][rs] |= (entries_dut[rs].issued && entries_dut[rs].dat.fu_idx == fu);
+        end
+    end
     int rs_scnt_sva;
 
     initial begin forever begin
@@ -213,6 +223,15 @@ module rs_sva #(parameter
                 && (num_issue_fus[FU_STORE] == $countones(fu_vld_store_dut));
             // 1;
         endproperty
+
+        property issd_cnts;
+            disable iff (reset || flush)
+            /*TODO*/
+            $countones(issd_dut_by_fu[FU_ALU]) == $countones(issd_sva_by_fu[FU_ALU])
+            && $countones(issd_dut_by_fu[FU_MULT]) == $countones(issd_sva_by_fu[FU_MULT])
+            && $countones(issd_dut_by_fu[FU_LOAD]) == $countones(issd_sva_by_fu[FU_LOAD])
+            && $countones(issd_dut_by_fu[FU_STORE]) == $countones(issd_sva_by_fu[FU_STORE]);
+        endproperty
     endclocking
 
     task exit_on_error(input string msg);
@@ -242,6 +261,8 @@ module rs_sva #(parameter
         else exit_on_error ("diff rs scnt");
     Issue_Cnts:  assert property(cb.issue_cnts)
         else exit_on_error ("diff issue cnts");
+    Issd_Cnts:  assert property(cb.issd_cnts)
+        else exit_on_error ("diff issued cnts");
 
 endmodule
 
