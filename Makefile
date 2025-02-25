@@ -202,13 +202,13 @@ build/mult.cov: $(MULT_FILES)
 synth/mult.vg: $(MULT_FILES)
 
 # TODO: add any files required for the RS here (besides test/rs_test.sv and verilog/rs.sv)
-RS_REQS = verilog/sys_defs.svh
+RS_FILES = verilog/sys_defs.svh verilog/psel_gen.sv test/rs_sva.svh
 build/rs.simv: $(RS_FILES)
 build/rs.cov: $(RS_FILES)
 synth/rs.vg: $(RS_FILES)
 
 # TODO: add any files required for the ROB here (besides test/rob_test.sv and verilog/rob.sv)
-ROB_FILES = verilog/sys_defs.svh
+ROB_FILES = verilog/sys_defs.svh verilog/memDP.sv
 build/rob.simv: $(ROB_FILES)
 build/rob.cov: $(ROB_FILES)
 synth/rob.vg: $(ROB_FILES)
@@ -226,7 +226,8 @@ CPU_HEADERS = verilog/sys_defs.svh \
 # test/cpu_test.sv is implicit
 CPU_TESTBENCH = test/pipeline_print.c \
 			    test/decode_inst.c \
-                test/mem.sv 
+                test/mem.sv \
+				test/rs_test.sv
 # NOTE: you CANNOT alter the given memory module
 
 # verilog/cpu.sv is implicit
@@ -239,7 +240,9 @@ CPU_SOURCES = verilog/cpu.sv \
 			  verilog/p3/stage_ex.sv \
 			  verilog/p3/stage_mem.sv \
 			  verilog/p3/stage_wb.sv \
-			  verilog/mult.sv
+			  verilog/mult.sv \
+			  verilog/rs.sv \
+			  verilog/psel_gen.sv
 
 build/cpu.simv: $(CPU_SOURCES) $(CPU_HEADERS) $(CPU_TESTBENCH)
 synth/cpu.vg: $(CPU_SOURCES) $(CPU_HEADERS)

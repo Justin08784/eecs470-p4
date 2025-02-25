@@ -403,7 +403,7 @@ typedef enum logic [1:0] {
     FU_ALU  = 2'b00,
     FU_MULT = 2'b01,
     FU_LOAD = 2'b10,
-    FU_STOR = 2'b11
+    FU_STORE = 2'b11
 } FU_IDX;
 `define FU_IDX_NUM 4
 
