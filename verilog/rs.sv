@@ -247,7 +247,11 @@ module rs #(parameter
         foreach (gbus_fu_rdy_alu[i, j]) begin
             if (gbus_fu_rdy_alu[i][j]) begin
                 fu2issuer_alu[j]    |= gbus_can_issue_alu[i];
-                /**/
+                /*
+                This feels expensive. Isn't there a more efficient way to check
+                if a gnt_bus row is actually used?
+                \/ \/ \/ \/
+                */
                 fu_vld_alu[j]       = |gbus_can_issue_alu[i];
                 // for (int rs = 0; rs < RS_SZ; ++rs) begin
                 //     fu_dat_alu[j]   |= entries[i];
