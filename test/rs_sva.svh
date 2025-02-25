@@ -10,10 +10,11 @@ localparam int NUM_FU_ALU = 1;
 localparam int NUM_FU_MULT = 2;
 localparam int NUM_FU_STORE = 4;
 localparam int NUM_FU_LOAD = 4;
+localparam logic DEBUG = 1;
 
 function marker();
     static int i = 0;
-    $display("~~~~ %d !!!!", i++);
+    $display("%d !!!!:", i++);
 endfunction
 
 function get_fu_name(input FU_IDX fu_idx, output string name);
@@ -180,18 +181,20 @@ module rs_sva #(parameter
         assign rs_scnt_sva = $min($countones(~busy_sva | issd_sva), N);
 
         @(negedge clock);
-        marker();
-        print_entries(entries);
-        $display("<><><><><>");
-        print_entries(entries_dut);
-        $display("FU_ALU: num_issue_fus[%0d] = %0d, $countones(fu_vld_alu_dut) = %0d", 
-            FU_ALU, num_issue_fus[FU_ALU], $countones(fu_vld_alu_dut));
-        $display("FU_MULT: num_issue_fus[%0d] = %0d, $countones(fu_vld_mult_dut) = %0d", 
-            FU_MULT, num_issue_fus[FU_MULT], $countones(fu_vld_mult_dut));
-        $display("FU_LOAD: num_issue_fus[%0d] = %0d, $countones(fu_vld_load_dut) = %0d", 
-            FU_LOAD, num_issue_fus[FU_LOAD], $countones(fu_vld_load_dut));
-        $display("FU_STORE: num_issue_fus[%0d] = %0d, $countones(fu_vld_store_dut) = %0d", 
-            FU_STORE, num_issue_fus[FU_STORE], $countones(fu_vld_store_dut));
+        if (DEBUG) begin
+            marker();
+            print_entries(entries_dut);
+        end
+        // $display("<><><><><>");
+        // print_entries(entries);
+        // $display("FU_ALU: num_issue_fus[%0d] = %0d, $countones(fu_vld_alu_dut) = %0d", 
+        //     FU_ALU, num_issue_fus[FU_ALU], $countones(fu_vld_alu_dut));
+        // $display("FU_MULT: num_issue_fus[%0d] = %0d, $countones(fu_vld_mult_dut) = %0d", 
+        //     FU_MULT, num_issue_fus[FU_MULT], $countones(fu_vld_mult_dut));
+        // $display("FU_LOAD: num_issue_fus[%0d] = %0d, $countones(fu_vld_load_dut) = %0d", 
+        //     FU_LOAD, num_issue_fus[FU_LOAD], $countones(fu_vld_load_dut));
+        // $display("FU_STORE: num_issue_fus[%0d] = %0d, $countones(fu_vld_store_dut) = %0d", 
+        //     FU_STORE, num_issue_fus[FU_STORE], $countones(fu_vld_store_dut));
     end
 
     always_ff @(posedge clock) begin

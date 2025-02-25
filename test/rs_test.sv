@@ -235,33 +235,31 @@ module rs_testbench;
 
 
     task test_1inst();
-        reset   = 1;
+        reset = 1;
         @(negedge clock);
-        @(negedge clock);
-
         reset = 0;
-        @(negedge clock);
 
-        set_dispatch(1, 2, 4, 0, 0, 1);
-        @(posedge clock);
-        // $display("s_vld: %b", s_vld);
+        // ID[1]: p1 <- p2{!rdy} * p4{!rdy}
+        set_dispatch(1, 2, 4, 0, 0, FU_MULT);
         @(negedge clock);
-
-        clr_dispatch(0);
         clr_dispatch(1);
-        set_cdb(0, 1);
-        set_cdb(1, 2);
-        @(posedge clock);
-        @(negedge clock);
 
-        // ask about timing; why does s_vld display need to be after posedge?
+        // CDB: [p2, -]
+        set_cdb(0, 2);
+        @(negedge clock);
         clr_cdb(0);
+
+        // CDB: [-, p4]
+        set_cdb(1, 4);
+        @(negedge clock);
         clr_cdb(1);
-        set_fu(FU_ALU, 0);
-        @(posedge clock);
+
+        // fu_rdy_mult[0] <- 1
+        set_fu(FU_MULT, 0);
         @(negedge clock);
 
-        @(posedge clock);
+        @(negedge clock);
+
         @(negedge clock);
 
 
@@ -287,12 +285,7 @@ module rs_testbench;
 
         set_dispatch(1, 2, 4, 0, 0, 1);
         // set_dispatch(0, 3, 6, 0, 0, 1);
-        @(posedge clock);
-
-        for (int i = 0; i < 10; ++i) begin
-            @(negedge clock);
-        end
-
+        @(negedge clock);
 
         clr_dispatch(1);
         set_cdb(0, 2);
