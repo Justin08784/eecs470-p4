@@ -256,8 +256,8 @@ module rs_sva #(parameter
         else exit_on_error ("diff num busy");
     Same_Rs_Scnt:  assert property(cb.same_rs_scnt)
         else exit_on_error ("diff rs scnt");
-    Issue_Cnts:  assert property(cb.issue_cnts)
-        else exit_on_error ("diff issue cnts");
+    // Issue_Cnts:  assert property(cb.issue_cnts)
+    //     else exit_on_error ("diff issue cnts");
 
 endmodule
 

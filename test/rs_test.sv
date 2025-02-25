@@ -314,6 +314,9 @@ module rs_testbench;
         @(negedge clock);
         @(negedge clock);
         @(negedge clock);
+        @(negedge clock);
+        @(negedge clock);
+        @(negedge clock);
 
         if (failed)
             $display("@@@ Failed\n");
