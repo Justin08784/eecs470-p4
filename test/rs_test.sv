@@ -1,5 +1,6 @@
 
 `include "sys_defs.svh"
+`include "test/rs_sva.svh"
 /*
 CLARIFICATION NEEDED:
 Ok, checking the accuracy of FF state like entries_dbg seems pretty
@@ -60,6 +61,44 @@ module rs_testbench;
         .NUM_FU_STORE(NUM_FU_STORE),
         .NUM_FU_LOAD(NUM_FU_LOAD)
     ) rs_dut(
+        .clock(clock),
+        .reset(reset),
+        .flush(1'b0),
+        .entries_dbg(entries_dbg),
+        .free_gnt_bus_dbg(free_gnt_bus_dbg),
+        .d_gnt_bus_dbg(d_gnt_bus_dbg),
+
+        .rs_scnt(rs_scnt),
+        .d_vld(d_vld),
+        .d_dat(d_dat),
+
+        .fu_rdy_alu(fu_rdy_alu),
+        .fu_rdy_mult(fu_rdy_mult),
+        .fu_rdy_store(fu_rdy_store),
+        .fu_rdy_load(fu_rdy_load),
+
+        .fu_vld_alu(fu_vld_alu),
+        .fu_vld_mult(fu_vld_mult),
+        .fu_vld_store(fu_vld_store),
+        .fu_vld_load(fu_vld_load),
+        .fu_dat_alu(fu_dat_alu),
+        .fu_dat_mult(fu_dat_mult),
+        .fu_dat_store(fu_dat_store),
+        .fu_dat_load(fu_dat_load),
+
+        .c_en(c_en),
+        .c_ts(c_ts)
+    );
+
+    bind rs_dut rs_sva # (
+        .N(N),
+        .RS_SZ(RS_SZ),
+        .FU_IDX_NUM(FU_IDX_NUM),
+        .NUM_FU_ALU(NUM_FU_ALU),
+        .NUM_FU_MULT(NUM_FU_MULT),
+        .NUM_FU_STORE(NUM_FU_STORE),
+        .NUM_FU_LOAD(NUM_FU_LOAD)
+    ) dut_sva (
         .clock(clock),
         .reset(reset),
         .flush(1'b0),
@@ -205,28 +244,8 @@ module rs_testbench;
         clock = ~clock;
     end
 
-    initial begin
-        /* some unused debugs */
-        // $display("rs_scnt: %b", rs_scnt);
-        // for (int i = 0; i < N; ++i) begin
-        //     $display("%b", free_gnt_bus_dbg[i]);
-        // end
-        // for (int i = 0; i < N; ++i) begin
-        //     $display("d_gnt_bus: %b", d_gnt_bus_dbg[i]);
-        // end
 
-        /* initialize */
-        clock           = 0;
-        failed          = 0;
-        d_vld           = '0;
-        d_dat           = '0;
-        fu_rdy_alu      = '0;
-        fu_rdy_mult     = '0;
-        fu_rdy_store    = '0;
-        fu_rdy_load     = '0;
-        c_en            = '0;
-        c_ts            = '0;
-
+    task test_1inst();
         reset   = 1;
         @(negedge clock);
         @(negedge clock);
@@ -234,7 +253,6 @@ module rs_testbench;
         reset = 0;
         @(negedge clock);
 
-        set_dispatch(0, 1, 2, 0, 0, 0);
         set_dispatch(1, 2, 4, 0, 0, 1);
         @(posedge clock);
         // $display("s_vld: %b", s_vld);
@@ -264,6 +282,31 @@ module rs_testbench;
         @(negedge clock);
         marker();
         print_entries();
+
+
+    endtask
+    initial begin
+        /* some unused debugs */
+        // $display("rs_scnt: %b", rs_scnt);
+        // for (int i = 0; i < N; ++i) begin
+        //     $display("%b", free_gnt_bus_dbg[i]);
+        // end
+        // for (int i = 0; i < N; ++i) begin
+        //     $display("d_gnt_bus: %b", d_gnt_bus_dbg[i]);
+        // end
+
+        /* initialize */
+        clock           = 0;
+        failed          = 0;
+        d_vld           = '0;
+        d_dat           = '0;
+        fu_rdy_alu      = '0;
+        fu_rdy_mult     = '0;
+        fu_rdy_store    = '0;
+        fu_rdy_load     = '0;
+        c_en            = '0;
+        c_ts            = '0;
+
 
         // @(negedge clock);
         // marker();
