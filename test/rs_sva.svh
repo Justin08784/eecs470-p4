@@ -99,6 +99,18 @@ module rs_sva #(parameter
     int num_free_fus [int];
     int cdb_tags [int];
 
+    logic [RS_SZ-1:0] busy_sva;
+    logic [RS_SZ-1:0] busy_dut;
+    logic [RS_SZ-1:0] issd_sva;
+    generate
+    for (genvar i = 0; i < RS_SZ; i++) begin : gen_vecs
+        assign busy_sva[i] = entries[i].busy;
+        assign busy_dut[i] = entries_dut[i].busy;
+
+        assign issd_sva[i] = entries[i].issued;
+    end
+    endgenerate
+
     // always_ff @(posedge clock) begin
     //     if (reset || flush) begin
     //         entries <= '0;
@@ -166,11 +178,12 @@ module rs_sva #(parameter
         end else begin
             entries = entries_n;
         end
+        @(negedge clock);
         marker();
         print_entries(entries);
-        @(posedge clock);
         $display("<><><><><>");
         print_entries(entries_dut);
+        @(posedge clock);
     end end
 
     // always_ff @(posedge clock) begin
@@ -181,19 +194,16 @@ module rs_sva #(parameter
     //     end
     // end
 
-    logic [RS_SZ-1:0] busy_sva;
-    logic [RS_SZ-1:0] busy_dut;
-    generate
-    for (genvar i = 0; i < RS_SZ; i++) begin : gen_vecs
-        assign busy_sva[i] = entries[i].busy;
-        assign busy_dut[i] = entries_dut[i].busy;
-    end
-    endgenerate
 
-    clocking cb @(posedge clock);
+    clocking cb @(negedge clock);
         property same_num_busy;
             disable iff (reset || flush)
             $countones(busy_sva) == $countones(busy_dut);
+        endproperty
+
+        property same_rs_scnt;
+            disable iff (reset || flush)
+            rs_scnt == $min($countones(~busy_sva | issd_sva), N);
         endproperty
     endclocking
 
@@ -211,6 +221,9 @@ module rs_sva #(parameter
 
     Same_Num_Busy:  assert property(cb.same_num_busy)
         else exit_on_error ("diff num busy");
+
+    Same_Rs_Scnt:  assert property(cb.same_rs_scnt)
+        else exit_on_error ("diff rs scnt");
 
 endmodule
 
