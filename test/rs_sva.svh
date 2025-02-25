@@ -118,7 +118,7 @@ module rs_sva #(parameter
     end
     int rs_scnt_sva;
 
-    initial begin forever begin
+    always begin
         entries_n = entries;
 
         // clear (insn going to ex)
@@ -192,7 +192,7 @@ module rs_sva #(parameter
             FU_LOAD, num_issue_fus[FU_LOAD], $countones(fu_vld_load_dut));
         $display("FU_STORE: num_issue_fus[%0d] = %0d, $countones(fu_vld_store_dut) = %0d", 
             FU_STORE, num_issue_fus[FU_STORE], $countones(fu_vld_store_dut));
-    end end
+    end
 
     always_ff @(posedge clock) begin
         if (reset || flush) begin
