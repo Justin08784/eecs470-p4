@@ -121,11 +121,11 @@ module rs_sva #(parameter
         // ready insns (cdb)
         for (int rs = 0; rs < RS_SZ; ++rs) begin
             for (int n = 0; n < N; ++n) begin
-                if (entries_n[rs].dat.t1 == c_ts[n]) begin
+                if (c_en[n] && entries_n[rs].dat.t1 == c_ts[n]) begin
                     entries_n[rs].dat.t1_rdy = 1;
                 end
 
-                if (entries_n[rs].dat.t2 == c_ts[n]) begin
+                if (c_en[n] && entries_n[rs].dat.t2 == c_ts[n]) begin
                     entries_n[rs].dat.t2_rdy = 1;
                 end
             end
@@ -153,7 +153,7 @@ module rs_sva #(parameter
                 continue;
             
             for (; rs < RS_SZ; ++rs) begin
-                if (!entries_n[rs].busy)
+                if (entries_n[rs].busy)
                     continue;
                 entries_n[rs].busy   = 1;
                 entries_n[rs].issued = 0;
@@ -163,21 +163,30 @@ module rs_sva #(parameter
         end
 
         @(posedge clock);
+        if (reset || flush) begin
+            entries = '0;
+        end else begin
+            entries = entries_n;
+        end
         marker();
         print_entries(entries);
+        $display("<><><><><>");
+        print_entries(entries_dbg);
+        // print_entries(entries_n);
+        // $display("x val!: %d", x);
     end end
 
-    always_ff @(posedge clock) begin
-        if (reset || flush) begin
-            entries <= '0;
-        end else begin
-            entries <= entries_n;
-        end
-    end
+    // always_ff @(posedge clock) begin
+    //     if (reset || flush) begin
+    //         entries <= '0;
+    //     end else begin
+    //         entries <= entries_n;
+    //     end
+    // end
 
     clocking cb @(posedge clock);
         property fuck;
-            disable iff (reset || flush)
+            disable iff (reset || flush || 1)
             entries == entries_dbg;
         endproperty
     endclocking

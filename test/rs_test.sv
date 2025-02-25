@@ -313,8 +313,25 @@ module rs_testbench;
         @(negedge clock);
         @(negedge clock);
         reset = 0;
+        @(negedge clock);
         // @(negedge clock);
         // @(negedge clock);
+
+        set_dispatch(1, 2, 4, 0, 0, 1);
+        @(posedge clock);
+        // $display("s_vld: %b", s_vld);
+        @(negedge clock);
+        @(posedge clock);
+
+        @(negedge clock);
+        @(negedge clock);
+        @(negedge clock);
+        @(negedge clock);
+        @(negedge clock);
+        @(negedge clock);
+        @(negedge clock);
+        @(negedge clock);
+        @(negedge clock);
 
 
         // @(negedge clock);
