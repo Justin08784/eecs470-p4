@@ -279,19 +279,15 @@ module rs_testbench;
         c_en            = '0;
         c_ts            = '0;
 
-        // test_1inst();
         reset = 1;
         @(negedge clock);
         @(negedge clock);
         reset = 0;
         @(negedge clock);
-        // @(negedge clock);
-        // @(negedge clock);
 
         set_dispatch(1, 2, 4, 0, 0, 1);
         // set_dispatch(0, 3, 6, 0, 0, 1);
         @(posedge clock);
-        // $display("s_vld: %b", s_vld);
 
         for (int i = 0; i < 10; ++i) begin
             @(negedge clock);

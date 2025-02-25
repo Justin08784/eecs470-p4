@@ -108,14 +108,6 @@ module rs_sva #(parameter
     endgenerate
     int rs_scnt_sva;
 
-    // always_ff @(posedge clock) begin
-    //     if (reset || flush) begin
-    //         entries <= '0;
-    //     end else begin
-    //         entries <= entries_n;
-    //     end
-    // end
-
     initial begin forever begin
         entries_n = entries;
 
@@ -177,13 +169,6 @@ module rs_sva #(parameter
         end
         assign rs_scnt_sva = $min($countones(~busy_sva | issd_sva), N);
 
-        // if (reset || flush) begin
-        //     entries = '0;
-        // end else begin
-        //     entries = entries_n;
-        // end
-        // @(negedge clock);
-        // @(posedge clock);
         @(negedge clock);
         marker();
         print_entries(entries);
