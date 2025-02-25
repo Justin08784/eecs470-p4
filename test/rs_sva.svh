@@ -93,7 +93,7 @@ module rs_sva #(parameter
 );
     RS_ENTRY [RS_SZ-1:0] entries, entries_n;
     int num_free_fus [int];
-    int num_issue_fus [int];
+    int num_issue_fus [FU_IDX_NUM];
     int cdb_tags [int];
 
     logic [RS_SZ-1:0] busy_sva;
@@ -184,12 +184,20 @@ module rs_sva #(parameter
         //     entries = entries_n;
         // end
         // @(negedge clock);
-        // marker();
-        // print_entries(entries);
-        // $display("<><><><><>");
-        // print_entries(entries_dut);
         // @(posedge clock);
         @(negedge clock);
+        marker();
+        print_entries(entries);
+        $display("<><><><><>");
+        print_entries(entries_dut);
+        $display("FU_ALU: num_issue_fus[%0d] = %0d, $countones(fu_vld_alu_dut) = %0d", 
+            FU_ALU, num_issue_fus[FU_ALU], $countones(fu_vld_alu_dut));
+        $display("FU_MULT: num_issue_fus[%0d] = %0d, $countones(fu_vld_mult_dut) = %0d", 
+            FU_MULT, num_issue_fus[FU_MULT], $countones(fu_vld_mult_dut));
+        $display("FU_LOAD: num_issue_fus[%0d] = %0d, $countones(fu_vld_load_dut) = %0d", 
+            FU_LOAD, num_issue_fus[FU_LOAD], $countones(fu_vld_load_dut));
+        $display("FU_STORE: num_issue_fus[%0d] = %0d, $countones(fu_vld_store_dut) = %0d", 
+            FU_STORE, num_issue_fus[FU_STORE], $countones(fu_vld_store_dut));
     end end
 
     always_ff @(posedge clock) begin
@@ -215,7 +223,11 @@ module rs_sva #(parameter
         property issue_cnts;
             disable iff (reset || flush)
             /*TODO*/
-            1;
+            (num_issue_fus[FU_ALU] == $countones(fu_vld_alu_dut))
+                && (num_issue_fus[FU_MULT] == $countones(fu_vld_mult_dut))
+                && (num_issue_fus[FU_LOAD] == $countones(fu_vld_load_dut))
+                && (num_issue_fus[FU_STORE] == $countones(fu_vld_store_dut));
+            // 1;
         endproperty
     endclocking
 
@@ -226,6 +238,15 @@ module rs_sva #(parameter
             $display("\033[31mError: %0s\033[0m\n\n", msg);
             print_entries(entries);
             print_entries(entries_dut);
+            $display("FU_ALU: num_issue_fus[%0d] = %0d, $countones(fu_vld_alu_dut) = %0d", 
+                FU_ALU, num_issue_fus[FU_ALU], $countones(fu_vld_alu_dut));
+            $display("FU_MULT: num_issue_fus[%0d] = %0d, $countones(fu_vld_mult_dut) = %0d", 
+                FU_MULT, num_issue_fus[FU_MULT], $countones(fu_vld_mult_dut));
+            $display("FU_LOAD: num_issue_fus[%0d] = %0d, $countones(fu_vld_load_dut) = %0d", 
+                FU_LOAD, num_issue_fus[FU_LOAD], $countones(fu_vld_load_dut));
+            $display("FU_STORE: num_issue_fus[%0d] = %0d, $countones(fu_vld_store_dut) = %0d", 
+                FU_STORE, num_issue_fus[FU_STORE], $countones(fu_vld_store_dut));
+
             $finish;
         end
     endtask
@@ -233,9 +254,10 @@ module rs_sva #(parameter
 
     Same_Num_Busy:  assert property(cb.same_num_busy)
         else exit_on_error ("diff num busy");
-
     Same_Rs_Scnt:  assert property(cb.same_rs_scnt)
         else exit_on_error ("diff rs scnt");
+    Issue_Cnts:  assert property(cb.issue_cnts)
+        else exit_on_error ("diff issue cnts");
 
 endmodule
 

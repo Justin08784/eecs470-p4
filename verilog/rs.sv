@@ -235,22 +235,36 @@ module rs #(parameter
         fu2issuer_mult  = '0;
         fu2issuer_load  = '0;
         fu2issuer_store = '0;
+        fu_vld_alu      = '0;
+        fu_vld_mult     = '0;
+        fu_vld_store    = '0;
+        fu_vld_load     = '0;
+        // fu_dat_alu      = '0;
+        // fu_dat_mult     = '0;
+        // fu_dat_store    = '0;
+        // fu_dat_load     = '0;
 
         foreach (gbus_fu_rdy_alu[i, j]) begin
             if (gbus_fu_rdy_alu[i][j]) begin
                 fu2issuer_alu[j]    |= gbus_can_issue_alu[i];
+                fu_vld_alu[j]       = 1;
+                // for (int rs = 0; rs < RS_SZ; ++rs) begin
+                //     fu_dat_alu[j]   |= entries[i];
+                // end
                 to_issue            |= gbus_can_issue_alu[i];
             end
         end
         foreach (gbus_fu_rdy_mult[i, j]) begin
             if (gbus_fu_rdy_mult[i][j]) begin
                 fu2issuer_mult[j]   |= gbus_can_issue_mult[i];
+                fu_vld_mult[j]      = 1;
                 to_issue            |= gbus_can_issue_mult[i];
             end
         end
         foreach (gbus_fu_rdy_load[i, j]) begin
             if (gbus_fu_rdy_load[i][j]) begin
                 fu2issuer_load[j]   |= gbus_can_issue_load[i];
+                fu_vld_load[j]      = 1;
                 to_issue            |= gbus_can_issue_load[i];
 
             end
@@ -258,6 +272,7 @@ module rs #(parameter
         foreach (gbus_fu_rdy_store[i, j]) begin
             if (gbus_fu_rdy_store[i][j]) begin
                 fu2issuer_store[j]  |= gbus_can_issue_store[i];
+                fu_vld_store[j]      = 1;
                 to_issue            |= gbus_can_issue_store[i];
             end
         end
