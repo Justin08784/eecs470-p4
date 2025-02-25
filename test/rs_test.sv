@@ -7,13 +7,6 @@ Ok, checking the accuracy of FF state like entries_dbg seems pretty
 straightforward. But how to check correctness of combinational stuff like
 s_vld, rs_scnt? Aren't there timing issues?
 */
-localparam int N = 2;
-localparam int RS_SZ = 8;
-localparam int FU_IDX_NUM = `FU_IDX_NUM;
-localparam int NUM_FU_ALU = 1;
-localparam int NUM_FU_MULT = 2;
-localparam int NUM_FU_STORE = 4;
-localparam int NUM_FU_LOAD = 4;
 
 
 typedef struct packed {
@@ -245,51 +238,7 @@ module rs_testbench;
         endcase
     endtask
 
-    task marker();
-        static int i = 0;
-        $display("~~~~ %d !!!!", i++);
-    endtask
 
-    task get_fu_name(input FU_IDX fu_idx, output string name);
-        case (fu_idx)
-            FU_ALU:     name = "ALU";
-            FU_MULT:    name = "MULT";
-            FU_LOAD:    name = "LOAD";
-            FU_STORE:   name = "STORE";
-            default:    name = "Unknown FU";
-        endcase
-    endtask
-
-    task print_entries();
-        for (int i = 0; i < RS_SZ; ++i) begin
-            string fu_name;
-            get_fu_name(entries_dbg[i].dat.fu_idx, fu_name);
-            $display("Entry [%0d]: busy=%b, issued=%b, t=%0d, t1=%0d, t2=%0d, t1_rdy=%b, t2_rdy=%b, fu=%s(%0d)",
-                i, 
-                entries_dbg[i].busy, 
-                entries_dbg[i].issued, 
-                entries_dbg[i].dat.t, 
-                entries_dbg[i].dat.t1, 
-                entries_dbg[i].dat.t2, 
-                entries_dbg[i].dat.t1_rdy, 
-                entries_dbg[i].dat.t2_rdy, 
-                
-                entries_dbg[i].busy ? fu_name : "*",
-                entries_dbg[i].dat.fu_idx
-                // entries_dbg[i].dat.PC, 
-                // entries_dbg[i].dat.NPC, 
-                // entries_dbg[i].dat.alu_func, 
-                // entries_dbg[i].dat.mult, 
-                // entries_dbg[i].dat.rd_mem, 
-                // entries_dbg[i].dat.wr_mem, 
-                // entries_dbg[i].dat.cond_branch, 
-                // entries_dbg[i].dat.uncond_branch, 
-                // entries_dbg[i].dat.halt, 
-                // entries_dbg[i].dat.illegal, 
-                // entries_dbg[i].dat.csr_op
-            );
-        end
-    endtask
 
     always begin
         #(`CLOCK_PERIOD/2.0);
@@ -310,7 +259,7 @@ module rs_testbench;
         // $display("s_vld: %b", s_vld);
         @(negedge clock);
         marker();
-        print_entries();
+        print_entries(entries_dbg);
 
         clr_dispatch(0);
         clr_dispatch(1);
@@ -319,7 +268,7 @@ module rs_testbench;
         @(posedge clock);
         @(negedge clock);
         marker();
-        print_entries();
+        print_entries(entries_dbg);
 
         // ask about timing; why does s_vld display need to be after posedge?
         clr_cdb(0);
@@ -328,12 +277,12 @@ module rs_testbench;
         @(posedge clock);
         @(negedge clock);
         marker();
-        print_entries();
+        print_entries(entries_dbg);
 
         @(posedge clock);
         @(negedge clock);
         marker();
-        print_entries();
+        print_entries(entries_dbg);
 
 
     endtask
@@ -370,7 +319,7 @@ module rs_testbench;
 
         // @(negedge clock);
         // marker();
-        // print_entries();
+        // print_entries(entries_dbg);
 
         if (failed)
             $display("@@@ Failed\n");

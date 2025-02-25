@@ -3,6 +3,60 @@
 `ifndef RS_SVA_SVH
 `define RS_SVA_SVH
 
+localparam int N = 2;
+localparam int RS_SZ = 8;
+localparam int FU_IDX_NUM = `FU_IDX_NUM;
+localparam int NUM_FU_ALU = 1;
+localparam int NUM_FU_MULT = 2;
+localparam int NUM_FU_STORE = 4;
+localparam int NUM_FU_LOAD = 4;
+
+function marker();
+    static int i = 0;
+    $display("~~~~ %d !!!!", i++);
+endfunction
+
+function get_fu_name(input FU_IDX fu_idx, output string name);
+    case (fu_idx)
+        FU_ALU:     name = "ALU";
+        FU_MULT:    name = "MULT";
+        FU_LOAD:    name = "LOAD";
+        FU_STORE:   name = "STORE";
+        default:    name = "Unknown FU";
+    endcase
+endfunction
+
+function print_entries(input RS_ENTRY [RS_SZ-1:0] entries);
+    for (int i = 0; i < RS_SZ; ++i) begin
+        string fu_name;
+        get_fu_name(entries[i].dat.fu_idx, fu_name);
+        $display("Entry [%0d]: busy=%b, issued=%b, t=%0d, t1=%0d, t2=%0d, t1_rdy=%b, t2_rdy=%b, fu=%s(%0d)",
+            i, 
+            entries[i].busy, 
+            entries[i].issued, 
+            entries[i].dat.t, 
+            entries[i].dat.t1, 
+            entries[i].dat.t2, 
+            entries[i].dat.t1_rdy, 
+            entries[i].dat.t2_rdy, 
+            
+            entries[i].busy ? fu_name : "*",
+            entries[i].dat.fu_idx
+            // entries[i].dat.PC, 
+            // entries[i].dat.NPC, 
+            // entries[i].dat.alu_func, 
+            // entries[i].dat.mult, 
+            // entries[i].dat.rd_mem, 
+            // entries[i].dat.wr_mem, 
+            // entries[i].dat.cond_branch, 
+            // entries[i].dat.uncond_branch, 
+            // entries[i].dat.halt, 
+            // entries[i].dat.illegal, 
+            // entries[i].dat.csr_op
+        );
+    end
+endfunction
+
 module rs_sva #(parameter 
     N=`N,
     RS_SZ=`RS_SZ,
@@ -109,6 +163,8 @@ module rs_sva #(parameter
         end
 
         @(posedge clock);
+        marker();
+        print_entries(entries);
     end end
 
     always_ff @(posedge clock) begin
