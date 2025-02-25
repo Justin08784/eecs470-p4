@@ -265,6 +265,9 @@ module rs #(parameter
                 to_issue            |= gbus_can_issue_store[i];
             end
         end
+        /*
+        TODO: We're not actually doing anything fu2issuer_Xs?
+        Should we not set fu_dat_Xs? */
     end
 
     /*
