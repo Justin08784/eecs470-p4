@@ -1,4 +1,4 @@
-`include "sys_defs.svh"
+`include "../verilog/sys_defs.svh"
 
 `ifndef RS_SVA_SVH
 `define RS_SVA_SVH
