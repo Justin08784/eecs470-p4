@@ -226,6 +226,111 @@ module rs_testbench;
 
     endtask
 
+
+    task test_back_to_back();
+        reset = 1;
+        @(negedge clock);
+        reset = 0;
+        set_dispatch(0, 3, 4, 0, 1, FU_ALU);
+        @(negedge clock);
+        set_dispatch(1, 5, 6, 1, 0, FU_MULT);
+        @(negedge clock);
+        clr_dispatch(0);
+        clr_dispatch(1);
+        set_cdb(0, 3);
+        set_cdb(1, 5);
+        @(negedge clock);
+        clr_cdb(0);
+        clr_cdb(1);
+        set_fu(FU_ALU, 0);
+        set_fu(FU_MULT, 0);
+        @(negedge clock);
+        clr_all();
+    endtask
+
+    task test_multiple_cdb();
+        reset = 1;
+        @(negedge clock);
+        reset = 0;
+        set_dispatch(0, 7, 8, 0, 0, FU_STORE);
+        set_dispatch(1, 9, 10, 1, 1, FU_LOAD);
+        @(negedge clock);
+        clr_dispatch(0);
+        clr_dispatch(1);
+        set_cdb(0, 7);
+        set_cdb(1, 9);
+        set_cdb(2, 8);
+        set_cdb(3, 10);
+        @(negedge clock);
+        clr_cdb(0);
+        clr_cdb(1);
+        clr_cdb(2);
+        clr_cdb(3);
+        set_fu(FU_STORE, 0);
+        set_fu(FU_LOAD, 0);
+        @(negedge clock);
+        clr_all();
+    endtask
+
+
+    task test_sequential_fu();
+        reset = 1;
+        @(negedge clock);
+        reset = 0;
+        set_dispatch(0, 11, 12, 0, 1, FU_ALU);
+        @(negedge clock);
+        clr_dispatch(0);
+        set_cdb(0, 11);
+        @(negedge clock);
+        clr_cdb(0);
+        set_dispatch(1, 13, 14, 1, 0, FU_MULT);
+        @(negedge clock);
+        clr_dispatch(1);
+        set_cdb(1, 13);
+        @(negedge clock);
+        clr_cdb(1);
+        set_fu(FU_ALU, 0);
+        @(negedge clock);
+        clr_all();
+    endtask
+
+    task test_mixed();
+        reset = 1;
+        @(negedge clock);
+        reset = 0;
+        set_dispatch(0, 2, 3, 0, 1, FU_ALU);
+        set_dispatch(1, 4, 5, 1, 0, FU_MULT);
+        set_dispatch(2, 6, 7, 0, 0, FU_LOAD);
+        @(negedge clock);
+        clr_dispatch(0);
+        clr_dispatch(1);
+        clr_dispatch(2);
+        set_cdb(0, 2);
+        @(negedge clock);
+        clr_cdb(0);
+        set_cdb(1, 4);
+        @(negedge clock);
+        clr_cdb(1);
+        set_cdb(2, 6);
+        @(negedge clock);
+        clr_cdb(2);
+        set_fu(FU_ALU, 0);
+        set_fu(FU_MULT, 0);
+        set_fu(FU_LOAD, 0);
+        @(negedge clock);
+        clr_all();
+    endtask
+
+    task test_idle();
+        reset = 1;
+        @(negedge clock);
+        reset = 0;
+        @(negedge clock);
+        @(negedge clock);
+        clr_all();
+    endtask
+
+
     task test_multi_1();
         reset = 1;
         @(negedge clock);
@@ -284,6 +389,7 @@ module rs_testbench;
 
         @(negedge clock);
         @(negedge clock);
+        clr_all();
 
     endtask
 
@@ -300,7 +406,13 @@ module rs_testbench;
         c_en            = '0;
         c_ts            = '0;
 
+        test_1inst();
         test_multi_1();
+        test_idle();
+        test_mixed();
+        test_sequential_fu();
+        test_multiple_cdb();
+        test_back_to_back();
 
     
         if (failed)
