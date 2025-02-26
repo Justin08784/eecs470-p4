@@ -9,13 +9,12 @@ make -B syn CLOCK_PERIOD=1.9
 typedef struct packed {
   INST inst;
   // logic [4:0] rob_num;
-  ADDR NPC;
-  logic [5:0] tag;
-  logic [5:0] t_old;
+  logic [$clog2(`PHYS_REG_SZ_R10K)-1:0] tag;
+  logic [$clog2(`PHYS_REG_SZ_R10K)-1:0] t_old;
 } robItem;
 
 module FIFO #(
-    parameter DEPTH = 32, // num elements
+    parameter DEPTH = `ROB_SZ, // num elements
     parameter WIDTH = $bits(robItem),//32, // num bits per element
     localparam CNT_BITS = $clog2(DEPTH)
 ) (
@@ -37,6 +36,7 @@ module FIFO #(
     logic [DEPTH-1:0] [WIDTH-1:0] buffer;
     logic [$clog2(DEPTH):0] cnt, next_cnt;
     logic empty;
+    logic [1:0] [WIDTH-1:0] next_rd_data;
     //logic head_overwritten;
 
     assign empty    = cnt == '0;
@@ -44,6 +44,9 @@ module FIFO #(
     assign spots     = DEPTH - cnt;
 
     always_comb begin
+        rd_data[0] = buffer[head];
+        rd_data[1] = buffer[head+1];
+
         rd_valid[0] = rd_en[0] && !empty;
         rd_valid[1] = rd_en[1] && !empty;
         next_head   = rd_valid[0] || rd_valid[1] ? (rd_valid[0] ^ rd_valid[1] ? (head + 1) % DEPTH : (head + 2) % DEPTH) : head;
@@ -85,7 +88,7 @@ endmodule
 
 
 module rob #(
-    parameter DEPTH = 32,  // num elements
+    parameter DEPTH = `ROB_SZ,  // num elements
     parameter WIDTH = $bits(robItem),  // num bits per element 
                            //(32 bits per insn + log2(64) = 6 bits each for T & Told)
     localparam CNT_BITS = $clog2(DEPTH)
