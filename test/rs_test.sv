@@ -9,57 +9,6 @@ s_vld, rs_scnt? Aren't there timing issues?
 */
 
 
-typedef struct packed {
-    logic       [$clog2(N):0]       rs_scnt; // to dispatcher
-    logic       [NUM_FU_ALU-1:0]    fu_vld_alu;
-    logic       [NUM_FU_MULT-1:0]   fu_vld_mult;
-    logic       [NUM_FU_STORE-1:0]  fu_vld_store;
-    logic       [NUM_FU_LOAD-1:0]   fu_vld_load;
-    ID_RESULT   [NUM_FU_ALU-1:0]    fu_dat_alu;
-    ID_RESULT   [NUM_FU_MULT-1:0]   fu_dat_mult;
-    ID_RESULT   [NUM_FU_STORE-1:0]  fu_dat_store;
-    ID_RESULT   [NUM_FU_LOAD-1:0]   fu_dat_load;
-} RS_OUTS;
-
-RS_OUTS model_out;
-function int model_update(
-    // input   clock,
-    input   reset,
-    input   flush,
-
-    // dispatch
-    input   logic       [$clog2(N):0]       rs_scnt, // to dispatcher
-    input   logic       [N-1:0]             d_vld,     // which dispatch lines are valid? (from dispatcher; dep. on rs_scnt)
-    input   ID_RESULT   [N-1:0]             d_dat,
-
-    // issue
-    input   logic       [NUM_FU_ALU-1:0]    fu_rdy_alu,
-    input   logic       [NUM_FU_MULT-1:0]   fu_rdy_mult,
-    input   logic       [NUM_FU_STORE-1:0]  fu_rdy_store,
-    input   logic       [NUM_FU_LOAD-1:0]   fu_rdy_load,
-
-    input   logic       [NUM_FU_ALU-1:0]    fu_vld_alu,
-    input   logic       [NUM_FU_MULT-1:0]   fu_vld_mult,
-    input   logic       [NUM_FU_STORE-1:0]  fu_vld_store,
-    input   logic       [NUM_FU_LOAD-1:0]   fu_vld_load,
-    input   ID_RESULT   [NUM_FU_ALU-1:0]    fu_dat_alu,
-    input   ID_RESULT   [NUM_FU_MULT-1:0]   fu_dat_mult,
-    input   ID_RESULT   [NUM_FU_STORE-1:0]  fu_dat_store,
-    input   ID_RESULT   [NUM_FU_LOAD-1:0]   fu_dat_load,
-
-    input   logic           [N-1:0] c_en,
-    input   PHYS_REG_IDX    [N-1:0] c_ts
-
-);
-    static RS_ENTRY [RS_SZ-1:0] entries;
-
-    if (reset || flush) begin
-        entries = '0;
-    end
-
-endfunction
-
-
 module rs_testbench;
     // constants
 
@@ -226,6 +175,17 @@ module rs_testbench;
         endcase
     endtask
 
+    task clr_all();
+        d_vld = '0;
+        d_dat = '0;
+        c_en = '0;
+        c_ts = '0;
+        fu_rdy_alu = '0;
+        fu_rdy_mult = '0;
+        fu_rdy_load = '0;
+        fu_rdy_store = '0;
+    endtask
+
 
 
     always begin
@@ -239,7 +199,7 @@ module rs_testbench;
         @(negedge clock);
         reset = 0;
 
-        // ID[1]: p1 <- p2{!rdy} * p4{!rdy}
+        // ID[1]: p? <- p2{!rdy} * p4{!rdy}
         set_dispatch(1, 2, 4, 0, 0, FU_MULT);
         @(negedge clock);
         clr_dispatch(1);
@@ -262,8 +222,71 @@ module rs_testbench;
 
         @(negedge clock);
 
+        clr_all();
 
     endtask
+
+    task test_multi_1();
+        reset = 1;
+        @(negedge clock);
+        reset = 0;
+        
+        $display("### Starting Multiple Instruction Test ###");
+
+        // ID[0]: p? <- p1 * p2
+        set_dispatch(0, 1, 2, 0, 0, FU_MULT);
+        // ID[1]: p? <- (p3+) + p4
+        set_dispatch(1, 3, 4, 1, 0, FU_ALU);
+        @(negedge clock);
+        clr_dispatch(0);
+        clr_dispatch(1);
+
+        // ID[0]: p? <- M[p8+]
+        set_dispatch(0, 8, 0, 1, 1, FU_LOAD);
+        set_cdb(0, 1);
+        @(negedge clock);
+        clr_cdb(0);
+
+        // Step 3: Make p2 available in the CDB
+        set_cdb(1, 2);
+        @(negedge clock);
+        clr_cdb(1);
+
+        // Step 4: ALU execution readiness
+        set_fu(FU_ALU, 0);  // ALU unit ready
+        @(negedge clock);
+
+        // Step 5: Make p4 available (for ALU inst)
+        set_cdb(2, 4);
+        @(negedge clock);
+        clr_cdb(2);
+
+        // Step 6: MULT functional unit becomes ready
+        set_fu(FU_MULT, 0);
+        @(negedge clock);
+
+        // Step 7: Load functional unit becomes ready
+        set_fu(FU_LOAD, 0);
+        @(negedge clock);
+
+        // Step 8: Completion of results
+        set_cdb(0, 5);  // MULT result p5
+        @(negedge clock);
+        clr_cdb(0);
+
+        set_cdb(1, 6);  // ALU result p6
+        @(negedge clock);
+        clr_cdb(1);
+
+        set_cdb(2, 7);  // Load result p7
+        @(negedge clock);
+        clr_cdb(2);
+
+        @(negedge clock);
+        @(negedge clock);
+
+    endtask
+
     initial begin
         /* initialize */
         clock           = 0;
@@ -277,51 +300,9 @@ module rs_testbench;
         c_en            = '0;
         c_ts            = '0;
 
-        reset = 1;
-        @(negedge clock);
-        @(negedge clock);
-        reset = 0;
-        @(negedge clock);
+        test_multi_1();
 
-        set_dispatch(1, 2, 4, 0, 0, 1);
-        // set_dispatch(0, 3, 6, 0, 0, 1);
-        @(negedge clock);
-
-        clr_dispatch(1);
-        set_cdb(0, 2);
-        @(negedge clock);
-
-        clr_cdb(0);
-        set_cdb(1, 4);
-        @(negedge clock);
-
-        clr_cdb(1);
-        set_fu(FU_MULT, 0);
-        set_fu(FU_MULT, 1);
-        @(negedge clock);
-
-        @(negedge clock);
-        set_dispatch(0, 3, 6, 0, 0, 2);
-        set_dispatch(1, 2, 4, 0, 0, 3);
-        set_fu(FU_STORE, 1);
-        set_fu(FU_LOAD, 1);
-        set_cdb(0, 3);
-        clr_cdb(1);
-        @(negedge clock);
-        set_dispatch(0, 5, 8, 0, 0, 1);
-        set_cdb(0, 2);
-        set_cdb(1, 6);
-        set_dispatch(1, 1, 7, 0, 0, 2);
-        @(negedge clock);
-        set_cdb(0, 4);
-        set_cdb(1, 5);
-        @(negedge clock);
-        set_cdb(1, 8);
-        set_fu(FU_LOAD, 1);
-        @(negedge clock);
-        @(negedge clock);
-        @(negedge clock);
-
+    
         if (failed)
             $display("@@@ Failed\n");
         else
