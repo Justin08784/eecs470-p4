@@ -21,14 +21,14 @@ module FIFO #(
 ) (
     input                       clock, 
     input                       reset,
-    input                       wr_en,
-    input                       rd_en,
-    input           [WIDTH-1:0] wr_data,
+    input     [1:0]             wr_en,
+    input     [1:0]             rd_en,
+    input     [1:0] [WIDTH-1:0] wr_data,
     input                       err,
-    output logic                wr_valid,
-    output logic                rd_valid,
-    output logic    [WIDTH-1:0] rd_data,
-    output logic [CNT_BITS:0] spots,
+    output logic [1:0]          wr_valid,
+    output logic [1:0]          rd_valid,
+    output logic [1:0] [WIDTH-1:0] rd_data,
+    output logic   [CNT_BITS:0] spots,
     output logic                full
 );
 
@@ -44,20 +44,22 @@ module FIFO #(
     assign spots     = DEPTH - cnt;
 
     always_comb begin
-        rd_valid    = rd_en && !empty;
-        next_head   = rd_valid ? (head + 1) % DEPTH : head;
+        rd_valid[0] = rd_en[0] && !empty;
+        rd_valid[1] = rd_en[1] && !empty;
+        next_head   = rd_valid[0] || rd_valid[1] ? (rd_valid[0] ^ rd_valid[1] ? (head + 1) % DEPTH : (head + 2) % DEPTH) : head;
 
-        wr_valid    = wr_en && (!full || rd_valid);
-        next_tail   = (wr_valid ? (tail + 1) % DEPTH : tail);
+        wr_valid[0] = wr_en[0] && (!full || rd_valid[0]);
+        wr_valid[1] = spots == 1 ? '0 : (wr_en[1] && (!full || rd_valid[1]));
+        next_tail   = wr_valid[0] || wr_valid[1] ? (wr_valid[0] ^ wr_valid[1] ? (tail + 1) % DEPTH : (tail + 2) % DEPTH) : tail;
 
-        next_cnt    = cnt + wr_valid - rd_valid;
+        next_cnt    = cnt + wr_valid[0] + wr_valid[1] - rd_valid[0] - rd_valid[1];
 
-        if(rd_valid) begin
-          rd_data = buffer[head];
-          //buffer[head] = '0;
-          //head_overwritten = 0'b1;;
+        if(rd_valid[0] || rd_valid[1]) begin
+          rd_data[0] = buffer[head];
         end
-
+        if(rd_valid[0] && rd_valid[1]) begin
+          rd_data[1] = buffer[head+1];
+        end
     end
 
     always_ff @(posedge clock) begin
@@ -70,9 +72,11 @@ module FIFO #(
             head <= next_head;
             tail <= next_tail;
 
-            if(wr_valid) begin
-            buffer[tail] <= wr_data;
-            //next_tail = tail+1;
+            if(wr_valid[0] || wr_valid[1]) begin
+                buffer[tail] <= wr_data[0];
+            end
+            if(wr_valid[0] && wr_valid[1]) begin
+                buffer[tail+1] <= wr_data[1];
             end
         end
     end
@@ -88,13 +92,13 @@ module rob #(
 ) (
     input                     clock,
     input                     reset,
-    input                     dispatch_en,
-    input                     retire_en,
+    input  [1:0]              dispatch_en,
+    input  [1:0]              retire_en,
     input                     err,
-    input        [ WIDTH-1:0] next_insn,
-    output logic              wr_valid,
-    output logic              rd_valid,
-    output logic [ WIDTH-1:0] completed_insn,
+    input  [1:0] [ WIDTH-1:0] next_insn,
+    output logic [1:0]        wr_valid,
+    output logic [1:0]        rd_valid,
+    output logic [1:0] [ WIDTH-1:0] completed_insn,
     output logic [CNT_BITS:0] free_spots,
     output logic              full
 );

@@ -34,14 +34,14 @@ module FIFO_test();
     localparam CNT_BITS = $clog2(`DEPTH);
 
     logic                clock, reset;
-    logic                wr_en;
-    logic   [`WIDTH-1:0] wr_data;
+    logic          [1:0] wr_en;
+    logic [1:0] [`WIDTH-1:0] wr_data;
     logic                err;
-    logic                rd_en;
-    logic   [`WIDTH-1:0] rd_data;
-    logic                rd_valid;
-    logic                wr_valid;
-    logic [CNT_BITS:0] spots;
+    logic          [1:0] rd_en;
+    logic [1:0] [`WIDTH-1:0] rd_data;
+    logic          [1:0] rd_valid;
+    logic          [1:0] wr_valid;
+    logic   [CNT_BITS:0] spots;
     logic                full;
 
     // variable to count values written to FIFO
@@ -89,8 +89,8 @@ module FIFO_test();
 
         clock = 1;
         reset = 1;
-        wr_en = 0;
-        rd_en = 0;
+        wr_en = 2'b00;
+        rd_en = 2'b00;
         err = 0;
 
         $monitor("  %3d | d_in: %h   wr: %b  rd: %b  |  wr_vld: %b  rd_vld: %b   d_out: %h   full: %b  spots: %2d",
@@ -102,138 +102,154 @@ module FIFO_test();
 
         // ---------- Test 1 ---------- //
         $display("\nTest 1: invalid read");
-        rd_en = 1;
+        rd_en = 2'b01;
         @(negedge clock);
-        rd_en = 0;
-
-        // ---------- Test 1.5 ---------- //
-        // $display("\nTest 1.5: error on empty");
-        // err = 1;
-        // @(negedge clock);
-        // err = 0;
+        rd_en = 2'b00;
 
         // ---------- Test 2 ---------- //
         $display("\nTest 2: Write and read with one cycle wait");
         $display("Write 1 value");
-        wr_en = 1;
+        wr_en = 2'b01;
         @(negedge clock);
-        wr_en = 0;
+        wr_en = 2'b00;
 
         $display("Wait one cycle");
         @(negedge clock);
 
-        rd_en = 1;
+        rd_en = 2'b01;
         $display("Read 1 value");
         @(negedge clock);
-        rd_en = 0;
+        rd_en = 2'b00;
+
+        // ---------- Test 2.5 ---------- //
+        $display("\nTest 2.5: Write and read twice with one cycle wait");
+        $display("Write 1 value");
+        wr_en = 2'b11;
+        @(negedge clock);
+        wr_en = 2'b00;
+
+        $display("Wait one cycle");
+        @(negedge clock);
+
+        rd_en = 2'b11;
+        $display("Read 1 value");
+        @(negedge clock);
+        rd_en = 2'b00;
 
         // // ---------- Test 3 ---------- //
         $display("\nTest 3: Write and read with no wait");
         $display("Write 1 value");
-        wr_en = 1;
+        wr_en = 2'b01;
         @(negedge clock);
-        wr_en = 0;
+        wr_en = 2'b00;
 
-        rd_en = 1;
+        rd_en = 2'b01;
         $display("Read 1 value");
         @(negedge clock);
-        rd_en = 0;
+        rd_en = 2'b00;
+
+        // // ---------- Test 3.5 ---------- //
+        $display("\nTest 3.5: Write and read twice with no wait");
+        $display("Write 1 value");
+        wr_en = 2'b11;
+        @(negedge clock);
+        wr_en = 2'b00;
+
+        rd_en = 2'b11;
+        $display("Read 1 value");
+        @(negedge clock);
+        rd_en = 2'b00;
 
         // // ---------- Test 4 ---------- //
         $display("\nTest 4: Read and write when empty");
-        wr_en = 1;
-        rd_en = 1;
+        wr_en = 2'b11;
+        rd_en = 2'b11;
         @(negedge clock);
-        rd_en = 0;
+        rd_en = 2'b00;
 
         // // ---------- Test 5 ---------- //
-        $display("\nTest 5: Write 4 values");
-        repeat (4) @(negedge clock);
-        wr_en = 0;
+        $display("\nTest 5: Write 6 values");
+        wr_en = 2'b11;
+        repeat (2) @(negedge clock);
+        wr_en = 2'b10;
+        @(negedge clock);
+        wr_en = 2'b01;
+        @(negedge clock);
+        wr_en = 2'b00;
 
         // // ---------- Test 6 ---------- //
-        $display("\nTest 6: Read 3 values");
-        rd_en = 1;
-        repeat (3) @(negedge clock);
-        rd_en = 0;
+        $display("\nTest 6: Read 4 values");
+        rd_en = 2'b11;
+        @(negedge clock);
+        rd_en = 2'b10;
+        @(negedge clock);
+        rd_en = 2'b01;
+        @(negedge clock);
+        rd_en = 2'b00;
 
         // // ---------- Test 7 ---------- //
         $display("\nTest 7: Write until full");
-        cnt = 1;
-        wr_en = 1;
+        cnt = 2;
+        wr_en = 2'b11;
         while (!full) begin
-            cnt++;
+            cnt += 2;
             @(negedge clock);
         end
 
         // // ---------- Test 8 ---------- //
         $display("\nTest 8: Invalid write");
+        wr_en = 2'b11;
         @(negedge clock);
 
         // // ---------- Test 9 ---------- //
         $display("\nTest 9: Simultaneous read and write when full");
-        rd_en = 1;
+        rd_en = 2'b11;
         @(negedge clock);
-        wr_en = 0;
-        rd_en = 0;
+        wr_en = 2'b00;
+        rd_en = 2'b00;
         @(negedge clock);
 
         // // ---------- Test 10 ---------- //
-        $display("\nTest 10: Read and write when one less than full");
-        rd_en = 1;
-        $display("Read when full");
+        $display("\nTest 10: Write when one less than full");
+        rd_en = 2'b01;
+        $display("Read one");
         @(negedge clock);
-        $display("Read and write");
-        wr_en = 1;
+        $display("Write two");
+        wr_en = 2'b11;
+        rd_en = 2'b00;
         @(negedge clock);
-        wr_en = 0;
-        rd_en = 0;
+        $display("Read another one");
+        rd_en = 2'b10;
+        @(negedge clock);
+        wr_en = 2'b00;
+        rd_en = 2'b00;
         @(negedge clock);
 
         // // ---------- Test 11 ---------- //
         $display("\nTest 11: Read all values");
-        rd_en = 1;
+        rd_en = 2'b11;
         while (cnt > 0) begin
-            cnt--;
+            cnt -= 2;
             @(negedge clock);
         end
 
-        // // ---------- Test 11.5 ---------- //
-        // $display("\nTest 11.5: Error on full");
-        // rd_en = 0;
-        // wr_en = 1;
-        // //cnt = 1;
-        // while (!full) begin
-        //     cnt++;
-        //     @(negedge clock);
-        // end
-        // wr_en = 0;
-        // @(negedge clock);
-        // err = 1;
-        // @(negedge clock);
-        // err = 0;
-        // while (cnt > 0) begin
-        //     cnt--;
-        //     @(negedge clock);
-        // end
-
         // ---------- Test 12 ---------- //
         $display("\nTest 12: Invalid read");
-        rd_en = 1;
+        rd_en = 2'b11;
         @(negedge clock);
-        rd_en = 0;
+        rd_en = 2'b00;
 
         // ---------- Test 13 ---------- //
         $display("\nTest 13: Four simultaneous reads and writes");
-        rd_en = 1;
-        wr_en = 1;
+        rd_en = 2'b10;
+        wr_en = 2'b01;
         repeat (4) @(negedge clock);
-        wr_en = 0;
+        wr_en = 2'b00;
 
         // ---------- Test 14 ---------- //
         $display("\nTest 14: Read last item");
         @(negedge clock);
-        rd_en = 0;
+        rd_en = 2'b00;
 
         @(negedge clock);
         @(negedge clock);
