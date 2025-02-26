@@ -1,13 +1,6 @@
 
 `include "sys_defs.svh"
 `include "test/rs_sva.svh"
-/*
-CLARIFICATION NEEDED:
-Ok, checking the accuracy of FF state like entries_dbg seems pretty
-straightforward. But how to check correctness of combinational stuff like
-s_vld, rs_scnt? Aren't there timing issues?
-*/
-
 
 module rs_testbench;
     // constants
@@ -39,7 +32,6 @@ module rs_testbench;
     PHYS_REG_IDX    [N-1:0] c_ts;
 
     logic failed;
-    // DATA r1, r2, correct_r, mul_r;
     string fmt;
 
     rs # (
@@ -352,29 +344,23 @@ module rs_testbench;
         @(negedge clock);
         clr_cdb(0);
 
-        // Step 3: Make p2 available in the CDB
         set_cdb(1, 2);
         @(negedge clock);
         clr_cdb(1);
 
-        // Step 4: ALU execution readiness
         set_fu(FU_ALU, 0);  // ALU unit ready
         @(negedge clock);
 
-        // Step 5: Make p4 available (for ALU inst)
         set_cdb(2, 4);
         @(negedge clock);
         clr_cdb(2);
 
-        // Step 6: MULT functional unit becomes ready
         set_fu(FU_MULT, 0);
         @(negedge clock);
 
-        // Step 7: Load functional unit becomes ready
         set_fu(FU_LOAD, 0);
         @(negedge clock);
 
-        // Step 8: Completion of results
         set_cdb(0, 5);  // MULT result p5
         @(negedge clock);
         clr_cdb(0);
