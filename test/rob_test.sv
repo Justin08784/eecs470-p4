@@ -50,11 +50,24 @@ module rob_test();
         // .spots    (spots),
         .full     (full)
     );
+    
 
-    // bind dut FIFO_sva #(
-    //     .DEPTH(`DEPTH),
-    //     .WIDTH(`WIDTH)
-    // ) DUT_sva (.*);
+    bind dut rob_sva #(
+        .DEPTH(`DEPTH),
+        .WIDTH(`WIDTH)
+    ) DUT_sva (
+        .clock    (clock),
+        .reset    (reset)
+        // .wr_en (wr_en),
+        // .rd_en (rd_en),
+        // .err      (err),
+        // .wr_data (wr_data),
+        // .wr_valid (wr_valid),
+        // .rd_valid (rd_valid),
+        // .rd_data  (rd_data),
+        // .spots    (spots),
+        // .full     (full)
+    );
 
     always begin
         #(`CLOCK_PERIOD/2) clock = ~clock;
