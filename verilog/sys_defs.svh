@@ -458,4 +458,12 @@ typedef struct packed {
     ID_RESULT   dat;
 } FU_ENTRY;
 
+typedef struct packed {
+  INST inst;
+  // logic [4:0] rob_num;
+  logic [$clog2(`PHYS_REG_SZ_R10K)-1:0] tag;
+  logic [$clog2(`PHYS_REG_SZ_R10K)-1:0] t_old;
+} robItem;
+
+
 `endif // __SYS_DEFS_SVH__
