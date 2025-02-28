@@ -3,14 +3,22 @@
 `ifndef RS_SVA_SVH
 `define RS_SVA_SVH
 
+localparam N = 2;
+localparam RS_SZ = 8;
+localparam FU_IDX_NUM = `FU_IDX_NUM;
+localparam NUM_FU_ALU = 1;
+localparam NUM_FU_MULT = 2;
+localparam NUM_FU_STORE = 4;
+localparam NUM_FU_LOAD = 4;
+
 module rs_sva #(parameter 
-    N=`N,
-    RS_SZ=`RS_SZ,
-    FU_IDX_NUM=`FU_IDX_NUM,
-    NUM_FU_ALU=`NUM_FU_ALU,
-    NUM_FU_MULT=`NUM_FU_MULT,
-    NUM_FU_LOAD=`NUM_FU_LOAD,
-    NUM_FU_STORE=`NUM_FU_STORE
+    N=N,
+    RS_SZ=RS_SZ,
+    FU_IDX_NUM=FU_IDX_NUM,
+    NUM_FU_ALU=NUM_FU_ALU,
+    NUM_FU_MULT=NUM_FU_MULT,
+    NUM_FU_LOAD=NUM_FU_LOAD,
+    NUM_FU_STORE=NUM_FU_STORE
 ) (
     // ==== input lines so we can do our own parallel computation
     input clock,

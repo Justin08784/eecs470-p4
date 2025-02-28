@@ -3,39 +3,31 @@
 `include "test/rs_sva.svh"
 module rs_testbench;
     // constants
-    localparam N = 2;
-    localparam RS_SZ = 8;
-    localparam FU_IDX_NUM = `FU_IDX_NUM;
-    localparam NUM_FU_ALU = 1;
-    localparam NUM_FU_MULT = 2;
-    localparam NUM_FU_STORE = 4;
-    localparam NUM_FU_LOAD = 4;
-    localparam DEBUG = 1;
     // signals
     logic clock;
     logic reset;
     logic flush;
 
     logic           [$clog2(N):0] rs_scnt; // to dispatcher
-    logic           [`N-1:0] d_vld;     // which dispatch lines are valid? (from dispatcher; dep. on rs_scnt)
-    ID_RESULT       [`N-1:0] d_dat;
+    logic           [N-1:0] d_vld;     // which dispatch lines are valid? (from dispatcher; dep. on rs_scnt)
+    ID_RESULT       [N-1:0] d_dat;
     // issue
-    logic           [`NUM_FU_ALU-1:0]    fu_rdy_alu;
-    logic           [`NUM_FU_MULT-1:0]   fu_rdy_mult;
-    logic           [`NUM_FU_STORE-1:0]  fu_rdy_store;
-    logic           [`NUM_FU_LOAD-1:0]   fu_rdy_load;
+    logic           [NUM_FU_ALU-1:0]    fu_rdy_alu;
+    logic           [NUM_FU_MULT-1:0]   fu_rdy_mult;
+    logic           [NUM_FU_STORE-1:0]  fu_rdy_store;
+    logic           [NUM_FU_LOAD-1:0]   fu_rdy_load;
 
-    logic           [`NUM_FU_ALU-1:0]    fu_vld_alu;
-    logic           [`NUM_FU_MULT-1:0]   fu_vld_mult;
-    logic           [`NUM_FU_STORE-1:0]  fu_vld_store;
-    logic           [`NUM_FU_LOAD-1:0]   fu_vld_load;
-    ID_RESULT       [`NUM_FU_ALU-1:0]    fu_dat_alu;
-    ID_RESULT       [`NUM_FU_MULT-1:0]   fu_dat_mult;
-    ID_RESULT       [`NUM_FU_STORE-1:0]  fu_dat_store;
-    ID_RESULT       [`NUM_FU_LOAD-1:0]   fu_dat_load;
+    logic           [NUM_FU_ALU-1:0]    fu_vld_alu;
+    logic           [NUM_FU_MULT-1:0]   fu_vld_mult;
+    logic           [NUM_FU_STORE-1:0]  fu_vld_store;
+    logic           [NUM_FU_LOAD-1:0]   fu_vld_load;
+    ID_RESULT       [NUM_FU_ALU-1:0]    fu_dat_alu;
+    ID_RESULT       [NUM_FU_MULT-1:0]   fu_dat_mult;
+    ID_RESULT       [NUM_FU_STORE-1:0]  fu_dat_store;
+    ID_RESULT       [NUM_FU_LOAD-1:0]   fu_dat_load;
     // complete (CDB)
-    logic           [`N-1:0] c_en;
-    PHYS_REG_IDX    [`N-1:0] c_ts;
+    logic           [N-1:0] c_en;
+    PHYS_REG_IDX    [N-1:0] c_ts;
 
     logic failed;
     string fmt;
