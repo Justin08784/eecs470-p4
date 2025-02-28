@@ -4,7 +4,14 @@
 
 module rs_testbench;
     // constants
-
+    localparam N = 2;
+    localparam RS_SZ = 8;
+    localparam FU_IDX_NUM = `FU_IDX_NUM;
+    localparam NUM_FU_ALU = 1;
+    localparam NUM_FU_MULT = 2;
+    localparam NUM_FU_STORE = 4;
+    localparam NUM_FU_LOAD = 4;
+    localparam DEBUG = 1;
     // signals
     logic clock;
     logic reset;
@@ -69,14 +76,14 @@ module rs_testbench;
         .c_ts(c_ts)
     );
 
-    bind rs_dut rs_sva # (
-        .N(N),
-        .RS_SZ(RS_SZ),
-        .FU_IDX_NUM(FU_IDX_NUM),
-        .NUM_FU_ALU(NUM_FU_ALU),
-        .NUM_FU_MULT(NUM_FU_MULT),
-        .NUM_FU_STORE(NUM_FU_STORE),
-        .NUM_FU_LOAD(NUM_FU_LOAD)
+    bind rs_dut rs_sva #(
+        .N(2),
+        .RS_SZ(8),
+        .FU_IDX_NUM(4),
+        .NUM_FU_ALU(1),
+        .NUM_FU_MULT(2),
+        .NUM_FU_STORE(4),
+        .NUM_FU_LOAD(4)
     ) dut_sva (
         .clock(clock),
         .reset(reset),

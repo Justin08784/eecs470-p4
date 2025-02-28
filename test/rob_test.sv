@@ -31,6 +31,8 @@ module rob_test();
     logic   [CNT_BITS:0] spots;
     logic                full;
 
+    PHYS_REG_IDX fds;
+
     // variable to count values written to FIFO
     int cnt;
 

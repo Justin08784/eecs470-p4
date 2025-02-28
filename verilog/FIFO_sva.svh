@@ -21,6 +21,8 @@ module rob_sva #(
     // input [CNT_BITS:0] spots,
     // input              full
 );
+    initial begin
+    end
 
   // logic [$clog2(DEPTH+1)-1:0] entries;  // how full the buffer should be
   // int                         rd_count;  // number of reads complete
