@@ -2,9 +2,6 @@
 # ---- Introduction ---- #
 ##########################
 
-export DEBUG = 1
-export SYNTHESIS = 1
-
 # Welcome to the Project 3 VeriSimpleV Processor makefile!
 # this file will build and run a fully synthesizable RISC-V verilog processor
 # and is an extended version of the EECS 470 standard makefile
@@ -215,7 +212,6 @@ ROB_FILES = verilog/sys_defs.svh verilog/memDP.sv verilog/FIFO.sv
 build/rob.simv: $(ROB_FILES)
 build/rob.cov: $(ROB_FILES)
 synth/rob.vg: $(ROB_FILES)
-# test/rob_test.sv: verilog/FIFO.sv
 
 #################################
 # ---- Main CPU Definition ---- #
@@ -230,8 +226,7 @@ CPU_HEADERS = verilog/sys_defs.svh \
 # test/cpu_test.sv is implicit
 CPU_TESTBENCH = test/pipeline_print.c \
 			    test/decode_inst.c \
-                test/mem.sv \
-				test/rs_test.sv
+                test/mem.sv
 # NOTE: you CANNOT alter the given memory module
 
 # verilog/cpu.sv is implicit

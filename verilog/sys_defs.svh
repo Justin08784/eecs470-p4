@@ -466,6 +466,7 @@ typedef struct packed {
 } robItem;
 
 
+/* How can we implement this in the Makefile? */
 // comment out to disable DEBUG:
 `define DEBUG
 
