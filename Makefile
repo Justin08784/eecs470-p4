@@ -226,7 +226,7 @@ CPU_HEADERS = verilog/sys_defs.svh \
 # test/cpu_test.sv is implicit
 CPU_TESTBENCH = test/pipeline_print.c \
 			    test/decode_inst.c \
-                test/mem.sv
+                test/mem.sv 
 # NOTE: you CANNOT alter the given memory module
 
 # verilog/cpu.sv is implicit
@@ -305,7 +305,6 @@ synth/%.vg: verilog/%.sv $(TCL_SCRIPT) | synth
 	MODULE=$* SOURCES="$(filter-out $(TCL_SCRIPT) $(ALL_HEADERS),$^)" \
 	dc_shell-t -f $(notdir $(TCL_SCRIPT)) | tee $*_synth.out
 	@$(call PRINT_COLOR, 6, finished synthesizing $@)
-# MODULE=$* +define+DEBUG SOURCES="$(filter-out $(TCL_SCRIPT) $(ALL_HEADERS),$^)" \
 
 # A phony target to view the slack in all the *.rep synthesis reports
 slack:
