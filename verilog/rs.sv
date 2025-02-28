@@ -51,7 +51,7 @@ module rs #(parameter
     input   PHYS_REG_IDX    [N-1:0] c_ts
 
 );
-    RS_ENTRY [RS_SZ-1:0]       entries, entries_n;
+    RS_ENTRY [RS_SZ-1:0]       entries, entries_n; // ms1 test: remove one RS entry (caught)
     `ifdef DEBUG
     assign entries_dbg = entries;
     `endif 
@@ -61,8 +61,8 @@ module rs #(parameter
     logic [RS_SZ-1:0] t1_rdy_vec;
     logic [RS_SZ-1:0] t2_rdy_vec;
     generate
-    for (genvar i = 0; i < RS_SZ; i++) begin : gen_vecs
-        assign busy_vec[i] = entries[i].busy;
+    for (genvar i = 0; i < RS_SZ; i++) begin : gen_vecs // ms1 test: make loop count RS_SZ-1 instead of RS_SZ (caught)
+        assign busy_vec[i] = entries[i].busy; // ms1 test: make busy_vec sequential instead of combinational (caught)
         assign issd_vec[i] = entries[i].issued;
         assign t1_rdy_vec[i] = entries[i].dat.t1_rdy;
         assign t2_rdy_vec[i] = entries[i].dat.t2_rdy;
@@ -103,8 +103,8 @@ module rs #(parameter
         can_issues = '0;
         for (int rs = 0; rs < RS_SZ; ++rs) begin
             can_issue[rs] = busy_vec[rs]
-                && !entries[rs].issued
-                && (entries[rs].dat.t1_rdy || to_t1_rdy[rs])
+                && !entries[rs].issued // ms1 test: remove "!" from entries[rs].issued (caught)
+                && (entries[rs].dat.t1_rdy || to_t1_rdy[rs]) // ms1 test: remove "|| to_t1_rdy[rs]" (not caught) 
                 && (entries[rs].dat.t2_rdy || to_t2_rdy[rs]);
 
             can_issues[entries[rs].dat.fu_idx][rs] = can_issue[rs];
@@ -215,7 +215,7 @@ module rs #(parameter
         foreach (gbus_fu_rdy_mult[i, j]) begin
             if (gbus_fu_rdy_mult[i][j]) begin
                 fu2issuer_mult[j]   |= gbus_can_issue_mult[i];
-                fu_vld_mult[j]      = |gbus_can_issue_mult[i];
+                fu_vld_mult[j]      = |gbus_can_issue_mult[i]; // ms1 test: change i to j (not caught)
                 to_issue            |= gbus_can_issue_mult[i];
             end
         end
@@ -242,7 +242,7 @@ module rs #(parameter
         fu_dat_store    = '0;
         fu_dat_load     = '0;
         foreach (fu2issuer_alu[fu, rs]) begin
-            if (!fu2issuer_alu[fu][rs]) begin
+            if (!fu2issuer_alu[fu][rs]) begin // ms1 test: Remove "!" from if condition (not caught)
                 fu_dat_alu |= entries[rs].dat;
             end
         end
@@ -310,7 +310,7 @@ module rs #(parameter
         entries_n = entries;
         for (int rs = 0; rs < RS_SZ; ++rs) begin
             entries_n[rs].dat.t1_rdy |= to_t1_rdy[rs];
-            entries_n[rs].dat.t2_rdy |= to_t2_rdy[rs];
+            entries_n[rs].dat.t2_rdy |= to_t2_rdy[rs]; // ms1 test: change |= to = (not caught)
 
             if (to_issue[rs]) begin
                 // issuing
