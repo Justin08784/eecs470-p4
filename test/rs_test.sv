@@ -1,7 +1,15 @@
-
 `include "sys_defs.svh"
 `include "test/rs_sva.svh"
+
 module rs_testbench;
+    localparam N=`N;
+    localparam RS_SZ=`RS_SZ;
+    localparam FU_IDX_NUM=`FU_IDX_NUM;
+    localparam NUM_FU_ALU=`NUM_FU_ALU;
+    localparam NUM_FU_MULT=`NUM_FU_MULT;
+    localparam NUM_FU_LOAD=`NUM_FU_LOAD;
+    localparam NUM_FU_STORE=`NUM_FU_STORE;
+
     // constants
     // signals
     logic clock;

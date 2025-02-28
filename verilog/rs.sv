@@ -1,5 +1,3 @@
-
-
 `include "sys_defs.svh"
 
 module rs #(parameter 
