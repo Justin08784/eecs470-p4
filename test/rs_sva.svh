@@ -147,6 +147,8 @@ module rs_sva #(parameter
 
         for (int rs = 0, int fu = 0; rs < RS_SZ; ++rs) begin
             fu = entries_n[rs].dat.fu_idx;
+            // $display("(rs: %d, fu: %d): num_free_fus %d, entries_n.issued: %b, num_issue_fus %d", 
+            // rs, fu, num_free_fus[fu], entries_n[rs].issued, num_issue_fus[fu]);
             if (entries_n[rs].dat.t1_rdy 
                 && entries_n[rs].dat.t2_rdy
                 && num_free_fus[fu] > 0
@@ -174,12 +176,24 @@ module rs_sva #(parameter
         assign rs_scnt_sva = $min($countones(~busy_sva | issd_sva), N);
 
         @(negedge clock);
-        if (DEBUG) begin
-            marker();
-            print_entries(entries_dut);
+        // if (DEBUG) begin
+        marker();
+        $write("cdb={");
+        for (int i = 0; i < N; ++i) begin
+            $write("%d:%b", i, c_en[i] ? c_ts[i] : 'x);
         end
-        // $display("<><><><><>");
-        // print_entries(entries);
+        $write("}\n");
+        $display("fu_rdy={FU_ALU: %b, FU_MULT: %b, FU_LOAD: %b, STORE: %b}",
+            fu_rdy_alu,
+            fu_rdy_mult,
+            fu_rdy_load,
+            fu_rdy_store
+        );
+        $display("dut:");
+        print_entries(entries_dut);
+        // end
+        $display("sva:");
+        print_entries(entries);
         // $display("FU_ALU: num_issue_fus[%0d] = %0d, $countones(fu_vld_alu_dut) = %0d", 
         //     FU_ALU, num_issue_fus[FU_ALU], $countones(fu_vld_alu_dut));
         // $display("FU_MULT: num_issue_fus[%0d] = %0d, $countones(fu_vld_mult_dut) = %0d", 
