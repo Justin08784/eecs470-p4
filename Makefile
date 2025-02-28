@@ -2,6 +2,9 @@
 # ---- Introduction ---- #
 ##########################
 
+export DEBUG = 1
+export SYNTHESIS = 1
+
 # Welcome to the Project 3 VeriSimpleV Processor makefile!
 # this file will build and run a fully synthesizable RISC-V verilog processor
 # and is an extended version of the EECS 470 standard makefile
@@ -296,7 +299,7 @@ $(MODULES:%=./%.out) $(MODULES:%=./%.syn.out): ./%.out: build/%.out
 # The normal simulation executable will run your testbench on simulated modules
 $(MODULES:%=build/%.simv): build/%.simv: test/%_test.sv verilog/%.sv | build
 	@$(call PRINT_COLOR, 5, compiling the simulation executable $@)
-	$(VCS) $(filter-out $(ALL_HEADERS),$^) -o $@
+	$(VCS) +define+DEBUG $(filter-out $(ALL_HEADERS),$^) -o $@
 	@$(call PRINT_COLOR, 6, finished compiling $@)
 
 # This also generates many other files, see the tcl script's introduction for info on each of them
@@ -304,9 +307,10 @@ synth/%.vg: verilog/%.sv $(TCL_SCRIPT) | synth
 	@$(call PRINT_COLOR, 5, synthesizing the $* module)
 	@$(call PRINT_COLOR, 3, this might take a while...)
 	cd synth && \
-	MODULE=$* SOURCES="$(filter-out $(TCL_SCRIPT) $(ALL_HEADERS),$^)" \
+	MODULE=$* DEBUG=1 SOURCES="$(filter-out $(TCL_SCRIPT) $(ALL_HEADERS),$^)" \
 	dc_shell-t -f $(notdir $(TCL_SCRIPT)) | tee $*_synth.out
 	@$(call PRINT_COLOR, 6, finished synthesizing $@)
+# MODULE=$* +define+DEBUG SOURCES="$(filter-out $(TCL_SCRIPT) $(ALL_HEADERS),$^)" \
 
 # A phony target to view the slack in all the *.rep synthesis reports
 slack:
@@ -316,7 +320,7 @@ slack:
 # The synthesis executable runs your testbench on the synthesized versions of your modules
 $(MODULES:%=build/%.syn.simv): build/%.syn.simv: test/%_test.sv synth/%.vg | build
 	@$(call PRINT_COLOR, 5, compiling the synthesis executable $@)
-	$(VCS) +define+SYNTH $(filter-out $(ALL_HEADERS),$^) $(LIB) -o $@
+	$(VCS) +define+DEBUG +define+SYNTH $(filter-out $(ALL_HEADERS),$^) $(LIB) -o $@
 	@$(call PRINT_COLOR, 6, finished compiling $@)
 
 ##############################
