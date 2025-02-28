@@ -466,4 +466,8 @@ typedef struct packed {
 } robItem;
 
 
+// comment out to disable DEBUG:
+`define DEBUG
+
+
 `endif // __SYS_DEFS_SVH__

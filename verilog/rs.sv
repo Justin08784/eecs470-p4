@@ -44,9 +44,9 @@ module rs #(parameter
     output  ID_RESULT   [NUM_FU_STORE-1:0]  fu_dat_store,
     output  ID_RESULT   [NUM_FU_LOAD-1:0]   fu_dat_load,
 
-    // `ifdef DEBUG
-    output RS_ENTRY [RS_SZ-1:0]       entries_dbg,
-    // endif 
+    `ifdef DEBUG
+    output  RS_ENTRY    [RS_SZ-1:0]       entries_dbg,
+    `endif 
 
     // complete (CDB)
     input   logic           [N-1:0] c_en,

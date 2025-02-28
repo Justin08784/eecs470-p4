@@ -67,9 +67,9 @@ module rs_testbench;
         .fu_dat_store(fu_dat_store),
         .fu_dat_load(fu_dat_load),
 
-        // `ifdef DEBUG
+        `ifdef DEBUG
         .entries_dbg(entries_dut),
-        // `endif 
+        `endif 
  
         .c_en(c_en),
         .c_ts(c_ts)
