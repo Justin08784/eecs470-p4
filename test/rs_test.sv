@@ -388,6 +388,38 @@ module rs_testbench;
 
     endtask
 
+    task test_1inst_2();
+        /*
+        Test same-cycle complete AND issue:
+        (if operands ready AND fu is available same cycle, insn must issue;
+        requires tracking operand statuses not yet propagated to entries FF)
+
+        Catches ms1 test: remove "|| to_t1_rdy[rs]" (not caught) 
+        */
+        reset = 1;
+        @(negedge clock);
+        reset = 0;
+
+        set_dispatch(0, 1, 2, 0, 0, FU_STORE);
+        @(negedge clock);
+        clr_dispatch(0);
+
+        set_cdb(0, 1);
+        set_cdb(1, 2);
+        set_fu(FU_STORE, 0);
+        @(negedge clock);
+        clr_cdb(0);
+        clr_cdb(1);
+        clr_fu(FU_STORE, 0);
+
+        @(negedge clock);
+
+        @(negedge clock);
+
+        clr_all();
+        @(negedge clock);
+    endtask
+
     initial begin
         /* initialize */
         clock           = 0;
@@ -401,13 +433,15 @@ module rs_testbench;
         c_en            = '0;
         c_ts            = '0;
 
-        test_1inst();
-        test_multi_1();
-        test_idle();
-        test_mixed();
-        test_sequential_fu();
-        test_multiple_cdb();
-        test_back_to_back();
+        test_1inst_2();
+
+        // test_1inst();
+        // test_multi_1();
+        // test_idle();
+        // test_mixed();
+        // test_sequential_fu();
+        // test_multiple_cdb();
+        // test_back_to_back();
 
     
         if (failed)

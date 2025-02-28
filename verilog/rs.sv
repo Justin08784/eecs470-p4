@@ -101,13 +101,14 @@ module rs #(parameter
     logic [FU_IDX_NUM-1:0][RS_SZ-1:0] can_issues;
     always_comb begin
         can_issues = '0;
-        for (int rs = 0; rs < RS_SZ; ++rs) begin
+        for (int rs = 0, FU_IDX fu = 0; rs < RS_SZ; ++rs) begin
             can_issue[rs] = busy_vec[rs]
                 && !entries[rs].issued // ms1 test: remove "!" from entries[rs].issued (caught)
                 && (entries[rs].dat.t1_rdy || to_t1_rdy[rs]) // ms1 test: remove "|| to_t1_rdy[rs]" (not caught) 
                 && (entries[rs].dat.t2_rdy || to_t2_rdy[rs]);
 
-            can_issues[entries[rs].dat.fu_idx][rs] = can_issue[rs];
+            fu = entries[rs].dat.fu_idx;
+            can_issues[fu][rs] = can_issue[rs];
         end
     end
 
