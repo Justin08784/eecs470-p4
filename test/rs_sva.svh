@@ -108,26 +108,28 @@ module rs_sva #(parameter
     endgenerate
     
     int rs_scnt_sva;
-    struct packed {
-        int     idx; // idx of original element
-        logic   busy;
-        ADDR    PC;
-    }   entries_sva_sorter[RS_SZ],
-        entries_dut_sorter[RS_SZ];
+    // struct packed {
+    //     int     idx; // idx of original element
+    //     logic   busy;
+    //     ADDR    PC;
+    // }   entries_sva_sorter[RS_SZ],
+    //     entries_dut_sorter[RS_SZ];
     logic   [RS_SZ-1:0] entries_eqs;
+    RS_ENTRY entries_sva_sorted[RS_SZ], entries_dut_sorted[RS_SZ];
 
     `define MAX(a, b) ((a) > (b) ? (a) : (b))
     localparam MAX_NUM_FU = `MAX(NUM_FU_ALU, `MAX(NUM_FU_MULT, `MAX(NUM_FU_LOAD, NUM_FU_STORE)));
-    struct packed {
-        int     idx; // idx of original element
-        logic   vld;
-        ADDR    PC;
-    }   fu_dat_sva_sorter[MAX_NUM_FU],
-        fu_dat_dut_sorter[MAX_NUM_FU];
+    // struct packed {
+    //     int     idx; // idx of original element
+    //     logic   vld;
+    //     ADDR    PC;
+    // }   fu_dat_sva_sorter[MAX_NUM_FU],
+    //     fu_dat_dut_sorter[MAX_NUM_FU];
     logic   [NUM_FU_ALU-1:0]    fu_dat_alu_eqs;
     logic   [NUM_FU_MULT-1:0]   fu_dat_mult_eqs;
     logic   [NUM_FU_LOAD-1:0]   fu_dat_load_eqs;
     logic   [NUM_FU_STORE-1:0]  fu_dat_store_eqs;
+    ID_RESULT [MAX_NUM_FU-1:0]  fu_dat_sva_sorted, fu_dat_dut_sorted;
 
     always begin
         entries_n = entries;
@@ -188,41 +190,39 @@ module rs_sva #(parameter
 
         // Sort-check entries: sort entries, entries_dut by ascending {busy, PC}
         // then do entrywise comparison. 
-        for (int rs = 0; rs < RS_SZ; ++rs) begin
-            entries_sva_sorter[rs].idx  = rs;
-            entries_sva_sorter[rs].busy = entries[rs].busy;
-            entries_sva_sorter[rs].PC   = entries[rs].dat.PC;
 
-            entries_dut_sorter[rs].idx  = rs;
-            entries_dut_sorter[rs].busy = entries_dut[rs].busy;
-            entries_dut_sorter[rs].PC   = entries_dut[rs].dat.PC;
-        end
-        entries_sva_sorter.sort() with ({item.busy, item.PC});
-        entries_dut_sorter.sort() with ({item.busy, item.PC});
-        for (int rs = 0, RS_ENTRY l=0, RS_ENTRY r=0; rs < RS_SZ; ++rs) begin
-            l = entries_dut[entries_dut_sorter[rs].idx];
-            r = entries[entries_sva_sorter[rs].idx];
-            entries_eqs[rs] = l == r;
-        end
+        // Version 1: Sort a copy of original arrays
+        foreach(entries[i]) entries_sva_sorted[i] = entries[i];
+        foreach(entries[i]) entries_dut_sorted[i] = entries_dut[i];
+        entries_sva_sorted.sort() with ({item.busy, item.dat.PC});
+        entries_dut_sorted.sort() with ({item.busy, item.dat.PC});
+        foreach(entries[i]) entries_eqs[i] = entries_sva_sorted[i] == entries_dut_sorted[i];
+
+        /* Version 2: Sort a sorter struct to index into original arrays */
+        // for (int rs = 0; rs < RS_SZ; ++rs) begin
+        //     entries_sva_sorter[rs].idx  = rs;
+        //     entries_sva_sorter[rs].busy = entries[rs].busy;
+        //     entries_sva_sorter[rs].PC   = entries[rs].dat.PC;
+
+        //     entries_dut_sorter[rs].idx  = rs;
+        //     entries_dut_sorter[rs].busy = entries_dut[rs].busy;
+        //     entries_dut_sorter[rs].PC   = entries_dut[rs].dat.PC;
+        // end
+        // entries_sva_sorter.sort() with ({item.busy, item.PC});
+        // entries_dut_sorter.sort() with ({item.busy, item.PC});
+        // for (int rs = 0, RS_ENTRY l=0, RS_ENTRY r=0; rs < RS_SZ; ++rs) begin
+        //     l = entries_dut[entries_dut_sorter[rs].idx];
+        //     r = entries[entries_sva_sorter[rs].idx];
+        //     entries_eqs[rs] = l == r;
+        // end
 
         // Sort-check fu_dats: sort fu_dats by ascending {busy, PC}
         // then do entrywise comparison. 
-        // for (int i = 0; i < NUM_FU_ALU; ++rs) begin
-        //     fu_dat_sva_sorter[rs].idx   = i;
-        //     fu_dat_sva_sorter[rs].vld   = fu_vld_alu[i];
-        //     fu_dat_sva_sorter[rs].PC    = fu_dat_alu[i].PC;
-
-        //     fu_dat_dut_sorter[rs].idx   = i;
-        //     fu_dat_dut_sorter[rs].vld   = fu_vld_alu[i];
-        //     fu_dat_dut_sorter[rs].PC    = fu_dat_alu[i].PC;
-        // end
-        // fu_dat_sva_sorter.sort() with ({item.vld, item.PC});
-        // fu_dat_dut_sorter.sort() with ({item.vld, item.PC});
-        // for (int i = 0, RS_ENTRY l=0, RS_ENTRY r=0; rs < RS_SZ; ++rs) begin
-        //     l = fu_dat_alu[entries_dut_sorter[rs].idx];
-        //     r = dut[entries_sva_sorter[rs].idx];
-        //     entries_eqs[rs] = l == r;
-        // end
+        // foreach(fu_dat_alu_eqs[i]) fu_dat_sva_sorted[i] = entries[i];
+        // foreach(fu_dat_alu_eqs[i]) fu_dat_dut_sorted[i] = entries_dut[i];
+        // entries_sva_sorted.sort() with ({item.busy, item.dat.PC});
+        // entries_dut_sorted.sort() with ({item.busy, item.dat.PC});
+        // foreach(fu_dat_alu_eqs[i]) entries_eqs[i] = entries_sva_sorted[i] == entries_dut_sorted[i];
 
         @(negedge clock);
         // if (DEBUG) begin
