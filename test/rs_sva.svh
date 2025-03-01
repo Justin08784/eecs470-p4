@@ -325,7 +325,6 @@ module rs_sva #(parameter
         fu_dat_dut_sorted[0:NUM_FU_STORE-1].sort() with ({item.PC});
         foreach(fu_dat_store_eqs[i]) fu_dat_store_eqs[i] = fu_dat_sva_sorted[i] == fu_dat_dut_sorted[i];
 
-        @(negedge clock);
         // if (DEBUG) begin
         marker();
         $write("cdb={");
@@ -382,6 +381,8 @@ module rs_sva #(parameter
         $display("can_issue_dut: %b", can_issue_dut);
         $display("to_t1_rdy_dut: %b", to_t1_rdy_dut);
         $display("to_t2_rdy_dut: %b", to_t2_rdy_dut);
+        
+        @(negedge clock);
 
 
         /* TODO: add debug prints for FUs vld/dat; for all FU types */
