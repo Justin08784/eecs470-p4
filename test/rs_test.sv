@@ -465,6 +465,40 @@ module rs_testbench;
         @(negedge clock);
     endtask
 
+    task test_nonzero_fu_rdy_idx();
+        /*
+        Set fu at non-zero index.
+        */
+        reset = 1;
+        @(negedge clock);
+        reset = 0;
+
+        set_dispatch(0, 1, 2, 0, 0, FU_STORE);
+        set_dispatch(1, 3, 4, 0, 0, FU_LOAD);
+        @(negedge clock);
+        clr_all();
+
+        set_cdb(0, 1);
+        set_cdb(1, 4);
+        set_fu(FU_STORE, NUM_FU_STORE-1);
+        set_fu(FU_LOAD, NUM_FU_LOAD-1);
+        @(negedge clock);
+        clr_all();
+
+        set_cdb(0, 2);
+        set_cdb(1, 3);
+        set_fu(FU_STORE, NUM_FU_STORE-1);
+        set_fu(FU_LOAD, NUM_FU_LOAD-1);
+        @(negedge clock);
+        clr_all();
+
+        @(negedge clock);
+        @(negedge clock);
+        @(negedge clock);
+
+        @(negedge clock);
+    endtask
+
     initial begin
         /* initialize */
         clock           = 0;
@@ -478,16 +512,7 @@ module rs_testbench;
         c_en            = '0;
         c_ts            = '0;
 
-        test_1inst_2();
-        test_delayed_rdy();
-        test_1inst();
-        test_multi_1();
-        test_idle();
-        test_mixed();
-        test_sequential_fu();
-        test_multiple_cdb();
-        test_back_to_back();
-
+        test_nonzero_fu_rdy_idx();
     
         if (failed)
             $display("@@@ Failed\n");
