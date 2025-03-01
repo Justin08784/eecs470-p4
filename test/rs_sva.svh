@@ -119,13 +119,12 @@ module rs_sva #(parameter
     int rs_scnt_sva;
     struct packed {
         int     idx; // idx of original element
-        logic   key1_busy;
-        ADDR    key2_PC;
+        logic   busy;
+        ADDR    PC;
     } entries_sva_sorter[RS_SZ], entries_dut_sorter[RS_SZ];
     logic   [RS_SZ-1:0] entries_equal;
 
     always begin
-        entries_equal = '0;
         entries_n = entries;
 
         // clear (insn going to ex)
@@ -149,10 +148,10 @@ module rs_sva #(parameter
         end
 
         // issue
-        num_free_fus[FU_ALU] = $countones(fu_rdy_alu);
-        num_free_fus[FU_MULT] = $countones(fu_rdy_mult);
-        num_free_fus[FU_STORE] = $countones(fu_rdy_store);
-        num_free_fus[FU_LOAD] = $countones(fu_rdy_load);
+        num_free_fus[FU_ALU]    = $countones(fu_rdy_alu);
+        num_free_fus[FU_MULT]   = $countones(fu_rdy_mult);
+        num_free_fus[FU_STORE]  = $countones(fu_rdy_store);
+        num_free_fus[FU_LOAD]   = $countones(fu_rdy_load);
         num_issue_fus[FU_ALU]   = 0;
         num_issue_fus[FU_MULT]  = 0;
         num_issue_fus[FU_STORE] = 0;
@@ -189,19 +188,19 @@ module rs_sva #(parameter
         assign rs_scnt_sva = $min($countones(~busy_sva | issd_sva), N);
 
 
-        // Sort entries, entries_dut ascending by {busy, PC} then do entrywise
-        // comparison entries_equal
+        // Sort-check entries: sort entries, entries_dut by ascending {busy, PC}
+        // then do entrywise comparison. 
         for (int rs = 0; rs < RS_SZ; ++rs) begin
-            entries_sva_sorter[rs].idx        = rs;
-            entries_sva_sorter[rs].key1_busy  = entries[rs].busy;
-            entries_sva_sorter[rs].key2_PC    = entries[rs].dat.PC;
+            entries_sva_sorter[rs].idx  = rs;
+            entries_sva_sorter[rs].busy = entries[rs].busy;
+            entries_sva_sorter[rs].PC   = entries[rs].dat.PC;
 
-            entries_dut_sorter[rs].idx        = rs;
-            entries_dut_sorter[rs].key1_busy  = entries_dut[rs].busy;
-            entries_dut_sorter[rs].key2_PC    = entries_dut[rs].dat.PC;
+            entries_dut_sorter[rs].idx  = rs;
+            entries_dut_sorter[rs].busy = entries_dut[rs].busy;
+            entries_dut_sorter[rs].PC   = entries_dut[rs].dat.PC;
         end
-        entries_sva_sorter.sort() with ({item.key1_busy, item.key2_PC});
-        entries_dut_sorter.sort() with ({item.key1_busy, item.key2_PC});
+        entries_sva_sorter.sort() with ({item.busy, item.PC});
+        entries_dut_sorter.sort() with ({item.busy, item.PC});
         for (int rs = 0, RS_ENTRY l=0, RS_ENTRY r=0; rs < RS_SZ; ++rs) begin
             l = entries_dut[entries_dut_sorter[rs].idx];
             r = entries[entries_sva_sorter[rs].idx];
