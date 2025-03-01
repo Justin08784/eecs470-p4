@@ -468,6 +468,8 @@ module rs_testbench;
     task test_nonzero_fu_rdy_idx();
         /*
         Set fu at non-zero index.
+        NOTE: This test is only effective if NUM_FU_X > 1 for all FU types X
+        (otherwise it will just set the FU at index 0)
         */
         reset = 1;
         @(negedge clock);
@@ -480,8 +482,6 @@ module rs_testbench;
 
         set_cdb(0, 1);
         set_cdb(1, 4);
-        set_fu(FU_STORE, NUM_FU_STORE-1);
-        set_fu(FU_LOAD, NUM_FU_LOAD-1);
         @(negedge clock);
         clr_all();
 
@@ -492,9 +492,22 @@ module rs_testbench;
         @(negedge clock);
         clr_all();
 
+        set_dispatch(0, 1, 2, 0, 0, FU_ALU);
+        set_dispatch(1, 3, 4, 0, 0, FU_MULT);
         @(negedge clock);
+        clr_all();
+
+        set_cdb(0, 1);
+        set_cdb(1, 4);
         @(negedge clock);
+        clr_all();
+
+        set_cdb(0, 2);
+        set_cdb(1, 3);
+        set_fu(FU_ALU, NUM_FU_ALU-1);
+        set_fu(FU_MULT, NUM_FU_MULT-1);
         @(negedge clock);
+        clr_all();
 
         @(negedge clock);
     endtask
