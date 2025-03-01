@@ -143,7 +143,10 @@ module rs_sva #(parameter
     logic   [NUM_FU_MULT-1:0]   fu_dat_mult_eqs;
     logic   [NUM_FU_LOAD-1:0]   fu_dat_load_eqs;
     logic   [NUM_FU_STORE-1:0]  fu_dat_store_eqs;
-    ID_RESULT fu_dat_sva_sorted[MAX_NUM_FU], fu_dat_dut_sorted[MAX_NUM_FU];
+    struct packed {
+        int vld;
+        ID_RESULT dat;
+    } fu_dat_sva_sorted[MAX_NUM_FU], fu_dat_dut_sorted[MAX_NUM_FU];
 
     // always_comb begin
     //     // Sort-check fu_dats: sort fu_dats by ascending {busy, PC}
@@ -301,29 +304,41 @@ module rs_sva #(parameter
 
         // Sort-check fu_dats: sort fu_dats by ascending {busy, PC}
         // then do entrywise comparison. 
-        foreach(fu_dat_alu_eqs[i]) fu_dat_sva_sorted[i] = fu_vld_alu[i]     ? fu_dat_alu[i]     : '0;
-        foreach(fu_dat_alu_eqs[i]) fu_dat_dut_sorted[i] = fu_vld_alu_dut[i] ? fu_dat_alu_dut[i] : '0;
-        fu_dat_sva_sorted[0:NUM_FU_ALU-1].sort() with ({item.PC});
-        fu_dat_dut_sorted[0:NUM_FU_ALU-1].sort() with ({item.PC});
+        foreach(fu_dat_alu_eqs[i]) fu_dat_sva_sorted[i] = '{vld:fu_vld_alu[i], dat:fu_dat_alu[i]};
+        foreach(fu_dat_alu_eqs[i]) fu_dat_dut_sorted[i] = '{vld:fu_vld_alu_dut[i], dat:fu_dat_alu_dut[i]};
+        fu_dat_sva_sorted[0:NUM_FU_ALU-1].rsort() with ({item.vld, item.dat.PC});
+        fu_dat_dut_sorted[0:NUM_FU_ALU-1].rsort() with ({item.vld, item.dat.PC});
         foreach(fu_dat_alu_eqs[i]) fu_dat_alu_eqs[i] = fu_dat_sva_sorted[i] == fu_dat_dut_sorted[i];
+        for (int i = 0; i < NUM_FU_ALU; ++i) $display("alu sva_dat_sorted[0%d]: %b", i, fu_dat_sva_sorted[i]);
+        for (int i = 0; i < NUM_FU_ALU; ++i) $display("alu dut_dat_sorted[0%d]: %b", i, fu_dat_dut_sorted[i]);
+        $display("");
 
-        foreach(fu_dat_mult_eqs[i]) fu_dat_sva_sorted[i] = fu_vld_mult[i]     ? fu_dat_mult[i]     : '0;
-        foreach(fu_dat_mult_eqs[i]) fu_dat_dut_sorted[i] = fu_vld_mult_dut[i] ? fu_dat_mult_dut[i] : '0;
-        fu_dat_sva_sorted[0:NUM_FU_MULT-1].sort() with ({item.PC});
-        fu_dat_dut_sorted[0:NUM_FU_MULT-1].sort() with ({item.PC});
+        foreach(fu_dat_mult_eqs[i]) fu_dat_sva_sorted[i] = '{vld:fu_vld_mult[i], dat:fu_dat_mult[i]};
+        foreach(fu_dat_mult_eqs[i]) fu_dat_dut_sorted[i] = '{vld:fu_vld_mult_dut[i], dat:fu_dat_mult_dut[i]};
+        fu_dat_sva_sorted[0:NUM_FU_MULT-1].rsort() with ({item.vld, item.dat.PC});
+        fu_dat_dut_sorted[0:NUM_FU_MULT-1].rsort() with ({item.vld, item.dat.PC});
         foreach(fu_dat_mult_eqs[i]) fu_dat_mult_eqs[i] = fu_dat_sva_sorted[i] == fu_dat_dut_sorted[i];
+        for (int i = 0; i < NUM_FU_MULT; ++i) $display("mult sva_dat_sorted[0%d]: %b", i, fu_dat_sva_sorted[i]);
+        for (int i = 0; i < NUM_FU_MULT; ++i) $display("mult dut_dat_sorted[0%d]: %b", i, fu_dat_dut_sorted[i]);
+        $display("");
 
-        foreach(fu_dat_load_eqs[i]) fu_dat_sva_sorted[i] = fu_vld_load[i]     ? fu_dat_load[i]     : '0;
-        foreach(fu_dat_load_eqs[i]) fu_dat_dut_sorted[i] = fu_vld_load_dut[i] ? fu_dat_load_dut[i] : '0;
-        fu_dat_sva_sorted[0:NUM_FU_LOAD-1].sort() with ({item.PC});
-        fu_dat_dut_sorted[0:NUM_FU_LOAD-1].sort() with ({item.PC});
+        foreach(fu_dat_load_eqs[i]) fu_dat_sva_sorted[i] = '{vld:fu_vld_load[i], dat:fu_dat_load[i]};
+        foreach(fu_dat_load_eqs[i]) fu_dat_dut_sorted[i] = '{vld:fu_vld_load_dut[i], dat:fu_dat_load_dut[i]};
+        fu_dat_sva_sorted[0:NUM_FU_LOAD-1].rsort() with ({item.vld, item.dat.PC});
+        fu_dat_dut_sorted[0:NUM_FU_LOAD-1].rsort() with ({item.vld, item.dat.PC});
         foreach(fu_dat_load_eqs[i]) fu_dat_load_eqs[i] = fu_dat_sva_sorted[i] == fu_dat_dut_sorted[i];
+        for (int i = 0; i < NUM_FU_LOAD; ++i) $display("load sva_dat_sorted[0%d]: %b", i, fu_dat_sva_sorted[i]);
+        for (int i = 0; i < NUM_FU_LOAD; ++i) $display("load dut_dat_sorted[0%d]: %b", i, fu_dat_dut_sorted[i]);
+        $display("");
 
-        foreach(fu_dat_store_eqs[i]) fu_dat_sva_sorted[i] = fu_vld_store[i]     ? fu_dat_store[i]     : '0;
-        foreach(fu_dat_store_eqs[i]) fu_dat_dut_sorted[i] = fu_vld_store_dut[i] ? fu_dat_store_dut[i] : '0;
-        fu_dat_sva_sorted[0:NUM_FU_STORE-1].sort() with ({item.PC});
-        fu_dat_dut_sorted[0:NUM_FU_STORE-1].sort() with ({item.PC});
+        foreach(fu_dat_store_eqs[i]) fu_dat_sva_sorted[i] = '{vld:fu_vld_store[i], dat:fu_dat_store[i]};
+        foreach(fu_dat_store_eqs[i]) fu_dat_dut_sorted[i] = '{vld:fu_vld_store_dut[i], dat:fu_dat_store_dut[i]};
+        fu_dat_sva_sorted[0:NUM_FU_STORE-1].rsort() with ({item.vld, item.dat.PC});
+        fu_dat_dut_sorted[0:NUM_FU_STORE-1].rsort() with ({item.vld, item.dat.PC});
         foreach(fu_dat_store_eqs[i]) fu_dat_store_eqs[i] = fu_dat_sva_sorted[i] == fu_dat_dut_sorted[i];
+        for (int i = 0; i < NUM_FU_STORE; ++i) $display("store sva_dat_sorted[0%d]: %b", i, fu_dat_sva_sorted[i]);
+        for (int i = 0; i < NUM_FU_STORE; ++i) $display("store dut_dat_sorted[0%d]: %b", i, fu_dat_dut_sorted[i]);
+        $display("");
 
         // if (DEBUG) begin
         marker();
@@ -344,31 +359,31 @@ module rs_sva #(parameter
         $display("sva:");
         print_entries(entries);
 
-        $display("fu_vld dut={FU_ALU: %b, FU_MULT: %b, FU_LOAD: %b, STORE: %b}",
-            fu_vld_alu_dut,
-            fu_vld_mult_dut,
-            fu_vld_load_dut,
-            fu_vld_store_dut
-        );
+        // $display("fu_vld dut={FU_ALU: %b, FU_MULT: %b, FU_LOAD: %b, STORE: %b}",
+        //     fu_vld_alu_dut,
+        //     fu_vld_mult_dut,
+        //     fu_vld_load_dut,
+        //     fu_vld_store_dut
+        // );
 
-        $display("fu_vld sva={FU_ALU: %b, FU_MULT: %b, FU_LOAD: %b, STORE: %b}",
-            fu_vld_alu,
-            fu_vld_mult,
-            fu_vld_load,
-            fu_vld_store
-        );
-        $display("fu_dat dut={FU_ALU: %b, FU_MULT: %b, FU_LOAD: %b, STORE: %b}",
-            fu_dat_alu_dut,
-            fu_dat_mult_dut,
-            fu_dat_load_dut,
-            fu_dat_store_dut
-        );
-        $display("fu_dat sva={FU_ALU: %b, FU_MULT: %b, FU_LOAD: %b, STORE: %b}",
-            fu_dat_alu,
-            fu_dat_mult,
-            fu_dat_load,
-            fu_dat_store
-        );
+        // $display("fu_vld sva={FU_ALU: %b, FU_MULT: %b, FU_LOAD: %b, STORE: %b}",
+        //     fu_vld_alu,
+        //     fu_vld_mult,
+        //     fu_vld_load,
+        //     fu_vld_store
+        // );
+        // $display("fu_dat dut={FU_ALU: %b, FU_MULT: %b, FU_LOAD: %b, STORE: %b}",
+        //     fu_dat_alu_dut,
+        //     fu_dat_mult_dut,
+        //     fu_dat_load_dut,
+        //     fu_dat_store_dut
+        // );
+        // $display("fu_dat sva={FU_ALU: %b, FU_MULT: %b, FU_LOAD: %b, STORE: %b}",
+        //     fu_dat_alu,
+        //     fu_dat_mult,
+        //     fu_dat_load,
+        //     fu_dat_store
+        // );
 
         $display("fu_dat eqs={FU_ALU: %b, FU_MULT: %b, FU_LOAD: %b, STORE: %b}",
             fu_dat_alu_eqs,
@@ -377,10 +392,10 @@ module rs_sva #(parameter
             fu_dat_store_eqs
         );
 
-        foreach (can_issues_dut[fu]) $display("can_issues_dut[%d]: %b", fu, can_issues_dut[fu]);
-        $display("can_issue_dut: %b", can_issue_dut);
-        $display("to_t1_rdy_dut: %b", to_t1_rdy_dut);
-        $display("to_t2_rdy_dut: %b", to_t2_rdy_dut);
+        // foreach (can_issues_dut[fu]) $display("can_issues_dut[%d]: %b", fu, can_issues_dut[fu]);
+        // $display("can_issue_dut: %b", can_issue_dut);
+        // $display("to_t1_rdy_dut: %b", to_t1_rdy_dut);
+        // $display("to_t2_rdy_dut: %b", to_t2_rdy_dut);
         
         @(negedge clock);
 
@@ -450,58 +465,58 @@ module rs_sva #(parameter
             // print_failure();
             $display("\n\033[31m@@@ Failed at time %4d\033[0m", $time);
             $display("\033[31mError: %0s\033[0m\n\n", msg);
-            $write("cdb={");
-            for (int i = 0; i < N; ++i) begin
-                $write("%0d:%0d, ", i, c_en[i] ? c_ts[i] : 'x);
-            end
-            $write("}\n");
-            $display("fu_rdy={FU_ALU: %b, FU_MULT: %b, FU_LOAD: %b, STORE: %b}",
-                fu_rdy_alu,
-                fu_rdy_mult,
-                fu_rdy_load,
-                fu_rdy_store
-            );
-            $display("dut:");
-            print_entries(entries_dut);
-            $display("sva:");
-            print_entries(entries);
-            $display("fu_vld dut={FU_ALU: %b, FU_MULT: %b, FU_LOAD: %b, STORE: %b}",
-                fu_vld_alu_dut,
-                fu_vld_mult_dut,
-                fu_vld_load_dut,
-                fu_vld_store_dut
-            );
+            // $write("cdb={");
+            // for (int i = 0; i < N; ++i) begin
+            //     $write("%0d:%0d, ", i, c_en[i] ? c_ts[i] : 'x);
+            // end
+            // $write("}\n");
+            // $display("fu_rdy={FU_ALU: %b, FU_MULT: %b, FU_LOAD: %b, STORE: %b}",
+            //     fu_rdy_alu,
+            //     fu_rdy_mult,
+            //     fu_rdy_load,
+            //     fu_rdy_store
+            // );
+            // $display("dut:");
+            // print_entries(entries_dut);
+            // $display("sva:");
+            // print_entries(entries);
+            // $display("fu_vld dut={FU_ALU: %b, FU_MULT: %b, FU_LOAD: %b, STORE: %b}",
+            //     fu_vld_alu_dut,
+            //     fu_vld_mult_dut,
+            //     fu_vld_load_dut,
+            //     fu_vld_store_dut
+            // );
 
-            $display("fu_vld sva={FU_ALU: %b, FU_MULT: %b, FU_LOAD: %b, STORE: %b}",
-                fu_vld_alu,
-                fu_vld_mult,
-                fu_vld_load,
-                fu_vld_store
-            );
-            $display("fu_dat dut={FU_ALU: %b, FU_MULT: %b, FU_LOAD: %b, STORE: %b}",
-                fu_dat_alu_dut,
-                fu_dat_mult_dut,
-                fu_dat_load_dut,
-                fu_dat_store_dut
-            );
-            $display("fu_dat sva={FU_ALU: %b, FU_MULT: %b, FU_LOAD: %b, STORE: %b}",
-                fu_dat_alu,
-                fu_dat_mult,
-                fu_dat_load,
-                fu_dat_store
-            );
+            // $display("fu_vld sva={FU_ALU: %b, FU_MULT: %b, FU_LOAD: %b, STORE: %b}",
+            //     fu_vld_alu,
+            //     fu_vld_mult,
+            //     fu_vld_load,
+            //     fu_vld_store
+            // );
+            // $display("fu_dat dut={FU_ALU: %b, FU_MULT: %b, FU_LOAD: %b, STORE: %b}",
+            //     fu_dat_alu_dut,
+            //     fu_dat_mult_dut,
+            //     fu_dat_load_dut,
+            //     fu_dat_store_dut
+            // );
+            // $display("fu_dat sva={FU_ALU: %b, FU_MULT: %b, FU_LOAD: %b, STORE: %b}",
+            //     fu_dat_alu,
+            //     fu_dat_mult,
+            //     fu_dat_load,
+            //     fu_dat_store
+            // );
 
-            $display("fu_dat eqs={FU_ALU: %b, FU_MULT: %b, FU_LOAD: %b, STORE: %b}",
-                fu_dat_alu_eqs,
-                fu_dat_mult_eqs,
-                fu_dat_load_eqs,
-                fu_dat_store_eqs
-            );
+            // $display("fu_dat eqs={FU_ALU: %b, FU_MULT: %b, FU_LOAD: %b, STORE: %b}",
+            //     fu_dat_alu_eqs,
+            //     fu_dat_mult_eqs,
+            //     fu_dat_load_eqs,
+            //     fu_dat_store_eqs
+            // );
 
-            foreach (can_issues_dut[fu]) $display("can_issues_dut[%d]: %b", fu, can_issues_dut[fu]);
-            $display("can_issue_dut: %b", can_issue_dut);
-            $display("to_t1_rdy_dut: %b", to_t1_rdy_dut);
-            $display("to_t2_rdy_dut: %b", to_t2_rdy_dut);
+            // foreach (can_issues_dut[fu]) $display("can_issues_dut[%d]: %b", fu, can_issues_dut[fu]);
+            // $display("can_issue_dut: %b", can_issue_dut);
+            // $display("to_t1_rdy_dut: %b", to_t1_rdy_dut);
+            // $display("to_t2_rdy_dut: %b", to_t2_rdy_dut);
 
             $finish;
         end
