@@ -4,6 +4,12 @@
 `define RS_SVA_SVH
 
 
+typedef struct packed {
+    int idx;
+    ADDR PC;
+    logic busy;
+} SORT_EL;
+
 module rs_sva #(parameter 
     N=`N,
     RS_SZ=`RS_SZ,
@@ -59,12 +65,12 @@ module rs_sva #(parameter
             string fu_name;
             get_fu_name(entries[i].dat.fu_idx, fu_name);
 
-            if (!entries[i].busy) begin
-                $display("Entry [%0d]:", i);
-                continue;
-            end
+            // if (!entries[i].busy) begin
+            //     $display("Entry [%0d]:", i);
+            //     continue;
+            // end
 
-            $display("Entry [%0d]: PC=%0x, busy=%b, issued=%b, t=%0d, t1=%0d, t2=%0d, t1_rdy=%b, t2_rdy=%b, fu=%s(%0d)",
+            $display("Entry [%0d]: PC=%0x, busy=%b, issued=%b, t=%0d, t1=%0d, t2=%0d, t1_rdy=%b, t2_rdy=%b, fu=%s(%0d), all:%b",
                 i, 
                 entries[i].dat.PC, 
                 entries[i].busy, 
@@ -76,7 +82,8 @@ module rs_sva #(parameter
                 entries[i].dat.t2_rdy, 
                 
                 entries[i].busy ? fu_name : "*",
-                entries[i].dat.fu_idx
+                entries[i].dat.fu_idx,
+                entries[i],
                 // entries[i].dat.NPC, 
                 // entries[i].dat.alu_func, 
                 // entries[i].dat.mult, 
@@ -117,8 +124,12 @@ module rs_sva #(parameter
         end
     end
     int rs_scnt_sva;
+    SORT_EL sva_sort_idx[RS_SZ];
+    SORT_EL dut_sort_idx[RS_SZ];
+    logic   [RS_SZ-1:0] entries_equal;
 
     always begin
+        entries_equal = '0;
         entries_n = entries;
 
         // clear (insn going to ex)
@@ -180,6 +191,26 @@ module rs_sva #(parameter
             end
         end
         assign rs_scnt_sva = $min($countones(~busy_sva | issd_sva), N);
+
+
+        // Sort entries, entries_dut ascending by {busy, PC} then do entrywise
+        // comparison entries_equal
+        for (int rs = 0; rs < RS_SZ; ++rs) begin
+            sva_sort_idx[rs].idx = rs;
+            sva_sort_idx[rs].PC = entries[rs].dat.PC;
+            sva_sort_idx[rs].busy = entries[rs].busy;
+
+            dut_sort_idx[rs].idx = rs;
+            dut_sort_idx[rs].PC = entries_dut[rs].dat.PC;
+            dut_sort_idx[rs].busy = entries_dut[rs].busy;
+        end
+        sva_sort_idx.sort() with ({item.busy, item.PC});
+        dut_sort_idx.sort() with ({item.busy, item.PC});
+        for (int rs = 0, RS_ENTRY l=0, RS_ENTRY r=0; rs < RS_SZ; ++rs) begin
+            l = entries_dut[dut_sort_idx[rs].idx];
+            r = entries[sva_sort_idx[rs].idx];
+            entries_equal[rs] = (l == r);
+        end
 
         @(negedge clock);
         // if (DEBUG) begin
@@ -248,6 +279,12 @@ module rs_sva #(parameter
             && $countones(issd_dut_by_fu[FU_LOAD]) == $countones(issd_sva_by_fu[FU_LOAD])
             && $countones(issd_dut_by_fu[FU_STORE]) == $countones(issd_sva_by_fu[FU_STORE]);
         endproperty
+
+        property entries_eq;
+            disable iff (reset || flush)
+            /*TODO*/
+            &entries_equal;
+        endproperty
     endclocking
 
     task exit_on_error(input string msg);
@@ -279,6 +316,8 @@ module rs_sva #(parameter
         else exit_on_error ("diff issue cnts");
     Issd_Cnts:  assert property(cb.issd_cnts)
         else exit_on_error ("diff issued cnts");
+    Entries_Eq:  assert property(cb.entries_eq)
+        else exit_on_error ("diff entries");
 
 endmodule
 
