@@ -24,6 +24,11 @@ module rs_testbench;
     logic           [NUM_FU_MULT-1:0]   fu_rdy_mult;
     logic           [NUM_FU_STORE-1:0]  fu_rdy_store;
     logic           [NUM_FU_LOAD-1:0]   fu_rdy_load;
+
+    ID_RESULT       [NUM_FU_ALU-1:0]    fu_dat_alu_dut;
+    ID_RESULT       [NUM_FU_MULT-1:0]   fu_dat_mult_dut;
+    ID_RESULT       [NUM_FU_STORE-1:0]  fu_dat_store_dut;
+    ID_RESULT       [NUM_FU_LOAD-1:0]   fu_dat_load_dut;
     // complete (CDB)
     logic           [N-1:0] c_en;
     PHYS_REG_IDX    [N-1:0] c_ts;
@@ -48,6 +53,11 @@ module rs_testbench;
         .fu_rdy_mult(fu_rdy_mult),
         .fu_rdy_store(fu_rdy_store),
         .fu_rdy_load(fu_rdy_load),
+
+        .fu_dat_alu(fu_dat_alu_dut),
+        .fu_dat_mult(fu_dat_mult_dut),
+        .fu_dat_store(fu_dat_store_dut),
+        .fu_dat_load(fu_dat_load_dut),
 
         `ifdef DEBUG
         .entries_dbg(entries_dut),
@@ -91,10 +101,15 @@ module rs_testbench;
         .fu_vld_mult_dut    (rs_dut.fu_vld_mult),
         .fu_vld_store_dut   (rs_dut.fu_vld_store),
         .fu_vld_load_dut    (rs_dut.fu_vld_load),
-        .fu_dat_alu_dut     (rs_dut.fu_dat_alu),
-        .fu_dat_mult_dut    (rs_dut.fu_dat_mult),
-        .fu_dat_store_dut   (rs_dut.fu_dat_store),
-        .fu_dat_load_dut    (rs_dut.fu_dat_load)
+        /* Ideally you wanna do this, but synthie cant handle complex types yet. */
+        // .fu_dat_alu_dut     (rs_dut.fu_dat_alu),
+        // .fu_dat_mult_dut    (rs_dut.fu_dat_mult),
+        // .fu_dat_store_dut   (rs_dut.fu_dat_store),
+        // .fu_dat_load_dut    (rs_dut.fu_dat_load)
+        .fu_dat_alu_dut     (fu_dat_alu_dut),
+        .fu_dat_mult_dut    (fu_dat_mult_dut),
+        .fu_dat_store_dut   (fu_dat_store_dut),
+        .fu_dat_load_dut    (fu_dat_load_dut)
     );
 
     task set_dispatch(
