@@ -119,6 +119,7 @@ module rs_testbench;
         input int t2_rdy,
         input int fu_idx
     );
+        static ADDR nex_PC = 0;
         // Set up a valid dispatch line
         d_vld[i]        = 1;
 
@@ -128,6 +129,9 @@ module rs_testbench;
         d_dat[i].t1_rdy = t1_rdy;
         d_dat[i].t2_rdy = t2_rdy;
         d_dat[i].fu_idx = fu_idx;
+        // we use PC as a unique identifier (ofc, this is not necessarily true
+        // in a real program with cond jumps)
+        d_dat[i].PC     = nex_PC++;
     endtask
 
     task clr_dispatch(

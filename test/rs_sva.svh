@@ -58,8 +58,10 @@ module rs_sva #(parameter
         for (int i = 0; i < RS_SZ; ++i) begin
             string fu_name;
             get_fu_name(entries[i].dat.fu_idx, fu_name);
-            $display("Entry [%0d]: busy=%b, issued=%b, t=%0d, t1=%0d, t2=%0d, t1_rdy=%b, t2_rdy=%b, fu=%s(%0d)",
+
+            $display("Entry [%0d] (PC=%0x): busy=%b, issued=%b, t=%0d, t1=%0d, t2=%0d, t1_rdy=%b, t2_rdy=%b, fu=%s(%0d)",
                 i, 
+                entries[i].dat.PC, 
                 entries[i].busy, 
                 entries[i].issued, 
                 entries[i].dat.t, 
@@ -70,7 +72,6 @@ module rs_sva #(parameter
                 
                 entries[i].busy ? fu_name : "*",
                 entries[i].dat.fu_idx
-                // entries[i].dat.PC, 
                 // entries[i].dat.NPC, 
                 // entries[i].dat.alu_func, 
                 // entries[i].dat.mult, 
