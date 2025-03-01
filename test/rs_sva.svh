@@ -381,6 +381,26 @@ module rs_sva #(parameter
                 fu_vld_store_dut
             );
 
+            $display("fu_dat sva={FU_ALU: %b, FU_MULT: %b, FU_LOAD: %b, STORE: %b}",
+                fu_dat_alu,
+                fu_dat_mult,
+                fu_dat_load,
+                fu_dat_store
+            );
+            $display("fu_dat dut={FU_ALU: %b, FU_MULT: %b, FU_LOAD: %b, STORE: %b}",
+                fu_dat_alu_dut,
+                fu_dat_mult_dut,
+                fu_dat_load_dut,
+                fu_dat_store_dut
+            );
+
+            $display("fu_dat eqs={FU_ALU: %b, FU_MULT: %b, FU_LOAD: %b, STORE: %b}",
+                fu_dat_alu_eqs,
+                fu_dat_mult_eqs,
+                fu_dat_load_eqs,
+                fu_dat_store_eqs
+            );
+
             $finish;
         end
     endtask
