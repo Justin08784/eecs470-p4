@@ -3,13 +3,6 @@
 `ifndef RS_SVA_SVH
 `define RS_SVA_SVH
 
-
-typedef struct packed {
-    int idx;
-    ADDR PC;
-    logic busy;
-} SORT_EL;
-
 module rs_sva #(parameter 
     N=`N,
     RS_SZ=`RS_SZ,
@@ -65,12 +58,12 @@ module rs_sva #(parameter
             string fu_name;
             get_fu_name(entries[i].dat.fu_idx, fu_name);
 
-            // if (!entries[i].busy) begin
-            //     $display("Entry [%0d]:", i);
-            //     continue;
-            // end
+            if (!entries[i].busy) begin
+                $display("Entry [%0d]:", i);
+                continue;
+            end
 
-            $display("Entry [%0d]: PC=%0x, busy=%b, issued=%b, t=%0d, t1=%0d, t2=%0d, t1_rdy=%b, t2_rdy=%b, fu=%s(%0d), all:%b",
+            $display("Entry [%0d]: PC=%0x, busy=%b, issued=%b, t=%0d, t1=%0d, t2=%0d, t1_rdy=%b, t2_rdy=%b, fu=%s(%0d)",
                 i, 
                 entries[i].dat.PC, 
                 entries[i].busy, 
@@ -83,7 +76,6 @@ module rs_sva #(parameter
                 
                 entries[i].busy ? fu_name : "*",
                 entries[i].dat.fu_idx,
-                entries[i],
                 // entries[i].dat.NPC, 
                 // entries[i].dat.alu_func, 
                 // entries[i].dat.mult, 
@@ -123,9 +115,13 @@ module rs_sva #(parameter
             issd_dut_by_fu[fu][rs] |= (entries_dut[rs].issued && entries_dut[rs].dat.fu_idx == fu);
         end
     end
+    
     int rs_scnt_sva;
-    SORT_EL sva_sort_idx[RS_SZ];
-    SORT_EL dut_sort_idx[RS_SZ];
+    struct packed {
+        int     idx; // idx of original element
+        logic   key1_busy;
+        ADDR    key2_PC;
+    } entries_sva_sorter[RS_SZ], entries_dut_sorter[RS_SZ];
     logic   [RS_SZ-1:0] entries_equal;
 
     always begin
@@ -196,20 +192,20 @@ module rs_sva #(parameter
         // Sort entries, entries_dut ascending by {busy, PC} then do entrywise
         // comparison entries_equal
         for (int rs = 0; rs < RS_SZ; ++rs) begin
-            sva_sort_idx[rs].idx = rs;
-            sva_sort_idx[rs].PC = entries[rs].dat.PC;
-            sva_sort_idx[rs].busy = entries[rs].busy;
+            entries_sva_sorter[rs].idx        = rs;
+            entries_sva_sorter[rs].key1_busy  = entries[rs].busy;
+            entries_sva_sorter[rs].key2_PC    = entries[rs].dat.PC;
 
-            dut_sort_idx[rs].idx = rs;
-            dut_sort_idx[rs].PC = entries_dut[rs].dat.PC;
-            dut_sort_idx[rs].busy = entries_dut[rs].busy;
+            entries_dut_sorter[rs].idx        = rs;
+            entries_dut_sorter[rs].key1_busy  = entries_dut[rs].busy;
+            entries_dut_sorter[rs].key2_PC    = entries_dut[rs].dat.PC;
         end
-        sva_sort_idx.sort() with ({item.busy, item.PC});
-        dut_sort_idx.sort() with ({item.busy, item.PC});
+        entries_sva_sorter.sort() with ({item.key1_busy, item.key2_PC});
+        entries_dut_sorter.sort() with ({item.key1_busy, item.key2_PC});
         for (int rs = 0, RS_ENTRY l=0, RS_ENTRY r=0; rs < RS_SZ; ++rs) begin
-            l = entries_dut[dut_sort_idx[rs].idx];
-            r = entries[sva_sort_idx[rs].idx];
-            entries_equal[rs] = (l == r);
+            l = entries_dut[entries_dut_sorter[rs].idx];
+            r = entries[entries_sva_sorter[rs].idx];
+            entries_equal[rs] = l == r;
         end
 
         @(negedge clock);
