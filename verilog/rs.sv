@@ -318,7 +318,7 @@ module rs #(parameter
             /*
             TODO: Ask Bradley! This change is not breaking because t2_rdy is 
             ALREADY incorporated into the value of to_t2_rdy, which means an
-            assignment behaves identically to 'or' assignment here.
+            assignment behaves identically to 'or' assignment here. i.e. logically redundant
             This is because to_t2_rdy is initialized to t2_rdy, instead of 0;
             if we did the latter, it would break as intended. So can we get
             our points back here? */
