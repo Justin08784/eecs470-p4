@@ -24,15 +24,6 @@ module rs_testbench;
     logic           [NUM_FU_MULT-1:0]   fu_rdy_mult;
     logic           [NUM_FU_STORE-1:0]  fu_rdy_store;
     logic           [NUM_FU_LOAD-1:0]   fu_rdy_load;
-
-    logic           [NUM_FU_ALU-1:0]    fu_vld_alu;
-    logic           [NUM_FU_MULT-1:0]   fu_vld_mult;
-    logic           [NUM_FU_STORE-1:0]  fu_vld_store;
-    logic           [NUM_FU_LOAD-1:0]   fu_vld_load;
-    ID_RESULT       [NUM_FU_ALU-1:0]    fu_dat_alu;
-    ID_RESULT       [NUM_FU_MULT-1:0]   fu_dat_mult;
-    ID_RESULT       [NUM_FU_STORE-1:0]  fu_dat_store;
-    ID_RESULT       [NUM_FU_LOAD-1:0]   fu_dat_load;
     // complete (CDB)
     logic           [N-1:0] c_en;
     PHYS_REG_IDX    [N-1:0] c_ts;
@@ -57,15 +48,6 @@ module rs_testbench;
         .fu_rdy_mult(fu_rdy_mult),
         .fu_rdy_store(fu_rdy_store),
         .fu_rdy_load(fu_rdy_load),
- 
-        .fu_vld_alu(fu_vld_alu),
-        .fu_vld_mult(fu_vld_mult),
-        .fu_vld_store(fu_vld_store),
-        .fu_vld_load(fu_vld_load),
-        .fu_dat_alu(fu_dat_alu),
-        .fu_dat_mult(fu_dat_mult),
-        .fu_dat_store(fu_dat_store),
-        .fu_dat_load(fu_dat_load),
 
         `ifdef DEBUG
         .entries_dbg(entries_dut),
@@ -105,10 +87,14 @@ module rs_testbench;
         .entries_dut(entries_dut),
         `endif 
 
-        .fu_vld_alu_dut(rs_dut.fu_vld_alu),
-        .fu_vld_mult_dut(rs_dut.fu_vld_mult),
-        .fu_vld_store_dut(rs_dut.fu_vld_store),
-        .fu_vld_load_dut(rs_dut.fu_vld_load)
+        .fu_vld_alu_dut     (rs_dut.fu_vld_alu),
+        .fu_vld_mult_dut    (rs_dut.fu_vld_mult),
+        .fu_vld_store_dut   (rs_dut.fu_vld_store),
+        .fu_vld_load_dut    (rs_dut.fu_vld_load),
+        .fu_dat_alu_dut     (rs_dut.fu_dat_alu),
+        .fu_dat_mult_dut    (rs_dut.fu_dat_mult),
+        .fu_dat_store_dut   (rs_dut.fu_dat_store),
+        .fu_dat_load_dut    (rs_dut.fu_dat_load)
     );
 
     task set_dispatch(
@@ -389,9 +375,7 @@ module rs_testbench;
         @(negedge clock);
         @(negedge clock);
         clr_all();
-
     endtask
-
     task test_1inst_2();
         /*
         Test same-cycle complete AND issue:
@@ -438,14 +422,13 @@ module rs_testbench;
         c_ts            = '0;
 
         test_1inst_2();
-
-        // test_1inst();
-        // test_multi_1();
-        // test_idle();
-        // test_mixed();
-        // test_sequential_fu();
-        // test_multiple_cdb();
-        // test_back_to_back();
+        test_1inst();
+        test_multi_1();
+        test_idle();
+        test_mixed();
+        test_sequential_fu();
+        test_multiple_cdb();
+        test_back_to_back();
 
     
         if (failed)

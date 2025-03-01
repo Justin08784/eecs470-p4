@@ -34,6 +34,10 @@ module rs_sva #(parameter
     input   logic           [NUM_FU_MULT-1:0]   fu_vld_mult_dut,
     input   logic           [NUM_FU_STORE-1:0]  fu_vld_store_dut,
     input   logic           [NUM_FU_LOAD-1:0]   fu_vld_load_dut,
+    input   ID_RESULT       [NUM_FU_ALU-1:0]    fu_dat_alu_dut,
+    input   ID_RESULT       [NUM_FU_MULT-1:0]   fu_dat_mult_dut,
+    input   ID_RESULT       [NUM_FU_STORE-1:0]  fu_dat_store_dut,
+    input   ID_RESULT       [NUM_FU_LOAD-1:0]   fu_dat_load_dut,
     input   RS_ENTRY        [RS_SZ-1:0]         entries_dut
 );
     localparam DEBUG = 1;
@@ -99,7 +103,6 @@ module rs_sva #(parameter
     generate
     for (genvar i = 0; i < RS_SZ; i++) begin : gen_vecs
         assign busy_sva[i] = entries[i].busy;
-
         assign issd_sva[i] = entries[i].issued;
     end
     endgenerate
@@ -109,8 +112,22 @@ module rs_sva #(parameter
         int     idx; // idx of original element
         logic   busy;
         ADDR    PC;
-    } entries_sva_sorter[RS_SZ], entries_dut_sorter[RS_SZ];
-    logic   [RS_SZ-1:0] entries_equal;
+    }   entries_sva_sorter[RS_SZ],
+        entries_dut_sorter[RS_SZ];
+    logic   [RS_SZ-1:0] entries_eqs;
+
+    `define MAX(a, b) ((a) > (b) ? (a) : (b))
+    localparam MAX_NUM_FU = `MAX(NUM_FU_ALU, `MAX(NUM_FU_MULT, `MAX(NUM_FU_LOAD, NUM_FU_STORE)));
+    struct packed {
+        int     idx; // idx of original element
+        logic   vld;
+        ADDR    PC;
+    }   fu_dat_sva_sorter[MAX_NUM_FU],
+        fu_dat_dut_sorter[MAX_NUM_FU];
+    logic   [NUM_FU_ALU-1:0]    fu_dat_alu_eqs;
+    logic   [NUM_FU_MULT-1:0]   fu_dat_mult_eqs;
+    logic   [NUM_FU_LOAD-1:0]   fu_dat_load_eqs;
+    logic   [NUM_FU_STORE-1:0]  fu_dat_store_eqs;
 
     always begin
         entries_n = entries;
@@ -185,8 +202,27 @@ module rs_sva #(parameter
         for (int rs = 0, RS_ENTRY l=0, RS_ENTRY r=0; rs < RS_SZ; ++rs) begin
             l = entries_dut[entries_dut_sorter[rs].idx];
             r = entries[entries_sva_sorter[rs].idx];
-            entries_equal[rs] = l == r;
+            entries_eqs[rs] = l == r;
         end
+
+        // Sort-check fu_dats: sort fu_dats by ascending {busy, PC}
+        // then do entrywise comparison. 
+        // for (int i = 0; i < NUM_FU_ALU; ++rs) begin
+        //     fu_dat_sva_sorter[rs].idx   = i;
+        //     fu_dat_sva_sorter[rs].vld   = fu_vld_alu[i];
+        //     fu_dat_sva_sorter[rs].PC    = fu_dat_alu[i].PC;
+
+        //     fu_dat_dut_sorter[rs].idx   = i;
+        //     fu_dat_dut_sorter[rs].vld   = fu_vld_alu[i];
+        //     fu_dat_dut_sorter[rs].PC    = fu_dat_alu[i].PC;
+        // end
+        // fu_dat_sva_sorter.sort() with ({item.vld, item.PC});
+        // fu_dat_dut_sorter.sort() with ({item.vld, item.PC});
+        // for (int i = 0, RS_ENTRY l=0, RS_ENTRY r=0; rs < RS_SZ; ++rs) begin
+        //     l = fu_dat_alu[entries_dut_sorter[rs].idx];
+        //     r = dut[entries_sva_sorter[rs].idx];
+        //     entries_eqs[rs] = l == r;
+        // end
 
         @(negedge clock);
         // if (DEBUG) begin
@@ -253,7 +289,7 @@ module rs_sva #(parameter
         property entries_eq;
             disable iff (reset || flush)
             /*TODO*/
-            &entries_equal;
+            &entries_eqs;
         endproperty
     endclocking
 
