@@ -525,6 +525,15 @@ module rs_testbench;
         c_en            = '0;
         c_ts            = '0;
 
+        test_1inst();
+        test_back_to_back();
+        test_multiple_cdb();
+        test_sequential_fu();
+        test_mixed();
+        test_idle();
+        test_multi_1();
+        test_1inst_2();
+        test_delayed_rdy();
         test_nonzero_fu_rdy_idx();
     
         if (failed)

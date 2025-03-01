@@ -219,7 +219,7 @@ module rs #(parameter
         foreach (gbus_fu_rdy_mult[i, j]) begin
             if (gbus_fu_rdy_mult[i][j]) begin
                 fu2issuer_mult[j]   |= gbus_can_issue_mult[i];
-                fu_vld_mult[j]      = |gbus_can_issue_mult[i]; // ms1 test: change i to j (not caught)
+                fu_vld_mult[j]      = |gbus_can_issue_mult[i]; // [ADDRESSED] ms1 test: change i to j (not caught)
                 to_issue            |= gbus_can_issue_mult[i];
             end
         end
