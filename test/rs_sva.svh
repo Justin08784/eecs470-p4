@@ -94,6 +94,14 @@ module rs_sva #(parameter
         end
     endfunction
     RS_ENTRY [RS_SZ-1:0] entries, entries_n;
+    logic               [NUM_FU_ALU-1:0]    fu_vld_alu;
+    logic               [NUM_FU_MULT-1:0]   fu_vld_mult;
+    logic               [NUM_FU_STORE-1:0]  fu_vld_store;
+    logic               [NUM_FU_LOAD-1:0]   fu_vld_load;
+    ID_RESULT           [NUM_FU_ALU-1:0]    fu_dat_alu;
+    ID_RESULT           [NUM_FU_MULT-1:0]   fu_dat_mult;
+    ID_RESULT           [NUM_FU_STORE-1:0]  fu_dat_store;
+    ID_RESULT           [NUM_FU_LOAD-1:0]   fu_dat_load;
     int num_free_fus    [FU_IDX_NUM];
     int num_issue_fus   [FU_IDX_NUM];
     int cdb_tags [int];
@@ -129,7 +137,7 @@ module rs_sva #(parameter
     logic   [NUM_FU_MULT-1:0]   fu_dat_mult_eqs;
     logic   [NUM_FU_LOAD-1:0]   fu_dat_load_eqs;
     logic   [NUM_FU_STORE-1:0]  fu_dat_store_eqs;
-    ID_RESULT [MAX_NUM_FU-1:0]  fu_dat_sva_sorted, fu_dat_dut_sorted;
+    ID_RESULT fu_dat_sva_sorted[MAX_NUM_FU], fu_dat_dut_sorted[MAX_NUM_FU];
 
     always begin
         entries_n = entries;
@@ -159,6 +167,14 @@ module rs_sva #(parameter
         num_free_fus[FU_MULT]   = $countones(fu_rdy_mult);
         num_free_fus[FU_STORE]  = $countones(fu_rdy_store);
         num_free_fus[FU_LOAD]   = $countones(fu_rdy_load);
+        num_issue_fus[FU_ALU]   = 0;
+        num_issue_fus[FU_MULT]  = 0;
+        num_issue_fus[FU_STORE] = 0;
+        num_issue_fus[FU_LOAD]  = 0;
+        fu_dat_alu     = '0;  
+        fu_dat_mult    = '0;  
+        fu_dat_load    = '0;  
+        fu_dat_store   = '0;
 
         for (int rs = 0, int fu = 0; rs < RS_SZ; ++rs) begin
             fu = entries_n[rs].dat.fu_idx;
@@ -168,6 +184,13 @@ module rs_sva #(parameter
             ) begin
                 num_free_fus[fu] -= 1;
                 entries_n[rs].issued = 1;
+                case (fu) 
+                FU_ALU:     fu_dat_alu  [num_issue_fus[fu]] = entries[rs].dat;
+                FU_MULT:    fu_dat_mult [num_issue_fus[fu]] = entries[rs].dat;
+                FU_LOAD:    fu_dat_load [num_issue_fus[fu]] = entries[rs].dat;
+                FU_STORE:   fu_dat_store[num_issue_fus[fu]] = entries[rs].dat;
+                endcase
+                num_issue_fus[fu] += 1;
             end
         end
 
@@ -218,18 +241,36 @@ module rs_sva #(parameter
 
         // Sort-check fu_dats: sort fu_dats by ascending {busy, PC}
         // then do entrywise comparison. 
-        // foreach(fu_dat_alu_eqs[i]) fu_dat_sva_sorted[i] = entries[i];
-        // foreach(fu_dat_alu_eqs[i]) fu_dat_dut_sorted[i] = entries_dut[i];
-        // entries_sva_sorted.sort() with ({item.busy, item.dat.PC});
-        // entries_dut_sorted.sort() with ({item.busy, item.dat.PC});
-        // foreach(fu_dat_alu_eqs[i]) entries_eqs[i] = entries_sva_sorted[i] == entries_dut_sorted[i];
+        foreach(fu_dat_alu_eqs[i]) fu_dat_sva_sorted[i] = fu_vld_alu[i]     ? fu_dat_alu[i]     : '0;
+        foreach(fu_dat_alu_eqs[i]) fu_dat_dut_sorted[i] = fu_vld_alu_dut[i] ? fu_dat_alu_dut[i] : '0;
+        fu_dat_sva_sorted[0:NUM_FU_ALU-1].sort() with ({item.PC});
+        fu_dat_dut_sorted[0:NUM_FU_ALU-1].sort() with ({item.PC});
+        foreach(fu_dat_alu_eqs[i]) fu_dat_alu_eqs[i] = fu_dat_sva_sorted[i] == fu_dat_dut_sorted[i];
+
+        foreach(fu_dat_mult_eqs[i]) fu_dat_sva_sorted[i] = fu_vld_mult[i]     ? fu_dat_mult[i]     : '0;
+        foreach(fu_dat_mult_eqs[i]) fu_dat_dut_sorted[i] = fu_vld_mult_dut[i] ? fu_dat_mult_dut[i] : '0;
+        fu_dat_sva_sorted[0:NUM_FU_MULT-1].sort() with ({item.PC});
+        fu_dat_dut_sorted[0:NUM_FU_MULT-1].sort() with ({item.PC});
+        foreach(fu_dat_mult_eqs[i]) fu_dat_mult_eqs[i] = fu_dat_sva_sorted[i] == fu_dat_dut_sorted[i];
+
+        foreach(fu_dat_load_eqs[i]) fu_dat_sva_sorted[i] = fu_vld_load[i]     ? fu_dat_load[i]     : '0;
+        foreach(fu_dat_load_eqs[i]) fu_dat_dut_sorted[i] = fu_vld_load_dut[i] ? fu_dat_load_dut[i] : '0;
+        fu_dat_sva_sorted[0:NUM_FU_LOAD-1].sort() with ({item.PC});
+        fu_dat_dut_sorted[0:NUM_FU_LOAD-1].sort() with ({item.PC});
+        foreach(fu_dat_load_eqs[i]) fu_dat_load_eqs[i] = fu_dat_sva_sorted[i] == fu_dat_dut_sorted[i];
+
+        foreach(fu_dat_store_eqs[i]) fu_dat_sva_sorted[i] = fu_vld_store[i]     ? fu_dat_store[i]     : '0;
+        foreach(fu_dat_store_eqs[i]) fu_dat_dut_sorted[i] = fu_vld_store_dut[i] ? fu_dat_store_dut[i] : '0;
+        fu_dat_sva_sorted[0:NUM_FU_STORE-1].sort() with ({item.PC});
+        fu_dat_dut_sorted[0:NUM_FU_STORE-1].sort() with ({item.PC});
+        foreach(fu_dat_store_eqs[i]) fu_dat_store_eqs[i] = fu_dat_sva_sorted[i] == fu_dat_dut_sorted[i];
 
         @(negedge clock);
         // if (DEBUG) begin
         marker();
         $write("cdb={");
         for (int i = 0; i < N; ++i) begin
-            $write("%0d:%0b, ", i, c_en[i] ? c_ts[i] : 'x);
+            $write("%0d:%0d, ", i, c_en[i] ? c_ts[i] : 'x);
         end
         $write("}\n");
         $display("fu_rdy={FU_ALU: %b, FU_MULT: %b, FU_LOAD: %b, STORE: %b}",
@@ -243,6 +284,7 @@ module rs_sva #(parameter
         // end
         $display("sva:");
         print_entries(entries);
+        /* TODO: add debug prints for FUs vld/dat; for all FU types */
     end
 
     always_ff @(posedge clock) begin
@@ -291,6 +333,15 @@ module rs_sva #(parameter
             /*TODO*/
             &entries_eqs;
         endproperty
+
+        property fus_eq;
+            disable iff (reset || flush)
+            /*TODO*/
+            (&fu_dat_alu_eqs)
+            && (&fu_dat_mult_eqs)
+            && (&fu_dat_load_eqs)
+            && (&fu_dat_store_eqs);
+        endproperty
     endclocking
 
     task exit_on_error(input string msg);
@@ -316,6 +367,8 @@ module rs_sva #(parameter
     //     else exit_on_error ("diff issued cnts");
     Entries_Eq:  assert property(cb.entries_eq)
         else exit_on_error ("diff entries");
+    Fus_Eq:  assert property(cb.fus_eq)
+        else exit_on_error ("diff fus");
 
 endmodule
 
