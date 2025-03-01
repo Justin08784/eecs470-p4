@@ -243,22 +243,22 @@ module rs #(parameter
         fu_dat_store    = '0;
         fu_dat_load     = '0;
         foreach (fu2issuer_alu[fu, rs]) begin
-            if (!fu2issuer_alu[fu][rs]) begin // ms1 test: Remove "!" from if condition (not caught)
+            if (fu2issuer_alu[fu][rs]) begin // ms1 test: Remove "!" from if condition (not caught)
                 fu_dat_alu |= entries[rs].dat;
             end
         end
         foreach (fu2issuer_mult[fu, rs]) begin
-            if (!fu2issuer_mult[fu][rs]) begin
+            if (fu2issuer_mult[fu][rs]) begin
                 fu_dat_mult |= entries[rs].dat;
             end
         end
         foreach (fu2issuer_load[fu, rs]) begin
-            if (!fu2issuer_load[fu][rs]) begin
+            if (fu2issuer_load[fu][rs]) begin
                 fu_dat_load |= entries[rs].dat;
             end
         end
         foreach (fu2issuer_store[fu, rs]) begin
-            if (!fu2issuer_store[fu][rs]) begin
+            if (fu2issuer_store[fu][rs]) begin
                 fu_dat_store |= entries[rs].dat;
             end
         end
