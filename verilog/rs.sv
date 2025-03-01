@@ -78,8 +78,11 @@ module rs #(parameter
         for (int rs = 0; rs < RS_SZ; ++rs) begin
             logic match_t1;
             logic match_t2;
-            match_t1 = t1_rdy_vec[rs];
-            match_t2 = t2_rdy_vec[rs];
+            // in milestone 1:
+            // match_t1 = t1_rdy_vec[rs];
+            // match_t2 = t2_rdy_vec[rs];
+            match_t1 = 0;
+            match_t2 = 0;
 
             // match any tag in CDB?
             for (int n = 0; n < N; ++n) begin
@@ -312,6 +315,13 @@ module rs #(parameter
         for (int rs = 0; rs < RS_SZ; ++rs) begin
             entries_n[rs].dat.t1_rdy |= to_t1_rdy[rs];
             entries_n[rs].dat.t2_rdy |= to_t2_rdy[rs]; // ms1 test: change |= to = (not caught)
+            /*
+            TODO: Ask Bradley! This change is not breaking because t2_rdy is 
+            ALREADY incorporated into the value of to_t2_rdy, which means an
+            assignment behaves identically to 'or' assignment here.
+            This is because to_t2_rdy is initialized to t2_rdy, instead of 0;
+            if we did the latter, it would break as intended. So can we get
+            our points back here? */
 
             if (to_issue[rs]) begin
                 // issuing

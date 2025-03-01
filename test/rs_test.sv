@@ -428,6 +428,43 @@ module rs_testbench;
         @(negedge clock);
     endtask
 
+    task test_delayed_rdy();
+        /*
+        Test operand readying across different cycles:
+        - insn1: ready src1, then src2
+        - insn2: ready src2, then src1
+        Catches ms1 test: remove "|| to_t1_rdy[rs]" (not caught) 
+        */
+        reset = 1;
+        @(negedge clock);
+        reset = 0;
+
+        set_dispatch(0, 1, 2, 0, 0, FU_STORE);
+        set_dispatch(1, 3, 4, 0, 0, FU_LOAD);
+        @(negedge clock);
+        clr_all();
+
+        set_cdb(0, 1);
+        set_cdb(1, 4);
+        set_fu(FU_STORE, 0);
+        set_fu(FU_LOAD, 0);
+        @(negedge clock);
+        clr_all();
+
+        set_cdb(0, 2);
+        set_cdb(1, 3);
+        set_fu(FU_STORE, 0);
+        set_fu(FU_LOAD, 0);
+        @(negedge clock);
+        clr_all();
+
+        @(negedge clock);
+        @(negedge clock);
+        @(negedge clock);
+
+        @(negedge clock);
+    endtask
+
     initial begin
         /* initialize */
         clock           = 0;
@@ -442,6 +479,7 @@ module rs_testbench;
         c_ts            = '0;
 
         test_1inst_2();
+        test_1inst_3();
         // test_1inst();
         // test_multi_1();
         // test_idle();
