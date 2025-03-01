@@ -175,8 +175,12 @@ module rs_sva #(parameter
         fu_dat_mult    = '0;  
         fu_dat_load    = '0;  
         fu_dat_store   = '0;
+        fu_vld_alu     = '0;  
+        fu_vld_mult    = '0;  
+        fu_vld_load    = '0;  
+        fu_vld_store   = '0;
 
-        for (int rs = 0, int fu = 0; rs < RS_SZ; ++rs) begin
+        for (int rs = 0, int fu = 0, int cur = 0; rs < RS_SZ; ++rs) begin
             fu = entries_n[rs].dat.fu_idx;
             if (entries_n[rs].dat.t1_rdy 
                 && entries_n[rs].dat.t2_rdy
@@ -184,11 +188,24 @@ module rs_sva #(parameter
             ) begin
                 num_free_fus[fu] -= 1;
                 entries_n[rs].issued = 1;
+                cur = num_issue_fus[fu];
                 case (fu) 
-                FU_ALU:     fu_dat_alu  [num_issue_fus[fu]] = entries[rs].dat;
-                FU_MULT:    fu_dat_mult [num_issue_fus[fu]] = entries[rs].dat;
-                FU_LOAD:    fu_dat_load [num_issue_fus[fu]] = entries[rs].dat;
-                FU_STORE:   fu_dat_store[num_issue_fus[fu]] = entries[rs].dat;
+                FU_ALU: begin
+                    fu_dat_alu  [cur] = entries[rs].dat;
+                    fu_vld_alu  [cur] = 1;
+                end
+                FU_MULT: begin
+                    fu_dat_mult [cur] = entries[rs].dat;
+                    fu_vld_mult [cur] = 1;
+                end
+                FU_LOAD: begin
+                    fu_dat_load [cur] = entries[rs].dat;
+                    fu_vld_load [cur] = 1;
+                end
+                FU_STORE: begin
+                    fu_dat_store[cur] = entries[rs].dat;
+                    fu_vld_store[cur] = 1;
+                end
                 endcase
                 num_issue_fus[fu] += 1;
             end
@@ -351,6 +368,18 @@ module rs_sva #(parameter
             $display("\033[31mError: %0s\033[0m\n\n", msg);
             print_entries(entries);
             print_entries(entries_dut);
+            $display("fu_vld sva={FU_ALU: %b, FU_MULT: %b, FU_LOAD: %b, STORE: %b}",
+                fu_vld_alu,
+                fu_vld_mult,
+                fu_vld_load,
+                fu_vld_store
+            );
+            $display("fu_vld dut={FU_ALU: %b, FU_MULT: %b, FU_LOAD: %b, STORE: %b}",
+                fu_vld_alu_dut,
+                fu_vld_mult_dut,
+                fu_vld_load_dut,
+                fu_vld_store_dut
+            );
 
             $finish;
         end
