@@ -59,7 +59,12 @@ module rs_sva #(parameter
             string fu_name;
             get_fu_name(entries[i].dat.fu_idx, fu_name);
 
-            $display("Entry [%0d] (PC=%0x): busy=%b, issued=%b, t=%0d, t1=%0d, t2=%0d, t1_rdy=%b, t2_rdy=%b, fu=%s(%0d)",
+            if (!entries[i].busy) begin
+                $display("Entry [%0d]:", i);
+                continue;
+            end
+
+            $display("Entry [%0d]: PC=%0x, busy=%b, issued=%b, t=%0d, t1=%0d, t2=%0d, t1_rdy=%b, t2_rdy=%b, fu=%s(%0d)",
                 i, 
                 entries[i].dat.PC, 
                 entries[i].busy, 
@@ -181,7 +186,7 @@ module rs_sva #(parameter
         marker();
         $write("cdb={");
         for (int i = 0; i < N; ++i) begin
-            $write("%d:%b", i, c_en[i] ? c_ts[i] : 'x);
+            $write("%0d:%0b, ", i, c_en[i] ? c_ts[i] : 'x);
         end
         $write("}\n");
         $display("fu_rdy={FU_ALU: %b, FU_MULT: %b, FU_LOAD: %b, STORE: %b}",
