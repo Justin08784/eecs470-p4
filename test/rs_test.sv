@@ -479,14 +479,14 @@ module rs_testbench;
         c_ts            = '0;
 
         test_1inst_2();
-        test_1inst_3();
-        // test_1inst();
-        // test_multi_1();
-        // test_idle();
-        // test_mixed();
-        // test_sequential_fu();
-        // test_multiple_cdb();
-        // test_back_to_back();
+        test_delayed_rdy();
+        test_1inst();
+        test_multi_1();
+        test_idle();
+        test_mixed();
+        test_sequential_fu();
+        test_multiple_cdb();
+        test_back_to_back();
 
     
         if (failed)

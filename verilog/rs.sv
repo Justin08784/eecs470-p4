@@ -107,7 +107,7 @@ module rs #(parameter
         for (int rs = 0, FU_IDX fu = 0; rs < RS_SZ; ++rs) begin
             can_issue[rs] = busy_vec[rs]
                 && !entries[rs].issued // ms1 test: remove "!" from entries[rs].issued (caught)
-                && (entries[rs].dat.t1_rdy || to_t1_rdy[rs]) // ms1 test: remove "|| to_t1_rdy[rs]" (not caught) 
+                && (entries[rs].dat.t1_rdy || to_t1_rdy[rs]) // [ADDRESSED] ms1 test: remove "|| to_t1_rdy[rs]" (not caught) 
                 && (entries[rs].dat.t2_rdy || to_t2_rdy[rs]);
 
             fu = entries[rs].dat.fu_idx;
@@ -246,7 +246,7 @@ module rs #(parameter
         fu_dat_store    = '0;
         fu_dat_load     = '0;
         foreach (fu2issuer_alu[fu, rs]) begin
-            if (fu2issuer_alu[fu][rs]) begin // ms1 test: Remove "!" from if condition (not caught)
+            if (fu2issuer_alu[fu][rs]) begin // [ADDRESSED] ms1 test: Remove "!" from if condition (not caught)
                 fu_dat_alu |= entries[rs].dat;
             end
         end
@@ -314,7 +314,7 @@ module rs #(parameter
         entries_n = entries;
         for (int rs = 0; rs < RS_SZ; ++rs) begin
             entries_n[rs].dat.t1_rdy |= to_t1_rdy[rs];
-            entries_n[rs].dat.t2_rdy |= to_t2_rdy[rs]; // ms1 test: change |= to = (not caught)
+            entries_n[rs].dat.t2_rdy |= to_t2_rdy[rs]; // [ADDRESSED] ms1 test: change |= to = (not caught)
             /*
             TODO: Ask Bradley! This change is not breaking because t2_rdy is 
             ALREADY incorporated into the value of to_t2_rdy, which means an
