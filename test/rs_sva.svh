@@ -29,6 +29,12 @@ module rs_sva #(parameter
     input   logic           [N-1:0] c_en,
     input   PHYS_REG_IDX    [N-1:0] c_ts,
 
+    // delicious spaghetti for print debugging
+    input   logic           [RS_SZ-1:0]   to_t1_rdy_dut,
+    input   logic           [RS_SZ-1:0]   to_t2_rdy_dut,
+    input   logic           [RS_SZ-1:0]   can_issue_dut,
+    input   logic           [FU_IDX_NUM-1:0][RS_SZ-1:0]   can_issues_dut,
+
     // ==== dut lines for comparison
     input   logic           [NUM_FU_ALU-1:0]    fu_vld_alu_dut,
     input   logic           [NUM_FU_MULT-1:0]   fu_vld_mult_dut,
@@ -139,6 +145,34 @@ module rs_sva #(parameter
     logic   [NUM_FU_STORE-1:0]  fu_dat_store_eqs;
     ID_RESULT fu_dat_sva_sorted[MAX_NUM_FU], fu_dat_dut_sorted[MAX_NUM_FU];
 
+    // always_comb begin
+    //     // Sort-check fu_dats: sort fu_dats by ascending {busy, PC}
+    //     // then do entrywise comparison. 
+    //     foreach(fu_dat_alu_eqs[i]) fu_dat_sva_sorted[i] = fu_vld_alu[i]     ? fu_dat_alu[i]     : '0;
+    //     foreach(fu_dat_alu_eqs[i]) fu_dat_dut_sorted[i] = fu_vld_alu_dut[i] ? fu_dat_alu_dut[i] : '0;
+    //     fu_dat_sva_sorted[0:NUM_FU_ALU-1].sort() with ({item.PC});
+    //     fu_dat_dut_sorted[0:NUM_FU_ALU-1].sort() with ({item.PC});
+    //     foreach(fu_dat_alu_eqs[i]) fu_dat_alu_eqs[i] = fu_dat_sva_sorted[i] == fu_dat_dut_sorted[i];
+
+    //     foreach(fu_dat_mult_eqs[i]) fu_dat_sva_sorted[i] = fu_vld_mult[i]     ? fu_dat_mult[i]     : '0;
+    //     foreach(fu_dat_mult_eqs[i]) fu_dat_dut_sorted[i] = fu_vld_mult_dut[i] ? fu_dat_mult_dut[i] : '0;
+    //     fu_dat_sva_sorted[0:NUM_FU_MULT-1].sort() with ({item.PC});
+    //     fu_dat_dut_sorted[0:NUM_FU_MULT-1].sort() with ({item.PC});
+    //     foreach(fu_dat_mult_eqs[i]) fu_dat_mult_eqs[i] = fu_dat_sva_sorted[i] == fu_dat_dut_sorted[i];
+
+    //     foreach(fu_dat_load_eqs[i]) fu_dat_sva_sorted[i] = fu_vld_load[i]     ? fu_dat_load[i]     : '0;
+    //     foreach(fu_dat_load_eqs[i]) fu_dat_dut_sorted[i] = fu_vld_load_dut[i] ? fu_dat_load_dut[i] : '0;
+    //     fu_dat_sva_sorted[0:NUM_FU_LOAD-1].sort() with ({item.PC});
+    //     fu_dat_dut_sorted[0:NUM_FU_LOAD-1].sort() with ({item.PC});
+    //     foreach(fu_dat_load_eqs[i]) fu_dat_load_eqs[i] = fu_dat_sva_sorted[i] == fu_dat_dut_sorted[i];
+
+    //     foreach(fu_dat_store_eqs[i]) fu_dat_sva_sorted[i] = fu_vld_store[i]     ? fu_dat_store[i]     : '0;
+    //     foreach(fu_dat_store_eqs[i]) fu_dat_dut_sorted[i] = fu_vld_store_dut[i] ? fu_dat_store_dut[i] : '0;
+    //     fu_dat_sva_sorted[0:NUM_FU_STORE-1].sort() with ({item.PC});
+    //     fu_dat_dut_sorted[0:NUM_FU_STORE-1].sort() with ({item.PC});
+    //     foreach(fu_dat_store_eqs[i]) fu_dat_store_eqs[i] = fu_dat_sva_sorted[i] == fu_dat_dut_sorted[i];
+    // end
+
     always begin
         entries_n = entries;
 
@@ -227,6 +261,15 @@ module rs_sva #(parameter
         end
         assign rs_scnt_sva = $min($countones(~busy_sva | issd_sva), N);
 
+        /* IMPORTANT:
+        This delay makes the fus_eq work. I dont know why!
+        An alternative fix is to wrap all of the "Sort-check fu_dats" logic in
+        a always_comb block (see above, commented out), but my main concern with
+        that approach is performance: lots of computations if inputs change
+        a lot in same cycle no?
+        */
+        #0
+
 
         // Sort-check entries: sort entries, entries_dut by ascending {busy, PC}
         // then do entrywise comparison. 
@@ -301,6 +344,46 @@ module rs_sva #(parameter
         // end
         $display("sva:");
         print_entries(entries);
+
+        $display("fu_vld dut={FU_ALU: %b, FU_MULT: %b, FU_LOAD: %b, STORE: %b}",
+            fu_vld_alu_dut,
+            fu_vld_mult_dut,
+            fu_vld_load_dut,
+            fu_vld_store_dut
+        );
+
+        $display("fu_vld sva={FU_ALU: %b, FU_MULT: %b, FU_LOAD: %b, STORE: %b}",
+            fu_vld_alu,
+            fu_vld_mult,
+            fu_vld_load,
+            fu_vld_store
+        );
+        $display("fu_dat dut={FU_ALU: %b, FU_MULT: %b, FU_LOAD: %b, STORE: %b}",
+            fu_dat_alu_dut,
+            fu_dat_mult_dut,
+            fu_dat_load_dut,
+            fu_dat_store_dut
+        );
+        $display("fu_dat sva={FU_ALU: %b, FU_MULT: %b, FU_LOAD: %b, STORE: %b}",
+            fu_dat_alu,
+            fu_dat_mult,
+            fu_dat_load,
+            fu_dat_store
+        );
+
+        $display("fu_dat eqs={FU_ALU: %b, FU_MULT: %b, FU_LOAD: %b, STORE: %b}",
+            fu_dat_alu_eqs,
+            fu_dat_mult_eqs,
+            fu_dat_load_eqs,
+            fu_dat_store_eqs
+        );
+
+        foreach (can_issues_dut[fu]) $display("can_issues_dut[%d]: %b", fu, can_issues_dut[fu]);
+        $display("can_issue_dut: %b", can_issue_dut);
+        $display("to_t1_rdy_dut: %b", to_t1_rdy_dut);
+        $display("to_t2_rdy_dut: %b", to_t2_rdy_dut);
+
+
         /* TODO: add debug prints for FUs vld/dat; for all FU types */
     end
 
@@ -366,14 +449,21 @@ module rs_sva #(parameter
             // print_failure();
             $display("\n\033[31m@@@ Failed at time %4d\033[0m", $time);
             $display("\033[31mError: %0s\033[0m\n\n", msg);
-            print_entries(entries);
-            print_entries(entries_dut);
-            $display("fu_vld sva={FU_ALU: %b, FU_MULT: %b, FU_LOAD: %b, STORE: %b}",
-                fu_vld_alu,
-                fu_vld_mult,
-                fu_vld_load,
-                fu_vld_store
+            $write("cdb={");
+            for (int i = 0; i < N; ++i) begin
+                $write("%0d:%0d, ", i, c_en[i] ? c_ts[i] : 'x);
+            end
+            $write("}\n");
+            $display("fu_rdy={FU_ALU: %b, FU_MULT: %b, FU_LOAD: %b, STORE: %b}",
+                fu_rdy_alu,
+                fu_rdy_mult,
+                fu_rdy_load,
+                fu_rdy_store
             );
+            $display("dut:");
+            print_entries(entries_dut);
+            $display("sva:");
+            print_entries(entries);
             $display("fu_vld dut={FU_ALU: %b, FU_MULT: %b, FU_LOAD: %b, STORE: %b}",
                 fu_vld_alu_dut,
                 fu_vld_mult_dut,
@@ -381,17 +471,23 @@ module rs_sva #(parameter
                 fu_vld_store_dut
             );
 
-            $display("fu_dat sva={FU_ALU: %b, FU_MULT: %b, FU_LOAD: %b, STORE: %b}",
-                fu_dat_alu,
-                fu_dat_mult,
-                fu_dat_load,
-                fu_dat_store
+            $display("fu_vld sva={FU_ALU: %b, FU_MULT: %b, FU_LOAD: %b, STORE: %b}",
+                fu_vld_alu,
+                fu_vld_mult,
+                fu_vld_load,
+                fu_vld_store
             );
             $display("fu_dat dut={FU_ALU: %b, FU_MULT: %b, FU_LOAD: %b, STORE: %b}",
                 fu_dat_alu_dut,
                 fu_dat_mult_dut,
                 fu_dat_load_dut,
                 fu_dat_store_dut
+            );
+            $display("fu_dat sva={FU_ALU: %b, FU_MULT: %b, FU_LOAD: %b, STORE: %b}",
+                fu_dat_alu,
+                fu_dat_mult,
+                fu_dat_load,
+                fu_dat_store
             );
 
             $display("fu_dat eqs={FU_ALU: %b, FU_MULT: %b, FU_LOAD: %b, STORE: %b}",
@@ -400,6 +496,11 @@ module rs_sva #(parameter
                 fu_dat_load_eqs,
                 fu_dat_store_eqs
             );
+
+            foreach (can_issues_dut[fu]) $display("can_issues_dut[%d]: %b", fu, can_issues_dut[fu]);
+            $display("can_issue_dut: %b", can_issue_dut);
+            $display("to_t1_rdy_dut: %b", to_t1_rdy_dut);
+            $display("to_t2_rdy_dut: %b", to_t2_rdy_dut);
 
             $finish;
         end

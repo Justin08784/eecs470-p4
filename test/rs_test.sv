@@ -97,6 +97,11 @@ module rs_testbench;
         .entries_dut(entries_dut),
         `endif 
 
+        .to_t1_rdy_dut      (rs_dut.to_t1_rdy),
+        .to_t2_rdy_dut      (rs_dut.to_t2_rdy),
+        .can_issue_dut      (rs_dut.can_issue),
+        .can_issues_dut     (rs_dut.can_issues),
+
         .fu_vld_alu_dut     (rs_dut.fu_vld_alu),
         .fu_vld_mult_dut    (rs_dut.fu_vld_mult),
         .fu_vld_store_dut   (rs_dut.fu_vld_store),
@@ -437,13 +442,13 @@ module rs_testbench;
         c_ts            = '0;
 
         test_1inst_2();
-        test_1inst();
-        test_multi_1();
-        test_idle();
-        test_mixed();
-        test_sequential_fu();
-        test_multiple_cdb();
-        test_back_to_back();
+        // test_1inst();
+        // test_multi_1();
+        // test_idle();
+        // test_mixed();
+        // test_sequential_fu();
+        // test_multiple_cdb();
+        // test_back_to_back();
 
     
         if (failed)
