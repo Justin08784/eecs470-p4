@@ -1,5 +1,6 @@
 `include "sys_defs.svh"
 `include "test/rs_sva.svh"
+// `include "test/rs_chk.svh"
 
 module rs_testbench;
     localparam N=`N;
@@ -126,7 +127,7 @@ module rs_testbench;
         input int t2_rdy,
         input int fu_idx
     );
-        static ADDR nex_PC = 0;
+        static ADDR nex_id = 0;
         // Set up a valid dispatch line
         d_vld[i]        = 1;
 
@@ -136,9 +137,8 @@ module rs_testbench;
         d_dat[i].t1_rdy = t1_rdy;
         d_dat[i].t2_rdy = t2_rdy;
         d_dat[i].fu_idx = fu_idx;
-        // we use PC as a unique identifier (ofc, this is not necessarily true
-        // in a real program with cond jumps)
-        d_dat[i].PC     = nex_PC++;
+        // we use id to uniquely identify each instruction
+        d_dat[i].id     = nex_id++;
     endtask
 
     task clr_dispatch(
@@ -526,7 +526,7 @@ module rs_testbench;
     task test_random();
         int seed = 1;
         logic [31:0] r32 = $urandom(seed);
-        int pc = 0;
+        int id = 0;
 
         reset = 1;
         @(negedge clock);
@@ -540,7 +540,7 @@ module rs_testbench;
                     continue;
                 // restricting to pregs in [0, 31]. There are more pregs than
                 // arch regs obviously, but isnt this okay?...
-                d_dat[i].PC      = pc++;
+                d_dat[i].id      = id++;
                 d_dat[i].t       = $urandom_range(32);
                 d_dat[i].t1      = $urandom_range(32);
                 d_dat[i].t2      = $urandom_range(32);
@@ -548,7 +548,7 @@ module rs_testbench;
                 d_dat[i].t2_rdy  = $urandom_range(1);
                 d_dat[i].fu_idx  = $urandom_range(FU_IDX_NUM-1);
             end
-            foreach(d_dat[i]) $display("d_dat[0%d]: %d", i, d_dat[i].PC);
+            foreach(d_dat[i]) $display("d_dat[0%d]: %d", i, d_dat[i].id);
             @(negedge clock);
             clr_all();
         end

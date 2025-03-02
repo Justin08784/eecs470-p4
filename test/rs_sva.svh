@@ -73,9 +73,9 @@ module rs_sva #(parameter
                 continue;
             end
 
-            $display("Entry [%0d]: PC=%0d, busy=%b, issued=%b, t=%0d, t1=%0d, t2=%0d, t1_rdy=%b, t2_rdy=%b, fu=%s(%0d)",
+            $display("Entry [%0d]: id=%0d, busy=%b, issued=%b, t=%0d, t1=%0d, t2=%0d, t1_rdy=%b, t2_rdy=%b, fu=%s(%0d)",
                 i, 
-                entries[i].dat.PC, 
+                entries[i].dat.id, 
                 entries[i].busy, 
                 entries[i].issued, 
                 entries[i].dat.t, 
@@ -86,6 +86,7 @@ module rs_sva #(parameter
                 
                 entries[i].busy ? fu_name : "*",
                 entries[i].dat.fu_idx,
+                // entries[i].dat.PC, 
                 // entries[i].dat.NPC, 
                 // entries[i].dat.alu_func, 
                 // entries[i].dat.mult, 
@@ -125,7 +126,7 @@ module rs_sva #(parameter
     // struct packed {
     //     int     idx; // idx of original element
     //     logic   busy;
-    //     ADDR    PC;
+    //     ADDR    id;
     // }   entries_sva_sorter[RS_SZ],
     //     entries_dut_sorter[RS_SZ];
     logic   [RS_SZ-1:0] entries_eqs;
@@ -136,7 +137,7 @@ module rs_sva #(parameter
     // struct packed {
     //     int     idx; // idx of original element
     //     logic   vld;
-    //     ADDR    PC;
+    //     ADDR    id;
     // }   fu_dat_sva_sorter[MAX_NUM_FU],
     //     fu_dat_dut_sorter[MAX_NUM_FU];
     logic   [NUM_FU_ALU-1:0]    fu_dat_alu_eqs;
@@ -149,30 +150,30 @@ module rs_sva #(parameter
     } fu_dat_sva_sorted[MAX_NUM_FU], fu_dat_dut_sorted[MAX_NUM_FU];
 
     // always_comb begin
-    //     // Sort-check fu_dats: sort fu_dats by ascending {busy, PC}
+    //     // Sort-check fu_dats: sort fu_dats by ascending {busy, id}
     //     // then do entrywise comparison. 
     //     foreach(fu_dat_alu_eqs[i]) fu_dat_sva_sorted[i] = fu_vld_alu[i]     ? fu_dat_alu[i]     : '0;
     //     foreach(fu_dat_alu_eqs[i]) fu_dat_dut_sorted[i] = fu_vld_alu_dut[i] ? fu_dat_alu_dut[i] : '0;
-    //     fu_dat_sva_sorted[0:NUM_FU_ALU-1].sort() with ({item.PC});
-    //     fu_dat_dut_sorted[0:NUM_FU_ALU-1].sort() with ({item.PC});
+    //     fu_dat_sva_sorted[0:NUM_FU_ALU-1].sort() with ({item.id});
+    //     fu_dat_dut_sorted[0:NUM_FU_ALU-1].sort() with ({item.id});
     //     foreach(fu_dat_alu_eqs[i]) fu_dat_alu_eqs[i] = fu_dat_sva_sorted[i] == fu_dat_dut_sorted[i];
 
     //     foreach(fu_dat_mult_eqs[i]) fu_dat_sva_sorted[i] = fu_vld_mult[i]     ? fu_dat_mult[i]     : '0;
     //     foreach(fu_dat_mult_eqs[i]) fu_dat_dut_sorted[i] = fu_vld_mult_dut[i] ? fu_dat_mult_dut[i] : '0;
-    //     fu_dat_sva_sorted[0:NUM_FU_MULT-1].sort() with ({item.PC});
-    //     fu_dat_dut_sorted[0:NUM_FU_MULT-1].sort() with ({item.PC});
+    //     fu_dat_sva_sorted[0:NUM_FU_MULT-1].sort() with ({item.id});
+    //     fu_dat_dut_sorted[0:NUM_FU_MULT-1].sort() with ({item.id});
     //     foreach(fu_dat_mult_eqs[i]) fu_dat_mult_eqs[i] = fu_dat_sva_sorted[i] == fu_dat_dut_sorted[i];
 
     //     foreach(fu_dat_load_eqs[i]) fu_dat_sva_sorted[i] = fu_vld_load[i]     ? fu_dat_load[i]     : '0;
     //     foreach(fu_dat_load_eqs[i]) fu_dat_dut_sorted[i] = fu_vld_load_dut[i] ? fu_dat_load_dut[i] : '0;
-    //     fu_dat_sva_sorted[0:NUM_FU_LOAD-1].sort() with ({item.PC});
-    //     fu_dat_dut_sorted[0:NUM_FU_LOAD-1].sort() with ({item.PC});
+    //     fu_dat_sva_sorted[0:NUM_FU_LOAD-1].sort() with ({item.id});
+    //     fu_dat_dut_sorted[0:NUM_FU_LOAD-1].sort() with ({item.id});
     //     foreach(fu_dat_load_eqs[i]) fu_dat_load_eqs[i] = fu_dat_sva_sorted[i] == fu_dat_dut_sorted[i];
 
     //     foreach(fu_dat_store_eqs[i]) fu_dat_sva_sorted[i] = fu_vld_store[i]     ? fu_dat_store[i]     : '0;
     //     foreach(fu_dat_store_eqs[i]) fu_dat_dut_sorted[i] = fu_vld_store_dut[i] ? fu_dat_store_dut[i] : '0;
-    //     fu_dat_sva_sorted[0:NUM_FU_STORE-1].sort() with ({item.PC});
-    //     fu_dat_dut_sorted[0:NUM_FU_STORE-1].sort() with ({item.PC});
+    //     fu_dat_sva_sorted[0:NUM_FU_STORE-1].sort() with ({item.id});
+    //     fu_dat_dut_sorted[0:NUM_FU_STORE-1].sort() with ({item.id});
     //     foreach(fu_dat_store_eqs[i]) fu_dat_store_eqs[i] = fu_dat_sva_sorted[i] == fu_dat_dut_sorted[i];
     // end
 
@@ -274,40 +275,40 @@ module rs_sva #(parameter
         #0
 
 
-        // Sort-check entries: sort entries, entries_dut by ascending {busy, PC}
+        // Sort-check entries: sort entries, entries_dut by ascending {busy, id}
         // then do entrywise comparison. 
 
         // Version 1: Sort a copy of original arrays
         foreach(entries[i]) entries_sva_sorted[i] = entries[i];
         foreach(entries[i]) entries_dut_sorted[i] = entries_dut[i];
-        entries_sva_sorted.sort() with ({item.busy, item.dat.PC});
-        entries_dut_sorted.sort() with ({item.busy, item.dat.PC});
+        entries_sva_sorted.sort() with ({item.busy, item.dat.id});
+        entries_dut_sorted.sort() with ({item.busy, item.dat.id});
         foreach(entries[i]) entries_eqs[i] = entries_sva_sorted[i] == entries_dut_sorted[i];
 
         /* Version 2: Sort a sorter struct to index into original arrays */
         // for (int rs = 0; rs < RS_SZ; ++rs) begin
         //     entries_sva_sorter[rs].idx  = rs;
         //     entries_sva_sorter[rs].busy = entries[rs].busy;
-        //     entries_sva_sorter[rs].PC   = entries[rs].dat.PC;
+        //     entries_sva_sorter[rs].id   = entries[rs].dat.id;
 
         //     entries_dut_sorter[rs].idx  = rs;
         //     entries_dut_sorter[rs].busy = entries_dut[rs].busy;
-        //     entries_dut_sorter[rs].PC   = entries_dut[rs].dat.PC;
+        //     entries_dut_sorter[rs].id   = entries_dut[rs].dat.id;
         // end
-        // entries_sva_sorter.sort() with ({item.busy, item.PC});
-        // entries_dut_sorter.sort() with ({item.busy, item.PC});
+        // entries_sva_sorter.sort() with ({item.busy, item.id});
+        // entries_dut_sorter.sort() with ({item.busy, item.id});
         // for (int rs = 0, RS_ENTRY l=0, RS_ENTRY r=0; rs < RS_SZ; ++rs) begin
         //     l = entries_dut[entries_dut_sorter[rs].idx];
         //     r = entries[entries_sva_sorter[rs].idx];
         //     entries_eqs[rs] = l == r;
         // end
 
-        // Sort-check fu_dats: sort fu_dats by ascending {busy, PC}
+        // Sort-check fu_dats: sort fu_dats by ascending {busy, id}
         // then do entrywise comparison. 
         foreach(fu_dat_alu_eqs[i]) fu_dat_sva_sorted[i] = '{vld:fu_vld_alu[i], dat:fu_dat_alu[i]};
         foreach(fu_dat_alu_eqs[i]) fu_dat_dut_sorted[i] = '{vld:fu_vld_alu_dut[i], dat:fu_dat_alu_dut[i]};
-        fu_dat_sva_sorted[0:NUM_FU_ALU-1].rsort() with ({item.vld, item.dat.PC});
-        fu_dat_dut_sorted[0:NUM_FU_ALU-1].rsort() with ({item.vld, item.dat.PC});
+        fu_dat_sva_sorted[0:NUM_FU_ALU-1].rsort() with ({item.vld, item.dat.id});
+        fu_dat_dut_sorted[0:NUM_FU_ALU-1].rsort() with ({item.vld, item.dat.id});
         foreach(fu_dat_alu_eqs[i]) fu_dat_alu_eqs[i] = fu_dat_sva_sorted[i] == fu_dat_dut_sorted[i];
         // for (int i = 0; i < NUM_FU_ALU; ++i) $display("alu sva_dat_sorted[0%d]: %b", i, fu_dat_sva_sorted[i]);
         // for (int i = 0; i < NUM_FU_ALU; ++i) $display("alu dut_dat_sorted[0%d]: %b", i, fu_dat_dut_sorted[i]);
@@ -315,8 +316,8 @@ module rs_sva #(parameter
 
         foreach(fu_dat_mult_eqs[i]) fu_dat_sva_sorted[i] = '{vld:fu_vld_mult[i], dat:fu_dat_mult[i]};
         foreach(fu_dat_mult_eqs[i]) fu_dat_dut_sorted[i] = '{vld:fu_vld_mult_dut[i], dat:fu_dat_mult_dut[i]};
-        fu_dat_sva_sorted[0:NUM_FU_MULT-1].rsort() with ({item.vld, item.dat.PC});
-        fu_dat_dut_sorted[0:NUM_FU_MULT-1].rsort() with ({item.vld, item.dat.PC});
+        fu_dat_sva_sorted[0:NUM_FU_MULT-1].rsort() with ({item.vld, item.dat.id});
+        fu_dat_dut_sorted[0:NUM_FU_MULT-1].rsort() with ({item.vld, item.dat.id});
         foreach(fu_dat_mult_eqs[i]) fu_dat_mult_eqs[i] = fu_dat_sva_sorted[i] == fu_dat_dut_sorted[i];
         // for (int i = 0; i < NUM_FU_MULT; ++i) $display("mult sva_dat_sorted[0%d]: %b", i, fu_dat_sva_sorted[i]);
         // for (int i = 0; i < NUM_FU_MULT; ++i) $display("mult dut_dat_sorted[0%d]: %b", i, fu_dat_dut_sorted[i]);
@@ -324,8 +325,8 @@ module rs_sva #(parameter
 
         foreach(fu_dat_load_eqs[i]) fu_dat_sva_sorted[i] = '{vld:fu_vld_load[i], dat:fu_dat_load[i]};
         foreach(fu_dat_load_eqs[i]) fu_dat_dut_sorted[i] = '{vld:fu_vld_load_dut[i], dat:fu_dat_load_dut[i]};
-        fu_dat_sva_sorted[0:NUM_FU_LOAD-1].rsort() with ({item.vld, item.dat.PC});
-        fu_dat_dut_sorted[0:NUM_FU_LOAD-1].rsort() with ({item.vld, item.dat.PC});
+        fu_dat_sva_sorted[0:NUM_FU_LOAD-1].rsort() with ({item.vld, item.dat.id});
+        fu_dat_dut_sorted[0:NUM_FU_LOAD-1].rsort() with ({item.vld, item.dat.id});
         foreach(fu_dat_load_eqs[i]) fu_dat_load_eqs[i] = fu_dat_sva_sorted[i] == fu_dat_dut_sorted[i];
         // for (int i = 0; i < NUM_FU_LOAD; ++i) $display("load sva_dat_sorted[0%d]: %b", i, fu_dat_sva_sorted[i]);
         // for (int i = 0; i < NUM_FU_LOAD; ++i) $display("load dut_dat_sorted[0%d]: %b", i, fu_dat_dut_sorted[i]);
@@ -333,8 +334,8 @@ module rs_sva #(parameter
 
         foreach(fu_dat_store_eqs[i]) fu_dat_sva_sorted[i] = '{vld:fu_vld_store[i], dat:fu_dat_store[i]};
         foreach(fu_dat_store_eqs[i]) fu_dat_dut_sorted[i] = '{vld:fu_vld_store_dut[i], dat:fu_dat_store_dut[i]};
-        fu_dat_sva_sorted[0:NUM_FU_STORE-1].rsort() with ({item.vld, item.dat.PC});
-        fu_dat_dut_sorted[0:NUM_FU_STORE-1].rsort() with ({item.vld, item.dat.PC});
+        fu_dat_sva_sorted[0:NUM_FU_STORE-1].rsort() with ({item.vld, item.dat.id});
+        fu_dat_dut_sorted[0:NUM_FU_STORE-1].rsort() with ({item.vld, item.dat.id});
         foreach(fu_dat_store_eqs[i]) fu_dat_store_eqs[i] = fu_dat_sva_sorted[i] == fu_dat_dut_sorted[i];
         // for (int i = 0; i < NUM_FU_STORE; ++i) $display("store sva_dat_sorted[0%d]: %b", i, fu_dat_sva_sorted[i]);
         // for (int i = 0; i < NUM_FU_STORE; ++i) $display("store dut_dat_sorted[0%d]: %b", i, fu_dat_dut_sorted[i]);
