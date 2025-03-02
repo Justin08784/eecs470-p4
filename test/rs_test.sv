@@ -513,6 +513,16 @@ module rs_testbench;
         @(negedge clock);
     endtask
 
+    /*
+    IMPORTANT: I have made a fucking devastating realization. Suppose there
+    are fewer RS entry slots than dispatching instructions. Only a subset
+    can fill those slots. However rs_sva picks from lowest indices, while
+    rs alternates between lsb-msb. Because the fucking picking mechanism is
+    different eventually their states will diverge, which means rs_sva CANNOT
+    serve as a golden model of rs.
+
+    How I realized this: run with N = 4, RS_SZ = 16
+    */
     task test_random();
         int seed = 1;
         logic [31:0] r32 = $urandom(seed);
@@ -538,6 +548,7 @@ module rs_testbench;
                 d_dat[i].t2_rdy  = $urandom_range(1);
                 d_dat[i].fu_idx  = $urandom_range(FU_IDX_NUM-1);
             end
+            foreach(d_dat[i]) $display("d_dat[0%d]: %d", i, d_dat[i].PC);
             @(negedge clock);
             clr_all();
         end
