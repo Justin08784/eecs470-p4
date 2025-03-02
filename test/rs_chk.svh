@@ -114,6 +114,19 @@ module rs_chk #(parameter
         PHYS_REG_IDX    [N-1:0] c_ts;
     } ins_pre, ins_cur; 
 
+    struct packed {
+        logic       [$clog2(N):0]       rs_scnt;
+        
+        logic       [NUM_FU_ALU-1:0]    fu_vld_alu;
+        logic       [NUM_FU_MULT-1:0]   fu_vld_mult;
+        logic       [NUM_FU_STORE-1:0]  fu_vld_store;
+        logic       [NUM_FU_LOAD-1:0]   fu_vld_load;
+        ID_RESULT   [NUM_FU_ALU-1:0]    fu_dat_alu;
+        ID_RESULT   [NUM_FU_MULT-1:0]   fu_dat_mult;
+        ID_RESULT   [NUM_FU_STORE-1:0]  fu_dat_store;
+        ID_RESULT   [NUM_FU_LOAD-1:0]   fu_dat_load;
+    } outs_pre, outs_cur; 
+
     // This syntax is so fucking gorgeous btw.
     assign ins_cur = '{
         d_vld:d_vld,
@@ -124,6 +137,18 @@ module rs_chk #(parameter
         fu_rdy_store:fu_rdy_store,
         c_en:c_en,
         c_ts:c_ts
+    };
+
+    assign outs_cur = '{
+        rs_scnt:rs_scnt,
+        fu_vld_alu:fu_vld_alu_dut,
+        fu_vld_mult:fu_vld_mult_dut,
+        fu_vld_load:fu_vld_load_dut,
+        fu_vld_store:fu_vld_store_dut,
+        fu_dat_alu:fu_dat_alu_dut,
+        fu_dat_mult:fu_dat_mult_dut,
+        fu_dat_load:fu_dat_load_dut,
+        fu_dat_store:fu_dat_store_dut
     };
     
     logic               [NUM_FU_ALU-1:0]    fu_vld_alu;
@@ -183,17 +208,16 @@ module rs_chk #(parameter
         print_entries(entries_cur);
 
         // initialization
-        id2idx_mut.delete();
+        id2idx_pre.delete();
         foreach(entries_pre[rs]) begin
             if (entries_pre[rs].busy)
-                id2idx_mut[entries_pre[rs].dat.id] = rs;
+                id2idx_pre[entries_pre[rs].dat.id] = rs;
         end
         id2idx_cur.delete();
         foreach(entries_cur[rs]) begin
             if (entries_cur[rs].busy)
                 id2idx_cur[entries_cur[rs].dat.id] = rs;
         end
-        entries_mut = entries_pre;
 
         // marker();
         // $display("entries_pre");
@@ -229,6 +253,7 @@ module rs_chk #(parameter
         end
 
         // update ready in scratchpad
+        entries_mut = entries_pre;
         for (int rs = 0, PHYS_REG_IDX t1 = 0, PHYS_REG_IDX t2 = 0; rs < RS_SZ; ++rs) begin
             t1 = entries_pre[rs].dat.t1;
             t2 = entries_pre[rs].dat.t2;
@@ -245,10 +270,10 @@ module rs_chk #(parameter
         issd_by_fu_cur  = '0;
         for (int rs = 0, FU_IDX fu = 0; rs < RS_SZ; ++rs) begin
             issd_cur[rs] = entries_cur[rs].busy && entries_cur[rs].issued;
-            $display("duck[%0d]: %b", rs, issd_cur[rs]);
+            // $display("duck[%0d]: %b", rs, issd_cur[rs]);
             fu = entries_cur[rs].dat.fu_idx;
             issd_by_fu_cur[fu][rs] = issd_cur[rs];
-            $display("golo[%0d]: fu=%0d %b", rs, fu, issd_by_fu_cur[fu][rs]);
+            // $display("golo[%0d]: fu=%0d %b", rs, fu, issd_by_fu_cur[fu][rs]);
         end
 
         can_issue_mut       = '0;
@@ -270,12 +295,54 @@ module rs_chk #(parameter
             FU_LOAD:    rdy_num = $countones(ins_pre.fu_rdy_load);
             FU_STORE:   rdy_num = $countones(ins_pre.fu_rdy_store);
             endcase
-            $display("fu=%0d: issd:      %0b", fu, issd_by_fu_cur[fu]);
-            $display("fu=%0d: can_issue: %0b", fu, can_issue_by_fu_mut[fu]);
-            $display("fu=%0d: rdy_num:   %0d", fu, rdy_num);
+            // $display("fu=%0d: issd:      %0b", fu, issd_by_fu_cur[fu]);
+            // $display("fu=%0d: can_issue: %0b", fu, can_issue_by_fu_mut[fu]);
+            // $display("fu=%0d: rdy_num:   %0d", fu, rdy_num);
             issue_cnt_correct &= 
                 $countones(issd_by_fu_cur[fu])
                 == $min($countones(can_issue_by_fu_mut[fu]), rdy_num);
+        end
+
+        issue_dat_correct = 1;
+        for (int i = 0, int id = 0, int rs = 0; i < NUM_FU_ALU; ++i) begin
+            if (!outs_pre.fu_vld_alu[i])
+                continue;
+            $display("kn0");
+            issue_dat_correct &= ins_pre.fu_rdy_alu[i];
+            id = outs_pre.fu_dat_alu[i].id;
+            if (!id2idx_pre.exists(id)) begin
+                $display("WHAT THE FUCK?");
+                $finish;
+            end
+            rs = id2idx_pre[id];
+            issue_dat_correct &= (outs_pre.fu_dat_alu[i] == entries_pre[rs].dat);
+        end
+        for (int i = 0, int id = 0, int rs = 0; i < NUM_FU_MULT; ++i) begin
+            if (!outs_pre.fu_vld_mult[i])
+                continue;
+            $display("kn1");
+            issue_dat_correct &= ins_pre.fu_rdy_mult[i];
+            id = outs_pre.fu_dat_mult[i].id;
+            rs = id2idx_pre[id];
+            issue_dat_correct &= (outs_pre.fu_dat_mult[i] == entries_pre[rs].dat);
+        end
+        for (int i = 0, int id = 0, int rs = 0; i < NUM_FU_LOAD; ++i) begin
+            if (!outs_pre.fu_vld_load[i])
+                continue;
+            $display("kn2");
+            issue_dat_correct &= ins_pre.fu_rdy_load[i];
+            id = outs_pre.fu_dat_load[i].id;
+            rs = id2idx_pre[id];
+            issue_dat_correct &= (outs_pre.fu_dat_load[i] == entries_pre[rs].dat);
+        end
+        for (int i = 0, int id = 0, int rs = 0; i < NUM_FU_STORE; ++i) begin
+            if (!outs_pre.fu_vld_store[i])
+                continue;
+            $display("kn3");
+            issue_dat_correct &= ins_pre.fu_rdy_store[i];
+            id = outs_pre.fu_dat_store[i].id;
+            rs = id2idx_pre[id];
+            issue_dat_correct &= (outs_pre.fu_dat_store[i] == entries_pre[rs].dat);
         end
         
 
@@ -383,10 +450,12 @@ module rs_chk #(parameter
         if (reset || flush) begin
             entries_pre <= '0;
             ins_pre     <= '0;
+            outs_pre    <= '0;
             // id2idx.delete();
         end else begin
             entries_pre <= entries_cur;
             ins_pre     <= ins_cur;
+            outs_pre    <= outs_cur;
             // id2idx.delete();
             // foreach (id2idx_n[id])
             //     id2idx[id] <= id2idx_n[id];
@@ -424,6 +493,11 @@ module rs_chk #(parameter
             disable iff (reset || flush)
             issue_cnt_correct;
         endproperty
+
+        property issue_dat;
+            disable iff (reset || flush)
+            issue_dat_correct;
+        endproperty
     endclocking
 
     Ex_Clear: assert property(cb.ex_clear)
@@ -432,6 +506,8 @@ module rs_chk #(parameter
         else exit_on_error ("did not ready");
     Issue_Cnt: assert property(cb.issue_cnt)
         else exit_on_error ("issue cnt wrong");
+    Issue_Dat: assert property(cb.issue_dat)
+        else exit_on_error ("issue dat wrong");
 
 
 endmodule
