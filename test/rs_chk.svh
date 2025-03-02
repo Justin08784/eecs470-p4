@@ -129,10 +129,24 @@ module rs_chk #(parameter
     assign entries_n = entries_dut;
     int id2idx[int], id2idx_mut[int], id2idx_n[int];
 
+    // misc control
+
     // clear correctness
     logic clear_correct;
 
-    always begin
+    // ready correctness
+    logic ready_correct;
+    logic rdy_mut[int];
+
+    initial begin
+        // wait until 1st reset: ensures no Xs are floating around
+        // (if there are Xs we get errors like indexing with Xs into assoc. arrays)
+        while (!reset)
+            @(negedge clock);
+        @(negedge clock);   
+    forever begin
+
+        rdy_mut.delete();
         id2idx_mut.delete();
         foreach(id2idx[id])
             id2idx_mut[id] = id2idx[id];
@@ -153,12 +167,57 @@ module rs_chk #(parameter
             clear_correct &= (!id2idx_n.exists(id));
 
             entries_mut[rs] = '0;
+            id2idx_mut.delete(id);
         end 
+
+        // ready insns (cdb)
+        for (int rs = 0, PHYS_REG_IDX t1 = 0, PHYS_REG_IDX t2 = 0; rs < RS_SZ; ++rs) begin
+            if (!entries_mut[rs].busy)
+                continue;
+
+            // id = entries_mut[rs].dat.id;
+            t1 = entries_mut[rs].dat.t1;
+            t2 = entries_mut[rs].dat.t2;
+            rdy_mut[t1] = entries_mut[rs].dat.t1_rdy;
+            rdy_mut[t2] = entries_mut[rs].dat.t2_rdy;
+        end 
+        foreach (c_ts[i]) begin
+            $display("cdb[%0d]= %0d", i, c_ts[i]);
+            if (!c_en[i]) 
+                continue;
+            rdy_mut[c_ts[i]] = 1;
+        end
+        ready_correct = 1;
+        $display("inter entries:");
+        print_entries(entries);
+        $display("inter entries_n:");
+        print_entries(entries_n);
+        for (int rs = 0, 
+             PHYS_REG_IDX t1 = 0, PHYS_REG_IDX t2 = 0,
+             logic t1_rdy = 0, logic t2_rdy = 0; rs < RS_SZ; ++rs) begin
+            if (!entries_n[rs].busy)
+                continue;
+
+            // id = entries_mut[rs].dat.id;
+            t1 = entries_n[rs].dat.t1;
+            t2 = entries_n[rs].dat.t2;
+            t1_rdy = entries_n[rs].dat.t1_rdy;
+            t2_rdy = entries_n[rs].dat.t2_rdy;
+            if (rdy_mut.exists(t1)) begin
+                $display("check t1: %0d %b %b", t1, t1_rdy, rdy_mut[t1]);
+                ready_correct &= (t1_rdy == rdy_mut[t1]);
+            end
+            if (rdy_mut.exists(t2)) begin
+                $display("check t2: %0d %b %b", t2, t2_rdy, rdy_mut[t2]);
+                ready_correct &= (t2_rdy == rdy_mut[t2]);
+            end
+        end 
+
 
         @(negedge clock);
 
 
-    end
+    end end
 
     always_ff @(posedge clock) begin
         if (reset || flush) begin
@@ -184,6 +243,9 @@ module rs_chk #(parameter
             print_entries(entries);
             $display("entries_n:");
             print_entries(entries_n);
+            foreach(rdy_mut[t]) begin
+                $display("rdy_mut[%0d]=%b", t, rdy_mut[t]);
+            end
 
             $finish;
         end
@@ -194,10 +256,17 @@ module rs_chk #(parameter
             disable iff (reset || flush)
             clear_correct;
         endproperty
+        property c_rdy;
+            disable iff (reset || flush)
+            ready_correct;
+        endproperty
     endclocking
 
     Ex_Clear: assert property(cb.ex_clear)
         else exit_on_error ("did not clear");
+    C_Rdy: assert property(cb.c_rdy)
+        else exit_on_error ("did not ready");
+
 
 endmodule
 
