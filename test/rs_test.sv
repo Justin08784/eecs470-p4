@@ -395,43 +395,45 @@ module rs_testbench;
         // ID[1]: p? <- (p3+) + p4
         set_dispatch(1, 3, 4, 1, 0, FU_ALU);
         @(negedge clock);
-        clr_dispatch(0);
-        clr_dispatch(1);
+        clr_all();
 
         // ID[0]: p? <- M[p8+]
         set_dispatch(0, 8, 0, 1, 1, FU_LOAD);
         set_cdb(0, 1);
         @(negedge clock);
-        clr_cdb(0);
+        clr_all();
 
         set_cdb(1, 2);
         @(negedge clock);
-        clr_cdb(1);
+        clr_all();
 
         set_fu(FU_ALU, 0);  // ALU unit ready
         @(negedge clock);
+        clr_all();
 
         set_cdb(2, 4);
         @(negedge clock);
-        clr_cdb(2);
+        clr_all();
 
         set_fu(FU_MULT, 0);
         @(negedge clock);
+        clr_all();
 
         set_fu(FU_LOAD, 0);
         @(negedge clock);
+        clr_all();
 
         set_cdb(0, 5);  // MULT result p5
         @(negedge clock);
-        clr_cdb(0);
+        clr_all();
 
         set_cdb(1, 6);  // ALU result p6
         @(negedge clock);
-        clr_cdb(1);
+        clr_all();
 
         set_cdb(2, 7);  // Load result p7
         @(negedge clock);
-        clr_cdb(2);
+        clr_all();
 
         @(negedge clock);
         @(negedge clock);
@@ -451,21 +453,19 @@ module rs_testbench;
 
         set_dispatch(0, 1, 2, 0, 0, FU_STORE);
         @(negedge clock);
-        clr_dispatch(0);
+        clr_all();
 
         set_cdb(0, 1);
         set_cdb(1, 2);
         set_fu(FU_STORE, 0);
         @(negedge clock);
-        clr_cdb(0);
-        clr_cdb(1);
-        clr_fu(FU_STORE, 0);
-
-        @(negedge clock);
-
-        @(negedge clock);
-
         clr_all();
+
+        @(negedge clock);
+
+        @(negedge clock);
+        clr_all();
+
         @(negedge clock);
     endtask
 
@@ -609,14 +609,14 @@ module rs_testbench;
 
         // hand-crafted:
         test_1inst();
-        // test_1inst_2();
-        // test_idle();
-        // test_multi_1();
-        // test_delayed_rdy();
-        // test_nonzero_fu_rdy_idx();
+        test_1inst_2();
+        test_idle();
+        test_delayed_rdy();
+        test_nonzero_fu_rdy_idx();
         // test_random();
 
         // not hand-crafted:
+        test_multi_1();
         // test_back_to_back();
         // test_multiple_cdb();
         // test_sequential_fu();
