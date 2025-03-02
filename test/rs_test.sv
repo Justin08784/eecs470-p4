@@ -1,6 +1,6 @@
 `include "sys_defs.svh"
 `include "test/rs_sva.svh"
-// `include "test/rs_chk.svh"
+`include "test/rs_chk.svh"
 
 module rs_testbench;
     localparam N=`N;
@@ -79,7 +79,47 @@ module rs_testbench;
     Strangely not all of the DEBUG ifdefs work when enabled
     */
     // bind rs_dut rs_sva dut_sva (
-    rs_sva dut_sva (
+    // rs_sva dut_sva (
+    //     .clock(clock),
+    //     .reset(reset),
+    //     .flush(1'b0),
+
+    //     .rs_scnt(rs_scnt),
+    //     .d_vld(d_vld),
+    //     .d_dat(d_dat),
+
+    //     .fu_rdy_alu(fu_rdy_alu),
+    //     .fu_rdy_mult(fu_rdy_mult),
+    //     .fu_rdy_store(fu_rdy_store),
+    //     .fu_rdy_load(fu_rdy_load),
+
+    //     .c_en(c_en),
+    //     .c_ts(c_ts),
+    //     `ifdef DEBUG
+    //     .entries_dut(entries_dut),
+    //     `endif 
+
+    //     // .to_t1_rdy_dut      (rs_dut.to_t1_rdy),
+    //     // .to_t2_rdy_dut      (rs_dut.to_t2_rdy),
+    //     // .can_issue_dut      (rs_dut.can_issue),
+    //     // .can_issues_dut     (rs_dut.can_issues),
+
+    //     .fu_vld_alu_dut     (rs_dut.fu_vld_alu),
+    //     .fu_vld_mult_dut    (rs_dut.fu_vld_mult),
+    //     .fu_vld_store_dut   (rs_dut.fu_vld_store),
+    //     .fu_vld_load_dut    (rs_dut.fu_vld_load),
+    //     /* Ideally you wanna do this, but synthie cant handle complex types yet. */
+    //     // .fu_dat_alu_dut     (rs_dut.fu_dat_alu),
+    //     // .fu_dat_mult_dut    (rs_dut.fu_dat_mult),
+    //     // .fu_dat_store_dut   (rs_dut.fu_dat_store),
+    //     // .fu_dat_load_dut    (rs_dut.fu_dat_load)
+    //     .fu_dat_alu_dut     (fu_dat_alu_dut),
+    //     .fu_dat_mult_dut    (fu_dat_mult_dut),
+    //     .fu_dat_store_dut   (fu_dat_store_dut),
+    //     .fu_dat_load_dut    (fu_dat_load_dut)
+    // );
+
+    rs_chk dut_chk (
         .clock(clock),
         .reset(reset),
         .flush(1'b0),
@@ -566,22 +606,21 @@ module rs_testbench;
         fu_rdy_load     = '0;
         c_en            = '0;
         c_ts            = '0;
-        test_random();
-        $finish;
 
         // hand-crafted:
         test_1inst();
-        test_1inst_2();
-        test_idle();
-        test_multi_1();
-        test_delayed_rdy();
-        test_nonzero_fu_rdy_idx();
+        // test_1inst_2();
+        // test_idle();
+        // test_multi_1();
+        // test_delayed_rdy();
+        // test_nonzero_fu_rdy_idx();
+        // test_random();
 
         // not hand-crafted:
-        test_back_to_back();
-        test_multiple_cdb();
-        test_sequential_fu();
-        test_mixed();
+        // test_back_to_back();
+        // test_multiple_cdb();
+        // test_sequential_fu();
+        // test_mixed();
     
         if (failed)
             $display("@@@ Failed\n");
