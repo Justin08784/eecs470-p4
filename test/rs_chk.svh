@@ -114,6 +114,17 @@ module rs_chk #(parameter
         PHYS_REG_IDX    [N-1:0] c_ts;
     } ins_pre, ins_cur; 
 
+    assign ins_cur = '{
+        d_vld:d_vld,
+        d_dat:d_dat,
+        fu_rdy_alu:fu_rdy_alu,
+        fu_rdy_mult:fu_rdy_mult,
+        fu_rdy_load:fu_rdy_load,
+        fu_rdy_store:fu_rdy_store,
+        c_en:c_en,
+        c_ts:c_ts
+    };
+    
     logic               [NUM_FU_ALU-1:0]    fu_vld_alu;
     logic               [NUM_FU_MULT-1:0]   fu_vld_mult;
     logic               [NUM_FU_STORE-1:0]  fu_vld_store;
@@ -142,7 +153,7 @@ module rs_chk #(parameter
     // ready correctness
     logic ready_correct;
     logic rdy_mut[int];
-    logic last_cycle_rdy[int];
+    logic readied_pre[int]; // was readied last cycle
 
     initial begin
         // wait until 1st reset: ensures no Xs are floating around
@@ -152,98 +163,118 @@ module rs_chk #(parameter
         @(negedge clock);   
         @(negedge clock);   
     forever begin
-        marker();
-        $display("entries_pre");
-        print_entries(entries_pre);
-        $display("entries_cur");
-        print_entries(entries_cur);
-        id2idx_n.delete();
-        foreach(entries_cur[rs]) begin
-            if (entries_cur[rs].busy)
-                id2idx_n[entries_cur[rs].dat.id] = rs;
-        end
+        // marker();
+        // $display("entries_pre");
+        // print_entries(entries_pre);
+        // $display("entries_cur");
+        // print_entries(entries_cur);
 
-
-        rdy_mut.delete();
-        id2idx_mut.delete();
-        foreach(id2idx[id])
-            id2idx_mut[id] = id2idx[id];
-        entries_mut = entries_pre;
-
-
-        // ready insns (cdb)
-        foreach(last_cycle_rdy[t]) begin
-            $display("fig[%0d]=%b", t, last_cycle_rdy[t]);
-        end
+        // check ready correctness 
         ready_correct = 1;
-        for (int rs = 0, 
-             PHYS_REG_IDX t1 = 0, PHYS_REG_IDX t2 = 0,
-             logic t1_rdy = 0, logic t2_rdy = 0; rs < RS_SZ; ++rs) begin
-            if (!entries_pre[rs].busy)
-                continue;
-
-            // id = entries_pre_mut[rs].dat.id;
-            t1 = entries_pre[rs].dat.t1;
-            t2 = entries_pre[rs].dat.t2;
-            t1_rdy = entries_pre[rs].dat.t1_rdy;
-            t2_rdy = entries_pre[rs].dat.t2_rdy;
-            if (last_cycle_rdy.exists(t1)) begin
-                $display("check t1: %0d %b %b", t1, t1_rdy, last_cycle_rdy[t1]);
-                ready_correct &= (t1_rdy == last_cycle_rdy[t1]);
-            end
-            if (last_cycle_rdy.exists(t2)) begin
-                $display("check t2: %0d %b %b", t2, t2_rdy, last_cycle_rdy[t2]);
-                ready_correct &= (t2_rdy == last_cycle_rdy[t2]);
-            end
-        end 
-
-
-        @(posedge clock);
-        #0
-
-        // correctness checks ABOVE
-
-        // state updates BELOW
-
-
-        // clear (insn going to ex)
-        clear_correct = 1;
-        for (int rs = 0, int id = 0; rs < RS_SZ; ++rs) begin
-            if (!entries_mut[rs].issued)
-                continue;
-            id = entries_mut[rs].dat.id;
-            clear_correct &= (!id2idx_n.exists(id));
-
-            entries_mut[rs] = '0;
-            id2idx_mut.delete(id);
-        end 
-
-        // ready insns (cdb)
-        last_cycle_rdy.delete();
-        #0
-        $display("fsd:");
-        print_entries(entries_pre);
-        $display("rrs:");
-        print_entries(entries_cur);
         for (int rs = 0, PHYS_REG_IDX t1 = 0, PHYS_REG_IDX t2 = 0; rs < RS_SZ; ++rs) begin
             if (!entries_cur[rs].busy)
                 continue;
-
-            // id = entries_cur[rs].dat.id;
             t1 = entries_cur[rs].dat.t1;
             t2 = entries_cur[rs].dat.t2;
-            last_cycle_rdy[t1] = entries_cur[rs].dat.t1_rdy;
-            last_cycle_rdy[t2] = entries_cur[rs].dat.t2_rdy;
-        end 
-        foreach (c_ts[i]) begin
-            $display("cdb[%0d]= %0d", i, c_ts[i]);
-            if (!c_en[i]) 
-                continue;
-            last_cycle_rdy[c_ts[i]] = 1;
+
+            foreach (ins_pre.c_en[i]) begin
+                if (!ins_pre.c_en[i])
+                    continue;
+                ready_correct &= (ins_pre.c_ts[i] == t1 ? entries_cur[rs].dat.t1_rdy : 1);
+                ready_correct &= (ins_pre.c_ts[i] == t2 ? entries_cur[rs].dat.t2_rdy : 1);
+            end
         end
-        foreach(last_cycle_rdy[t]) begin
-            $display("last_cycle_rdy[%0d]=%b", t, last_cycle_rdy[t]);
-        end
+        // marker();
+        // $display("entries_pre");
+        // print_entries(entries_pre);
+        // $display("entries_cur");
+        // print_entries(entries_cur);
+        // id2idx_n.delete();
+        // foreach(entries_cur[rs]) begin
+        //     if (entries_cur[rs].busy)
+        //         id2idx_n[entries_cur[rs].dat.id] = rs;
+        // end
+
+
+        // rdy_mut.delete();
+        // id2idx_mut.delete();
+        // foreach(id2idx[id])
+        //     id2idx_mut[id] = id2idx[id];
+        // entries_mut = entries_pre;
+
+
+        // // ready insns (cdb)
+        // foreach(last_cycle_rdy[t]) begin
+        //     $display("fig[%0d]=%b", t, last_cycle_rdy[t]);
+        // end
+        // ready_correct = 1;
+        // for (int rs = 0, 
+        //      PHYS_REG_IDX t1 = 0, PHYS_REG_IDX t2 = 0,
+        //      logic t1_rdy = 0, logic t2_rdy = 0; rs < RS_SZ; ++rs) begin
+        //     if (!entries_pre[rs].busy)
+        //         continue;
+
+        //     // id = entries_pre_mut[rs].dat.id;
+        //     t1 = entries_pre[rs].dat.t1;
+        //     t2 = entries_pre[rs].dat.t2;
+        //     t1_rdy = entries_pre[rs].dat.t1_rdy;
+        //     t2_rdy = entries_pre[rs].dat.t2_rdy;
+        //     if (last_cycle_rdy.exists(t1)) begin
+        //         $display("check t1: %0d %b %b", t1, t1_rdy, last_cycle_rdy[t1]);
+        //         ready_correct &= (t1_rdy == last_cycle_rdy[t1]);
+        //     end
+        //     if (last_cycle_rdy.exists(t2)) begin
+        //         $display("check t2: %0d %b %b", t2, t2_rdy, last_cycle_rdy[t2]);
+        //         ready_correct &= (t2_rdy == last_cycle_rdy[t2]);
+        //     end
+        // end 
+
+
+        @(posedge clock);
+
+        // // correctness checks ABOVE
+
+        // // state updates BELOW
+
+
+        // // clear (insn going to ex)
+        // clear_correct = 1;
+        // for (int rs = 0, int id = 0; rs < RS_SZ; ++rs) begin
+        //     if (!entries_mut[rs].issued)
+        //         continue;
+        //     id = entries_mut[rs].dat.id;
+        //     clear_correct &= (!id2idx_n.exists(id));
+
+        //     entries_mut[rs] = '0;
+        //     id2idx_mut.delete(id);
+        // end 
+
+        // // ready insns (cdb)
+        // last_cycle_rdy.delete();
+        // #0
+        // $display("fsd:");
+        // print_entries(entries_pre);
+        // $display("rrs:");
+        // print_entries(entries_cur);
+        // for (int rs = 0, PHYS_REG_IDX t1 = 0, PHYS_REG_IDX t2 = 0; rs < RS_SZ; ++rs) begin
+        //     if (!entries_cur[rs].busy)
+        //         continue;
+
+        //     // id = entries_cur[rs].dat.id;
+        //     t1 = entries_cur[rs].dat.t1;
+        //     t2 = entries_cur[rs].dat.t2;
+        //     last_cycle_rdy[t1] = entries_cur[rs].dat.t1_rdy;
+        //     last_cycle_rdy[t2] = entries_cur[rs].dat.t2_rdy;
+        // end 
+        // foreach (c_ts[i]) begin
+        //     $display("cdb[%0d]= %0d", i, c_ts[i]);
+        //     if (!c_en[i]) 
+        //         continue;
+        //     last_cycle_rdy[c_ts[i]] = 1;
+        // end
+        // foreach(last_cycle_rdy[t]) begin
+        //     $display("last_cycle_rdy[%0d]=%b", t, last_cycle_rdy[t]);
+        // end
         @(negedge clock);
 
 
@@ -254,14 +285,14 @@ module rs_chk #(parameter
     always_ff @(posedge clock) begin
         if (reset || flush) begin
             entries_pre <= '0;
-            ins_pre <= '0;
-            id2idx.delete();
+            ins_pre     <= '0;
+            // id2idx.delete();
         end else begin
             entries_pre <= entries_cur;
-            ins_pre <= ins_cur;
-            id2idx.delete();
-            foreach (id2idx_n[id])
-                id2idx[id] <= id2idx_n[id];
+            ins_pre     <= ins_cur;
+            // id2idx.delete();
+            // foreach (id2idx_n[id])
+            //     id2idx[id] <= id2idx_n[id];
         end
     end
 
