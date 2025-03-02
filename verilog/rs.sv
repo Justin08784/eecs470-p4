@@ -314,7 +314,7 @@ module rs #(parameter
         entries_n = entries;
         for (int rs = 0; rs < RS_SZ; ++rs) begin
             entries_n[rs].dat.t1_rdy |= to_t1_rdy[rs];
-            entries_n[rs].dat.t2_rdy |= to_t2_rdy[rs]; // [MISSING] ms1 test: change |= to = (not caught)
+            entries_n[rs].dat.t2_rdy |= to_t2_rdy[rs]; // [ADDRESSED] ms1 test: change |= to = (not caught)
             /*
             TODO: Ask Bradley! This change is not breaking because t2_rdy is 
             ALREADY incorporated into the value of to_t2_rdy, which means an

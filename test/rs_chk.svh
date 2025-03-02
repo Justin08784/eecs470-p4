@@ -161,7 +161,6 @@ module rs_chk #(parameter
     ID_RESULT           [NUM_FU_LOAD-1:0]   fu_dat_load;
     int num_free_fus    [FU_IDX_NUM];
     int num_issue_fus   [FU_IDX_NUM];
-    int cdb_tags [int];
 
     int rs_scnt_sva;
     RS_ENTRY [RS_SZ-1:0] 
@@ -182,6 +181,7 @@ module rs_chk #(parameter
     logic ready_correct;
     logic rdy_mut[int];
     logic readied_pre[int]; // was readied last cycle
+    logic cdb_tags_pre [PHYS_REG_IDX];
 
     // issue correctness
     logic issue_cnt_correct;
@@ -247,6 +247,12 @@ module rs_chk #(parameter
         end 
 
         // check ready correctness 
+        cdb_tags_pre.delete();
+        foreach (c_ts[i]) begin
+            if (!ins_pre.c_en[i])
+                continue;
+            cdb_tags_pre[ins_pre.c_ts[i]] = 1;
+        end
         ready_correct = 1;
         for (int rs = 0, PHYS_REG_IDX t1 = 0, PHYS_REG_IDX t2 = 0; rs < RS_SZ; ++rs) begin
             if (!entries_cur[rs].busy)
@@ -254,12 +260,18 @@ module rs_chk #(parameter
             t1 = entries_cur[rs].dat.t1;
             t2 = entries_cur[rs].dat.t2;
 
-            foreach (ins_pre.c_en[i]) begin
-                if (!ins_pre.c_en[i])
-                    continue;
-                ready_correct &= (ins_pre.c_ts[i] == t1 ? entries_cur[rs].dat.t1_rdy : 1);
-                ready_correct &= (ins_pre.c_ts[i] == t2 ? entries_cur[rs].dat.t2_rdy : 1);
-            end
+            ready_correct &= (
+                cdb_tags_pre.exists(t1) ? 
+                // if found, should ready
+                entries_cur[rs].dat.t1_rdy :
+                // if not found, ready status should not change
+                entries_pre[rs].dat.t1_rdy == entries_cur[rs].dat.t1_rdy
+            );
+            ready_correct &= (
+                cdb_tags_pre.exists(t2) ? 
+                entries_cur[rs].dat.t2_rdy :
+                entries_pre[rs].dat.t2_rdy == entries_cur[rs].dat.t2_rdy
+            );
         end
 
         // update ready in scratchpad
