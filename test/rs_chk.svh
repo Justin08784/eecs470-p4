@@ -143,7 +143,9 @@ module rs_chk #(parameter
         entries_mut,    // prev value with some mutations (hence "mut"); scratchpad for correctness calculations
         entries_cur;      // next value (set by rs module)
     assign entries_cur = entries_dut;
-    // int id2idx[int], id2idx_mut[int], id2idx_n[int];
+    int id2idx_pre[int],
+        id2idx_mut[int],
+        id2idx_cur[int];
 
     // misc control
 
@@ -163,11 +165,26 @@ module rs_chk #(parameter
         @(negedge clock);   
         @(negedge clock);   
     forever begin
+        id2idx_cur.delete();
+        foreach(entries_cur[rs]) begin
+            if (entries_cur[rs].busy)
+                id2idx_cur[entries_cur[rs].dat.id] = rs;
+        end
+
         // marker();
         // $display("entries_pre");
         // print_entries(entries_pre);
         // $display("entries_cur");
         // print_entries(entries_cur);
+
+        // check clear correctness (insn going to ex)
+        clear_correct = 1;
+        for (int rs = 0, int id = 0; rs < RS_SZ; ++rs) begin
+            if (!entries_pre[rs].issued)
+                continue;
+            id = entries_pre[rs].dat.id;
+            clear_correct &= (!id2idx_cur.exists(id));
+        end 
 
         // check ready correctness 
         ready_correct = 1;
@@ -324,8 +341,8 @@ module rs_chk #(parameter
         endproperty
     endclocking
 
-    // Ex_Clear: assert property(cb.ex_clear)
-    //     else exit_on_error ("did not clear");
+    Ex_Clear: assert property(cb.ex_clear)
+        else exit_on_error ("did not clear");
     C_Rdy: assert property(cb.c_rdy)
         else exit_on_error ("did not ready");
 
