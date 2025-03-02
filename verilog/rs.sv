@@ -219,7 +219,7 @@ module rs #(parameter
         foreach (gbus_fu_rdy_mult[i, j]) begin
             if (gbus_fu_rdy_mult[i][j]) begin
                 fu2issuer_mult[j]   |= gbus_can_issue_mult[i];
-                fu_vld_mult[j]      = |gbus_can_issue_mult[i]; // [ADDRESSED] ms1 test: change i to j (not caught)
+                fu_vld_mult[j]      = |gbus_can_issue_mult[i]; // [MISSING] ms1 test: change i to j (not caught)
                 to_issue            |= gbus_can_issue_mult[i];
             end
         end
@@ -246,7 +246,7 @@ module rs #(parameter
         fu_dat_store    = '0;
         fu_dat_load     = '0;
         foreach (fu2issuer_alu[fu, rs]) begin
-            if (fu2issuer_alu[fu][rs]) begin // [ADDRESSED] ms1 test: Remove "!" from if condition (not caught)
+            if (fu2issuer_alu[fu][rs]) begin // [MISSING] ms1 test: Remove "!" from if condition (not caught)
                 fu_dat_alu[fu] |= entries[rs].dat;
             end
         end
@@ -314,7 +314,7 @@ module rs #(parameter
         entries_n = entries;
         for (int rs = 0; rs < RS_SZ; ++rs) begin
             entries_n[rs].dat.t1_rdy |= to_t1_rdy[rs];
-            entries_n[rs].dat.t2_rdy |= to_t2_rdy[rs]; // [ADDRESSED] ms1 test: change |= to = (not caught)
+            entries_n[rs].dat.t2_rdy |= to_t2_rdy[rs]; // [MISSING] ms1 test: change |= to = (not caught)
             /*
             TODO: Ask Bradley! This change is not breaking because t2_rdy is 
             ALREADY incorporated into the value of to_t2_rdy, which means an
