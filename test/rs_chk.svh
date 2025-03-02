@@ -100,6 +100,20 @@ module rs_chk #(parameter
             );
         end
     endfunction
+
+    struct packed {
+        logic           [N-1:0] d_vld;     // which dispatch lines are valid? (from dispatcher; dep. on rs_scnt)
+        ID_RESULT       [N-1:0] d_dat;
+        // issue
+        logic           [NUM_FU_ALU-1:0]    fu_rdy_alu;
+        logic           [NUM_FU_MULT-1:0]   fu_rdy_mult;
+        logic           [NUM_FU_STORE-1:0]  fu_rdy_store;
+        logic           [NUM_FU_LOAD-1:0]   fu_rdy_load;
+        // complete
+        logic           [N-1:0] c_en;
+        PHYS_REG_IDX    [N-1:0] c_ts;
+    } ins_pre, ins_cur; 
+
     logic               [NUM_FU_ALU-1:0]    fu_vld_alu;
     logic               [NUM_FU_MULT-1:0]   fu_vld_mult;
     logic               [NUM_FU_STORE-1:0]  fu_vld_store;
@@ -112,22 +126,13 @@ module rs_chk #(parameter
     int num_issue_fus   [FU_IDX_NUM];
     int cdb_tags [int];
 
-    logic [RS_SZ-1:0] busy_sva;
-    logic [RS_SZ-1:0] issd_sva;
-    generate
-    for (genvar i = 0; i < RS_SZ; i++) begin : gen_vecs
-        assign busy_sva[i] = entries[i].busy;
-        assign issd_sva[i] = entries[i].issued;
-    end
-    endgenerate
-    
     int rs_scnt_sva;
     RS_ENTRY [RS_SZ-1:0] 
-        entries,        // prev value (updated to entries_n on posedge)
+        entries_pre,        // prev value (updated to entries_cur on posedge)
         entries_mut,    // prev value with some mutations (hence "mut"); scratchpad for correctness calculations
-        entries_n;      // next value (set by rs module)
-    assign entries_n = entries_dut;
-    int id2idx[int], id2idx_mut[int], id2idx_n[int];
+        entries_cur;      // next value (set by rs module)
+    assign entries_cur = entries_dut;
+    // int id2idx[int], id2idx_mut[int], id2idx_n[int];
 
     // misc control
 
@@ -142,19 +147,20 @@ module rs_chk #(parameter
     initial begin
         // wait until 1st reset: ensures no Xs are floating around
         // (if there are Xs we get errors like indexing with Xs into assoc. arrays)
-        while (!reset)
-            @(negedge clock);
+        // while (!reset)
+        //     @(negedge clock);
+        @(negedge clock);   
         @(negedge clock);   
     forever begin
         marker();
-        $display("entries");
-        print_entries(entries);
-        $display("entries_n");
-        print_entries(entries_n);
+        $display("entries_pre");
+        print_entries(entries_pre);
+        $display("entries_cur");
+        print_entries(entries_cur);
         id2idx_n.delete();
-        foreach(entries_n[rs]) begin
-            if (entries_n[rs].busy)
-                id2idx_n[entries_n[rs].dat.id] = rs;
+        foreach(entries_cur[rs]) begin
+            if (entries_cur[rs].busy)
+                id2idx_n[entries_cur[rs].dat.id] = rs;
         end
 
 
@@ -162,7 +168,7 @@ module rs_chk #(parameter
         id2idx_mut.delete();
         foreach(id2idx[id])
             id2idx_mut[id] = id2idx[id];
-        entries_mut = entries;
+        entries_mut = entries_pre;
 
 
         // ready insns (cdb)
@@ -173,14 +179,14 @@ module rs_chk #(parameter
         for (int rs = 0, 
              PHYS_REG_IDX t1 = 0, PHYS_REG_IDX t2 = 0,
              logic t1_rdy = 0, logic t2_rdy = 0; rs < RS_SZ; ++rs) begin
-            if (!entries[rs].busy)
+            if (!entries_pre[rs].busy)
                 continue;
 
-            // id = entries_mut[rs].dat.id;
-            t1 = entries[rs].dat.t1;
-            t2 = entries[rs].dat.t2;
-            t1_rdy = entries[rs].dat.t1_rdy;
-            t2_rdy = entries[rs].dat.t2_rdy;
+            // id = entries_pre_mut[rs].dat.id;
+            t1 = entries_pre[rs].dat.t1;
+            t2 = entries_pre[rs].dat.t2;
+            t1_rdy = entries_pre[rs].dat.t1_rdy;
+            t2_rdy = entries_pre[rs].dat.t2_rdy;
             if (last_cycle_rdy.exists(t1)) begin
                 $display("check t1: %0d %b %b", t1, t1_rdy, last_cycle_rdy[t1]);
                 ready_correct &= (t1_rdy == last_cycle_rdy[t1]);
@@ -215,15 +221,19 @@ module rs_chk #(parameter
         // ready insns (cdb)
         last_cycle_rdy.delete();
         #0
+        $display("fsd:");
+        print_entries(entries_pre);
+        $display("rrs:");
+        print_entries(entries_cur);
         for (int rs = 0, PHYS_REG_IDX t1 = 0, PHYS_REG_IDX t2 = 0; rs < RS_SZ; ++rs) begin
-            if (!entries_mut[rs].busy)
+            if (!entries_cur[rs].busy)
                 continue;
 
-            // id = entries_mut[rs].dat.id;
-            t1 = entries_mut[rs].dat.t1;
-            t2 = entries_mut[rs].dat.t2;
-            last_cycle_rdy[t1] = entries_mut[rs].dat.t1_rdy;
-            last_cycle_rdy[t2] = entries_mut[rs].dat.t2_rdy;
+            // id = entries_cur[rs].dat.id;
+            t1 = entries_cur[rs].dat.t1;
+            t2 = entries_cur[rs].dat.t2;
+            last_cycle_rdy[t1] = entries_cur[rs].dat.t1_rdy;
+            last_cycle_rdy[t2] = entries_cur[rs].dat.t2_rdy;
         end 
         foreach (c_ts[i]) begin
             $display("cdb[%0d]= %0d", i, c_ts[i]);
@@ -243,10 +253,12 @@ module rs_chk #(parameter
 
     always_ff @(posedge clock) begin
         if (reset || flush) begin
-            entries <= '0;
+            entries_pre <= '0;
+            ins_pre <= '0;
             id2idx.delete();
         end else begin
-            entries <= entries_n;
+            entries_pre <= entries_cur;
+            ins_pre <= ins_cur;
             id2idx.delete();
             foreach (id2idx_n[id])
                 id2idx[id] <= id2idx_n[id];
@@ -263,8 +275,8 @@ module rs_chk #(parameter
             // foreach(id2idx_n[id]) $display("id2_n[%0d]: %0d", id, id2idx_n[id]);
             // $display("entries:");
             // print_entries(entries);
-            // $display("entries_n:");
-            // print_entries(entries_n);
+            // $display("entries_cur:");
+            // print_entries(entries_cur);
 
             $finish;
         end
