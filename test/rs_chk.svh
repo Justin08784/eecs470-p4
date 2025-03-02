@@ -185,6 +185,7 @@ module rs_chk #(parameter
 
     // issue correctness
     logic issue_cnt_correct;
+    logic issue_asg_correct;
     logic issue_dat_correct;
     // logic issd_mut[int], issd_cur[int];
 
@@ -303,12 +304,12 @@ module rs_chk #(parameter
                 == $min($countones(can_issue_by_fu_mut[fu]), rdy_num);
         end
 
+        issue_asg_correct = 1; // is data assigned to a read fu?
         issue_dat_correct = 1;
         for (int i = 0, int id = 0, int rs = 0; i < NUM_FU_ALU; ++i) begin
             if (!outs_pre.fu_vld_alu[i])
                 continue;
-            $display("kn0");
-            issue_dat_correct &= ins_pre.fu_rdy_alu[i];
+            issue_asg_correct &= ins_pre.fu_rdy_alu[i];
             id = outs_pre.fu_dat_alu[i].id;
             if (!id2idx_pre.exists(id)) begin
                 $display("WHAT THE FUCK?");
@@ -320,8 +321,7 @@ module rs_chk #(parameter
         for (int i = 0, int id = 0, int rs = 0; i < NUM_FU_MULT; ++i) begin
             if (!outs_pre.fu_vld_mult[i])
                 continue;
-            $display("kn1");
-            issue_dat_correct &= ins_pre.fu_rdy_mult[i];
+            issue_asg_correct &= ins_pre.fu_rdy_mult[i];
             id = outs_pre.fu_dat_mult[i].id;
             rs = id2idx_pre[id];
             issue_dat_correct &= (outs_pre.fu_dat_mult[i] == entries_pre[rs].dat);
@@ -329,8 +329,7 @@ module rs_chk #(parameter
         for (int i = 0, int id = 0, int rs = 0; i < NUM_FU_LOAD; ++i) begin
             if (!outs_pre.fu_vld_load[i])
                 continue;
-            $display("kn2");
-            issue_dat_correct &= ins_pre.fu_rdy_load[i];
+            issue_asg_correct &= ins_pre.fu_rdy_load[i];
             id = outs_pre.fu_dat_load[i].id;
             rs = id2idx_pre[id];
             issue_dat_correct &= (outs_pre.fu_dat_load[i] == entries_pre[rs].dat);
@@ -338,8 +337,7 @@ module rs_chk #(parameter
         for (int i = 0, int id = 0, int rs = 0; i < NUM_FU_STORE; ++i) begin
             if (!outs_pre.fu_vld_store[i])
                 continue;
-            $display("kn3");
-            issue_dat_correct &= ins_pre.fu_rdy_store[i];
+            issue_asg_correct &= ins_pre.fu_rdy_store[i];
             id = outs_pre.fu_dat_store[i].id;
             rs = id2idx_pre[id];
             issue_dat_correct &= (outs_pre.fu_dat_store[i] == entries_pre[rs].dat);
@@ -494,6 +492,11 @@ module rs_chk #(parameter
             issue_cnt_correct;
         endproperty
 
+        property issue_asg;
+            disable iff (reset || flush)
+            issue_asg_correct;
+        endproperty
+
         property issue_dat;
             disable iff (reset || flush)
             issue_dat_correct;
@@ -506,6 +509,8 @@ module rs_chk #(parameter
         else exit_on_error ("did not ready");
     Issue_Cnt: assert property(cb.issue_cnt)
         else exit_on_error ("issue cnt wrong");
+    Issue_Asg: assert property(cb.issue_asg)
+        else exit_on_error ("issue assignment wrong");
     Issue_Dat: assert property(cb.issue_dat)
         else exit_on_error ("issue dat wrong");
 
