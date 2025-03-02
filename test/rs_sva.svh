@@ -30,10 +30,10 @@ module rs_sva #(parameter
     input   PHYS_REG_IDX    [N-1:0] c_ts,
 
     // delicious spaghetti for print debugging
-    input   logic           [RS_SZ-1:0]   to_t1_rdy_dut,
-    input   logic           [RS_SZ-1:0]   to_t2_rdy_dut,
-    input   logic           [RS_SZ-1:0]   can_issue_dut,
-    input   logic           [FU_IDX_NUM-1:0][RS_SZ-1:0]   can_issues_dut,
+    // input   logic           [RS_SZ-1:0]   to_t1_rdy_dut,
+    // input   logic           [RS_SZ-1:0]   to_t2_rdy_dut,
+    // input   logic           [RS_SZ-1:0]   can_issue_dut,
+    // input   logic           [FU_IDX_NUM-1:0][RS_SZ-1:0]   can_issues_dut,
 
     // ==== dut lines for comparison
     input   logic           [NUM_FU_ALU-1:0]    fu_vld_alu_dut,

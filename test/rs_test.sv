@@ -97,10 +97,10 @@ module rs_testbench;
         .entries_dut(entries_dut),
         `endif 
 
-        .to_t1_rdy_dut      (rs_dut.to_t1_rdy),
-        .to_t2_rdy_dut      (rs_dut.to_t2_rdy),
-        .can_issue_dut      (rs_dut.can_issue),
-        .can_issues_dut     (rs_dut.can_issues),
+        // .to_t1_rdy_dut      (rs_dut.to_t1_rdy),
+        // .to_t2_rdy_dut      (rs_dut.to_t2_rdy),
+        // .can_issue_dut      (rs_dut.can_issue),
+        // .can_issues_dut     (rs_dut.can_issues),
 
         .fu_vld_alu_dut     (rs_dut.fu_vld_alu),
         .fu_vld_mult_dut    (rs_dut.fu_vld_mult),
