@@ -16,6 +16,7 @@ module rs_testbench;
     logic reset;
     logic flush;
 
+
     logic           [$clog2(N):0] rs_scnt; // to dispatcher
     logic           [N-1:0] d_vld;     // which dispatch lines are valid? (from dispatcher; dep. on rs_scnt)
     ID_RESULT       [N-1:0] d_dat;
@@ -512,6 +513,36 @@ module rs_testbench;
         @(negedge clock);
     endtask
 
+    task test_random();
+        int seed = 1;
+        logic [31:0] r32 = $urandom(seed);
+        int pc = 0;
+
+        reset = 1;
+        @(negedge clock);
+        reset = 0;
+
+        for (int iter = 0; iter < 100; ++iter) begin
+            d_vld = $urandom & {N{1'b1}};
+            $display("d_vld: %b", d_vld);
+            for (int i = 0; i < N; ++i) begin
+                if (!d_vld[i])
+                    continue;
+                // restricting to pregs in [0, 31]. There are more pregs than
+                // arch regs obviously, but isnt this okay?...
+                d_dat[i].PC      = pc++;
+                d_dat[i].t       = $urandom_range(32);
+                d_dat[i].t1      = $urandom_range(32);
+                d_dat[i].t2      = $urandom_range(32);
+                d_dat[i].t1_rdy  = $urandom_range(1);
+                d_dat[i].t2_rdy  = $urandom_range(1);
+                d_dat[i].fu_idx  = $urandom_range(FU_IDX_NUM-1);
+            end
+            @(negedge clock);
+            clr_all();
+        end
+    endtask
+
     initial begin
         /* initialize */
         clock           = 0;
@@ -524,17 +555,22 @@ module rs_testbench;
         fu_rdy_load     = '0;
         c_en            = '0;
         c_ts            = '0;
+        test_random();
+        $finish;
 
+        // hand-crafted:
         test_1inst();
+        test_1inst_2();
+        test_idle();
+        test_multi_1();
+        test_delayed_rdy();
+        test_nonzero_fu_rdy_idx();
+
+        // not hand-crafted:
         test_back_to_back();
         test_multiple_cdb();
         test_sequential_fu();
         test_mixed();
-        test_idle();
-        test_multi_1();
-        test_1inst_2();
-        test_delayed_rdy();
-        test_nonzero_fu_rdy_idx();
     
         if (failed)
             $display("@@@ Failed\n");
