@@ -187,6 +187,15 @@ module rs_chk #(parameter
     logic issue_cnt_correct;
     logic issue_asg_correct;
     logic issue_dat_correct;
+
+    // dispatch correctness
+    logic dispatch_cnt_correct;
+    logic dispatch_asg_correct;
+    logic dispatch_dat_correct;
+    int num_dispatches;
+    int num_free;
+    int d_find_id_pre[int];
+
     // logic issd_mut[int], issd_cur[int];
 
     logic [RS_SZ-1:0] issd_cur;
@@ -343,6 +352,36 @@ module rs_chk #(parameter
             issue_dat_correct &= (outs_pre.fu_dat_store[i] == entries_pre[rs].dat);
         end
         
+        // check dispatch correctness
+        d_find_id_pre.delete();
+        foreach (d_vld[i]) begin
+            if (!ins_pre.d_vld[i])
+                continue;
+            d_find_id_pre[ins_pre.d_dat[i].id] = i;
+        end
+        num_free = 0;
+        for (int rs = 0; rs < RS_SZ; ++rs)
+            num_free += !entries_mut[rs].busy;
+
+        dispatch_asg_correct = 1;
+        dispatch_dat_correct = 1;
+        num_dispatches = 0;
+        for (int rs = 0, 
+             int d_idx = 0, int id = 0, logic was_dispatched = 0; rs < RS_SZ; ++rs) begin
+            id = entries_cur[rs].dat.id;
+            // not exists; this id was dispatched last cycle
+            was_dispatched = entries_cur[rs].busy && !id2idx_pre.exists(id);
+            num_dispatches += was_dispatched;
+            if (!was_dispatched)
+                continue;
+            
+            dispatch_asg_correct &= d_find_id_pre.exists(id);
+            dispatch_dat_correct &= (ins_pre.d_dat[d_find_id_pre[id]] == entries_cur[rs].dat);
+        end
+        dispatch_cnt_correct = num_dispatches == $min($countones(ins_pre.d_vld), num_free);
+        // $display("cundir: numdis=%0d, d_vld=%0d, numfre=%0d minifry=%0d", num_dispatches, 
+        // $countones(ins_pre.d_vld), num_free, $min($countones(ins_pre.d_vld), num_free));
+
         @(posedge clock);
 
         @(negedge clock);
@@ -405,6 +444,21 @@ module rs_chk #(parameter
             disable iff (reset || flush)
             issue_dat_correct;
         endproperty
+
+        property dispatch_cnt;
+            disable iff (reset || flush)
+            dispatch_cnt_correct;
+        endproperty
+
+        property dispatch_asg;
+            disable iff (reset || flush)
+            dispatch_asg_correct;
+        endproperty
+
+        property dispatch_dat;
+            disable iff (reset || flush)
+            dispatch_dat_correct;
+        endproperty
     endclocking
 
     Ex_Clear: assert property(cb.ex_clear)
@@ -417,9 +471,16 @@ module rs_chk #(parameter
         else exit_on_error ("issue assignment wrong");
     Issue_Dat: assert property(cb.issue_dat)
         else exit_on_error ("issue dat wrong");
-
+    Dispatch_Cnt: assert property(cb.dispatch_cnt)
+        else exit_on_error ("dispatch cnt wrong");
+    Dispatch_Asg: assert property(cb.dispatch_asg)
+        else exit_on_error ("dispatch asg wrong");
+    Dispatch_Dat: assert property(cb.dispatch_dat)
+        else exit_on_error ("dispatch dat wrong");
 
 endmodule
 
 
+            
+            
 `endif // RS_CHK_SVH
