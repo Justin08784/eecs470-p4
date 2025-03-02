@@ -255,7 +255,10 @@ module rs_chk #(parameter
         end
         ready_correct = 1;
         for (int rs = 0, PHYS_REG_IDX t1 = 0, PHYS_REG_IDX t2 = 0; rs < RS_SZ; ++rs) begin
-            if (!entries_cur[rs].busy)
+            // Readying can occur IFF (unsure)
+            // a) insn was dispatched prev cycle
+            // b) but NOT issued prev cycle
+            if (!(entries_pre[rs].busy && !entries_pre[rs].issued))
                 continue;
             t1 = entries_cur[rs].dat.t1;
             t2 = entries_cur[rs].dat.t2;
