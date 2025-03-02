@@ -114,6 +114,7 @@ module rs_chk #(parameter
         PHYS_REG_IDX    [N-1:0] c_ts;
     } ins_pre, ins_cur; 
 
+    // This syntax is so fucking gorgeous btw.
     assign ins_cur = '{
         d_vld:d_vld,
         d_dat:d_dat,
@@ -139,8 +140,8 @@ module rs_chk #(parameter
 
     int rs_scnt_sva;
     RS_ENTRY [RS_SZ-1:0] 
-        entries_pre,        // prev value (updated to entries_cur on posedge)
-        entries_mut,    // prev value with some mutations (hence "mut"); scratchpad for correctness calculations
+        entries_pre,      // prev value (updated to entries_cur on posedge)
+        entries_mut,      // scratchpad (entries_pre with some modifications)
         entries_cur;      // next value (set by rs module)
     assign entries_cur = entries_dut;
     int id2idx_pre[int],
@@ -157,6 +158,16 @@ module rs_chk #(parameter
     logic rdy_mut[int];
     logic readied_pre[int]; // was readied last cycle
 
+    // issue correctness
+    logic issue_cnt_correct;
+    logic issue_dat_correct;
+    // logic issd_mut[int], issd_cur[int];
+
+    logic [RS_SZ-1:0] issd_cur;
+    logic [FU_IDX_NUM-1:0][RS_SZ-1:0] issd_by_fu_cur;
+    logic [RS_SZ-1:0] can_issue_mut;
+    logic [FU_IDX_NUM-1:0][RS_SZ-1:0] can_issue_by_fu_mut;
+
     initial begin
         // wait until 1st reset: ensures no Xs are floating around
         // (if there are Xs we get errors like indexing with Xs into assoc. arrays)
@@ -165,11 +176,24 @@ module rs_chk #(parameter
         @(negedge clock);   
         @(negedge clock);   
     forever begin
+        marker();
+        $display("entries_pre");
+        print_entries(entries_pre);
+        $display("entries_cur");
+        print_entries(entries_cur);
+
+        // initialization
+        id2idx_mut.delete();
+        foreach(entries_pre[rs]) begin
+            if (entries_pre[rs].busy)
+                id2idx_mut[entries_pre[rs].dat.id] = rs;
+        end
         id2idx_cur.delete();
         foreach(entries_cur[rs]) begin
             if (entries_cur[rs].busy)
                 id2idx_cur[entries_cur[rs].dat.id] = rs;
         end
+        entries_mut = entries_pre;
 
         // marker();
         // $display("entries_pre");
@@ -184,6 +208,8 @@ module rs_chk #(parameter
                 continue;
             id = entries_pre[rs].dat.id;
             clear_correct &= (!id2idx_cur.exists(id));
+
+            entries_mut[rs] = '0;
         end 
 
         // check ready correctness 
@@ -201,6 +227,60 @@ module rs_chk #(parameter
                 ready_correct &= (ins_pre.c_ts[i] == t2 ? entries_cur[rs].dat.t2_rdy : 1);
             end
         end
+
+        // update ready in scratchpad
+        for (int rs = 0, PHYS_REG_IDX t1 = 0, PHYS_REG_IDX t2 = 0; rs < RS_SZ; ++rs) begin
+            t1 = entries_pre[rs].dat.t1;
+            t2 = entries_pre[rs].dat.t2;
+            foreach (ins_pre.c_en[i]) begin
+                if (!ins_pre.c_en[i])
+                    continue;
+                entries_mut[rs].dat.t1_rdy |= (ins_pre.c_ts[i] == t1);
+                entries_mut[rs].dat.t2_rdy |= (ins_pre.c_ts[i] == t2);
+            end
+        end
+
+        // check issue correctness
+        issd_cur        = '0;
+        issd_by_fu_cur  = '0;
+        for (int rs = 0, FU_IDX fu = 0; rs < RS_SZ; ++rs) begin
+            issd_cur[rs] = entries_cur[rs].busy && entries_cur[rs].issued;
+            $display("duck[%0d]: %b", rs, issd_cur[rs]);
+            fu = entries_cur[rs].dat.fu_idx;
+            issd_by_fu_cur[fu][rs] = issd_cur[rs];
+            $display("golo[%0d]: fu=%0d %b", rs, fu, issd_by_fu_cur[fu][rs]);
+        end
+
+        can_issue_mut       = '0;
+        can_issue_by_fu_mut = '0;
+        for (int rs = 0, FU_IDX fu = 0; rs < RS_SZ; ++rs) begin
+            can_issue_mut[rs] = entries_mut[rs].busy
+                && !entries_mut[rs].issued
+                && (entries_mut[rs].dat.t1_rdy)
+                && (entries_mut[rs].dat.t2_rdy);
+            fu = entries_mut[rs].dat.fu_idx;
+            can_issue_by_fu_mut[fu][rs] = can_issue_mut[rs];
+        end
+
+        issue_cnt_correct = 1;
+        for (int fu = 0, int rdy_num = 0; fu < FU_IDX_NUM; ++fu) begin
+            case (fu) 
+            FU_ALU:     rdy_num = $countones(ins_pre.fu_rdy_alu);
+            FU_MULT:    rdy_num = $countones(ins_pre.fu_rdy_mult);
+            FU_LOAD:    rdy_num = $countones(ins_pre.fu_rdy_load);
+            FU_STORE:   rdy_num = $countones(ins_pre.fu_rdy_store);
+            endcase
+            $display("fu=%0d: issd:      %0b", fu, issd_by_fu_cur[fu]);
+            $display("fu=%0d: can_issue: %0b", fu, can_issue_by_fu_mut[fu]);
+            $display("fu=%0d: rdy_num:   %0d", fu, rdy_num);
+            issue_cnt_correct &= 
+                $countones(issd_by_fu_cur[fu])
+                == $min($countones(can_issue_by_fu_mut[fu]), rdy_num);
+        end
+        
+
+
+
         // marker();
         // $display("entries_pre");
         // print_entries(entries_pre);
@@ -339,12 +419,19 @@ module rs_chk #(parameter
             disable iff (reset || flush)
             ready_correct;
         endproperty
+
+        property issue_cnt;
+            disable iff (reset || flush)
+            issue_cnt_correct;
+        endproperty
     endclocking
 
     Ex_Clear: assert property(cb.ex_clear)
         else exit_on_error ("did not clear");
     C_Rdy: assert property(cb.c_rdy)
         else exit_on_error ("did not ready");
+    Issue_Cnt: assert property(cb.issue_cnt)
+        else exit_on_error ("issue cnt wrong");
 
 
 endmodule
