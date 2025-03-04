@@ -106,7 +106,7 @@ module rob (
 
     input   [$clog2(N):0]           d_en_cnt,
         // From: dispatch
-        // - Number of valid dispatch lines?
+        // - Number of enabled dispatch lines?
     input   ROB_ENTRY   [N-1:0]     d_dat,
         // From: dispatch
         // - IMPORTANT: Set from lowest indices in program-order. NO GAPS!!!
@@ -227,11 +227,14 @@ module map_table (
     // issue ??
 
     // dispatch
-    input logic         [$clog2(N):0] d_en_cnt,
-        // - Number of valid dispatch lines?
-    input REG_IDX       [N-1:0] d_src1s,
-    input REG_IDX       [N-1:0] d_src2s,
-    input REG_IDX       [N-1:0] d_dsts,
+    input logic         [$clog2(N):0] en_cnt,
+        // - Number of enabled dispatch lines?
+        // - NOTE: For in-order stuff with serial deps (like dispatch), use c(ou)nts;
+        // otherwise use en(able) buses.
+    input REG_IDX       [N-1:0] src1s,
+    input REG_IDX       [N-1:0] src2s,
+    input REG_IDX       [N-1:0] dsts,
+    input PHYS_REG_IDX  [N-1:0] ts,
         // From: dispatch
         // - IMPORTANT: Set from lowest indices in program-order. NO GAPS!!!
 
@@ -251,12 +254,24 @@ endmodule
 Architectural Map
 ================================================
 */
+// Comments:
+// - similar to map table, submodule to ROB?
 module arch_map (
     input clock, reset,
     // retire
-    // complete
-    // issue
-    // dispatch
+    input logic         [$clog2(N):0] en_cnt,
+        // - Number of enabled retire lines?
+        // - Question: Does this need to be a count, or can we make it an enable
+        // bus? I fear that there can be serial dependencies and ordering issues
+        // e.g. if multiple insns retire to the same dest arch register.
+    input REG_IDX       [N-1:0] dsts,
+    input PHYS_REG_IDX  [N-1:0] dst_ts,
+        // From: retire (ROB)
+        // - IMPORTANT: Set from lowest indices in program-order. NO GAPS!!!
+
+    // complete ??
+    // issue ??
+    // dispatch ??
 );
 endmodule
 
@@ -267,9 +282,21 @@ endmodule
 */
 module prf (
     input clock, reset, flush,
-    // retire
-    // complete
-    // issue
-    // dispatch
+    // retire ??
+
+    // complete (write)
+    input logic         [N-1:0] c_en,
+        // - Enabled complete lines?
+    input PHYS_REG_IDX  [N-1:0] c_ts, // tags
+    input DATA          [N-1:0] c_vs, // vals
+        // From: complete (EX)
+
+    // issue (read)
+    output DATA         [31:0]  state
+        // To: issue (RS)
+        // - RF state after propagated completes
+        // - we just expose the damn thing to RS, who seems to be the only consumer
+
+    // dispatch ??
 );
 endmodule
