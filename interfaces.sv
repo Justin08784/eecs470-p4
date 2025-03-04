@@ -24,7 +24,7 @@ module rs (
 
     // dispatch
     output  logic       [$clog2(N):0] rs_scnt, // TODO: rename to rs_rdy_scnt
-        // - To: dispatch
+        // To: dispatch
     input   ID_RESULT   [N-1:0] d_dat,
         // - From: dispatch
     // >> [TODO: delete]
@@ -47,7 +47,7 @@ module rs (
 
     // >> UNSURE
     output  ID_RESULT   [RS_SZ-1:0] rs_rdy,
-        // - To: dispatch
+        // To: dispatch
         // - rs_rdy[i] = !rs_table[i].busy
     input   logic       [N-1:0][RS_SZ-1:0] d_dat2rs,
         // - From: dispatch
@@ -58,17 +58,17 @@ module rs (
     // issue
     // for X in {FU types}:
     input   logic       [NUM_FU_X-1:0]    fu_rdy_X,
-        // - From EX
+        // - From: EX
     output  logic       [NUM_FU_X-1:0]    fu_vld_X, // TODO: rename to fu_en_X
-        // - To EX
+        // To: EX
     output  ID_RESULT   [NUM_FU_X-1:0]    fu_dat_X,
-        // - To EX
+        // To: EX
 
     // complete (CDB)
     input   logic           [N-1:0] c_en,
-        // - From EX
+        // - From: EX
     input   PHYS_REG_IDX    [N-1:0] c_ts
-        // - From EX
+        // - From: EX
     );
 endmodule
 
@@ -113,9 +113,9 @@ module rob (
 
     // complete (write)
     input   logic        [N-1:0]    c_en,
-        // - From EX
+        // - From: EX
     input   PHYS_REG_IDX [N-1:0]    c_ts,
-        // - From EX
+        // - From: EX
 
     // retire (read)
     output logic [N-1:0]            r_en,
@@ -182,6 +182,10 @@ module complete_list (
     output logic        [PHYS_REG_SZ_R10K] c_cpl_lst
         // To: RS (issue)
         // - complete list state after sets by completes
+        // - Question: Exposing the cpl_lst directly to RS gives me some concerns.
+        //   So if potentially any RS can ready + issue via indexing into cpl_lst
+        //   (e.g. c_cpl_lst[t1]), and if there are 16 RS  entries, does this mean 
+        //   16 * 2 implicit read ports? Isn't this like... bad?
 
     // dispatch (read and write)
     input logic         [RS_SZ-1:0] d_en,
@@ -193,6 +197,7 @@ module complete_list (
         // - complete list state after: 
         //   1) sets by completes, AND 
         //   2) clears by renames/dispatches
+        // - Same implicit read port concert as for c_cpl_lst.
 
     // Question: can we combine writes by complete and renames into
     // a single step, or do we need the intermediate c_cpl_lst?
@@ -334,9 +339,15 @@ module prf (
 
     // issue (read)
     output DATA         [31:0]  state
-        // To: issue (RS)
+        // To: EX
         // - RF state after propagated completes
-        // - we just expose the damn thing to RS, who seems to be the only consumer
+        // - we just expose the damn thing to EX, who seems to be the only consumer
+        //   (insns issued just from RS to EX should read operands same-cycle)
+        // - Question: My idea is just to let potentially any FU in EX to index 
+        //   into the prf and get the operands it needs. So if there are 32 FUs,
+        //   is this like 32 * 2 implicit read ports? (Same implicit read port
+        //   concern as cpl_lst's)
+
 
     // dispatch ??
 );
