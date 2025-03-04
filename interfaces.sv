@@ -53,6 +53,8 @@ module rs (
         // - From: dispatch
         // - asg = assignment
         // - If (d_vld[i] && d_dat2rs[i][j]), d_dat[i] should go to rs_table[j]
+        // - I'm unsure about this because it seems to let RS handle dat->entry
+        //   assignment internally, instead of unnaturally offloading it to the dispatcher.
     // << UNSURE
 
     // issue
@@ -101,8 +103,6 @@ module rob (
     output logic    [$clog2(N):0]   rob_rdy_scnt,
         // To: dispatch
         // saturating counter for number of free rob entries
-    output logic                    full,
-        // To: dispatch
 
     input   [$clog2(N):0]           d_en_cnt,
         // From: dispatch
