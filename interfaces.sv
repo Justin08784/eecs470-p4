@@ -209,3 +209,67 @@ module dispatch (
     input clock, reset, flush,
 );
 endmodule
+
+/* 
+================================================
+Map Table
+================================================
+*/
+// Comments:
+// - should be declared as a submodule of dispatch eh? doesnt seem anyone
+// else references it...?
+// - map table is more complicated than a simple lookup. forall i < j,
+// src1s[j], src2s[j] may potentially be dsts[i]. i.e. there is a serial dependency
+module map_table (
+    input clock, reset,
+    // retire ??
+    // complete ??
+    // issue ??
+
+    // dispatch
+    input logic         [$clog2(N):0] d_en_cnt,
+        // - Number of valid dispatch lines?
+    input REG_IDX       [N-1:0] d_src1s,
+    input REG_IDX       [N-1:0] d_src2s,
+    input REG_IDX       [N-1:0] d_dsts,
+        // From: dispatch
+        // - IMPORTANT: Set from lowest indices in program-order. NO GAPS!!!
+
+    output PHYS_REG_IDX [N-1:0] t1s,
+        // To: dispatch
+        // - Renamed physical registers tags for src1s
+        // - src1[i] -> t1[i]
+    output PHYS_REG_IDX [N-1:0] t2s
+        // To: dispatch
+        // - Renamed physical registers tags for src2s
+        // - src2[i] -> t2[i]
+);
+endmodule
+
+/* 
+================================================
+Architectural Map
+================================================
+*/
+module arch_map (
+    input clock, reset,
+    // retire
+    // complete
+    // issue
+    // dispatch
+);
+endmodule
+
+/* 
+================================================
+(physical) Register File
+================================================
+*/
+module prf (
+    input clock, reset, flush,
+    // retire
+    // complete
+    // issue
+    // dispatch
+);
+endmodule
