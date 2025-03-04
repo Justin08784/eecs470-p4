@@ -17,31 +17,36 @@ input clock, reset, flush,
 
 // dispatch
 output  logic       [$clog2(N):0] rs_scnt,
-    // [TODO: delete]
     // - To: dispatcher
-input   logic       [N-1:0] d_vld,
-    // [TODO: delete]
-    // - From: dispatcher
 input   ID_RESULT   [N-1:0] d_dat,
-    // [TODO: delete]
     // - From: dispatcher
+// >> [TODO: delete]
+input   logic       [N-1:0] d_vld,
+    // - From: dispatcher
+    // - IMPORTANT: Set from lowest indices in program-order. NO GAPS!!!
+    //   i.e. forall i < j, if d_vld[i] && d_vld[j], 
+    //   then d_dat[i] <_{Prog Order} d_dat[j]
+// << [TODO: delete]
+
+// >> [TODO: impl]
+input   logic       [$clog2(N):0] d_cnt,
+    // - From: dispatcher
+    // - Number of valid dispatch lines? (replacement for d_vld)
+    // - Question: permit
+    // 1) only N dispatches, OR
+    // 2) a different limit number of dispatches DIS_MAX: N ≤ DIS_MAX ≤ RS_SZ
+    // (DIS_MAX will be a new sys_defs.svh constant) ?
+// << [TODO: impl]
+
+// >> UNSURE
 output  ID_RESULT   [RS_SZ-1:0] rs_rdy,
-    // [TODO: delete]
     // - To: dispatcher
     // - rs_rdy[i] = !rs_table[i].busy
-
-output  logic       [DIS_MAX-1:0] d_vld,
-    // [TODO: impl]
-    // - From: dispatcher
-    // - Need new sys_defs.svh constant DIS_MAX: N ≤ DIS_MAX ≤ RS_SZ
-output  logic       [DIS_MAX-1:0][RS_SZ-1:0] d_dat2rs,
-    // [TODO: impl]
+input   logic       [N-1:0][RS_SZ-1:0] d_dat2rs,
     // - From: dispatcher
     // - asg = assignment
     // - If (d_vld[i] && d_dat2rs[i][j]), d_dat[i] should go to rs_table[j]
-input   ID_RESULT   [DIS_MAX-1:0] d_dat,
-    // [TODO: impl]
-    // - From: dispatcher
+// << UNSURE
 
 // issue
 // for X in {FU types}:
@@ -60,6 +65,63 @@ input   PHYS_REG_IDX    [N-1:0] c_ts
 );
 endmodule
 
+/* 
+================================================
+Re-order Buffer (ROB)
+================================================
+*/
+module rob (
+input                           clock, reset,
+
+// >> [TODO: delete]
+input  [1:0]                    dispatch_en,
+input  [1:0]                    retire_en,
+input                           err,
+input  [1:0][WIDTH-1:0]         next_insn,
+output logic [1:0]              wr_valid,
+    // We don't need this anymore because dispatcher only dispatches as
+    // many as ROB can accept.
+output logic [1:0]              rd_valid,
+    // See above.
+output logic [1:0][WIDTH-1:0]   completed_insn,
+output logic [CNT_BITS:0]       free_spots,
+output logic                    full
+// << [TODO: delete]
+
+
+// >> [TODO: impl]
+
+// dispatch (write)
+output logic    [$clog2(N):0]   rob_scnt,
+    // To: dispatcher
+    // saturating counter for number of free rob entries
+output logic                    full,
+    // To: dispatcher
+
+input   [$clog2(N):0]           d_cnt,
+    // From: dispatcher
+    // - Number of valid dispatch lines?
+input   ROB_ENTRY   [N-1:0]     d_dat,
+    // From: dispatcher
+    // - IMPORTANT: Set from lowest indices in program-order. NO GAPS!!!
+
+// complete (write)
+input   logic        [N-1:0]    c_en,
+    // - From EX
+input   PHYS_REG_IDX [N-1:0]    c_ts,
+    // - From EX
+
+// retire (read)
+output logic [N-1:0]            r_en,
+output struct packed {
+    PHYS_REG_IDX tag;
+    PHYS_REG_IDX t_old;
+} [N-1:0] r_dat,
+// << [TODO: impl]
+
+
+);
+endmodule
 
 /* 
 ================================================
