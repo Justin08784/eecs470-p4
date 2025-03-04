@@ -2,6 +2,11 @@ Terminology:
 - vld, rdy
 - vld=valid. Sender side: is the sender requesting to send data on a line?
 - rdy=ready. Receiver side: is the receiver ready/requesting to receive data on a line?
+- There is some confusion with en, vld, rdy.
+There needs to be a clearer distinction between vld (as in request send) and rdy 
+(as in request receive), vs. en (which is ORDER send, having accounted for both
+vld and rdy already). In short, en is a "forced" signal which doesn't need confirmation
+or negotiation from anywhere else.
 
 Notes:
 - When making a change, make sure to edit dependents (to/from) as well!
@@ -16,7 +21,7 @@ module rs (
 input clock, reset, flush,
 
 // dispatch
-output  logic       [$clog2(N):0] rs_scnt,
+output  logic       [$clog2(N):0] rs_scnt, // TODO: rename to rs_rdy_scnt
     // - To: dispatcher
 input   ID_RESULT   [N-1:0] d_dat,
     // - From: dispatcher
@@ -29,9 +34,9 @@ input   logic       [N-1:0] d_vld,
 // << [TODO: delete]
 
 // >> [TODO: impl]
-input   logic       [$clog2(N):0] d_cnt,
+input   logic       [$clog2(N):0] d_en_cnt,
     // - From: dispatcher
-    // - Number of valid dispatch lines? (replacement for d_vld)
+    // - Number of enabled dispatch lines? (replacement for d_vld)
     // - Question: permit
     // 1) only N dispatches, OR
     // 2) a different limit number of dispatches DIS_MAX: N ≤ DIS_MAX ≤ RS_SZ
@@ -52,7 +57,7 @@ input   logic       [N-1:0][RS_SZ-1:0] d_dat2rs,
 // for X in {FU types}:
 input   logic       [NUM_FU_X-1:0]    fu_rdy_X,
     // - From EX
-output  logic       [NUM_FU_X-1:0]    fu_vld_X,
+output  logic       [NUM_FU_X-1:0]    fu_vld_X, // TODO: rename to fu_en_X
     // - To EX
 output  ID_RESULT   [NUM_FU_X-1:0]    fu_dat_X,
     // - To EX
@@ -92,13 +97,13 @@ output logic                    full
 // >> [TODO: impl]
 
 // dispatch (write)
-output logic    [$clog2(N):0]   rob_scnt,
+output logic    [$clog2(N):0]   rob_rdy_scnt,
     // To: dispatcher
     // saturating counter for number of free rob entries
 output logic                    full,
     // To: dispatcher
 
-input   [$clog2(N):0]           d_cnt,
+input   [$clog2(N):0]           d_en_cnt,
     // From: dispatcher
     // - Number of valid dispatch lines?
 input   ROB_ENTRY   [N-1:0]     d_dat,
@@ -113,10 +118,12 @@ input   PHYS_REG_IDX [N-1:0]    c_ts,
 
 // retire (read)
 output logic [N-1:0]            r_en,
+    // To: idk
 output struct packed {
     PHYS_REG_IDX tag;
     PHYS_REG_IDX t_old;
 } [N-1:0] r_dat,
+    // To: idk
 // << [TODO: impl]
 
 
