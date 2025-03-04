@@ -24,12 +24,12 @@ module rs (
 
     // dispatch
     output  logic       [$clog2(N):0] rs_scnt, // TODO: rename to rs_rdy_scnt
-        // - To: dispatcher
+        // - To: dispatch
     input   ID_RESULT   [N-1:0] d_dat,
-        // - From: dispatcher
+        // - From: dispatch
     // >> [TODO: delete]
     input   logic       [N-1:0] d_vld,
-        // - From: dispatcher
+        // - From: dispatch
         // - IMPORTANT: Set from lowest indices in program-order. NO GAPS!!!
         //   i.e. forall i < j, if d_vld[i] && d_vld[j], 
         //   then d_dat[i] <_{Prog Order} d_dat[j]
@@ -37,7 +37,7 @@ module rs (
 
     // >> [TODO: impl]
     input   logic       [$clog2(N):0] d_en_cnt,
-        // - From: dispatcher
+        // - From: dispatch
         // - Number of enabled dispatch lines? (replacement for d_vld)
         // - Question: permit
         // 1) only N dispatches, OR
@@ -47,10 +47,10 @@ module rs (
 
     // >> UNSURE
     output  ID_RESULT   [RS_SZ-1:0] rs_rdy,
-        // - To: dispatcher
+        // - To: dispatch
         // - rs_rdy[i] = !rs_table[i].busy
     input   logic       [N-1:0][RS_SZ-1:0] d_dat2rs,
-        // - From: dispatcher
+        // - From: dispatch
         // - asg = assignment
         // - If (d_vld[i] && d_dat2rs[i][j]), d_dat[i] should go to rs_table[j]
     // << UNSURE
@@ -86,7 +86,7 @@ module rob (
     input                           err,
     input  [1:0][WIDTH-1:0]         next_insn,
     output logic [1:0]              wr_valid,
-        // We don't need this anymore because dispatcher only dispatches as
+        // We don't need this anymore because dispatch only dispatches as
         // many as ROB can accept.
     output logic [1:0]              rd_valid,
         // See above.
@@ -99,16 +99,16 @@ module rob (
     // >> [TODO: impl]
     // dispatch (write)
     output logic    [$clog2(N):0]   rob_rdy_scnt,
-        // To: dispatcher
+        // To: dispatch
         // saturating counter for number of free rob entries
     output logic                    full,
-        // To: dispatcher
+        // To: dispatch
 
     input   [$clog2(N):0]           d_en_cnt,
-        // From: dispatcher
+        // From: dispatch
         // - Number of valid dispatch lines?
     input   ROB_ENTRY   [N-1:0]     d_dat,
-        // From: dispatcher
+        // From: dispatch
         // - IMPORTANT: Set from lowest indices in program-order. NO GAPS!!!
 
     // complete (write)
@@ -131,7 +131,78 @@ endmodule
 
 /* 
 ================================================
-Dispatcher
+Complete list
+================================================
+*/
+// internal states maps PHYS_REG_IDX -> is_complete
+// TODO: Decide between Version 1 and 2:
+// 1) rat's nest of wires; less efficient?
+// 2) cleaner wiring; more efficient?; coherence between replicated cpl_lst's
+module complete_list (
+    // >> [TODO: impl] :: VERSION 1 (centralized r/w)
+    input clock, reset, flush,
+
+    // retire (read)
+        // To/from: ROB
+    input logic         [N-1:0] r_en,
+    input PHYS_REG_IDX  [N-1:0] r_ts,
+    output logic        [N-1:0] r_cpls,
+
+    // complete (write)
+        // From: EX
+    input logic         [N-1:0] c_en,
+    input PHYS_REG_IDX  [N-1:0] c_ts,
+
+    // issue (read)
+        // To/from: RS
+    input logic         [RS_SZ-1:0] s_en,
+    input PHYS_REG_IDX  [RS_SZ-1:0] s_t1s,
+    input PHYS_REG_IDX  [RS_SZ-1:0] s_t2s,
+    output logic        [RS_SZ-1:0] s_cpl1s,
+    output logic        [RS_SZ-1:0] s_cpl2s,
+
+    // dispatch (read and write)
+        // To/from: dispatch
+    input logic         [RS_SZ-1:0] d_en,
+    input PHYS_REG_IDX  [RS_SZ-1:0] d_ts,
+    input PHYS_REG_IDX  [RS_SZ-1:0] d_t1s,
+    input PHYS_REG_IDX  [RS_SZ-1:0] d_t2s,
+    output logic        [RS_SZ-1:0] d_cpl1s,
+    output logic        [RS_SZ-1:0] d_cpl2s
+    // << [TODO: impl]
+
+    // >> [TODO: impl] :: VERSION 2 (centralized writes, distributed reads)
+    input clock, reset, flush,
+
+    // complete (write)
+    input logic         [N-1:0] c_en,
+    input PHYS_REG_IDX  [N-1:0] c_ts,
+        // From: EX
+
+    output logic        [PHYS_REG_SZ_R10K] c_cpl_lst
+        // To: RS (issue)
+        // - complete list state after sets by completes
+
+    // dispatch (read and write)
+    input logic         [RS_SZ-1:0] d_en,
+    input PHYS_REG_IDX  [RS_SZ-1:0] d_ts,
+        // From: dispatch
+
+    output logic        [PHYS_REG_SZ_R10K] d_cpl_lst
+        // To: dispatch
+        // - complete list state after: 
+        //   1) sets by completes, AND 
+        //   2) clears by renames/dispatches
+
+    // Question: can we combine writes by complete and renames into
+    // a single step, or do we need the intermediate c_cpl_lst?
+    // << [TODO: impl]
+);
+endmodule
+
+/* 
+================================================
+Dispatch
 ================================================
 */
 module dispatch (
