@@ -452,18 +452,22 @@ Architectural Map
 */
 // Comments:
 // - similar to map table, submodule to ROB?
-module arch_map (
+module arch_map #(parameter 
+    N=`N
+) (
     input clock, reset,
     // retire
-    input logic         [$clog2(N):0] en_cnt,
-        // - Number of enabled retire lines?
-        // - Question: Does this need to be a count, or can we make it an enable
-        // bus? I fear that there can be serial dependencies and ordering issues
-        // e.g. if multiple insns retire to the same dest arch register.
-    input REG_IDX       [N-1:0] dsts,
-    input PHYS_REG_IDX  [N-1:0] ts,
-        // From: retire (ROB)
-        // - IMPORTANT: Set from lowest indices in program-order. NO GAPS!!!
+    input struct packed {
+        logic         [$clog2(N):0] en_cnt;
+            // - Number of enabled retire lines?
+            // - Question: Does this need to be a count, or can we make it an enable
+            // bus? I fear that there can be serial dependencies and ordering issues
+            // e.g. if multiple insns retire to the same dest arch register.
+        REG_IDX       [N-1:0] dsts;
+        PHYS_REG_IDX  [N-1:0] ts;
+            // From: retire (ROB)
+            // - IMPORTANT: Set from lowest indices in program-order. NO GAPS!!!
+    } r_in
 
     // complete ??
     // issue ??
