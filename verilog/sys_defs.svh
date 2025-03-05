@@ -408,6 +408,8 @@ typedef enum logic [1:0] {
 `define FU_IDX_NUM 4
 
 typedef struct packed {
+    int             id; // debug only; unique insn identifier
+
     PHYS_REG_IDX    t;
     PHYS_REG_IDX    t1;
     PHYS_REG_IDX    t2;
