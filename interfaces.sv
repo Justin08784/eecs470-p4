@@ -220,6 +220,76 @@ Dispatch
 */
 module dispatch (
     input clock, reset, flush,
+    // TODO: wrap module specific ins and outs into anonymous structs
+    // e.g. input struct packed { ... } rob_in;
+
+
+    // RS
+    input logic       [$clog2(N):0] rs_scnt, // TODO: rename to rs_rdy_scnt
+        // - From: RS
+    output ID_RESULT   [N-1:0] d_dat,
+        // - To: RS
+
+    output logic       [$clog2(N):0] d_en_cnt,
+        // - To: RS
+        // - Number of enabled dispatch lines? (replacement for d_vld)
+        // - Question: permit
+        // 1) only N dispatches, OR
+        // 2) a different limit number of dispatches DIS_MAX: N ≤ DIS_MAX ≤ RS_SZ
+        // (DIS_MAX will be a new sys_defs.svh constant) ?
+
+
+    // ROB
+    input logic    [$clog2(N):0]    rob_rdy_scnt,
+        // From: ROB
+        // saturating counter for number of free rob entries
+    output [$clog2(N):0]            d_en_cnt,
+        // To: ROB
+        // - Number of enabled dispatch lines?
+    output ROB_ENTRY   [N-1:0]      d_dat,
+        // To: ROB
+        // - IMPORTANT: Set from lowest indices in program-order. NO GAPS!!!
+
+
+    // Free list
+    input logic    [$clog2(N):0]    free_rdy_scnt,
+        // From: Free list
+        // - sat. count of number of free pregs in free list;
+        //   count reflects any pregs returned in retire! (i.e. AFTER retires)
+    output logic     [$clog2(N):0]  d_en_cnt,
+        // To: Free list
+        // - number of enabled dispatch lines WHO NEED A DEST PREG 
+        //   (e.g. no stores)
+        //   (i.e. may only be a strict subset of dispatching insns!)
+    output PHYS_REG_IDX [N-1:0]     d_ts,
+        // From: Free list
+        // - newly allocated pregs
+
+
+    // Map table
+    output logic         [$clog2(N):0] en_cnt,
+        // - Number of enabled dispatch lines?
+        // - NOTE: For in-order stuff with serial deps (like dispatch), use c(ou)nts;
+        // otherwise use en(able) buses.
+    output REG_IDX       [N-1:0] src1s,
+    output REG_IDX       [N-1:0] src2s,
+    output REG_IDX       [N-1:0] dsts,
+    output PHYS_REG_IDX  [N-1:0] ts,
+        // To: Map table
+        // - IMPORTANT: Set from lowest indices in program-order. NO GAPS!!!
+
+    input logic        [N-1:0] cpl1s,
+    input logic        [N-1:0] cpl2s,
+        // From: Map table
+        // - src1s, src2s is_complete bits resp.
+    input PHYS_REG_IDX [N-1:0] t1s,
+        // From: Map table
+        // - Renamed physical registers tags for src1s
+        // - src1[i] -> t1[i]
+    input PHYS_REG_IDX [N-1:0] t2s
+        // From: Map table
+        // - Renamed physical registers tags for src2s
+        // - src2[i] -> t2[i]
 );
 endmodule
 
