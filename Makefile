@@ -213,7 +213,7 @@ build/rob.simv: $(ROB_FILES)
 build/rob.cov: $(ROB_FILES)
 synth/rob.vg: $(ROB_FILES)
 
-MAPS_FILES = verilog/sys_defs.svh
+MAPS_FILES = verilog/sys_defs.svh verilog/FIFO.sv
 build/maps.simv: $(MAPS_FILES)
 build/maps.cov: $(MAPS_FILES)
 synth/maps.vg: $(MAPS_FILES)
