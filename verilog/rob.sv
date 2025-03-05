@@ -9,7 +9,7 @@ make -B syn CLOCK_PERIOD=1.9
 
 module rob #(
     parameter DEPTH = `ROB_SZ,  // num elements
-    parameter WIDTH = $bits(robItem),  // num bits per element 
+    parameter WIDTH = $bits(ROB_ENTRY),  // num bits per element 
                            //(32 bits per insn + log2(64) = 6 bits each for T & Told)
     localparam CNT_BITS = $clog2(DEPTH)
 ) (

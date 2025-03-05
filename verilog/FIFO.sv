@@ -2,7 +2,7 @@
 
 module FIFO #(
     parameter DEPTH = `ROB_SZ, // num elements
-    parameter WIDTH = $bits(robItem),//32, // num bits per element
+    parameter WIDTH = $bits(ROB_ENTRY),//32, // num bits per element
     localparam CNT_BITS = $clog2(DEPTH)
 ) (
     input                       clock, 

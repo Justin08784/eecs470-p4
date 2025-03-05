@@ -116,6 +116,11 @@ module rob (
         // - From: EX
     input   PHYS_REG_IDX [N-1:0]    c_ts,
         // - From: EX
+    input   ROB_IDX      [N-1:0]    c_rob_idxs,
+        // - From: EX
+        // - It's either this OR c_ts. If we have c_ts, then we CAM in ROB. If
+        // we have c_rob_idxs, we index into ROB.
+
 
     // retire (read)
     output logic [N-1:0]            r_en,
@@ -138,6 +143,7 @@ Complete list
 // TODO: Decide between Version 1 and 2:
 // 1) rat's nest of wires; less efficient?
 // 2) cleaner wiring; more efficient?; coherence between replicated cpl_lst's
+// Comments: I don't like the idea of a complete list anymore. It's a centralized bottleneck.
 module complete_list (
     // >> [TODO: impl] :: VERSION 1 (centralized r/w)
     input clock, reset, flush,
@@ -269,7 +275,12 @@ Map Table
 module map_table (
     input clock, reset,
     // retire ??
-    // complete ??
+    // complete
+    input logic         [N-1:0] c_en,
+        // - Enabled complete lines?
+    input PHYS_REG_IDX  [N-1:0] c_ts, // tags
+        // From: complete (EX)
+
     // issue ??
 
     // dispatch
@@ -311,7 +322,7 @@ module arch_map (
         // bus? I fear that there can be serial dependencies and ordering issues
         // e.g. if multiple insns retire to the same dest arch register.
     input REG_IDX       [N-1:0] dsts,
-    input PHYS_REG_IDX  [N-1:0] dst_ts,
+    input PHYS_REG_IDX  [N-1:0] ts,
         // From: retire (ROB)
         // - IMPORTANT: Set from lowest indices in program-order. NO GAPS!!!
 
