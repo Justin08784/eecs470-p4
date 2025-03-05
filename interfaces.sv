@@ -53,8 +53,9 @@ module rs (
         // - From: dispatch
         // - asg = assignment
         // - If (d_vld[i] && d_dat2rs[i][j]), d_dat[i] should go to rs_table[j]
-        // - I'm unsure about this because it seems to let RS handle dat->entry
+        // - I'm unsure about this because it seems better to let RS handle dat->entry
         //   assignment internally, instead of unnaturally offloading it to the dispatcher.
+        // - TODO: ...speaking of which, we should let a submodule handle dat2rs assignment
     // << UNSURE
 
     // issue
@@ -65,6 +66,7 @@ module rs (
         // To: EX
     output  ID_RESULT   [NUM_FU_X-1:0]    fu_dat_X,
         // To: EX
+        // - TODO: ...we should let a submodule handle issuing logic
 
     // complete (CDB)
     input   logic           [N-1:0] c_en,
@@ -295,6 +297,10 @@ module map_table (
         // From: dispatch
         // - IMPORTANT: Set from lowest indices in program-order. NO GAPS!!!
 
+    output logic        [N-1:0] cpl1s,
+    output logic        [N-1:0] cpl2s,
+        // To: dispatch
+        // - src1s, src2s is_complete bits resp.
     output PHYS_REG_IDX [N-1:0] t1s,
         // To: dispatch
         // - Renamed physical registers tags for src1s
