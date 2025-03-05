@@ -349,7 +349,7 @@ module prf (
         // From: complete (EX)
 
     // issue (read)
-    output DATA         [31:0]  state
+    output DATA         [31:0]  state,
         // To: EX
         // - RF state after propagated completes
         // - we just expose the damn thing to EX, who seems to be the only consumer
@@ -358,6 +358,21 @@ module prf (
         //   into the prf and get the operands it needs. So if there are 32 FUs,
         //   is this like 32 * 2 implicit read ports? (Same implicit read port
         //   concern as cpl_lst's)
+    input logic         [N-1:0] s_en,
+    input PHYS_REG_IDX  [N-1:0] s_t1s,
+    input PHYS_REG_IDX  [N-1:0] s_t2s,
+    output logic        [N-1:0] s_v1s,
+    output logic        [N-1:0] s_v2s
+        // To: EX/RS/issuer idk
+        // - Explicit read ports for issuing insns to collect operands (alternative to state) 
+        // - Have 2N read ports and only allow N issues per cycle. But problem: 
+        //   If an insn can issue but is prevented from doing so due to issue
+        //   limit, presumably it wont be able to collect operand in that cycle right?
+        //   But what happens if some other insn writes to the same operand preg
+        //   in the next cycle; it would overwrite the correct value? But then AHA,
+        //   THERE CANT BE ANOTHER IDIOT WRITING TO THE SAME PREG CAN IT? So this 
+        //   seems to be a non-issue after all. Remember, another insn can only have
+        //   same dst in r10k after the one writing to it RETIRES.
 
 
     // dispatch ??
