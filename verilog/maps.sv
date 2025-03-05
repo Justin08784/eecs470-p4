@@ -219,6 +219,26 @@ module free_list #(parameter
             // - depends on d_in.d_en_cnt
     } d_out
 );
+    localparam NUM_ARCH_REG = 32;
+    struct packed {
+        PHYS_REG_IDX    t;
+    } [NUM_ARCH_REG-1:0] entries, entries_n;
+
+    logic [$clog2(`PHYS_REG_SZ_R10K):0] spots;
+    FIFO #(
+        .DEPTH(`PHYS_REG_SZ_R10K),
+        .WIDTH($bits(PHYS_REG_IDX))
+    ) lst (
+        .clock(clock),
+        .reset(reset),
+        .spots(spots),
+        .wr_en(r_in.r_en_cnt), // TODO: this is a cnt, but FIFO requires a enable bus????
+        .rd_en(d_in.d_en_cnt), // TODO: this is a cnt, but FIFO requires a enable bus????
+        .wr_data(r_in.r_tolds),
+        .rd_data(d_out.d_ts)
+    );
+    assign d_out.free_rdy_scnt = spots > N ? N : spots;
+
 endmodule
 
 
