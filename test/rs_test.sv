@@ -613,7 +613,7 @@ module rs_testbench;
         test_idle();
         test_delayed_rdy();
         test_nonzero_fu_rdy_idx();
-        // test_random();
+        test_random();
 
         // not hand-crafted:
         test_multi_1();

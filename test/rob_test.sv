@@ -7,7 +7,7 @@
 
 
 `ifndef WIDTH
-  `define WIDTH $bits(robItem)
+  `define WIDTH $bits(ROB_ENTRY)
 `endif
 
 `ifndef DEPTH
