@@ -398,41 +398,50 @@ Map Table
 // else references it...?
 // - map table is more complicated than a simple lookup. forall i < j,
 // src1s[j], src2s[j] may potentially be dsts[i]. i.e. there is a serial dependency
-module map_table (
+module map_table #(parameter 
+    N=`N,
+    RS_SZ=`RS_SZ
+) (
     input clock, reset,
     // retire ??
+
     // complete
-    input logic         [N-1:0] c_en,
-        // - Enabled complete lines?
-    input PHYS_REG_IDX  [N-1:0] c_ts, // tags
-        // From: complete (EX)
+    input struct packed {
+        logic         [N-1:0] c_en;
+            // - Enabled complete lines?
+        PHYS_REG_IDX  [N-1:0] c_ts; // tags
+            // From: complete (EX)
+    } c_in,
 
     // issue ??
 
     // dispatch
-    input logic         [$clog2(N):0] en_cnt,
-        // - Number of enabled dispatch lines?
-        // - NOTE: For in-order stuff with serial deps (like dispatch), use c(ou)nts;
-        // otherwise use en(able) buses.
-    input REG_IDX       [N-1:0] src1s,
-    input REG_IDX       [N-1:0] src2s,
-    input REG_IDX       [N-1:0] dsts,
-    input PHYS_REG_IDX  [N-1:0] ts,
-        // From: dispatch
-        // - IMPORTANT: Set from lowest indices in program-order. NO GAPS!!!
-
-    output logic        [N-1:0] cpl1s,
-    output logic        [N-1:0] cpl2s,
-        // To: dispatch
-        // - src1s, src2s is_complete bits resp.
-    output PHYS_REG_IDX [N-1:0] t1s,
-        // To: dispatch
-        // - Renamed physical registers tags for src1s
-        // - src1[i] -> t1[i]
-    output PHYS_REG_IDX [N-1:0] t2s
-        // To: dispatch
-        // - Renamed physical registers tags for src2s
-        // - src2[i] -> t2[i]
+    input struct packed {
+        logic         [$clog2(N):0] en_cnt;
+            // - Number of enabled dispatch lines?
+            // - NOTE: For in-order stuff with serial deps (like dispatch), use c(ou)nts;
+            // otherwise use en(able) buses.
+        REG_IDX       [N-1:0] src1s;
+        REG_IDX       [N-1:0] src2s;
+        REG_IDX       [N-1:0] dsts;
+        PHYS_REG_IDX  [N-1:0] ts;
+            // From: dispatch
+            // - IMPORTANT: Set from lowest indices in program-order. NO GAPS!!!
+    } d_in,
+    output struct packed {
+        logic        [N-1:0] cpl1s;
+        logic        [N-1:0] cpl2s;
+            // To: dispatch
+            // - src1s, src2s is_complete bits resp.
+        PHYS_REG_IDX [N-1:0] t1s;
+            // To: dispatch
+            // - Renamed physical registers tags for src1s
+            // - src1[i] -> t1[i]
+        PHYS_REG_IDX [N-1:0] t2s;
+            // To: dispatch
+            // - Renamed physical registers tags for src2s
+            // - src2[i] -> t2[i]
+    } d_out
 );
 endmodule
 

@@ -189,7 +189,7 @@ GREP = grep -E --color=auto
 # ---- Modules to Test ---- #
 
 # TODO: add more modules here
-MODULES = cpu mult rob rs FIFO
+MODULES = cpu mult rob rs FIFO map_table maps 
 
 # TODO: update this if you add more header files
 ALL_HEADERS = $(CPU_HEADERS)
@@ -212,6 +212,11 @@ ROB_FILES = verilog/sys_defs.svh verilog/memDP.sv verilog/FIFO.sv
 build/rob.simv: $(ROB_FILES)
 build/rob.cov: $(ROB_FILES)
 synth/rob.vg: $(ROB_FILES)
+
+MAPS_FILES = verilog/sys_defs.svh
+build/maps.simv: $(MAPS_FILES)
+build/maps.cov: $(MAPS_FILES)
+synth/maps.vg: $(MAPS_FILES)
 
 #################################
 # ---- Main CPU Definition ---- #
