@@ -155,6 +155,25 @@ module rob (
 
 
     // >> [TODO: impl]
+    // retire (read)
+    output logic [N-1:0]            r_en,
+        // To: idk
+    output struct packed {
+        PHYS_REG_IDX tag;
+        PHYS_REG_IDX t_old;
+    } [N-1:0] r_dat,
+        // To: idk
+
+    // complete (write)
+    input   logic        [N-1:0]    c_en,
+        // - From: EX
+    input   PHYS_REG_IDX [N-1:0]    c_ts,
+        // - From: EX
+    input   ROB_IDX      [N-1:0]    c_rob_idxs,
+        // - From: EX
+        // - It's either this OR c_ts. If we have c_ts, then we CAM in ROB. If
+        // we have c_rob_idxs, we index into ROB.
+
     // dispatch (write)
     output logic    [$clog2(N):0]   rob_rdy_scnt,
         // To: dispatch
@@ -167,25 +186,6 @@ module rob (
         // From: dispatch
         // - IMPORTANT: Set from lowest indices in program-order. NO GAPS!!!
 
-    // complete (write)
-    input   logic        [N-1:0]    c_en,
-        // - From: EX
-    input   PHYS_REG_IDX [N-1:0]    c_ts,
-        // - From: EX
-    input   ROB_IDX      [N-1:0]    c_rob_idxs,
-        // - From: EX
-        // - It's either this OR c_ts. If we have c_ts, then we CAM in ROB. If
-        // we have c_rob_idxs, we index into ROB.
-
-
-    // retire (read)
-    output logic [N-1:0]            r_en,
-        // To: idk
-    output struct packed {
-        PHYS_REG_IDX tag;
-        PHYS_REG_IDX t_old;
-    } [N-1:0] r_dat,
-        // To: idk
     // << [TODO: impl]
 );
 endmodule
