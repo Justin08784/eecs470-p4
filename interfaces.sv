@@ -19,7 +19,23 @@ Notes:
 Fetch
 ================================================
 */
-module fetch();
+module fetch(
+    input clock,          // system clock
+    input reset,          // system reset
+
+    input               [N-1:0] if_valid,       // only go to next PC when true
+    input               [N-1:0] take_branch,    // taken-branch signal
+    input ADDR          [N-1:0] branch_target,  // target pc: use if take_branch is TRUE
+    input MEM_BLOCK     [N-1:0] Imem_data,      // data coming back from Instruction memory
+
+    // tags from memory
+    input MEM_TAG       [N-1:0] Imem2proc_transaction_tag, // Should be zero unless there is a response
+    input MEM_TAG       [N-1:0] Imem2proc_data_tag,
+
+    output MEM_COMMAND  [N-1:0] Imem_command, // Command sent to memory
+    output IF_ID_PACKET [N-1:0] if_packet,
+    output ADDR         [N-1:0] Imem_addr // address sent to Instruction memory
+);
 endmodule
 
 /* 
@@ -27,7 +43,17 @@ endmodule
 Decode
 ================================================
 */
-module decode();
+module decode(
+    input clock,           // system clock
+    input reset,           // system reset
+
+    input IF_ID_PACKET  [N-1:0] if_id_reg,
+    input               [N-1:0] wb_regfile_en,   // Reg write enable from WB Stage
+    input REG_IDX       [N-1:0] wb_regfile_idx,  // Reg write index from WB Stage
+    input DATA          [N-1:0] wb_regfile_data, // Reg write data from WB Stage
+
+    output ID_EX_PACKET [N-1:0] id_packet
+);
 endmodule
 
 /* 
@@ -35,7 +61,11 @@ endmodule
 Execute / Functional units
 ================================================
 */
-module execute();
+module execute(
+    input ID_EX_PACKET   [N-1:0] id_ex_reg,
+
+    output EX_MEM_PACKET [N-1:0] ex_packet
+);
 endmodule
 
 /* 
