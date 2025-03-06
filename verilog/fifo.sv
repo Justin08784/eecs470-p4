@@ -42,23 +42,46 @@ module fifo #(
     assign free_scnt    = free > MAX_SCNT ? MAX_SCNT : free;
     assign used_scnt    = used > MAX_SCNT ? MAX_SCNT : used;
 
+    // Version 1:
+    // always_comb begin
+    //     for (int unsigned i = 0; i < NUM_RPORTS; ++i)
+    //         rd_idxs[i] = (head + i) % DEPTH;
+    //     for (int unsigned i = 0; i < NUM_WPORTS; ++i)
+    //         wr_idxs[i] = (tail + i) % DEPTH;
+
+
+    //     rd_data = '0;
+    //     // fwd if read matches a write; last write wins
+    //     for (int unsigned i = 0; i < NUM_RPORTS; ++i) begin
+    //         if (i >= rd_en_cnt) // suppresses oob index warning
+    //             continue;
+    //         rd_data[i] = state[rd_idxs[i]];
+    //         for (int unsigned j = 0; j < NUM_WPORTS; ++j) begin
+    //             if (j >= wr_en_cnt || rd_idxs[i] != wr_idxs[j]) // j >= ... suppresses oob index warning
+    //                 continue;
+    //             rd_data[i] = wr_data[j];
+    //         end
+    //     end
+    // end
+
+    // Version 2:
+    logic [NUM_RPORTS-1:0] fwd_dat;
     always_comb begin
         for (int unsigned i = 0; i < NUM_RPORTS; ++i)
             rd_idxs[i] = (head + i) % DEPTH;
         for (int unsigned i = 0; i < NUM_WPORTS; ++i)
             wr_idxs[i] = (tail + i) % DEPTH;
+        for (int unsigned i = 0; i < NUM_RPORTS; ++i)
+            fwd_dat[i] = i >= used;
 
-
-        rd_data = '0;
-        // fwd if read matches a write; last write wins
+        // fwding logic
         for (int unsigned i = 0; i < NUM_RPORTS; ++i) begin
-            if (i >= rd_en_cnt) // suppresses oob index warning
-                continue;
-            rd_data[i] = state[rd_idxs[i]];
-            for (int unsigned j = 0; j < NUM_WPORTS; ++j) begin
-                if (j >= wr_en_cnt || rd_idxs[i] != wr_idxs[j]) // j >= ... suppresses oob index warning
-                    continue;
-                rd_data[i] = wr_data[j];
+            if (i >= rd_en_cnt) begin
+                rd_data[i] = '0;
+            end else if (fwd_dat[i] && (i - used) < wr_en_cnt) begin
+                rd_data[i] = wr_data[i - used];
+            end else begin
+                rd_data[i] = state[rd_idxs[i]];
             end
         end
     end
