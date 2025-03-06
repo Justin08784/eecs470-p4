@@ -1,5 +1,3 @@
-
-
 `include "sys_defs.svh"
 
 module rs #(parameter 
@@ -44,20 +42,27 @@ module rs #(parameter
     output  ID_RESULT   [NUM_FU_STORE-1:0]  fu_dat_store,
     output  ID_RESULT   [NUM_FU_LOAD-1:0]   fu_dat_load,
 
+    `ifdef DEBUG
+    output  RS_ENTRY    [RS_SZ-1:0]       entries_dbg,
+    `endif 
+
     // complete (CDB)
     input   logic           [N-1:0] c_en,
     input   PHYS_REG_IDX    [N-1:0] c_ts
 
 );
-    RS_ENTRY [RS_SZ-1:0]       entries, entries_n;
+    RS_ENTRY [RS_SZ-1:0]       entries, entries_n; // ms1 test: remove one RS entry (caught)
+    `ifdef DEBUG
+    assign entries_dbg = entries;
+    `endif 
 
     logic [RS_SZ-1:0] busy_vec;
     logic [RS_SZ-1:0] issd_vec;
     logic [RS_SZ-1:0] t1_rdy_vec;
     logic [RS_SZ-1:0] t2_rdy_vec;
     generate
-    for (genvar i = 0; i < RS_SZ; i++) begin : gen_vecs
-        assign busy_vec[i] = entries[i].busy;
+    for (genvar i = 0; i < RS_SZ; i++) begin : gen_vecs // ms1 test: make loop count RS_SZ-1 instead of RS_SZ (caught)
+        assign busy_vec[i] = entries[i].busy; // ms1 test: make busy_vec sequential instead of combinational (caught)
         assign issd_vec[i] = entries[i].issued;
         assign t1_rdy_vec[i] = entries[i].dat.t1_rdy;
         assign t2_rdy_vec[i] = entries[i].dat.t2_rdy;
@@ -73,8 +78,11 @@ module rs #(parameter
         for (int rs = 0; rs < RS_SZ; ++rs) begin
             logic match_t1;
             logic match_t2;
-            match_t1 = t1_rdy_vec[rs];
-            match_t2 = t2_rdy_vec[rs];
+            // in milestone 1:
+            // match_t1 = t1_rdy_vec[rs];
+            // match_t2 = t2_rdy_vec[rs];
+            match_t1 = 0;
+            match_t2 = 0;
 
             // match any tag in CDB?
             for (int n = 0; n < N; ++n) begin
@@ -96,13 +104,14 @@ module rs #(parameter
     logic [FU_IDX_NUM-1:0][RS_SZ-1:0] can_issues;
     always_comb begin
         can_issues = '0;
-        for (int rs = 0; rs < RS_SZ; ++rs) begin
+        for (int rs = 0, FU_IDX fu = 0; rs < RS_SZ; ++rs) begin
             can_issue[rs] = busy_vec[rs]
-                && !entries[rs].issued
-                && (entries[rs].dat.t1_rdy || to_t1_rdy[rs])
+                && !entries[rs].issued // ms1 test: remove "!" from entries[rs].issued (caught)
+                && (entries[rs].dat.t1_rdy || to_t1_rdy[rs]) // [ADDRESSED] ms1 test: remove "|| to_t1_rdy[rs]" (not caught) 
                 && (entries[rs].dat.t2_rdy || to_t2_rdy[rs]);
 
-            can_issues[entries[rs].dat.fu_idx][rs] = can_issue[rs];
+            fu = entries[rs].dat.fu_idx;
+            can_issues[fu][rs] = can_issue[rs];
         end
     end
 
@@ -210,7 +219,7 @@ module rs #(parameter
         foreach (gbus_fu_rdy_mult[i, j]) begin
             if (gbus_fu_rdy_mult[i][j]) begin
                 fu2issuer_mult[j]   |= gbus_can_issue_mult[i];
-                fu_vld_mult[j]      = |gbus_can_issue_mult[i];
+                fu_vld_mult[j]      = |gbus_can_issue_mult[i]; // [MISSING] ms1 test: change i to j (not caught)
                 to_issue            |= gbus_can_issue_mult[i];
             end
         end
@@ -237,23 +246,23 @@ module rs #(parameter
         fu_dat_store    = '0;
         fu_dat_load     = '0;
         foreach (fu2issuer_alu[fu, rs]) begin
-            if (!fu2issuer_alu[fu][rs]) begin
-                fu_dat_alu |= entries[rs].dat;
+            if (fu2issuer_alu[fu][rs]) begin // [MISSING] ms1 test: Remove "!" from if condition (not caught)
+                fu_dat_alu[fu] |= entries[rs].dat;
             end
         end
         foreach (fu2issuer_mult[fu, rs]) begin
-            if (!fu2issuer_mult[fu][rs]) begin
-                fu_dat_mult |= entries[rs].dat;
+            if (fu2issuer_mult[fu][rs]) begin
+                fu_dat_mult[fu] |= entries[rs].dat;
             end
         end
         foreach (fu2issuer_load[fu, rs]) begin
-            if (!fu2issuer_load[fu][rs]) begin
-                fu_dat_load |= entries[rs].dat;
+            if (fu2issuer_load[fu][rs]) begin
+                fu_dat_load[fu] |= entries[rs].dat;
             end
         end
         foreach (fu2issuer_store[fu, rs]) begin
-            if (!fu2issuer_store[fu][rs]) begin
-                fu_dat_store |= entries[rs].dat;
+            if (fu2issuer_store[fu][rs]) begin
+                fu_dat_store[fu] |= entries[rs].dat;
             end
         end
     end
@@ -305,7 +314,14 @@ module rs #(parameter
         entries_n = entries;
         for (int rs = 0; rs < RS_SZ; ++rs) begin
             entries_n[rs].dat.t1_rdy |= to_t1_rdy[rs];
-            entries_n[rs].dat.t2_rdy |= to_t2_rdy[rs];
+            entries_n[rs].dat.t2_rdy |= to_t2_rdy[rs]; // [ADDRESSED] ms1 test: change |= to = (not caught)
+            /*
+            TODO: Ask Bradley! This change is not breaking because t2_rdy is 
+            ALREADY incorporated into the value of to_t2_rdy, which means an
+            assignment behaves identically to 'or' assignment here. i.e. logically redundant
+            This is because to_t2_rdy is initialized to t2_rdy, instead of 0;
+            if we did the latter, it would break as intended. So can we get
+            our points back here? */
 
             if (to_issue[rs]) begin
                 // issuing

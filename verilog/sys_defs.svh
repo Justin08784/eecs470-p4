@@ -397,6 +397,16 @@ typedef struct packed {
     logic   valid;
 } COMMIT_PACKET;
 
+// ROB stuff
+typedef logic [$clog2(`ROB_SZ)-1:0] ROB_IDX;
+typedef struct packed {
+    INST inst;
+    // logic [4:0] rob_num;
+    logic cpl;
+    logic [$clog2(`PHYS_REG_SZ_R10K)-1:0] tag;
+    logic [$clog2(`PHYS_REG_SZ_R10K)-1:0] t_old;
+} ROB_ENTRY;
+
 
 // Reservation station stuff
 typedef enum logic [1:0] {
@@ -408,12 +418,16 @@ typedef enum logic [1:0] {
 `define FU_IDX_NUM 4
 
 typedef struct packed {
+    int             id; // debug only; unique insn identifier
+
     PHYS_REG_IDX    t;
     PHYS_REG_IDX    t1;
     PHYS_REG_IDX    t2;
-    logic           t1_rdy; // ready in ROB?
+    logic           t1_rdy; // completed? should we rename to cpl for consistency?
     logic           t2_rdy;
     FU_IDX          fu_idx;
+    ROB_IDX         rob_idx;
+    
 
     /* from ID_EX_PACKET */
     INST inst;
@@ -458,12 +472,11 @@ typedef struct packed {
     ID_RESULT   dat;
 } FU_ENTRY;
 
-typedef struct packed {
-  INST inst;
-  // logic [4:0] rob_num;
-  logic [$clog2(`PHYS_REG_SZ_R10K)-1:0] tag;
-  logic [$clog2(`PHYS_REG_SZ_R10K)-1:0] t_old;
-} robItem;
+
+
+/* How can we implement this in the Makefile? */
+// comment out to disable DEBUG:
+`define DEBUG
 
 
 `endif // __SYS_DEFS_SVH__

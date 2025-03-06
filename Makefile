@@ -189,7 +189,7 @@ GREP = grep -E --color=auto
 # ---- Modules to Test ---- #
 
 # TODO: add more modules here
-MODULES = cpu mult rob rs FIFO
+MODULES = cpu mult rob rs FIFO map_table maps 
 
 # TODO: update this if you add more header files
 ALL_HEADERS = $(CPU_HEADERS)
@@ -212,7 +212,11 @@ ROB_FILES = verilog/sys_defs.svh verilog/memDP.sv verilog/FIFO.sv
 build/rob.simv: $(ROB_FILES)
 build/rob.cov: $(ROB_FILES)
 synth/rob.vg: $(ROB_FILES)
-# test/rob_test.sv: verilog/FIFO.sv
+
+MAPS_FILES = verilog/sys_defs.svh verilog/FIFO.sv
+build/maps.simv: $(MAPS_FILES)
+build/maps.cov: $(MAPS_FILES)
+synth/maps.vg: $(MAPS_FILES)
 
 #################################
 # ---- Main CPU Definition ---- #
@@ -227,8 +231,7 @@ CPU_HEADERS = verilog/sys_defs.svh \
 # test/cpu_test.sv is implicit
 CPU_TESTBENCH = test/pipeline_print.c \
 			    test/decode_inst.c \
-                test/mem.sv \
-				test/rs_test.sv
+                test/mem.sv 
 # NOTE: you CANNOT alter the given memory module
 
 # verilog/cpu.sv is implicit
