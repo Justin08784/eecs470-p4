@@ -8,7 +8,7 @@ module fifo #(
         logic [$clog2(DEPTH)-1:0] tail;
         logic [DEPTH-1:0][WIDTH-1:0] state;
         logic [$clog2(DEPTH):0]   used;
-        logic [$clog2(DEPTH):0]   free;
+        // logic [$clog2(DEPTH):0]   free;
     },
     parameter int unsigned NUM_RPORTS,
     parameter int unsigned NUM_WPORTS,
@@ -65,10 +65,10 @@ module fifo #(
 
     always_ff @(posedge clock) begin
         if (reset) begin
-            used    <= '0;
-            head    <= '0;
-            tail    <= '0;
-            state   <= RESET_STATE;
+            used    <= RESET_STATE.used;
+            head    <= RESET_STATE.head;
+            tail    <= RESET_STATE.tail;
+            state   <= RESET_STATE.state;
         end else begin
             if (wr_en_cnt > free)
                 $error("FIFO overflow!");

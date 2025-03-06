@@ -58,7 +58,7 @@ module free_list #(parameter
         logic [$clog2(DEPTH)-1:0] tail;
         logic [DEPTH-1:0][WIDTH-1:0] state;
         logic [$clog2(DEPTH):0]   used;
-        logic [$clog2(DEPTH):0]   free;
+        // logic [$clog2(DEPTH):0]   free;
     } FIFO_STATE;
 
     // TODO: need reset states for head, tail, cnt as well!!
@@ -71,10 +71,9 @@ module free_list #(parameter
         end
         return '{
             head:0,
-            tail:DEPTH-1,
+            tail:0,
             state:state,
-            used:DEPTH,
-            free:0
+            used:DEPTH
         };
     endfunction
     const FIFO_STATE RESET_STATE = gen_reset_state();
