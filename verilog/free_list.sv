@@ -51,25 +51,42 @@ module free_list #(parameter
             // - depends on d_in.d_en_cnt
     } d_out
 );
+    localparam DEPTH = `ROB_SZ;
+    localparam WIDTH = $bits(PHYS_REG_IDX);
+    typedef struct packed {
+        logic [$clog2(DEPTH)-1:0] head;
+        logic [$clog2(DEPTH)-1:0] tail;
+        logic [DEPTH-1:0][WIDTH-1:0] state;
+        logic [$clog2(DEPTH):0]   used;
+        logic [$clog2(DEPTH):0]   free;
+    } FIFO_STATE;
+
     // TODO: need reset states for head, tail, cnt as well!!
-    function automatic [`PHYS_REG_SZ_R10K-1:0][$bits(PHYS_REG_IDX)-1:0] gen_reset_state();
-        logic [`PHYS_REG_SZ_R10K-1:0][$bits(PHYS_REG_IDX)-1:0] state;
-        logic [$bits(PHYS_REG_IDX)-1:0] start = 32 + 1;
-        for (int unsigned i = 0; i < $unsigned(`PHYS_REG_SZ_R10K); ++i) begin
+    function automatic FIFO_STATE gen_reset_state();
+        logic [DEPTH-1:0][WIDTH-1:0] state;
+        logic [WIDTH-1:0] start = 32 + 1;
+        // `ROB_SZ = `PHYS_REG_SZ_R10K - 32
+        for (int unsigned i = 0; i < $unsigned(DEPTH); ++i) begin
             state[i] = start + i;
         end
-        return state;
+        return '{
+            head:0,
+            tail:DEPTH-1,
+            state:state,
+            used:DEPTH,
+            free:0
+        };
     endfunction
-    const logic [`PHYS_REG_SZ_R10K-1:0][$bits(PHYS_REG_IDX)-1:0] RESET_STATE = gen_reset_state();
+    const FIFO_STATE RESET_STATE = gen_reset_state();
    
 
     fifo #(
-        .DEPTH(`PHYS_REG_SZ_R10K),
-        .WIDTH($bits(PHYS_REG_IDX)),
+        .DEPTH(DEPTH),
+        .WIDTH(WIDTH),
         .NUM_RPORTS(`N),
         .NUM_WPORTS(`N),
         .MAX_SCNT(`N),
-        .RESET_STATE('0)
+        .RESET_STATE(RESET_STATE)
     ) lst (
         .clock(clock),
         .reset(reset),
