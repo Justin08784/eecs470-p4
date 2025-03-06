@@ -55,7 +55,7 @@ module free_list #(parameter
     function automatic [`PHYS_REG_SZ_R10K-1:0][$bits(PHYS_REG_IDX)-1:0] gen_reset_state();
         logic [`PHYS_REG_SZ_R10K-1:0][$bits(PHYS_REG_IDX)-1:0] state;
         logic [$bits(PHYS_REG_IDX)-1:0] start = 32 + 1;
-        for (int i = 0; i < `PHYS_REG_SZ_R10K; i++) begin
+        for (int unsigned i = 0; i < $unsigned(`PHYS_REG_SZ_R10K); ++i) begin
             state[i] = start + i;
         end
         return state;

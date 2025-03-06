@@ -1,11 +1,11 @@
 `include "sys_defs.svh"
 
 module fifo #(parameter
-    DEPTH,       // num elements
-    WIDTH,       // num bits per element
-    NUM_RPORTS,
-    NUM_WPORTS,
-    MAX_SCNT,    // should be less than DEPTH
+    int unsigned DEPTH,       // num elements
+    int unsigned WIDTH,       // num bits per element
+    int unsigned NUM_RPORTS,
+    int unsigned NUM_WPORTS,
+    int unsigned MAX_SCNT,    // should be less than DEPTH
     logic [DEPTH-1:0][WIDTH-1:0] RESET_STATE
 ) (
     input                                           clock, 
@@ -36,17 +36,20 @@ module fifo #(parameter
     assign used_scnt    = used > MAX_SCNT ? MAX_SCNT : used;
 
     always_comb begin
-        foreach (rd_idxs[i])
+        for (int unsigned i = 0; i < NUM_RPORTS; ++i)
             rd_idxs[i] = (head + i) % DEPTH;
-        foreach (wr_idxs[i])
+        for (int unsigned i = 0; i < NUM_WPORTS; ++i)
             wr_idxs[i] = (tail + i) % DEPTH;
+
 
         rd_data = '0;
         // fwd if read matches a write; last write wins
-        for (int i = 0; i < rd_en_cnt; ++i) begin
+        for (int unsigned i = 0; i < NUM_RPORTS; ++i) begin
+            if (i >= rd_en_cnt) // suppresses oob index warning
+                continue;
             rd_data[i] = state[rd_idxs[i]];
-            for (int j = 0; j < wr_en_cnt; ++j) begin
-                if (rd_idxs[i] != wr_idxs[j])
+            for (int unsigned j = 0; j < NUM_WPORTS; ++j) begin
+                if (j >= wr_en_cnt || rd_idxs[i] != wr_idxs[j]) // j >= ... suppresses oob index warning
                     continue;
                 rd_data[i] = wr_data[j];
             end
@@ -67,7 +70,9 @@ module fifo #(parameter
             used    <= used + wr_en_cnt - rd_en_cnt;
             head    <= (head + rd_en_cnt) % DEPTH;
             tail    <= (tail + wr_en_cnt) % DEPTH;
-            for (int i = 0; i < wr_en_cnt; ++i) begin
+            for (int unsigned i = 0; i < NUM_WPORTS; ++i) begin
+                if (i >= wr_en_cnt) // suppresses oob index warning
+                    continue;
                 state[wr_idxs[i]] <= wr_data[i];
             end
         end
