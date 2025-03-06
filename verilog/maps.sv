@@ -219,25 +219,38 @@ module free_list #(parameter
             // - depends on d_in.d_en_cnt
     } d_out
 );
-    localparam NUM_ARCH_REG = 32;
-    struct packed {
-        PHYS_REG_IDX    t;
-    } [NUM_ARCH_REG-1:0] entries, entries_n;
+    // TODO: need reset states for head, tail, cnt as well!!
+    function automatic [`PHYS_REG_SZ_R10K-1:0][$bits(PHYS_REG_IDX)-1:0] gen_reset_state();
+        logic [`PHYS_REG_SZ_R10K-1:0][$bits(PHYS_REG_IDX)-1:0] state;
+        logic [$bits(PHYS_REG_IDX)-1:0] start = 32 + 1;
+        for (int i = 0; i < `PHYS_REG_SZ_R10K; i++) begin
+            state[i] = start + i;
+        end
+        return state;
+    endfunction
+    const logic [`PHYS_REG_SZ_R10K-1:0][$bits(PHYS_REG_IDX)-1:0] RESET_STATE = gen_reset_state();
+   
 
-    logic [$clog2(`PHYS_REG_SZ_R10K):0] spots;
-    FIFO #(
+    fifo #(
         .DEPTH(`PHYS_REG_SZ_R10K),
-        .WIDTH($bits(PHYS_REG_IDX))
+        .WIDTH($bits(PHYS_REG_IDX)),
+        .NUM_RPORTS(`N),
+        .NUM_WPORTS(`N),
+        .MAX_SCNT(`N),
+        .RESET_STATE('0)
     ) lst (
         .clock(clock),
         .reset(reset),
-        .spots(spots),
-        .wr_en(r_in.r_en_cnt), // TODO: this is a cnt, but FIFO requires a enable bus????
-        .rd_en(d_in.d_en_cnt), // TODO: this is a cnt, but FIFO requires a enable bus????
+
+        .wr_en_cnt(r_in.r_en_cnt),
         .wr_data(r_in.r_tolds),
-        .rd_data(d_out.d_ts)
+
+        .rd_en_cnt(d_in.d_en_cnt),
+        .rd_data(d_out.d_ts),
+
+        .free_scnt(d_out.free_rdy_scnt),
+        .used_scnt() // do we need this? how would even retire return more pregs than in existence?
     );
-    assign d_out.free_rdy_scnt = spots > N ? N : spots;
 
 endmodule
 

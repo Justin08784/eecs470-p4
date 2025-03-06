@@ -6,7 +6,7 @@ module fifo #(parameter
     NUM_RPORTS=`N,
     NUM_WPORTS=`N,
     MAX_SCNT=`N,    // should be less than DEPTH
-    localparam CNT_BITS = $clog2(MAX_SCNT)
+    logic [DEPTH-1:0][WIDTH-1:0] RESET_STATE = '0
 ) (
     input                                           clock, 
     input                                           reset,
@@ -18,8 +18,7 @@ module fifo #(parameter
     output  logic   [NUM_RPORTS-1:0][WIDTH-1:0]     rd_data,
 
     output  logic   [$clog2(MAX_SCNT):0]            free_scnt,
-    output  logic   [$clog2(MAX_SCNT):0]            used_scnt,
-    output  logic                                   full
+    output  logic   [$clog2(MAX_SCNT):0]            used_scnt
 
     /*NOTE: By removing rd_valid, wr_valid, we force the caller to make sure
     the enabled cnts are correct. */
@@ -59,7 +58,7 @@ module fifo #(parameter
             used    <= '0;
             head    <= '0;
             tail    <= '0;
-            state   <= '0;
+            state   <= RESET_STATE;
         end else begin
             if (wr_en_cnt > free)
                 $error("FIFO overflow!");
