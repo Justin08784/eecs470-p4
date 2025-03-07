@@ -59,7 +59,8 @@ module fifo_test();
         .WIDTH(WIDTH),
         .NUM_RPORTS(NUM_RPORTS),
         .NUM_WPORTS(NUM_WPORTS),
-        .MAX_SCNT(MAX_SCNT)
+        .MAX_SCNT(MAX_SCNT),
+        .RESET_STATE('{default:0})
     ) dut (
         .clock      (clock),
         .reset      (reset),

@@ -1,8 +1,8 @@
 `include "sys_defs.svh"
 
 module fifo #(
-    parameter int unsigned DEPTH,       // num elements
-    parameter int unsigned WIDTH,       // num bits per element
+    parameter int unsigned DEPTH=`ROB_SZ,       // num elements
+    parameter int unsigned WIDTH=$bits(PHYS_REG_IDX),       // num bits per element
     type FIFO_STATE = struct packed {
         logic [$clog2(DEPTH)-1:0] head;
         logic [$clog2(DEPTH)-1:0] tail;
@@ -10,10 +10,10 @@ module fifo #(
         logic [$clog2(DEPTH):0]   used;
         // logic [$clog2(DEPTH):0]   free;
     },
-    parameter int unsigned NUM_RPORTS,
-    parameter int unsigned NUM_WPORTS,
-    parameter int unsigned MAX_SCNT,    // should be less than DEPTH
-    parameter FIFO_STATE RESET_STATE = '{default:0}
+    parameter int unsigned NUM_RPORTS=`N,
+    parameter int unsigned NUM_WPORTS=`N,
+    parameter int unsigned MAX_SCNT=`N,    // should be less than DEPTH
+    parameter FIFO_STATE RESET_STATE='{default:0}
 ) (
     input                                           clock, 
     input                                           reset,

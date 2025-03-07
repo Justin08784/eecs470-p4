@@ -27,7 +27,7 @@ module fifo_sva #(
     input   logic   [$clog2(NUM_WPORTS):0]          wr_en_cnt,
     input   logic   [NUM_WPORTS-1:0][WIDTH-1:0]     wr_data,
 
-    input   logic   [$clog2(NUM_RPORTS):0]          rd_en_cnt
+    input   logic   [$clog2(NUM_RPORTS):0]          rd_en_cnt,
     // outputs
     input   logic   [NUM_RPORTS-1:0][WIDTH-1:0]     rd_data,
 
@@ -35,17 +35,17 @@ module fifo_sva #(
     input   logic   [$clog2(MAX_SCNT):0]            used_scnt
 );
     struct packed {
-        logic   [$clog2(NUM_WPORTS):0]          wr_en_cnt,
-        logic   [NUM_WPORTS-1:0][WIDTH-1:0]     wr_data,
+        logic   [$clog2(NUM_WPORTS):0]          wr_en_cnt;
+        logic   [NUM_WPORTS-1:0][WIDTH-1:0]     wr_data;
 
-        logic   [$clog2(NUM_RPORTS):0]          rd_en_cnt,
+        logic   [$clog2(NUM_RPORTS):0]          rd_en_cnt;
     } ins_pre, ins_cur;
 
     struct packed {
-        logic   [NUM_RPORTS-1:0][WIDTH-1:0]     rd_data,
+        logic   [NUM_RPORTS-1:0][WIDTH-1:0]     rd_data;
 
-        logic   [$clog2(MAX_SCNT):0]            free_scnt,
-        logic   [$clog2(MAX_SCNT):0]            used_scnt
+        logic   [$clog2(MAX_SCNT):0]            free_scnt;
+        logic   [$clog2(MAX_SCNT):0]            used_scnt;
     } outs_pre, outs_cur;
 
     assign ins_cur = '{
@@ -65,7 +65,7 @@ module fifo_sva #(
     logic [$clog2(DEPTH):0] free;    // how full the buffer should be
     assign free = DEPTH - used;
 
-     initial begin
+    initial begin
         // wait until 1st reset: ensures no Xs are floating around
         // (if there are Xs we get errors like indexing with Xs into assoc. arrays)
         // while (!reset)
@@ -78,14 +78,24 @@ module fifo_sva #(
     end
     end
 
+    // type FIFO_STATE = struct packed {
+    //     logic [$clog2(DEPTH)-1:0] head;
+    //     logic [$clog2(DEPTH)-1:0] tail;
+    //     logic [DEPTH-1:0][WIDTH-1:0] state;
+    //     logic [$clog2(DEPTH):0]   used;
+    //     // logic [$clog2(DEPTH):0]   free;
+    // },
+
 
     always_ff @(posedge clock) begin
-        if (reset || flush) begin
-            entries_pre <= '0;
+        if (reset) begin
+            // for (unsigned int i = 0;)
+            // entries.push_back()
+            // entries_pre <= '0;
             ins_pre     <= '0;
             outs_pre    <= '0;
         end else begin
-            entries_pre <= entries_cur;
+            // entries_pre <= entries_cur;
             ins_pre     <= ins_cur;
             outs_pre    <= outs_cur;
         end
