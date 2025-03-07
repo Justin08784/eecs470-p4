@@ -2,7 +2,7 @@
 // This module generates the test vectors
 // Correctness checking is in FIFO_sva.svh
 `include "sys_defs.svh"
-// `include "test/fifo_sva.svh"
+`include "test/fifo_sva.svh"
 
 module fifo_test();
     localparam DEPTH = `ROB_SZ;
