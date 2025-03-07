@@ -71,6 +71,23 @@ module fifo_test();
         .used_scnt  (used_scnt)
     );
 
+    fifo_sva #(
+        .DEPTH(DEPTH),
+        .WIDTH(WIDTH),
+        .NUM_RPORTS(NUM_RPORTS),
+        .NUM_WPORTS(NUM_WPORTS),
+        .MAX_SCNT(MAX_SCNT)
+    ) sva (
+        .clock      (clock),
+        .reset      (reset),
+        .wr_en_cnt  (wr_en_cnt),
+        .wr_data    (wr_data),
+        .rd_en_cnt  (rd_en_cnt),
+        .rd_data    (),
+        .free_scnt  (),
+        .used_scnt  ()
+    );
+
     initial begin
         $display("\nStart Testbench");
         clock = 0;
@@ -93,9 +110,11 @@ module fifo_test();
 
         // ---------- Test 1 ---------- //
         $display("\nTest 1: invalid read");
-        rd_en_cnt = 2'b01;
+        // rd_en_cnt = 2'b00;
         @(negedge clock);
-        rd_en_cnt = 2'b00;
+        // rd_en_cnt = 2'b00;
+        wr_en_cnt = 1;
+        @(negedge clock);
 
         // // ---------- Test 2 ---------- //
         // $display("\nTest 2: Write and read with one cycle wait");
