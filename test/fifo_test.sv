@@ -84,9 +84,9 @@ module fifo_test();
         .wr_en_cnt  (wr_en_cnt),
         .wr_data    (wr_data),
         .rd_en_cnt  (rd_en_cnt),
-        .rd_data    (),
-        .free_scnt  (),
-        .used_scnt  ()
+        .rd_data    (rd_data),
+        .free_scnt  (free_scnt),
+        .used_scnt  (used_scnt)
     );
 
     initial begin
@@ -106,8 +106,8 @@ module fifo_test();
             free_scnt);
 
         @(negedge clock);
-        @(negedge clock);
         reset = 0;
+        @(negedge clock);
 
         // ---------- Test 1 ---------- //
         $display("\nTest 1: invalid read");
