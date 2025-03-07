@@ -110,75 +110,73 @@ module fifo_test();
         @(negedge clock);
 
         // ---------- Test 1 ---------- //
-        $display("\nTest 1: invalid read");
-        // rd_en_cnt = 2'b00;
-        @(negedge clock);
-        // rd_en_cnt = 2'b00;
+        // $display("\nTest 1: invalid read");
+        // rd_en_cnt = 1;
+        // @(negedge clock);
+        // rd_en_cnt = 0;
+
+        // ---------- Test 2 ---------- //
+        $display("\nTest 2: Write and read with one cycle wait");
+        $display("Write 1 value");
         wr_en_cnt = 1;
         @(negedge clock);
+        wr_en_cnt = 0;
 
-        // // ---------- Test 2 ---------- //
-        // $display("\nTest 2: Write and read with one cycle wait");
-        // $display("Write 1 value");
-        // wr_en_cnt = 2'b01;
-        // @(negedge clock);
-        // wr_en_cnt = 2'b00;
+        $display("Wait one cycle");
+        @(negedge clock);
 
-        // $display("Wait one cycle");
-        // @(negedge clock);
+        rd_en_cnt = 1;
+        $display("Read 1 value");
+        @(negedge clock);
+        rd_en_cnt = 0;
 
-        // rd_en_cnt = 2'b01;
-        // $display("Read 1 value");
-        // @(negedge clock);
-        // rd_en_cnt = 2'b00;
+        // ---------- Test 2.5 ---------- //
+        $display("\nTest 2.5: Write and read twice with one cycle wait");
+        $display("Write 1 value");
+        wr_en_cnt = 2;
+        @(negedge clock);
+        wr_en_cnt = 0;
 
-        // // ---------- Test 2.5 ---------- //
-        // $display("\nTest 2.5: Write and read twice with one cycle wait");
-        // $display("Write 1 value");
-        // wr_en_cnt = 2'b11;
-        // @(negedge clock);
-        // wr_en_cnt = 2'b00;
+        $display("Wait one cycle");
+        @(negedge clock);
 
-        // $display("Wait one cycle");
-        // @(negedge clock);
+        rd_en_cnt = 2;
+        $display("Read 1 value");
+        @(negedge clock);
+        rd_en_cnt = 0;
 
-        // rd_en_cnt = 2'b11;
-        // $display("Read 1 value");
-        // @(negedge clock);
-        // rd_en_cnt = 2'b00;
+        // ---------- Test 3 ---------- //
+        $display("\nTest 3: Write and read with no wait");
+        $display("Write 1 value");
+        wr_en_cnt = 1;
+        @(negedge clock);
+        wr_en_cnt = 0;
 
-        // // // ---------- Test 3 ---------- //
-        // $display("\nTest 3: Write and read with no wait");
-        // $display("Write 1 value");
-        // wr_en_cnt = 2'b01;
-        // @(negedge clock);
-        // wr_en_cnt = 2'b00;
+        rd_en_cnt = 1;
+        $display("Read 1 value");
+        @(negedge clock);
+        rd_en_cnt = 0;
 
-        // rd_en_cnt = 2'b01;
-        // $display("Read 1 value");
-        // @(negedge clock);
-        // rd_en_cnt = 2'b00;
+        // ---------- Test 3.5 ---------- //
+        $display("\nTest 3.5: Write and read twice with no wait");
+        $display("Write 2 values");
+        wr_en_cnt = 2;
+        @(negedge clock);
+        wr_en_cnt = 0;
 
-        // // // ---------- Test 3.5 ---------- //
-        // $display("\nTest 3.5: Write and read twice with no wait");
-        // $display("Write 1 value");
-        // wr_en_cnt = 2'b11;
-        // @(negedge clock);
-        // wr_en_cnt = 2'b00;
+        rd_en_cnt = 2;
+        $display("Read 2 values");
+        @(negedge clock);
+        rd_en_cnt = 0;
 
-        // rd_en_cnt = 2'b11;
-        // $display("Read 1 value");
-        // @(negedge clock);
-        // rd_en_cnt = 2'b00;
-
-        // // // ---------- Test 4 ---------- //
+        // // ---------- Test 4 ---------- //
         // $display("\nTest 4: Read and write when empty");
         // wr_en_cnt = 2'b11;
         // rd_en_cnt = 2'b11;
         // @(negedge clock);
         // rd_en_cnt = 2'b00;
 
-        // // // ---------- Test 5 ---------- //
+        // // ---------- Test 5 ---------- //
         // $display("\nTest 5: Write 6 values");
         // wr_en_cnt = 2'b11;
         // repeat (2) @(negedge clock);
@@ -188,7 +186,7 @@ module fifo_test();
         // @(negedge clock);
         // wr_en_cnt = 2'b00;
 
-        // // // ---------- Test 6 ---------- //
+        // // ---------- Test 6 ---------- //
         // $display("\nTest 6: Read 4 values");
         // rd_en_cnt = 2'b11;
         // @(negedge clock);
@@ -198,7 +196,7 @@ module fifo_test();
         // @(negedge clock);
         // rd_en_cnt = 2'b00;
 
-        // // // ---------- Test 7 ---------- //
+        // // ---------- Test 7 ---------- //
         // $display("\nTest 7: Write until full");
         // cnt = 2;
         // wr_en_cnt = 2'b11;
@@ -207,12 +205,12 @@ module fifo_test();
         //     @(negedge clock);
         // end
 
-        // // // ---------- Test 8 ---------- //
+        // // ---------- Test 8 ---------- //
         // $display("\nTest 8: Invalid write");
         // wr_en_cnt = 2'b11;
         // @(negedge clock);
 
-        // // // ---------- Test 9 ---------- //
+        // // ---------- Test 9 ---------- //
         // $display("\nTest 9: Simultaneous read and write when full");
         // rd_en_cnt = 2'b11;
         // @(negedge clock);
@@ -220,7 +218,7 @@ module fifo_test();
         // rd_en_cnt = 2'b00;
         // @(negedge clock);
 
-        // // // ---------- Test 10 ---------- //
+        // // ---------- Test 10 ---------- //
         // $display("\nTest 10: Write when one less than full");
         // rd_en_cnt = 2'b01;
         // $display("Read one");
@@ -236,7 +234,7 @@ module fifo_test();
         // rd_en_cnt = 2'b00;
         // @(negedge clock);
 
-        // // // ---------- Test 11 ---------- //
+        // // ---------- Test 11 ---------- //
         // $display("\nTest 11: Read all values");
         // rd_en_cnt = 2'b11;
         // while (cnt > 0) begin

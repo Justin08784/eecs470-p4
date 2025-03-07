@@ -65,6 +65,7 @@ module fifo_sva #(
     logic [$clog2(DEPTH):0] free;    // how full the buffer should be
     logic [NUM_RPORTS-1:0][WIDTH-1:0] rd_data_sva;
     assign free = DEPTH - used;
+    // string s;
 
     initial begin
         // wait until 1st reset: ensures no Xs are floating around
@@ -74,6 +75,16 @@ module fifo_sva #(
         @(negedge clock);   
         @(negedge clock);   
     forever begin
+        // #0
+        // for (int i = 0, string s; i < NUM_WPORTS; ++i) begin
+        //     $display(wr_data[i]);
+        //     s.itoa(wr_data[i]);
+        //     $display("wr_dat[%d]: %s", i, i < wr_en_cnt ? s : "f");
+        // end
+        // for (int i = 0, string s; i < NUM_RPORTS; ++i) begin
+        //     s.itoa(rd_data[i]);
+        //     $display("rd_dat[%d]: %d", i, i < rd_en_cnt ? s : "f");
+        // end
         for (int i = 0; i < wr_en_cnt; ++i) begin
             entries.push_back(wr_data[i]);
         end
