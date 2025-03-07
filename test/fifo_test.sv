@@ -167,6 +167,22 @@ module fifo_test();
         rd_en_cnt = 2;
         $display("Read 2 values");
         @(negedge clock);
+
+        // ---------- Test -3 ---------- //
+        $display("\nTest -3: Same-cycle write and read");
+        wr_en_cnt = 1;
+        rd_en_cnt = 1;
+        @(negedge clock);
+        wr_en_cnt = 0;
+        rd_en_cnt = 0;
+
+        // ---------- Test -3.5 ---------- //
+        $display("\nTest -3.5: Same-cycle writes and reads each (2 of each)");
+        $display("Write 2 values");
+        wr_en_cnt = 2;
+        rd_en_cnt = 2;
+        @(negedge clock);
+        wr_en_cnt = 0;
         rd_en_cnt = 0;
 
         // // ---------- Test 4 ---------- //

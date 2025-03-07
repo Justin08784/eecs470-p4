@@ -130,12 +130,12 @@ module fifo_sva #(
     clocking cb @(posedge clock);
         property rd_en_correct;
             disable iff (reset)
-            rd_en_cnt <= used;
+            rd_en_cnt <= used + wr_en_cnt;
         endproperty
 
         property wr_en_correct;
             disable iff (reset)
-            wr_en_cnt <= free;
+            wr_en_cnt <= free + rd_en_cnt;
         endproperty
 
         property used_scnt_correct;

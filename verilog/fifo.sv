@@ -93,9 +93,9 @@ module fifo #(
             tail    <= RESET_STATE.tail;
             state   <= RESET_STATE.state;
         end else begin
-            if (wr_en_cnt > free)
+            if (wr_en_cnt > free + rd_en_cnt)
                 $error("FIFO overflow!");
-            if (rd_en_cnt > used)
+            if (rd_en_cnt > used + wr_en_cnt)
                 $error("FIFO underflow!");
             used    <= used + wr_en_cnt - rd_en_cnt;
             head    <= (head + rd_en_cnt) % DEPTH;
