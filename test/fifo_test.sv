@@ -48,9 +48,27 @@ module fifo_test();
     always begin
         #(`CLOCK_PERIOD/2) clock = ~clock;
     end
-    // Generate random numbers for our write data on each cycle
+    // Generate nonzero random numbers for our write data on each cycle
+    // (we shall treat a 0 as non-enabled; this allows us to print 0s in the $monitor
+    // to indicate non-enabled)
     always @(negedge clock) begin
-        std::randomize(wr_data);
+        std::randomize(wr_data) with {
+            foreach(wr_data[i])
+                wr_data[i] != 0;
+        };
+    end
+
+    always @(posedge clock) begin
+        $display("  %3d | d_in: [%d, %d]   wr_en_cnt: %d  rd_en_cnt: %d  |  d_out: [%d, %d]   used_scnt: %2d  free_scnt: %2d",
+            $time,
+            wr_en_cnt > 0 ? wr_data[0] : 0,
+            wr_en_cnt > 1 ? wr_data[1] : 0,
+            wr_en_cnt,
+            rd_en_cnt,
+            rd_data[0], 
+            rd_data[1], 
+            used_scnt, 
+            free_scnt);
     end
     
     // FIFO instance
@@ -96,14 +114,16 @@ module fifo_test();
         wr_en_cnt = 0;
         rd_en_cnt = 0;
 
-        $monitor("  %3d | d_in: %b   wr_en_cnt: %d  rd_en_cnt: %d  |  d_out: %b   used_scnt: %2d  free_scnt: %2d",
-            $time,
-            wr_data,
-            wr_en_cnt,
-            rd_en_cnt,
-            rd_data, 
-            used_scnt, 
-            free_scnt);
+        // $monitor("  %3d | d_in: [%d, %d]   wr_en_cnt: %d  rd_en_cnt: %d  |  d_out: [%d, %d]   used_scnt: %2d  free_scnt: %2d",
+        //     $time,
+        //     wr_en_cnt > 0 ? wr_data[0] : 0,
+        //     wr_en_cnt > 1 ? wr_data[1] : 0,
+        //     wr_en_cnt,
+        //     rd_en_cnt,
+        //     rd_data[0], 
+        //     rd_data[1], 
+        //     used_scnt, 
+        //     free_scnt);
 
         @(negedge clock);
         reset = 0;
