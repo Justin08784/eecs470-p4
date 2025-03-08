@@ -20,12 +20,8 @@ module rob #(
     input struct packed {
         logic [N-1:0]           c_en;
             // - From: EX
-        PHYS_REG_IDX [N-1:0]    c_ts;
-            // - From: EX
         ROB_IDX [N-1:0]         c_rob_idxs;
             // - From: EX
-            // - It's either this OR c_ts. If we have c_ts, then we CAM in ROB. If
-            // we have c_rob_idxs, we index into ROB.
     } c_in,
 
     // dispatch (write)
