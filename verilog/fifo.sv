@@ -29,10 +29,10 @@ module fifo #(
     /*NOTE: By removing rd_valid, wr_valid, we force the caller to make sure
     the enabled cnts are correct. */
 );
-    logic [$clog2(DEPTH)-1:0] head;
-    logic [$clog2(DEPTH)-1:0] tail;
-    logic [DEPTH-1:0][WIDTH-1:0] state;
-    logic [$clog2(DEPTH):0]   used, free;
+    logic [$clog2(DEPTH)-1:0]       head;
+    logic [$clog2(DEPTH)-1:0]       tail;
+    logic [DEPTH-1:0][WIDTH-1:0]    state;
+    logic [$clog2(DEPTH):0]         used, free;
 
     logic [NUM_RPORTS-1:0][$clog2(DEPTH)-1:0] rd_idxs;
     logic [NUM_WPORTS-1:0][$clog2(DEPTH)-1:0] wr_idxs;
