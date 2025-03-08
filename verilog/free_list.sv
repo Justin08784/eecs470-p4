@@ -54,18 +54,15 @@ module free_list #(parameter
     localparam DEPTH = `ROB_SZ;
     localparam WIDTH = $bits(PHYS_REG_IDX);
     typedef struct packed {
-        logic [$clog2(DEPTH)-1:0] head;
-        logic [$clog2(DEPTH)-1:0] tail;
-        logic [DEPTH-1:0][WIDTH-1:0] state;
-        logic [$clog2(DEPTH):0]   used;
-        // logic [$clog2(DEPTH):0]   free;
+        logic [$clog2(DEPTH)-1:0]       head;
+        logic [$clog2(DEPTH)-1:0]       tail;
+        logic [DEPTH-1:0][WIDTH-1:0]    state;
+        logic [$clog2(DEPTH):0]         used;
     } FIFO_STATE;
 
-    // TODO: need reset states for head, tail, cnt as well!!
     function automatic FIFO_STATE gen_reset_state();
         logic [DEPTH-1:0][WIDTH-1:0] state;
         logic [WIDTH-1:0] start = 32;
-        // `ROB_SZ = `PHYS_REG_SZ_R10K - 32
         for (int unsigned i = 0; i < $unsigned(DEPTH); ++i) begin
             state[i] = start + i;
         end
@@ -84,7 +81,6 @@ module free_list #(parameter
         .WIDTH(WIDTH),
         .NUM_RPORTS(`N),
         .NUM_WPORTS(`N),
-        .MAX_SCNT(`N),
         .RESET_STATE(RESET_STATE)
     ) lst (
         .clock(clock),
