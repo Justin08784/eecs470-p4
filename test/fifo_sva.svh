@@ -15,9 +15,8 @@ module fifo_sva #(
         logic [$clog2(DEPTH):0]   used;
         // logic [$clog2(DEPTH):0]   free;
     },
-    parameter int unsigned NUM_RPORTS,
-    parameter int unsigned NUM_WPORTS,
-    parameter int unsigned MAX_SCNT,    // should be less than DEPTH
+    parameter int unsigned NUM_RPORTS, // also cap for used_scnt
+    parameter int unsigned NUM_WPORTS, // also cap for free_scnt
     parameter FIFO_STATE RESET_STATE = '{default:0}
 ) (
     // inputs
@@ -31,8 +30,8 @@ module fifo_sva #(
     // outputs
     input   logic   [NUM_RPORTS-1:0][WIDTH-1:0]     rd_data,
 
-    input   logic   [$clog2(MAX_SCNT):0]            free_scnt,
-    input   logic   [$clog2(MAX_SCNT):0]            used_scnt
+    input   logic   [$clog2(NUM_WPORTS):0]          free_scnt,
+    input   logic   [$clog2(NUM_RPORTS):0]          used_scnt
 );
     struct packed {
         logic   [$clog2(NUM_WPORTS):0]          wr_en_cnt;
@@ -44,8 +43,8 @@ module fifo_sva #(
     struct packed {
         logic   [NUM_RPORTS-1:0][WIDTH-1:0]     rd_data;
 
-        logic   [$clog2(MAX_SCNT):0]            free_scnt;
-        logic   [$clog2(MAX_SCNT):0]            used_scnt;
+        logic   [$clog2(NUM_WPORTS):0]          free_scnt;
+        logic   [$clog2(NUM_RPORTS):0]          used_scnt;
     } outs_pre, outs_cur;
 
     assign ins_cur = '{
@@ -140,12 +139,12 @@ module fifo_sva #(
 
         property used_scnt_correct;
             disable iff (reset)
-            used_scnt == used < MAX_SCNT ? used : MAX_SCNT;
+            used_scnt == used < NUM_RPORTS ? used : NUM_RPORTS;
         endproperty
 
         property free_scnt_correct;
             disable iff (reset)
-            free_scnt == free < MAX_SCNT ? free : MAX_SCNT;
+            free_scnt == free < NUM_WPORTS ? free : NUM_WPORTS;
         endproperty
 
         property rd_data_correct;

@@ -10,9 +10,8 @@ module fifo #(
         logic [$clog2(DEPTH):0]   used;
         // logic [$clog2(DEPTH):0]   free;
     },
-    parameter int unsigned NUM_RPORTS=`N,
-    parameter int unsigned NUM_WPORTS=`N,
-    parameter int unsigned MAX_SCNT=`N,    // should be less than DEPTH
+    parameter int unsigned NUM_RPORTS=`N, // also cap for used_scnt
+    parameter int unsigned NUM_WPORTS=`N, // also cap for free_scnt
     parameter FIFO_STATE RESET_STATE='{default:0}
 ) (
     input                                           clock, 
@@ -24,8 +23,8 @@ module fifo #(
     input   logic   [$clog2(NUM_RPORTS):0]          rd_en_cnt,
     output  logic   [NUM_RPORTS-1:0][WIDTH-1:0]     rd_data,
 
-    output  logic   [$clog2(MAX_SCNT):0]            free_scnt,
-    output  logic   [$clog2(MAX_SCNT):0]            used_scnt
+    output  logic   [$clog2(NUM_WPORTS):0]          free_scnt,
+    output  logic   [$clog2(NUM_RPORTS):0]          used_scnt
 
     /*NOTE: By removing rd_valid, wr_valid, we force the caller to make sure
     the enabled cnts are correct. */
@@ -39,8 +38,8 @@ module fifo #(
     logic [NUM_WPORTS-1:0][$clog2(DEPTH)-1:0] wr_idxs;
 
     assign free         = DEPTH - used;
-    assign free_scnt    = free > MAX_SCNT ? MAX_SCNT : free;
-    assign used_scnt    = used > MAX_SCNT ? MAX_SCNT : used;
+    assign free_scnt    = free > NUM_WPORTS ? NUM_WPORTS : free;
+    assign used_scnt    = used > NUM_RPORTS ? NUM_RPORTS : used;
 
     // Version 1:
     // always_comb begin
