@@ -58,17 +58,20 @@ module fifo_test();
         };
     end
 
+    logic DEBUG = 1;
     always @(posedge clock) begin
-        $display("  %3d | d_in: [%d, %d]   wr_en_cnt: %d  rd_en_cnt: %d  |  d_out: [%d, %d]   used_scnt: %2d  free_scnt: %2d",
-            $time,
-            wr_en_cnt > 0 ? wr_data[0] : 0,
-            wr_en_cnt > 1 ? wr_data[1] : 0,
-            wr_en_cnt,
-            rd_en_cnt,
-            rd_data[0], 
-            rd_data[1], 
-            used_scnt, 
-            free_scnt);
+        if (DEBUG) begin
+            $display("  %3d | d_in: [%d, %d]   wr_en_cnt: %d  rd_en_cnt: %d  |  d_out: [%d, %d]   used_scnt: %2d  free_scnt: %2d",
+                $time,
+                wr_en_cnt > 0 ? wr_data[0] : 0,
+                wr_en_cnt > 1 ? wr_data[1] : 0,
+                wr_en_cnt,
+                rd_en_cnt,
+                rd_data[0], 
+                rd_data[1], 
+                used_scnt, 
+                free_scnt);
+        end
     end
     
     // FIFO instance
@@ -334,6 +337,28 @@ module fifo_test();
         @(negedge clock);
         wr_en_cnt = 0;
         rd_en_cnt = 0;
+
+
+        // ---------- Test 16 ---------- //
+        $display("\nTest 16: Randomized stress testing");
+        `define MIN(a, b) ((a) < (b) ? (a) : (b))
+        DEBUG = 0; // disable debugs
+        for (int i = 0; i < 10000; ++i) begin
+            if (free_scnt < NUM_WPORTS) begin
+                wr_en_cnt = $urandom_range(`MIN(NUM_WPORTS, free_scnt + NUM_RPORTS), 0);
+            end else begin
+                wr_en_cnt = $urandom_range(NUM_WPORTS, 0);
+            end
+
+            if (free_scnt < wr_en_cnt) begin
+                rd_en_cnt = $urandom_range(`MIN(NUM_RPORTS, used_scnt + wr_en_cnt), wr_en_cnt - free_scnt);
+            end else begin
+                rd_en_cnt = $urandom_range(`MIN(NUM_RPORTS, used_scnt + wr_en_cnt), 0);
+            end
+            @(negedge clock);
+            wr_en_cnt = 0;
+            rd_en_cnt = 0;
+        end
 
 
 
