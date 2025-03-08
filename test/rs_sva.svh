@@ -132,7 +132,6 @@ module rs_sva #(parameter
     logic   [RS_SZ-1:0] entries_eqs;
     RS_ENTRY entries_sva_sorted[RS_SZ], entries_dut_sorted[RS_SZ];
 
-    `define MAX(a, b) ((a) > (b) ? (a) : (b))
     localparam MAX_NUM_FU = `MAX(NUM_FU_ALU, `MAX(NUM_FU_MULT, `MAX(NUM_FU_LOAD, NUM_FU_STORE)));
     // struct packed {
     //     int     idx; // idx of original element

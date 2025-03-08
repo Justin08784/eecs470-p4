@@ -341,7 +341,6 @@ module fifo_test();
 
         // ---------- Test 16 ---------- //
         $display("\nTest 16: Randomized stress testing");
-        `define MIN(a, b) ((a) < (b) ? (a) : (b))
         DEBUG = 0; // disable debugs
         for (int i = 0; i < 10000; ++i) begin
             if (free_scnt < NUM_WPORTS) begin

@@ -13,6 +13,10 @@
 // all files should `include "sys_defs.svh" to at least define the timescale
 `timescale 1ns/100ps
 
+// helpful macros
+`define MIN(a, b) ((a) < (b) ? (a) : (b))
+`define MAX(a, b) ((a) > (b) ? (a) : (b))
+
 ///////////////////////////////////
 // ---- Starting Parameters ---- //
 ///////////////////////////////////
