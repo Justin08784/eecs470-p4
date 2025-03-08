@@ -289,10 +289,53 @@ module fifo_test();
         // ---------- Test 14 ---------- //
         $display("\nTest 14: Read last item");
         @(negedge clock);
-        rd_en_cnt = 2'b00;
+        rd_en_cnt = 0;
 
+        // ---------- Test 15 ---------- //
+        $display("\nTest 15: Forwarding");
+
+        $display("1 read: from state");
+        wr_en_cnt = 1;
         @(negedge clock);
+        wr_en_cnt = 0;
+
+        rd_en_cnt = 1;
         @(negedge clock);
+        rd_en_cnt = 0;
+
+        $display("1 read: fwded");
+        wr_en_cnt = 1;
+        rd_en_cnt = 1;
+        @(negedge clock);
+        wr_en_cnt = 0;
+        rd_en_cnt = 0;
+
+        $display("2 reads: both from state");
+        wr_en_cnt = 2;
+        @(negedge clock);
+        wr_en_cnt = 0;
+
+        rd_en_cnt = 2;
+        @(negedge clock);
+        rd_en_cnt = 0;
+
+        $display("2 reads: 1 from state, 1 fwded");
+        wr_en_cnt = 1;
+        @(negedge clock);
+
+        rd_en_cnt = 2;
+        @(negedge clock);
+        wr_en_cnt = 0;
+        rd_en_cnt = 0;
+
+        $display("2 reads: both fwded");
+        wr_en_cnt = 2;
+        rd_en_cnt = 2;
+        @(negedge clock);
+        wr_en_cnt = 0;
+        rd_en_cnt = 0;
+
+
 
         // $display("\n\033[32m@@@ Passed\033[0m\n");
 
