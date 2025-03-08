@@ -135,58 +135,48 @@ endmodule
 Re-order Buffer (ROB)
 ================================================
 */
-module rob (
-    input                           clock, reset,
+module rob #(
+    parameter DEPTH = `ROB_SZ,  // num elements
+    parameter WIDTH = $bits(ROB_ENTRY),  // num bits per element 
+                           //(32 bits per insn + log2(64) = 6 bits each for T & Told)
+    parameter N=`N,
+) (
+    input                       clock, reset,
 
-    // >> [TODO: delete]
-    input  [1:0]                    dispatch_en,
-    input  [1:0]                    retire_en,
-    input                           err,
-    input  [1:0][WIDTH-1:0]         next_insn,
-    output logic [1:0]              wr_valid,
-        // We don't need this anymore because dispatch only dispatches as
-        // many as ROB can accept.
-    output logic [1:0]              rd_valid,
-        // See above.
-    output logic [1:0][WIDTH-1:0]   completed_insn,
-    output logic [CNT_BITS:0]       free_spots,
-    output logic                    full
-    // << [TODO: delete]
-
-
-    // >> [TODO: impl]
     // retire (read)
-    output logic [N-1:0]            r_en,
-        // To: idk
     output struct packed {
-        PHYS_REG_IDX tag;
-        PHYS_REG_IDX t_old;
-    } [N-1:0] r_dat,
-        // To: idk
+        logic [N-1:0]           r_en;
+
+        PHYS_REG_IDX [N-1:0]    tag;
+        PHYS_REG_IDX [N-1:0]    t_old;
+    } r_out,
 
     // complete (write)
-    input   logic        [N-1:0]    c_en,
-        // - From: EX
-    input   PHYS_REG_IDX [N-1:0]    c_ts,
-        // - From: EX
-    input   ROB_IDX      [N-1:0]    c_rob_idxs,
-        // - From: EX
-        // - It's either this OR c_ts. If we have c_ts, then we CAM in ROB. If
-        // we have c_rob_idxs, we index into ROB.
+    input struct packed {
+        logic [N-1:0]           c_en;
+            // - From: EX
+        PHYS_REG_IDX [N-1:0]    c_ts;
+            // - From: EX
+        ROB_IDX [N-1:0]         c_rob_idxs;
+            // - From: EX
+            // - It's either this OR c_ts. If we have c_ts, then we CAM in ROB. If
+            // we have c_rob_idxs, we index into ROB.
+    } c_in,
 
     // dispatch (write)
-    output logic    [$clog2(N):0]   rob_rdy_scnt,
-        // To: dispatch
-        // saturating counter for number of free rob entries
-
-    input   [$clog2(N):0]           d_en_cnt,
-        // From: dispatch
-        // - Number of enabled dispatch lines?
-    input   ROB_ENTRY   [N-1:0]     d_dat,
-        // From: dispatch
-        // - IMPORTANT: Set from lowest indices in program-order. NO GAPS!!!
-
-    // << [TODO: impl]
+    output struct packed {
+        logic [$clog2(N):0]     rob_rdy_scnt;
+            // To: dispatch
+            // saturating counter for number of free rob entries
+    } d_out,
+    input struct packed {
+        logic [$clog2(N):0]     d_en_cnt;
+            // From: dispatch
+            // - Number of enabled dispatch lines?
+        ROB_ENTRY   [N-1:0]     d_dat;
+            // From: dispatch
+            // - IMPORTANT: Set from lowest indices in program-order. NO GAPS!!!
+    } d_in
 );
 endmodule
 
