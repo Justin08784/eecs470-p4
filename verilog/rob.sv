@@ -1,9 +1,7 @@
 `include "sys_defs.svh"
 
 module rob #(
-    parameter DEPTH = `ROB_SZ,  // num elements
-    parameter WIDTH = $bits(ROB_ENTRY),  // num bits per element 
-                           //(32 bits per insn + log2(64) = 6 bits each for T & Told)
+    parameter ROB_SZ = `ROB_SZ,  // num elements
     parameter N=`N
 ) (
     input                       clock, reset,
@@ -52,24 +50,24 @@ module rob #(
     logic [$clog2(NUM_DPORTS):0]    free_scnt;
     logic [$clog2(NUM_RPORTS):0]    used_scnt;
 
-    logic [$clog2(DEPTH)-1:0]   head;
-    logic [$clog2(DEPTH)-1:0]   tail;
+    logic [$clog2(ROB_SZ)-1:0]   head;
+    logic [$clog2(ROB_SZ)-1:0]   tail;
 
-    ROB_ENTRY [DEPTH-1:0]       state;
-    logic [$clog2(DEPTH):0]     used, free;
+    ROB_ENTRY [ROB_SZ-1:0]       state;
+    logic [$clog2(ROB_SZ):0]     used, free;
 
-    logic [NUM_RPORTS-1:0][$clog2(DEPTH)-1:0] r_idxs;
-    logic [NUM_DPORTS-1:0][$clog2(DEPTH)-1:0] d_idxs;
+    logic [NUM_RPORTS-1:0][$clog2(ROB_SZ)-1:0] r_idxs;
+    logic [NUM_DPORTS-1:0][$clog2(ROB_SZ)-1:0] d_idxs;
 
-    assign free         = DEPTH - used;
+    assign free         = ROB_SZ - used;
     assign free_scnt    = free > NUM_DPORTS ? NUM_DPORTS : free;
     assign used_scnt    = used > NUM_RPORTS ? NUM_RPORTS : used;
 
     always_comb begin
         for (int unsigned i = 0; i < NUM_RPORTS; ++i)
-            r_idxs[i] = (head + i) % DEPTH;
+            r_idxs[i] = (head + i) % ROB_SZ;
         for (int unsigned i = 0; i < NUM_DPORTS; ++i)
-            d_idxs[i] = (tail + i) % DEPTH;
+            d_idxs[i] = (tail + i) % ROB_SZ;
 
         // handle retire (outs)
         r_out.r_en_cnt  = '0;
@@ -106,8 +104,8 @@ module rob #(
             if (r_out.r_en_cnt > used + d_in.d_en_cnt)
                 $error("ROB underflow!");
             used    <= used + d_in.d_en_cnt - r_out.r_en_cnt;
-            head    <= (head + r_out.r_en_cnt) % DEPTH;
-            tail    <= (tail + d_in.d_en_cnt) % DEPTH;
+            head    <= (head + r_out.r_en_cnt) % ROB_SZ;
+            tail    <= (tail + d_in.d_en_cnt) % ROB_SZ;
 
             // handle complete (ins)
             for (int unsigned i = 0; i < NUM_CPORTS; ++i)

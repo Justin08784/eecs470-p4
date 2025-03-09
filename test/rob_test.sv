@@ -5,11 +5,10 @@
 `include "test/rob_sva.svh"
 
 module rob_test();
-    localparam DEPTH = `ROB_SZ;
-    localparam WIDTH = $bits(PHYS_REG_IDX);
+    localparam ROB_SZ = `ROB_SZ;  // num elements
     localparam NUM_RPORTS = 2;
-    localparam NUM_WPORTS = 2;
-    localparam MAX_SCNT   = 2;
+    localparam NUM_DPORTS = 2;
+    localparam NUM_CPORTS = 2;
     localparam N          = `N;
 
     logic                       clock, reset;
@@ -92,8 +91,7 @@ module rob_test();
     
     // FIFO instance
     rob #(
-        .DEPTH(DEPTH),
-        .WIDTH(WIDTH),
+        .ROB_SZ(ROB_SZ),
         .N(N)
     ) dut (
         .clock  (clock),
@@ -105,8 +103,7 @@ module rob_test();
     );
 
     rob_sva #(
-        .DEPTH(DEPTH),
-        .WIDTH(WIDTH),
+        .ROB_SZ(ROB_SZ),
         .N(N)
     ) sva (
         .clock  (clock),
