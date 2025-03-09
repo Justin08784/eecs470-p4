@@ -1,5 +1,14 @@
 `include "sys_defs.svh"
 
+/*
+TODO:
+- Do w->r forwarding optimization tricks like those you used in fifo/rob?
+(in particular, combinationally updating entries_n seems incredibly expensive.
+What if we handle all writes synchronously? And combinationally forward writes to
+reads.)
+- Bundle rs I/O by stages like rob and free_list?
+*/
+
 module rs #(parameter 
     N=`N,
     RS_SZ=`RS_SZ,
@@ -24,7 +33,7 @@ module rs #(parameter
     0      1      2 
     */
     output  logic           [$clog2(N):0] rs_scnt, // to dispatcher
-    input   logic           [N-1:0] d_vld,     // which dispatch lines are valid? (from dispatcher; dep. on rs_scnt)
+    input   logic           [$clog2(N):0] d_en_cnt,     // number of enabled dispatch lines? (from dispatcher; dep. on rs_scnt)
     input   ID_RESULT       [N-1:0] d_dat,
 
     // issue
@@ -288,23 +297,12 @@ module rs #(parameter
         .gnt_bus(gbus_free)
     );
 
-    // select valid dispatches
-    logic [N-1:0][N-1:0] gbus_d_vld;
-    psel_gen #(
-        .WIDTH(N),
-        .REQS(N)
-    ) sel_d_vld (
-        .req    (d_vld),
-        .gnt_bus(gbus_d_vld)
-    );
-
     logic [N-1:0][RS_SZ-1:0] d2entry;
     always_comb begin
         d2entry = '0;
-        foreach (gbus_d_vld[i, j]) begin
-            if (gbus_d_vld[i][j]) begin
-                d2entry[j] |= gbus_free[i];
-                // to_issue   |= gbus_can_issue_alu[i];
+        foreach (d2entry[i]) begin
+            if (i < d_en_cnt) begin
+                d2entry[i] |= gbus_free[i];
             end
         end
     end

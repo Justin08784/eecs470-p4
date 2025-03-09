@@ -73,7 +73,15 @@ endmodule
 Reservation Station (RS)
 ================================================
 */
-module rs (
+module rs #(parameter 
+    N=`N,
+    RS_SZ=`RS_SZ,
+    FU_IDX_NUM=`FU_IDX_NUM,
+    NUM_FU_ALU=`NUM_FU_ALU,
+    NUM_FU_MULT=`NUM_FU_MULT,
+    NUM_FU_LOAD=`NUM_FU_LOAD,
+    NUM_FU_STORE=`NUM_FU_STORE
+) (
     input clock, reset, flush,
 
     // dispatch
@@ -81,15 +89,6 @@ module rs (
         // To: dispatch
     input   ID_RESULT   [N-1:0] d_dat,
         // - From: dispatch
-    // >> [TODO: delete]
-    input   logic       [N-1:0] d_vld,
-        // - From: dispatch
-        // - IMPORTANT: Set from lowest indices in program-order. NO GAPS!!!
-        //   i.e. forall i < j, if d_vld[i] && d_vld[j], 
-        //   then d_dat[i] <_{Prog Order} d_dat[j]
-    // << [TODO: delete]
-
-    // >> [TODO: impl]
     input   logic       [$clog2(N):0] d_en_cnt,
         // - From: dispatch
         // - Number of enabled dispatch lines? (replacement for d_vld)
@@ -97,7 +96,6 @@ module rs (
         // 1) only N dispatches, OR
         // 2) a different limit number of dispatches DIS_MAX: N ≤ DIS_MAX ≤ RS_SZ
         // (DIS_MAX will be a new sys_defs.svh constant) ?
-    // << [TODO: impl]
 
     // >> UNSURE
     output  ID_RESULT   [RS_SZ-1:0] rs_rdy,
@@ -135,58 +133,52 @@ endmodule
 Re-order Buffer (ROB)
 ================================================
 */
-module rob (
-    input                           clock, reset,
+module rob #(
+    parameter ROB_SZ = `ROB_SZ,  // num elements
+    parameter N=`N
+) (
+    `ifdef DEBUG
+    output  ROB_ENTRY   [ROB_SZ-1:0]    state_dbg,
+    `endif 
+    input                       clock, reset,
 
-    // >> [TODO: delete]
-    input  [1:0]                    dispatch_en,
-    input  [1:0]                    retire_en,
-    input                           err,
-    input  [1:0][WIDTH-1:0]         next_insn,
-    output logic [1:0]              wr_valid,
-        // We don't need this anymore because dispatch only dispatches as
-        // many as ROB can accept.
-    output logic [1:0]              rd_valid,
-        // See above.
-    output logic [1:0][WIDTH-1:0]   completed_insn,
-    output logic [CNT_BITS:0]       free_spots,
-    output logic                    full
-    // << [TODO: delete]
-
-
-    // >> [TODO: impl]
     // retire (read)
-    output logic [N-1:0]            r_en,
-        // To: idk
     output struct packed {
-        PHYS_REG_IDX tag;
-        PHYS_REG_IDX t_old;
-    } [N-1:0] r_dat,
-        // To: idk
+        logic [$clog2(N):0]     r_en_cnt;
+
+        PHYS_REG_IDX [N-1:0]    tag;
+        PHYS_REG_IDX [N-1:0]    t_old;
+    } r_out,
 
     // complete (write)
-    input   logic        [N-1:0]    c_en,
-        // - From: EX
-    input   PHYS_REG_IDX [N-1:0]    c_ts,
-        // - From: EX
-    input   ROB_IDX      [N-1:0]    c_rob_idxs,
-        // - From: EX
-        // - It's either this OR c_ts. If we have c_ts, then we CAM in ROB. If
-        // we have c_rob_idxs, we index into ROB.
+    input struct packed {
+        logic [N-1:0]           c_en;
+            // - From: EX
+        ROB_IDX [N-1:0]         c_rob_idxs;
+            // - From: EX
+    } c_in,
 
     // dispatch (write)
-    output logic    [$clog2(N):0]   rob_rdy_scnt,
-        // To: dispatch
-        // saturating counter for number of free rob entries
-
-    input   [$clog2(N):0]           d_en_cnt,
-        // From: dispatch
-        // - Number of enabled dispatch lines?
-    input   ROB_ENTRY   [N-1:0]     d_dat,
-        // From: dispatch
-        // - IMPORTANT: Set from lowest indices in program-order. NO GAPS!!!
-
-    // << [TODO: impl]
+    output struct packed {
+        logic [$clog2(N):0]     rob_rdy_scnt;
+            // To: dispatch
+            // saturating counter for number of free rob entries
+        ROB_IDX [N-1:0]         rob_idxs;
+            // To: dispatch
+            // rob idxs of entries that can be allocated this cycle
+            // Option 1: This
+            // Option 2: expose HEAD pointer and let dispatcher generate these
+            // (main concern with option 2 is it could be wrong? idk)
+    } d_out,
+    input struct packed {
+        logic [$clog2(N):0]     d_en_cnt;
+            // From: dispatch
+            // - Number of enabled dispatch lines?
+        logic [N-1:0][$clog2(`PHYS_REG_SZ_R10K)-1:0] tag;
+        logic [N-1:0][$clog2(`PHYS_REG_SZ_R10K)-1:0] t_old;
+            // From: dispatch
+            // - IMPORTANT: Set from lowest indices in program-order. NO GAPS!!!
+    } d_in
 );
 endmodule
 
