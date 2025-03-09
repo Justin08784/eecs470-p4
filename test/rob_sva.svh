@@ -72,6 +72,7 @@ module rob_sva #(
         logic [$clog2(N):0]     rob_rdy_scnt;
             // To: dispatch
             // saturating counter for number of free rob entries
+        ROB_IDX [N-1:0]         rob_idxs;
     } d_out_sva;
 
     initial begin
@@ -98,7 +99,7 @@ module rob_sva #(
         end
 
         d_out_sva.rob_rdy_scnt = `MIN(entries.size(), NUM_DPORTS);
-        for (d_out_sva.rob_idxs[i])
+        foreach (d_out_sva.rob_idxs[i])
             d_out_sva.rob_idxs[i] = (wr_idx + i) % DEPTH;
 
         // #0

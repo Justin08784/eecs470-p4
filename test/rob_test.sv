@@ -38,6 +38,19 @@ module rob_test();
         logic [N-1:0][$clog2(`PHYS_REG_SZ_R10K)-1:0] t_old;
     } d_in;
 
+    task set_complete(
+        input int i,
+        input int rob_idx 
+    );
+        c_in.c_en[i]        = 1;
+        c_in.c_rob_idxs[i]  = rob_idx;
+    endtask
+
+    task clr_all();
+        d_in = '0;
+        c_in = '0;
+    endtask
+
     // Variable to count values written to FIFO
     int cnt;
 
@@ -48,38 +61,32 @@ module rob_test();
     // (we shall treat a 0 as non-enabled; this allows us to print 0s in the $monitor
     // to indicate non-enabled)
 
-    logic [N-1:0][$clog2(`PHYS_REG_SZ_R10K)-1:0] tags;
-    logic [N-1:0][$clog2(`PHYS_REG_SZ_R10K)-1:0] t_olds;
-    generate
-    for (genvar i = 0; i < N; i++) begin : gen_vecs // ms1 test: make loop count RS_SZ-1 instead of RS_SZ (caught)
-        assign tags[i] = d_in.tag[i]; // ms1 test: make busy_vec sequential instead of combinational (caught)
-        assign t_olds[i] = d_in.t_old[i];
-    end
-    endgenerate
     always @(negedge clock) begin
-        std::randomize(tags) with {
-            foreach(tags[i])
-                tags[i] != 0;
-        };
-        std::randomize(t_olds) with {
-            foreach(t_olds[i])
-                t_olds[i] != 0;
-        };
+        foreach (d_in.tag[i]) begin
+            d_in.tag[i]     = $urandom_range(`PHYS_REG_SZ_R10K-1, 1);
+            d_in.t_old[i]   = $urandom_range(`PHYS_REG_SZ_R10K-1, 1);
+        end
     end
 
     logic DEBUG = 1;
     always @(posedge clock) begin
         if (DEBUG) begin
-            // $display("  %3d | d_in: [%d, %d]   wr_en_cnt: %d  rd_en_cnt: %d  |  d_out: [%d, %d]   used_scnt: %2d  free_scnt: %2d",
-            //     $time,
-            //     wr_en_cnt > 0 ? wr_data[0] : 0,
-            //     wr_en_cnt > 1 ? wr_data[1] : 0,
-            //     wr_en_cnt,
-            //     rd_en_cnt,
-            //     rd_data[0], 
-            //     rd_data[1], 
-            //     used_scnt, 
-            //     free_scnt);
+            $display("  %3d | d_in: [(%d, %d), (%d, %d)]   wr_en_cnt: %d  rd_en_cnt: %d  |  d_out: [(%d, %d), (%d, %d)]",
+                $time,
+                d_in.tag[0],
+                d_in.t_old[0],
+                d_in.tag[1],
+                d_in.t_old[1],
+                // d_in.d_en_cnt > 0 ? d_in.tag[0] : 0,
+                // d_in.d_en_cnt > 0 ? d_in.t_old[0] : 0,
+                // d_in.d_en_cnt > 1 ? d_in.tag[1] : 0,
+                // d_in.d_en_cnt > 1 ? d_in.t_old[1] : 0,
+                d_in.d_en_cnt,
+                r_out.r_en_cnt,
+                r_out.tag[0], 
+                r_out.t_old[0], 
+                r_out.tag[1], 
+                r_out.t_old[1]);
         end
     end
     
@@ -89,6 +96,8 @@ module rob_test();
         .WIDTH(WIDTH),
         .N(N)
     ) dut (
+        .clock  (clock),
+        .reset  (reset),
         .r_out  (r_out),
         .c_in   (c_in),
         .d_out  (d_out),
@@ -100,6 +109,8 @@ module rob_test();
         .WIDTH(WIDTH),
         .N(N)
     ) sva (
+        .clock  (clock),
+        .reset  (reset),
         .r_out  (r_out),
         .c_in   (c_in),
         .d_out  (d_out),
@@ -110,6 +121,7 @@ module rob_test();
         $display("\nStart Testbench");
         clock = 0;
         reset = 1;
+        d_in.d_en_cnt = 0;
         // wr_en_cnt = 0;
         // rd_en_cnt = 0;
 
@@ -126,6 +138,11 @@ module rob_test();
 
         @(negedge clock);
         reset = 0;
+        @(negedge clock);
+
+        d_in.d_en_cnt = 1;
+        @(negedge clock);
+        set_complete(0, 0);
         @(negedge clock);
 
         $display("\n\033[32m@@@ Passed\033[0m\n");
