@@ -73,7 +73,15 @@ endmodule
 Reservation Station (RS)
 ================================================
 */
-module rs (
+module rs #(parameter 
+    N=`N,
+    RS_SZ=`RS_SZ,
+    FU_IDX_NUM=`FU_IDX_NUM,
+    NUM_FU_ALU=`NUM_FU_ALU,
+    NUM_FU_MULT=`NUM_FU_MULT,
+    NUM_FU_LOAD=`NUM_FU_LOAD,
+    NUM_FU_STORE=`NUM_FU_STORE
+) (
     input clock, reset, flush,
 
     // dispatch
@@ -81,15 +89,6 @@ module rs (
         // To: dispatch
     input   ID_RESULT   [N-1:0] d_dat,
         // - From: dispatch
-    // >> [TODO: delete]
-    input   logic       [N-1:0] d_vld,
-        // - From: dispatch
-        // - IMPORTANT: Set from lowest indices in program-order. NO GAPS!!!
-        //   i.e. forall i < j, if d_vld[i] && d_vld[j], 
-        //   then d_dat[i] <_{Prog Order} d_dat[j]
-    // << [TODO: delete]
-
-    // >> [TODO: impl]
     input   logic       [$clog2(N):0] d_en_cnt,
         // - From: dispatch
         // - Number of enabled dispatch lines? (replacement for d_vld)
@@ -97,7 +96,6 @@ module rs (
         // 1) only N dispatches, OR
         // 2) a different limit number of dispatches DIS_MAX: N ≤ DIS_MAX ≤ RS_SZ
         // (DIS_MAX will be a new sys_defs.svh constant) ?
-    // << [TODO: impl]
 
     // >> UNSURE
     output  ID_RESULT   [RS_SZ-1:0] rs_rdy,
