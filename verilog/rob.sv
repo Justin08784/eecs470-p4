@@ -29,6 +29,12 @@ module rob #(
         logic [$clog2(N):0]     rob_rdy_scnt;
             // To: dispatch
             // saturating counter for number of free rob entries
+        ROB_IDX [N-1:0]         rob_idxs;
+            // To: dispatch
+            // rob idxs of entries that can be allocated this cycle
+            // Option 1: This
+            // Option 2: expose HEAD pointer and let dispatcher generate these
+            // (main concern with option 2 is it could be wrong? idk)
     } d_out,
     input struct packed {
         logic [$clog2(N):0]     d_en_cnt;
@@ -81,6 +87,7 @@ module rob #(
         // handle dispatch (outs)
         // The true number of same-cycle free slots is free + r_en_cnt
         d_out.rob_rdy_scnt = `MIN(free + r_out.r_en_cnt, NUM_DPORTS);
+        d_out.rob_idxs     = d_idxs;
     end
 
     always_ff @(posedge clock) begin

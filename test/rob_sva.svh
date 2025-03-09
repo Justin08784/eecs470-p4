@@ -31,6 +31,9 @@ module rob_sva #(
         logic [$clog2(N):0]     rob_rdy_scnt;
             // To: dispatch
             // saturating counter for number of free rob entries
+        ROB_IDX [N-1:0]         rob_idxs;
+            // To: dispatch
+            // rob idxs of entries that can be allocated this cycle
     } d_out,
     input struct packed {
         logic [$clog2(N):0]     d_en_cnt;
@@ -95,6 +98,8 @@ module rob_sva #(
         end
 
         d_out_sva.rob_rdy_scnt = `MIN(entries.size(), NUM_DPORTS);
+        for (d_out_sva.rob_idxs[i])
+            d_out_sva.rob_idxs[i] = (wr_idx + i) % DEPTH;
 
         // #0
         for (int i = 0; i < d_in.d_en_cnt; ++i) begin

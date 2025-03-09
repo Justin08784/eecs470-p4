@@ -29,6 +29,7 @@ module rob_test();
     // dispatch (write)
     struct packed {
         logic [$clog2(N):0]     rob_rdy_scnt;
+        ROB_IDX [N-1:0]         rob_idxs;
     } d_out;
 
     struct packed {
