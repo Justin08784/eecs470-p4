@@ -8,7 +8,6 @@ TODO:
 does not explicitly toggle d_en_cnt does NOTHING! NEED REVISION!
 (Currently set/clr_dispatch awkwardly only sets/clrs d_dat; d_en_cnt must 
 be toggled separately.)
-- Bundle rs I/O by stages like rob and free_list?
 */
 
 module rs_testbench;

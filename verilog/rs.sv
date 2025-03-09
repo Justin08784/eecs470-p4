@@ -1,5 +1,11 @@
 `include "sys_defs.svh"
 
+/*
+TODO:
+- Do w->r forwarding optimization tricks like those you used in fifo/rob?
+- Bundle rs I/O by stages like rob and free_list?
+*/
+
 module rs #(parameter 
     N=`N,
     RS_SZ=`RS_SZ,
