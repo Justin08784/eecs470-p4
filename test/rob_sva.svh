@@ -93,7 +93,7 @@ module rob_sva #(
                 break;
             
             r_out_sva.tag[i] = tmp_entry.tag;
-            r_out_sva.t_old[i] = tmp_entry.tag;
+            r_out_sva.t_old[i] = tmp_entry.t_old;
             cpls_sva.delete(tmp_entry.idx);
             entries.pop_front();
         end
@@ -134,6 +134,12 @@ module rob_sva #(
     task exit_on_error;
         begin
             $display("\n\033[31m@@@ Failed at time %4d\033[0m\n", $time);
+            for (int i = 0; i < N; ++i) begin
+                $display("r_out[%d]: (%d, %d)", i, r_out.tag[i], r_out.t_old[i]);
+            end
+            for (int i = 0; i < N; ++i) begin
+                $display("r_out_sva[%d]: (%d, %d)", i, r_out_sva.tag[i], r_out_sva.t_old[i]);
+            end
             $display("used %d free %d reset: %b", used, free, reset);
             $finish;
         end
