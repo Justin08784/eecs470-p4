@@ -98,7 +98,7 @@ module rob_sva #(
             entries.pop_front();
         end
 
-        d_out_sva.rob_rdy_scnt = `MIN(entries.size(), NUM_DPORTS);
+        d_out_sva.rob_rdy_scnt = `MIN(free, NUM_DPORTS);
         foreach (d_out_sva.rob_idxs[i])
             d_out_sva.rob_idxs[i] = (wr_idx + i) % DEPTH;
 
@@ -140,6 +140,17 @@ module rob_sva #(
             for (int i = 0; i < N; ++i) begin
                 $display("r_out_sva[%d]: (%d, %d)", i, r_out_sva.tag[i], r_out_sva.t_old[i]);
             end
+
+            $display("d_out.rob_rdy_scnt: %d", d_out.rob_rdy_scnt);
+            $display("d_out_sva.rob_rdy_scnt: %d", d_out.rob_rdy_scnt);
+            for (int i = 0; i < N; ++i) begin
+                $display("d_out.rob_idxs[%d]: %d", i, d_out.rob_idxs[i]);
+            end
+            for (int i = 0; i < N; ++i) begin
+                $display("d_out_sva.rob_idxs[%d]: %d", i, d_out_sva.rob_idxs[i]);
+            end
+            $display("d_out:%b", d_out);
+            $display("d_out_sva:%b", d_out_sva);
             $display("used %d free %d reset: %b", used, free, reset);
             $finish;
         end
@@ -166,9 +177,14 @@ module rob_sva #(
         //     free_scnt == free < NUM_WPORTS ? free : NUM_WPORTS;
         // endproperty
 
-        property r_data_correct;
+        property r_out_correct;
             disable iff (reset)
             r_out == r_out_sva;
+        endproperty
+
+        property d_out_correct;
+            disable iff (reset)
+            d_out == d_out_sva;
         endproperty
     endclocking
 
@@ -181,7 +197,9 @@ module rob_sva #(
     //     else exit_on_error;
     // FreeScnt: assert property(cb.free_scnt_correct)
     //     else exit_on_error;
-    RData: assert property(cb.r_data_correct)
+    ROut: assert property(cb.r_out_correct)
+        else exit_on_error;
+    DOut: assert property(cb.d_out_correct)
         else exit_on_error;
 
 endmodule
