@@ -121,9 +121,9 @@ module rob_test();
         $display("\nStart Testbench");
         clock = 0;
         reset = 1;
-        d_in.d_en_cnt = 0;
-        // wr_en_cnt = 0;
-        // rd_en_cnt = 0;
+
+        d_in = '0;
+        c_in = '0;
 
         // $monitor("  %3d | d_in: [%d, %d]   wr_en_cnt: %d  rd_en_cnt: %d  |  d_out: [%d, %d]   used_scnt: %2d  free_scnt: %2d",
         //     $time,
@@ -140,8 +140,19 @@ module rob_test();
         reset = 0;
         @(negedge clock);
 
+        // Test 1:
+        $display("\nTest 1: 1 inst lifecycle");
+        // dispatch 1
         d_in.d_en_cnt = 1;
         @(negedge clock);
+        clr_all();
+
+        // complete it
+        set_complete(0, 0);
+        @(negedge clock);
+        clr_all();
+
+        // wait for it to retire
         set_complete(0, 0);
         @(negedge clock);
 
