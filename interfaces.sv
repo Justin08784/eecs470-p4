@@ -136,11 +136,12 @@ Re-order Buffer (ROB)
 ================================================
 */
 module rob #(
-    parameter DEPTH = `ROB_SZ,  // num elements
-    parameter WIDTH = $bits(ROB_ENTRY),  // num bits per element 
-                           //(32 bits per insn + log2(64) = 6 bits each for T & Told)
+    parameter ROB_SZ = `ROB_SZ,  // num elements
     parameter N=`N
 ) (
+    `ifdef DEBUG
+    output  ROB_ENTRY   [ROB_SZ-1:0]    state_dbg,
+    `endif 
     input                       clock, reset,
 
     // retire (read)
@@ -164,12 +165,19 @@ module rob #(
         logic [$clog2(N):0]     rob_rdy_scnt;
             // To: dispatch
             // saturating counter for number of free rob entries
+        ROB_IDX [N-1:0]         rob_idxs;
+            // To: dispatch
+            // rob idxs of entries that can be allocated this cycle
+            // Option 1: This
+            // Option 2: expose HEAD pointer and let dispatcher generate these
+            // (main concern with option 2 is it could be wrong? idk)
     } d_out,
     input struct packed {
         logic [$clog2(N):0]     d_en_cnt;
             // From: dispatch
             // - Number of enabled dispatch lines?
-        ROB_ENTRY   [N-1:0]     d_dat;
+        logic [N-1:0][$clog2(`PHYS_REG_SZ_R10K)-1:0] tag;
+        logic [N-1:0][$clog2(`PHYS_REG_SZ_R10K)-1:0] t_old;
             // From: dispatch
             // - IMPORTANT: Set from lowest indices in program-order. NO GAPS!!!
     } d_in
