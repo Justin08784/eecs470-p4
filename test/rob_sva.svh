@@ -36,7 +36,8 @@ module rob_sva #(
         logic [$clog2(N):0]     d_en_cnt;
             // From: dispatch
             // - Number of enabled dispatch lines?
-        ROB_ENTRY   [N-1:0]     d_dat;
+        logic [N-1:0][$clog2(`PHYS_REG_SZ_R10K)-1:0] tag;
+        logic [N-1:0][$clog2(`PHYS_REG_SZ_R10K)-1:0] t_old;
             // From: dispatch
             // - IMPORTANT: Set from lowest indices in program-order. NO GAPS!!!
     } d_in
@@ -49,7 +50,8 @@ module rob_sva #(
     logic cpls_sva[int]; // idx to cpl
     struct packed {
         int idx;
-        ROB_ENTRY dat;
+        logic [$clog2(`PHYS_REG_SZ_R10K)-1:0] tag;
+        logic [$clog2(`PHYS_REG_SZ_R10K)-1:0] t_old;
     } entries [$], tmp_entry;
 
     logic [$clog2(DEPTH):0] used;    // how full the buffer should be
@@ -86,17 +88,20 @@ module rob_sva #(
             if (!cpls_sva[tmp_entry.idx])
                 break;
             
-            r_out_sva.tag[i] = tmp_entry.dat.tag;
-            r_out_sva.t_old[i] = tmp_entry.dat.tag;
+            r_out_sva.tag[i] = tmp_entry.tag;
+            r_out_sva.t_old[i] = tmp_entry.tag;
             cpls_sva.delete(tmp_entry.idx);
             entries.pop_front();
         end
+
+        d_out_sva.rob_rdy_scnt = `MIN(entries.size(), NUM_DPORTS);
 
         // #0
         for (int i = 0; i < d_in.d_en_cnt; ++i) begin
             entries.push_back('{
                 idx:wr_idx,
-                dat:d_in.d_dat[i]
+                tag:d_in.tag[i],
+                t_old:d_in.t_old[i]
             });
             cpls_sva[wr_idx] = 0;
             wr_idx = (wr_idx + 1) % DEPTH;
@@ -129,15 +134,15 @@ module rob_sva #(
     endtask
 
     clocking cb @(posedge clock);
-        // property rd_en_correct;
-        //     disable iff (reset)
-        //     rd_en_cnt <= used + wr_en_cnt;
-        // endproperty
+        property r_en_correct;
+            disable iff (reset)
+            r_out.r_en_cnt <= used + d_in.d_en_cnt;
+        endproperty
 
-        // property wr_en_correct;
-        //     disable iff (reset)
-        //     wr_en_cnt <= free + rd_en_cnt;
-        // endproperty
+        property d_en_correct;
+            disable iff (reset)
+            d_in.d_en_cnt <= free + r_out.r_en_cnt;
+        endproperty
 
         // property used_scnt_correct;
         //     disable iff (reset)
@@ -149,23 +154,23 @@ module rob_sva #(
         //     free_scnt == free < NUM_WPORTS ? free : NUM_WPORTS;
         // endproperty
 
-        // property rd_data_correct;
-        //     disable iff (reset)
-        //     rd_data == rd_data_sva;
-        // endproperty
+        property r_data_correct;
+            disable iff (reset)
+            r_out == r_out_sva;
+        endproperty
     endclocking
 
     // Assert properties
-    // RdEn: assert property(cb.rd_en_correct)
-    //     else exit_on_error;
-    // WrEn: assert property(cb.wr_en_correct)
-    //     else exit_on_error;
+    REn: assert property(cb.r_en_correct)
+        else exit_on_error;
+    WEn: assert property(cb.d_en_correct)
+        else exit_on_error;
     // UsedScnt: assert property(cb.used_scnt_correct)
     //     else exit_on_error;
     // FreeScnt: assert property(cb.free_scnt_correct)
     //     else exit_on_error;
-    // RdData: assert property(cb.rd_data_correct)
-    //     else exit_on_error;
+    RData: assert property(cb.r_data_correct)
+        else exit_on_error;
 
 endmodule
 

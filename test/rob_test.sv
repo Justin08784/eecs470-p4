@@ -33,7 +33,8 @@ module rob_test();
 
     struct packed {
         logic [$clog2(N):0]     d_en_cnt;
-        ROB_ENTRY   [N-1:0]     d_dat;
+        logic [N-1:0][$clog2(`PHYS_REG_SZ_R10K)-1:0] tag;
+        logic [N-1:0][$clog2(`PHYS_REG_SZ_R10K)-1:0] t_old;
     } d_in;
 
     // Variable to count values written to FIFO
@@ -45,11 +46,24 @@ module rob_test();
     // Generate nonzero random numbers for our write data on each cycle
     // (we shall treat a 0 as non-enabled; this allows us to print 0s in the $monitor
     // to indicate non-enabled)
+
+    logic [N-1:0][$clog2(`PHYS_REG_SZ_R10K)-1:0] tags;
+    logic [N-1:0][$clog2(`PHYS_REG_SZ_R10K)-1:0] t_olds;
+    generate
+    for (genvar i = 0; i < N; i++) begin : gen_vecs // ms1 test: make loop count RS_SZ-1 instead of RS_SZ (caught)
+        assign tags[i] = d_in.tag[i]; // ms1 test: make busy_vec sequential instead of combinational (caught)
+        assign t_olds[i] = d_in.t_old[i];
+    end
+    endgenerate
     always @(negedge clock) begin
-        // std::randomize(wr_data) with {
-        //     foreach(wr_data[i])
-        //         wr_data[i] != 0;
-        // };
+        std::randomize(tags) with {
+            foreach(tags[i])
+                tags[i] != 0;
+        };
+        std::randomize(t_olds) with {
+            foreach(t_olds[i])
+                t_olds[i] != 0;
+        };
     end
 
     logic DEBUG = 1;

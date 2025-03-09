@@ -34,7 +34,8 @@ module rob #(
         logic [$clog2(N):0]     d_en_cnt;
             // From: dispatch
             // - Number of enabled dispatch lines?
-        ROB_ENTRY   [N-1:0]     d_dat;
+        logic [N-1:0][$clog2(`PHYS_REG_SZ_R10K)-1:0] tag;
+        logic [N-1:0][$clog2(`PHYS_REG_SZ_R10K)-1:0] t_old;
             // From: dispatch
             // - IMPORTANT: Set from lowest indices in program-order. NO GAPS!!!
     } d_in
@@ -106,10 +107,12 @@ module rob #(
                 state[c_in.c_rob_idxs[i]].cpl |= c_in.c_en[i];
 
             // handle dispatch (ins)
-            for (int unsigned i = 0; i < NUM_DPORTS; ++i) begin
+            for (int unsigned i = 0, int cur_idx = 0; i < NUM_DPORTS; ++i) begin
                 if (i >= d_in.d_en_cnt)
                     continue;
-                state[d_idxs[i]] <= d_in.d_dat[i];
+                cur_idx = d_idxs[i];
+                state[cur_idx].tag    <= d_in.tag[i];
+                state[cur_idx].t_old  <= d_in.t_old[i];
             end
         end
     end
