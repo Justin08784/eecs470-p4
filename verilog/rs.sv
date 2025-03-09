@@ -3,6 +3,9 @@
 /*
 TODO:
 - Do w->r forwarding optimization tricks like those you used in fifo/rob?
+(in particular, combinationally updating entries_n seems incredibly expensive.
+What if we handle all writes synchronously? And combinationally forward writes to
+reads.)
 - Bundle rs I/O by stages like rob and free_list?
 */
 
