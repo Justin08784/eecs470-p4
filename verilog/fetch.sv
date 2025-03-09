@@ -31,7 +31,7 @@ module stage_if (
     MEM_BLOCK [N-1:0] icache_out;
     logic  [N-1:0] icache_valid;
 
-    logic   valid_out;
+    logic  [N-1:0] valid_out;
 
     icache icache_0 [N-1:0] (
         // inputs
@@ -48,39 +48,39 @@ module stage_if (
         .Icache_valid_out           (icache_valid) // When valid is high
     );
 
-    always_ff @(posedge clock) begin
-        if (reset) begin
-            PC_reg <= 0;             // initial PC value is 0 (the memory address where our program starts)
-        end else if (take_branch) begin
-            PC_reg <= branch_target; // update to a taken branch (does not depend on valid bit)
-        end else if (valid_out) begin
-            PC_reg <= PC_reg + 4;    // or transition to next PC if valid
-        end
-    end
-
-    logic if_valid_q;
-
-    // Keep if valid until it gets valid data out
-    always_ff @(posedge clock) begin
-        if (reset) begin
-            if_valid_q <= 1'b0;
-        end else begin
-            if_valid_q <= if_valid || (if_valid_q && !valid_out);
-        end
-    end
-
-    assign valid_out = &icache_valid && if_valid_q;
+    logic [N-1:0] if_valid_q;
 
     genvar i;
     generate
-        for (i = 0; i < N; i = i + 1) begin : gen_loop
+        for (i = 0; i < N; i++) begin
+            always_ff @(posedge clock) begin
+                if (reset) begin
+                    PC_reg[i] <= 0;             // initial PC value is 0 (the memory address where our program starts)
+                end else if (take_branch) begin
+                    PC_reg[i] <= branch_target; // update to a taken branch (does not depend on valid bit)
+                end else if (valid_out) begin
+                    PC_reg[i] <= PC_reg[i] + ((i+1) * 4);    // or transition to next PC if valid
+                end
+            end
+
+            // Keep if valid until it gets valid data out
+            always_ff @(posedge clock) begin
+                if (reset) begin
+                    if_valid_q[i] <= 1'b0;
+                end else begin
+                    if_valid_q[i] <= if_valid[i] || (if_valid_q[i] && !valid_out);
+                end
+            end
+
+            assign valid_out[i] = icache_valid[i] && if_valid_q[i];
+
             // index into the word (32-bits) of memory that matches this instruction
-            assign if_packet[i].inst = valid_out ? icache_out[i].word_level[PC_reg[2]] : `NOP;
+            assign if_packet[i].inst = valid_out ? icache_out[i].word_level[PC_reg[i][2]] : `NOP;
 
             assign if_packet[i].PC  = PC_reg[i];
             assign if_packet[i].NPC = PC_reg[i] + 4; // pass PC+4 down pipeline w/instruction
 
-            assign if_packet[i].valid = valid_out;
+            assign if_packet[i].valid = valid_out[i];
         end
     endgenerate
 
