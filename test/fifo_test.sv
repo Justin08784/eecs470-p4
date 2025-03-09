@@ -361,7 +361,7 @@ module fifo_test();
 
 
 
-        // $display("\n\033[32m@@@ Passed\033[0m\n");
+        $display("\n\033[32m@@@ Passed\033[0m\n");
 
         $finish;
     end
