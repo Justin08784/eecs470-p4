@@ -18,7 +18,7 @@ module rs_chk #(parameter
     input flush,
     // dispatch
     input   logic           [$clog2(N):0] rs_scnt, // to dispatcher
-    input   logic           [N-1:0] d_vld,     // which dispatch lines are valid? (from dispatcher; dep. on rs_scnt)
+    input   logic           [$clog2(N):0] d_en_cnt,     // number of enabled dispatch lines? (from dispatcher; dep. on rs_scnt)
     input   ID_RESULT       [N-1:0] d_dat,
     // issue
     input   logic           [NUM_FU_ALU-1:0]    fu_rdy_alu,
@@ -102,7 +102,7 @@ module rs_chk #(parameter
     endfunction
 
     struct packed {
-        logic           [N-1:0] d_vld;     // which dispatch lines are valid? (from dispatcher; dep. on rs_scnt)
+        logic           [$clog2(N):0] d_en_cnt;     // number of enabled dispatch lines? (from dispatcher; dep. on rs_scnt)
         ID_RESULT       [N-1:0] d_dat;
         // issue
         logic           [NUM_FU_ALU-1:0]    fu_rdy_alu;
@@ -129,7 +129,7 @@ module rs_chk #(parameter
 
     // This syntax is so fucking gorgeous btw.
     assign ins_cur = '{
-        d_vld:d_vld,
+        d_en_cnt:d_en_cnt,
         d_dat:d_dat,
         fu_rdy_alu:fu_rdy_alu,
         fu_rdy_mult:fu_rdy_mult,
@@ -369,10 +369,10 @@ module rs_chk #(parameter
         
         // check dispatch correctness
         d_find_id_pre.delete();
-        foreach (d_vld[i]) begin
-            if (!ins_pre.d_vld[i])
-                continue;
-            d_find_id_pre[ins_pre.d_dat[i].id] = i;
+        for (int i = 0; i < N; ++i) begin
+            if (i < ins_pre.d_en_cnt) begin
+                d_find_id_pre[ins_pre.d_dat[i].id] = i;
+            end
         end
         num_free = 0;
         for (int rs = 0; rs < RS_SZ; ++rs)
@@ -393,9 +393,7 @@ module rs_chk #(parameter
             dispatch_asg_correct &= d_find_id_pre.exists(id);
             dispatch_dat_correct &= (ins_pre.d_dat[d_find_id_pre[id]] == entries_cur[rs].dat);
         end
-        dispatch_cnt_correct = num_dispatches == $min($countones(ins_pre.d_vld), num_free);
-        // $display("cundir: numdis=%0d, d_vld=%0d, numfre=%0d minifry=%0d", num_dispatches, 
-        // $countones(ins_pre.d_vld), num_free, $min($countones(ins_pre.d_vld), num_free));
+        dispatch_cnt_correct = num_dispatches == $min(int'(ins_pre.d_en_cnt), num_free);
 
         @(posedge clock);
 

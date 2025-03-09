@@ -2,6 +2,15 @@
 `include "test/rs_sva.svh"
 `include "test/rs_chk.svh"
 
+/*
+TODO:
+- We recently switched from d_vld to d_en_cnt. Due to this, any test case that
+does not explicitly toggle d_en_cnt does NOTHING! NEED REVISION!
+(Currently set/clr_dispatch awkwardly only sets/clrs d_dat; d_en_cnt must 
+be toggled separately.)
+- Bundle rs I/O by stages like rob and free_list?
+*/
+
 module rs_testbench;
     localparam N=`N;
     localparam RS_SZ=`RS_SZ;
@@ -18,8 +27,8 @@ module rs_testbench;
     logic flush;
 
 
-    logic           [$clog2(N):0] rs_scnt; // to dispatcher
-    logic           [N-1:0] d_vld;     // which dispatch lines are valid? (from dispatcher; dep. on rs_scnt)
+    logic           [$clog2(N):0] rs_scnt;  // to dispatcher
+    logic           [$clog2(N):0] d_en_cnt; // number of enabled dispatch lines? (from dispatcher; dep. on rs_scnt)
     ID_RESULT       [N-1:0] d_dat;
     // issue
     logic           [NUM_FU_ALU-1:0]    fu_rdy_alu;
@@ -48,7 +57,7 @@ module rs_testbench;
         .flush(1'b0),
  
         .rs_scnt(rs_scnt),
-        .d_vld(d_vld),
+        .d_en_cnt(d_en_cnt),
         .d_dat(d_dat),
  
         .fu_rdy_alu(fu_rdy_alu),
@@ -85,7 +94,7 @@ module rs_testbench;
     //     .flush(1'b0),
 
     //     .rs_scnt(rs_scnt),
-    //     .d_vld(d_vld),
+    //     .d_en_cnt(d_en_cnt),
     //     .d_dat(d_dat),
 
     //     .fu_rdy_alu(fu_rdy_alu),
@@ -125,7 +134,7 @@ module rs_testbench;
         .flush(1'b0),
 
         .rs_scnt(rs_scnt),
-        .d_vld(d_vld),
+        .d_en_cnt(d_en_cnt),
         .d_dat(d_dat),
 
         .fu_rdy_alu(fu_rdy_alu),
@@ -169,7 +178,6 @@ module rs_testbench;
     );
         static ADDR nex_id = 0;
         // Set up a valid dispatch line
-        d_vld[i]        = 1;
 
         d_dat[i]        = '0;
         d_dat[i].t1     = t1;
@@ -184,7 +192,6 @@ module rs_testbench;
     task clr_dispatch(
         input int i
     );
-        d_vld[i] = 0;
         d_dat[i] = '0;
     endtask
 
@@ -228,7 +235,7 @@ module rs_testbench;
     endtask
 
     task clr_all();
-        d_vld = '0;
+        d_en_cnt = 0;
         d_dat = '0;
         c_en = '0;
         c_ts = '0;
@@ -573,11 +580,11 @@ module rs_testbench;
         reset = 0;
 
         for (int iter = 0; iter < 100; ++iter) begin
-            d_vld = $urandom & {N{1'b1}};
-            $display("d_vld: %b", d_vld);
+            d_en_cnt = $urandom_range(N, 0);
+            $display("d_en_cnt: %b", d_en_cnt);
             for (int i = 0; i < N; ++i) begin
-                if (!d_vld[i])
-                    continue;
+                if (i >= d_en_cnt)
+                    break;
                 // restricting to pregs in [0, 31]. There are more pregs than
                 // arch regs obviously, but isnt this okay?...
                 d_dat[i].id      = id++;
@@ -588,7 +595,7 @@ module rs_testbench;
                 d_dat[i].t2_rdy  = $urandom_range(1);
                 d_dat[i].fu_idx  = $urandom_range(FU_IDX_NUM-1);
             end
-            foreach(d_dat[i]) $display("d_dat[0%d]: %d", i, d_dat[i].id);
+            foreach(d_dat[i]) $display("d_dat[%0d]: %d", i, d_dat[i].id);
             @(negedge clock);
             clr_all();
         end
@@ -598,7 +605,7 @@ module rs_testbench;
         /* initialize */
         clock           = 0;
         failed          = 0;
-        d_vld           = '0;
+        d_en_cnt        = 0;
         d_dat           = '0;
         fu_rdy_alu      = '0;
         fu_rdy_mult     = '0;
