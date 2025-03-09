@@ -59,6 +59,7 @@ module fifo_sva #(
         used_scnt:used_scnt
     };
 
+    int                        rd_count; // number of reads complete
     logic [WIDTH-1:0] entries [$];
     logic [$clog2(DEPTH):0] used;    // how full the buffer should be
     logic [$clog2(DEPTH):0] free;    // how full the buffer should be
@@ -100,6 +101,7 @@ module fifo_sva #(
 
     always_ff @(posedge clock) begin
         if (reset) begin
+            rd_count    <= 0;
             used        <= RESET_STATE.used;
             entries.delete();
             for (int i = 0; i < RESET_STATE.used; ++i) begin
@@ -110,6 +112,7 @@ module fifo_sva #(
             ins_pre     <= '0;
             outs_pre    <= '0;
         end else begin
+            rd_count    <= rd_count + rd_en_cnt;
             used        <= entries.size;
             // entries_pre <= entries_cur;
 
@@ -152,48 +155,13 @@ module fifo_sva #(
             rd_data == rd_data_sva;
         endproperty
 
-
-
-        // // rd_valid asserted if and only if rd_en=1 and there is valid data
-        // property rd_valid_correct;
-        //     rd_valid_c iff rd_valid;
-        // endproperty
-
-        // // wr_valid asserted if and only if wr_en=1 and buffer not full
-        // property wr_valid_correct;
-        //     wr_valid_c iff wr_valid;
-        // endproperty
-
-        // // full asserted if and only if buffer is full
-        // property full_correct;
-        //     full iff used == DEPTH;
-        // endproperty
-
-        // // almost full signal asserted when there are ALERT_DEPTH used left
-        // property spots_correct;
-        //     disable iff (reset)
-        //     spots == (used < (DEPTH-MAX_CNT) ? MAX_CNT : DEPTH - used);
-        // endproperty
-
-        // // Check that data written in comes out after proper number of reads
-        // // NOTE: this property isn't used in verification as it runs slowly
-        // //      However, feel free to reference as an example of a more
-        // //      complex assertion
-        // property write_read_correctly;
-        //     logic [WIDTH-1:0] data_in;
-        //     int               idx;
-        //     (wr_valid, data_in=wr_data, idx=(rd_count+used)) // value is written
-        //     ##[1:$] (rd_valid && rd_count == idx) // wait for previous used to be read
-        //     |-> rd_data === data_in;              // ensure correct value out
-        // endproperty
-
-        // property rd_valid_live;
-        //     rd_en |-> s_eventually rd_valid;
-        // endproperty
-
-        // property wr_valid_live;
-        //     wr_en |-> s_eventually wr_valid;
-        // endproperty
+        property write_read_correctly(i);
+            logic [WIDTH-1:0] data_in;
+            int               idx;
+            (wr_en_cnt > i, data_in=wr_data[i], idx=(rd_count + used + i)) // value is written
+            ##[1:$] (rd_en_cnt > 0 && rd_count <= idx && idx < rd_count + rd_en_cnt) // wait for previous entries to be read
+            |-> rd_data[idx - rd_count] === data_in;              // ensure correct value out
+        endproperty
 
     endclocking
 
@@ -208,26 +176,12 @@ module fifo_sva #(
         else exit_on_error;
     RdData: assert property(cb.rd_data_correct)
         else exit_on_error;
-    // ValidRd:    assert property(cb.rd_valid_correct)     else exit_on_error;
-    // ValidWr:    assert property(cb.wr_valid_correct)     else exit_on_error;
-    // ValidFull:  assert property(cb.full_correct)         else exit_on_error;
-    // ValidSpots: assert property(cb.spots_correct)        else exit_on_error;
-
-    // Liveness checks
-    // RdValidLiveness: assert property(cb.rd_valid_live)   else exit_on_error;
-    // WrValidLiveness: assert property(cb.wr_valid_live)   else exit_on_error;
-
-    // This assertion is large and slow for formal verification, 
-    // but it works for a testbench
-    // DataOutErr: assert property(cb.write_read_correctly) else exit_on_error;
-
-    // genvar i;
-    // generate 
-    //     for (i = 0; i < WIDTH; i++) begin
-    //         cov_bit_i:  cover property(@(posedge clock) wr_data[i]);
-    //     end
-    // endgenerate
-    
+    generate
+        for (genvar wr_port = 0; wr_port < NUM_WPORTS; ++wr_port) begin : gen_wr_props
+            assert property(cb.write_read_correctly(wr_port));
+        end
+    endgenerate
+  
 
 endmodule
 
