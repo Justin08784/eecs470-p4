@@ -4,6 +4,9 @@ module rob #(
     parameter ROB_SZ = `ROB_SZ,  // num elements
     parameter N=`N
 ) (
+    `ifdef DEBUG
+    output  ROB_ENTRY   [ROB_SZ-1:0]    state_dbg,
+    `endif 
     input                       clock, reset,
 
     // retire (read)
@@ -59,6 +62,7 @@ module rob #(
     logic [NUM_RPORTS-1:0][$clog2(ROB_SZ)-1:0] r_idxs;
     logic [NUM_DPORTS-1:0][$clog2(ROB_SZ)-1:0] d_idxs;
 
+    assign state_dbg    = state;
     assign free         = ROB_SZ - used;
     assign free_scnt    = free > NUM_DPORTS ? NUM_DPORTS : free;
     assign used_scnt    = used > NUM_RPORTS ? NUM_RPORTS : used;
@@ -78,6 +82,8 @@ module rob #(
             // small; synthesizer may simply unroll this loop.)
             if (!state[r_idxs[i]].cpl)
                 break;
+            // if (i >= used)
+            //     break;
             r_out.tag[i]    = state[r_idxs[i]].tag;
             r_out.t_old[i]  = state[r_idxs[i]].t_old;
         end

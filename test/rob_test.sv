@@ -37,6 +37,8 @@ module rob_test();
         logic [N-1:0][$clog2(`PHYS_REG_SZ_R10K)-1:0] t_old;
     } d_in;
 
+    ROB_ENTRY   [ROB_SZ-1:0]    state_dbg;
+
     task set_complete(
         input int i,
         input int rob_idx 
@@ -94,6 +96,10 @@ module rob_test();
         .ROB_SZ(ROB_SZ),
         .N(N)
     ) dut (
+        `ifdef DEBUG
+        .state_dbg(state_dbg),
+        `endif
+
         .clock  (clock),
         .reset  (reset),
         .r_out  (r_out),
@@ -106,6 +112,10 @@ module rob_test();
         .ROB_SZ(ROB_SZ),
         .N(N)
     ) sva (
+        `ifdef DEBUG
+        .state_dbg(state_dbg),
+        `endif
+
         .clock  (clock),
         .reset  (reset),
         .r_out  (r_out),

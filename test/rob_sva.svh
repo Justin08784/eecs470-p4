@@ -2,11 +2,13 @@
 `define ROB_SVA_SVH
 
 module rob_sva #(
-    parameter DEPTH = `ROB_SZ,  // num elements
-    parameter WIDTH = $bits(ROB_ENTRY),  // num bits per element 
-                           //(32 bits per insn + log2(64) = 6 bits each for T & Told)
+    parameter ROB_SZ = `ROB_SZ,  // num elements
     parameter N=`N
 ) (
+    `ifdef DEBUG
+    input ROB_ENTRY   [ROB_SZ-1:0]    state_dbg,
+    `endif
+
     input                       clock, reset,
 
     // retire (read)
@@ -51,17 +53,16 @@ module rob_sva #(
 
     int                        r_count; // number of reads/retires complete
     int wr_idx = 0;
-    logic cpls_sva[int]; // idx to cpl
+    logic cpls[int]; // idx to cpl
     struct packed {
         int idx;
         logic [$clog2(`PHYS_REG_SZ_R10K)-1:0] tag;
         logic [$clog2(`PHYS_REG_SZ_R10K)-1:0] t_old;
     } entries [$], tmp_entry;
 
-    logic [$clog2(DEPTH):0] used;    // how full the buffer should be
-    logic [$clog2(DEPTH):0] free;    // how full the buffer should be
-    logic [NUM_RPORTS-1:0][WIDTH-1:0] rd_data_sva;
-    assign free = DEPTH - used;
+    logic [$clog2(ROB_SZ):0] used;    // how full the buffer should be
+    logic [$clog2(ROB_SZ):0] free;    // how full the buffer should be
+    assign free = ROB_SZ - used;
 
     struct packed {
         logic [$clog2(N):0]     r_en_cnt;
@@ -90,18 +91,18 @@ module rob_sva #(
                 break;
 
             tmp_entry = entries[i];
-            if (!cpls_sva[tmp_entry.idx])
+            if (!cpls[tmp_entry.idx])
                 break;
             
             r_out_sva.tag[i] = tmp_entry.tag;
             r_out_sva.t_old[i] = tmp_entry.t_old;
-            cpls_sva.delete(tmp_entry.idx);
+            cpls.delete(tmp_entry.idx);
             entries.pop_front();
         end
 
         d_out_sva.rob_rdy_scnt = `MIN(free, NUM_DPORTS);
         foreach (d_out_sva.rob_idxs[i])
-            d_out_sva.rob_idxs[i] = (wr_idx + i) % DEPTH;
+            d_out_sva.rob_idxs[i] = (wr_idx + i) % ROB_SZ;
 
         // #0
         for (int i = 0; i < d_in.d_en_cnt; ++i) begin
@@ -110,12 +111,12 @@ module rob_sva #(
                 tag:d_in.tag[i],
                 t_old:d_in.t_old[i]
             });
-            cpls_sva[wr_idx] = 0;
-            wr_idx = (wr_idx + 1) % DEPTH;
+            cpls[wr_idx] = 0;
+            wr_idx = (wr_idx + 1) % ROB_SZ;
         end
 
         for (int i = 0; i < c_in.c_en; ++i)
-            cpls_sva[c_in.c_rob_idxs[i]] |= c_in.c_en[i];
+            cpls[c_in.c_rob_idxs[i]] |= c_in.c_en[i];
 
         @(posedge clock);
         @(negedge clock);
@@ -126,7 +127,7 @@ module rob_sva #(
         if (reset) begin
             r_count <= 0;
             used <= 0;
-            cpls_sva.delete();
+            cpls.delete();
             entries.delete();
         end else begin
             r_count <= r_count + r_out.r_en_cnt;
@@ -222,6 +223,26 @@ module rob_sva #(
             // $display("OK: dispatch %0d completed+retired", idx_in); 
             // or do a final check that they match, or simply succeed silently
         endproperty
+
+        property retire_head_only(i);
+            // An insn can retire only if its rob_idx is in [head, (head + r_en_cnt - 1) % ROB_SIZE]
+            int cnt_idx; (
+                d_in.d_en_cnt > i,
+                cnt_idx= (r_count + used + i)
+            ) ##[1:$] (
+                1
+                // ??
+            ) |-> 1;
+        endproperty
+
+        property no_early_retire(i);
+            // An insn can retire ONLY IF it has already completed.
+            disable iff (reset)
+            // “If the design is retiring slot i this cycle, then cpl must be set in state[]”
+            1;
+            // (i < r_out.r_en_cnt) |-> state[r_idxs[i]].cpl;
+            // ??
+        endproperty
     endclocking
 
     // Assert properties
@@ -237,9 +258,11 @@ module rob_sva #(
         else exit_on_error;
     DOut: assert property(cb.d_out_correct)
         else exit_on_error;
+    // NoEarlyRetire: assert property(cb.no_early_retire)
+    //     else exit_on_error;
     generate
-        for (genvar i = 0; i < NUM_DPORTS; ++i) begin
-            assert property(cb.dispatch_complete_retire(i))
+        for (genvar i = 0; i < NUM_DPORTS; ++i) begin : gen_dcrs
+            DCR_i: assert property(cb.dispatch_complete_retire(i))
                 else exit_on_error;
         end
     endgenerate
