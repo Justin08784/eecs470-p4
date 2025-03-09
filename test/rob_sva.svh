@@ -49,6 +49,7 @@ module rob_sva #(
     localparam NUM_RPORTS = N; // retire ports (in-order)
     localparam NUM_CPORTS = N; // complete ports (*OUT-OF-ORDER*)
 
+    int                        r_count; // number of reads/retires complete
     int wr_idx = 0;
     logic cpls_sva[int]; // idx to cpl
     struct packed {
@@ -123,10 +124,12 @@ module rob_sva #(
 
     always_ff @(posedge clock) begin
         if (reset) begin
+            r_count <= 0;
             used <= 0;
             cpls_sva.delete();
             entries.delete();
         end else begin
+            r_count <= r_count + r_out.r_en_cnt;
             used <= entries.size;
         end
     end
@@ -186,6 +189,39 @@ module rob_sva #(
             disable iff (reset)
             d_out == d_out_sva;
         endproperty
+        
+        property dispatch_complete_retire(i);
+            // Step 1) Dispatch
+            logic [$clog2(`PHYS_REG_SZ_R10K)-1:0] tag_in;
+            logic [$clog2(`PHYS_REG_SZ_R10K)-1:0] t_old_in;
+            int idx_in; 
+            int cnt_idx; (
+                d_in.d_en_cnt > i,
+                idx_in = d_out.rob_idxs[i],
+                cnt_idx= (r_count + used + i),
+                tag_in = d_in.tag[i],
+                t_old_in = d_in.t_old[i]
+            )
+            // Step 2) eventually Complete
+            ##[1:$] (
+                |(c_in.c_en & (c_in.c_rob_idxs == idx_in))
+            )
+            // Step 3) eventually Retire
+            ##[1:$] (
+                // We know the design retires in order, so the item at rob index = idx_in
+                // will eventually appear in r_out.*some slot* EXACTLY once all prior
+                // entries are retired + it's completed. Checking that it *does* appear:
+                (r_out.r_en_cnt > i && r_count <= cnt_idx && cnt_idx < r_count + r_out.r_en_cnt)
+                // r_out.r_en_cnt > 0
+                // &&  // We want to see if *some* slot `j` in r_out matches (tag_in, t_old_in).
+                //     // Usually you'd do something like:
+                //     ( (r_out.tag[0]   == tag_in && r_out.t_old[0]   == t_old_in)
+                //     || (r_out.tag[1]   == tag_in && r_out.t_old[1]   == t_old_in))
+            )
+            |-> (r_out.tag[cnt_idx - r_count] === tag_in) && (r_out.t_old[cnt_idx - r_count] === t_old_in);
+            // $display("OK: dispatch %0d completed+retired", idx_in); 
+            // or do a final check that they match, or simply succeed silently
+        endproperty
     endclocking
 
     // Assert properties
@@ -201,6 +237,12 @@ module rob_sva #(
         else exit_on_error;
     DOut: assert property(cb.d_out_correct)
         else exit_on_error;
+    generate
+        for (genvar i = 0; i < NUM_DPORTS; ++i) begin
+            assert property(cb.dispatch_complete_retire(i))
+                else exit_on_error;
+        end
+    endgenerate
 
 endmodule
 
