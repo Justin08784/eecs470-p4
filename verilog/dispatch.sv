@@ -44,7 +44,7 @@ module dispatch #(parameter
     } rob_in,
 
     output struct packed {
-        [$clog2(N):0]            rob_d_en_cnt;
+        logic   [$clog2(N):0]            rob_d_en_cnt;
             // To: ROB
             // - Number of enabled dispatch lines?
         // ROB_ENTRY   [N-1:0]      d_dat, //shouldn't have dispatch feed to ROB,
@@ -106,7 +106,7 @@ module dispatch #(parameter
         // TAGS ARE APPLIED AT THE CORRECT TIMES (paired with free list tag output)
         // (means that tags will be applied when the dispatched insts actually get
         // to RS/ROB)
-    } map_out,
+    } map_out
     
     //dispatch shouldn't need to read from the map table.
     //dispatch will pair a new tag (from free list) with
@@ -136,9 +136,9 @@ always_comb begin
     logic [$clog2(N):0] d_reg_cnt = '0;
 
     for (int i = 0; i < dispatch_cnt; i++) begin
-        if (!decode.d_dat[i].mult && !decode.d_dat[i].wr_mem 
-            && !decode.d_dat[i].cond_branch && !decode.d_dat[i].uncond_branch 
-            && !decode.d_dat[i].halt) d_reg_cnt += 1;
+        if (!decode_in.d_dat[i].mult && !decode_in.d_dat[i].wr_mem 
+            && !decode_in.d_dat[i].cond_branch && !decode_in.d_dat[i].uncond_branch 
+            && !decode_in.d_dat[i].halt) d_reg_cnt += 1;
     end
 
     free_out.free_d_en_cnt = (d_reg_cnt == 0) ? '0 : (d_reg_cnt == N) ? '1 : 2'b01;
@@ -156,7 +156,7 @@ always_ff @(posedge clock) begin
     end
     else begin
         claimed_tags <= free_in.d_ts;
-        for (int i = 0; i < N; i++) dest_regs[i] = decode_in.d_dat[i].t;
+        for (int i = 0; i < N; i++) dest_regs[i] <= decode_in.d_dat[i].t;
     end
 end
 
