@@ -13,7 +13,7 @@
 module stage_if (
     input           clock,          // system clock
     input           reset,          // system reset
-    input           [1:0] if_valid,       // only go to next PC when true
+    input     [1:0] if_valid,       // only go to next PC when true
     input           take_branch,    // taken-branch signal
     input ADDR      branch_target,  // target pc: use if take_branch is TRUE
     input MEM_BLOCK Imem_data,      // data coming back from Instruction memory
@@ -74,7 +74,8 @@ module stage_if (
         end
     end
 
-    assign valid_out[0] = icache_valid && if_valid_q[0];
+    //RE-EVALUATE
+    assign valid_out[0] = icache_valid && (if_valid_q[0] || if_valid_q[1]);
     assign valid_out[1] = icache_valid && if_valid_q[1] && (PC_reg % 8 == 0);
 
     // index into the word (32-bits) of memory that matches this instruction

@@ -23,18 +23,18 @@ module fetch(
     input clock,          // system clock
     input reset,          // system reset
 
-    input               [N-1:0] if_valid,       // only go to next PC when true
-    input               [N-1:0] take_branch,    // taken-branch signal
-    input ADDR          [N-1:0] branch_target,  // target pc: use if take_branch is TRUE
-    input MEM_BLOCK     [N-1:0] Imem_data,      // data coming back from Instruction memory
+    input       [N-1:0] if_valid,       // only go to next PC when true
+    input               take_branch,    // taken-branch signal
+    input ADDR          branch_target,  // target pc: use if take_branch is TRUE
+    input MEM_BLOCK     Imem_data,      // data coming back from Instruction memory
 
     // tags from memory
-    input MEM_TAG       [N-1:0] Imem2proc_transaction_tag, // Should be zero unless there is a response
-    input MEM_TAG       [N-1:0] Imem2proc_data_tag,
+    input MEM_TAG       Imem2proc_transaction_tag, // Should be zero unless there is a response
+    input MEM_TAG       Imem2proc_data_tag,
 
-    output MEM_COMMAND  [N-1:0] Imem_command, // Command sent to memory
+    output MEM_COMMAND  Imem_command, // Command sent to memory
     output IF_ID_PACKET [N-1:0] if_packet,
-    output ADDR         [N-1:0] Imem_addr // address sent to Instruction memory
+    output ADDR         Imem_addr // address sent to Instruction memory
 );
 endmodule
 
