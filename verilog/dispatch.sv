@@ -13,7 +13,7 @@ module dispatch #(parameter
     } decode_in,
 
     output struct packed {
-        logic       [$clog2(N):0] decode_d_en_cnt;
+        logic       [N-1:0] decode_d_en_cnt;
     } decode_out,
     
 
@@ -62,10 +62,6 @@ module dispatch #(parameter
         PHYS_REG_IDX [N-1:0]     d_ts;
         // From: Free list
         // - newly allocated pregs
-        // THIS WILL BE 1 CLOCK CYCLE BEHIND. THIS IS DESIRED SO THAT
-        // TAGS ARE APPLIED AT THE CORRECT TIMES (paired with map table output)
-        // (means that tags will be applied when the dispatched insts actually get
-        // to RS/ROB)
     } free_in,
 
     output struct packed {
@@ -96,16 +92,12 @@ module dispatch #(parameter
             // - Number of enabled dispatch lines?
             // - NOTE: For in-order stuff with serial deps (like dispatch), use c(ou)nts;
             // otherwise use en(able) buses.
-        // REG_IDX       [N-1:0] src1s,
-        // output REG_IDX       [N-1:0] src2s,
+        REG_IDX       [N-1:0] src1s;
+        REG_IDX       [N-1:0] src2s;
         REG_IDX       [N-1:0] dsts;
         PHYS_REG_IDX  [N-1:0] ts;
             // To: Map table
             // - IMPORTANT: Set from lowest indices in program-order. NO GAPS!!!
-        // THIS WILL BE 1 CLOCK CYCLE BEHIND. THIS IS DESIRED SO THAT
-        // TAGS ARE APPLIED AT THE CORRECT TIMES (paired with free list tag output)
-        // (means that tags will be applied when the dispatched insts actually get
-        // to RS/ROB)
     } map_out
     
     //dispatch shouldn't need to read from the map table.
@@ -120,55 +112,94 @@ logic dispatch_cnt;
 always_comb begin
     
     //logic to find the minimum # of spots free across the 4 inputs
-    dispatch_cnt = rs_in.rs_rdy_scnt & rob_in.rob_rdy_scnt 
-                            & free_in.free_rdy_scnt & lsq_in.lsq_rdy_scnt;
-    dispatch_cnt = (reset || flush) ? '0 : dispatch_cnt;
+    // dispatch_cnt = rs_in.rs_rdy_scnt & rob_in.rob_rdy_scnt 
+    //                         & free_in.free_rdy_scnt & lsq_in.lsq_rdy_scnt;
+    // dispatch_cnt = (reset || flush) ? '0 : dispatch_cnt;
+    logic [$clog2(N):0] a = (rs_in.rs_rdy_scnt < rob_in.rob_rdy_scnt) ? rs_in.rs_rdy_scnt : rob_in.rob_rdy_scnt;
+    logic [$clog2(N):0] b = (free_in.free_rdy_scnt < lsq_in.lsq_rdy_scnt) ? free_in.free_rdy_scnt : lsq_in.lsq_rdy_scnt;
+    dispatch_cnt = (a < b) ? a : b;
+    dispatch_cnt = (reset || flush) ? '0 : ((dispatch_cnt > 2) ? 2 : dispatch_cnt);    
 
     //assigning output #'s
-    decode_out.decode_d_en_cnt = dispatch_cnt;
+    decode_out.decode_d_en_cnt = (dispatch_cnt == 2) ? 2'b11 : ((dispatch_cnt == 1) ? 2'b01 : 2'b00);
     rs_out.rs_d_en_cnt = dispatch_cnt;
     rob_out.rob_d_en_cnt = dispatch_cnt;
     lsq_out.lsq_d_en_cnt = dispatch_cnt; //this will likely need to be changed once memory operations are introduced
 end
 
+logic [N-1:0] dest_free_match;
+
 //logic for free list
 always_comb begin
     logic [$clog2(N):0] d_reg_cnt = '0;
+    dest_free_match = '0;
 
     for (int i = 0; i < dispatch_cnt; i++) begin
         if (!decode_in.d_dat[i].mult && !decode_in.d_dat[i].wr_mem 
             && !decode_in.d_dat[i].cond_branch && !decode_in.d_dat[i].uncond_branch 
-            && !decode_in.d_dat[i].halt) d_reg_cnt += 1;
+            && !decode_in.d_dat[i].halt) begin
+                d_reg_cnt += 1;
+                dest_free_match[i] = 1'b1;
+        end
     end
 
-    free_out.free_d_en_cnt = (d_reg_cnt == 0) ? '0 : (d_reg_cnt == N) ? '1 : 2'b01;
+    free_out.free_d_en_cnt = (d_reg_cnt == 0) ? '0 : (d_reg_cnt == N) ? 2 : 1;
     free_out.free_d_en_cnt = (reset || flush) ? '0 : free_out.free_d_en_cnt;
 end
 
 //logic for map table
-PHYS_REG_IDX [N-1:0] claimed_tags;
-PHYS_REG_IDX [N-1:0] dest_regs;
-
-always_ff @(posedge clock) begin
-    if (reset || flush) begin
-        claimed_tags <= '0;
-        dest_regs <= '0;
-    end
-    else begin
-        claimed_tags <= free_in.d_ts;
-        for (int i = 0; i < N; i++) dest_regs[i] <= decode_in.d_dat[i].t;
-    end
-end
-
 always_comb begin
+    map_out.en_cnt = dispatch_cnt;
+
     for (int i = 0; i < N; i++) begin
-        if (claimed_tags[i] != '0) begin
-            map_out.dsts[i] = dest_regs[i];
-            map_out.ts[i] = claimed_tags[i];
+        //handling dest tags
+        if (reset || flush) begin
+            map_out.dsts[i] = '0;
+            map_out.ts[i] = '0;
+        end
+        else if (dest_free_match[i] != 1'b0) begin
+            map_out.dsts[i] = decode_in.d_dat[i].t;
+            map_out.ts[i] = free_in.d_ts[i];
         end
         else begin
             map_out.dsts[i] = '0;
             map_out.ts[i] = '0;
+        end
+
+        //handling src1s tags
+        if (reset || flush) begin
+            map_out.src1s[i] = '0;
+        end
+        else if (decode_in.d_dat[i].opa_select == OPA_IS_RS1) begin
+            map_out.src1s[i] = decode_in.d_dat[i].inst.r.rs1;
+        end
+        //left these two separate in case we discover that they need to be handled differently
+        else if (decode_in.d_dat[i].cond_branch) begin
+            map_out.src1s[i] = decode_in.d_dat[i].inst.r.rs1;
+        end
+        else if (decode_in.d_dat[i].wr_mem) begin
+            map_out.src1s[i] = decode_in.d_dat[i].inst.r.rs1;
+        end
+        else begin
+            map_out.src1s[i] = '0;
+        end
+
+        //handling src2s tags
+        if (reset || flush) begin
+            map_out.src2s[i] = '0;
+        end
+        else if (decode_in.d_dat[i].opa_select == OPA_IS_RS1) begin
+            map_out.src2s[i] = decode_in.d_dat[i].inst.r.rs2;
+        end
+        //left these two separate in case we discover that they need to be handled differently
+        else if (decode_in.d_dat[i].cond_branch) begin
+            map_out.src2s[i] = decode_in.d_dat[i].inst.r.rs2;
+        end
+        else if (decode_in.d_dat[i].wr_mem) begin
+            map_out.src2s[i] = decode_in.d_dat[i].inst.r.rs2;
+        end
+        else begin
+            map_out.src2s[i] = '0;
         end
     end
 end
