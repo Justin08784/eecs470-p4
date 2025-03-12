@@ -99,8 +99,8 @@ module dispatch_testbench;
             // - Number of enabled dispatch lines?
             // - NOTE: For in-order stuff with serial deps (like dispatch), use c(ou)nts;
             // otherwise use en(able) buses.
-        // REG_IDX       [N-1:0] src1s,
-        // output REG_IDX       [N-1:0] src2s,
+        REG_IDX       [N-1:0] src1s;
+        REG_IDX       [N-1:0] src2s;
         REG_IDX       [N-1:0] dsts;
         PHYS_REG_IDX  [N-1:0] ts;
             // To: Map table
@@ -134,5 +134,41 @@ module dispatch_testbench;
 
         .map_out(map_out)
     );
+
+
+    task set_decode(
+        input int i,
+        input int rd,
+        input int rs1,
+        input int rs2,
+        input int opa_select,
+        input int opb_select,
+        input int wr_mem,
+        input int cond_branch,
+        input int uncond_branch,
+        input int halt
+    );
+        static ADDR nex_id = 0;
+        // Set up a valid dispatch line
+
+        decode_in.d_dat[i]        = '0;
+        decode_in.d_dat[i].inst.r.rd  = rd;
+        decode_in.d_dat[i].inst.r.rs1 = rs1;
+        decode_in.d_dat[i].inst.r.rs2 = rs2;
+        decode_in.d_dat[i].opa_select = opa_select;
+        decode_in.d_dat[i].opb_select = opb_select;
+        decode_in.d_dat[i].wr_mem = wr_mem;
+        decode_in.d_dat[i].cond_branch = cond_branch;
+        decode_in.d_dat[i].uncond_branch = uncond_branch;
+        decode_in.d_dat[i].halt = halt;
+        // we use id to uniquely identify each instruction
+        decode_in.d_dat[i].id     = nex_id++;
+    endtask
+
+    task clr_dispatch(
+        input int i
+    );
+        decode_in.d_dat[i] = '0;
+    endtask
 
 endmodule

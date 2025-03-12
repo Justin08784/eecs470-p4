@@ -135,9 +135,8 @@ always_comb begin
     dest_free_match = '0;
 
     for (int i = 0; i < dispatch_cnt; i++) begin
-        if (!decode_in.d_dat[i].mult && !decode_in.d_dat[i].wr_mem 
-            && !decode_in.d_dat[i].cond_branch && !decode_in.d_dat[i].uncond_branch 
-            && !decode_in.d_dat[i].halt) begin
+        if (!decode_in.d_dat[i].wr_mem && !decode_in.d_dat[i].cond_branch 
+            && !decode_in.d_dat[i].uncond_branch && !decode_in.d_dat[i].halt) begin
                 d_reg_cnt += 1;
                 dest_free_match[i] = 1'b1;
         end
@@ -158,7 +157,7 @@ always_comb begin
             map_out.ts[i] = '0;
         end
         else if (dest_free_match[i] != 1'b0) begin
-            map_out.dsts[i] = decode_in.d_dat[i].t;
+            map_out.dsts[i] = decode_in.d_dat[i].inst.r.rd;
             map_out.ts[i] = free_in.d_ts[i];
         end
         else begin
