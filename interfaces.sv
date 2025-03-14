@@ -551,3 +551,21 @@ module prf (
     // dispatch ??
 );
 endmodule
+
+
+/* 
+================================================
+CDB
+================================================
+*/
+module cdb #(parameter 
+    N=`N
+) (
+    input clock,
+    input reset,
+    // input flush, //I don't think CDB cares about flush, since even when flushing we want CDB to do its job in order to flush
+    input PHYS_REG_IDX [N-1:0] complete_tags,
+    output [N-1:0] cdb_en,
+    output PHYS_REG_IDX [N-1:0] cdb_broadcast
+);
+endmodule
