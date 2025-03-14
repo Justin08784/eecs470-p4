@@ -116,7 +116,8 @@ module stage_ex (
     output  logic       [NUM_FU_STORE-1:0]  fu_rdy_store,
     output  logic       [NUM_FU_LOAD-1:0]   fu_rdy_load,
 
-
+    output  logic       [N-1:0]             c_en;
+    output  logic       [N-1:0]             c_ts;
 );
 
     ALU_FUNC [NUM_FU_ALU-1:0] alu_func;
