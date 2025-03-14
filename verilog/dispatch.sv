@@ -101,11 +101,11 @@ module dispatch #(parameter
     //item to the map table for it to decide how to update.
 );
 
-logic dispatch_cnt;
-logic [$clog2(N):0] a;
-logic [$clog2(N):0] b;
+logic [$clog2(N):0] dispatch_cnt;
+logic [$clog2(N):0] min1;
+logic [$clog2(N):0] min2;
 
-//logic for rs, rob, decode
+//logic for rs, rob, decode, lsq
 always_comb begin
     // decode_out.decode_d_en_cnt = '0;
     // rs_out.rs_d_en_cnt = '0;
@@ -113,14 +113,11 @@ always_comb begin
     // lsq_out.lsq_d_en_cnt = '0;
     
     //logic to find the minimum # of spots free across the 4 inputs
-    // dispatch_cnt = rs_in.rs_rdy_scnt & rob_in.rob_rdy_scnt 
-    //                         & free_in.free_rdy_scnt & lsq_in.lsq_rdy_scnt;
-    // dispatch_cnt = (reset || flush) ? '0 : dispatch_cnt;
-    a = (rs_in.rs_rdy_scnt < rob_in.rob_rdy_scnt) ? rs_in.rs_rdy_scnt : rob_in.rob_rdy_scnt;
-    b = (free_in.free_rdy_scnt < lsq_in.lsq_rdy_scnt) ? free_in.free_rdy_scnt : lsq_in.lsq_rdy_scnt;
-    dispatch_cnt = (a < b) ? a : b;
+    min1 = (rs_in.rs_rdy_scnt < rob_in.rob_rdy_scnt) ? rs_in.rs_rdy_scnt : rob_in.rob_rdy_scnt;
+    min2 = (free_in.free_rdy_scnt < lsq_in.lsq_rdy_scnt) ? free_in.free_rdy_scnt : lsq_in.lsq_rdy_scnt;
+    dispatch_cnt = (min1 < min2) ? min1 : min2;
     dispatch_cnt = (reset || flush) ? '0 : ((dispatch_cnt > 2) ? 2 : dispatch_cnt);    
-
+    
     //assigning output #'s
     decode_out.decode_d_en_cnt = (dispatch_cnt == 2) ? 2'b11 : ((dispatch_cnt == 1) ? 2'b01 : 2'b00);
     rs_out.rs_d_en_cnt = dispatch_cnt;
@@ -138,12 +135,7 @@ always_comb begin
 
     //determining how many instructions have a dest reg
     for (int i = 0; i < dispatch_cnt; i++) begin
-        // if (!decode_in.d_dat[i].wr_mem && !decode_in.d_dat[i].cond_branch 
-        //     && !decode_in.d_dat[i].uncond_branch && !decode_in.d_dat[i].halt) begin
-        //         d_reg_cnt += 1;
-        //         dest_free_match[i] = 1'b1;
-        // end
-        if (!decode_in.d_dat[i].inst.r.rd != 0) begin
+        if (decode_in.d_dat[i].inst.r.rd != '0) begin
                 d_reg_cnt += 1;
                 dest_free_match[i] = 1'b1;
         end
@@ -156,41 +148,33 @@ end
 //logic for map table
 always_comb begin
     map_out.en_cnt = dispatch_cnt;
+    map_out.src1s = '0;
+    map_out.src2s = '0;
+    map_out.dsts = '0;
+    map_out.ts = '0;
 
-    //handling dest tags
-    if (reset || flush) begin
-        map_out.dsts = '0;
-        map_out.ts = '0;
-    end
-    // else if (dest_free_match[i] != 1'b0) begin
-        // map_out.dsts[i] = decode_in.d_dat[i].inst.r.rd;
-        // map_out.ts[i] = free_in.d_ts[i];
-    // end
-    else if (dest_free_match == 2'b11) begin
-        map_out.dsts[0] = decode_in.d_dat[0].inst.r.rd;
-        map_out.ts[0] = free_in.d_ts[0];
-        map_out.dsts[1] = decode_in.d_dat[1].inst.r.rd;
-        map_out.ts[1] = free_in.d_ts[1];
-    end
-    else if (dest_free_match == 2'b10) begin
-        map_out.dsts[0] = decode_in.d_dat[0].inst.r.rd;
-        map_out.ts[0] = 0;
-        map_out.dsts[1] = decode_in.d_dat[1].inst.r.rd;
-        map_out.ts[1] = free_in.d_ts[0];
-    end
-    else if (dest_free_match == 2'b01) begin
-        map_out.dsts[0] = decode_in.d_dat[0].inst.r.rd;
-        map_out.ts[0] = free_in.d_ts[0];
-        map_out.dsts[1] = decode_in.d_dat[1].inst.r.rd;
-        map_out.ts[1] = 0;
-    end
-    else begin
-        map_out.dsts = '0;
-        map_out.ts = '0;
-    end
+    for (int i = 0; i < dispatch_cnt; i++) begin
 
-    //handling src tags
-    for (int i = 0; i < N; i++) begin
+        //handling dest register
+        if (reset || flush) begin
+            map_out.dsts[i] = '0;
+            map_out.ts[i] = '0;
+        end
+        else begin
+            map_out.dsts[i] = decode_in.d_dat[i].inst.r.rd;
+        end
+
+        //handling dest tags
+        if (reset || flush) begin
+            map_out.dsts[i] = '0;
+            map_out.ts[i] = '0;
+        end
+        else if (dest_free_match[i]) begin
+            map_out.ts[i] = free_in.d_ts[i];
+        end
+        else begin
+            map_out.ts[i] = '0;
+        end
         
         //handling src1s tags
         if (reset || flush) begin
@@ -214,7 +198,7 @@ always_comb begin
         if (reset || flush) begin
             map_out.src2s[i] = '0;
         end
-        else if (decode_in.d_dat[i].opa_select == OPA_IS_RS1) begin
+        else if (decode_in.d_dat[i].opb_select == OPB_IS_RS2) begin
             map_out.src2s[i] = decode_in.d_dat[i].inst.r.rs2;
         end
         //left these two separate in case we discover that they need to be handled differently

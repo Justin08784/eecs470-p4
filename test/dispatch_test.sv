@@ -199,9 +199,9 @@ module dispatch_testbench;
     endtask
 
     task set_free(
-        input rdy,
-        input t0,
-        input t1
+        input int rdy,
+        input REG_IDX t0,
+        input REG_IDX t1
     );
         free_in.free_rdy_scnt = rdy;
         free_in.d_ts[0] = t0;
@@ -215,7 +215,7 @@ module dispatch_testbench;
     endtask
 
     task set_lsq(
-        input rdy
+        input int rdy
     );
         lsq_in.lsq_rdy_scnt = rdy;
     endtask
@@ -262,6 +262,8 @@ module dispatch_testbench;
     task test_reset();
         reset = 1;
         @(negedge clock);
+        assert (decode_out.decode_d_en_cnt == '0)
+            else exit_on_error ("test_reset decode error");
         assert (rs_out.rs_d_en_cnt == 0)
             else exit_on_error ("test_reset rs error");
         assert (rob_out.rob_d_en_cnt == 0)
@@ -270,8 +272,33 @@ module dispatch_testbench;
             else exit_on_error ("test_reset free error");
         assert (lsq_out.lsq_d_en_cnt == 0)
             else exit_on_error ("test_reset lsq error");
+        assert (map_out.en_cnt == '0)
+            else exit_on_error ("test_reset map error");
         @(negedge clock);
         reset = 0;
+
+        @(negedge clock);
+        set_rs(2);
+        set_rob(2);
+        set_free(2,3,4);
+        set_lsq(2);
+        reset = 1;
+
+        @(negedge clock);
+        assert (decode_out.decode_d_en_cnt == '0)
+            else exit_on_error ("test_reset decode error");
+        assert (rs_out.rs_d_en_cnt == 0)
+            else exit_on_error ("test_reset rs error");
+        assert (rob_out.rob_d_en_cnt == 0)
+            else exit_on_error ("test_reset rob error");
+        assert (free_out.free_d_en_cnt == 0)
+            else exit_on_error ("test_reset free error");
+        assert (lsq_out.lsq_d_en_cnt == 0)
+            else exit_on_error ("test_reset lsq error");
+        assert (map_out.en_cnt == '0)
+            else exit_on_error ("test_reset map error");
+        @(negedge clock);
+        reset = 0;        
     endtask
 
     task test_zero();
@@ -282,6 +309,8 @@ module dispatch_testbench;
         clear_all();
         @(negedge clock);
         // $display("\n\nRS VALUE: %2d:", rs_out.rs_d_en_cnt);
+        assert (decode_out.decode_d_en_cnt == '0)
+            else exit_on_error ("test_zero decode error");
         assert (rs_out.rs_d_en_cnt == 2'b0)
             else exit_on_error ("test_zero rs error");
         assert (rob_out.rob_d_en_cnt == 2'b0)
@@ -290,19 +319,272 @@ module dispatch_testbench;
             else exit_on_error ("test_zero free error");
         assert (lsq_out.lsq_d_en_cnt == 2'b0)
             else exit_on_error ("test_zero lsq error");
+        assert (map_out.en_cnt == '0)
+            else exit_on_error ("test_zero map error");
 
+    endtask
+
+    task test_two_rdy();
+        reset = 1;
+        @(negedge clock);
+        reset = 0;
+
+        clear_all();
+        @(negedge clock);
+        set_rs(2);
+        set_rob(2);
+        set_free(2,8,16);
+        set_lsq(2);
+        set_decode(0,1,2,3,OPA_IS_RS1,OPB_IS_RS2,0,0,0,0);
+        set_decode(1,4,5,6,OPA_IS_RS1,OPB_IS_RS2,0,0,0,0);
+
+        @(negedge clock);
+        // $display("\n\nFREE VALUE: %2d:", free_in.free_rdy_scnt);
+        assert (decode_out.decode_d_en_cnt == 2'b11)
+            else exit_on_error ("test_two decode error");
+        assert (rs_out.rs_d_en_cnt == 2)
+            else exit_on_error ("test_two_rdy rs error");
+        assert (rob_out.rob_d_en_cnt == 2)
+            else exit_on_error ("test_two_rdy rob error");
+        assert (free_out.free_d_en_cnt == 2)
+            else exit_on_error ("test_two_rdy free error");
+        assert (lsq_out.lsq_d_en_cnt == 2)
+            else exit_on_error ("test_two_rdy lsq error");
+
+        assert (map_out.en_cnt == 2)
+            else exit_on_error ("test_two_rdy map error");
+
+        assert (map_out.dsts[0] == 1)
+            else exit_on_error ("test_two_rdy map error");
+        assert (map_out.dsts[1] == 4)
+            else exit_on_error ("test_two_rdy map error");
+        assert (map_out.ts[0] == 8)
+            else exit_on_error ("test_two_rdy map error");
+        assert (map_out.ts[1] == 16)
+            else exit_on_error ("test_two_rdy map error");
+
+        assert (map_out.src1s[0] == 2)
+            else exit_on_error ("test_two_rdy map error");
+        assert (map_out.src2s[0] == 3)
+            else exit_on_error ("test_two_rdy map error");
+        assert (map_out.src1s[1] == 5)
+            else exit_on_error ("test_two_rdy map error");
+        assert (map_out.src2s[1] == 6)
+            else exit_on_error ("test_two_rdy map error");
+
+        @(negedge clock);
+        set_decode(0,0,2,3,OPA_IS_RS1,OPB_IS_RS2,0,0,0,0);
+
+        @(negedge clock);
+        assert (decode_out.decode_d_en_cnt == 2'b11)
+            else exit_on_error ("test_two decode error");
+        assert (rs_out.rs_d_en_cnt == 2)
+            else exit_on_error ("test_two_rdy rs error");
+        assert (rob_out.rob_d_en_cnt == 2)
+            else exit_on_error ("test_two_rdy rob error");
+        assert (free_out.free_d_en_cnt == 1)
+            else exit_on_error ("test_two_rdy free error");
+        assert (lsq_out.lsq_d_en_cnt == 2)
+            else exit_on_error ("test_two_rdy lsq error");
+
+        assert (map_out.en_cnt == 2)
+            else exit_on_error ("test_two_rdy map error");
+
+        assert (map_out.dsts[0] == 0)
+            else exit_on_error ("test_two_rdy map error");
+        assert (map_out.dsts[1] == 4)
+            else exit_on_error ("test_two_rdy map error");
+        assert (map_out.ts[0] == 0)
+            else exit_on_error ("test_two_rdy map error");
+        assert (map_out.ts[1] == 16)
+            else exit_on_error ("test_two_rdy map error");
+
+        assert (map_out.src1s[0] == 2)
+            else exit_on_error ("test_two_rdy map error");
+        assert (map_out.src2s[0] == 3)
+            else exit_on_error ("test_two_rdy map error");
+        assert (map_out.src1s[1] == 5)
+            else exit_on_error ("test_two_rdy map error");
+        assert (map_out.src2s[1] == 6)
+            else exit_on_error ("test_two_rdy map error");
+    endtask
+
+    task test_one_rdy();
+        reset = 1;
+        @(negedge clock);
+        reset = 0;
+
+        clear_all();
+        @(negedge clock);
+        set_rs(1);
+        set_rob(2);
+        set_free(2,8,16);
+        set_lsq(2);
+        set_decode(0,1,2,3,OPA_IS_RS1,OPB_IS_RS2,0,0,0,0);
+        set_decode(1,4,5,6,OPA_IS_RS1,OPB_IS_RS2,0,0,0,0);
+
+        @(negedge clock);
+        // $display("\n\nFREE VALUE: %2d:", free_in.free_rdy_scnt);
+        assert (decode_out.decode_d_en_cnt == 2'b01)
+            else exit_on_error ("test_one decode error");
+        assert (rs_out.rs_d_en_cnt == 1)
+            else exit_on_error ("test_one_rdy rs error");
+        assert (rob_out.rob_d_en_cnt == 1)
+            else exit_on_error ("test_one_rdy rob error");
+        assert (free_out.free_d_en_cnt == 1)
+            else exit_on_error ("test_one_rdy free error");
+        assert (lsq_out.lsq_d_en_cnt == 1)
+            else exit_on_error ("test_one_rdy lsq error");
+
+        assert (map_out.en_cnt == 1)
+            else exit_on_error ("test_one_rdy map error");
+
+        assert (map_out.dsts[0] == 1)
+            else exit_on_error ("test_two_rdy map error");
+        assert (map_out.ts[0] == 8)
+            else exit_on_error ("test_two_rdy map error");
+        assert (map_out.dsts[1] == 0)
+            else exit_on_error ("test_two_rdy map error");
+        assert (map_out.ts[1] == 0)
+            else exit_on_error ("test_two_rdy map error");
+
+        assert (map_out.src1s[0] == 2)
+            else exit_on_error ("test_two_rdy map error");
+        assert (map_out.src2s[0] == 3)
+            else exit_on_error ("test_two_rdy map error");
+        assert (map_out.src1s[1] == 0)
+            else exit_on_error ("test_two_rdy map error");
+        assert (map_out.src2s[1] == 0)
+            else exit_on_error ("test_two_rdy map error");
+
+        @(negedge clock);
+        set_rs(2);
+        set_rob(1);
+        set_free(2,3,4);
+        set_lsq(2);
+
+        @(negedge clock);
+        // $display("\n\nFREE VALUE: %2d:", free_in.free_rdy_scnt);
+        assert (decode_out.decode_d_en_cnt == 2'b01)
+            else exit_on_error ("test_one decode error");
+        assert (rs_out.rs_d_en_cnt == 1)
+            else exit_on_error ("test_one_rdy rs error");
+        assert (rob_out.rob_d_en_cnt == 1)
+            else exit_on_error ("test_one_rdy rob error");
+        assert (free_out.free_d_en_cnt == 1)
+            else exit_on_error ("test_one_rdy free error");
+        assert (lsq_out.lsq_d_en_cnt == 1)
+            else exit_on_error ("test_one_rdy lsq error");
+        assert (map_out.en_cnt == 1)
+            else exit_on_error ("test_one_rdy map error");
+
+        @(negedge clock);
+        set_rs(2);
+        set_rob(2);
+        set_free(1,3,4);
+        set_lsq(2);
+
+        @(negedge clock);
+        // $display("\n\nFREE VALUE: %2d:", free_in.free_rdy_scnt);
+        assert (decode_out.decode_d_en_cnt == 2'b01)
+            else exit_on_error ("test_one decode error");
+        assert (rs_out.rs_d_en_cnt == 1)
+            else exit_on_error ("test_one_rdy rs error");
+        assert (rob_out.rob_d_en_cnt == 1)
+            else exit_on_error ("test_one_rdy rob error");
+        assert (free_out.free_d_en_cnt == 1)
+            else exit_on_error ("test_one_rdy free error");
+        assert (lsq_out.lsq_d_en_cnt == 1)
+            else exit_on_error ("test_one_rdy lsq error");
+        assert (map_out.en_cnt == 1)
+            else exit_on_error ("test_one_rdy map error");
+
+        @(negedge clock);
+        set_rs(2);
+        set_rob(2);
+        set_free(2,3,4);
+        set_lsq(1);
+
+        @(negedge clock);
+        // $display("\n\nFREE VALUE: %2d:", free_in.free_rdy_scnt);
+        assert (decode_out.decode_d_en_cnt == 2'b01)
+            else exit_on_error ("test_one decode error");
+        assert (rs_out.rs_d_en_cnt == 1)
+            else exit_on_error ("test_one_rdy rs error");
+        assert (rob_out.rob_d_en_cnt == 1)
+            else exit_on_error ("test_one_rdy rob error");
+        assert (free_out.free_d_en_cnt == 1)
+            else exit_on_error ("test_one_rdy free error");
+        assert (lsq_out.lsq_d_en_cnt == 1)
+            else exit_on_error ("test_one_rdy lsq error");
+        assert (map_out.en_cnt == 1)
+            else exit_on_error ("test_one_rdy map error");
+    endtask
+
+    task test_too_many();
+    reset = 1;
+        @(negedge clock);
+        reset = 0;
+
+        clear_all();
+        @(negedge clock);
+        set_rs(3);
+        set_rob(3);
+        set_free(3,8,16);
+        set_lsq(3);
+        set_decode(0,1,2,3,OPA_IS_RS1,OPB_IS_RS2,0,0,0,0);
+        set_decode(1,4,5,6,OPA_IS_RS1,OPB_IS_RS2,0,0,0,0);
+
+        @(negedge clock);
+        // $display("\n\nFREE VALUE: %2d:", free_in.free_rdy_scnt);
+        assert (decode_out.decode_d_en_cnt == 2'b11)
+            else exit_on_error ("test_too_many decode error");
+        assert (rs_out.rs_d_en_cnt == 2)
+            else exit_on_error ("test_too_many rs error");
+        assert (rob_out.rob_d_en_cnt == 2)
+            else exit_on_error ("test_too_many rob error");
+        assert (free_out.free_d_en_cnt == 2)
+            else exit_on_error ("test_too_many free error");
+        assert (lsq_out.lsq_d_en_cnt == 2)
+            else exit_on_error ("test_too_many lsq error");
+
+        assert (map_out.en_cnt == 2)
+            else exit_on_error ("test_too_many map error");
+
+        assert (map_out.dsts[0] == 1)
+            else exit_on_error ("test_too_many map error");
+        assert (map_out.dsts[1] == 4)
+            else exit_on_error ("test_too_many map error");
+        assert (map_out.ts[0] == 8)
+            else exit_on_error ("test_too_many map error");
+        assert (map_out.ts[1] == 16)
+            else exit_on_error ("test_too_many map error");
+
+        assert (map_out.src1s[0] == 2)
+            else exit_on_error ("test_too_many map error");
+        assert (map_out.src2s[0] == 3)
+            else exit_on_error ("test_too_many map error");
+        assert (map_out.src1s[1] == 5)
+            else exit_on_error ("test_too_many map error");
+        assert (map_out.src2s[1] == 6)
+            else exit_on_error ("test_too_many map error");
     endtask
 
 
     initial begin
         clock = 0;
         failed = 0;
+        reset = 0;
+        flush = 0;
 
 
         clear_all();
 
         test_reset();
         test_zero();
+        test_two_rdy();
+        test_one_rdy();
+        test_too_many();
 
         if (failed)
             $display("@@@ Failed\n");
