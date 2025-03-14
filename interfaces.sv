@@ -264,80 +264,105 @@ endmodule
 Dispatch
 ================================================
 */
-module dispatch (
+module dispatch #(parameter 
+    N=`N
+) (
     input clock, reset, flush,
-    // TODO: wrap module specific ins and outs into anonymous structs
-    // e.g. input struct packed { ... } rob_in;
 
+
+    // DECODE
+    input struct packed {
+        ID_RESULT   [N-1:0]     d_dat;
+    } decode_in,
+
+    output struct packed {
+        logic       [N-1:0] decode_d_en_cnt;
+    } decode_out,
+    
 
     // RS
-    input logic       [$clog2(N):0] rs_scnt, // TODO: rename to rs_rdy_scnt
-        // - From: RS
-    output ID_RESULT   [N-1:0] d_dat,
-        // - To: RS
+    input struct packed {
+        logic       [$clog2(N):0] rs_rdy_scnt;
+            // - From: RS
+    } rs_in,
 
-    output logic       [$clog2(N):0] d_en_cnt,
-        // - To: RS
-        // - Number of enabled dispatch lines? (replacement for d_vld)
-        // - Question: permit
-        // 1) only N dispatches, OR
-        // 2) a different limit number of dispatches DIS_MAX: N ≤ DIS_MAX ≤ RS_SZ
-        // (DIS_MAX will be a new sys_defs.svh constant) ?
-
-
+    output struct packed {
+        logic       [$clog2(N):0] rs_d_en_cnt;
+            // - To: RS
+            // - Number of enabled dispatch lines? (replacement for d_vld)
+            // - Question: permit
+            // 1) only N dispatches, OR
+            // 2) a different limit number of dispatches DIS_MAX: N ≤ DIS_MAX ≤ RS_SZ
+            // (DIS_MAX will be a new sys_defs.svh constant) ?
+    } rs_out,
+    
+    
     // ROB
-    input logic    [$clog2(N):0]    rob_rdy_scnt,
-        // From: ROB
-        // saturating counter for number of free rob entries
-    output [$clog2(N):0]            d_en_cnt,
-        // To: ROB
-        // - Number of enabled dispatch lines?
-    output ROB_ENTRY   [N-1:0]      d_dat,
-        // To: ROB
-        // - IMPORTANT: Set from lowest indices in program-order. NO GAPS!!!
+    input struct packed {
+        logic    [$clog2(N):0]    rob_rdy_scnt;
+            // From: ROB
+            // saturating counter for number of free rob entries
+    } rob_in,
 
+    output struct packed {
+        logic   [$clog2(N):0]            rob_d_en_cnt;
+            // To: ROB
+            // - Number of enabled dispatch lines?
+    } rob_out,
+    
 
     // Free list
-    input logic    [$clog2(N):0]    free_rdy_scnt,
+    input struct packed {
+        logic    [$clog2(N):0]    free_rdy_scnt;
         // From: Free list
         // - sat. count of number of free pregs in free list;
         //   count reflects any pregs returned in retire! (i.e. AFTER retires)
-    output logic     [$clog2(N):0]  d_en_cnt,
-        // To: Free list
-        // - number of enabled dispatch lines WHO NEED A DEST PREG 
-        //   (e.g. no stores)
-        //   (i.e. may only be a strict subset of dispatching insns!)
-    output PHYS_REG_IDX [N-1:0]     d_ts,
+        PHYS_REG_IDX [N-1:0]     d_ts;
         // From: Free list
         // - newly allocated pregs
+    } free_in,
+
+    output struct packed {
+        logic     [$clog2(N):0]  free_d_en_cnt;
+            // To: Free list
+            // - number of enabled dispatch lines WHO NEED A DEST PREG 
+            //   (e.g. no stores)
+            //   (i.e. may only be a strict subset of dispatching insns!)
+    } free_out,
 
 
+    // LSQ
+    input struct packed {
+        logic    [$clog2(N):0]    lsq_rdy_scnt;
+    } lsq_in,
+
+    output struct packed {
+        logic     [$clog2(N):0]  lsq_d_en_cnt;
+            // To: LSQ
+            // - number of enabled dispatch lines WHO NEED A LD/ST 
+            //   (i.e. may only be a strict subset of dispatching insns!)
+    } lsq_out,
+    
+    
     // Map table
-    output logic         [$clog2(N):0] en_cnt,
-        // - Number of enabled dispatch lines?
-        // - NOTE: For in-order stuff with serial deps (like dispatch), use c(ou)nts;
-        // otherwise use en(able) buses.
-    output REG_IDX       [N-1:0] src1s,
-    output REG_IDX       [N-1:0] src2s,
-    output REG_IDX       [N-1:0] dsts,
-    output PHYS_REG_IDX  [N-1:0] ts,
-        // To: Map table
-        // - IMPORTANT: Set from lowest indices in program-order. NO GAPS!!!
-
-    input logic        [N-1:0] cpl1s,
-    input logic        [N-1:0] cpl2s,
-        // From: Map table
-        // - src1s, src2s is_complete bits resp.
-    input PHYS_REG_IDX [N-1:0] t1s,
-        // From: Map table
-        // - Renamed physical registers tags for src1s
-        // - src1[i] -> t1[i]
-    input PHYS_REG_IDX [N-1:0] t2s
-        // From: Map table
-        // - Renamed physical registers tags for src2s
-        // - src2[i] -> t2[i]
+    output struct packed {
+        logic         [$clog2(N):0] en_cnt;
+            // - Number of enabled dispatch lines?
+            // - NOTE: For in-order stuff with serial deps (like dispatch), use c(ou)nts;
+            // otherwise use en(able) buses.
+        REG_IDX       [N-1:0] src1s;
+        REG_IDX       [N-1:0] src2s;
+        REG_IDX       [N-1:0] dsts;
+        PHYS_REG_IDX  [N-1:0] ts;
+            // To: Map table
+            // - IMPORTANT: Set from lowest indices in program-order. NO GAPS!!!
+    } map_out
+    
+    //dispatch shouldn't need to read from the map table.
+    //dispatch will pair a new tag (from free list) with
+    //the dest reg (from decode), and output the paired
+    //item to the map table for it to decide how to update.
 );
-endmodule
 
 /* 
 ================================================
