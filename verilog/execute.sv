@@ -66,46 +66,65 @@ module conditional_branch (
 
 endmodule // conditional_branch
 
-module mult_no_pipeline (
-    input clock, reset, start,
-    input DATA rs1, rs2,
-    input MULT_FUNC func,
+// module mult_no_pipeline (
+//     input clock, reset, start,
+//     input DATA rs1, rs2,
+//     input MULT_FUNC func,
 
-    output DATA  result,
-    output logic done
-);
+//     output DATA  result,
+//     output logic done
+// );
 
-    logic [63:0] mcand, mplier, product;
+//     logic [63:0] mcand, mplier, product;
 
-    assign product = mcand * mplier;
+//     assign product = mcand * mplier;
 
-    // Sign-extend the multiplier inputs based on the operation
-    always_comb begin
-        case (func)
-            M_MUL, M_MULH, M_MULHSU: mcand = {{(32){rs1[31]}}, rs1};
-            default:                 mcand = {32'b0, rs1};
-        endcase
-        case (func)
-            M_MUL, M_MULH: mplier = {{(32){rs2[31]}}, rs2};
-            default:       mplier = {32'b0, rs2};
-        endcase
-    end
+//     // Sign-extend the multiplier inputs based on the operation
+//     always_comb begin
+//         case (func)
+//             M_MUL, M_MULH, M_MULHSU: mcand = {{(32){rs1[31]}}, rs1};
+//             default:                 mcand = {32'b0, rs1};
+//         endcase
+//         case (func)
+//             M_MUL, M_MULH: mplier = {{(32){rs2[31]}}, rs2};
+//             default:       mplier = {32'b0, rs2};
+//         endcase
+//     end
 
-    // Use the high or low bits of the product based on the output func
-    assign result = (func == M_MUL) ? product[31:0] : product[63:32];
+//     // Use the high or low bits of the product based on the output func
+//     assign result = (func == M_MUL) ? product[31:0] : product[63:32];
 
-endmodule
+// endmodule
 
 
 
 module stage_ex (
-    input ID_EX_PACKET id_ex_reg,
+    input   logic       [NUM_FU_ALU-1:0]    fu_vld_alu,
+    input   logic       [NUM_FU_MULT-1:0]   fu_vld_mult,
+    input   logic       [NUM_FU_STORE-1:0]  fu_vld_store,
+    input   logic       [NUM_FU_LOAD-1:0]   fu_vld_load,
+    input   ID_RESULT   [NUM_FU_ALU-1:0]    fu_dat_alu,
+    input   ID_RESULT   [NUM_FU_MULT-1:0]   fu_dat_mult,
+    input   ID_RESULT   [NUM_FU_STORE-1:0]  fu_dat_store,
+    input   ID_RESULT   [NUM_FU_LOAD-1:0]   fu_dat_load,
 
-    output EX_MEM_PACKET ex_packet
+    output  logic       [NUM_FU_ALU-1:0]    fu_rdy_alu,
+    output  logic       [NUM_FU_MULT-1:0]   fu_rdy_mult,
+    output  logic       [NUM_FU_STORE-1:0]  fu_rdy_store,
+    output  logic       [NUM_FU_LOAD-1:0]   fu_rdy_load,
+
+    output  logic         [N-1:0] c_en;
+            
+    output  PHYS_REG_IDX  [N-1:0] c_ts;
+
+
+
+
 );
 
     DATA alu_result, mult_result, opa_mux_out, opb_mux_out;
     logic take_conditional;
+    logic mult_done;
 
     // Pass-throughs
     assign ex_packet.NPC          = id_ex_reg.NPC;
@@ -156,7 +175,7 @@ module stage_ex (
     end
 
     // Instantiate the ALU
-    alu alu_0 (
+    alu [NUM_FU_ALU-1:0] alu_0 (
         // Inputs
         .opa(opa_mux_out),
         .opb(opb_mux_out),
@@ -167,18 +186,22 @@ module stage_ex (
     );
 
     // Instantiate the multiplier
-    mult_no_pipeline mult_0 (
+    mult [NUM_FU_MULT-1:0] mults (
         // Inputs
+        .clock(clock),
+        .reset(reset),
+        .start(),
         .rs1(id_ex_reg.rs1_value),
         .rs2(id_ex_reg.rs2_value),
         .func(id_ex_reg.inst.r.funct3), // which mult operation to perform
 
         // Output
-        .result(mult_result)
+        .result(mult_result),
+        .done(mult_done)
     );
 
     // Instantiate the conditional branch module
-    conditional_branch conditional_branch_0 (
+    conditional_branch [NUM_FU_BRANCH-1:0] conditional_branchs (
         // Inputs
         .rs1(id_ex_reg.rs1_value),
         .rs2(id_ex_reg.rs2_value),
@@ -187,5 +210,92 @@ module stage_ex (
         // Output
         .take(take_conditional)
     );
+
+
+    always_comb begin
+       
+        PHYS_REG_IDX completed_tags [NUM_FU_ALU + NUM_FU_MULT + NUM_FU_LOAD + NUM_FU_STORE];
+        int completed_ids [NUM_FU_ALU + NUM_FU_MULT + NUM_FU_LOAD + NUM_FU_STORE];
+        int completed_count = 0;
+
+        
+        for (int i = 0; i < NUM_FU_ALU; i++) begin
+            if (fu_vld_alu[i] && fu_dat_alu[i].alu_func != default) begin
+                completed_tags[completed_count] = fu_dat_alu[i].t;
+                completed_ids[completed_count] = fu_dat_alu[i].id;
+                completed_count++;
+            end
+        end
+
+        for (int i = 0; i < NUM_FU_MULT; i++) begin
+            if (fu_vld_mult[i] && fu_dat_mult[i].mult_done) begin
+                completed_tags[completed_count] = fu_dat_mult[i].t;
+                completed_ids[completed_count] = fu_dat_mult[i].id;
+                completed_count++;
+            end
+        end
+
+        for (int i = 0; i < NUM_FU_LOAD; i++) begin
+            if (fu_vld_load[i]) begin
+                completed_tags[completed_count] = fu_dat_load[i].t;
+                completed_ids[completed_count] = fu_dat_load[i].id;
+                completed_count++;
+            end
+        end
+
+        for (int i = 0; i < NUM_FU_STORE; i++) begin
+            if (fu_vld_store[i]) begin
+                completed_tags[completed_count] = fu_dat_store[i].t;
+                completed_ids[completed_count] = fu_dat_store[i].id;
+                completed_count++;
+            end
+        end
+
+        // Step 3: Find the two oldest completions without sorting everything
+        int oldest_id = 999999;       // Large initial value for min search
+        PHYS_REG_IDX oldest_tag = '0; // Default to zero to avoid uninitialized values
+        int second_oldest_id = 999999;
+        PHYS_REG_IDX second_oldest_tag = '0; // Default to zero
+
+        for (int i = 0; i < completed_count; i++) begin
+            if (completed_ids[i] < oldest_id) begin
+                second_oldest_id = oldest_id;
+                second_oldest_tag = oldest_tag;
+                oldest_id = completed_ids[i];
+                oldest_tag = completed_tags[i];
+            end else if (completed_ids[i] < second_oldest_id) begin
+                second_oldest_id = completed_ids[i];
+                second_oldest_tag = completed_tags[i];
+            end
+        end
+
+        // Step 4: Assign the selected oldest completions
+        c_en = '0; // Initialize completion enable signals
+        c_ts = '0; // Initialize completed physical register tags
+
+        case (completed_count)
+            0: begin
+                // Default case: No completions this cycle
+                c_en = '0;
+                c_ts = '0;
+            end
+            1: begin
+                // Only one instruction finished
+                c_en[0] = 1'b1;
+                c_ts[0] = oldest_tag;
+            end
+            default: begin
+                // Two or more completions: Take the two oldest
+                c_en[0] = 1'b1;
+                c_ts[0] = oldest_tag;
+                c_en[1] = 1'b1;
+                c_ts[1] = second_oldest_tag;
+            end
+        endcase
+    end
+
+
+
+
 
 endmodule // stage_ex
