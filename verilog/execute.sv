@@ -66,46 +66,59 @@ module conditional_branch (
 
 endmodule // conditional_branch
 
-module mult_no_pipeline (
-    input clock, reset, start,
-    input DATA rs1, rs2,
-    input MULT_FUNC func,
+// module mult_no_pipeline (
+//     input clock, reset, start,
+//     input DATA rs1, rs2,
+//     input MULT_FUNC func,
 
-    output DATA  result,
-    output logic done
-);
+//     output DATA  result,
+//     output logic done
+// );
 
-    logic [63:0] mcand, mplier, product;
+//     logic [63:0] mcand, mplier, product;
 
-    assign product = mcand * mplier;
+//     assign product = mcand * mplier;
 
-    // Sign-extend the multiplier inputs based on the operation
-    always_comb begin
-        case (func)
-            M_MUL, M_MULH, M_MULHSU: mcand = {{(32){rs1[31]}}, rs1};
-            default:                 mcand = {32'b0, rs1};
-        endcase
-        case (func)
-            M_MUL, M_MULH: mplier = {{(32){rs2[31]}}, rs2};
-            default:       mplier = {32'b0, rs2};
-        endcase
-    end
+//     // Sign-extend the multiplier inputs based on the operation
+//     always_comb begin
+//         case (func)
+//             M_MUL, M_MULH, M_MULHSU: mcand = {{(32){rs1[31]}}, rs1};
+//             default:                 mcand = {32'b0, rs1};
+//         endcase
+//         case (func)
+//             M_MUL, M_MULH: mplier = {{(32){rs2[31]}}, rs2};
+//             default:       mplier = {32'b0, rs2};
+//         endcase
+//     end
 
-    // Use the high or low bits of the product based on the output func
-    assign result = (func == M_MUL) ? product[31:0] : product[63:32];
+//     // Use the high or low bits of the product based on the output func
+//     assign result = (func == M_MUL) ? product[31:0] : product[63:32];
 
-endmodule
+// endmodule
 
 
 
 module stage_ex (
-    input ID_EX_PACKET id_ex_reg,
+    input   logic       [NUM_FU_ALU-1:0]    fu_vld_alu,
+    input   logic       [NUM_FU_MULT-1:0]   fu_vld_mult,
+    input   logic       [NUM_FU_STORE-1:0]  fu_vld_store,
+    input   logic       [NUM_FU_LOAD-1:0]   fu_vld_load,
+    input   ID_RESULT   [NUM_FU_ALU-1:0]    fu_dat_alu,
+    input   ID_RESULT   [NUM_FU_MULT-1:0]   fu_dat_mult,
+    input   ID_RESULT   [NUM_FU_STORE-1:0]  fu_dat_store,
+    input   ID_RESULT   [NUM_FU_LOAD-1:0]   fu_dat_load,
 
-    output EX_MEM_PACKET ex_packet
+    output  logic       [NUM_FU_ALU-1:0]    fu_rdy_alu,
+    output  logic       [NUM_FU_MULT-1:0]   fu_rdy_mult,
+    output  logic       [NUM_FU_STORE-1:0]  fu_rdy_store,
+    output  logic       [NUM_FU_LOAD-1:0]   fu_rdy_load,
+
+
 );
 
     DATA alu_result, mult_result, opa_mux_out, opb_mux_out;
     logic take_conditional;
+    logic mult_done;
 
     // Pass-throughs
     assign ex_packet.NPC          = id_ex_reg.NPC;
@@ -156,7 +169,7 @@ module stage_ex (
     end
 
     // Instantiate the ALU
-    alu alu_0 (
+    alu [NUM_FU_ALU-1:0] alu_0 (
         // Inputs
         .opa(opa_mux_out),
         .opb(opb_mux_out),
@@ -167,18 +180,22 @@ module stage_ex (
     );
 
     // Instantiate the multiplier
-    mult_no_pipeline mult_0 (
+    mult [NUM_FU_MULT-1:0] mults (
         // Inputs
+        .clock(clock),
+        .reset(reset),
+        .start(),
         .rs1(id_ex_reg.rs1_value),
         .rs2(id_ex_reg.rs2_value),
         .func(id_ex_reg.inst.r.funct3), // which mult operation to perform
 
         // Output
-        .result(mult_result)
+        .result(mult_result),
+        .done(mult_done)
     );
 
     // Instantiate the conditional branch module
-    conditional_branch conditional_branch_0 (
+    conditional_branch [NUM_FU_BRANCH-1:0] conditional_branchs (
         // Inputs
         .rs1(id_ex_reg.rs1_value),
         .rs2(id_ex_reg.rs2_value),
