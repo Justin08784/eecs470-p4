@@ -13,5 +13,16 @@ N = `N
     input DATA [N-1:0] c_res
 );
 
+logic [N-1:0] my_en;
+PHYS_REG_IDX [N-1:0] my_ts;
+DATA [N-1:0] my_res;
+
+
+
+always_ff @(posedge clock) begin
+    
+end
+
+
 
 endmodule
