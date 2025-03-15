@@ -16,9 +16,9 @@ module free_list #(parameter
     // issue ??
 
     // dispatch
-    input dispatch2fl d_in,
+    input dispatch2free_list d_in,
     
-    output fl2dispatch d_out
+    output free_list2dispatch d_out
 );
     localparam DEPTH = `ROB_SZ;
     localparam WIDTH = $bits(PHYS_REG_IDX);
@@ -58,7 +58,7 @@ module free_list #(parameter
         .wr_en_cnt(r_in.r_en_cnt),
         .wr_data(r_in.r_tolds),
 
-        .rd_en_cnt(d_in.d_en_cnt),
+        .rd_en_cnt(d_in.free_d_en_cnt),
         .rd_data(d_out.d_ts),
 
         .free_scnt(d_out.free_rdy_scnt),
