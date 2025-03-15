@@ -58,20 +58,29 @@ genvar i;
 always_comb begin
     for (int i = 0; i < N; i++) begin
         if (BYPASS_EN != 0) begin : bypass_path
-            if (s_en[i] && (s_t1s[i] != `ZERO_REG) && (s_t2s[i] != `ZERO_REG)) begin
-                s_v1s[i] = phys_reg_file[s_t1s[i]];
-                s_v2s[i] = phys_reg_file[s_t2s[i]];
+            if (s_en[i]) begin
+                // s_v1s[i] = phys_reg_file[s_t1s[i]];
+                // s_v2s[i] = phys_reg_file[s_t2s[i]];
                 for (int j = 0; j < N; j++) begin
-                    if (c_en[j] && (s_t1s[i] == c_ts[j])) begin
-                        s_v1s[i] = c_vs[j];
+                    if (s_t1s[i] == `ZERO_REG) begin
+                        s_v1s[i] = '0;
+                    end else begin
+                        if (c_en[j] && (s_t1s[i] == c_ts[j])) begin
+                            s_v1s[i] = c_vs[j];
+                        end
+                        else
+                            s_v1s[i] = phys_reg_file[s_t1s[i]];
                     end
-                    // else
-                    //     s_v1s[i] = phys_reg_file[s_t1s[i]];
-                    if (c_en[j] && (s_t2s[i] == c_ts[j])) begin
-                        s_v2s[i] = c_vs[j];
+
+                    if (s_t2s[i] == `ZERO_REG) begin
+                        s_v2s[i] = '0;
+                    end else begin
+                        if (c_en[j] && (s_t2s[i] == c_ts[j])) begin
+                            s_v2s[i] = c_vs[j];
+                        end
+                        else
+                            s_v2s[i] = phys_reg_file[s_t2s[i]];
                     end
-                    // else
-                    //     s_v2s[i] = phys_reg_file[s_t2s[i]];
                 end
             end else begin
                 s_v1s[i] = '0;
