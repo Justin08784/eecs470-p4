@@ -376,4 +376,202 @@ module cpu (
     // Output the committed instruction to the testbench for counting
     assign committed_insts[0] = wb_packet;
 
+
+    //////////////////////////////////////////////////
+    //                                              //
+    //                   Dispatch                   //
+    //                                              //
+    //////////////////////////////////////////////////   
+
+    decode2dispatch d2dis;
+    dispatch2decode dis2d;
+    rs2dispatch rs2dis;
+    dispatch2rs dis2rs;
+    rob2dispatch rob2dis;
+    dispatch2rob dis2rob;
+    free_list2dispatch fl2dis;
+    dispatch2free_list dis2fl; // TODO
+    dispatch2map_table dis2mt; // TODO
+
+    dispatch dispatcher(
+        .clock(clock),
+        .reset(reset),
+        .flush(),
+
+        .decode_in(d2dis),
+        .decode_out(dis2d),
+
+        .rs_in(rs2dis),
+        .rs_out(dis2rs),
+
+        .rob_in(rob2dis),
+        .rob_out(dis2rob),
+
+        .free_in(fl2dis),
+        .free_out(dis2fl),
+
+        .lsq_in('0),
+        .lsq_out(),
+
+        .map_out(dis2mt)
+    );
+
+    //////////////////////////////////////////////////
+    //                                              //
+    //              Reservation Station             //
+    //                                              //
+    //////////////////////////////////////////////////  
+    logic       [$clog2(`N):0] rs_scnt;  // to dispatcher
+    logic       [$clog2(`N):0] d_en_cnt; // number of enabled dispatch lines? (from dispatcher; dep. on rs_scnt)
+    ID_RESULT   [`N-1:0] d_dat;
+
+    logic       [`NUM_FU_ALU-1:0]    fu_rdy_alu;
+    logic       [`NUM_FU_MULT-1:0]   fu_rdy_mult;
+    logic       [`NUM_FU_STORE-1:0]  fu_rdy_store;
+    logic       [`NUM_FU_LOAD-1:0]   fu_rdy_load;
+    logic           [`N-1:0] c_en;
+    PHYS_REG_IDX    [`N-1:0] c_ts;
+
+    logic       [`NUM_FU_ALU-1:0]    fu_vld_alu;
+    logic       [`NUM_FU_MULT-1:0]   fu_vld_mult;
+    logic       [`NUM_FU_STORE-1:0]  fu_vld_store;
+    logic       [`NUM_FU_LOAD-1:0]   fu_vld_load;
+    ID_RESULT   [`NUM_FU_ALU-1:0]    fu_dat_alu;
+    ID_RESULT   [`NUM_FU_MULT-1:0]   fu_dat_mult;
+    ID_RESULT   [`NUM_FU_STORE-1:0]  fu_dat_store;
+    ID_RESULT   [`NUM_FU_LOAD-1:0]   fu_dat_load;
+
+
+    rs rs_0(
+        .clock(clock),
+        .reset(reset),
+        .flush(),
+ 
+        .rs_scnt(rs_scnt),
+        .d_en_cnt(d_en_cnt),
+        .d_dat(d_dat),
+ 
+        .fu_rdy_alu(fu_rdy_alu),
+        .fu_rdy_mult(fu_rdy_mult),
+        .fu_rdy_store(fu_rdy_store),
+        .fu_rdy_load(fu_rdy_load),
+
+        .fu_dat_alu(fu_dat_alu),
+        .fu_dat_mult(fu_dat_mult),
+        .fu_dat_store(fu_dat_store),
+        .fu_dat_load(fu_dat_load),
+ 
+        .c_en(c_en),
+        .c_ts(c_ts)
+    );
+
+    //////////////////////////////////////////////////
+    //                                              //
+    //                Re-Order Buffer               //
+    //                                              //
+    //////////////////////////////////////////////////  
+
+    rob2retire rob2r;
+    complete2rob c2rob;
+    typedef struct packed {logic dummy;} rob2decode;
+    typedef struct packed {logic dummy;} decode2rob;
+    rob2decode rob2d;
+    decode2rob d2rob;
+
+    rob #(
+        .ROB_SZ(`ROB_SZ),
+        .N(`N)
+    ) rob_0 (
+        .clock  (clock),
+        .reset  (reset),
+        .r_out  (rob2r),
+        .c_in   (c2rob),
+        .d_out  (rob2d),
+        .d_in   (d2rob)
+    );
+
+    //////////////////////////////////////////////////
+    //                                              //
+    //                  Map Table                   //
+    //                                              //
+    //////////////////////////////////////////////////  
+
+    // retire (read)
+
+    map_table map_table_0 (
+        .clock(clock),
+        .reset(reset),
+        .c_in(),
+        .d_in(),
+        .rs_out()
+    );
+
+    //////////////////////////////////////////////////
+    //                                              //
+    //           Architectural Map Table            //
+    //                                              //
+    //////////////////////////////////////////////////  
+
+    arch_map arch_map_0 (
+        .clock(clock),
+        .reset(reset),
+        .r_in()
+    );
+
+    //////////////////////////////////////////////////
+    //                                              //
+    //                  Free List                   //
+    //                                              //
+    //////////////////////////////////////////////////  
+
+    free_list free_list_0 (
+        .clock(clock),
+        .reset(reset),
+        .flush(),
+        .r_in(),
+        .d_in(),
+        .d_out()
+    );
+
+    //////////////////////////////////////////////////
+    //                                              //
+    //            Physical Register File            //
+    //                                              //
+    //////////////////////////////////////////////////  
+
+    prf #(
+        .WIDTH(32),
+        .DEPTH(`PHYS_REG_SZ_R10K),
+        .N(`N),
+        .BYPASS_EN(1)
+    ) prf_0 (
+        .clock(clock),
+        .reset(reset),
+        .flush(),
+        .c_en(),
+        .c_ts(),
+        .c_vs(),
+        .s_en(),
+        .s_t1s(),
+        .s_t2s(),
+        .s_v1s(),
+        .s_v2s()
+    );
+
+    //////////////////////////////////////////////////
+    //                                              //
+    //                      CDB                     //
+    //                                              //
+    //////////////////////////////////////////////////  
+
+    cdb #(
+        .N(`N)
+    ) cdb_0  (
+        .reset(reset),
+        .complete_tags(),
+        .cdb_en(),
+        .cdb_broadcast()
+    );
+
+
 endmodule // pipeline
