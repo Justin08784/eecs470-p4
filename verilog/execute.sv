@@ -102,6 +102,9 @@ endmodule // alu
 
 
 module stage_ex (
+    input clock,
+    input reset,
+
     input   logic       [NUM_FU_ALU-1:0]    fu_vld_alu,
     input   logic       [NUM_FU_MULT-1:0]   fu_vld_mult,
     input   logic       [NUM_FU_STORE-1:0]  fu_vld_store,
@@ -241,6 +244,30 @@ module stage_ex (
     //     // Output
     //     .take(take_conditional)
     // );
+
+    always_ff @(posedge clock) begin
+        foreach(fu_dat_alu[i]) begin
+            if (reset) begin
+                fu_rdy_alu[i] <= 0;
+            end else if ((!branch[i] && alu_result[i] != 32'hfacebeec) || branch[i]) begin
+                fu_rdy_alu[i] <= 0;
+            end else begin
+                fu_rdy_alu[i] <= 1;
+            end
+        end
+
+        foreach(fu_dat_mult[i]) begin
+            if (reset) begin
+                fu_rdy_mult[i] <= 0;
+            end else if (mult_done[i]) begin
+                fu_rdy_mult[i] <= 1;
+            end else if (fu_vld_mult[i]) begin
+                fu_rdy_mult[i] <= 0;
+            end else begin
+                fu_rdy_mult[i] <= fu_rdy_mult[i];
+            end
+        end
+    end
 
     always_comb begin
        
