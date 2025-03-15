@@ -596,27 +596,6 @@ typedef struct packed {
         // - pregs being returned to free list
 } retire2fl;
 
-typedef struct packed {
-    logic     [$clog2(`N):0]   d_en_cnt;
-        // From: dispatch
-        // - number of enabled dispatch lines WHO NEED A DEST PREG 
-        //   (e.g. no stores)
-        //   (i.e. may only be a strict subset of dispatching insns!)
-        // - depends on d_out.free_rdy_scnt
-
-} dispatch2fl;
-
-typedef struct packed {
-    logic    [$clog2(`N):0]   free_rdy_scnt;
-        // To: dispatch
-        // - sat. count of number of free pregs in free list;
-        //   count reflects any pregs returned in retire! (i.e. AFTER retires)
-        // - depends on r_in
-    PHYS_REG_IDX [`N-1:0]     d_ts;
-        // To: dispatch
-        // - newly allocated pregs
-        // - depends on d_in.d_en_cnt
-} fl2dispatch;
 
 
 /* How can we implement this in the Makefile? */
