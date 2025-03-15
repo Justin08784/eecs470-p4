@@ -29,7 +29,7 @@ module arch_map #(parameter
             be allocated as a dest reg... No wait it can? But it will just write
             the preg#0 tag anyways, right?
             */
-            if (r_in.dsts[i] == ZERO_REG)
+            if (r_in.dsts[i] == `ZERO_REG)
                 continue;
             entries_n[r_in.dsts[i]] = r_in.ts[i];
         end
