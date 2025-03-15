@@ -99,7 +99,7 @@ module rob #(
             used    <= 0;
             head    <= 0;
             tail    <= 0;
-            state   <= '0;
+            state   = '0;
             // used    <= RESET_STATE.used;
             // head    <= RESET_STATE.head;
             // tail    <= RESET_STATE.tail;
@@ -122,8 +122,8 @@ module rob #(
                 if (i >= d_in.d_en_cnt)
                     continue;
                 cur_idx = d_idxs[i];
-                state[cur_idx].tag    <= d_in.tag[i];
-                state[cur_idx].t_old  <= d_in.t_old[i];
+                state[cur_idx].tag    = d_in.tag[i];
+                state[cur_idx].t_old  = d_in.t_old[i];
             end
         end
     end
