@@ -610,6 +610,17 @@ typedef struct packed {
         // - pregs being returned to free list
 } retire2fl;
 
+typedef struct packed {
+    logic         [$clog2(N):0] en_cnt;
+        // - Number of enabled retire lines?
+        // - Question: Does this need to be a count, or can we make it an enable
+        // bus? I fear that there can be serial dependencies and ordering issues
+        // e.g. if multiple insns retire to the same dest arch register.
+    REG_IDX       [N-1:0] dsts;
+    PHYS_REG_IDX  [N-1:0] ts;
+        // From: retire (ROB)
+        // - IMPORTANT: Set from lowest indices in program-order. NO GAPS!!!
+} retire2archmap;
 
 
 /* How can we implement this in the Makefile? */
