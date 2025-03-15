@@ -121,6 +121,7 @@ module stage_ex (
 
     output  logic       [N-1:0]             c_en;
     output  PHYS_REG_IDX[N-1:0]             c_ts;
+    output  DATA        [N-1:0]             c_data;
 );
 
     ALU_FUNC [NUM_FU_ALU-1:0] alu_func;
@@ -269,26 +270,30 @@ module stage_ex (
         end
     end
 
+
     always_comb begin
        
         PHYS_REG_IDX completed_tags [NUM_FU_ALU + NUM_FU_MULT + NUM_FU_LOAD + NUM_FU_STORE];
-        int completed_ids [NUM_FU_ALU + NUM_FU_MULT + NUM_FU_LOAD + NUM_FU_STORE];
-        logic [$clog2(NUM_FU_ALU + NUM_FU_MULT + NUM_FU_LOAD + NUM_FU_STORE)-1:0] completed_count = '0;
+        logic [3:0] completed_ids [NUM_FU_ALU + NUM_FU_MULT + NUM_FU_LOAD + NUM_FU_STORE];
+        int [3:0] completed_count = 0;
+        DATA [3:0] completed_data;
 
         
         for (int i = 0; i < NUM_FU_ALU; i++) begin
-            if (fu_vld_alu[i] && fu_dat_alu[i].alu_func != default) begin
+            if (fu_dat_alu[i].alu_result != default || branch[i]) begin
                 completed_tags[completed_count] = fu_dat_alu[i].t;
                 completed_ids[completed_count] = fu_dat_alu[i].id;
-                completed_count++;
+                completed_count = completed_count + 1;
+                completed_data = alu_result;
             end
         end
 
         for (int i = 0; i < NUM_FU_MULT; i++) begin
-            if (fu_vld_mult[i] && fu_dat_mult[i].mult_done) begin
+            if (fu_dat_mult[i].mult_done) begin
                 completed_tags[completed_count] = fu_dat_mult[i].t;
                 completed_ids[completed_count] = fu_dat_mult[i].id;
-                completed_count++;
+                completed_count = completed_count + 1;
+                completed_data = mult_result;
             end
         end
 
@@ -296,7 +301,7 @@ module stage_ex (
             if (fu_vld_load[i]) begin
                 completed_tags[completed_count] = fu_dat_load[i].t;
                 completed_ids[completed_count] = fu_dat_load[i].id;
-                completed_count++;
+                completed_count = completed_count + 1;
             end
         end
 
@@ -304,133 +309,60 @@ module stage_ex (
             if (fu_vld_store[i]) begin
                 completed_tags[completed_count] = fu_dat_store[i].t;
                 completed_ids[completed_count] = fu_dat_store[i].id;
-                completed_count++;
+                completed_count = completed_count + 1;
             end
         end
 
         // Step 3: Find the two oldest completions without sorting everything
-        int oldest_id = 999999;       // Large initial value for min search
+        logic [3:0] oldest_id = 4'b1111;       // Large initial value for min search
         PHYS_REG_IDX oldest_tag = '0; // Default to zero to avoid uninitialized values
-        int second_oldest_id = 999999;
+        DATA oldest_data;
+        logic [3:0] second_oldest_id = 4'b1111;
         PHYS_REG_IDX second_oldest_tag = '0; // Default to zero
+        DATA second_oldest_data;
+
 
         for (int i = 0; i < completed_count; i++) begin
             if (completed_ids[i] < oldest_id) begin
                 second_oldest_id = oldest_id;
                 second_oldest_tag = oldest_tag;
+                second_oldest_data = oldest_data;
                 oldest_id = completed_ids[i];
                 oldest_tag = completed_tags[i];
+                oldest_data = completed_data;
             end else if (completed_ids[i] < second_oldest_id) begin
                 second_oldest_id = completed_ids[i];
                 second_oldest_tag = completed_tags[i];
+                second_oldest_data = completed_data;
             end
         end
 
         // Step 4: Assign the selected oldest completions
         c_en = '0; // Initialize completion enable signals
         c_ts = '0; // Initialize completed physical register tags
+        c_data = '0;
 
         case (completed_count)
             0: begin
                 // Default case: No completions this cycle
                 c_en = '0;
                 c_ts = '0;
+                c_data = '0;
             end
             1: begin
                 // Only one instruction finished
                 c_en[0] = 1'b1;
                 c_ts[0] = oldest_tag;
+                c_data[0] = oldest_data;
             end
             default: begin
                 // Two or more completions: Take the two oldest
                 c_en[0] = 1'b1;
                 c_ts[0] = oldest_tag;
+                c_data[0] = oldest_data;
                 c_en[1] = 1'b1;
                 c_ts[1] = second_oldest_tag;
-            end
-        endcase
-    end
-
-
-
-    always_comb begin
-       
-        PHYS_REG_IDX completed_tags [NUM_FU_ALU + NUM_FU_MULT + NUM_FU_LOAD + NUM_FU_STORE];
-        int completed_ids [NUM_FU_ALU + NUM_FU_MULT + NUM_FU_LOAD + NUM_FU_STORE];
-        int completed_count = 0;
-
-        
-        for (int i = 0; i < NUM_FU_ALU; i++) begin
-            if (fu_vld_alu[i] && fu_dat_alu[i].alu_func != default) begin
-                completed_tags[completed_count] = fu_dat_alu[i].t;
-                completed_ids[completed_count] = fu_dat_alu[i].id;
-                completed_count++;
-            end
-        end
-
-        for (int i = 0; i < NUM_FU_MULT; i++) begin
-            if (fu_vld_mult[i] && fu_dat_mult[i].mult_done) begin
-                completed_tags[completed_count] = fu_dat_mult[i].t;
-                completed_ids[completed_count] = fu_dat_mult[i].id;
-                completed_count++;
-            end
-        end
-
-        for (int i = 0; i < NUM_FU_LOAD; i++) begin
-            if (fu_vld_load[i]) begin
-                completed_tags[completed_count] = fu_dat_load[i].t;
-                completed_ids[completed_count] = fu_dat_load[i].id;
-                completed_count++;
-            end
-        end
-
-        for (int i = 0; i < NUM_FU_STORE; i++) begin
-            if (fu_vld_store[i]) begin
-                completed_tags[completed_count] = fu_dat_store[i].t;
-                completed_ids[completed_count] = fu_dat_store[i].id;
-                completed_count++;
-            end
-        end
-
-        // Step 3: Find the two oldest completions without sorting everything
-        int oldest_id = 999999;       // Large initial value for min search
-        PHYS_REG_IDX oldest_tag = '0; // Default to zero to avoid uninitialized values
-        int second_oldest_id = 999999;
-        PHYS_REG_IDX second_oldest_tag = '0; // Default to zero
-
-        for (int i = 0; i < completed_count; i++) begin
-            if (completed_ids[i] < oldest_id) begin
-                second_oldest_id = oldest_id;
-                second_oldest_tag = oldest_tag;
-                oldest_id = completed_ids[i];
-                oldest_tag = completed_tags[i];
-            end else if (completed_ids[i] < second_oldest_id) begin
-                second_oldest_id = completed_ids[i];
-                second_oldest_tag = completed_tags[i];
-            end
-        end
-
-        // Step 4: Assign the selected oldest completions
-        c_en = '0; // Initialize completion enable signals
-        c_ts = '0; // Initialize completed physical register tags
-
-        case (completed_count)
-            0: begin
-                // Default case: No completions this cycle
-                c_en = '0;
-                c_ts = '0;
-            end
-            1: begin
-                // Only one instruction finished
-                c_en[0] = 1'b1;
-                c_ts[0] = oldest_tag;
-            end
-            default: begin
-                // Two or more completions: Take the two oldest
-                c_en[0] = 1'b1;
-                c_ts[0] = oldest_tag;
-                c_en[1] = 1'b1;
-                c_ts[1] = second_oldest_tag;
+                c_data[1] = second_oldest_data;
             end
         endcase
     end
