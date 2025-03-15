@@ -1,110 +1,364 @@
 `include "sys_defs.svh"
 
 
-module map_table(
-    input clock,
-    input reset,
+/* 
+================================================
+Map Table
+================================================
+*/
+// Comments:
+// - should be declared as a submodule of dispatch eh? doesnt seem anyone
+// else references it...?
+// - map table is more complicated than a simple lookup. forall i < j,
+// src1s[j], src2s[j] may potentially be dsts[i]. i.e. there is a serial dependency
+module map_table #(parameter 
+    N=`N
+) (
+    input clock, reset,
+    // retire ??
 
-    input PHYS_REG_IDX changed_tags [31:0],
-    input tag_vld [31:0],
+    // complete
+    input struct packed {
+        logic         [N-1:0] c_en;
+            // - Enabled complete lines?
+        PHYS_REG_IDX  [N-1:0] c_ts; // tags
+            // From: complete (EX)
+    } c_in,
 
-    output PHYS_REG_IDX map_table [31:0]
+    // issue ??
+
+    // dispatch
+    input struct packed {
+        logic         [$clog2(N):0] en_cnt;
+            // - Number of enabled dispatch lines?
+            // - NOTE: For in-order stuff with serial deps (like dispatch), use c(ou)nts;
+            // otherwise use en(able) buses.
+        REG_IDX       [N-1:0] src1s;
+        REG_IDX       [N-1:0] src2s;
+        REG_IDX       [N-1:0] dsts;
+        PHYS_REG_IDX  [N-1:0] ts;
+            // From: dispatch
+            // - IMPORTANT: Set from lowest indices in program-order. NO GAPS!!!
+    } d_in,
+    output struct packed {
+        logic        [N-1:0] cpl1s;
+        logic        [N-1:0] cpl2s;
+            // To: dispatch
+            // - src1s, src2s is_complete bits resp.
+        PHYS_REG_IDX [N-1:0] t1s;
+            // To: dispatch
+            // - Renamed physical registers tags for src1s
+            // - src1[i] -> t1[i]
+        PHYS_REG_IDX [N-1:0] t2s;
+            // To: dispatch
+            // - Renamed physical registers tags for src2s
+            // - src2[i] -> t2[i]
+    } d_out //TODO: actually goes to RS
 );
+    localparam NUM_ARCH_REG = 32;
+    struct packed {
+        PHYS_REG_IDX t;
+        logic cpl;
+    } [NUM_ARCH_REG-1:0] entries, entries_n;
 
-logic PHYS_REG_IDX next_map [31:0];
+    always_comb begin
+        entries_n = entries;
+        // handle completes
+        for (int i = 0; i < N; ++i) begin
+            /* Checking for preg#0 is presumably not necessary since it cannot
+            be allocated as a dest reg. */
+            // if (!c_in.c_en[i] || c_in.c_ts[i] == `0)
+            //     continue;
+            if (!c_in.c_en[i])
+                continue;
+            for (int r = 0; r < NUM_ARCH_REG; ++r) begin
+                entries_n[r].cpl |= (entries_n[r].t == c_in.c_ts[i]);
+            end
+        end
 
+        // handle renames
+        for (int i = 0; i < d_in.en_cnt; ++i) begin
+            /*
+            Idea: how about we always map ZERO_REG -> preg #0, cpl=1,
+            and it cannot be edited?
+            */
+            d_out.t1s[i]    = entries_n[d_in.src1s[i]].t;
+            d_out.t2s[i]    = entries_n[d_in.src2s[i]].t;
+            d_out.cpl1s[i]  = entries_n[d_in.src1s[i]].cpl;
+            d_out.cpl2s[i]  = entries_n[d_in.src2s[i]].cpl;
 
-always_comb begin
-    for (int i = 0; i < 32; i++) begin
-        next_map[i] = tag_vld[i] ? changed_tags[i] : map_table[i];
+            if (d_in.dsts[i] != `ZERO_REG) begin
+                entries_n[d_in.dsts[i]].t   = d_in.ts[i];
+                entries_n[d_in.dsts[i]].cpl = 0;
+            end
+        end
     end
-end
 
-
-always_ff @(posedge clock) begin
-    if (reset) begin
-        map_table <= default_map_table();
+    always_ff @(posedge clock) begin
+        if (reset) begin
+            entries <= '0;
+            entries[`ZERO_REG] <= '{
+                t : '0,
+                cpl : 1
+            };
+        end else begin
+            entries <= entries_n;
+        end
     end
-    else begin
-        map_table <= next_map;
-    end    
-end
+endmodule
+
+
+/* 
+================================================
+Architectural Map
+================================================
+*/
+// Comments:
+// - similar to map table, submodule to ROB?
+module arch_map #(parameter 
+    N=`N
+) (
+    input clock, reset,
+    // retire
+    input struct packed {
+        logic         [$clog2(N):0] en_cnt;
+            // - Number of enabled retire lines?
+            // - Question: Does this need to be a count, or can we make it an enable
+            // bus? I fear that there can be serial dependencies and ordering issues
+            // e.g. if multiple insns retire to the same dest arch register.
+        REG_IDX       [N-1:0] dsts;
+        PHYS_REG_IDX  [N-1:0] ts;
+            // From: retire (ROB)
+            // - IMPORTANT: Set from lowest indices in program-order. NO GAPS!!!
+    } r_in
+
+    // complete ??
+    // issue ??
+    // dispatch ??
+);
+    localparam NUM_ARCH_REG = 32;
+    struct packed {
+        PHYS_REG_IDX    t;
+    } [NUM_ARCH_REG-1:0] entries, entries_n;
+
+    always_comb begin
+        entries_n = entries;
+        // handle completes
+        for (int i = 0; i < r_in.en_cnt; ++i) begin
+            /* Checking for ZERO_REG is presumably not necessary since it cannot
+            be allocated as a dest reg... No wait it can? But it will just write
+            the preg#0 tag anyways, right?
+            */
+            // if (r_in.dsts[i] == ZERO_REG)
+            //     continue;
+            entries_n[r_in.dsts[i]] = r_in.ts[i];
+        end
+    end
+
+    always_ff @(posedge clock) begin
+        if (reset) begin
+            entries <= '0;
+            entries[`ZERO_REG] <= '{
+                t : '0
+            };
+        end else begin
+            entries <= entries_n;
+        end
+    end
+endmodule
+
+
+/* 
+================================================
+Free List
+================================================
+*/
+module free_list #(parameter 
+    N=`N
+) (
+    input clock, reset, flush,
+    // retire
+    input struct packed {
+        logic     [$clog2(N):0]   r_en_cnt;
+            // From: retire (ROB)
+            // - number of enabled retire lines WHO ARE RETURNING/DEALLOC'ING A PREG
+            //   (e.g. no stores)
+            //   (i.e. may only be a strict subset of retiring insns!)
+            // - Question: Does this really need to be an count? Surely there isn't
+            //   any serial dep. between returning pregs no? But again, the free list
+            //   itself is likely going to be FIFO so I'm not sure what's more performant...
+            //   enable bus vs. count?
+        PHYS_REG_IDX [N-1:0]     r_tolds;
+            // From: retire (ROB)
+            // - pregs being returned to free list
+    } r_in,
+
+    // complete ?? 
+    // issue ??
+
+    // dispatch
+    input struct packed {
+        logic     [$clog2(N):0]   d_en_cnt;
+            // From: dispatch
+            // - number of enabled dispatch lines WHO NEED A DEST PREG 
+            //   (e.g. no stores)
+            //   (i.e. may only be a strict subset of dispatching insns!)
+            // - depends on d_out.free_rdy_scnt
+
+    } d_in,
+    
+    output struct packed {
+        logic    [$clog2(N):0]   free_rdy_scnt;
+            // To: dispatch
+            // - sat. count of number of free pregs in free list;
+            //   count reflects any pregs returned in retire! (i.e. AFTER retires)
+            // - depends on r_in
+        PHYS_REG_IDX [N-1:0]     d_ts;
+            // To: dispatch
+            // - newly allocated pregs
+            // - depends on d_in.d_en_cnt
+    } d_out
+);
+    // TODO: need reset states for head, tail, cnt as well!!
+    function automatic [`PHYS_REG_SZ_R10K-1:0][$bits(PHYS_REG_IDX)-1:0] gen_reset_state();
+        logic [`PHYS_REG_SZ_R10K-1:0][$bits(PHYS_REG_IDX)-1:0] state;
+        logic [$bits(PHYS_REG_IDX)-1:0] start = 32 + 1;
+        for (int i = 0; i < `PHYS_REG_SZ_R10K; i++) begin
+            state[i] = start + i;
+        end
+        return state;
+    endfunction
+    const logic [`PHYS_REG_SZ_R10K-1:0][$bits(PHYS_REG_IDX)-1:0] RESET_STATE = gen_reset_state();
+   
+
+    fifo #(
+        .DEPTH(`PHYS_REG_SZ_R10K),
+        .WIDTH($bits(PHYS_REG_IDX)),
+        .NUM_RPORTS(`N),
+        .NUM_WPORTS(`N),
+        .MAX_SCNT(`N),
+        .RESET_STATE('0)
+    ) lst (
+        .clock(clock),
+        .reset(reset),
+
+        .wr_en_cnt(r_in.r_en_cnt),
+        .wr_data(r_in.r_tolds),
+
+        .rd_en_cnt(d_in.d_en_cnt),
+        .rd_data(d_out.d_ts),
+
+        .free_scnt(d_out.free_rdy_scnt),
+        .used_scnt() // do we need this? how would even retire return more pregs than in existence?
+    );
 
 endmodule
 
 
-
-module arch_map(
-    input clock,
-    input reset,
-
-    input PHYS_REG_IDX changed_tags [31:0],
-    input tag_vld [31:0],
-
-    output PHYS_REG_IDX arch_table [31:0]
-);
-
-logic PHYS_REG_IDX next_arch [31:0];
-
-
-always_comb begin
-    for (int i = 0; i < 32; i++) begin
-        next_arch[i] = tag_vld[i] ? changed_tags[i] : arch_table[i];
-    end
-end
-
-
-always_ff @(posedge clock) begin
-    if (reset) begin
-        arch_table <= default_map_table();
-    end
-    else begin
-        arch_table <= next_arch;
-    end    
-end
-
-endmodule
-
-
-
-module free_list(
-    input clock,
-    input reset,
-
-    input PHYS_REG_IDX changed_tags [`PHYS_REG_SZ_R10K-1:0],
-
-    output PHYS_REG_IDX free_list [`PHYS_REG_SZ_R10K-1:0]
-);
-
-logic PHYS_REG_IDX next_free [`PHYS_REG_SZ_R10K-1:0];
-
-//Updates the free list indices based on whether it is marked to become free or
-//if it is already free and still marked to be free next cycle
-always_comb begin
-    for (int i = 0; i < `PHYS_REG_SZ_R10K; i++) begin
-        next_free[i] = changed_tags[i] || (free_list[i] && changed_tags[i]);
-    end
-end
-
-
-always_ff @(posedge clock) begin
-    if (reset) begin
-        free_list <= '1;
-    end
-    else begin
-        free_list <= next_free;
-    end
-end
-
-
-endmodule
-
-
-task default_map_table;
-
-    output default_table;
-
-    begin
-
-    end
-endtask
+// module map_table(
+//     input clock,
+//     input reset,
+// 
+//     input PHYS_REG_IDX changed_tags [31:0],
+//     input tag_vld [31:0],
+// 
+//     output PHYS_REG_IDX map_table [31:0]
+// );
+// 
+// logic PHYS_REG_IDX next_map [31:0];
+// 
+// 
+// always_comb begin
+//     for (int i = 0; i < 32; i++) begin
+//         next_map[i] = tag_vld[i] ? changed_tags[i] : map_table[i];
+//     end
+// end
+// 
+// 
+// always_ff @(posedge clock) begin
+//     if (reset) begin
+//         map_table <= default_map_table();
+//     end
+//     else begin
+//         map_table <= next_map;
+//     end    
+// end
+// 
+// endmodule
+// 
+// 
+// 
+// module arch_map(
+//     input clock,
+//     input reset,
+// 
+//     input PHYS_REG_IDX changed_tags [31:0],
+//     input tag_vld [31:0],
+// 
+//     output PHYS_REG_IDX arch_table [31:0]
+// );
+// 
+// logic PHYS_REG_IDX next_arch [31:0];
+// 
+// 
+// always_comb begin
+//     for (int i = 0; i < 32; i++) begin
+//         next_arch[i] = tag_vld[i] ? changed_tags[i] : arch_table[i];
+//     end
+// end
+// 
+// 
+// always_ff @(posedge clock) begin
+//     if (reset) begin
+//         arch_table <= default_map_table();
+//     end
+//     else begin
+//         arch_table <= next_arch;
+//     end    
+// end
+// 
+// endmodule
+// 
+// 
+// 
+// module free_list(
+//     input clock,
+//     input reset,
+// 
+//     input PHYS_REG_IDX changed_tags [`PHYS_REG_SZ_R10K-1:0],
+// 
+//     output PHYS_REG_IDX free_list [`PHYS_REG_SZ_R10K-1:0]
+// );
+// 
+// logic PHYS_REG_IDX next_free [`PHYS_REG_SZ_R10K-1:0];
+// 
+// //Updates the free list indices based on whether it is marked to become free or
+// //if it is already free and still marked to be free next cycle
+// always_comb begin
+//     for (int i = 0; i < `PHYS_REG_SZ_R10K; i++) begin
+//         next_free[i] = changed_tags[i] || (free_list[i] && changed_tags[i]);
+//     end
+// end
+// 
+// 
+// always_ff @(posedge clock) begin
+//     if (reset) begin
+//         free_list <= '1;
+//     end
+//     else begin
+//         free_list <= next_free;
+//     end
+// end
+// 
+// 
+// endmodule
+// 
+// 
+// task default_map_table;
+// 
+//     output default_table;
+// 
+//     begin
+// 
+//     end
+// endtask

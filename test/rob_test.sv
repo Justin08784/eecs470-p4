@@ -2,261 +2,171 @@
 // This module generates the test vectors
 // Correctness checking is in FIFO_sva.svh
 `include "sys_defs.svh"
-`include "FIFO_sva.svh"
+`include "test/rob_sva.svh"
 
-`ifndef SYS_DEFS_SVH
-`define SYS_DEFS_SVH
+module rob_test();
+    localparam ROB_SZ = `ROB_SZ;  // num elements
+    localparam NUM_RPORTS = 2;
+    localparam NUM_DPORTS = 2;
+    localparam NUM_CPORTS = 2;
+    localparam N          = `N;
 
-`ifdef SYNTH
-// Rename "FIFO" to "FIFO_svsim" if in synthesis
-// The synthesis script produces this extra module in order to allow parameters
-`define INSTANCE(mod) ``mod``_svsim
-`else
-// If not in synthesis, can just instantiate like normal
-`define INSTANCE(mod) mod
-`endif
+    logic                       clock, reset;
+    // retire (read)
+    struct packed {
+        logic [$clog2(N):0]     r_en_cnt;
+        PHYS_REG_IDX [N-1:0]    tag;
+        PHYS_REG_IDX [N-1:0]    t_old;
+    } r_out;
 
-`endif // SYS_DEFS_SVH
+    // complete (write)
+    struct packed {
+        logic [N-1:0]           c_en;
+        ROB_IDX [N-1:0]         c_rob_idxs;
+    } c_in;
 
+    // dispatch (write)
+    struct packed {
+        logic [$clog2(N):0]     rob_rdy_scnt;
+        ROB_IDX [N-1:0]         rob_idxs;
+    } d_out;
 
-`ifndef WIDTH
-  `define WIDTH 44
-`endif
+    struct packed {
+        logic [$clog2(N):0]     d_en_cnt;
+        logic [N-1:0][$clog2(`PHYS_REG_SZ_R10K)-1:0] tag;
+        logic [N-1:0][$clog2(`PHYS_REG_SZ_R10K)-1:0] t_old;
+    } d_in;
 
-`ifndef DEPTH
-  `define DEPTH 32
-`endif
+    ROB_ENTRY   [ROB_SZ-1:0]    state_dbg;
 
-
-
-module FIFO_test();
-
-    localparam CNT_BITS = $clog2(`DEPTH);
-
-    logic                clock, reset;
-    logic          [1:0] wr_en;
-    logic [1:0] [`WIDTH-1:0] wr_data;
-    logic                err;
-    logic          [1:0] rd_en;
-    logic [1:0] [`WIDTH-1:0] rd_data;
-    logic          [1:0] rd_valid;
-    logic          [1:0] wr_valid;
-    logic   [CNT_BITS:0] spots;
-    logic                full;
-
-    // variable to count values written to FIFO
-    int cnt;
-
-    // INSTANCE is from the sys_defs.svh file
-    // it renames the module if SYNTH is defined in
-    // order to rename the module to FIFO_svsim
-    `INSTANCE(FIFO) #(
-        .DEPTH(`DEPTH),
-        .WIDTH(`WIDTH))
-    dut (
-        .clock    (clock),
-        .reset    (reset),
-        .wr_en    (wr_en),
-        .wr_data  (wr_data),
-        .err      (err),
-        .rd_en    (rd_en),
-        .rd_data  (rd_data),
-        .rd_valid (rd_valid),
-        .wr_valid (wr_valid),
-        .spots    (spots),
-        .full     (full)
+    task set_complete(
+        input int i,
+        input int rob_idx 
     );
+        c_in.c_en[i]        = 1;
+        c_in.c_rob_idxs[i]  = rob_idx;
+    endtask
 
-    bind dut FIFO_sva #(
-        .DEPTH(`DEPTH),
-        .WIDTH(`WIDTH)
-    ) DUT_sva (.*);
+    task clr_all();
+        d_in = '0;
+        c_in = '0;
+    endtask
+
+    // Variable to count values written to FIFO
+    int cnt;
 
     always begin
         #(`CLOCK_PERIOD/2) clock = ~clock;
     end
+    // Generate nonzero random numbers for our write data on each cycle
+    // (we shall treat a 0 as non-enabled; this allows us to print 0s in the $monitor
+    // to indicate non-enabled)
 
-    // Generate random numbers for our write data on each cycle
     always @(negedge clock) begin
-        std::randomize(wr_data);
+        foreach (d_in.tag[i]) begin
+            d_in.tag[i]     = $urandom_range(`PHYS_REG_SZ_R10K-1, 1);
+            d_in.t_old[i]   = $urandom_range(`PHYS_REG_SZ_R10K-1, 1);
+        end
     end
 
+    logic DEBUG = 1;
+    always @(posedge clock) begin
+        if (DEBUG) begin
+            $display("  %3d | d_in: [(%d, %d), (%d, %d)]   wr_en_cnt: %d  rd_en_cnt: %d  |  d_out: [(%d, %d), (%d, %d)]",
+                $time,
+                d_in.tag[0],
+                d_in.t_old[0],
+                d_in.tag[1],
+                d_in.t_old[1],
+                // d_in.d_en_cnt > 0 ? d_in.tag[0] : 0,
+                // d_in.d_en_cnt > 0 ? d_in.t_old[0] : 0,
+                // d_in.d_en_cnt > 1 ? d_in.tag[1] : 0,
+                // d_in.d_en_cnt > 1 ? d_in.t_old[1] : 0,
+                d_in.d_en_cnt,
+                r_out.r_en_cnt,
+                r_out.tag[0], 
+                r_out.t_old[0], 
+                r_out.tag[1], 
+                r_out.t_old[1]);
+        end
+    end
+    
+    // FIFO instance
+    rob #(
+        .ROB_SZ(ROB_SZ),
+        .N(N)
+    ) dut (
+        `ifdef DEBUG
+        .state_dbg(state_dbg),
+        `endif
+
+        .clock  (clock),
+        .reset  (reset),
+        .r_out  (r_out),
+        .c_in   (c_in),
+        .d_out  (d_out),
+        .d_in   (d_in)
+    );
+
+    rob_sva #(
+        .ROB_SZ(ROB_SZ),
+        .N(N)
+    ) sva (
+        `ifdef DEBUG
+        .state_dbg(state_dbg),
+        `endif
+
+        .clock  (clock),
+        .reset  (reset),
+        .r_out  (r_out),
+        .c_in   (c_in),
+        .d_out  (d_out),
+        .d_in   (d_in)
+    );
+
     initial begin
-
-        $dumpfile("../ROB.vcd");
-        $dumpvars(0, FIFO_test.dut);
         $display("\nStart Testbench");
-
-        clock = 1;
+        clock = 0;
         reset = 1;
-        wr_en = 2'b00;
-        rd_en = 2'b00;
-        err = 0;
 
-        $monitor("  %3d | d_in: %h   wr: %b  rd: %b  |  wr_vld: %b  rd_vld: %b   d_out: %h   full: %b  spots: %2d",
-                  $time,  wr_data,   wr_en, rd_en,      wr_valid,  rd_valid,     rd_data,    full,     spots);
+        d_in = '0;
+        c_in = '0;
 
-        @(negedge clock);
+        // $monitor("  %3d | d_in: [%d, %d]   wr_en_cnt: %d  rd_en_cnt: %d  |  d_out: [%d, %d]   used_scnt: %2d  free_scnt: %2d",
+        //     $time,
+        //     wr_en_cnt > 0 ? wr_data[0] : 0,
+        //     wr_en_cnt > 1 ? wr_data[1] : 0,
+        //     wr_en_cnt,
+        //     rd_en_cnt,
+        //     rd_data[0], 
+        //     rd_data[1], 
+        //     used_scnt, 
+        //     free_scnt);
+
         @(negedge clock);
         reset = 0;
-
-        // ---------- Test 1 ---------- //
-        $display("\nTest 1: invalid read");
-        rd_en = 2'b01;
-        @(negedge clock);
-        rd_en = 2'b00;
-
-        // ---------- Test 2 ---------- //
-        $display("\nTest 2: Write and read with one cycle wait");
-        $display("Write 1 value");
-        wr_en = 2'b01;
-        @(negedge clock);
-        wr_en = 2'b00;
-
-        $display("Wait one cycle");
         @(negedge clock);
 
-        rd_en = 2'b01;
-        $display("Read 1 value");
+        // Test 1:
+        $display("\nTest 1: 1 inst lifecycle");
+        // dispatch 1
+        d_in.d_en_cnt = 1;
         @(negedge clock);
-        rd_en = 2'b00;
+        clr_all();
 
-        // ---------- Test 2.5 ---------- //
-        $display("\nTest 2.5: Write and read twice with one cycle wait");
-        $display("Write 1 value");
-        wr_en = 2'b11;
+        // complete it
+        set_complete(0, 0);
         @(negedge clock);
-        wr_en = 2'b00;
+        clr_all();
 
-        $display("Wait one cycle");
-        @(negedge clock);
-
-        rd_en = 2'b11;
-        $display("Read 1 value");
-        @(negedge clock);
-        rd_en = 2'b00;
-
-        // // ---------- Test 3 ---------- //
-        $display("\nTest 3: Write and read with no wait");
-        $display("Write 1 value");
-        wr_en = 2'b01;
-        @(negedge clock);
-        wr_en = 2'b00;
-
-        rd_en = 2'b01;
-        $display("Read 1 value");
-        @(negedge clock);
-        rd_en = 2'b00;
-
-        // // ---------- Test 3.5 ---------- //
-        $display("\nTest 3.5: Write and read twice with no wait");
-        $display("Write 1 value");
-        wr_en = 2'b11;
-        @(negedge clock);
-        wr_en = 2'b00;
-
-        rd_en = 2'b11;
-        $display("Read 1 value");
-        @(negedge clock);
-        rd_en = 2'b00;
-
-        // // ---------- Test 4 ---------- //
-        $display("\nTest 4: Read and write when empty");
-        wr_en = 2'b11;
-        rd_en = 2'b11;
-        @(negedge clock);
-        rd_en = 2'b00;
-
-        // // ---------- Test 5 ---------- //
-        $display("\nTest 5: Write 6 values");
-        wr_en = 2'b11;
-        repeat (2) @(negedge clock);
-        wr_en = 2'b10;
-        @(negedge clock);
-        wr_en = 2'b01;
-        @(negedge clock);
-        wr_en = 2'b00;
-
-        // // ---------- Test 6 ---------- //
-        $display("\nTest 6: Read 4 values");
-        rd_en = 2'b11;
-        @(negedge clock);
-        rd_en = 2'b10;
-        @(negedge clock);
-        rd_en = 2'b01;
-        @(negedge clock);
-        rd_en = 2'b00;
-
-        // // ---------- Test 7 ---------- //
-        $display("\nTest 7: Write until full");
-        cnt = 2;
-        wr_en = 2'b11;
-        while (!full) begin
-            cnt += 2;
-            @(negedge clock);
-        end
-
-        // // ---------- Test 8 ---------- //
-        $display("\nTest 8: Invalid write");
-        wr_en = 2'b11;
-        @(negedge clock);
-
-        // // ---------- Test 9 ---------- //
-        $display("\nTest 9: Simultaneous read and write when full");
-        rd_en = 2'b11;
-        @(negedge clock);
-        wr_en = 2'b00;
-        rd_en = 2'b00;
-        @(negedge clock);
-
-        // // ---------- Test 10 ---------- //
-        $display("\nTest 10: Write when one less than full");
-        rd_en = 2'b01;
-        $display("Read one");
-        @(negedge clock);
-        $display("Write two");
-        wr_en = 2'b11;
-        rd_en = 2'b00;
-        @(negedge clock);
-        $display("Read another one");
-        rd_en = 2'b10;
-        @(negedge clock);
-        wr_en = 2'b00;
-        rd_en = 2'b00;
-        @(negedge clock);
-
-        // // ---------- Test 11 ---------- //
-        $display("\nTest 11: Read all values");
-        rd_en = 2'b11;
-        while (cnt > 0) begin
-            cnt -= 2;
-            @(negedge clock);
-        end
-
-        // ---------- Test 12 ---------- //
-        $display("\nTest 12: Invalid read");
-        rd_en = 2'b11;
-        @(negedge clock);
-        rd_en = 2'b00;
-
-        // ---------- Test 13 ---------- //
-        $display("\nTest 13: Four simultaneous reads and writes");
-        rd_en = 2'b10;
-        wr_en = 2'b01;
-        repeat (4) @(negedge clock);
-        wr_en = 2'b00;
-
-        // ---------- Test 14 ---------- //
-        $display("\nTest 14: Read last item");
-        @(negedge clock);
-        rd_en = 2'b00;
-
-        @(negedge clock);
+        // wait for it to retire
+        set_complete(0, 0);
         @(negedge clock);
 
         $display("\n\033[32m@@@ Passed\033[0m\n");
 
         $finish;
     end
+
 
 endmodule

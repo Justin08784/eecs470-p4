@@ -1,92 +1,205 @@
 `include "sys_defs.svh"
 
 
-module dispatch (
-    input clock,
-    input reset,
+module dispatch #(parameter 
+    N=`N
+) (
+    input clock, reset, flush,
 
-    //incoming instructions from decode to dispatch
-    input ID_EX_PACKET inst_fetched [`N-1:0],
 
-    //incoming state of the rs_table
-    input RS_ENTRY rs_table [`RS_SZ-1:0],
+    // DECODE
+    input struct packed {
+        ID_RESULT   [N-1:0]     d_dat;
+    } decode_in,
 
-    //counts of how many free entries in rob and lsq
-    input [$clog(`ROB_SZ):0] rob_free,
-    input [$clog(`LSQ_SZ):0] lsq_free,
+    output struct packed {
+        logic       [N-1:0] decode_d_en_cnt;
+    } decode_out,
+    
 
-    //incoming state of the map table
-    input PHYS_REG_IDX map_table [31:0], //NOT SURE IF THIS IS THE RIGHT SIZE TO DECLARE
+    // RS
+    input struct packed {
+        logic       [$clog2(N):0] rs_rdy_scnt;
+            // - From: RS
+    } rs_in,
 
-    //current free list
-    input PHYS_REG_IDX free_list [`PHYS_REG_SZ_R10K-1:0], //NOT SURE IF THIS IS THE RIGHT SIZE TO DECLARE
+    output struct packed {
+        logic       [$clog2(N):0] rs_d_en_cnt;
+            // - To: RS
+            // - Number of enabled dispatch lines? (replacement for d_vld)
+            // - Question: permit
+            // 1) only N dispatches, OR
+            // 2) a different limit number of dispatches DIS_MAX: N ≤ DIS_MAX ≤ RS_SZ
+            // (DIS_MAX will be a new sys_defs.svh constant) ?
+        // ID_RESULT   [N-1:0] d_dat, //shouldn't have dispatch feed to RS,
+            // - To: RS               //should come directly from dispatch
+    } rs_out,
+    
+    
+    // ROB
+    input struct packed {
+        logic    [$clog2(N):0]    rob_rdy_scnt;
+            // From: ROB
+            // saturating counter for number of free rob entries
+    } rob_in,
 
-    //updated state of the rs_table back to rs.sv
-    output [$bits(`RS_ENTRY)-1:0] next_rs [RS_SZ-1:0],
+    output struct packed {
+        logic   [$clog2(N):0]            rob_d_en_cnt;
+            // To: ROB
+            // - Number of enabled dispatch lines?
+        // ROB_ENTRY   [N-1:0]      d_dat, //shouldn't have dispatch feed to ROB,
+            // To: ROB                     //should come directly from dispatch
+            // - IMPORTANT: Set from lowest indices in program-order. NO GAPS!!!
+    } rob_out,
+    
 
-    //tells stage_if/id how many insts to dispatch
-    output [$clog(`N):0] dispatch_cnt, 
-    //sets if_valid to false if cnt == 0
-    output dispatch_vld,
+    // Free list
+    input struct packed {
+        logic    [$clog2(N):0]    free_rdy_scnt;
+        // From: Free list
+        // - sat. count of number of free pregs in free list;
+        //   count reflects any pregs returned in retire! (i.e. AFTER retires)
+        PHYS_REG_IDX [N-1:0]     d_ts;
+        // From: Free list
+        // - newly allocated pregs
+    } free_in,
 
-    //output instructions to enter into the ROB
-    output INST ROB_isnts [`N:0],
-    output PHYS_REG_IDX ROB_tags [`N:0],
-    output [`N:0] ROB_vld,
+    output struct packed {
+        logic     [$clog2(N):0]  free_d_en_cnt;
+            // To: Free list
+            // - number of enabled dispatch lines WHO NEED A DEST PREG 
+            //   (e.g. no stores)
+            //   (i.e. may only be a strict subset of dispatching insns!)
+    } free_out,
 
-    //updated state of the map table
-    output PHYS_REG_IDX changed_map_tags [31:0],
-    output map_tag_vld [31:0],
-    //new free list
-    output PHYS_REG_IDX changed_free_tags [`PHYS_REG_SZ_R10K-1:0]
+
+    // LSQ
+    input struct packed {
+        logic    [$clog2(N):0]    lsq_rdy_scnt;
+    } lsq_in,
+
+    output struct packed {
+        logic     [$clog2(N):0]  lsq_d_en_cnt;
+            // To: LSQ
+            // - number of enabled dispatch lines WHO NEED A LD/ST 
+            //   (i.e. may only be a strict subset of dispatching insns!)
+    } lsq_out,
+    
+    
+    // Map table
+    output struct packed {
+        logic         [$clog2(N):0] en_cnt;
+            // - Number of enabled dispatch lines?
+            // - NOTE: For in-order stuff with serial deps (like dispatch), use c(ou)nts;
+            // otherwise use en(able) buses.
+        REG_IDX       [N-1:0] src1s;
+        REG_IDX       [N-1:0] src2s;
+        REG_IDX       [N-1:0] dsts;
+        PHYS_REG_IDX  [N-1:0] ts;
+            // To: Map table
+            // - IMPORTANT: Set from lowest indices in program-order. NO GAPS!!!
+    } map_out
+    
+    //dispatch shouldn't need to read from the map table.
+    //dispatch will pair a new tag (from free list) with
+    //the dest reg (from decode), and output the paired
+    //item to the map table for it to decide how to update.
 );
 
-logic [`RS_SZ-1:0] pos_vld;
-// logic [$bits(`RS_ENTRY)-1:0] next_rs [RS_SZ-1:0];
+logic dispatch_cnt;
 
-
+//logic for rs, rob, decode
 always_comb begin
     
-    //run this if we have an opening in the ROB and LSQ
-    if ((rob_free > 0) && (lsq_free > 0)) begin
-        //Find up to Superscaler width open entries in rs_table
-        for (int i = 0; i < RS_SZ; i++) begin
-            pos_vld[i] = rs_table[i].busy ? 0 : 1;
-            dispatch_cnt = rs_table[i].busy ? dispatch_cnt : dispatch_cnt+1;
-            if (dispatch_cnt >= `N) break;
-        end
+    //logic to find the minimum # of spots free across the 4 inputs
+    // dispatch_cnt = rs_in.rs_rdy_scnt & rob_in.rob_rdy_scnt 
+    //                         & free_in.free_rdy_scnt & lsq_in.lsq_rdy_scnt;
+    // dispatch_cnt = (reset || flush) ? '0 : dispatch_cnt;
+    logic [$clog2(N):0] a = (rs_in.rs_rdy_scnt < rob_in.rob_rdy_scnt) ? rs_in.rs_rdy_scnt : rob_in.rob_rdy_scnt;
+    logic [$clog2(N):0] b = (free_in.free_rdy_scnt < lsq_in.lsq_rdy_scnt) ? free_in.free_rdy_scnt : lsq_in.lsq_rdy_scnt;
+    dispatch_cnt = (a < b) ? a : b;
+    dispatch_cnt = (reset || flush) ? '0 : ((dispatch_cnt > 2) ? 2 : dispatch_cnt);    
 
-        //Set dispatch_cnt equal to the smallest # of openings between
-        //RS, ROB, and LSQ
-        if (rob_free > lsq_free) begin
-            if (lsq_free < dispatch_cnt) dispatch_cnt = lsq_free;
-        end
-        else begin
-            if (rob_free < dispatch_cnt) dispatch_cnt = rob_free;
-        end
-        dispatch_vld = (dispatch_cnt > 0) ? 1 : 0;
+    //assigning output #'s
+    decode_out.decode_d_en_cnt = (dispatch_cnt == 2) ? 2'b11 : ((dispatch_cnt == 1) ? 2'b01 : 2'b00);
+    rs_out.rs_d_en_cnt = dispatch_cnt;
+    rob_out.rob_d_en_cnt = dispatch_cnt;
+    lsq_out.lsq_d_en_cnt = dispatch_cnt; //this will likely need to be changed once memory operations are introduced
+end
 
-        //If we have open space to dispatch, do so
-        if (dispatch_vld) begin
-            int i = 0;
-            for (int pos = 0; pos < RS_SZ; pos++) begin
-                if pos_vld[pos] begin
-                    next_rs[pos].busy = 1;
-                    next_rs[pos].dat = id_ex_to_id_result(inst_fetched[i]);
-                    next_rs[pos].issued = 0;
-                    i += 1;
-                    if (i > dispatch_cnt) break;
-                end
-            end
-        end
-        else begin
-            next_rs = rs_table;
+logic [N-1:0] dest_free_match;
+
+//logic for free list
+always_comb begin
+    logic [$clog2(N):0] d_reg_cnt = '0;
+    dest_free_match = '0;
+
+    for (int i = 0; i < dispatch_cnt; i++) begin
+        if (!decode_in.d_dat[i].wr_mem && !decode_in.d_dat[i].cond_branch 
+            && !decode_in.d_dat[i].uncond_branch && !decode_in.d_dat[i].halt) begin
+                d_reg_cnt += 1;
+                dest_free_match[i] = 1'b1;
         end
     end
-    //If no opening in ROB or LSQ, can immediately assign next_rs to rs_table
-    else begin
-        next_rs = rs_table;
-        dispatch_vld = 0;
+
+    free_out.free_d_en_cnt = (d_reg_cnt == 0) ? '0 : (d_reg_cnt == N) ? 2 : 1;
+    free_out.free_d_en_cnt = (reset || flush) ? '0 : free_out.free_d_en_cnt;
+end
+
+//logic for map table
+always_comb begin
+    map_out.en_cnt = dispatch_cnt;
+
+    for (int i = 0; i < N; i++) begin
+        //handling dest tags
+        if (reset || flush) begin
+            map_out.dsts[i] = '0;
+            map_out.ts[i] = '0;
+        end
+        else if (dest_free_match[i] != 1'b0) begin
+            map_out.dsts[i] = decode_in.d_dat[i].inst.r.rd;
+            map_out.ts[i] = free_in.d_ts[i];
+        end
+        else begin
+            map_out.dsts[i] = '0;
+            map_out.ts[i] = '0;
+        end
+
+        //handling src1s tags
+        if (reset || flush) begin
+            map_out.src1s[i] = '0;
+        end
+        else if (decode_in.d_dat[i].opa_select == OPA_IS_RS1) begin
+            map_out.src1s[i] = decode_in.d_dat[i].inst.r.rs1;
+        end
+        //left these two separate in case we discover that they need to be handled differently
+        else if (decode_in.d_dat[i].cond_branch) begin
+            map_out.src1s[i] = decode_in.d_dat[i].inst.r.rs1;
+        end
+        else if (decode_in.d_dat[i].wr_mem) begin
+            map_out.src1s[i] = decode_in.d_dat[i].inst.r.rs1;
+        end
+        else begin
+            map_out.src1s[i] = '0;
+        end
+
+        //handling src2s tags
+        if (reset || flush) begin
+            map_out.src2s[i] = '0;
+        end
+        else if (decode_in.d_dat[i].opa_select == OPA_IS_RS1) begin
+            map_out.src2s[i] = decode_in.d_dat[i].inst.r.rs2;
+        end
+        //left these two separate in case we discover that they need to be handled differently
+        else if (decode_in.d_dat[i].cond_branch) begin
+            map_out.src2s[i] = decode_in.d_dat[i].inst.r.rs2;
+        end
+        else if (decode_in.d_dat[i].wr_mem) begin
+            map_out.src2s[i] = decode_in.d_dat[i].inst.r.rs2;
+        end
+        else begin
+            map_out.src2s[i] = '0;
+        end
     end
 end
 
@@ -94,37 +207,3 @@ end
 endmodule
 
 
-task id_ex_to_id_result;
-    input ID_EX_PACKET in;
-    output ID_RESULT out;
-
-    begin
-        id_result.t             = 0; //implement later
-        id_result.t1            = 0; //implement later
-        id_result.t2            = 0; //implement later
-        id_result.t1_rdy        = 0; //implement later
-        id_result.t2_rdy        = 0; //implement later
-        id_result.fu_idx        = 0; //implement later
-
-        id_result.inst          = id_ex_packet.inst;
-        id_result.PC            = id_ex_packet.PC;
-        id_result.NPC           = id_ex_packet.NPC;
-
-        id_result.rs1_value     = id_ex_packet.rs1_value;
-        id_result.rs2_value     = id_ex_packet.rs2_value;
-
-        id_result.opa_select    = id_ex_packet.opa_select;
-        id_result.opb_select    = id_ex_packet.opb_select;
-
-        id_result.dest_reg_idx  = id_ex_packet.dest_reg_idx;
-        id_result.alu_func      = id_ex_packet.alu_func;
-        id_result.mult          = id_ex_packet.mult;
-        id_result.rd_mem        = id_ex_packet.rd_mem;
-        id_result.wr_mem        = id_ex_packet.wr_mem;
-        id_result.cond_branch   = id_ex_packet.cond_branch;
-        id_result.uncond_branch = id_ex_packet.uncond_branch;
-        id_result.halt          = id_ex_packet.halt;
-        id_result.illegal       = id_ex_packet.illegal;
-        id_result.csr_op        = id_ex_packet.csr_op;
-    end
-endtask

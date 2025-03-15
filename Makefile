@@ -189,7 +189,7 @@ GREP = grep -E --color=auto
 # ---- Modules to Test ---- #
 
 # TODO: add more modules here
-MODULES = cpu mult rob rs
+MODULES = cpu mult rob rs fifo free_list dispatch prf
 
 # TODO: update this if you add more header files
 ALL_HEADERS = $(CPU_HEADERS)
@@ -202,16 +202,41 @@ build/mult.cov: $(MULT_FILES)
 synth/mult.vg: $(MULT_FILES)
 
 # TODO: add any files required for the RS here (besides test/rs_test.sv and verilog/rs.sv)
-RS_FILES = verilog/sys_defs.svh verilog/psel_gen.sv test/rs_sva.svh
+RS_FILES = verilog/sys_defs.svh verilog/psel_gen.sv
 build/rs.simv: $(RS_FILES)
 build/rs.cov: $(RS_FILES)
 synth/rs.vg: $(RS_FILES)
 
 # TODO: add any files required for the ROB here (besides test/rob_test.sv and verilog/rob.sv)
-ROB_FILES = verilog/sys_defs.svh verilog/memDP.sv
+ROB_FILES = verilog/sys_defs.svh verilog/memDP.sv verilog/FIFO.sv
 build/rob.simv: $(ROB_FILES)
 build/rob.cov: $(ROB_FILES)
 synth/rob.vg: $(ROB_FILES)
+
+MAPS_FILES = verilog/sys_defs.svh verilog/FIFO.sv
+build/maps.simv: $(MAPS_FILES)
+build/maps.cov: $(MAPS_FILES)
+synth/maps.vg: $(MAPS_FILES)
+
+FIFO_FILES = verilog/sys_defs.svh
+build/fifo.simv: $(FIFO_FILES)
+build/fifo.cov: $(FIFO_FILES)
+synth/fifo.vg: $(FIFO_FILES)
+
+FREE_LIST_FILES = verilog/sys_defs.svh verilog/fifo.sv
+build/free_list.simv: $(FREE_LIST_FILES)
+build/free_list.cov: $(FREE_LIST_FILES)
+synth/free_list.vg: $(FREE_LIST_FILES)
+
+DISPATCH_FILES = verilog/sys_defs.svh
+build/dispatch.simv: $(DISPATCH_FILES)
+build/dispatch.cov: $(DISPATCH_FILES)
+build/dispatch.vg: $(DISPATCH_FILES)
+
+PRF_FILES = verilog/sys_defs.svh verilog/prf.sv
+build/dispatch.simv: $(PRF_FILES)
+build/dispatch.cov: $(PRF_FILES)
+build/dispatch.vg: $(PRF_FILES)
 
 #################################
 # ---- Main CPU Definition ---- #
@@ -226,8 +251,7 @@ CPU_HEADERS = verilog/sys_defs.svh \
 # test/cpu_test.sv is implicit
 CPU_TESTBENCH = test/pipeline_print.c \
 			    test/decode_inst.c \
-                test/mem.sv \
-				test/rs_test.sv
+                test/mem.sv 
 # NOTE: you CANNOT alter the given memory module
 
 # verilog/cpu.sv is implicit
