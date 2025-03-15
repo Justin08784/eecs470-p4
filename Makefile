@@ -233,6 +233,16 @@ build/dispatch.simv: $(DISPATCH_FILES)
 build/dispatch.cov: $(DISPATCH_FILES)
 build/dispatch.vg: $(DISPATCH_FILES)
 
+PRF_FILES = verilog/sys_defs.svh verilog/prf.sv
+build/prf.simv: $(PRF_FILES)
+build/prf.cov: $(PRF_FILES)
+build/prf.vg: $(PRF_FILES)
+
+CDB_FILES = verilog/sys_defs.svh
+build/cdb.simv: $(CDB_FILES)
+build/cdb.cov: $(CDB_FILES)
+build/cdb.vg: $(CDB_FILES)
+
 #################################
 # ---- Main CPU Definition ---- #
 #################################
