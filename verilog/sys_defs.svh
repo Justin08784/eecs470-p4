@@ -593,6 +593,45 @@ typedef struct packed {
     ROB_IDX [`N-1:0]         c_rob_idxs;
 } complete2rob;
 
+// Retire 
+// Retire to free list
+typedef struct packed {
+    logic     [$clog2(`N):0]   r_en_cnt;
+        // From: retire (ROB)
+        // - number of enabled retire lines WHO ARE RETURNING/DEALLOC'ING A PREG
+        //   (e.g. no stores)
+        //   (i.e. may only be a strict subset of retiring insns!)
+        // - Question: Does this really need to be an count? Surely there isn't
+        //   any serial dep. between returning pregs no? But again, the free list
+        //   itself is likely going to be FIFO so I'm not sure what's more performant...
+        //   enable bus vs. count?
+    PHYS_REG_IDX [`N-1:0]     r_tolds;
+        // From: retire (ROB)
+        // - pregs being returned to free list
+} retire2fl;
+
+typedef struct packed {
+    logic     [$clog2(`N):0]   d_en_cnt;
+        // From: dispatch
+        // - number of enabled dispatch lines WHO NEED A DEST PREG 
+        //   (e.g. no stores)
+        //   (i.e. may only be a strict subset of dispatching insns!)
+        // - depends on d_out.free_rdy_scnt
+
+} dispatch2fl;
+
+typedef struct packed {
+    logic    [$clog2(`N):0]   free_rdy_scnt;
+        // To: dispatch
+        // - sat. count of number of free pregs in free list;
+        //   count reflects any pregs returned in retire! (i.e. AFTER retires)
+        // - depends on r_in
+    PHYS_REG_IDX [`N-1:0]     d_ts;
+        // To: dispatch
+        // - newly allocated pregs
+        // - depends on d_in.d_en_cnt
+} fl2dispatch;
+
 
 /* How can we implement this in the Makefile? */
 // comment out to disable DEBUG:
