@@ -119,6 +119,9 @@ module rob_sva #(
             cpls[c_in.c_rob_idxs[i]] |= c_in.c_en[i];
 
         @(posedge clock);
+        // for (int i = 0; i < `MIN(ROB_SZ, 10); ++i) begin
+        //     $display("rob[%d]: (t: %d, t_old: %d, cpl: %b)", i, state_dbg[i].tag, state_dbg[i].t_old, state_dbg[i].cpl);
+        // end
         @(negedge clock);
     end
     end
