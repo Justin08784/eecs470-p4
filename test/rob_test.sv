@@ -160,7 +160,6 @@ module rob_test();
         clr_all();
 
         // wait for it to retire
-        set_complete(0, 0);
         @(negedge clock);
 
         $display("\n\033[32m@@@ Passed\033[0m\n");

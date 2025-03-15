@@ -99,7 +99,7 @@ module rob #(
             used    <= 0;
             head    <= 0;
             tail    <= 0;
-            state   = '0;
+            state   <= '0;
             // used    <= RESET_STATE.used;
             // head    <= RESET_STATE.head;
             // tail    <= RESET_STATE.tail;
@@ -114,16 +114,34 @@ module rob #(
             tail    <= (tail + d_in.d_en_cnt) % ROB_SZ;
 
             // handle complete (ins)
-            for (int unsigned i = 0; i < NUM_CPORTS; ++i)
-                state[c_in.c_rob_idxs[i]].cpl |= c_in.c_en[i];
+            for (int unsigned i = 0, int cur_idx = 0; i < NUM_CPORTS; ++i) begin
+                cur_idx = c_in.c_rob_idxs[i];
+                // $display("c[%d]: (en: %b, idx: %d), state[%d].cpl: %b, c_in.c_en[i]: %b, or: %b...",
+                //     i,
+                //     c_in.c_en[i],
+                //     c_in.c_rob_idxs[i],
+                //     cur_idx,
+                //     state[cur_idx].cpl,
+                //     c_in.c_en[i],
+                //     state[cur_idx].cpl | c_in.c_en[i]
+                // );
+
+                /* V1: This doesn't actually update the cpl bit... */
+                // state[cur_idx].cpl <= state[cur_idx].cpl | c_in.c_en[i];
+                /* V2: ...but this one does???! Make this make sense? */
+                if (c_in.c_en[i])
+                    state[cur_idx].cpl <= 1;
+            end
 
             // handle dispatch (ins)
+            // $display("d_en_cnt: %d", d_in.d_en_cnt);
             for (int unsigned i = 0, int cur_idx = 0; i < NUM_DPORTS; ++i) begin
+                // $display("d[%d]: (tag: %d, t_old: %d, idx: %d)", i, d_idxs[i], d_in.tag[i], d_in.t_old[i]);
                 if (i >= d_in.d_en_cnt)
                     continue;
                 cur_idx = d_idxs[i];
-                state[cur_idx].tag    = d_in.tag[i];
-                state[cur_idx].t_old  = d_in.t_old[i];
+                state[cur_idx].tag    <= d_in.tag[i];
+                state[cur_idx].t_old  <= d_in.t_old[i];
             end
         end
     end
