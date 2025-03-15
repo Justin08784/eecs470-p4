@@ -630,13 +630,17 @@ typedef struct packed {
 
 // Map table outputs
 typedef struct packed {
+    PHYS_REG_IDX [`N-1:0] ts;
+    PHYS_REG_IDX [`N-1:0] ts_old;
+}  map_table2ROB;
+
+typedef struct packed {
     logic        [`N-1:0] cpl1s;
     logic        [`N-1:0] cpl2s;
     PHYS_REG_IDX [`N-1:0] t1s;
     PHYS_REG_IDX [`N-1:0] t2s;
     PHYS_REG_IDX [`N-1:0] ts;
-    PHYS_REG_IDX [`N-1:0] ts_old;
-}  map_table2ROBandRS;
+} map_table2dispatch;
 
 /* How can we implement this in the Makefile? */
 // comment out to disable DEBUG:
