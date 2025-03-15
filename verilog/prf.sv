@@ -1,3 +1,5 @@
+`include "sys_defs.svh"
+
 module prf #(
     parameter WIDTH      = 32,
     parameter DEPTH      = `PHYS_REG_SZ_R10K,
@@ -17,7 +19,7 @@ module prf #(
         // From: complete (EX)
 
     // issue (read)
-    output DATA         [31:0]  state,
+    //output DATA         [31:0]  state,
         // To: EX
         // - RF state after propagated completes
         // - we just expose the damn thing to EX, who seems to be the only consumer

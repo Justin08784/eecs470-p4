@@ -11,7 +11,7 @@ logic clock, reset, flush;
 logic         [N-1:0] c_en;
 PHYS_REG_IDX  [N-1:0] c_ts; // tags
 DATA          [N-1:0] c_vs; // vals
-DATA         [31:0]  state;
+//DATA         [31:0]  state;
 logic         [N-1:0] s_en;
 PHYS_REG_IDX  [N-1:0] s_t1s;
 PHYS_REG_IDX  [N-1:0] s_t2s;
@@ -30,7 +30,7 @@ prf #(
     .c_en(c_en),
     .c_ts(c_ts),
     .c_vs(c_vs),
-    .state(state),
+    //.state(state),
     .s_en(s_en),
     .s_t1s(s_t1s),
     .s_t2s(s_t2s),
