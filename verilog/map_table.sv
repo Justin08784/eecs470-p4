@@ -18,42 +18,13 @@ module map_table #(parameter
     // retire ??
 
     // complete
-    input struct packed {
-        logic         [N-1:0] c_en;
-            // - Enabled complete lines?
-        PHYS_REG_IDX  [N-1:0] c_ts; // tags
-            // From: complete (EX)
-    } c_in,
+    input complete2map_table c_in,
 
     // issue ??
 
     // dispatch
-    input struct packed {
-        logic         [$clog2(N):0] en_cnt;
-            // - Number of enabled dispatch lines?
-            // - NOTE: For in-order stuff with serial deps (like dispatch), use c(ou)nts;
-            // otherwise use en(able) buses.
-        REG_IDX       [N-1:0] src1s;
-        REG_IDX       [N-1:0] src2s;
-        REG_IDX       [N-1:0] dsts;
-        PHYS_REG_IDX  [N-1:0] ts;
-            // From: dispatch
-            // - IMPORTANT: Set from lowest indices in program-order. NO GAPS!!!
-    } d_in,
-    output struct packed {
-        logic        [N-1:0] cpl1s;
-        logic        [N-1:0] cpl2s;
-            // To: dispatch
-            // - src1s, src2s is_complete bits resp.
-        PHYS_REG_IDX [N-1:0] t1s;
-            // To: dispatch
-            // - Renamed physical registers tags for src1s
-            // - src1[i] -> t1[i]
-        PHYS_REG_IDX [N-1:0] t2s;
-            // To: dispatch
-            // - Renamed physical registers tags for src2s
-            // - src2[i] -> t2[i]
-    } rs_out
+    input dispatch2map_table d_in,
+    output map_table2ROBandRS rs_out
 );
     localparam NUM_ARCH_REG = 32;
     struct packed {

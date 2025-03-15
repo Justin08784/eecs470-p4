@@ -610,7 +610,19 @@ typedef struct packed {
         // - pregs being returned to free list
 } retire2fl;
 
+// Completion signals
+typedef struct packed {
+    logic         [`N-1:0] c_en;
+    PHYS_REG_IDX  [`N-1:0] c_ts;
+} complete2map_table;
 
+// Map table outputs
+typedef struct packed {
+    logic        [`N-1:0] cpl1s;
+    logic        [`N-1:0] cpl2s;
+    PHYS_REG_IDX [`N-1:0] t1s;
+    PHYS_REG_IDX [`N-1:0] t2s;
+}  map_table2ROBandRS;
 
 /* How can we implement this in the Makefile? */
 // comment out to disable DEBUG:
