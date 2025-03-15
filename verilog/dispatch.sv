@@ -8,92 +8,37 @@ module dispatch #(parameter
 
 
     // DECODE
-    input struct packed {
-        ID_RESULT   [N-1:0]     d_dat;
-    } decode_in,
+    input dispatch_decode_in decode_in,
 
-    output struct packed {
-        logic       [N-1:0] decode_d_en_cnt;
-    } decode_out,
+    output dispatch_decode_out decode_out,
     
 
     // RS
-    input struct packed {
-        logic       [$clog2(N):0] rs_rdy_scnt;
-            // - From: RS
-    } rs_in,
+    input dispatch_rs_in rs_in,
 
-    output struct packed {
-        logic       [$clog2(N):0] rs_d_en_cnt;
-            // - To: RS
-            // - Number of enabled dispatch lines? (replacement for d_vld)
-            // - Question: permit
-            // 1) only N dispatches, OR
-            // 2) a different limit number of dispatches DIS_MAX: N ≤ DIS_MAX ≤ RS_SZ
-            // (DIS_MAX will be a new sys_defs.svh constant) ?
-    } rs_out,
+    output dispatch_rs_out rs_out,
     
     
     // ROB
-    input struct packed {
-        logic    [$clog2(N):0]    rob_rdy_scnt;
-            // From: ROB
-            // saturating counter for number of free rob entries
-    } rob_in,
+    input dispatch_rob_in rob_in,
 
-    output struct packed {
-        logic   [$clog2(N):0]            rob_d_en_cnt;
-            // To: ROB
-            // - Number of enabled dispatch lines?
-    } rob_out,
+    output dispatch_rob_out rob_out,
     
 
     // Free list
-    input struct packed {
-        logic    [$clog2(N):0]    free_rdy_scnt;
-        // From: Free list
-        // - sat. count of number of free pregs in free list;
-        //   count reflects any pregs returned in retire! (i.e. AFTER retires)
-        PHYS_REG_IDX [N-1:0]     d_ts;
-        // From: Free list
-        // - newly allocated pregs
-    } free_in,
+    input dispatch_free_in free_in,
 
-    output struct packed {
-        logic     [$clog2(N):0]  free_d_en_cnt;
-            // To: Free list
-            // - number of enabled dispatch lines WHO NEED A DEST PREG 
-            //   (e.g. no stores)
-            //   (i.e. may only be a strict subset of dispatching insns!)
-    } free_out,
+    output dispatch_free_out free_out,
 
 
     // LSQ
-    input struct packed {
-        logic    [$clog2(N):0]    lsq_rdy_scnt;
-    } lsq_in,
+    input dispatch_lsq_in lsq_in,
 
-    output struct packed {
-        logic     [$clog2(N):0]  lsq_d_en_cnt;
-            // To: LSQ
-            // - number of enabled dispatch lines WHO NEED A LD/ST 
-            //   (i.e. may only be a strict subset of dispatching insns!)
-    } lsq_out,
+    output dispatch_lsq_out lsq_out,
     
     
     // Map table
-    output struct packed {
-        logic         [$clog2(N):0] en_cnt;
-            // - Number of enabled dispatch lines?
-            // - NOTE: For in-order stuff with serial deps (like dispatch), use c(ou)nts;
-            // otherwise use en(able) buses.
-        REG_IDX       [N-1:0] src1s;
-        REG_IDX       [N-1:0] src2s;
-        REG_IDX       [N-1:0] dsts;
-        PHYS_REG_IDX  [N-1:0] ts;
-            // To: Map table
-            // - IMPORTANT: Set from lowest indices in program-order. NO GAPS!!!
-    } map_out
+    output dispatch_map_out map_out
     
     //dispatch shouldn't need to read from the map table.
     //dispatch will pair a new tag (from free list) with
