@@ -438,8 +438,8 @@ typedef struct packed {
     ADDR PC;
     ADDR NPC; // PC + 4
 
-    // DATA rs1_value; // reg A value
-    // DATA rs2_value; // reg B value
+    DATA rs1_value; // reg A value
+    DATA rs2_value; // reg B value
 
     ALU_OPA_SELECT opa_select; // ALU opa mux select (ALU_OPA_xxx *)
     ALU_OPB_SELECT opb_select; // ALU opb mux select (ALU_OPB_xxx *)
