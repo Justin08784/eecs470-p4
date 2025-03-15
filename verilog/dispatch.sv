@@ -8,37 +8,37 @@ module dispatch #(parameter
 
 
     // DECODE
-    input dispatch_decode_in decode_in,
+    input decode2dispatch decode_in,
 
-    output dispatch_decode_out decode_out,
+    output dispatch2decode decode_out,
     
 
     // RS
-    input dispatch_rs_in rs_in,
+    input rs2dispatch rs_in,
 
-    output dispatch_rs_out rs_out,
+    output dispatch2rs rs_out,
     
     
     // ROB
-    input dispatch_rob_in rob_in,
+    input rob2dispatch rob_in,
 
-    output dispatch_rob_out rob_out,
+    output dispatch2rob rob_out,
     
 
     // Free list
-    input dispatch_free_in free_in,
+    input free_list2dispatch free_in,
 
-    output dispatch_free_out free_out,
+    output dispatch2free_list free_out,
 
 
     // LSQ
-    input dispatch_lsq_in lsq_in,
+    input lsq2dispatch lsq_in,
 
-    output dispatch_lsq_out lsq_out,
+    output dispatch2lsq lsq_out,
     
     
     // Map table
-    output dispatch_map_out map_out
+    output dispatch2map_table map_out
     
     //dispatch shouldn't need to read from the map table.
     //dispatch will pair a new tag (from free list) with

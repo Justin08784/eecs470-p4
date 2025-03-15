@@ -479,18 +479,18 @@ typedef struct packed {
 // DISPATCH DECODE
 typedef struct packed {
     ID_RESULT   [`N-1:0]     d_dat;
-} dispatch_decode_in;
+} decode2dispatch;
 
 typedef struct packed {
     logic       [$clog2(`N):0] decode_d_en_cnt;
-} dispatch_decode_out;
+} dispatch2decode;
 
 
 // DISPATCH RS
 typedef struct packed {
     logic       [$clog2(`N):0] rs_rdy_scnt;
         // - From: RS
-} dispatch_rs_in;
+} rs2dispatch;
 
 typedef struct packed {
     logic       [$clog2(`N):0] rs_d_en_cnt;
@@ -502,7 +502,7 @@ typedef struct packed {
         // (DIS_MAX will be a new sys_defs.svh constant) ?
     // ID_RESULT   [N-1:0] d_dat, //shouldn't have dispatch feed to RS,
         // - To: RS               //should come directly from dispatch
-} dispatch_rs_out;
+} dispatch2rs;
 
 
 // DISPATCH ROB
@@ -510,7 +510,7 @@ typedef struct packed {
     logic    [$clog2(`N):0]    rob_rdy_scnt;
         // From: ROB
         // saturating counter for number of free rob entries
-} dispatch_rob_in;
+} rob2dispatch;
 
 typedef struct packed {
     logic   [$clog2(`N):0]            rob_d_en_cnt;
@@ -519,7 +519,7 @@ typedef struct packed {
     // ROB_ENTRY   [N-1:0]      d_dat, //shouldn't have dispatch feed to ROB,
         // To: ROB                     //should come directly from dispatch
         // - IMPORTANT: Set from lowest indices in program-order. NO GAPS!!!
-} dispatch_rob_out;
+} dispatch2rob;
 
 
 // DISPATCH Free list
@@ -535,7 +535,7 @@ typedef struct packed {
     // TAGS ARE APPLIED AT THE CORRECT TIMES (paired with map table output)
     // (means that tags will be applied when the dispatched insts actually get
     // to RS/ROB)
-} dispatch_free_in;
+} free_list2dispatch;
 
 typedef struct packed {
     logic     [$clog2(`N):0]  free_d_en_cnt;
@@ -543,20 +543,20 @@ typedef struct packed {
         // - number of enabled dispatch lines WHO NEED A DEST PREG 
         //   (e.g. no stores)
         //   (i.e. may only be a strict subset of dispatching insns!)
-} dispatch_free_out;
+} dispatch2free_list;
 
 
 // DISPATCH LSQ
 typedef struct packed {
     logic    [$clog2(`N):0]    lsq_rdy_scnt;
-} dispatch_lsq_in;
+} lsq2dispatch;
 
 typedef struct packed {
     logic     [$clog2(`N):0]  lsq_d_en_cnt;
         // To: LSQ
         // - number of enabled dispatch lines WHO NEED A LD/ST 
         //   (i.e. may only be a strict subset of dispatching insns!)
-} dispatch_lsq_out;
+} dispatch2lsq;
 
 
 // DISPATCH Map table
@@ -575,7 +575,7 @@ typedef struct packed {
     // TAGS ARE APPLIED AT THE CORRECT TIMES (paired with free list tag output)
     // (means that tags will be applied when the dispatched insts actually get
     // to RS/ROB)
-} dispatch_map_out;
+} dispatch2map_table;
 
 /* How can we implement this in the Makefile? */
 // comment out to disable DEBUG:

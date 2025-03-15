@@ -12,37 +12,37 @@ module dispatch_testbench;
     logic failed;
 
     // DECODE
-    dispatch_decode_in decode_in;
+    decode2dispatch decode_in;
 
-    dispatch_decode_out decode_out;
+    dispatch2decode decode_out;
     
 
     // RS
-    dispatch_rs_in rs_in;
+    rs2dispatch rs_in;
 
-    dispatch_rs_out rs_out;
+    dispatch2rs rs_out;
     
     
     // ROB
-    dispatch_rob_in rob_in;
+    rob2dispatch rob_in;
 
-    dispatch_rob_out rob_out;
+    dispatch2rob rob_out;
     
 
     // Free list
-    dispatch_free_in free_in;
+    free_list2dispatch free_in;
 
-    dispatch_free_out free_out;
+    dispatch2free_list free_out;
 
 
     // LSQ
-    dispatch_lsq_in lsq_in;
+    lsq2dispatch lsq_in;
 
-    dispatch_lsq_out lsq_out;
+    dispatch2lsq lsq_out;
     
     
     // Map table
-    dispatch_map_out map_out;
+    dispatch2map_table map_out;
 
 
     dispatch d_dut(
