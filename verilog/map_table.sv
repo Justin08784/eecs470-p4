@@ -24,7 +24,8 @@ module map_table #(parameter
 
     // dispatch
     input dispatch2map_table d_in,
-    output map_table2ROBandRS rs_out
+    output map_table2dispatch dispatch_out,
+    output map_table2rob rob_out
 );
     localparam NUM_ARCH_REG = 32;
     struct packed {
@@ -46,15 +47,13 @@ module map_table #(parameter
                 if (entries_n[r].t == c_in.c_ts[i]) begin
                     $display("DEBUG: Completing reg[%0d] because t = %0d matches c_ts[%0d] = %0d", r, entries_n[r].t, i, c_in.c_ts[i]);
                     entries_n[r].cpl = 1;  // ✅ Mark as completed
-                    rs_out.cpl1s[i]  = entries_n[r].cpl;
+                    dispatch_out.cpl1s[i]  = entries_n[r].cpl;
                    // break;  // ✅ Stop checking once we've found the match
                 end else begin
                     $display("DEBUG: Not Completing reg[%0d]  t = %0d  c_ts[%0d] = %0d, %0d", r, entries_n[r].t, i, c_in.c_ts[i], entries_n[r].cpl);
                 end
             end
 
-          //  rs_out.cpl1s[i]  = entries_n[d_in.src1s[i]].cpl;
-           // rs_out.cpl2s[i]  = entries_n[d_in.src2s[i]].cpl;
 
         end
 
@@ -67,8 +66,6 @@ module map_table #(parameter
             */
 
             
-
-            //rs_out.t1s[i]    = entries_n[d_in.src1s[i]].t;
 
             if (d_in.dsts[i] != `ZERO_REG) begin
                 entries_n[d_in.dsts[i]].t   = d_in.ts[i];
@@ -83,30 +80,22 @@ module map_table #(parameter
            
 
             if (d_in.dsts[i] != `ZERO_REG) begin
-                rs_out.t1s[i]    = entries_n[d_in.src1s[i]].t;
-                rs_out.t2s[i]    = entries_n[d_in.src2s[i]].t;
-                rs_out.cpl1s[i]  = entries_n[d_in.src1s[i]].cpl;
-                rs_out.cpl2s[i]  = entries_n[d_in.src2s[i]].cpl;
+                dispatch_out.t1s[i]    = entries_n[d_in.src1s[i]].t;
+                dispatch_out.t2s[i]    = entries_n[d_in.src2s[i]].t;
+                dispatch_out.cpl1s[i]  = entries_n[d_in.src1s[i]].cpl;
+                dispatch_out.cpl2s[i]  = entries_n[d_in.src2s[i]].cpl;
 
-                $display("DEBUG: rs_out.cpl1s[%0d] = %0d (entries[%0d].cpl = %0d)", i, rs_out.cpl1s[i], d_in.src1s[i], entries_n[d_in.src1s[i]].cpl);
-                $display("DEBUG: rs_out.cpl2s[%0d] = %0d (entries[%0d].cpl = %0d)", i, rs_out.cpl2s[i], d_in.src2s[i], entries_n[d_in.src2s[i]].cpl);
+                $display("DEBUG: dispatch_out.cpl1s[%0d] = %0d (entries[%0d].cpl = %0d)", i, dispatch_out.cpl1s[i], d_in.src1s[i], entries_n[d_in.src1s[i]].cpl);
+                $display("DEBUG: dispatch_out.cpl2s[%0d] = %0d (entries[%0d].cpl = %0d)", i, dispatch_out.cpl2s[i], d_in.src2s[i], entries_n[d_in.src2s[i]].cpl);
             end else begin
-                rs_out.t1s[i]    = 0;
-                rs_out.t2s[i]    = 0;
-                rs_out.cpl1s[i]  = 1;
-                rs_out.cpl2s[i]  = 1;
-                $display("DEBUG: rs_out.cpl1s[%0d] = %0d (entries[%0d].cpl = %0d)", i, rs_out.cpl1s[i], d_in.src1s[i], entries_n[d_in.src1s[i]].cpl);
-                $display("DEBUG: rs_out.cpl2s[%0d] = %0d (entries[%0d].cpl = %0d)", i, rs_out.cpl2s[i], d_in.src2s[i], entries_n[d_in.src2s[i]].cpl);
+                dispatch_out.t1s[i]    = 0;
+                dispatch_out.t2s[i]    = 0;
+                dispatch_out.cpl1s[i]  = 1;
+                dispatch_out.cpl2s[i]  = 1;
+                $display("DEBUG: dispatch_out.cpl1s[%0d] = %0d (entries[%0d].cpl = %0d)", i, dispatch_out.cpl1s[i], d_in.src1s[i], entries_n[d_in.src1s[i]].cpl);
+                $display("DEBUG: dispatch_out.cpl2s[%0d] = %0d (entries[%0d].cpl = %0d)", i, dispatch_out.cpl2s[i], d_in.src2s[i], entries_n[d_in.src2s[i]].cpl);
 
             end
-
-            
-
-          /*  if (d_in.src2s[i] == `ZERO_REG) begin
-                rs_out.t2s[i] = 0;
-            end else begin
-                rs_out.t2s[i] = entries_n[d_in.src2s[i]].t;
-            end*/
 
         end
     end
@@ -121,7 +110,7 @@ module map_table #(parameter
         end else begin
             entries <= entries_n;
             if (entries[`ZERO_REG].t != 0) begin
-                $error("❌ ERROR: entries[0].t was modified! Got: %0d", entries[`ZERO_REG].t);
+                $error("ERROR: entries[0].t was modified! Got: %0d", entries[`ZERO_REG].t);
             end
         end
     end
