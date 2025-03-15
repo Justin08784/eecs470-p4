@@ -54,7 +54,7 @@ logic [$clog2(N):0] min2;
 always_comb begin
     // decode_out.decode_d_en_cnt = '0;
     // rs_out.rs_d_en_cnt = '0;
-    // rob_out.rob_d_en_cnt = '0;
+    // rob_out.d_en_cnt = '0;
     // lsq_out.lsq_d_en_cnt = '0;
     
     //logic to find the minimum # of spots free across the 4 inputs
@@ -66,7 +66,7 @@ always_comb begin
     //assigning output #'s
     decode_out.decode_d_en_cnt = (dispatch_cnt == 2) ? 2'b11 : ((dispatch_cnt == 1) ? 2'b01 : 2'b00);
     rs_out.rs_d_en_cnt = dispatch_cnt;
-    rob_out.rob_d_en_cnt = dispatch_cnt;
+    rob_out.d_en_cnt = dispatch_cnt;
     lsq_out.lsq_d_en_cnt = dispatch_cnt; //this will likely need to be changed once memory operations are introduced
 end
 

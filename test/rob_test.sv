@@ -13,29 +13,15 @@ module rob_test();
 
     logic                       clock, reset;
     // retire (read)
-    struct packed {
-        logic [$clog2(N):0]     r_en_cnt;
-        PHYS_REG_IDX [N-1:0]    tag;
-        PHYS_REG_IDX [N-1:0]    t_old;
-    } r_out;
+    rob2retire r_out;
 
     // complete (write)
-    struct packed {
-        logic [N-1:0]           c_en;
-        ROB_IDX [N-1:0]         c_rob_idxs;
-    } c_in;
+    complete2rob c_in;
 
     // dispatch (write)
-    struct packed {
-        logic [$clog2(N):0]     rob_rdy_scnt;
-        ROB_IDX [N-1:0]         rob_idxs;
-    } d_out;
+    rob2dispatch d_out;
 
-    struct packed {
-        logic [$clog2(N):0]     d_en_cnt;
-        logic [N-1:0][$clog2(`PHYS_REG_SZ_R10K)-1:0] tag;
-        logic [N-1:0][$clog2(`PHYS_REG_SZ_R10K)-1:0] t_old;
-    } d_in;
+    dispatch2rob d_in;
 
     ROB_ENTRY   [ROB_SZ-1:0]    state_dbg;
 

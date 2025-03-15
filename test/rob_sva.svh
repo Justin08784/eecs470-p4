@@ -12,40 +12,14 @@ module rob_sva #(
     input                       clock, reset,
 
     // retire (read)
-    input struct packed {
-        logic [$clog2(N):0]     r_en_cnt;
-
-
-        PHYS_REG_IDX [N-1:0]    tag;
-        PHYS_REG_IDX [N-1:0]    t_old;
-    } r_out,
+    input rob2retire r_out,
 
     // complete (write)
-    input struct packed {
-        logic [N-1:0]           c_en;
-            // - From: EX
-        ROB_IDX [N-1:0]         c_rob_idxs;
-            // - From: EX
-    } c_in,
+    input complete2rob c_in,
 
     // dispatch (write)
-    input struct packed {
-        logic [$clog2(N):0]     rob_rdy_scnt;
-            // To: dispatch
-            // saturating counter for number of free rob entries
-        ROB_IDX [N-1:0]         rob_idxs;
-            // To: dispatch
-            // rob idxs of entries that can be allocated this cycle
-    } d_out,
-    input struct packed {
-        logic [$clog2(N):0]     d_en_cnt;
-            // From: dispatch
-            // - Number of enabled dispatch lines?
-        logic [N-1:0][$clog2(`PHYS_REG_SZ_R10K)-1:0] tag;
-        logic [N-1:0][$clog2(`PHYS_REG_SZ_R10K)-1:0] t_old;
-            // From: dispatch
-            // - IMPORTANT: Set from lowest indices in program-order. NO GAPS!!!
-    } d_in
+    input rob2dispatch d_out,
+    input dispatch2rob d_in
 );
     localparam NUM_DPORTS = N; // dispatch ports (in-order)
     localparam NUM_RPORTS = N; // retire ports (in-order)

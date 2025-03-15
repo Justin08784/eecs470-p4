@@ -510,15 +510,17 @@ typedef struct packed {
     logic    [$clog2(`N):0]    rob_rdy_scnt;
         // From: ROB
         // saturating counter for number of free rob entries
+    ROB_IDX [`N-1:0]         rob_idxs; //not needed, but putting here for testbench
 } rob2dispatch;
 
 typedef struct packed {
-    logic   [$clog2(`N):0]            rob_d_en_cnt;
+    logic   [$clog2(`N):0]            d_en_cnt;
         // To: ROB
         // - Number of enabled dispatch lines?
-    // ROB_ENTRY   [N-1:0]      d_dat, //shouldn't have dispatch feed to ROB,
-        // To: ROB                     //should come directly from dispatch
-        // - IMPORTANT: Set from lowest indices in program-order. NO GAPS!!!
+    logic [`N-1:0][$clog2(`PHYS_REG_SZ_R10K)-1:0] tag;
+    logic [`N-1:0][$clog2(`PHYS_REG_SZ_R10K)-1:0] t_old;
+    //THESE ARE NOT COMING FROM DISPATCH, GET THESE FROM MAP TABLE
+    //(ONLY HERE FOR CURRENT ROB TESTBENCH)
 } dispatch2rob;
 
 
@@ -576,6 +578,21 @@ typedef struct packed {
     // (means that tags will be applied when the dispatched insts actually get
     // to RS/ROB)
 } dispatch2map_table;
+
+
+// retire (read)
+typedef struct packed {
+    logic [$clog2(`N):0]     r_en_cnt;
+    PHYS_REG_IDX [`N-1:0]    tag;
+    PHYS_REG_IDX [`N-1:0]    t_old;
+} rob2retire;
+
+// complete (write)
+typedef struct packed {
+    logic [`N-1:0]           c_en;
+    ROB_IDX [`N-1:0]         c_rob_idxs;
+} complete2rob;
+
 
 /* How can we implement this in the Makefile? */
 // comment out to disable DEBUG:
