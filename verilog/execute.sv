@@ -19,7 +19,10 @@ module alu (
     input DATA     opa,
     input DATA     opb,
     input ALU_FUNC alu_func,
+    input logic branch, // is this a cond_branch
+    input [2:0] branch_func, // Which branch condition to check
 
+    output logic take, // True/False condition result
     output DATA result
 );
 
@@ -40,20 +43,8 @@ module alu (
         endcase
     end
 
-endmodule // alu
-
-// Conditional branch module: compute whether to take conditional branches
-// This module is purely combinational
-module conditional_branch (
-    input DATA  rs1,
-    input DATA  rs2,
-    input [2:0] func, // Which branch condition to check
-
-    output logic take // True/False condition result
-);
-
     always_comb begin
-        case (func)
+        case (branch_func)
             3'b000:  take = signed'(rs1) == signed'(rs2); // BEQ
             3'b001:  take = signed'(rs1) != signed'(rs2); // BNE
             3'b100:  take = signed'(rs1) <  signed'(rs2); // BLT
@@ -64,7 +55,19 @@ module conditional_branch (
         endcase
     end
 
-endmodule // conditional_branch
+endmodule // alu
+
+// // Conditional branch module: compute whether to take conditional branches
+// // This module is purely combinational
+// module conditional_branch (
+//     input DATA  rs1,
+//     input DATA  rs2,
+    
+// );
+
+    
+
+// endmodule // conditional_branch
 
 // module mult_no_pipeline (
 //     input clock, reset, start,
@@ -99,6 +102,9 @@ endmodule // conditional_branch
 
 
 module stage_ex (
+    input clock,
+    input reset,
+
     input   logic       [NUM_FU_ALU-1:0]    fu_vld_alu,
     input   logic       [NUM_FU_MULT-1:0]   fu_vld_mult,
     input   logic       [NUM_FU_STORE-1:0]  fu_vld_store,
@@ -113,19 +119,21 @@ module stage_ex (
     output  logic       [NUM_FU_STORE-1:0]  fu_rdy_store,
     output  logic       [NUM_FU_LOAD-1:0]   fu_rdy_load,
 
-    output  logic         [N-1:0] c_en;
-            
-    output  PHYS_REG_IDX  [N-1:0] c_ts;
-
-
-
-
+    output  logic       [N-1:0]             c_en;
+    output  PHYS_REG_IDX[N-1:0]             c_ts;
 );
 
-    DATA alu_result, mult_result, opa_mux_out, opb_mux_out;
-    logic take_conditional;
-    logic mult_done;
+    ALU_FUNC [NUM_FU_ALU-1:0] alu_func;
+    DATA [NUM_FU_ALU-1:0] opa_mux_out, opb_mux_out, alu_result;
+    logic [NUM_FU_ALU-1:0] branch;
+    logic [NUM_FU_MULT-1:0] [2:0] mult_func;
+    logic [NUM_FU_MULT-1:0] mult_done;
+    DATA [NUM_FU_MULT-1:0] mult_value1, mult_value2, mult_result, 
+    logic [NUM_FU_BRANCH-1:0] [2:0] branch_func;
+    logic [NUM_FU_BRANCH-1:0] take_conditional;
+    // DATA [NUM_FU_BRANCH-1:0] branch_value1, branch_value2;
 
+    /* I don't know what to do with these yet
     // Pass-throughs
     assign ex_packet.NPC          = id_ex_reg.NPC;
     assign ex_packet.rd_mem       = id_ex_reg.rd_mem;
@@ -148,49 +156,75 @@ module stage_ex (
     assign ex_packet.take_branch = id_ex_reg.uncond_branch || (id_ex_reg.cond_branch && take_conditional);
 
     // We split the alu and mult here since they will be split in the final project
-    assign ex_packet.alu_result = (id_ex_reg.mult) ? mult_result : alu_result;
+    assign ex_packet.alu_result = (id_ex_reg.mult) ? mult_result : alu_result; */
 
-    // ALU opA mux
     always_comb begin
-        case (id_ex_reg.opa_select)
-            OPA_IS_RS1:  opa_mux_out = id_ex_reg.rs1_value;
-            OPA_IS_NPC:  opa_mux_out = id_ex_reg.NPC;
-            OPA_IS_PC:   opa_mux_out = id_ex_reg.PC;
-            OPA_IS_ZERO: opa_mux_out = 0;
-            default:     opa_mux_out = 32'hdeadface; // dead face
-        endcase
+        foreach(fu_dat_alu[i]) begin
+            if(fu_vld_alu[i]) begin
+                if (fu_dat_alu[i].cond_branch) begin
+                    opa_mux_out[i] = fu_dat_alu[i].rs1_value;
+                    opb_mux_out[i] = fu_dat_alu[i].rs2_value;
+                    alu_func[i] = 4'ha; //SENTINEL VALUE
+                    branch_func[i] = fu_dat_alu[i].inst.b.funct3;
+                    branch[i] = 1;
+                end else begin
+                    // ALU opA mux
+                    always_comb begin
+                        case (fu_dat_alu[i].opa_select)
+                            OPA_IS_RS1:  opa_mux_out[i] = fu_dat_alu[i].rs1_value;
+                            OPA_IS_NPC:  opa_mux_out[i] = fu_dat_alu[i].NPC;
+                            OPA_IS_PC:   opa_mux_out[i] = fu_dat_alu[i].PC;
+                            OPA_IS_ZERO: opa_mux_out[i] = 0;
+                            default:     opa_mux_out[i]= 32'hdeadface; // dead face
+                        endcase
+                    end
+
+                    // ALU opB mux
+                    always_comb begin
+                        case (fu_dat_alu[i].opb_select)
+                            OPB_IS_RS2:   opb_mux_out[i] = fu_dat_alu[i].rs2_value;
+                            OPB_IS_I_IMM: opb_mux_out[i] = `RV32_signext_Iimm(fu_dat_alu[i].inst);
+                            OPB_IS_S_IMM: opb_mux_out[i] = `RV32_signext_Simm(fu_dat_alu[i].inst);
+                            OPB_IS_B_IMM: opb_mux_out[i] = `RV32_signext_Bimm(fu_dat_alu[i].inst);
+                            OPB_IS_U_IMM: opb_mux_out[i] = `RV32_signext_Uimm(fu_dat_alu[i].inst);
+                            OPB_IS_J_IMM: opb_mux_out[i] = `RV32_signext_Jimm(fu_dat_alu[i].inst);
+                            default:      opb_mux_out[i] = 32'hfacefeed; // face feed
+                        endcase
+                    end
+
+                    alu_func[i] = fu_dat_alu[i].alu_func;
+                    branch_func[i] = 3'b011; //SENTINEL VALUE
+                    branch[i] = 0;
+                end
+            end
+        end
+
+        foreach(fu_dat_mult[i]) begin
+            mult_func[i] = fu_vld_mult[i] ? fu_dat_mult[i].inst.r.funct3 : '0;
+            mult_value1[i] = fu_vld_mult[i] ? fu_dat_mult[i].rs1_value : '0;
+            mult_value2[i] = fu_vld_mult[i] ? fu_dat_mult[i].rs2_value : '0;
+        end
     end
 
-    // ALU opB mux
-    always_comb begin
-        case (id_ex_reg.opb_select)
-            OPB_IS_RS2:   opb_mux_out = id_ex_reg.rs2_value;
-            OPB_IS_I_IMM: opb_mux_out = `RV32_signext_Iimm(id_ex_reg.inst);
-            OPB_IS_S_IMM: opb_mux_out = `RV32_signext_Simm(id_ex_reg.inst);
-            OPB_IS_B_IMM: opb_mux_out = `RV32_signext_Bimm(id_ex_reg.inst);
-            OPB_IS_U_IMM: opb_mux_out = `RV32_signext_Uimm(id_ex_reg.inst);
-            OPB_IS_J_IMM: opb_mux_out = `RV32_signext_Jimm(id_ex_reg.inst);
-            default:      opb_mux_out = 32'hfacefeed; // face feed
-        endcase
-    end
-
+   
     // Instantiate the ALU
-    alu [NUM_FU_ALU-1:0] alu_0 (
+    alu alu_0 [NUM_FU_ALU-1:0] (
         // Inputs
         .opa(opa_mux_out),
         .opb(opb_mux_out),
         .alu_func(id_ex_reg.alu_func),
+        .branch(branch), // is this a cond_branch
+        .branch_func(branch_func), // Which branch condition to check
 
-        // Output
-        .result(alu_result)
+        .take(take_conditional), // True/False condition result (will return FALSE if branch is low)
+        .result(alu_result) // will return 32'hfacebeec if branch is high (Sentinel, hopefully none of our alu computations result in that value)
     );
-
     // Instantiate the multiplier
-    mult [NUM_FU_MULT-1:0] mults (
+    mult mults [NUM_FU_MULT-1:0] (
         // Inputs
         .clock(clock),
         .reset(reset),
-        .start(),
+        .start(fu_vld_mult),
         .rs1(id_ex_reg.rs1_value),
         .rs2(id_ex_reg.rs2_value),
         .func(id_ex_reg.inst.r.funct3), // which mult operation to perform
@@ -200,16 +234,123 @@ module stage_ex (
         .done(mult_done)
     );
 
-    // Instantiate the conditional branch module
-    conditional_branch [NUM_FU_BRANCH-1:0] conditional_branchs (
-        // Inputs
-        .rs1(id_ex_reg.rs1_value),
-        .rs2(id_ex_reg.rs2_value),
-        .func(id_ex_reg.inst.b.funct3), // Which branch condition to check
+    // // Instantiate the conditional branch module
+    // conditional_branch conditional_branchs [NUM_FU_BRANCH-1:0] (
+    //     // Inputs
+    //     .rs1(id_ex_reg.rs1_value),
+    //     .rs2(id_ex_reg.rs2_value),
+    //     .func(id_ex_reg.inst.b.funct3), // Which branch condition to check
 
-        // Output
-        .take(take_conditional)
-    );
+    //     // Output
+    //     .take(take_conditional)
+    // );
+
+    always_ff @(posedge clock) begin
+        foreach(fu_dat_alu[i]) begin
+            if (reset) begin
+                fu_rdy_alu[i] <= 0;
+            end else if ((!branch[i] && alu_result[i] != 32'hfacebeec) || branch[i]) begin
+                fu_rdy_alu[i] <= 0;
+            end else begin
+                fu_rdy_alu[i] <= 1;
+            end
+        end
+
+        foreach(fu_dat_mult[i]) begin
+            if (reset) begin
+                fu_rdy_mult[i] <= 0;
+            end else if (mult_done[i]) begin
+                fu_rdy_mult[i] <= 1;
+            end else if (fu_vld_mult[i]) begin
+                fu_rdy_mult[i] <= 0;
+            end else begin
+                fu_rdy_mult[i] <= fu_rdy_mult[i];
+            end
+        end
+    end
+
+    always_comb begin
+       
+        PHYS_REG_IDX completed_tags [NUM_FU_ALU + NUM_FU_MULT + NUM_FU_LOAD + NUM_FU_STORE];
+        int completed_ids [NUM_FU_ALU + NUM_FU_MULT + NUM_FU_LOAD + NUM_FU_STORE];
+        logic [$clog2(NUM_FU_ALU + NUM_FU_MULT + NUM_FU_LOAD + NUM_FU_STORE)-1:0] completed_count = '0;
+
+        
+        for (int i = 0; i < NUM_FU_ALU; i++) begin
+            if (fu_vld_alu[i] && fu_dat_alu[i].alu_func != default) begin
+                completed_tags[completed_count] = fu_dat_alu[i].t;
+                completed_ids[completed_count] = fu_dat_alu[i].id;
+                completed_count++;
+            end
+        end
+
+        for (int i = 0; i < NUM_FU_MULT; i++) begin
+            if (fu_vld_mult[i] && fu_dat_mult[i].mult_done) begin
+                completed_tags[completed_count] = fu_dat_mult[i].t;
+                completed_ids[completed_count] = fu_dat_mult[i].id;
+                completed_count++;
+            end
+        end
+
+        for (int i = 0; i < NUM_FU_LOAD; i++) begin
+            if (fu_vld_load[i]) begin
+                completed_tags[completed_count] = fu_dat_load[i].t;
+                completed_ids[completed_count] = fu_dat_load[i].id;
+                completed_count++;
+            end
+        end
+
+        for (int i = 0; i < NUM_FU_STORE; i++) begin
+            if (fu_vld_store[i]) begin
+                completed_tags[completed_count] = fu_dat_store[i].t;
+                completed_ids[completed_count] = fu_dat_store[i].id;
+                completed_count++;
+            end
+        end
+
+        // Step 3: Find the two oldest completions without sorting everything
+        int oldest_id = 999999;       // Large initial value for min search
+        PHYS_REG_IDX oldest_tag = '0; // Default to zero to avoid uninitialized values
+        int second_oldest_id = 999999;
+        PHYS_REG_IDX second_oldest_tag = '0; // Default to zero
+
+        for (int i = 0; i < completed_count; i++) begin
+            if (completed_ids[i] < oldest_id) begin
+                second_oldest_id = oldest_id;
+                second_oldest_tag = oldest_tag;
+                oldest_id = completed_ids[i];
+                oldest_tag = completed_tags[i];
+            end else if (completed_ids[i] < second_oldest_id) begin
+                second_oldest_id = completed_ids[i];
+                second_oldest_tag = completed_tags[i];
+            end
+        end
+
+        // Step 4: Assign the selected oldest completions
+        c_en = '0; // Initialize completion enable signals
+        c_ts = '0; // Initialize completed physical register tags
+
+        case (completed_count)
+            0: begin
+                // Default case: No completions this cycle
+                c_en = '0;
+                c_ts = '0;
+            end
+            1: begin
+                // Only one instruction finished
+                c_en[0] = 1'b1;
+                c_ts[0] = oldest_tag;
+            end
+            default: begin
+                // Two or more completions: Take the two oldest
+                c_en[0] = 1'b1;
+                c_ts[0] = oldest_tag;
+                c_en[1] = 1'b1;
+                c_ts[1] = second_oldest_tag;
+            end
+        endcase
+    end
+
 
 
     always_comb begin

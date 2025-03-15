@@ -53,7 +53,7 @@ module map_table #(parameter
             // To: dispatch
             // - Renamed physical registers tags for src2s
             // - src2[i] -> t2[i]
-    } d_out
+    } d_out //TODO: actually goes to RS
 );
     localparam NUM_ARCH_REG = 32;
     struct packed {

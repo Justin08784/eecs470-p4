@@ -189,7 +189,7 @@ GREP = grep -E --color=auto
 # ---- Modules to Test ---- #
 
 # TODO: add more modules here
-MODULES = cpu mult rob rs fifo free_list
+MODULES = cpu mult rob rs fifo free_list dispatch cdb prf
 
 # TODO: update this if you add more header files
 ALL_HEADERS = $(CPU_HEADERS)
@@ -227,6 +227,21 @@ FREE_LIST_FILES = verilog/sys_defs.svh verilog/fifo.sv
 build/free_list.simv: $(FREE_LIST_FILES)
 build/free_list.cov: $(FREE_LIST_FILES)
 synth/free_list.vg: $(FREE_LIST_FILES)
+
+DISPATCH_FILES = verilog/sys_defs.svh
+build/dispatch.simv: $(DISPATCH_FILES)
+build/dispatch.cov: $(DISPATCH_FILES)
+build/dispatch.vg: $(DISPATCH_FILES)
+
+PRF_FILES = verilog/sys_defs.svh verilog/prf.sv
+build/prf.simv: $(PRF_FILES)
+build/prf.cov: $(PRF_FILES)
+build/prf.vg: $(PRF_FILES)
+
+CDB_FILES = verilog/sys_defs.svh
+build/cdb.simv: $(CDB_FILES)
+build/cdb.cov: $(CDB_FILES)
+build/cdb.vg: $(CDB_FILES)
 
 #################################
 # ---- Main CPU Definition ---- #
