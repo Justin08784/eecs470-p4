@@ -39,18 +39,20 @@ module arch_map #(parameter
             be allocated as a dest reg... No wait it can? But it will just write
             the preg#0 tag anyways, right?
             */
-            // if (r_in.dsts[i] == ZERO_REG)
-            //     continue;
+            if (r_in.dsts[i] == ZERO_REG)
+                continue;
             entries_n[r_in.dsts[i]] = r_in.ts[i];
         end
     end
 
     always_ff @(posedge clock) begin
         if (reset) begin
-            entries <= '0;
             entries[`ZERO_REG] <= '{
                 t : '0
             };
+            for (int r = 1; r < NUM_ARCH_REG; ++r) begin
+                entries[r].t <= r;  // ✅ Map PRx = Rx (Arch Reg x → PRx)
+            end
         end else begin
             entries <= entries_n;
         end
