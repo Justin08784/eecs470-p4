@@ -634,6 +634,8 @@ typedef struct packed {
     logic        [`N-1:0] cpl2s;
     PHYS_REG_IDX [`N-1:0] t1s;
     PHYS_REG_IDX [`N-1:0] t2s;
+    PHYS_REG_IDX [`N-1:0] ts;
+    PHYS_REG_IDX [`N-1:0] ts_old;
 }  map_table2ROBandRS;
 
 /* How can we implement this in the Makefile? */
