@@ -13,7 +13,7 @@ module rob #(
     output rob2retire r_out,
 
     // complete (write)
-    input complete2rob c_in,
+    input execute2complete c_in,
 
     // dispatch (write)
     output rob2dispatch d_out,

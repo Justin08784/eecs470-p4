@@ -15,7 +15,7 @@ module rob_sva #(
     input rob2retire r_out,
 
     // complete (write)
-    input complete2rob c_in,
+    input execute2complete c_in,
 
     // dispatch (write)
     input rob2dispatch d_out,

@@ -482,7 +482,7 @@ module cpu (
     //////////////////////////////////////////////////  
 
     // rob2retire rob2r;
-    // complete2rob c2rob;
+    // execute2complete c2rob;
     // typedef struct packed {logic dummy;} rob2decode;
     // typedef struct packed {logic dummy;} decode2rob;
     // rob2decode rob2d;
@@ -508,7 +508,7 @@ module cpu (
 
     // retire (read)
 
-    // map_table2ROBandRS mt2rob_rs;
+    // map_table2robandRS mt2rob_rs;
     // complete2map_table c2mt;
 
     map_table map_table_0 (

@@ -10,7 +10,7 @@ module free_list #(parameter
 ) (
     input clock, reset, flush,
     // retire
-    input retire2fl r_in,
+    input rob2retire r_in,
 
     // complete ?? 
     // issue ??
@@ -56,7 +56,7 @@ module free_list #(parameter
         .reset(reset),
 
         .wr_en_cnt(r_in.r_en_cnt),
-        .wr_data(r_in.r_tolds),
+        .wr_data(r_in.t_old),
 
         .rd_en_cnt(d_in.free_d_en_cnt),
         .rd_data(d_out.d_ts),

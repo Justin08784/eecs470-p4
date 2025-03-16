@@ -10,7 +10,7 @@ module arch_map #(parameter
 ) (
     input clock, reset,
     // retire
-    input retire2archmap r_in
+    input retire2arch_map r_in
 
     // complete ??
     // issue ??
