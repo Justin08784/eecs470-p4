@@ -10,38 +10,30 @@ module dispatch_testbench;
     logic reset;
     logic flush;
     logic failed;
+    ID_RESULT [N-1:0] d_dat;
 
     // DECODE
     decode2dispatch decode_in;
-
     dispatch2decode decode_out;
     
-
     // RS
     rs2dispatch rs_in;
-
     dispatch2rs rs_out;
-    
     
     // ROB
     rob2dispatch rob_in;
-
     dispatch2rob rob_out;
     
-
     // Free list
     free_list2dispatch free_in;
-
     dispatch2free_list free_out;
-
 
     // LSQ
     lsq2dispatch lsq_in;
-
     dispatch2lsq lsq_out;
     
-    
     // Map table
+    map_table2dispatch map_in;
     dispatch2map_table map_out;
 
 
@@ -49,6 +41,8 @@ module dispatch_testbench;
         .clock(clock),
         .reset(reset),
         .flush(1'b0),
+
+        .d_dat(d_dat),
 
         .decode_in(decode_in),
         .decode_out(decode_out),
@@ -65,6 +59,7 @@ module dispatch_testbench;
         .lsq_in(lsq_in),
         .lsq_out(lsq_out),
 
+        .map_in(map_in),
         .map_out(map_out)
     );
 
@@ -158,18 +153,56 @@ module dispatch_testbench;
         lsq_in = '0;
     endtask
 
+    task set_map(
+        int i,
+        logic cpl1s,
+        logic cpl2s,
+        PHYS_REG_IDX t1s,
+        PHYS_REG_IDX t2s,
+        PHYS_REG_IDX ts
+    );
+        map_in.ts[i] = ts;
+        map_in.t1s[i] = t1s;
+        map_in.t2s[i] = t2s;
+        map_in.cpl1s[i] = cpl1s;
+        map_in.cpl2s[i] = cpl2s;
+    endtask
+
     task clear_all();
         decode_in = '0;
         rs_in = '0;
         rob_in = '0;
         free_in = '0;
         lsq_in = '0;
+        map_in = '0;
     endtask
 
     always begin
         #(`CLOCK_PERIOD/2.0);
         clock = ~clock;
     end
+
+
+    task chk_dat(
+        int i,
+        logic cpl1s,
+        logic cpl2s,
+        PHYS_REG_IDX t1s,
+        PHYS_REG_IDX t2s,
+        PHYS_REG_IDX ts,
+        string msg
+    );
+    assert (d_dat[i].t == ts)
+        else exit_on_error (msg);
+    assert (d_dat[i].t1 == t1s)
+        else exit_on_error (msg);
+    assert (d_dat[i].t2 == t2s)
+        else exit_on_error (msg);
+    assert (d_dat[i].t1_rdy == cpl1s)
+        else exit_on_error (msg);
+    assert (d_dat[i].t2_rdy == cpl2s)
+        else exit_on_error (msg);
+    endtask
 
 
     task exit_on_error(input string msg);
@@ -206,6 +239,8 @@ module dispatch_testbench;
             else exit_on_error ("test_reset lsq error");
         assert (map_out.en_cnt == '0)
             else exit_on_error ("test_reset map error");
+        assert (d_dat == '0)
+            else exit_on_error ("test_reset d_dat error");
         @(negedge clock);
         reset = 0;
 
@@ -214,6 +249,8 @@ module dispatch_testbench;
         set_rob(2);
         set_free(2,3,4);
         set_lsq(2);
+        set_map(0,1,1,12,13,14);
+        set_map(1,0,0,15,16,17);
         reset = 1;
 
         @(negedge clock);
@@ -229,6 +266,8 @@ module dispatch_testbench;
             else exit_on_error ("test_reset lsq error");
         assert (map_out.en_cnt == '0)
             else exit_on_error ("test_reset map error");
+        assert (d_dat == '0)
+            else exit_on_error ("test_reset d_dat error");
         @(negedge clock);
         reset = 0;        
     endtask
@@ -253,6 +292,8 @@ module dispatch_testbench;
             else exit_on_error ("test_zero lsq error");
         assert (map_out.en_cnt == '0)
             else exit_on_error ("test_zero map error");
+        assert (d_dat == '0)
+            else exit_on_error ("test_reset d_dat error");
 
     endtask
 
@@ -269,6 +310,8 @@ module dispatch_testbench;
         set_lsq(2);
         set_decode(0,1,2,3,OPA_IS_RS1,OPB_IS_RS2,0,0,0,0);
         set_decode(1,4,5,6,OPA_IS_RS1,OPB_IS_RS2,0,0,0,0);
+        set_map(0,1,1,12,13,14);
+        set_map(1,0,0,15,16,17);
 
         @(negedge clock);
         // $display("\n\nFREE VALUE: %2d:", free_in.free_rdy_scnt);
@@ -303,6 +346,9 @@ module dispatch_testbench;
             else exit_on_error ("test_two_rdy map error");
         assert (map_out.src2s[1] == 6)
             else exit_on_error ("test_two_rdy map error");
+
+        chk_dat(0,1,1,12,13,14,"test_two d_dat error");
+        chk_dat(1,0,0,15,16,17,"test_two d_dat error");
 
         @(negedge clock);
         set_decode(0,0,2,3,OPA_IS_RS1,OPB_IS_RS2,0,0,0,0);
@@ -354,6 +400,8 @@ module dispatch_testbench;
         set_lsq(2);
         set_decode(0,1,2,3,OPA_IS_RS1,OPB_IS_RS2,0,0,0,0);
         set_decode(1,4,5,6,OPA_IS_RS1,OPB_IS_RS2,0,0,0,0);
+        set_map(0,1,1,12,13,14);
+        set_map(1,0,0,15,16,17);
 
         @(negedge clock);
         // $display("\n\nFREE VALUE: %2d:", free_in.free_rdy_scnt);
@@ -372,22 +420,25 @@ module dispatch_testbench;
             else exit_on_error ("test_one_rdy map error");
 
         assert (map_out.dsts[0] == 1)
-            else exit_on_error ("test_two_rdy map error");
+            else exit_on_error ("test_one_rdy map error");
         assert (map_out.ts[0] == 8)
-            else exit_on_error ("test_two_rdy map error");
+            else exit_on_error ("test_one_rdy map error");
         assert (map_out.dsts[1] == 0)
-            else exit_on_error ("test_two_rdy map error");
+            else exit_on_error ("test_one_rdy map error");
         assert (map_out.ts[1] == 0)
-            else exit_on_error ("test_two_rdy map error");
+            else exit_on_error ("test_one_rdy map error");
 
         assert (map_out.src1s[0] == 2)
-            else exit_on_error ("test_two_rdy map error");
+            else exit_on_error ("test_one_rdy map error");
         assert (map_out.src2s[0] == 3)
-            else exit_on_error ("test_two_rdy map error");
+            else exit_on_error ("test_one_rdy map error");
         assert (map_out.src1s[1] == 0)
-            else exit_on_error ("test_two_rdy map error");
+            else exit_on_error ("test_one_rdy map error");
         assert (map_out.src2s[1] == 0)
-            else exit_on_error ("test_two_rdy map error");
+            else exit_on_error ("test_one_rdy map error");
+
+        chk_dat(0,1,1,12,13,14,"test_one_rdy d_dat error");
+        chk_dat(1,0,0,0,0,0,"test_one_rdy d_dat error");
 
         @(negedge clock);
         set_rs(2);
@@ -521,7 +572,7 @@ module dispatch_testbench;
         if (failed)
             $display("@@@ Failed\n");
         else
-            $display("@@@ Passed\n");
+            $display("\n\033[32m@@@ Passed\033[0m\n");
 
         $finish;
     end
