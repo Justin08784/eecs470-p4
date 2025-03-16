@@ -226,8 +226,9 @@ module stage_id_p4 (
     // assign d_out.d_dat[0].valid = if_id_reg[0].valid;
     logic [$clog2(`N):0] used_scnt;
     logic [$clog2(`N):0] free_scnt;
-    assign f_out.d_rdy_cnt = `MIN(free_scnt + d_in.dispatch_rdy_cnt, `N);
-    assign d_out.d_en_cnt  = `MIN(`MIN(used_scnt + f_in.f_en_cnt, d_in.dispatch_rdy_cnt), `N);
+    assign f_out.d_rdy_cnt  = free_scnt;
+    assign d_out.d_vld_scnt = used_scnt;
+    assign d_out.free_alloc_vld_cnt = used_scnt; // TODO: set a real value here
 
     logic [`N-1:0] has_dest_reg;
     int insn_id;
@@ -271,8 +272,46 @@ module stage_id_p4 (
     end
 
 
+    /*
+    Q: Why is the FIFO depth 2 × issue width?
+
+    A: To decouple fetch from dispatch and avoid critical path dependencies.
+
+    Let’s assume the FIFO depth is only `N` (issue width), and its initial state is:
+    [insn0, -]
+
+    Cycle 1:
+    - Dispatch can pull 1 instruction.
+    - Fetch sees `free_scnt = 1` and writes 1 new instruction (insn1) into the FIFO.
+    - At the end of cycle 1, FIFO looks like: [-, insn1]
+
+    Cycle 2:
+    - Dispatch is now ready to pull **2** instructions.
+    - But only 1 instruction is available (insn1) → dispatch is underutilized.
+
+    **What went wrong?**
+    Fetch only saw the *start-of-cycle* free count and didn’t know that dispatch would free more space in the same cycle.
+
+    ---
+
+    **Possible Fix:** Let fetch use `free_scnt + dispatch_en_cnt` as the available space,
+    assuming dispatch frees entries during the same cycle.
+
+    **Why is that bad?**
+    It creates a *long combinational dependency chain*: dispatch depends on ROB/RS/Free List → decode → fetch.
+    This slows down the entire pipeline due to timing pressure.
+
+    ---
+
+    **Better Solution:**
+    Increase the FIFO depth to 2× issue width.
+
+    - This gives fetch enough buffer room to write aggressively (up to `N` entries per cycle).
+    - It guarantees that dispatch cannot underflow the FIFO, even when it pulls `N` entries every cycle.
+    - It breaks the dependency between fetch and dispatch, improving timing.
+    */
     fifo #(
-        .DEPTH(`N),
+        .DEPTH(2*`N),
         .WIDTH($bits(ID_RESULT)),
         .NUM_RPORTS(`N),
         .NUM_WPORTS(`N)
@@ -281,7 +320,7 @@ module stage_id_p4 (
         .reset      (reset),
         .wr_en_cnt  (f_in.f_en_cnt),
         .wr_data    (tmp),
-        .rd_en_cnt  (d_out.d_en_cnt),
+        .rd_en_cnt  (d_in.dispatch_en_cnt),
         .rd_data    (d_out.d_dat),
         .free_scnt  (free_scnt),
         .used_scnt  (used_scnt)
