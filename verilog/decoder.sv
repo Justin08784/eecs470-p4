@@ -36,181 +36,180 @@ module decoder (
         if(reset) begin
             id <= 0;
         end else begin
-            foreach(valid[i]) begin
-                id <= id + valid[i];
-            end
+            id <= id + valid;
         end
     end
     // Note: I recommend using an IDE's code folding feature on this block
     always_comb begin
-        foreach(if_id_reg[i]) begin
+        genvar i 
+        generate 
+            for(i = 0; i < valid; ++i) begin
 
-            // Default control values (looks like a NOP)
-            // See sys_defs.svh for the constants used here
-            decode_out_n[i].inst          = if_id_reg[i].inst;
-            decode_out_n[i].PC            = if_id_reg[i].PC;
-            decode_out_n[i].NPC           = if_id_reg[i].NPC;
-            decode_out_n[i].fu_idx        = '0;
-            decode_out_n[i].opa_select    = OPA_IS_RS1;
-            decode_out_n[i].opb_select    = OPB_IS_RS2;
-            decode_out_n[i].alu_func      = ALU_ADD;
-            decode_out_n[i].csr_op        = `FALSE;
-            decode_out_n[i].mult          = `FALSE;
-            decode_out_n[i].rd_mem        = `FALSE;
-            decode_out_n[i].wr_mem        = `FALSE;
-            decode_out_n[i].cond_branch   = `FALSE;
-            decode_out_n[i].uncond_branch = `FALSE;
-            decode_out_n[i].halt          = `FALSE;
-            decode_out_n[i].illegal       = `FALSE;
-            has_dest[i]                   = `FALSE;
+                // Default control values (looks like a NOP)
+                // See sys_defs.svh for the constants used here
+                decode_out_n[i].inst          = if_id_reg[i].inst;
+                decode_out_n[i].PC            = if_id_reg[i].PC;
+                decode_out_n[i].NPC           = if_id_reg[i].NPC;
+                decode_out_n[i].fu_idx        = '0;
+                decode_out_n[i].opa_select    = OPA_IS_RS1;
+                decode_out_n[i].opb_select    = OPB_IS_RS2;
+                decode_out_n[i].alu_func      = ALU_ADD;
+                decode_out_n[i].csr_op        = `FALSE;
+                decode_out_n[i].mult          = `FALSE;
+                decode_out_n[i].rd_mem        = `FALSE;
+                decode_out_n[i].wr_mem        = `FALSE;
+                decode_out_n[i].cond_branch   = `FALSE;
+                decode_out_n[i].uncond_branch = `FALSE;
+                decode_out_n[i].halt          = `FALSE;
+                decode_out_n[i].illegal       = `FALSE;
+                has_dest[i]                   = `FALSE;
 
-            if (valid[i]) begin
-                casez (if_id_reg[i].inst)
-                    `RV32_LUI: begin
-                        has_dest[i]   = `TRUE;
-                        decode_out_n[i].opa_select = OPA_IS_ZERO;
-                        decode_out_n[i].opb_select = OPB_IS_U_IMM;
-                    end
-                    `RV32_AUIPC: begin
-                        has_dest[i]   = `TRUE;
-                        decode_out_n[i].opa_select = OPA_IS_PC;
-                        decode_out_n[i].opb_select = OPB_IS_U_IMM;
-                    end
-                    `RV32_JAL: begin
-                        has_dest[i]      = `TRUE;
-                        decode_out_n[i].opa_select    = OPA_IS_PC;
-                        decode_out_n[i].opb_select    = OPB_IS_J_IMM;
-                        decode_out_n[i].uncond_branch = `TRUE;
-                    end
-                    `RV32_JALR: begin
-                        has_dest[i]      = `TRUE;
-                        decode_out_n[i].opa_select    = OPA_IS_RS1;
-                        decode_out_n[i].opb_select    = OPB_IS_I_IMM;
-                        decode_out_n[i].uncond_branch = `TRUE;
-                    end
-                    `RV32_BEQ, `RV32_BNE, `RV32_BLT, `RV32_BGE,
-                    `RV32_BLTU, `RV32_BGEU: begin
-                        decode_out_n[i].opa_select  = OPA_IS_PC;
-                        decode_out_n[i].opb_select  = OPB_IS_B_IMM;
-                        decode_out_n[i].cond_branch = `TRUE;
-                        // stage_ex uses inst.b.funct3 as the branch function
-                    end
-                    `RV32_MUL, `RV32_MULH, `RV32_MULHSU, `RV32_MULHU: begin
-                        has_dest[i]   = `TRUE;
-                        decode_out_n[i].mult       = `TRUE;
-                        decode_out_n[i].fu_idx     = 2'b01;
-                        // stage_ex uses inst.r.funct3 as the mult function
-                    end
-                    `RV32_LB, `RV32_LH, `RV32_LW,
-                    `RV32_LBU, `RV32_LHU: begin
-                        has_dest[i]   = `TRUE;
-                        decode_out_n[i].opb_select = OPB_IS_I_IMM;
-                        decode_out_n[i].rd_mem     = `TRUE;
-                        decode_out_n[i].fu_idx     = 2'b10;
-                        // stage_ex uses inst.r.funct3 as the load size and signedness
-                    end
-                    `RV32_SB, `RV32_SH, `RV32_SW: begin
-                        decode_out_n[i].opb_select = OPB_IS_S_IMM;
-                        decode_out_n[i].wr_mem     = `TRUE;
-                        decode_out_n[i].fu_idx     = 2'b11;
-                        // stage_ex uses inst.r.funct3 as the store size
-                    end
-                    `RV32_ADDI: begin
-                        has_dest[i]   = `TRUE;
-                        decode_out_n[i].opb_select = OPB_IS_I_IMM;
-                    end
-                    `RV32_SLTI: begin
-                        has_dest[i]   = `TRUE;
-                        decode_out_n[i].opb_select = OPB_IS_I_IMM;
-                        decode_out_n[i].alu_func   = ALU_SLT;
-                    end
-                    `RV32_SLTIU: begin
-                        has_dest[i]   = `TRUE;
-                        decode_out_n[i].opb_select = OPB_IS_I_IMM;
-                        decode_out_n[i].alu_func   = ALU_SLTU;
-                    end
-                    `RV32_ANDI: begin
-                        has_dest[i]   = `TRUE;
-                        decode_out_n[i].opb_select = OPB_IS_I_IMM;
-                        decode_out_n[i].alu_func   = ALU_AND;
-                    end
-                    `RV32_ORI: begin
-                        has_dest[i]   = `TRUE;
-                        decode_out_n[i].opb_select = OPB_IS_I_IMM;
-                        decode_out_n[i].alu_func   = ALU_OR;
-                    end
-                    `RV32_XORI: begin
-                        has_dest[i]   = `TRUE;
-                        decode_out_n[i].opb_select = OPB_IS_I_IMM;
-                        decode_out_n[i].alu_func   = ALU_XOR;
-                    end
-                    `RV32_SLLI: begin
-                        has_dest[i]   = `TRUE;
-                        decode_out_n[i].opb_select = OPB_IS_I_IMM;
-                        decode_out_n[i].alu_func   = ALU_SLL;
-                    end
-                    `RV32_SRLI: begin
-                        has_dest[i]   = `TRUE;
-                        decode_out_n[i].opb_select = OPB_IS_I_IMM;
-                        decode_out_n[i].alu_func   = ALU_SRL;
-                    end
-                    `RV32_SRAI: begin
-                        has_dest[i]   = `TRUE;
-                        decode_out_n[i].opb_select = OPB_IS_I_IMM;
-                        decode_out_n[i].alu_func   = ALU_SRA;
-                    end
-                    `RV32_ADD: begin
-                        has_dest[i]   = `TRUE;
-                    end
-                    `RV32_SUB: begin
-                        has_dest[i]   = `TRUE;
-                        decode_out_n[i].alu_func   = ALU_SUB;
-                    end
-                    `RV32_SLT: begin
-                        has_dest[i]   = `TRUE;
-                        decode_out_n[i].alu_func   = ALU_SLT;
-                    end
-                    `RV32_SLTU: begin
-                        has_dest[i]   = `TRUE;
-                        decode_out_n[i].alu_func   = ALU_SLTU;
-                    end
-                    `RV32_AND: begin
-                        has_dest[i]   = `TRUE;
-                        decode_out_n[i].alu_func   = ALU_AND;
-                    end
-                    `RV32_OR: begin
-                        has_dest[i]   = `TRUE;
-                        decode_out_n[i].alu_func   = ALU_OR;
-                    end
-                    `RV32_XOR: begin
-                        has_dest[i]   = `TRUE;
-                        decode_out_n[i].alu_func   = ALU_XOR;
-                    end
-                    `RV32_SLL: begin
-                        has_dest[i]   = `TRUE;
-                        decode_out_n[i].alu_func   = ALU_SLL;
-                    end
-                    `RV32_SRL: begin
-                        has_dest[i]   = `TRUE;
-                        decode_out_n[i].alu_func   = ALU_SRL;
-                    end
-                    `RV32_SRA: begin
-                        has_dest[i]   = `TRUE;
-                        decode_out_n[i].alu_func   = ALU_SRA;
-                    end
-                    `RV32_CSRRW, `RV32_CSRRS, `RV32_CSRRC: begin
-                        decode_out_n[i].csr_op = `TRUE;
-                    end
-                    `WFI: begin
-                        decode_out_n[i].halt = `TRUE;
-                    end
-                    default: begin
-                        decode_out_n[i].illegal = `TRUE;
-                    end
-            endcase // casez (inst)
-            assign decode_out_n[i].dest_reg_idx = (has_dest[i]) ? if_id_reg[i].inst.r.rd : `ZERO_REG;
-            end // if (valid)
-        end
+                    casez (if_id_reg[i].inst)
+                        `RV32_LUI: begin
+                            has_dest[i]   = `TRUE;
+                            decode_out_n[i].opa_select = OPA_IS_ZERO;
+                            decode_out_n[i].opb_select = OPB_IS_U_IMM;
+                        end
+                        `RV32_AUIPC: begin
+                            has_dest[i]   = `TRUE;
+                            decode_out_n[i].opa_select = OPA_IS_PC;
+                            decode_out_n[i].opb_select = OPB_IS_U_IMM;
+                        end
+                        `RV32_JAL: begin
+                            has_dest[i]      = `TRUE;
+                            decode_out_n[i].opa_select    = OPA_IS_PC;
+                            decode_out_n[i].opb_select    = OPB_IS_J_IMM;
+                            decode_out_n[i].uncond_branch = `TRUE;
+                        end
+                        `RV32_JALR: begin
+                            has_dest[i]      = `TRUE;
+                            decode_out_n[i].opa_select    = OPA_IS_RS1;
+                            decode_out_n[i].opb_select    = OPB_IS_I_IMM;
+                            decode_out_n[i].uncond_branch = `TRUE;
+                        end
+                        `RV32_BEQ, `RV32_BNE, `RV32_BLT, `RV32_BGE,
+                        `RV32_BLTU, `RV32_BGEU: begin
+                            decode_out_n[i].opa_select  = OPA_IS_PC;
+                            decode_out_n[i].opb_select  = OPB_IS_B_IMM;
+                            decode_out_n[i].cond_branch = `TRUE;
+                            // stage_ex uses inst.b.funct3 as the branch function
+                        end
+                        `RV32_MUL, `RV32_MULH, `RV32_MULHSU, `RV32_MULHU: begin
+                            has_dest[i]   = `TRUE;
+                            decode_out_n[i].mult       = `TRUE;
+                            decode_out_n[i].fu_idx     = 2'b01;
+                            // stage_ex uses inst.r.funct3 as the mult function
+                        end
+                        `RV32_LB, `RV32_LH, `RV32_LW,
+                        `RV32_LBU, `RV32_LHU: begin
+                            has_dest[i]   = `TRUE;
+                            decode_out_n[i].opb_select = OPB_IS_I_IMM;
+                            decode_out_n[i].rd_mem     = `TRUE;
+                            decode_out_n[i].fu_idx     = 2'b10;
+                            // stage_ex uses inst.r.funct3 as the load size and signedness
+                        end
+                        `RV32_SB, `RV32_SH, `RV32_SW: begin
+                            decode_out_n[i].opb_select = OPB_IS_S_IMM;
+                            decode_out_n[i].wr_mem     = `TRUE;
+                            decode_out_n[i].fu_idx     = 2'b11;
+                            // stage_ex uses inst.r.funct3 as the store size
+                        end
+                        `RV32_ADDI: begin
+                            has_dest[i]   = `TRUE;
+                            decode_out_n[i].opb_select = OPB_IS_I_IMM;
+                        end
+                        `RV32_SLTI: begin
+                            has_dest[i]   = `TRUE;
+                            decode_out_n[i].opb_select = OPB_IS_I_IMM;
+                            decode_out_n[i].alu_func   = ALU_SLT;
+                        end
+                        `RV32_SLTIU: begin
+                            has_dest[i]   = `TRUE;
+                            decode_out_n[i].opb_select = OPB_IS_I_IMM;
+                            decode_out_n[i].alu_func   = ALU_SLTU;
+                        end
+                        `RV32_ANDI: begin
+                            has_dest[i]   = `TRUE;
+                            decode_out_n[i].opb_select = OPB_IS_I_IMM;
+                            decode_out_n[i].alu_func   = ALU_AND;
+                        end
+                        `RV32_ORI: begin
+                            has_dest[i]   = `TRUE;
+                            decode_out_n[i].opb_select = OPB_IS_I_IMM;
+                            decode_out_n[i].alu_func   = ALU_OR;
+                        end
+                        `RV32_XORI: begin
+                            has_dest[i]   = `TRUE;
+                            decode_out_n[i].opb_select = OPB_IS_I_IMM;
+                            decode_out_n[i].alu_func   = ALU_XOR;
+                        end
+                        `RV32_SLLI: begin
+                            has_dest[i]   = `TRUE;
+                            decode_out_n[i].opb_select = OPB_IS_I_IMM;
+                            decode_out_n[i].alu_func   = ALU_SLL;
+                        end
+                        `RV32_SRLI: begin
+                            has_dest[i]   = `TRUE;
+                            decode_out_n[i].opb_select = OPB_IS_I_IMM;
+                            decode_out_n[i].alu_func   = ALU_SRL;
+                        end
+                        `RV32_SRAI: begin
+                            has_dest[i]   = `TRUE;
+                            decode_out_n[i].opb_select = OPB_IS_I_IMM;
+                            decode_out_n[i].alu_func   = ALU_SRA;
+                        end
+                        `RV32_ADD: begin
+                            has_dest[i]   = `TRUE;
+                        end
+                        `RV32_SUB: begin
+                            has_dest[i]   = `TRUE;
+                            decode_out_n[i].alu_func   = ALU_SUB;
+                        end
+                        `RV32_SLT: begin
+                            has_dest[i]   = `TRUE;
+                            decode_out_n[i].alu_func   = ALU_SLT;
+                        end
+                        `RV32_SLTU: begin
+                            has_dest[i]   = `TRUE;
+                            decode_out_n[i].alu_func   = ALU_SLTU;
+                        end
+                        `RV32_AND: begin
+                            has_dest[i]   = `TRUE;
+                            decode_out_n[i].alu_func   = ALU_AND;
+                        end
+                        `RV32_OR: begin
+                            has_dest[i]   = `TRUE;
+                            decode_out_n[i].alu_func   = ALU_OR;
+                        end
+                        `RV32_XOR: begin
+                            has_dest[i]   = `TRUE;
+                            decode_out_n[i].alu_func   = ALU_XOR;
+                        end
+                        `RV32_SLL: begin
+                            has_dest[i]   = `TRUE;
+                            decode_out_n[i].alu_func   = ALU_SLL;
+                        end
+                        `RV32_SRL: begin
+                            has_dest[i]   = `TRUE;
+                            decode_out_n[i].alu_func   = ALU_SRL;
+                        end
+                        `RV32_SRA: begin
+                            has_dest[i]   = `TRUE;
+                            decode_out_n[i].alu_func   = ALU_SRA;
+                        end
+                        `RV32_CSRRW, `RV32_CSRRS, `RV32_CSRRC: begin
+                            decode_out_n[i].csr_op = `TRUE;
+                        end
+                        `WFI: begin
+                            decode_out_n[i].halt = `TRUE;
+                        end
+                        default: begin
+                            decode_out_n[i].illegal = `TRUE;
+                        end
+                endcase // casez (inst)
+                assign decode_out_n[i].dest_reg_idx = (has_dest[i]) ? if_id_reg[i].inst.r.rd : `ZERO_REG;
+            end
+        endgenerate
     end // always
 
     always_ff @(posedge clock) begin
