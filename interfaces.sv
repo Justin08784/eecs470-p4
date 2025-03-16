@@ -363,6 +363,7 @@ module dispatch #(parameter
     //the dest reg (from decode), and output the paired
     //item to the map table for it to decide how to update.
 );
+endmodule
 
 /* 
 ================================================

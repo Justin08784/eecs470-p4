@@ -564,6 +564,16 @@ typedef struct packed {
         // - From: RS
 } rs2dispatch;
 
+typedef struct packed {
+    logic       [`NUM_FU_ALU-1:0]    fu_vld_alu;
+    logic       [`NUM_FU_MULT-1:0]   fu_vld_mult;
+    logic       [`NUM_FU_STORE-1:0]  fu_vld_store;
+    logic       [`NUM_FU_LOAD-1:0]   fu_vld_load;
+    ID_RESULT   [`NUM_FU_ALU-1:0]    fu_dat_alu;
+    ID_RESULT   [`NUM_FU_MULT-1:0]   fu_dat_mult;
+    ID_RESULT   [`NUM_FU_STORE-1:0]  fu_dat_store;
+    ID_RESULT   [`NUM_FU_LOAD-1:0]   fu_dat_load;
+} rs2execute;
 
 // By ROB
 typedef struct packed {

@@ -21,7 +21,7 @@ module rs_chk #(parameter
     input   logic           [$clog2(N):0] d_en_cnt,     // number of enabled dispatch lines? (from dispatcher; dep. on rs_scnt)
     input   ID_RESULT       [N-1:0] d_dat,
     // issue
-    input   execute2rs                          ex_in,
+    input   execute2rs      ex_in,
     // complete
     input   logic           [N-1:0] c_en,
     input   PHYS_REG_IDX    [N-1:0] c_ts,
@@ -33,14 +33,7 @@ module rs_chk #(parameter
     // input   logic           [FU_IDX_NUM-1:0][RS_SZ-1:0]   can_issues_dut,
 
     // ==== dut lines for comparison
-    input   logic           [NUM_FU_ALU-1:0]    fu_vld_alu_dut,
-    input   logic           [NUM_FU_MULT-1:0]   fu_vld_mult_dut,
-    input   logic           [NUM_FU_STORE-1:0]  fu_vld_store_dut,
-    input   logic           [NUM_FU_LOAD-1:0]   fu_vld_load_dut,
-    input   ID_RESULT       [NUM_FU_ALU-1:0]    fu_dat_alu_dut,
-    input   ID_RESULT       [NUM_FU_MULT-1:0]   fu_dat_mult_dut,
-    input   ID_RESULT       [NUM_FU_STORE-1:0]  fu_dat_store_dut,
-    input   ID_RESULT       [NUM_FU_LOAD-1:0]   fu_dat_load_dut,
+    input   rs2execute      ex_out_dut,
     input   RS_ENTRY        [RS_SZ-1:0]         entries_dut
 );
     localparam DEBUG = 1;
@@ -111,14 +104,7 @@ module rs_chk #(parameter
     struct packed {
         logic       [$clog2(N):0]       rs_scnt;
         
-        logic       [NUM_FU_ALU-1:0]    fu_vld_alu;
-        logic       [NUM_FU_MULT-1:0]   fu_vld_mult;
-        logic       [NUM_FU_STORE-1:0]  fu_vld_store;
-        logic       [NUM_FU_LOAD-1:0]   fu_vld_load;
-        ID_RESULT   [NUM_FU_ALU-1:0]    fu_dat_alu;
-        ID_RESULT   [NUM_FU_MULT-1:0]   fu_dat_mult;
-        ID_RESULT   [NUM_FU_STORE-1:0]  fu_dat_store;
-        ID_RESULT   [NUM_FU_LOAD-1:0]   fu_dat_load;
+        rs2execute  ex_out;
     } outs_pre, outs_cur; 
 
     // This syntax is so fucking gorgeous btw.
@@ -132,24 +118,9 @@ module rs_chk #(parameter
 
     assign outs_cur = '{
         rs_scnt:rs_scnt,
-        fu_vld_alu:fu_vld_alu_dut,
-        fu_vld_mult:fu_vld_mult_dut,
-        fu_vld_load:fu_vld_load_dut,
-        fu_vld_store:fu_vld_store_dut,
-        fu_dat_alu:fu_dat_alu_dut,
-        fu_dat_mult:fu_dat_mult_dut,
-        fu_dat_load:fu_dat_load_dut,
-        fu_dat_store:fu_dat_store_dut
+        ex_out:ex_out_dut
     };
     
-    logic               [NUM_FU_ALU-1:0]    fu_vld_alu;
-    logic               [NUM_FU_MULT-1:0]   fu_vld_mult;
-    logic               [NUM_FU_STORE-1:0]  fu_vld_store;
-    logic               [NUM_FU_LOAD-1:0]   fu_vld_load;
-    ID_RESULT           [NUM_FU_ALU-1:0]    fu_dat_alu;
-    ID_RESULT           [NUM_FU_MULT-1:0]   fu_dat_mult;
-    ID_RESULT           [NUM_FU_STORE-1:0]  fu_dat_store;
-    ID_RESULT           [NUM_FU_LOAD-1:0]   fu_dat_load;
     int num_free_fus    [FU_IDX_NUM];
     int num_issue_fus   [FU_IDX_NUM];
 
@@ -322,40 +293,40 @@ module rs_chk #(parameter
         issue_asg_correct = 1; // is data assigned to a read fu?
         issue_dat_correct = 1;
         for (int i = 0, int id = 0, int rs = 0; i < NUM_FU_ALU; ++i) begin
-            if (!outs_pre.fu_vld_alu[i])
+            if (!outs_pre.ex_out.fu_vld_alu[i])
                 continue;
             issue_asg_correct &= ins_pre.ex_in.fu_rdy_alu[i];
-            id = outs_pre.fu_dat_alu[i].id;
+            id = outs_pre.ex_out.fu_dat_alu[i].id;
             if (!id2idx_pre.exists(id)) begin
                 $display("WHAT THE FUCK?");
                 $finish;
             end
             rs = id2idx_pre[id];
-            issue_dat_correct &= (outs_pre.fu_dat_alu[i] == entries_pre[rs].dat);
+            issue_dat_correct &= (outs_pre.ex_out.fu_dat_alu[i] == entries_pre[rs].dat);
         end
         for (int i = 0, int id = 0, int rs = 0; i < NUM_FU_MULT; ++i) begin
-            if (!outs_pre.fu_vld_mult[i])
+            if (!outs_pre.ex_out.fu_vld_mult[i])
                 continue;
             issue_asg_correct &= ins_pre.ex_in.fu_rdy_mult[i];
-            id = outs_pre.fu_dat_mult[i].id;
+            id = outs_pre.ex_out.fu_dat_mult[i].id;
             rs = id2idx_pre[id];
-            issue_dat_correct &= (outs_pre.fu_dat_mult[i] == entries_pre[rs].dat);
+            issue_dat_correct &= (outs_pre.ex_out.fu_dat_mult[i] == entries_pre[rs].dat);
         end
         for (int i = 0, int id = 0, int rs = 0; i < NUM_FU_LOAD; ++i) begin
-            if (!outs_pre.fu_vld_load[i])
+            if (!outs_pre.ex_out.fu_vld_load[i])
                 continue;
             issue_asg_correct &= ins_pre.ex_in.fu_rdy_load[i];
-            id = outs_pre.fu_dat_load[i].id;
+            id = outs_pre.ex_out.fu_dat_load[i].id;
             rs = id2idx_pre[id];
-            issue_dat_correct &= (outs_pre.fu_dat_load[i] == entries_pre[rs].dat);
+            issue_dat_correct &= (outs_pre.ex_out.fu_dat_load[i] == entries_pre[rs].dat);
         end
         for (int i = 0, int id = 0, int rs = 0; i < NUM_FU_STORE; ++i) begin
-            if (!outs_pre.fu_vld_store[i])
+            if (!outs_pre.ex_out.fu_vld_store[i])
                 continue;
             issue_asg_correct &= ins_pre.ex_in.fu_rdy_store[i];
-            id = outs_pre.fu_dat_store[i].id;
+            id = outs_pre.ex_out.fu_dat_store[i].id;
             rs = id2idx_pre[id];
-            issue_dat_correct &= (outs_pre.fu_dat_store[i] == entries_pre[rs].dat);
+            issue_dat_correct &= (outs_pre.ex_out.fu_dat_store[i] == entries_pre[rs].dat);
         end
         
         // check dispatch correctness

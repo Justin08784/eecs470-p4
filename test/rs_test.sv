@@ -32,10 +32,7 @@ module rs_testbench;
     // issue
     execute2rs      ex_in; // from POV of rs
 
-    ID_RESULT       [NUM_FU_ALU-1:0]    fu_dat_alu_dut;
-    ID_RESULT       [NUM_FU_MULT-1:0]   fu_dat_mult_dut;
-    ID_RESULT       [NUM_FU_STORE-1:0]  fu_dat_store_dut;
-    ID_RESULT       [NUM_FU_LOAD-1:0]   fu_dat_load_dut;
+    rs2execute      ex_out_dut;
     // complete (CDB)
     logic           [N-1:0] c_en;
     PHYS_REG_IDX    [N-1:0] c_ts;
@@ -57,11 +54,7 @@ module rs_testbench;
         .d_dat(d_dat),
  
         .ex_in(ex_in),
-
-        .fu_dat_alu(fu_dat_alu_dut),
-        .fu_dat_mult(fu_dat_mult_dut),
-        .fu_dat_store(fu_dat_store_dut),
-        .fu_dat_load(fu_dat_load_dut),
+        .ex_out(ex_out_dut),
 
         `ifdef DEBUG
         .entries_dbg(entries_dut),
@@ -143,19 +136,12 @@ module rs_testbench;
         // .can_issue_dut      (rs_dut.can_issue),
         // .can_issues_dut     (rs_dut.can_issues),
 
-        .fu_vld_alu_dut     (rs_dut.fu_vld_alu),
-        .fu_vld_mult_dut    (rs_dut.fu_vld_mult),
-        .fu_vld_store_dut   (rs_dut.fu_vld_store),
-        .fu_vld_load_dut    (rs_dut.fu_vld_load),
         /* Ideally you wanna do this, but synthie cant handle complex types yet. */
         // .fu_dat_alu_dut     (rs_dut.fu_dat_alu),
         // .fu_dat_mult_dut    (rs_dut.fu_dat_mult),
         // .fu_dat_store_dut   (rs_dut.fu_dat_store),
         // .fu_dat_load_dut    (rs_dut.fu_dat_load)
-        .fu_dat_alu_dut     (fu_dat_alu_dut),
-        .fu_dat_mult_dut    (fu_dat_mult_dut),
-        .fu_dat_store_dut   (fu_dat_store_dut),
-        .fu_dat_load_dut    (fu_dat_load_dut)
+        .ex_out_dut(ex_out_dut)
     );
 
     task set_dispatch(
