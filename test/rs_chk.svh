@@ -23,8 +23,7 @@ module rs_chk #(parameter
     // issue
     input   execute2rs      ex_in,
     // complete
-    input   logic           [N-1:0] c_en,
-    input   PHYS_REG_IDX    [N-1:0] c_ts,
+    input   execute2complete c_in,
 
     // delicious spaghetti for print debugging
     // input   logic           [RS_SZ-1:0]   to_t1_rdy_dut,
@@ -97,8 +96,7 @@ module rs_chk #(parameter
         // issue
         execute2rs      ex_in;
         // complete
-        logic           [N-1:0] c_en;
-        PHYS_REG_IDX    [N-1:0] c_ts;
+        execute2complete c_in;
     } ins_pre, ins_cur; 
 
     struct packed {
@@ -112,8 +110,7 @@ module rs_chk #(parameter
         d_en_cnt:d_en_cnt,
         d_dat:d_dat,
         ex_in:ex_in,
-        c_en:c_en,
-        c_ts:c_ts
+        c_in:c_in
     };
 
     assign outs_cur = '{
@@ -210,10 +207,10 @@ module rs_chk #(parameter
 
         // check ready correctness 
         cdb_tags_pre.delete();
-        foreach (c_ts[i]) begin
-            if (!ins_pre.c_en[i])
+        foreach (c_in.c_ts[i]) begin
+            if (!ins_pre.c_in.c_en[i])
                 continue;
-            cdb_tags_pre[ins_pre.c_ts[i]] = 1;
+            cdb_tags_pre[ins_pre.c_in.c_ts[i]] = 1;
         end
         ready_correct = 1;
         for (int rs = 0, PHYS_REG_IDX t1 = 0, PHYS_REG_IDX t2 = 0; rs < RS_SZ; ++rs) begin
@@ -244,11 +241,11 @@ module rs_chk #(parameter
         for (int rs = 0, PHYS_REG_IDX t1 = 0, PHYS_REG_IDX t2 = 0; rs < RS_SZ; ++rs) begin
             t1 = entries_pre[rs].dat.t1;
             t2 = entries_pre[rs].dat.t2;
-            foreach (ins_pre.c_en[i]) begin
-                if (!ins_pre.c_en[i])
+            foreach (ins_pre.c_in.c_en[i]) begin
+                if (!ins_pre.c_in.c_en[i])
                     continue;
-                entries_mut[rs].dat.t1_rdy |= (ins_pre.c_ts[i] == t1);
-                entries_mut[rs].dat.t2_rdy |= (ins_pre.c_ts[i] == t2);
+                entries_mut[rs].dat.t1_rdy |= (ins_pre.c_in.c_ts[i] == t1);
+                entries_mut[rs].dat.t2_rdy |= (ins_pre.c_in.c_ts[i] == t2);
             end
         end
 

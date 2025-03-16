@@ -46,9 +46,7 @@ module rs #(parameter
     `endif 
 
     // complete (CDB)
-    input   logic           [N-1:0] c_en,
-    input   PHYS_REG_IDX    [N-1:0] c_ts
-
+    input execute2complete  c_in
 );
     RS_ENTRY [RS_SZ-1:0]       entries, entries_n; // ms1 test: remove one RS entry (caught)
     `ifdef DEBUG
@@ -85,9 +83,9 @@ module rs #(parameter
 
             // match any tag in CDB?
             for (int n = 0; n < N; ++n) begin
-                if (c_en[n]) begin
-                    match_t1 |= entries[rs].dat.t1 == c_ts[n];
-                    match_t2 |= entries[rs].dat.t2 == c_ts[n];
+                if (c_in.c_en[n]) begin
+                    match_t1 |= entries[rs].dat.t1 == c_in.c_ts[n];
+                    match_t2 |= entries[rs].dat.t2 == c_in.c_ts[n];
                 end
             end
 

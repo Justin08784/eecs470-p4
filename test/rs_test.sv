@@ -34,8 +34,7 @@ module rs_testbench;
 
     rs2execute      ex_out_dut;
     // complete (CDB)
-    logic           [N-1:0] c_en;
-    PHYS_REG_IDX    [N-1:0] c_ts;
+    execute2complete c_in;
 
     logic failed;
     string fmt;
@@ -60,8 +59,7 @@ module rs_testbench;
         .entries_dbg(entries_dut),
         `endif 
  
-        .c_en(c_en),
-        .c_ts(c_ts)
+        .c_in(c_in)
     );
 
     // logic idiot = rs_dut.entries;
@@ -125,8 +123,7 @@ module rs_testbench;
 
         .ex_in(ex_in),
 
-        .c_en(c_en),
-        .c_ts(c_ts),
+        .c_in(c_in),
         `ifdef DEBUG
         .entries_dut(entries_dut),
         `endif 
@@ -175,15 +172,15 @@ module rs_testbench;
         input int i,
         input int t
     );
-        c_en[i] = 1;
-        c_ts[i]  = t;
+        c_in.c_en[i] = 1;
+        c_in.c_ts[i]  = t;
     endtask
 
     task clr_cdb(
         input int i
     );
-        c_en[i] = 0;
-        c_ts[i]  = '0;
+        c_in.c_en[i] = 0;
+        c_in.c_ts[i]  = '0;
     endtask
 
     task set_fu(
@@ -213,8 +210,7 @@ module rs_testbench;
     task clr_all();
         d_en_cnt = 0;
         d_dat = '0;
-        c_en = '0;
-        c_ts = '0;
+        c_in = '0;
         ex_in = '0;
     endtask
 
@@ -581,8 +577,7 @@ module rs_testbench;
         d_en_cnt        = 0;
         d_dat           = '0;
         ex_in           = '0;
-        c_en            = '0;
-        c_ts            = '0;
+        c_in            = '0;
 
         // hand-crafted:
         test_1inst();

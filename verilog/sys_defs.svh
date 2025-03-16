@@ -604,6 +604,15 @@ typedef struct packed {
     logic       [`NUM_FU_LOAD-1:0]   fu_rdy_load;
 } execute2rs;
 
+typedef struct packed {
+    logic           [`N-1:0] c_en;
+        // - From: EX
+    PHYS_REG_IDX    [`N-1:0] c_ts;
+        // - From: EX
+    ROB_IDX         [`N-1:0] c_rob_idxs;
+        // - From: EX
+} execute2complete;
+
 // By Free List
 typedef struct packed {
     logic    [$clog2(`N):0]    free_rdy_scnt;
