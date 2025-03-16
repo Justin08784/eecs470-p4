@@ -214,8 +214,8 @@ module stage_id_p4 (
     input              clock,           // system clock
     input              reset,           // system reset
 
-    input IF_ID_PACKET [`N-1:0] if_id_reg,
-    input logic [$clog2(`N):0]  en_cnt,
+    input   fetch2decode f_in,
+    output  decode2fetch f_out,
 
     input   dispatch2decode d_in,
     output  decode2dispatch d_out
@@ -224,7 +224,10 @@ module stage_id_p4 (
 
 
     // assign d_out.d_dat[0].valid = if_id_reg[0].valid;
-    assign d_out.d_en_cnt = en_cnt;
+    logic [$clog2(`N):0] used_scnt;
+    logic [$clog2(`N):0] free_scnt;
+    assign f_out.d_rdy_cnt = `MIN(free_scnt + d_in.dispatch_rdy_cnt, `N);
+    assign d_out.d_en_cnt  = `MIN(`MIN(used_scnt + f_in.f_en_cnt, d_in.dispatch_rdy_cnt), `N);
 
     logic [`N-1:0] has_dest_reg;
     int insn_id;
@@ -236,8 +239,8 @@ module stage_id_p4 (
     for (genvar i = 0; i < `N; ++i) begin : gen_decoders
         decoder_p4 decoder_i (
             // Inputs
-            .inst  (if_id_reg[i].inst),
-            .valid (if_id_reg[i].valid),
+            .inst  (f_in.f_dat[i].inst),
+            .valid (f_in.f_dat[i].valid),
 
             // Outputs
             .opa_select    (tmp[i].opa_select),
@@ -258,12 +261,12 @@ module stage_id_p4 (
 
     always_comb begin
         for (int unsigned i = 0; i < `N; ++i) begin
-            tmp[i].inst = if_id_reg[i].inst;
-            tmp[i].PC   = if_id_reg[i].PC;
-            tmp[i].NPC  = if_id_reg[i].NPC;
+            tmp[i].inst = f_in.f_dat[i].inst;
+            tmp[i].PC   = f_in.f_dat[i].PC;
+            tmp[i].NPC  = f_in.f_dat[i].NPC;
             tmp[i].id   = insn_id + i;
 
-            tmp[i].dest_reg_idx = (has_dest_reg[i]) ? if_id_reg[i].inst.r.rd : `ZERO_REG;
+            tmp[i].dest_reg_idx = (has_dest_reg[i]) ? f_in.f_dat[i].inst.r.rd : `ZERO_REG;
         end
     end
 
@@ -276,19 +279,19 @@ module stage_id_p4 (
     ) id_buf(
         .clock      (clock),
         .reset      (reset),
-        .wr_en_cnt  (en_cnt),
+        .wr_en_cnt  (f_in.f_en_cnt),
         .wr_data    (tmp),
-        .rd_en_cnt  (d_in.dispatch_rdy_cnt),
+        .rd_en_cnt  (d_out.d_en_cnt),
         .rd_data    (d_out.d_dat),
-        .free_scnt  (),
-        .used_scnt  ()
+        .free_scnt  (free_scnt),
+        .used_scnt  (used_scnt)
     );
 
     always_ff @(posedge clock) begin
         if (reset) begin
             insn_id <= 0;
         end else begin
-            insn_id <= insn_id + en_cnt;
+            insn_id <= insn_id + d_out.d_en_cnt;
         end
     end
 
