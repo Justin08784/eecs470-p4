@@ -21,10 +21,7 @@ module rs_chk #(parameter
     input   logic           [$clog2(N):0] d_en_cnt,     // number of enabled dispatch lines? (from dispatcher; dep. on rs_scnt)
     input   ID_RESULT       [N-1:0] d_dat,
     // issue
-    input   logic           [NUM_FU_ALU-1:0]    fu_rdy_alu,
-    input   logic           [NUM_FU_MULT-1:0]   fu_rdy_mult,
-    input   logic           [NUM_FU_STORE-1:0]  fu_rdy_store,
-    input   logic           [NUM_FU_LOAD-1:0]   fu_rdy_load,
+    input   execute2rs                          ex_in,
     // complete
     input   logic           [N-1:0] c_en,
     input   PHYS_REG_IDX    [N-1:0] c_ts,
@@ -105,10 +102,7 @@ module rs_chk #(parameter
         logic           [$clog2(N):0] d_en_cnt;     // number of enabled dispatch lines? (from dispatcher; dep. on rs_scnt)
         ID_RESULT       [N-1:0] d_dat;
         // issue
-        logic           [NUM_FU_ALU-1:0]    fu_rdy_alu;
-        logic           [NUM_FU_MULT-1:0]   fu_rdy_mult;
-        logic           [NUM_FU_STORE-1:0]  fu_rdy_store;
-        logic           [NUM_FU_LOAD-1:0]   fu_rdy_load;
+        execute2rs      ex_in;
         // complete
         logic           [N-1:0] c_en;
         PHYS_REG_IDX    [N-1:0] c_ts;
@@ -131,10 +125,7 @@ module rs_chk #(parameter
     assign ins_cur = '{
         d_en_cnt:d_en_cnt,
         d_dat:d_dat,
-        fu_rdy_alu:fu_rdy_alu,
-        fu_rdy_mult:fu_rdy_mult,
-        fu_rdy_load:fu_rdy_load,
-        fu_rdy_store:fu_rdy_store,
+        ex_in:ex_in,
         c_en:c_en,
         c_ts:c_ts
     };
@@ -315,10 +306,10 @@ module rs_chk #(parameter
         issue_cnt_correct = 1;
         for (int fu = 0, int rdy_num = 0; fu < FU_IDX_NUM; ++fu) begin
             case (fu) 
-            FU_ALU:     rdy_num = $countones(ins_pre.fu_rdy_alu);
-            FU_MULT:    rdy_num = $countones(ins_pre.fu_rdy_mult);
-            FU_LOAD:    rdy_num = $countones(ins_pre.fu_rdy_load);
-            FU_STORE:   rdy_num = $countones(ins_pre.fu_rdy_store);
+            FU_ALU:     rdy_num = $countones(ins_pre.ex_in.fu_rdy_alu);
+            FU_MULT:    rdy_num = $countones(ins_pre.ex_in.fu_rdy_mult);
+            FU_LOAD:    rdy_num = $countones(ins_pre.ex_in.fu_rdy_load);
+            FU_STORE:   rdy_num = $countones(ins_pre.ex_in.fu_rdy_store);
             endcase
             // $display("fu=%0d: issd:      %0b", fu, issd_by_fu_cur[fu]);
             // $display("fu=%0d: can_issue: %0b", fu, can_issue_by_fu_mut[fu]);
@@ -333,7 +324,7 @@ module rs_chk #(parameter
         for (int i = 0, int id = 0, int rs = 0; i < NUM_FU_ALU; ++i) begin
             if (!outs_pre.fu_vld_alu[i])
                 continue;
-            issue_asg_correct &= ins_pre.fu_rdy_alu[i];
+            issue_asg_correct &= ins_pre.ex_in.fu_rdy_alu[i];
             id = outs_pre.fu_dat_alu[i].id;
             if (!id2idx_pre.exists(id)) begin
                 $display("WHAT THE FUCK?");
@@ -345,7 +336,7 @@ module rs_chk #(parameter
         for (int i = 0, int id = 0, int rs = 0; i < NUM_FU_MULT; ++i) begin
             if (!outs_pre.fu_vld_mult[i])
                 continue;
-            issue_asg_correct &= ins_pre.fu_rdy_mult[i];
+            issue_asg_correct &= ins_pre.ex_in.fu_rdy_mult[i];
             id = outs_pre.fu_dat_mult[i].id;
             rs = id2idx_pre[id];
             issue_dat_correct &= (outs_pre.fu_dat_mult[i] == entries_pre[rs].dat);
@@ -353,7 +344,7 @@ module rs_chk #(parameter
         for (int i = 0, int id = 0, int rs = 0; i < NUM_FU_LOAD; ++i) begin
             if (!outs_pre.fu_vld_load[i])
                 continue;
-            issue_asg_correct &= ins_pre.fu_rdy_load[i];
+            issue_asg_correct &= ins_pre.ex_in.fu_rdy_load[i];
             id = outs_pre.fu_dat_load[i].id;
             rs = id2idx_pre[id];
             issue_dat_correct &= (outs_pre.fu_dat_load[i] == entries_pre[rs].dat);
@@ -361,7 +352,7 @@ module rs_chk #(parameter
         for (int i = 0, int id = 0, int rs = 0; i < NUM_FU_STORE; ++i) begin
             if (!outs_pre.fu_vld_store[i])
                 continue;
-            issue_asg_correct &= ins_pre.fu_rdy_store[i];
+            issue_asg_correct &= ins_pre.ex_in.fu_rdy_store[i];
             id = outs_pre.fu_dat_store[i].id;
             rs = id2idx_pre[id];
             issue_dat_correct &= (outs_pre.fu_dat_store[i] == entries_pre[rs].dat);

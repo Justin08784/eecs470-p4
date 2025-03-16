@@ -458,7 +458,7 @@ module cpu (
         // .flush(),
  
         // .rs_scnt(rs2dis.rs_rdy_scnt),
-        // .d_en_cnt(dis2rs.rs_d_en_cnt),
+        // .d_en_cnt(dis2rs.d_en_cnt),
         // .d_dat(d_dat),
  
         // .fu_rdy_alu(fu_rdy_alu),

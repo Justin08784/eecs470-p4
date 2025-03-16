@@ -30,10 +30,7 @@ module rs_testbench;
     logic           [$clog2(N):0] d_en_cnt; // number of enabled dispatch lines? (from dispatcher; dep. on rs_scnt)
     ID_RESULT       [N-1:0] d_dat;
     // issue
-    logic           [NUM_FU_ALU-1:0]    fu_rdy_alu;
-    logic           [NUM_FU_MULT-1:0]   fu_rdy_mult;
-    logic           [NUM_FU_STORE-1:0]  fu_rdy_store;
-    logic           [NUM_FU_LOAD-1:0]   fu_rdy_load;
+    execute2rs      ex_in; // from POV of rs
 
     ID_RESULT       [NUM_FU_ALU-1:0]    fu_dat_alu_dut;
     ID_RESULT       [NUM_FU_MULT-1:0]   fu_dat_mult_dut;
@@ -59,10 +56,7 @@ module rs_testbench;
         .d_en_cnt(d_en_cnt),
         .d_dat(d_dat),
  
-        .fu_rdy_alu(fu_rdy_alu),
-        .fu_rdy_mult(fu_rdy_mult),
-        .fu_rdy_store(fu_rdy_store),
-        .fu_rdy_load(fu_rdy_load),
+        .ex_in(ex_in),
 
         .fu_dat_alu(fu_dat_alu_dut),
         .fu_dat_mult(fu_dat_mult_dut),
@@ -136,10 +130,7 @@ module rs_testbench;
         .d_en_cnt(d_en_cnt),
         .d_dat(d_dat),
 
-        .fu_rdy_alu(fu_rdy_alu),
-        .fu_rdy_mult(fu_rdy_mult),
-        .fu_rdy_store(fu_rdy_store),
-        .fu_rdy_load(fu_rdy_load),
+        .ex_in(ex_in),
 
         .c_en(c_en),
         .c_ts(c_ts),
@@ -214,10 +205,10 @@ module rs_testbench;
         input int i
     );
         case (fu)
-            FU_ALU:     fu_rdy_alu[i]   = 1;
-            FU_MULT:    fu_rdy_mult[i]  = 1;
-            FU_LOAD:    fu_rdy_load[i]  = 1;
-            FU_STORE:   fu_rdy_store[i] = 1;
+            FU_ALU:     ex_in.fu_rdy_alu[i]   = 1;
+            FU_MULT:    ex_in.fu_rdy_mult[i]  = 1;
+            FU_LOAD:    ex_in.fu_rdy_load[i]  = 1;
+            FU_STORE:   ex_in.fu_rdy_store[i] = 1;
         endcase
     endtask
 
@@ -226,10 +217,10 @@ module rs_testbench;
         input int i
     );
         case (fu)
-            FU_ALU:     fu_rdy_alu[i]   = 0;
-            FU_MULT:    fu_rdy_mult[i]  = 0;
-            FU_LOAD:    fu_rdy_load[i]  = 0;
-            FU_STORE:   fu_rdy_store[i] = 0;
+            FU_ALU:     ex_in.fu_rdy_alu[i]   = 0;
+            FU_MULT:    ex_in.fu_rdy_mult[i]  = 0;
+            FU_LOAD:    ex_in.fu_rdy_load[i]  = 0;
+            FU_STORE:   ex_in.fu_rdy_store[i] = 0;
         endcase
     endtask
 
@@ -238,10 +229,7 @@ module rs_testbench;
         d_dat = '0;
         c_en = '0;
         c_ts = '0;
-        fu_rdy_alu = '0;
-        fu_rdy_mult = '0;
-        fu_rdy_load = '0;
-        fu_rdy_store = '0;
+        ex_in = '0;
     endtask
 
 
@@ -606,10 +594,7 @@ module rs_testbench;
         failed          = 0;
         d_en_cnt        = 0;
         d_dat           = '0;
-        fu_rdy_alu      = '0;
-        fu_rdy_mult     = '0;
-        fu_rdy_store    = '0;
-        fu_rdy_load     = '0;
+        ex_in           = '0;
         c_en            = '0;
         c_ts            = '0;
 

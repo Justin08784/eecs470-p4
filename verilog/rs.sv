@@ -37,10 +37,7 @@ module rs #(parameter
     input   ID_RESULT       [N-1:0] d_dat,
 
     // issue
-    input   logic       [NUM_FU_ALU-1:0]    fu_rdy_alu,
-    input   logic       [NUM_FU_MULT-1:0]   fu_rdy_mult,
-    input   logic       [NUM_FU_STORE-1:0]  fu_rdy_store,
-    input   logic       [NUM_FU_LOAD-1:0]   fu_rdy_load,
+    input   execute2rs                      ex_in,
 
     output  logic       [NUM_FU_ALU-1:0]    fu_vld_alu,
     output  logic       [NUM_FU_MULT-1:0]   fu_vld_mult,
@@ -167,28 +164,28 @@ module rs #(parameter
         .WIDTH  (NUM_FU_ALU),
         .REQS   (NUM_FU_ALU)
     ) sel_rdy_alu (
-        .req    (fu_rdy_alu),
+        .req    (ex_in.fu_rdy_alu),
         .gnt_bus(gbus_fu_rdy_alu)
     );
     psel_gen #(
         .WIDTH  (NUM_FU_MULT),
         .REQS   (NUM_FU_MULT)
     ) sel_rdy_mult (
-        .req    (fu_rdy_mult),
+        .req    (ex_in.fu_rdy_mult),
         .gnt_bus(gbus_fu_rdy_mult)
     );
     psel_gen #(
         .WIDTH  (NUM_FU_LOAD),
         .REQS   (NUM_FU_LOAD)
     ) sel_rdy_load (
-        .req    (fu_rdy_load),
+        .req    (ex_in.fu_rdy_load),
         .gnt_bus(gbus_fu_rdy_load)
     );     
     psel_gen #(
         .WIDTH  (NUM_FU_STORE),
         .REQS   (NUM_FU_STORE)
     ) sel_rdy_store (
-        .req    (fu_rdy_store),
+        .req    (ex_in.fu_rdy_store),
         .gnt_bus(gbus_fu_rdy_store)
     );
 

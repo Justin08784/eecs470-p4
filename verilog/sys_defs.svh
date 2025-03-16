@@ -494,7 +494,7 @@ typedef struct packed {
         // 1) only N dispatches, OR
         // 2) a different limit number of dispatches DIS_MAX: N ≤ DIS_MAX ≤ RS_SZ
         // (DIS_MAX will be a new sys_defs.svh constant) ?
-    // ID_RESULT   [N-1:0] d_dat, //shouldn't have dispatch feed to RS,
+    ID_RESULT   [`N-1:0] d_dat; //shouldn't have dispatch feed to RS,
         // - To: RS               //should come directly from dispatch
 } dispatch2rs;
 
@@ -585,6 +585,14 @@ typedef struct packed {
     PHYS_REG_IDX [`N-1:0]    t_old;
 } rob2retire;
 
+
+// By Execute
+typedef struct packed {
+    logic       [`NUM_FU_ALU-1:0]    fu_rdy_alu;
+    logic       [`NUM_FU_MULT-1:0]   fu_rdy_mult;
+    logic       [`NUM_FU_STORE-1:0]  fu_rdy_store;
+    logic       [`NUM_FU_LOAD-1:0]   fu_rdy_load;
+} execute2rs;
 
 // By Free List
 typedef struct packed {

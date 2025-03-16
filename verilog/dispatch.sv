@@ -48,7 +48,7 @@ always_comb begin
     
     //assigning output #'s
     decode_out.decode_d_en_cnt = (dispatch_cnt == 2) ? 2'b11 : ((dispatch_cnt == 1) ? 2'b01 : 2'b00);
-    rs_out.rs_d_en_cnt = dispatch_cnt;
+    rs_out.d_en_cnt = dispatch_cnt;
     rob_out.d_en_cnt = dispatch_cnt;
     lsq_out.lsq_d_en_cnt = dispatch_cnt; //this will likely need to be changed once memory operations are introduced
 end

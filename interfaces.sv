@@ -287,7 +287,7 @@ module dispatch #(parameter
     } rs_in,
 
     output struct packed {
-        logic       [$clog2(N):0] rs_d_en_cnt;
+        logic       [$clog2(N):0] d_en_cnt;
             // - To: RS
             // - Number of enabled dispatch lines? (replacement for d_vld)
             // - Question: permit
