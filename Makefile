@@ -244,9 +244,9 @@ build/fetch.cov: $(FETCH_FILES)
 build/fetch.vg: $(FETCH_FILES)
 
 MAP_TABLE_FILES = verilog/sys_defs.svh
-build/cdb.simv: $(MAP_TABLE_FILES)
-build/cdb.cov: $(MAP_TABLE_FILES)
-build/cdb.vg: $(MAP_TABLE_FILES)
+build/map_table.simv: $(MAP_TABLE_FILES)
+build/map_table.cov: $(MAP_TABLE_FILES)
+build/map_table.vg: $(MAP_TABLE_FILES)
 
 #################################
 # ---- Main CPU Definition ---- #
