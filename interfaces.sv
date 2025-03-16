@@ -85,7 +85,7 @@ module rs #(parameter
     input clock, reset, flush,
 
     // dispatch
-    output  logic       [$clog2(N):0] rs_scnt, // TODO: rename to rs_rdy_scnt
+    output  logic       [$clog2(N):0] rs_rdy_scnt, // TODO: rename to rs_rdy_scnt
         // To: dispatch
     input   ID_RESULT   [N-1:0] d_dat,
         // - From: dispatch

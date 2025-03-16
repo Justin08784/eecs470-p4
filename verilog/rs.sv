@@ -24,16 +24,16 @@ module rs #(parameter
 
     // dispatch
     /*
-    rs_scnt saturates at N (Why? A: even if we have more free RS entries 
+    rs_rdy_scnt saturates at N (Why? A: even if we have more free RS entries 
     than N, we can only dispatch at most N each cycle anyways).
 
     e.g. N = 2
-    logic [1:0] rs_scnt;
+    logic [1:0] rs_rdy_scnt;
     b00 +> b01 +> b10 (cannot increment further)
     0      1      2 
     */
-    output  logic           [$clog2(N):0] rs_scnt, // to dispatcher
-    input   logic           [$clog2(N):0] d_en_cnt,     // number of enabled dispatch lines? (from dispatcher; dep. on rs_scnt)
+    output  logic           [$clog2(N):0] rs_rdy_scnt, // to dispatcher
+    input   logic           [$clog2(N):0] d_en_cnt,     // number of enabled dispatch lines? (from dispatcher; dep. on rs_rdy_scnt)
     input   ID_RESULT       [N-1:0] d_dat,
 
     // issue
@@ -46,9 +46,7 @@ module rs #(parameter
     `endif 
 
     // complete (CDB)
-    input   logic           [N-1:0] c_en,
-    input   PHYS_REG_IDX    [N-1:0] c_ts
-
+    input execute2complete  c_in
 );
     RS_ENTRY [RS_SZ-1:0]       entries, entries_n; // ms1 test: remove one RS entry (caught)
     `ifdef DEBUG
@@ -85,9 +83,9 @@ module rs #(parameter
 
             // match any tag in CDB?
             for (int n = 0; n < N; ++n) begin
-                if (c_en[n]) begin
-                    match_t1 |= entries[rs].dat.t1 == c_ts[n];
-                    match_t2 |= entries[rs].dat.t2 == c_ts[n];
+                if (c_in.c_en[n]) begin
+                    match_t1 |= entries[rs].dat.t1 == c_in.c_ts[n];
+                    match_t2 |= entries[rs].dat.t2 == c_in.c_ts[n];
                 end
             end
 
@@ -274,7 +272,7 @@ module rs #(parameter
         ~busy_vec
         | issd_vec; // an issued insn will go to EX and free its entry
     assign rs_cnt = $countones(free_entries);
-    assign rs_scnt = rs_cnt > N ? N : rs_cnt;
+    assign rs_rdy_scnt = rs_cnt > N ? N : rs_cnt;
 
 
     // select free entries

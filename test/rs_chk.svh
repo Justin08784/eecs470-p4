@@ -17,14 +17,13 @@ module rs_chk #(parameter
     input reset,
     input flush,
     // dispatch
-    input   logic           [$clog2(N):0] rs_scnt, // to dispatcher
-    input   logic           [$clog2(N):0] d_en_cnt,     // number of enabled dispatch lines? (from dispatcher; dep. on rs_scnt)
+    input   logic           [$clog2(N):0] rs_rdy_scnt, // to dispatcher
+    input   logic           [$clog2(N):0] d_en_cnt,     // number of enabled dispatch lines? (from dispatcher; dep. on rs_rdy_scnt)
     input   ID_RESULT       [N-1:0] d_dat,
     // issue
     input   execute2rs      ex_in,
     // complete
-    input   logic           [N-1:0] c_en,
-    input   PHYS_REG_IDX    [N-1:0] c_ts,
+    input   execute2complete c_in,
 
     // delicious spaghetti for print debugging
     // input   logic           [RS_SZ-1:0]   to_t1_rdy_dut,
@@ -92,17 +91,16 @@ module rs_chk #(parameter
     endfunction
 
     struct packed {
-        logic           [$clog2(N):0] d_en_cnt;     // number of enabled dispatch lines? (from dispatcher; dep. on rs_scnt)
+        logic           [$clog2(N):0] d_en_cnt;     // number of enabled dispatch lines? (from dispatcher; dep. on rs_rdy_scnt)
         ID_RESULT       [N-1:0] d_dat;
         // issue
         execute2rs      ex_in;
         // complete
-        logic           [N-1:0] c_en;
-        PHYS_REG_IDX    [N-1:0] c_ts;
+        execute2complete c_in;
     } ins_pre, ins_cur; 
 
     struct packed {
-        logic       [$clog2(N):0]       rs_scnt;
+        logic       [$clog2(N):0]       rs_rdy_scnt;
         
         rs2execute  ex_out;
     } outs_pre, outs_cur; 
@@ -112,19 +110,18 @@ module rs_chk #(parameter
         d_en_cnt:d_en_cnt,
         d_dat:d_dat,
         ex_in:ex_in,
-        c_en:c_en,
-        c_ts:c_ts
+        c_in:c_in
     };
 
     assign outs_cur = '{
-        rs_scnt:rs_scnt,
+        rs_rdy_scnt:rs_rdy_scnt,
         ex_out:ex_out_dut
     };
     
     int num_free_fus    [FU_IDX_NUM];
     int num_issue_fus   [FU_IDX_NUM];
 
-    int rs_scnt_sva;
+    int rs_rdy_scnt_sva;
     RS_ENTRY [RS_SZ-1:0] 
         entries_pre,      // prev value (updated to entries_cur on posedge)
         entries_mut,      // scratchpad (entries_pre with some modifications)
@@ -210,10 +207,10 @@ module rs_chk #(parameter
 
         // check ready correctness 
         cdb_tags_pre.delete();
-        foreach (c_ts[i]) begin
-            if (!ins_pre.c_en[i])
+        foreach (c_in.c_ts[i]) begin
+            if (!ins_pre.c_in.c_en[i])
                 continue;
-            cdb_tags_pre[ins_pre.c_ts[i]] = 1;
+            cdb_tags_pre[ins_pre.c_in.c_ts[i]] = 1;
         end
         ready_correct = 1;
         for (int rs = 0, PHYS_REG_IDX t1 = 0, PHYS_REG_IDX t2 = 0; rs < RS_SZ; ++rs) begin
@@ -244,11 +241,11 @@ module rs_chk #(parameter
         for (int rs = 0, PHYS_REG_IDX t1 = 0, PHYS_REG_IDX t2 = 0; rs < RS_SZ; ++rs) begin
             t1 = entries_pre[rs].dat.t1;
             t2 = entries_pre[rs].dat.t2;
-            foreach (ins_pre.c_en[i]) begin
-                if (!ins_pre.c_en[i])
+            foreach (ins_pre.c_in.c_en[i]) begin
+                if (!ins_pre.c_in.c_en[i])
                     continue;
-                entries_mut[rs].dat.t1_rdy |= (ins_pre.c_ts[i] == t1);
-                entries_mut[rs].dat.t2_rdy |= (ins_pre.c_ts[i] == t2);
+                entries_mut[rs].dat.t1_rdy |= (ins_pre.c_in.c_ts[i] == t1);
+                entries_mut[rs].dat.t2_rdy |= (ins_pre.c_in.c_ts[i] == t2);
             end
         end
 
