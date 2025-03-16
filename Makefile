@@ -238,11 +238,6 @@ build/prf.simv: $(PRF_FILES)
 build/prf.cov: $(PRF_FILES)
 build/prf.vg: $(PRF_FILES)
 
-CDB_FILES = verilog/sys_defs.svh
-build/cdb.simv: $(CDB_FILES)
-build/cdb.cov: $(CDB_FILES)
-build/cdb.vg: $(CDB_FILES)
-
 FETCH_FILES = verilog/sys_defs.svh verilog/mem.sv verilog/icache.sv verilog/memDP.sv
 build/fetch.simv: $(FETCH_FILES)
 build/fetch.cov: $(FETCH_FILES)
