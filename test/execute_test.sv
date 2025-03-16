@@ -6,21 +6,26 @@
 
 
 module execute_test();
+    localparam N=`N;
+    localparam NUM_FU_ALU=`NUM_FU_ALU;
+    localparam NUM_FU_MULT=`NUM_FU_MULT;
+    localparam NUM_FU_LOAD=`NUM_FU_LOAD;
+    localparam NUM_FU_STORE=`NUM_FU_STORE;
 
-    logic              clock, reset;
-    logic       [NUM_FU_ALU-1:0]    fu_vld_alu,
-    logic       [NUM_FU_MULT-1:0]   fu_vld_mult,
-    logic       [NUM_FU_STORE-1:0]  fu_vld_store,
-    logic       [NUM_FU_LOAD-1:0]   fu_vld_load,
-    ID_RESULT   [NUM_FU_ALU-1:0]    fu_dat_alu,
-    ID_RESULT   [NUM_FU_MULT-1:0]   fu_dat_mult,
-    ID_RESULT   [NUM_FU_STORE-1:0]  fu_dat_store,
-    ID_RESULT   [NUM_FU_LOAD-1:0]   fu_dat_load,
+    logic                           clock, reset;
+    logic       [NUM_FU_ALU-1:0]    fu_vld_alu;
+    logic       [NUM_FU_MULT-1:0]   fu_vld_mult;
+    logic       [NUM_FU_STORE-1:0]  fu_vld_store;
+    logic       [NUM_FU_LOAD-1:0]   fu_vld_load;
+    ID_RESULT   [NUM_FU_ALU-1:0]    fu_dat_alu;
+    ID_RESULT   [NUM_FU_MULT-1:0]   fu_dat_mult;
+    ID_RESULT   [NUM_FU_STORE-1:0]  fu_dat_store;
+    ID_RESULT   [NUM_FU_LOAD-1:0]   fu_dat_load;
 
-    logic       [NUM_FU_ALU-1:0]    fu_rdy_alu,
-    logic       [NUM_FU_MULT-1:0]   fu_rdy_mult,
-    logic       [NUM_FU_STORE-1:0]  fu_rdy_store,
-    logic       [NUM_FU_LOAD-1:0]   fu_rdy_load,
+    logic       [NUM_FU_ALU-1:0]    fu_rdy_alu;
+    logic       [NUM_FU_MULT-1:0]   fu_rdy_mult;
+    logic       [NUM_FU_STORE-1:0]  fu_rdy_store;
+    logic       [NUM_FU_LOAD-1:0]   fu_rdy_load;
 
     logic       [N-1:0]             c_en;
     PHYS_REG_IDX[N-1:0]             c_ts;
