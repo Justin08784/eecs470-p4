@@ -24,16 +24,16 @@ module rs #(parameter
 
     // dispatch
     /*
-    rs_scnt saturates at N (Why? A: even if we have more free RS entries 
+    rs_rdy_scnt saturates at N (Why? A: even if we have more free RS entries 
     than N, we can only dispatch at most N each cycle anyways).
 
     e.g. N = 2
-    logic [1:0] rs_scnt;
+    logic [1:0] rs_rdy_scnt;
     b00 +> b01 +> b10 (cannot increment further)
     0      1      2 
     */
-    output  logic           [$clog2(N):0] rs_scnt, // to dispatcher
-    input   logic           [$clog2(N):0] d_en_cnt,     // number of enabled dispatch lines? (from dispatcher; dep. on rs_scnt)
+    output  logic           [$clog2(N):0] rs_rdy_scnt, // to dispatcher
+    input   logic           [$clog2(N):0] d_en_cnt,     // number of enabled dispatch lines? (from dispatcher; dep. on rs_rdy_scnt)
     input   ID_RESULT       [N-1:0] d_dat,
 
     // issue
@@ -272,7 +272,7 @@ module rs #(parameter
         ~busy_vec
         | issd_vec; // an issued insn will go to EX and free its entry
     assign rs_cnt = $countones(free_entries);
-    assign rs_scnt = rs_cnt > N ? N : rs_cnt;
+    assign rs_rdy_scnt = rs_cnt > N ? N : rs_cnt;
 
 
     // select free entries

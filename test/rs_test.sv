@@ -26,8 +26,8 @@ module rs_testbench;
     logic flush;
 
 
-    logic           [$clog2(N):0] rs_scnt;  // to dispatcher
-    logic           [$clog2(N):0] d_en_cnt; // number of enabled dispatch lines? (from dispatcher; dep. on rs_scnt)
+    logic           [$clog2(N):0] rs_rdy_scnt;  // to dispatcher
+    logic           [$clog2(N):0] d_en_cnt; // number of enabled dispatch lines? (from dispatcher; dep. on rs_rdy_scnt)
     ID_RESULT       [N-1:0] d_dat;
     // issue
     execute2rs      ex_in; // from POV of rs
@@ -48,7 +48,7 @@ module rs_testbench;
         .reset(reset),
         .flush(1'b0),
  
-        .rs_scnt(rs_scnt),
+        .rs_rdy_scnt(rs_rdy_scnt),
         .d_en_cnt(d_en_cnt),
         .d_dat(d_dat),
  
@@ -77,7 +77,7 @@ module rs_testbench;
     //     .reset(reset),
     //     .flush(1'b0),
 
-    //     .rs_scnt(rs_scnt),
+    //     .rs_rdy_scnt(rs_rdy_scnt),
     //     .d_en_cnt(d_en_cnt),
     //     .d_dat(d_dat),
 
@@ -117,7 +117,7 @@ module rs_testbench;
         .reset(reset),
         .flush(1'b0),
 
-        .rs_scnt(rs_scnt),
+        .rs_rdy_scnt(rs_rdy_scnt),
         .d_en_cnt(d_en_cnt),
         .d_dat(d_dat),
 

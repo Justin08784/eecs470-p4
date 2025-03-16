@@ -17,8 +17,8 @@ module rs_chk #(parameter
     input reset,
     input flush,
     // dispatch
-    input   logic           [$clog2(N):0] rs_scnt, // to dispatcher
-    input   logic           [$clog2(N):0] d_en_cnt,     // number of enabled dispatch lines? (from dispatcher; dep. on rs_scnt)
+    input   logic           [$clog2(N):0] rs_rdy_scnt, // to dispatcher
+    input   logic           [$clog2(N):0] d_en_cnt,     // number of enabled dispatch lines? (from dispatcher; dep. on rs_rdy_scnt)
     input   ID_RESULT       [N-1:0] d_dat,
     // issue
     input   execute2rs      ex_in,
@@ -91,7 +91,7 @@ module rs_chk #(parameter
     endfunction
 
     struct packed {
-        logic           [$clog2(N):0] d_en_cnt;     // number of enabled dispatch lines? (from dispatcher; dep. on rs_scnt)
+        logic           [$clog2(N):0] d_en_cnt;     // number of enabled dispatch lines? (from dispatcher; dep. on rs_rdy_scnt)
         ID_RESULT       [N-1:0] d_dat;
         // issue
         execute2rs      ex_in;
@@ -100,7 +100,7 @@ module rs_chk #(parameter
     } ins_pre, ins_cur; 
 
     struct packed {
-        logic       [$clog2(N):0]       rs_scnt;
+        logic       [$clog2(N):0]       rs_rdy_scnt;
         
         rs2execute  ex_out;
     } outs_pre, outs_cur; 
@@ -114,14 +114,14 @@ module rs_chk #(parameter
     };
 
     assign outs_cur = '{
-        rs_scnt:rs_scnt,
+        rs_rdy_scnt:rs_rdy_scnt,
         ex_out:ex_out_dut
     };
     
     int num_free_fus    [FU_IDX_NUM];
     int num_issue_fus   [FU_IDX_NUM];
 
-    int rs_scnt_sva;
+    int rs_rdy_scnt_sva;
     RS_ENTRY [RS_SZ-1:0] 
         entries_pre,      // prev value (updated to entries_cur on posedge)
         entries_mut,      // scratchpad (entries_pre with some modifications)

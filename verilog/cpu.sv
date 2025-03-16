@@ -431,8 +431,8 @@ module cpu (
     //              Reservation Station             //
     //                                              //
     //////////////////////////////////////////////////  
-    // logic       [$clog2(`N):0] rs_scnt;  // to dispatcher
-    // logic       [$clog2(`N):0] d_en_cnt; // number of enabled dispatch lines? (from dispatcher; dep. on rs_scnt)
+    // logic       [$clog2(`N):0] rs_rdy_scnt;  // to dispatcher
+    // logic       [$clog2(`N):0] d_en_cnt; // number of enabled dispatch lines? (from dispatcher; dep. on rs_rdy_scnt)
     // ID_RESULT   [`N-1:0] d_dat;
 
     // logic       [`NUM_FU_ALU-1:0]    fu_rdy_alu;
@@ -457,7 +457,7 @@ module cpu (
         // .reset(reset),
         // .flush(),
  
-        // .rs_scnt(rs2dis.rs_rdy_scnt),
+        // .rs_rdy_scnt(rs2dis.rs_rdy_scnt),
         // .d_en_cnt(dis2rs.d_en_cnt),
         // .d_dat(d_dat),
  
