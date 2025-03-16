@@ -47,7 +47,7 @@ always_comb begin
     dispatch_cnt = (reset || flush) ? '0 : (`MIN(dispatch_cnt,2));
     
     //assigning output #'s
-    decode_out.decode_d_en_cnt = (dispatch_cnt == 2) ? 2'b11 : ((dispatch_cnt == 1) ? 2'b01 : 2'b00);
+    decode_out.dispatch_rdy_cnt = (dispatch_cnt == 2) ? 2'b11 : ((dispatch_cnt == 1) ? 2'b01 : 2'b00);
     rs_out.d_en_cnt = dispatch_cnt;
     rob_out.d_en_cnt = dispatch_cnt;
     lsq_out.lsq_d_en_cnt = dispatch_cnt; //this will likely need to be changed once memory operations are introduced

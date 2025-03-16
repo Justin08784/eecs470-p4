@@ -223,7 +223,7 @@ build/fifo.simv: $(FIFO_FILES)
 build/fifo.cov: $(FIFO_FILES)
 synth/fifo.vg: $(FIFO_FILES)
 
-ID_FILES = verilog/sys_defs.svh
+ID_FILES = verilog/sys_defs.svh verilog/fifo.sv
 build/stage_id_p4.simv: $(ID_FILES)
 build/stage_id_p4.cov: $(ID_FILES)
 synth/stage_id_p4.vg: $(ID_FILES)
