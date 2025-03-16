@@ -25,7 +25,7 @@ module map_table #(parameter
     // dispatch
     input dispatch2map_table d_in,
     output map_table2dispatch dispatch_out,
-    output map_table2rob rob_out
+    output map_table2ROB rob_out
 );
     localparam NUM_ARCH_REG = 32;
     struct packed {
