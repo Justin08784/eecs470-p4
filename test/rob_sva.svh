@@ -32,18 +32,22 @@ module rob_sva #(
         int idx;
         logic [$clog2(`PHYS_REG_SZ_R10K)-1:0] tag;
         logic [$clog2(`PHYS_REG_SZ_R10K)-1:0] t_old;
+        REG_IDX dst;
     } entries [$], tmp_entry;
 
     logic [$clog2(ROB_SZ):0] used;    // how full the buffer should be
     logic [$clog2(ROB_SZ):0] free;    // how full the buffer should be
     assign free = ROB_SZ - used;
 
-    struct packed {
-        logic [$clog2(N):0]     r_en_cnt;
+    // struct packed {
+    //     logic [$clog2(N):0]     r_en_cnt;
 
-        PHYS_REG_IDX [N-1:0]    tag;
-        PHYS_REG_IDX [N-1:0]    t_old;
-    } r_out_sva;
+    //     PHYS_REG_IDX [N-1:0]    tag;
+    //     PHYS_REG_IDX [N-1:0]    t_old;
+    //     REG_IDX     [N-1:0]            dst; // TODO: not handled by ROB
+    // } r_out_sva;
+
+    rob2retire r_out_sva;
     struct packed {
         logic [$clog2(N):0]     rob_rdy_scnt;
             // To: dispatch
@@ -70,6 +74,7 @@ module rob_sva #(
             
             r_out_sva.tag[i] = tmp_entry.tag;
             r_out_sva.t_old[i] = tmp_entry.t_old;
+            r_out_sva.dst[i] = tmp_entry.dst;
             cpls.delete(tmp_entry.idx);
             entries.pop_front();
         end
@@ -83,7 +88,8 @@ module rob_sva #(
             entries.push_back('{
                 idx:wr_idx,
                 tag:d_in.tag[i],
-                t_old:d_in.t_old[i]
+                t_old:d_in.t_old[i],
+                dst:d_in.dst[i]
             });
             cpls[wr_idx] = 0;
             wr_idx = (wr_idx + 1) % ROB_SZ;
@@ -116,10 +122,10 @@ module rob_sva #(
         begin
             $display("\n\033[31m@@@ Failed at time %4d\033[0m\n", $time);
             for (int i = 0; i < N; ++i) begin
-                $display("r_out[%d]: (%d, %d)", i, r_out.tag[i], r_out.t_old[i]);
+                $display("r_out[%d]: (%d, %d, %d)", i, r_out.tag[i], r_out.t_old[i], r_out.dst[i]);
             end
             for (int i = 0; i < N; ++i) begin
-                $display("r_out_sva[%d]: (%d, %d)", i, r_out_sva.tag[i], r_out_sva.t_old[i]);
+                $display("r_out_sva[%d]: (%d, %d, %d)", i, r_out_sva.tag[i], r_out_sva.t_old[i], r_out_sva.dst[i]);
             end
 
             $display("d_out.rob_rdy_scnt: %d", d_out.rob_rdy_scnt);
@@ -172,13 +178,15 @@ module rob_sva #(
             // Step 1) Dispatch
             logic [$clog2(`PHYS_REG_SZ_R10K)-1:0] tag_in;
             logic [$clog2(`PHYS_REG_SZ_R10K)-1:0] t_old_in;
+            REG_IDX dst_in;
             int idx_in; 
             int cnt_idx; (
                 d_in.d_en_cnt > i,
                 idx_in = d_out.rob_idxs[i],
                 cnt_idx= (r_count + used + i),
                 tag_in = d_in.tag[i],
-                t_old_in = d_in.t_old[i]
+                t_old_in = d_in.t_old[i],
+                dst_in = d_in.dst[i]
             )
             // Step 2) eventually Complete
             ##[1:$] (
@@ -196,7 +204,7 @@ module rob_sva #(
                 //     ( (r_out.tag[0]   == tag_in && r_out.t_old[0]   == t_old_in)
                 //     || (r_out.tag[1]   == tag_in && r_out.t_old[1]   == t_old_in))
             )
-            |-> (r_out.tag[cnt_idx - r_count] === tag_in) && (r_out.t_old[cnt_idx - r_count] === t_old_in);
+            |-> (r_out.tag[cnt_idx - r_count] === tag_in) && (r_out.t_old[cnt_idx - r_count] === t_old_in) && (r_out.dst[cnt_idx - r_count] === dst_in);
             // $display("OK: dispatch %0d completed+retired", idx_in); 
             // or do a final check that they match, or simply succeed silently
         endproperty

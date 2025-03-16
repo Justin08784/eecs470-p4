@@ -189,7 +189,7 @@ GREP = grep -E --color=auto
 # ---- Modules to Test ---- #
 
 # TODO: add more modules here
-MODULES = cpu mult rob rs fifo free_list dispatch cdb prf map_table
+MODULES = cpu mult rob rs fifo free_list dispatch prf map_table
 
 # TODO: update this if you add more header files
 ALL_HEADERS = $(CPU_HEADERS)
@@ -238,20 +238,15 @@ build/prf.simv: $(PRF_FILES)
 build/prf.cov: $(PRF_FILES)
 build/prf.vg: $(PRF_FILES)
 
-CDB_FILES = verilog/sys_defs.svh
-build/cdb.simv: $(CDB_FILES)
-build/cdb.cov: $(CDB_FILES)
-build/cdb.vg: $(CDB_FILES)
-
 FETCH_FILES = verilog/sys_defs.svh verilog/mem.sv verilog/icache.sv verilog/memDP.sv
 build/fetch.simv: $(FETCH_FILES)
 build/fetch.cov: $(FETCH_FILES)
 build/fetch.vg: $(FETCH_FILES)
 
 MAP_TABLE_FILES = verilog/sys_defs.svh
-build/cdb.simv: $(MAP_TABLE_FILES)
-build/cdb.cov: $(MAP_TABLE_FILES)
-build/cdb.vg: $(MAP_TABLE_FILES)
+build/map_table.simv: $(MAP_TABLE_FILES)
+build/map_table.cov: $(MAP_TABLE_FILES)
+build/map_table.vg: $(MAP_TABLE_FILES)
 
 #################################
 # ---- Main CPU Definition ---- #
@@ -288,7 +283,6 @@ CPU_SOURCES = verilog/cpu.sv \
 			  verilog/rob.sv \
 			  verilog/prf.sv \
 			  verilog/free_list.sv \
-			  verilog/cdb.sv \
 			  verilog/fifo.sv
 
 build/cpu.simv: $(CPU_SOURCES) $(CPU_HEADERS) $(CPU_TESTBENCH)

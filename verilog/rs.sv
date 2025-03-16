@@ -24,41 +24,28 @@ module rs #(parameter
 
     // dispatch
     /*
-    rs_scnt saturates at N (Why? A: even if we have more free RS entries 
+    rs_rdy_scnt saturates at N (Why? A: even if we have more free RS entries 
     than N, we can only dispatch at most N each cycle anyways).
 
     e.g. N = 2
-    logic [1:0] rs_scnt;
+    logic [1:0] rs_rdy_scnt;
     b00 +> b01 +> b10 (cannot increment further)
     0      1      2 
     */
-    output  logic           [$clog2(N):0] rs_scnt, // to dispatcher
-    input   logic           [$clog2(N):0] d_en_cnt,     // number of enabled dispatch lines? (from dispatcher; dep. on rs_scnt)
-    input   ID_RESULT       [N-1:0] d_dat,
+    output  rs2dispatch     d_out,
+    input   dispatch2rs     d_in,
 
     // issue
-    input   logic       [NUM_FU_ALU-1:0]    fu_rdy_alu,
-    input   logic       [NUM_FU_MULT-1:0]   fu_rdy_mult,
-    input   logic       [NUM_FU_STORE-1:0]  fu_rdy_store,
-    input   logic       [NUM_FU_LOAD-1:0]   fu_rdy_load,
+    input   execute2rs                      ex_in,
+    output  rs2execute                      ex_out,
 
-    output  logic       [NUM_FU_ALU-1:0]    fu_vld_alu,
-    output  logic       [NUM_FU_MULT-1:0]   fu_vld_mult,
-    output  logic       [NUM_FU_STORE-1:0]  fu_vld_store,
-    output  logic       [NUM_FU_LOAD-1:0]   fu_vld_load,
-    output  ID_RESULT   [NUM_FU_ALU-1:0]    fu_dat_alu,
-    output  ID_RESULT   [NUM_FU_MULT-1:0]   fu_dat_mult,
-    output  ID_RESULT   [NUM_FU_STORE-1:0]  fu_dat_store,
-    output  ID_RESULT   [NUM_FU_LOAD-1:0]   fu_dat_load,
 
     `ifdef DEBUG
     output  RS_ENTRY    [RS_SZ-1:0]       entries_dbg,
     `endif 
 
     // complete (CDB)
-    input   logic           [N-1:0] c_en,
-    input   PHYS_REG_IDX    [N-1:0] c_ts
-
+    input execute2complete  c_in
 );
     RS_ENTRY [RS_SZ-1:0]       entries, entries_n; // ms1 test: remove one RS entry (caught)
     `ifdef DEBUG
@@ -95,9 +82,9 @@ module rs #(parameter
 
             // match any tag in CDB?
             for (int n = 0; n < N; ++n) begin
-                if (c_en[n]) begin
-                    match_t1 |= entries[rs].dat.t1 == c_ts[n];
-                    match_t2 |= entries[rs].dat.t2 == c_ts[n];
+                if (c_in.c_en[n]) begin
+                    match_t1 |= entries[rs].dat.t1 == c_in.c_ts[n];
+                    match_t2 |= entries[rs].dat.t2 == c_in.c_ts[n];
                 end
             end
 
@@ -167,28 +154,28 @@ module rs #(parameter
         .WIDTH  (NUM_FU_ALU),
         .REQS   (NUM_FU_ALU)
     ) sel_rdy_alu (
-        .req    (fu_rdy_alu),
+        .req    (ex_in.fu_rdy_alu),
         .gnt_bus(gbus_fu_rdy_alu)
     );
     psel_gen #(
         .WIDTH  (NUM_FU_MULT),
         .REQS   (NUM_FU_MULT)
     ) sel_rdy_mult (
-        .req    (fu_rdy_mult),
+        .req    (ex_in.fu_rdy_mult),
         .gnt_bus(gbus_fu_rdy_mult)
     );
     psel_gen #(
         .WIDTH  (NUM_FU_LOAD),
         .REQS   (NUM_FU_LOAD)
     ) sel_rdy_load (
-        .req    (fu_rdy_load),
+        .req    (ex_in.fu_rdy_load),
         .gnt_bus(gbus_fu_rdy_load)
     );     
     psel_gen #(
         .WIDTH  (NUM_FU_STORE),
         .REQS   (NUM_FU_STORE)
     ) sel_rdy_store (
-        .req    (fu_rdy_store),
+        .req    (ex_in.fu_rdy_store),
         .gnt_bus(gbus_fu_rdy_store)
     );
 
@@ -205,10 +192,10 @@ module rs #(parameter
         fu2issuer_mult  = '0;
         fu2issuer_load  = '0;
         fu2issuer_store = '0;
-        fu_vld_alu      = '0;
-        fu_vld_mult     = '0;
-        fu_vld_store    = '0;
-        fu_vld_load     = '0;
+        ex_out.fu_vld_alu      = '0;
+        ex_out.fu_vld_mult     = '0;
+        ex_out.fu_vld_store    = '0;
+        ex_out.fu_vld_load     = '0;
 
         foreach (gbus_fu_rdy_alu[i, j]) begin
             if (gbus_fu_rdy_alu[i][j]) begin
@@ -218,9 +205,9 @@ module rs #(parameter
                 if a gnt_bus row is actually used?
                 \/ \/ \/ \/
                 */
-                fu_vld_alu[j]       = |gbus_can_issue_alu[i];
+                ex_out.fu_vld_alu[j]       = |gbus_can_issue_alu[i];
                 // for (int rs = 0; rs < RS_SZ; ++rs) begin
-                //     fu_dat_alu[j]   |= entries[i];
+                //     ex_out.fu_dat_alu[j]   |= entries[i];
                 // end
                 to_issue            |= gbus_can_issue_alu[i];
             end
@@ -228,14 +215,14 @@ module rs #(parameter
         foreach (gbus_fu_rdy_mult[i, j]) begin
             if (gbus_fu_rdy_mult[i][j]) begin
                 fu2issuer_mult[j]   |= gbus_can_issue_mult[i];
-                fu_vld_mult[j]      = |gbus_can_issue_mult[i]; // [MISSING] ms1 test: change i to j (not caught)
+                ex_out.fu_vld_mult[j]      = |gbus_can_issue_mult[i]; // [MISSING] ms1 test: change i to j (not caught)
                 to_issue            |= gbus_can_issue_mult[i];
             end
         end
         foreach (gbus_fu_rdy_load[i, j]) begin
             if (gbus_fu_rdy_load[i][j]) begin
                 fu2issuer_load[j]   |= gbus_can_issue_load[i];
-                fu_vld_load[j]      = |gbus_can_issue_load[i];
+                ex_out.fu_vld_load[j]      = |gbus_can_issue_load[i];
                 to_issue            |= gbus_can_issue_load[i];
 
             end
@@ -243,35 +230,35 @@ module rs #(parameter
         foreach (gbus_fu_rdy_store[i, j]) begin
             if (gbus_fu_rdy_store[i][j]) begin
                 fu2issuer_store[j]  |= gbus_can_issue_store[i];
-                fu_vld_store[j]     = |gbus_can_issue_store[i];
+                ex_out.fu_vld_store[j]     = |gbus_can_issue_store[i];
                 to_issue            |= gbus_can_issue_store[i];
             end
         end
     end
 
     always_comb begin
-        fu_dat_alu      = '0;
-        fu_dat_mult     = '0;
-        fu_dat_store    = '0;
-        fu_dat_load     = '0;
+        ex_out.fu_dat_alu      = '0;
+        ex_out.fu_dat_mult     = '0;
+        ex_out.fu_dat_store    = '0;
+        ex_out.fu_dat_load     = '0;
         foreach (fu2issuer_alu[fu, rs]) begin
             if (fu2issuer_alu[fu][rs]) begin // [MISSING] ms1 test: Remove "!" from if condition (not caught)
-                fu_dat_alu[fu] |= entries[rs].dat;
+                ex_out.fu_dat_alu[fu] |= entries[rs].dat;
             end
         end
         foreach (fu2issuer_mult[fu, rs]) begin
             if (fu2issuer_mult[fu][rs]) begin
-                fu_dat_mult[fu] |= entries[rs].dat;
+                ex_out.fu_dat_mult[fu] |= entries[rs].dat;
             end
         end
         foreach (fu2issuer_load[fu, rs]) begin
             if (fu2issuer_load[fu][rs]) begin
-                fu_dat_load[fu] |= entries[rs].dat;
+                ex_out.fu_dat_load[fu] |= entries[rs].dat;
             end
         end
         foreach (fu2issuer_store[fu, rs]) begin
             if (fu2issuer_store[fu][rs]) begin
-                fu_dat_store[fu] |= entries[rs].dat;
+                ex_out.fu_dat_store[fu] |= entries[rs].dat;
             end
         end
     end
@@ -284,7 +271,7 @@ module rs #(parameter
         ~busy_vec
         | issd_vec; // an issued insn will go to EX and free its entry
     assign rs_cnt = $countones(free_entries);
-    assign rs_scnt = rs_cnt > N ? N : rs_cnt;
+    assign d_out.rs_rdy_scnt = rs_cnt > N ? N : rs_cnt;
 
 
     // select free entries
@@ -301,7 +288,7 @@ module rs #(parameter
     always_comb begin
         d2entry = '0;
         foreach (d2entry[i]) begin
-            if (i < d_en_cnt) begin
+            if (i < d_in.d_en_cnt) begin
                 d2entry[i] |= gbus_free[i];
             end
         end
@@ -337,7 +324,7 @@ module rs #(parameter
                     continue;
                 entries_n[rs].busy   = 1;
                 entries_n[rs].issued = 0;
-                entries_n[rs].dat    = d_dat[n];
+                entries_n[rs].dat    = d_in.d_dat[n];
             end
         end
     end

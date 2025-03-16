@@ -85,7 +85,7 @@ module rs #(parameter
     input clock, reset, flush,
 
     // dispatch
-    output  logic       [$clog2(N):0] rs_scnt, // TODO: rename to rs_rdy_scnt
+    output  logic       [$clog2(N):0] rs_rdy_scnt, // TODO: rename to rs_rdy_scnt
         // To: dispatch
     input   ID_RESULT   [N-1:0] d_dat,
         // - From: dispatch
@@ -287,7 +287,7 @@ module dispatch #(parameter
     } rs_in,
 
     output struct packed {
-        logic       [$clog2(N):0] rs_d_en_cnt;
+        logic       [$clog2(N):0] d_en_cnt;
             // - To: RS
             // - Number of enabled dispatch lines? (replacement for d_vld)
             // - Question: permit
@@ -363,6 +363,7 @@ module dispatch #(parameter
     //the dest reg (from decode), and output the paired
     //item to the map table for it to decide how to update.
 );
+endmodule
 
 /* 
 ================================================
