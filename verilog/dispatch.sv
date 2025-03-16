@@ -4,32 +4,32 @@
 module dispatch #(parameter 
     N=`N
 ) (
-    input clock, reset, flush,
-    output ID_RESULT [N-1:0] d_dat,
+    input   clock, reset, flush,
+    output  ID_RESULT [N-1:0] d_dat,
 
     // DECODE
-    input decode2dispatch decode_in,
-    output dispatch2decode decode_out,
+    input   decode2dispatch decode_in,
+    output  dispatch2decode decode_out,
     
     // RS
-    input rs2dispatch rs_in,
-    output dispatch2rs rs_out,
+    input   rs2dispatch rs_in,
+    output  dispatch2rs rs_out,
 
     // ROB
-    input rob2dispatch rob_in,
-    output dispatch2rob rob_out,
+    input   rob2dispatch rob_in,
+    output  dispatch2rob rob_out,
     
     // Free list
-    input free_list2dispatch free_in,
-    output dispatch2free_list free_out,
+    input   free_list2dispatch free_in,
+    output  dispatch2free_list free_out,
 
     // LSQ
-    input lsq2dispatch lsq_in,
-    output dispatch2lsq lsq_out,
+    input   lsq2dispatch lsq_in,
+    output  dispatch2lsq lsq_out,
     
     // Map table
-    input map_table2dispatch map_in,
-    output dispatch2map_table map_out
+    input   map_table2dispatch map_in,
+    output  dispatch2map_table map_out
     
     //dispatch shouldn't need to read from the map table.
     //dispatch will pair a new tag (from free list) with
