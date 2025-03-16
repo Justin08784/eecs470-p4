@@ -3,12 +3,12 @@
 module prf #(
     parameter WIDTH      = 32,
     parameter DEPTH      = `PHYS_REG_SZ_R10K,
-    parameter N = `N,
+    parameter N = 2,
     parameter BYPASS_EN  = 0   // 0: Read data will update at positive edge
                                // 1: Read data will update combinationally if
                                //    write to same address
    )(
-    input clock, reset, flush, // QUESTION: do we need reset? or should we force write to happen before read at the same addr?
+    input clock, //reset, flush, // QUESTION: do we need reset? or should we force write to happen before read at the same addr?
     // retire ??
 
     // complete (write)
@@ -48,67 +48,61 @@ module prf #(
     // dispatch ??
 );
 
-logic [DEPTH-1:0][WIDTH-1:0]  phys_reg_file;
-genvar i;
+    logic [DEPTH-1:0][WIDTH-1:0]  phys_reg_file;
 
-///////////////////////////////////////////////////////////////////
-////////////////////////// Read Logic /////////////////////////////
-///////////////////////////////////////////////////////////////////
-
-always_comb begin
-    for (int i = 0; i < N; i++) begin
-        if (BYPASS_EN != 0) begin : bypass_path
-            if (s_en[i]) begin
-                // s_v1s[i] = phys_reg_file[s_t1s[i]];
-                // s_v2s[i] = phys_reg_file[s_t2s[i]];
-                for (int j = 0; j < N; j++) begin
-                    if (s_t1s[i] == `ZERO_REG) begin
-                        s_v1s[i] = '0;
-                    end else begin
-                        if (c_en[j] && (s_t1s[i] == c_ts[j])) begin
-                            s_v1s[i] = c_vs[j];
-                        end
-                        else
-                            s_v1s[i] = phys_reg_file[s_t1s[i]];
-                    end
-
-                    if (s_t2s[i] == `ZERO_REG) begin
-                        s_v2s[i] = '0;
-                    end else begin
-                        if (c_en[j] && (s_t2s[i] == c_ts[j])) begin
-                            s_v2s[i] = c_vs[j];
-                        end
-                        else
-                            s_v2s[i] = phys_reg_file[s_t2s[i]];
-                    end
+    genvar i;
+    generate
+        for (i = 0; i < N; i++) begin
+            
+            always_comb begin
+                if (s_t1s[i] == `ZERO_REG) begin
+                    s_v1s[i] = 0;
+                end else if (c_en[0] && (c_ts[0] == s_t1s[i])) begin
+                    s_v1s[i] = c_vs[0]; // internal forwarding
+                end else begin
+                    s_v1s[i] = phys_reg_file[s_t1s[i]];
                 end
-            end else begin
-                s_v1s[i] = '0;
-                s_v2s[i] = '0;
+                if (s_t1s[i] == `ZERO_REG) begin
+                    s_v1s[i] = 0;
+                end else if (c_en[1] && (c_ts[1] == s_t1s[i])) begin
+                    s_v1s[i] = c_vs[1]; // internal forwarding
+                end else begin
+                    s_v1s[i] = phys_reg_file[s_t1s[i]];
+                end
             end
-        end else begin : non_bypass_path
-            s_v1s[i] = s_en[i] ? phys_reg_file[s_t1s[i]] : '0;
-            s_v2s[i] = s_en[i] ? phys_reg_file[s_t2s[i]] : '0;
+
+            // Read port 2
+            always_comb begin
+                if (s_t2s[i] == `ZERO_REG) begin
+                    s_v2s[i] = 0;
+                end else if (c_en[0] && (c_ts[0] == s_t2s[i])) begin
+                    s_v2s[i] = c_vs[0]; // internal forwarding
+                end else begin
+                    s_v2s[i] = phys_reg_file[s_t2s[i]];
+                end
+                if (s_t2s[i] == `ZERO_REG) begin
+                    s_v2s[i] = 0;
+                end else if (c_en[1] && (c_ts[1] == s_t2s[i])) begin
+                    s_v2s[i] = c_vs[1]; // internal forwarding
+                end else begin
+                    s_v2s[i] = phys_reg_file[s_t2s[i]];
+                end
+            end
+            
+        end
+
+    endgenerate
+
+    // Write port
+    always_ff @(posedge clock) begin
+        if (c_en[0] && c_ts[0] != `ZERO_REG) begin
+            phys_reg_file[c_ts[0]] <= c_vs[0];
+        end
+        if (c_en[1] && c_ts[1] != `ZERO_REG) begin
+            phys_reg_file[c_ts[1]] <= c_vs[1];
         end
     end
-end
 
- 
-///////////////////////////////////////////////////////////////////
-////////////////////////// Write Logic ////////////////////////////
-///////////////////////////////////////////////////////////////////
-
-always_ff @(posedge clock) begin
-    if (reset || flush) begin
-        phys_reg_file        <= '0;
-    end else begin
-        for (int k = 0; k < N; k++) begin
-            if (c_en[k] && (c_ts[k] != `ZERO_REG)) begin
-                phys_reg_file[c_ts[k]] <= c_vs[k];
-            end
-        end
-    end
-end
 
 
 endmodule
