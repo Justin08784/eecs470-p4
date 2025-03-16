@@ -385,7 +385,7 @@ module cpu (
     // decode2dispatch d2dis;
     // dispatch2decode dis2d;
 
-    decoder decoder0 (
+    stage_id_p4 decoder0 (
         // TODO: Sam's commit
     );
 

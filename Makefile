@@ -189,7 +189,7 @@ GREP = grep -E --color=auto
 # ---- Modules to Test ---- #
 
 # TODO: add more modules here
-MODULES = cpu mult rob rs fifo free_list dispatch prf map_table
+MODULES = cpu mult rob rs fifo free_list dispatch prf map_table stage_id_p4 
 
 # TODO: update this if you add more header files
 ALL_HEADERS = $(CPU_HEADERS)
@@ -222,6 +222,11 @@ FIFO_FILES = verilog/sys_defs.svh
 build/fifo.simv: $(FIFO_FILES)
 build/fifo.cov: $(FIFO_FILES)
 synth/fifo.vg: $(FIFO_FILES)
+
+ID_FILES = verilog/sys_defs.svh
+build/stage_id_p4.simv: $(ID_FILES)
+build/stage_id_p4.cov: $(ID_FILES)
+synth/stage_id_p4.vg: $(ID_FILES)
 
 FREE_LIST_FILES = verilog/sys_defs.svh verilog/fifo.sv
 build/free_list.simv: $(FREE_LIST_FILES)
@@ -283,6 +288,7 @@ CPU_SOURCES = verilog/cpu.sv \
 			  verilog/rob.sv \
 			  verilog/prf.sv \
 			  verilog/free_list.sv \
+			  verilog/stage_id_p4.sv \
 			  verilog/fifo.sv
 
 build/cpu.simv: $(CPU_SOURCES) $(CPU_HEADERS) $(CPU_TESTBENCH)
