@@ -189,7 +189,7 @@ GREP = grep -E --color=auto
 # ---- Modules to Test ---- #
 
 # TODO: add more modules here
-MODULES = cpu mult rob rs fifo free_list dispatch cdb prf map_table
+MODULES = cpu mult rob rs fifo free_list dispatch prf map_table
 
 # TODO: update this if you add more header files
 ALL_HEADERS = $(CPU_HEADERS)
@@ -283,7 +283,6 @@ CPU_SOURCES = verilog/cpu.sv \
 			  verilog/rob.sv \
 			  verilog/prf.sv \
 			  verilog/free_list.sv \
-			  verilog/cdb.sv \
 			  verilog/fifo.sv
 
 build/cpu.simv: $(CPU_SOURCES) $(CPU_HEADERS) $(CPU_TESTBENCH)
