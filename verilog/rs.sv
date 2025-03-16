@@ -32,9 +32,8 @@ module rs #(parameter
     b00 +> b01 +> b10 (cannot increment further)
     0      1      2 
     */
-    output  logic           [$clog2(N):0] rs_rdy_scnt, // to dispatcher
-    input   logic           [$clog2(N):0] d_en_cnt,     // number of enabled dispatch lines? (from dispatcher; dep. on rs_rdy_scnt)
-    input   ID_RESULT       [N-1:0] d_dat,
+    output  rs2dispatch     d_out,
+    input   dispatch2rs     d_in,
 
     // issue
     input   execute2rs                      ex_in,
@@ -272,7 +271,7 @@ module rs #(parameter
         ~busy_vec
         | issd_vec; // an issued insn will go to EX and free its entry
     assign rs_cnt = $countones(free_entries);
-    assign rs_rdy_scnt = rs_cnt > N ? N : rs_cnt;
+    assign d_out.rs_rdy_scnt = rs_cnt > N ? N : rs_cnt;
 
 
     // select free entries
@@ -289,7 +288,7 @@ module rs #(parameter
     always_comb begin
         d2entry = '0;
         foreach (d2entry[i]) begin
-            if (i < d_en_cnt) begin
+            if (i < d_in.d_en_cnt) begin
                 d2entry[i] |= gbus_free[i];
             end
         end
@@ -325,7 +324,7 @@ module rs #(parameter
                     continue;
                 entries_n[rs].busy   = 1;
                 entries_n[rs].issued = 0;
-                entries_n[rs].dat    = d_dat[n];
+                entries_n[rs].dat    = d_in.d_dat[n];
             end
         end
     end

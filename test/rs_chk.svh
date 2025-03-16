@@ -17,9 +17,8 @@ module rs_chk #(parameter
     input reset,
     input flush,
     // dispatch
-    input   logic           [$clog2(N):0] rs_rdy_scnt, // to dispatcher
-    input   logic           [$clog2(N):0] d_en_cnt,     // number of enabled dispatch lines? (from dispatcher; dep. on rs_rdy_scnt)
-    input   ID_RESULT       [N-1:0] d_dat,
+    input   rs2dispatch     d_out_dut,
+    input   dispatch2rs     d_in,
     // issue
     input   execute2rs      ex_in,
     // complete
@@ -91,8 +90,7 @@ module rs_chk #(parameter
     endfunction
 
     struct packed {
-        logic           [$clog2(N):0] d_en_cnt;     // number of enabled dispatch lines? (from dispatcher; dep. on rs_rdy_scnt)
-        ID_RESULT       [N-1:0] d_dat;
+        dispatch2rs     d_in;
         // issue
         execute2rs      ex_in;
         // complete
@@ -100,21 +98,20 @@ module rs_chk #(parameter
     } ins_pre, ins_cur; 
 
     struct packed {
-        logic       [$clog2(N):0]       rs_rdy_scnt;
+        rs2dispatch d_out;
         
         rs2execute  ex_out;
     } outs_pre, outs_cur; 
 
     // This syntax is so fucking gorgeous btw.
     assign ins_cur = '{
-        d_en_cnt:d_en_cnt,
-        d_dat:d_dat,
+        d_in:d_in,
         ex_in:ex_in,
         c_in:c_in
     };
 
     assign outs_cur = '{
-        rs_rdy_scnt:rs_rdy_scnt,
+        d_out:d_out_dut,
         ex_out:ex_out_dut
     };
     
@@ -329,8 +326,8 @@ module rs_chk #(parameter
         // check dispatch correctness
         d_find_id_pre.delete();
         for (int i = 0; i < N; ++i) begin
-            if (i < ins_pre.d_en_cnt) begin
-                d_find_id_pre[ins_pre.d_dat[i].id] = i;
+            if (i < ins_pre.d_in.d_en_cnt) begin
+                d_find_id_pre[ins_pre.d_in.d_dat[i].id] = i;
             end
         end
         num_free = 0;
@@ -350,9 +347,9 @@ module rs_chk #(parameter
                 continue;
             
             dispatch_asg_correct &= d_find_id_pre.exists(id);
-            dispatch_dat_correct &= (ins_pre.d_dat[d_find_id_pre[id]] == entries_cur[rs].dat);
+            dispatch_dat_correct &= (ins_pre.d_in.d_dat[d_find_id_pre[id]] == entries_cur[rs].dat);
         end
-        dispatch_cnt_correct = num_dispatches == $min(int'(ins_pre.d_en_cnt), num_free);
+        dispatch_cnt_correct = num_dispatches == $min(int'(ins_pre.d_in.d_en_cnt), num_free);
 
         @(posedge clock);
 

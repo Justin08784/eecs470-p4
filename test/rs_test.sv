@@ -26,9 +26,8 @@ module rs_testbench;
     logic flush;
 
 
-    logic           [$clog2(N):0] rs_rdy_scnt;  // to dispatcher
-    logic           [$clog2(N):0] d_en_cnt; // number of enabled dispatch lines? (from dispatcher; dep. on rs_rdy_scnt)
-    ID_RESULT       [N-1:0] d_dat;
+    rs2dispatch     d_out_dut;
+    dispatch2rs     d_in;
     // issue
     execute2rs      ex_in; // from POV of rs
 
@@ -48,9 +47,8 @@ module rs_testbench;
         .reset(reset),
         .flush(1'b0),
  
-        .rs_rdy_scnt(rs_rdy_scnt),
-        .d_en_cnt(d_en_cnt),
-        .d_dat(d_dat),
+        .d_out(d_out_dut),
+        .d_in(d_in),
  
         .ex_in(ex_in),
         .ex_out(ex_out_dut),
@@ -117,9 +115,8 @@ module rs_testbench;
         .reset(reset),
         .flush(1'b0),
 
-        .rs_rdy_scnt(rs_rdy_scnt),
-        .d_en_cnt(d_en_cnt),
-        .d_dat(d_dat),
+        .d_out_dut(d_out_dut),
+        .d_in(d_in),
 
         .ex_in(ex_in),
 
@@ -152,20 +149,20 @@ module rs_testbench;
         static ADDR nex_id = 0;
         // Set up a valid dispatch line
 
-        d_dat[i]        = '0;
-        d_dat[i].t1     = t1;
-        d_dat[i].t2     = t2;
-        d_dat[i].t1_rdy = t1_rdy;
-        d_dat[i].t2_rdy = t2_rdy;
-        d_dat[i].fu_idx = fu_idx;
+        d_in.d_dat[i]        = '0;
+        d_in.d_dat[i].t1     = t1;
+        d_in.d_dat[i].t2     = t2;
+        d_in.d_dat[i].t1_rdy = t1_rdy;
+        d_in.d_dat[i].t2_rdy = t2_rdy;
+        d_in.d_dat[i].fu_idx = fu_idx;
         // we use id to uniquely identify each instruction
-        d_dat[i].id     = nex_id++;
+        d_in.d_dat[i].id     = nex_id++;
     endtask
 
     task clr_dispatch(
         input int i
     );
-        d_dat[i] = '0;
+        d_in.d_dat[i] = '0;
     endtask
 
     task set_cdb(
@@ -208,8 +205,7 @@ module rs_testbench;
     endtask
 
     task clr_all();
-        d_en_cnt = 0;
-        d_dat = '0;
+        d_in = '0;
         c_in = '0;
         ex_in = '0;
     endtask
@@ -549,22 +545,22 @@ module rs_testbench;
         reset = 0;
 
         for (int iter = 0; iter < 100; ++iter) begin
-            d_en_cnt = $urandom_range(N, 0);
-            $display("d_en_cnt: %b", d_en_cnt);
+            d_in.d_en_cnt = $urandom_range(N, 0);
+            $display("d_en_cnt: %b", d_in.d_en_cnt);
             for (int i = 0; i < N; ++i) begin
-                if (i >= d_en_cnt)
+                if (i >= d_in.d_en_cnt)
                     break;
                 // restricting to pregs in [0, 31]. There are more pregs than
                 // arch regs obviously, but isnt this okay?...
-                d_dat[i].id      = id++;
-                d_dat[i].t       = $urandom_range(32);
-                d_dat[i].t1      = $urandom_range(32);
-                d_dat[i].t2      = $urandom_range(32);
-                d_dat[i].t1_rdy  = $urandom_range(1);
-                d_dat[i].t2_rdy  = $urandom_range(1);
-                d_dat[i].fu_idx  = $urandom_range(FU_IDX_NUM-1);
+                d_in.d_dat[i].id      = id++;
+                d_in.d_dat[i].t       = $urandom_range(32);
+                d_in.d_dat[i].t1      = $urandom_range(32);
+                d_in.d_dat[i].t2      = $urandom_range(32);
+                d_in.d_dat[i].t1_rdy  = $urandom_range(1);
+                d_in.d_dat[i].t2_rdy  = $urandom_range(1);
+                d_in.d_dat[i].fu_idx  = $urandom_range(FU_IDX_NUM-1);
             end
-            foreach(d_dat[i]) $display("d_dat[%0d]: %d", i, d_dat[i].id);
+            foreach(d_in.d_dat[i]) $display("d_dat[%0d]: %d", i, d_in.d_dat[i].id);
             @(negedge clock);
             clr_all();
         end
@@ -574,8 +570,7 @@ module rs_testbench;
         /* initialize */
         clock           = 0;
         failed          = 0;
-        d_en_cnt        = 0;
-        d_dat           = '0;
+        d_in            = '0;
         ex_in           = '0;
         c_in            = '0;
 
