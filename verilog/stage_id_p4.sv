@@ -226,6 +226,7 @@ module stage_id_p4 (
     // assign d_out.d_dat[0].valid = if_id_reg[0].valid;
     logic [$clog2(`N):0] used_scnt;
     logic [$clog2(`N):0] free_scnt;
+    logic [$clog2(`N):0] prvw_vld_cnt;
     assign f_out.d_rdy_cnt  = free_scnt;
     assign d_out.d_vld_scnt = used_scnt;
     assign d_out.free_alloc_vld_cnt = used_scnt; // TODO: set a real value here
@@ -314,7 +315,8 @@ module stage_id_p4 (
         .DEPTH(2*`N),
         .WIDTH($bits(ID_RESULT)),
         .NUM_RPORTS(`N),
-        .NUM_WPORTS(`N)
+        .NUM_WPORTS(`N),
+        .ENABLE_READ_PREVIEW(`TRUE)
     ) id_buf(
         .clock      (clock),
         .reset      (reset),
@@ -322,6 +324,7 @@ module stage_id_p4 (
         .wr_data    (tmp),
         .rd_en_cnt  (d_in.dispatch_en_cnt),
         .rd_data    (d_out.d_dat),
+        .prvw_vld_cnt (prvw_vld_cnt),
         .free_scnt  (free_scnt),
         .used_scnt  (used_scnt)
     );

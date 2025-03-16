@@ -41,6 +41,7 @@ module fifo #(
 
     input   logic   [$clog2(NUM_RPORTS):0]          rd_en_cnt,
     output  logic   [NUM_RPORTS-1:0][WIDTH-1:0]     rd_data,
+    output  logic   [$clog2(NUM_RPORTS):0]          prvw_vld_cnt, // only valid if ENABLE_READ_PREVIEW set
 
     output  logic   [$clog2(NUM_WPORTS):0]          free_scnt,
     output  logic   [$clog2(NUM_RPORTS):0]          used_scnt
@@ -52,7 +53,6 @@ module fifo #(
     logic [$clog2(DEPTH)-1:0]       tail;
     logic [DEPTH-1:0][WIDTH-1:0]    state;
     logic [$clog2(DEPTH):0]         used, free;
-    logic [$clog2(NUM_RPORTS):0]    prvw_vld_cnt; // only valid if ENALBE_READ_PREVIEW set
     logic [$clog2(NUM_RPORTS):0]    show_limit;   // how many entries we display in rd_data
 
     logic [NUM_RPORTS-1:0][$clog2(DEPTH)-1:0] rd_idxs;
