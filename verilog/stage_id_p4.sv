@@ -229,7 +229,6 @@ module stage_id_p4 (
     logic [$clog2(`N):0] prvw_vld_cnt;
     assign f_out.d_rdy_cnt  = free_scnt;
     assign d_out.d_vld_scnt = used_scnt;
-    assign d_out.free_alloc_vld_cnt = used_scnt; // TODO: set a real value here
 
     logic [`N-1:0] has_dest_reg;
     int insn_id;
@@ -328,6 +327,13 @@ module stage_id_p4 (
         .free_scnt  (free_scnt),
         .used_scnt  (used_scnt)
     );
+
+    always_comb begin
+        for (int i = 0; i < `N; ++i)
+            d_out.prvw_has_dests[i] = 
+                (i < prvw_vld_cnt)
+                && (d_out.d_dat[i].inst.r.rd != `ZERO_REG);
+    end
 
     always_ff @(posedge clock) begin
         if (reset) begin
