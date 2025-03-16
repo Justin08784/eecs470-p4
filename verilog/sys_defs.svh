@@ -444,7 +444,7 @@ typedef struct packed {
     ALU_OPA_SELECT opa_select; // ALU opa mux select (ALU_OPA_xxx *)
     ALU_OPB_SELECT opb_select; // ALU opb mux select (ALU_OPB_xxx *)
 
-    // REG_IDX  dest_reg_idx;  // destination (writeback) register index
+    REG_IDX  dest_reg_idx;  // destination (writeback) register index
     ALU_FUNC alu_func;      // ALU function select (ALU_xxx *)
     logic    mult;          // Is inst a multiply instruction?
     logic    rd_mem;        // Does inst read memory?
@@ -510,7 +510,7 @@ typedef struct packed {
     logic    [$clog2(`N):0]    rob_rdy_scnt;
         // From: ROB
         // saturating counter for number of free rob entries
-    ROB_IDX [`N-1:0]         rob_idxs; //not needed, but putting here for testbench
+    ROB_IDX [`N-1:0]         rob_idxs; 
 } rob2dispatch;
 
 typedef struct packed {

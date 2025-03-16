@@ -155,6 +155,8 @@ always_comb begin
             d_dat[i].t2 = map_in.t2s[i];
             d_dat[i].t1_rdy = map_in.cpl1s[i];
             d_dat[i].t2_rdy = map_in.cpl2s[i];
+
+            d_dat[i].rob_idx = rob_in.rob_idxs[i];
         end
     end
 end

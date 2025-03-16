@@ -114,9 +114,13 @@ module dispatch_testbench;
 
 
     task set_rob(
-        input int rdy
+        input int rdy,
+        input ROB_IDX id0,
+        input ROB_IDX id1
     );
         rob_in.rob_rdy_scnt = rdy;
+        rob_in.rob_idxs[0] = id0;
+        rob_in.rob_idxs[1] = id1;
     endtask
 
     task clr_rob(
@@ -190,6 +194,7 @@ module dispatch_testbench;
         PHYS_REG_IDX t1s,
         PHYS_REG_IDX t2s,
         PHYS_REG_IDX ts,
+        ROB_IDX idx,
         string msg
     );
     assert (d_dat[i].t == ts)
@@ -201,6 +206,8 @@ module dispatch_testbench;
     assert (d_dat[i].t1_rdy == cpl1s)
         else exit_on_error (msg);
     assert (d_dat[i].t2_rdy == cpl2s)
+        else exit_on_error (msg);
+    assert (d_dat[i].rob_idx == idx)
         else exit_on_error (msg);
     endtask
 
@@ -246,7 +253,7 @@ module dispatch_testbench;
 
         @(negedge clock);
         set_rs(2);
-        set_rob(2);
+        set_rob(2,24,25);
         set_free(2,3,4);
         set_lsq(2);
         set_map(0,1,1,12,13,14);
@@ -305,7 +312,7 @@ module dispatch_testbench;
         clear_all();
         @(negedge clock);
         set_rs(2);
-        set_rob(2);
+        set_rob(2,24,25);
         set_free(2,8,16);
         set_lsq(2);
         set_decode(0,1,2,3,OPA_IS_RS1,OPB_IS_RS2,0,0,0,0);
@@ -347,8 +354,8 @@ module dispatch_testbench;
         assert (map_out.src2s[1] == 6)
             else exit_on_error ("test_two_rdy map error");
 
-        chk_dat(0,1,1,12,13,14,"test_two d_dat error");
-        chk_dat(1,0,0,15,16,17,"test_two d_dat error");
+        chk_dat(0,1,1,12,13,14,24,"test_two d_dat error");
+        chk_dat(1,0,0,15,16,17,25,"test_two d_dat error");
 
         @(negedge clock);
         set_decode(0,0,2,3,OPA_IS_RS1,OPB_IS_RS2,0,0,0,0);
@@ -395,7 +402,7 @@ module dispatch_testbench;
         clear_all();
         @(negedge clock);
         set_rs(1);
-        set_rob(2);
+        set_rob(2,24,25);
         set_free(2,8,16);
         set_lsq(2);
         set_decode(0,1,2,3,OPA_IS_RS1,OPB_IS_RS2,0,0,0,0);
@@ -437,12 +444,12 @@ module dispatch_testbench;
         assert (map_out.src2s[1] == 0)
             else exit_on_error ("test_one_rdy map error");
 
-        chk_dat(0,1,1,12,13,14,"test_one_rdy d_dat error");
-        chk_dat(1,0,0,0,0,0,"test_one_rdy d_dat error");
+        chk_dat(0,1,1,12,13,14,24,"test_one_rdy d_dat error");
+        chk_dat(1,0,0,0,0,0,0,"test_one_rdy d_dat error");
 
         @(negedge clock);
         set_rs(2);
-        set_rob(1);
+        set_rob(1,24,25);
         set_free(2,3,4);
         set_lsq(2);
 
@@ -463,7 +470,7 @@ module dispatch_testbench;
 
         @(negedge clock);
         set_rs(2);
-        set_rob(2);
+        set_rob(2,24,25);
         set_free(1,3,4);
         set_lsq(2);
 
@@ -484,7 +491,7 @@ module dispatch_testbench;
 
         @(negedge clock);
         set_rs(2);
-        set_rob(2);
+        set_rob(2,24,25);
         set_free(2,3,4);
         set_lsq(1);
 
@@ -512,7 +519,7 @@ module dispatch_testbench;
         clear_all();
         @(negedge clock);
         set_rs(3);
-        set_rob(3);
+        set_rob(3,24,25);
         set_free(3,8,16);
         set_lsq(3);
         set_decode(0,1,2,3,OPA_IS_RS1,OPB_IS_RS2,0,0,0,0);
