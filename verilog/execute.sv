@@ -119,6 +119,7 @@ module stage_ex (
     output  logic       [NUM_FU_STORE-1:0]  fu_rdy_store,
     output  logic       [NUM_FU_LOAD-1:0]   fu_rdy_load,
 
+    // TODO: wrap this stuff into execute2complete. Wrap crap here in general.
     output  logic       [N-1:0]             c_en;
     output  PHYS_REG_IDX[N-1:0]             c_ts;
     output  DATA        [N-1:0]             c_data;

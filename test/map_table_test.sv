@@ -32,7 +32,7 @@ module map_table_testbench;
 
     complete2map_table c_in;
     dispatch2map_table d_in;
-    map_table2ROBandRS rs_out;
+    map_table2robandRS rs_out;
 
     // Instantiate the DUT (Device Under Test)
     map_table #(N) dut (

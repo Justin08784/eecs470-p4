@@ -25,6 +25,8 @@ module map_table #(parameter
     // dispatch
     input dispatch2map_table d_in,
     output map_table2dispatch dispatch_out,
+
+    // TODO: do we really need or want this? this is questionable? have some other module handle it?
     output map_table2rob rob_out
 );
     localparam NUM_ARCH_REG = 32;

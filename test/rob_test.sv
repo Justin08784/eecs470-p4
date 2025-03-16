@@ -16,7 +16,7 @@ module rob_test();
     rob2retire r_out;
 
     // complete (write)
-    complete2rob c_in;
+    execute2complete c_in;
 
     // dispatch (write)
     rob2dispatch d_out;

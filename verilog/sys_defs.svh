@@ -549,7 +549,7 @@ typedef struct packed {
 typedef struct packed {
     PHYS_REG_IDX [`N-1:0] ts;
     PHYS_REG_IDX [`N-1:0] ts_old;
-}  map_table2ROB;
+} map_table2rob;
 
 typedef struct packed {
     logic        [`N-1:0] cpl1s;
@@ -579,10 +579,10 @@ typedef struct packed {
 
 // By ROB
 typedef struct packed {
-    logic    [$clog2(`N):0]    rob_rdy_scnt;
+    logic    [$clog2(`N):0]     rob_rdy_scnt;
         // From: ROB
         // saturating counter for number of free rob entries
-    ROB_IDX [`N-1:0]         rob_idxs; //not needed, but putting here for testbench
+    ROB_IDX [`N-1:0]            rob_idxs; //not needed, but putting here for testbench
         // To: dispatch
         // rob idxs of entries that can be allocated this cycle
         // Option 1: This
@@ -592,9 +592,21 @@ typedef struct packed {
 
 typedef struct packed {
     logic           [$clog2(`N):0]      r_en_cnt;
+        // From: retire (ROB)
+        // - number of enabled retire lines WHO ARE RETURNING/DEALLOC'ING A PREG
+        //   (e.g. no stores)
+        //   (i.e. may only be a strict subset of retiring insns!)
+        // - Question: Does this really need to be an count? Surely there isn't
+        //   any serial dep. between returning pregs no? But again, the free list
+        //   itself is likely going to be FIFO so I'm not sure what's more performant...
+        //   enable bus vs. count?
     PHYS_REG_IDX    [`N-1:0]            tag;
+        // From: retire (ROB)
+        // - IMPORTANT: Set from lowest indices in program-order. NO GAPS!!!
     PHYS_REG_IDX    [`N-1:0]            t_old;
-    REG_IDX         [`N-1:0]            dst; // TODO: not handled by ROB
+        // From: retire (ROB)
+        // - pregs being returned to free list
+    REG_IDX         [`N-1:0]            dst;
 } rob2retire;
 
 
@@ -617,17 +629,17 @@ typedef struct packed {
 
 // By Free List
 typedef struct packed {
-    logic    [$clog2(`N):0]    free_rdy_scnt;
-    // From: Free list
-    // - sat. count of number of free pregs in free list;
-    //   count reflects any pregs returned in retire! (i.e. AFTER retires)
-    PHYS_REG_IDX [`N-1:0]     d_ts;
-    // From: Free list
-    // - newly allocated pregs
-    // THIS WILL BE 1 CLOCK CYCLE BEHIND. THIS IS DESIRED SO THAT
-    // TAGS ARE APPLIED AT THE CORRECT TIMES (paired with map table output)
-    // (means that tags will be applied when the dispatched insts actually get
-    // to RS/ROB)
+    logic    [$clog2(`N):0] free_rdy_scnt;
+        // From: Free list
+        // - sat. count of number of free pregs in free list;
+        //   count reflects any pregs returned in retire! (i.e. AFTER retires)
+    PHYS_REG_IDX [`N-1:0]   d_ts;
+        // From: Free list
+        // - newly allocated pregs
+        // THIS WILL BE 1 CLOCK CYCLE BEHIND. THIS IS DESIRED SO THAT
+        // TAGS ARE APPLIED AT THE CORRECT TIMES (paired with map table output)
+        // (means that tags will be applied when the dispatched insts actually get
+        // to RS/ROB)
 } free_list2dispatch;
 
 
@@ -635,50 +647,6 @@ typedef struct packed {
 typedef struct packed {
     logic    [$clog2(`N):0]    lsq_rdy_scnt;
 } lsq2dispatch;
-
-// By complete
-// complete (write)
-typedef struct packed {
-    logic [`N-1:0]           c_en;
-        // - From: EX
-    ROB_IDX [`N-1:0]         c_rob_idxs;
-        // - From: EX
-} complete2rob;
-
-// Completion signals
-typedef struct packed {
-    logic         [`N-1:0] c_en;
-    PHYS_REG_IDX  [`N-1:0] c_ts;
-} complete2map_table;
-
-
-// By retire
-typedef struct packed {
-    logic     [$clog2(`N):0]   r_en_cnt;
-        // From: retire (ROB)
-        // - number of enabled retire lines WHO ARE RETURNING/DEALLOC'ING A PREG
-        //   (e.g. no stores)
-        //   (i.e. may only be a strict subset of retiring insns!)
-        // - Question: Does this really need to be an count? Surely there isn't
-        //   any serial dep. between returning pregs no? But again, the free list
-        //   itself is likely going to be FIFO so I'm not sure what's more performant...
-        //   enable bus vs. count?
-    PHYS_REG_IDX [`N-1:0]     r_tolds;
-        // From: retire (ROB)
-        // - pregs being returned to free list
-} retire2fl;
-
-typedef struct packed {
-    logic         [$clog2(`N):0] en_cnt;
-        // - Number of enabled retire lines?
-        // - Question: Does this need to be a count, or can we make it an enable
-        // bus? I fear that there can be serial dependencies and ordering issues
-        // e.g. if multiple insns retire to the same dest arch register.
-    REG_IDX       [`N-1:0] dsts;
-    PHYS_REG_IDX  [`N-1:0] ts;
-        // From: retire (ROB)
-        // - IMPORTANT: Set from lowest indices in program-order. NO GAPS!!!
-} retire2archmap;
 
 
 /* How can we implement this in the Makefile? */
