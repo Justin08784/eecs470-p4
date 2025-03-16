@@ -504,6 +504,8 @@ typedef struct packed {
         // - Number of enabled dispatch lines?
     logic [`N-1:0][$clog2(`PHYS_REG_SZ_R10K)-1:0] tag;
     logic [`N-1:0][$clog2(`PHYS_REG_SZ_R10K)-1:0] t_old;
+        // From: dispatch
+        // - IMPORTANT: Set from lowest indices in program-order. NO GAPS!!!
     //THESE ARE NOT COMING FROM DISPATCH, GET THESE FROM MAP TABLE
     //(ONLY HERE FOR CURRENT ROB TESTBENCH)
 } dispatch2rob;
@@ -569,10 +571,16 @@ typedef struct packed {
         // From: ROB
         // saturating counter for number of free rob entries
     ROB_IDX [`N-1:0]         rob_idxs; //not needed, but putting here for testbench
+        // To: dispatch
+        // rob idxs of entries that can be allocated this cycle
+        // Option 1: This
+        // Option 2: expose HEAD pointer and let dispatcher generate these
+        // (main concern with option 2 is it could be wrong? idk)
 } rob2dispatch;
 
 typedef struct packed {
     logic [$clog2(`N):0]     r_en_cnt;
+    REG_IDX                 dst; // TODO: not handled by ROB
     PHYS_REG_IDX [`N-1:0]    tag;
     PHYS_REG_IDX [`N-1:0]    t_old;
 } rob2retire;
@@ -603,7 +611,9 @@ typedef struct packed {
 // complete (write)
 typedef struct packed {
     logic [`N-1:0]           c_en;
+        // - From: EX
     ROB_IDX [`N-1:0]         c_rob_idxs;
+        // - From: EX
 } complete2rob;
 
 // Completion signals
