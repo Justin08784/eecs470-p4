@@ -45,12 +45,12 @@ module alu (
 
     always_comb begin
         case (branch_func)
-            3'b000:  take = signed'(rs1) == signed'(rs2); // BEQ
-            3'b001:  take = signed'(rs1) != signed'(rs2); // BNE
-            3'b100:  take = signed'(rs1) <  signed'(rs2); // BLT
-            3'b101:  take = signed'(rs1) >= signed'(rs2); // BGE
-            3'b110:  take = rs1 < rs2;                    // BLTU
-            3'b111:  take = rs1 >= rs2;                   // BGEU
+            3'b000:  take = signed'(opa) == signed'(opb); // BEQ
+            3'b001:  take = signed'(opa) != signed'(opb); // BNE
+            3'b100:  take = signed'(opa) <  signed'(opb); // BLT
+            3'b101:  take = signed'(opa) >= signed'(opb); // BGE
+            3'b110:  take = opa < opb;                    // BLTU
+            3'b111:  take = opa >= opb;                   // BGEU
             default: take = `FALSE;
         endcase
     end
@@ -105,34 +105,34 @@ module stage_ex (
     input clock,
     input reset,
 
-    input   logic       [NUM_FU_ALU-1:0]    fu_vld_alu,
-    input   logic       [NUM_FU_MULT-1:0]   fu_vld_mult,
-    input   logic       [NUM_FU_STORE-1:0]  fu_vld_store,
-    input   logic       [NUM_FU_LOAD-1:0]   fu_vld_load,
-    input   ID_RESULT   [NUM_FU_ALU-1:0]    fu_dat_alu,
-    input   ID_RESULT   [NUM_FU_MULT-1:0]   fu_dat_mult,
-    input   ID_RESULT   [NUM_FU_STORE-1:0]  fu_dat_store,
-    input   ID_RESULT   [NUM_FU_LOAD-1:0]   fu_dat_load,
+    input   logic       [`NUM_FU_ALU-1:0]    fu_vld_alu,
+    input   logic       [`NUM_FU_MULT-1:0]   fu_vld_mult,
+    input   logic       [`NUM_FU_STORE-1:0]  fu_vld_store,
+    input   logic       [`NUM_FU_LOAD-1:0]   fu_vld_load,
+    input   ID_RESULT   [`NUM_FU_ALU-1:0]    fu_dat_alu,
+    input   ID_RESULT   [`NUM_FU_MULT-1:0]   fu_dat_mult,
+    input   ID_RESULT   [`NUM_FU_STORE-1:0]  fu_dat_store,
+    input   ID_RESULT   [`NUM_FU_LOAD-1:0]   fu_dat_load,
 
-    output  logic       [NUM_FU_ALU-1:0]    fu_rdy_alu,
-    output  logic       [NUM_FU_MULT-1:0]   fu_rdy_mult,
-    output  logic       [NUM_FU_STORE-1:0]  fu_rdy_store,
-    output  logic       [NUM_FU_LOAD-1:0]   fu_rdy_load,
+    output  logic       [`NUM_FU_ALU-1:0]    fu_rdy_alu,
+    output  logic       [`NUM_FU_MULT-1:0]   fu_rdy_mult,
+    output  logic       [`NUM_FU_STORE-1:0]  fu_rdy_store,
+    output  logic       [`NUM_FU_LOAD-1:0]   fu_rdy_load,
 
     // TODO: wrap this stuff into execute2complete. Wrap crap here in general.
-    output  logic       [N-1:0]             c_en;
-    output  PHYS_REG_IDX[N-1:0]             c_ts;
-    output  DATA        [N-1:0]             c_data;
+    output  logic       [`N-1:0]             c_en,
+    output  PHYS_REG_IDX[`N-1:0]             c_ts,
+    output  DATA        [`N-1:0]             c_data
 );
 
-    ALU_FUNC [NUM_FU_ALU-1:0] alu_func;
-    DATA [NUM_FU_ALU-1:0] opa_mux_out, opb_mux_out, alu_result;
-    logic [NUM_FU_ALU-1:0] branch;
-    logic [NUM_FU_MULT-1:0] [2:0] mult_func;
-    logic [NUM_FU_MULT-1:0] mult_done;
-    DATA [NUM_FU_MULT-1:0] mult_value1, mult_value2, mult_result, 
-    logic [NUM_FU_BRANCH-1:0] [2:0] branch_func;
-    logic [NUM_FU_BRANCH-1:0] take_conditional;
+    ALU_FUNC [`NUM_FU_ALU-1:0] alu_func;
+    DATA [`NUM_FU_ALU-1:0] opa_mux_out, opb_mux_out, alu_result;
+    logic [`NUM_FU_ALU-1:0] branch;
+    logic [`NUM_FU_MULT-1:0] [2:0] mult_func;
+    logic [`NUM_FU_MULT-1:0] mult_done;
+    DATA [`NUM_FU_MULT-1:0] mult_value1, mult_value2, mult_result;
+    logic [`NUM_FU_ALU-1:0] [2:0] branch_func;
+    logic [`NUM_FU_ALU-1:0] take_conditional;
     // DATA [NUM_FU_BRANCH-1:0] branch_value1, branch_value2;
 
     /* I don't know what to do with these yet
@@ -171,28 +171,24 @@ module stage_ex (
                     branch[i] = 1;
                 end else begin
                     // ALU opA mux
-                    always_comb begin
-                        case (fu_dat_alu[i].opa_select)
-                            OPA_IS_RS1:  opa_mux_out[i] = fu_dat_alu[i].rs1_value;
-                            OPA_IS_NPC:  opa_mux_out[i] = fu_dat_alu[i].NPC;
-                            OPA_IS_PC:   opa_mux_out[i] = fu_dat_alu[i].PC;
-                            OPA_IS_ZERO: opa_mux_out[i] = 0;
-                            default:     opa_mux_out[i]= 32'hdeadface; // dead face
-                        endcase
-                    end
+                    case (fu_dat_alu[i].opa_select)
+                        OPA_IS_RS1:  opa_mux_out[i] = fu_dat_alu[i].rs1_value;
+                        OPA_IS_NPC:  opa_mux_out[i] = fu_dat_alu[i].NPC;
+                        OPA_IS_PC:   opa_mux_out[i] = fu_dat_alu[i].PC;
+                        OPA_IS_ZERO: opa_mux_out[i] = 0;
+                        default:     opa_mux_out[i]= 32'hdeadface; // dead face
+                    endcase
 
                     // ALU opB mux
-                    always_comb begin
-                        case (fu_dat_alu[i].opb_select)
-                            OPB_IS_RS2:   opb_mux_out[i] = fu_dat_alu[i].rs2_value;
-                            OPB_IS_I_IMM: opb_mux_out[i] = `RV32_signext_Iimm(fu_dat_alu[i].inst);
-                            OPB_IS_S_IMM: opb_mux_out[i] = `RV32_signext_Simm(fu_dat_alu[i].inst);
-                            OPB_IS_B_IMM: opb_mux_out[i] = `RV32_signext_Bimm(fu_dat_alu[i].inst);
-                            OPB_IS_U_IMM: opb_mux_out[i] = `RV32_signext_Uimm(fu_dat_alu[i].inst);
-                            OPB_IS_J_IMM: opb_mux_out[i] = `RV32_signext_Jimm(fu_dat_alu[i].inst);
-                            default:      opb_mux_out[i] = 32'hfacefeed; // face feed
-                        endcase
-                    end
+                    case (fu_dat_alu[i].opb_select)
+                        OPB_IS_RS2:   opb_mux_out[i] = fu_dat_alu[i].rs2_value;
+                        OPB_IS_I_IMM: opb_mux_out[i] = `RV32_signext_Iimm(fu_dat_alu[i].inst);
+                        OPB_IS_S_IMM: opb_mux_out[i] = `RV32_signext_Simm(fu_dat_alu[i].inst);
+                        OPB_IS_B_IMM: opb_mux_out[i] = `RV32_signext_Bimm(fu_dat_alu[i].inst);
+                        OPB_IS_U_IMM: opb_mux_out[i] = `RV32_signext_Uimm(fu_dat_alu[i].inst);
+                        OPB_IS_J_IMM: opb_mux_out[i] = `RV32_signext_Jimm(fu_dat_alu[i].inst);
+                        default:      opb_mux_out[i] = 32'hfacefeed; // face feed
+                    endcase
 
                     alu_func[i] = fu_dat_alu[i].alu_func;
                     branch_func[i] = 3'b011; //SENTINEL VALUE
@@ -210,7 +206,7 @@ module stage_ex (
 
    
     // Instantiate the ALU
-    alu alu_0 [NUM_FU_ALU-1:0] (
+    alu alu_0 [`NUM_FU_ALU-1:0] (
         // Inputs
         .opa(opa_mux_out),
         .opb(opb_mux_out),
@@ -222,7 +218,7 @@ module stage_ex (
         .result(alu_result) // will return 32'hfacebeec if branch is high (Sentinel, hopefully none of our alu computations result in that value)
     );
     // Instantiate the multiplier
-    mult mults [NUM_FU_MULT-1:0] (
+    mult mults [`NUM_FU_MULT-1:0] (
         // Inputs
         .clock(clock),
         .reset(reset),
@@ -277,14 +273,14 @@ module stage_ex (
 
     always_comb begin
        
-        PHYS_REG_IDX completed_tags [NUM_FU_ALU + NUM_FU_MULT + NUM_FU_LOAD + NUM_FU_STORE];
-        logic [3:0] completed_ids [NUM_FU_ALU + NUM_FU_MULT + NUM_FU_LOAD + NUM_FU_STORE];
-        int [3:0] completed_count = 0;
+        PHYS_REG_IDX [3:0] completed_tags;
+        logic [3:0] completed_ids;
+        logic [3:0] completed_count = 0;
         DATA [3:0] completed_data;
 
         
-        for (int i = 0; i < NUM_FU_ALU; i++) begin
-            if (fu_dat_alu[i].alu_result != default || branch[i]) begin
+        for (int i = 0; i < `NUM_FU_ALU; i++) begin
+            if (fu_dat_alu[i].alu_result != 32'hfacebeec || branch[i]) begin
                 completed_tags[completed_count] = fu_dat_alu[i].t;
                 completed_ids[completed_count] = fu_dat_alu[i].id;
                 completed_count = completed_count + 1;
@@ -292,7 +288,7 @@ module stage_ex (
             end
         end
 
-        for (int i = 0; i < NUM_FU_MULT; i++) begin
+        for (int i = 0; i < `NUM_FU_MULT; i++) begin
             if (fu_dat_mult[i].mult_done) begin
                 completed_tags[completed_count] = fu_dat_mult[i].t;
                 completed_ids[completed_count] = fu_dat_mult[i].id;
@@ -301,7 +297,7 @@ module stage_ex (
             end
         end
 
-        for (int i = 0; i < NUM_FU_LOAD; i++) begin
+        for (int i = 0; i < `NUM_FU_LOAD; i++) begin
             if (fu_vld_load[i]) begin
                 completed_tags[completed_count] = fu_dat_load[i].t;
                 completed_ids[completed_count] = fu_dat_load[i].id;
@@ -309,7 +305,7 @@ module stage_ex (
             end
         end
 
-        for (int i = 0; i < NUM_FU_STORE; i++) begin
+        for (int i = 0; i < `NUM_FU_STORE; i++) begin
             if (fu_vld_store[i]) begin
                 completed_tags[completed_count] = fu_dat_store[i].t;
                 completed_ids[completed_count] = fu_dat_store[i].id;
