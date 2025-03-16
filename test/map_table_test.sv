@@ -30,9 +30,9 @@ module map_table_testbench;
     //     PHYS_REG_IDX [N-1:0] t2s;
     // }  DispatchOutput;
 
-    complete2map_table c_in;
+    execute2complete c_in;
     dispatch2map_table d_in;
-    map_table2ROB rob_out;
+    map_table2rob rob_out;
     map_table2dispatch dispatch_out;
 
 
