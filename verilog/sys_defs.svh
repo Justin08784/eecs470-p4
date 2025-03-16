@@ -636,6 +636,8 @@ typedef struct packed {
         // - From: EX
     ROB_IDX         [`N-1:0] c_rob_idxs;
         // - From: EX
+    DATA            [`N-1:0] c_data;
+        // - From: EX
 } execute2complete;
 
 // By Free List
