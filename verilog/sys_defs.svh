@@ -477,15 +477,25 @@ typedef struct packed {
     ID_RESULT   dat;
 } FU_ENTRY;
 
+// By Fetch
+typedef struct packed {
+    logic       [$clog2(`N):0]  f_en_cnt;
+    IF_ID_PACKET    [`N-1:0]    f_dat;
+} fetch2decode;
+
 // By decode
 typedef struct packed {
-    ID_RESULT   [$clog2(`N):0]  d_en_cnt;
+    logic       [$clog2(`N):0]  d_rdy_cnt;
+} decode2fetch;
+
+typedef struct packed {
+    logic       [$clog2(`N):0]  d_en_cnt;
     ID_RESULT   [`N-1:0]        d_dat;
 } decode2dispatch;
 
 // By Dispatch
 typedef struct packed {
-    logic       [$clog2(`N):0] decode_d_en_cnt;
+    logic       [$clog2(`N):0] dispatch_rdy_cnt;
 } dispatch2decode;
 
 typedef struct packed {

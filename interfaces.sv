@@ -276,7 +276,7 @@ module dispatch #(parameter
     } decode_in,
 
     output struct packed {
-        logic       [N-1:0] decode_d_en_cnt;
+        logic       [N-1:0] dispatch_rdy_cnt;
     } decode_out,
     
 
