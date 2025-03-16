@@ -8,7 +8,7 @@ module prf #(
                                // 1: Read data will update combinationally if
                                //    write to same address
    )(
-    input clock, reset, flush, // QUESTION: do we need reset? or should we force write to happen before read at the same addr?
+    input clock, //reset, flush, // QUESTION: do we need reset? or should we force write to happen before read at the same addr?
     // retire ??
 
     // complete (write)
