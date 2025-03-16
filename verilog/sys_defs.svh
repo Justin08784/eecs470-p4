@@ -479,7 +479,8 @@ typedef struct packed {
 
 // By decode
 typedef struct packed {
-    ID_RESULT   [`N-1:0]     d_dat;
+    ID_RESULT   [$clog2(`N):0]  d_en_cnt;
+    ID_RESULT   [`N-1:0]        d_dat;
 } decode2dispatch;
 
 // By Dispatch

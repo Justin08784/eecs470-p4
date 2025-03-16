@@ -18,7 +18,7 @@ module map_table #(parameter
     // retire ??
 
     // complete
-    input complete2map_table c_in,
+    input execute2complete c_in,
 
     // issue ??
 

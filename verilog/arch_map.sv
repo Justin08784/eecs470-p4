@@ -10,7 +10,7 @@ module arch_map #(parameter
 ) (
     input clock, reset,
     // retire
-    input retire2arch_map r_in
+    input rob2retire r_in
 
     // complete ??
     // issue ??
@@ -24,14 +24,14 @@ module arch_map #(parameter
     always_comb begin
         entries_n = entries;
         // handle completes
-        for (int i = 0; i < r_in.en_cnt; ++i) begin
+        for (int i = 0; i < r_in.r_en_cnt; ++i) begin
             /* Checking for ZERO_REG is presumably not necessary since it cannot
             be allocated as a dest reg... No wait it can? But it will just write
             the preg#0 tag anyways, right?
             */
-            if (r_in.dsts[i] == `ZERO_REG)
+            if (r_in.dst[i] == `ZERO_REG)
                 continue;
-            entries_n[r_in.dsts[i]] = r_in.ts[i];
+            entries_n[r_in.dst[i]] = r_in.tag[i];
         end
     end
 
