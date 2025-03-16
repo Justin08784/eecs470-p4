@@ -476,21 +476,15 @@ typedef struct packed {
     ID_RESULT   dat;
 } FU_ENTRY;
 
-// DISPATCH DECODE
+// By decode
 typedef struct packed {
     ID_RESULT   [`N-1:0]     d_dat;
 } decode2dispatch;
 
+// By Dispatch
 typedef struct packed {
     logic       [$clog2(`N):0] decode_d_en_cnt;
 } dispatch2decode;
-
-
-// DISPATCH RS
-typedef struct packed {
-    logic       [$clog2(`N):0] rs_rdy_scnt;
-        // - From: RS
-} rs2dispatch;
 
 typedef struct packed {
     logic       [$clog2(`N):0] rs_d_en_cnt;
@@ -504,15 +498,6 @@ typedef struct packed {
         // - To: RS               //should come directly from dispatch
 } dispatch2rs;
 
-
-// DISPATCH ROB
-typedef struct packed {
-    logic    [$clog2(`N):0]    rob_rdy_scnt;
-        // From: ROB
-        // saturating counter for number of free rob entries
-    ROB_IDX [`N-1:0]         rob_idxs; //not needed, but putting here for testbench
-} rob2dispatch;
-
 typedef struct packed {
     logic   [$clog2(`N):0]            d_en_cnt;
         // To: ROB
@@ -523,22 +508,6 @@ typedef struct packed {
     //(ONLY HERE FOR CURRENT ROB TESTBENCH)
 } dispatch2rob;
 
-
-// DISPATCH Free list
-typedef struct packed {
-    logic    [$clog2(`N):0]    free_rdy_scnt;
-    // From: Free list
-    // - sat. count of number of free pregs in free list;
-    //   count reflects any pregs returned in retire! (i.e. AFTER retires)
-    PHYS_REG_IDX [`N-1:0]     d_ts;
-    // From: Free list
-    // - newly allocated pregs
-    // THIS WILL BE 1 CLOCK CYCLE BEHIND. THIS IS DESIRED SO THAT
-    // TAGS ARE APPLIED AT THE CORRECT TIMES (paired with map table output)
-    // (means that tags will be applied when the dispatched insts actually get
-    // to RS/ROB)
-} free_list2dispatch;
-
 typedef struct packed {
     logic     [$clog2(`N):0]  free_d_en_cnt;
         // To: Free list
@@ -547,12 +516,6 @@ typedef struct packed {
         //   (i.e. may only be a strict subset of dispatching insns!)
 } dispatch2free_list;
 
-
-// DISPATCH LSQ
-typedef struct packed {
-    logic    [$clog2(`N):0]    lsq_rdy_scnt;
-} lsq2dispatch;
-
 typedef struct packed {
     logic     [$clog2(`N):0]  lsq_d_en_cnt;
         // To: LSQ
@@ -560,8 +523,6 @@ typedef struct packed {
         //   (i.e. may only be a strict subset of dispatching insns!)
 } dispatch2lsq;
 
-
-// DISPATCH Map table
 typedef struct packed {
     logic         [$clog2(`N):0] en_cnt;
         // - Number of enabled dispatch lines?
@@ -580,13 +541,65 @@ typedef struct packed {
 } dispatch2map_table;
 
 
-// retire (read)
+// By Map Table
+typedef struct packed {
+    PHYS_REG_IDX [`N-1:0] ts;
+    PHYS_REG_IDX [`N-1:0] ts_old;
+}  map_table2ROB;
+
+typedef struct packed {
+    logic        [`N-1:0] cpl1s;
+    logic        [`N-1:0] cpl2s;
+    PHYS_REG_IDX [`N-1:0] t1s;
+    PHYS_REG_IDX [`N-1:0] t2s;
+    PHYS_REG_IDX [`N-1:0] ts;
+} map_table2dispatch;
+
+
+// By RS
+typedef struct packed {
+    logic       [$clog2(`N):0] rs_rdy_scnt;
+        // - From: RS
+} rs2dispatch;
+
+
+// By ROB
+typedef struct packed {
+    logic    [$clog2(`N):0]    rob_rdy_scnt;
+        // From: ROB
+        // saturating counter for number of free rob entries
+    ROB_IDX [`N-1:0]         rob_idxs; //not needed, but putting here for testbench
+} rob2dispatch;
+
 typedef struct packed {
     logic [$clog2(`N):0]     r_en_cnt;
     PHYS_REG_IDX [`N-1:0]    tag;
     PHYS_REG_IDX [`N-1:0]    t_old;
 } rob2retire;
 
+
+// By Free List
+typedef struct packed {
+    logic    [$clog2(`N):0]    free_rdy_scnt;
+    // From: Free list
+    // - sat. count of number of free pregs in free list;
+    //   count reflects any pregs returned in retire! (i.e. AFTER retires)
+    PHYS_REG_IDX [`N-1:0]     d_ts;
+    // From: Free list
+    // - newly allocated pregs
+    // THIS WILL BE 1 CLOCK CYCLE BEHIND. THIS IS DESIRED SO THAT
+    // TAGS ARE APPLIED AT THE CORRECT TIMES (paired with map table output)
+    // (means that tags will be applied when the dispatched insts actually get
+    // to RS/ROB)
+} free_list2dispatch;
+
+
+// By LSQ
+typedef struct packed {
+    logic    [$clog2(`N):0]    lsq_rdy_scnt;
+} lsq2dispatch;
+
+// By complete
 // complete (write)
 typedef struct packed {
     logic [`N-1:0]           c_en;
@@ -599,8 +612,8 @@ typedef struct packed {
     PHYS_REG_IDX  [`N-1:0] c_ts;
 } complete2map_table;
 
-// Retire 
-// Retire to free list
+
+// By retire
 typedef struct packed {
     logic     [$clog2(`N):0]   r_en_cnt;
         // From: retire (ROB)
@@ -628,19 +641,6 @@ typedef struct packed {
         // - IMPORTANT: Set from lowest indices in program-order. NO GAPS!!!
 } retire2archmap;
 
-// Map table outputs
-typedef struct packed {
-    PHYS_REG_IDX [`N-1:0] ts;
-    PHYS_REG_IDX [`N-1:0] ts_old;
-}  map_table2ROB;
-
-typedef struct packed {
-    logic        [`N-1:0] cpl1s;
-    logic        [`N-1:0] cpl2s;
-    PHYS_REG_IDX [`N-1:0] t1s;
-    PHYS_REG_IDX [`N-1:0] t2s;
-    PHYS_REG_IDX [`N-1:0] ts;
-} map_table2dispatch;
 
 /* How can we implement this in the Makefile? */
 // comment out to disable DEBUG:
