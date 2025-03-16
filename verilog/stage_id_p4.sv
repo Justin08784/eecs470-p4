@@ -291,7 +291,7 @@ module stage_id_p4 (
         if (reset) begin
             insn_id <= 0;
         end else begin
-            insn_id <= insn_id + d_out.d_en_cnt;
+            insn_id <= insn_id + f_in.f_en_cnt;
         end
     end
 
