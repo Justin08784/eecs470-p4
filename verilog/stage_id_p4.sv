@@ -278,7 +278,7 @@ module stage_id_p4 (
         .reset      (reset),
         .wr_en_cnt  (en_cnt),
         .wr_data    (tmp),
-        .rd_en_cnt  (d_in.decode_d_en_cnt),
+        .rd_en_cnt  (d_in.dispatch_rdy_cnt),
         .rd_data    (d_out.d_dat),
         .free_scnt  (),
         .used_scnt  ()
