@@ -7,32 +7,32 @@ module map_table_testbench;
     
     logic clock, reset;
     
-    // Completion signals
-    typedef struct packed {
-        logic         [N-1:0] c_en;
-        PHYS_REG_IDX  [N-1:0] c_ts;
-    } CompletionSignals;;
+    // // Completion signals
+    // typedef struct packed {
+    //     logic         [N-1:0] c_en;
+    //     PHYS_REG_IDX  [N-1:0] c_ts;
+    // } CompletionSignals;
 
     // Dispatch signals
-    typedef struct packed {
-        logic         [$clog2(N):0] en_cnt;
-        REG_IDX       [N-1:0] src1s;
-        REG_IDX       [N-1:0] src2s;
-        REG_IDX       [N-1:0] dsts;
-        PHYS_REG_IDX  [N-1:0] ts;
-    } DispatchSignals;
+    // typedef struct packed {
+    //     logic         [$clog2(N):0] en_cnt;
+    //     REG_IDX       [N-1:0] src1s;
+    //     REG_IDX       [N-1:0] src2s;
+    //     REG_IDX       [N-1:0] dsts;
+    //     PHYS_REG_IDX  [N-1:0] ts;
+    // } DispatchSignals;
 
     // Map table outputs
-    typedef struct packed {
-        logic        [N-1:0] cpl1s;
-        logic        [N-1:0] cpl2s;
-        PHYS_REG_IDX [N-1:0] t1s;
-        PHYS_REG_IDX [N-1:0] t2s;
-    }  DispatchOutput;
+    // typedef struct packed {
+    //     logic        [N-1:0] cpl1s;
+    //     logic        [N-1:0] cpl2s;
+    //     PHYS_REG_IDX [N-1:0] t1s;
+    //     PHYS_REG_IDX [N-1:0] t2s;
+    // }  DispatchOutput;
 
-    CompletionSignals c_in;
-    DispatchSignals d_in;
-    DispatchOutput rs_out;
+    complete2map_table c_in;
+    dispatch2map_table d_in;
+    map_table2ROBandRS rs_out;
 
     // Instantiate the DUT (Device Under Test)
     map_table #(N) dut (

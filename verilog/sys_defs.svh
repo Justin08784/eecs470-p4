@@ -593,6 +593,12 @@ typedef struct packed {
     ROB_IDX [`N-1:0]         c_rob_idxs;
 } complete2rob;
 
+// Completion signals
+typedef struct packed {
+    logic         [`N-1:0] c_en;
+    PHYS_REG_IDX  [`N-1:0] c_ts;
+} complete2map_table;
+
 // Retire 
 // Retire to free list
 typedef struct packed {
@@ -610,7 +616,31 @@ typedef struct packed {
         // - pregs being returned to free list
 } retire2fl;
 
+typedef struct packed {
+    logic         [$clog2(`N):0] en_cnt;
+        // - Number of enabled retire lines?
+        // - Question: Does this need to be a count, or can we make it an enable
+        // bus? I fear that there can be serial dependencies and ordering issues
+        // e.g. if multiple insns retire to the same dest arch register.
+    REG_IDX       [`N-1:0] dsts;
+    PHYS_REG_IDX  [`N-1:0] ts;
+        // From: retire (ROB)
+        // - IMPORTANT: Set from lowest indices in program-order. NO GAPS!!!
+} retire2archmap;
 
+// Map table outputs
+typedef struct packed {
+    PHYS_REG_IDX [`N-1:0] ts;
+    PHYS_REG_IDX [`N-1:0] ts_old;
+}  map_table2ROB;
+
+typedef struct packed {
+    logic        [`N-1:0] cpl1s;
+    logic        [`N-1:0] cpl2s;
+    PHYS_REG_IDX [`N-1:0] t1s;
+    PHYS_REG_IDX [`N-1:0] t2s;
+    PHYS_REG_IDX [`N-1:0] ts;
+} map_table2dispatch;
 
 /* How can we implement this in the Makefile? */
 // comment out to disable DEBUG:

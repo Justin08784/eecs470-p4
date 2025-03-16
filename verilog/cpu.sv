@@ -447,8 +447,8 @@ module cpu (
         .reset(reset),
         .flush(),
  
-        .rs_scnt(rs_scnt),
-        .d_en_cnt(d_en_cnt),
+        .rs_scnt(rs2dis.rs_rdy_scnt),
+        .d_en_cnt(dis2rs.rs_d_en_cnt),
         .d_dat(d_dat),
  
         .fu_rdy_alu(fu_rdy_alu),
@@ -473,10 +473,10 @@ module cpu (
 
     rob2retire rob2r;
     complete2rob c2rob;
-    typedef struct packed {logic dummy;} rob2decode;
-    typedef struct packed {logic dummy;} decode2rob;
-    rob2decode rob2d;
-    decode2rob d2rob;
+    // typedef struct packed {logic dummy;} rob2decode;
+    // typedef struct packed {logic dummy;} decode2rob;
+    // rob2decode rob2d;
+    // decode2rob d2rob;
 
     rob #(
         .ROB_SZ(`ROB_SZ),
@@ -486,8 +486,8 @@ module cpu (
         .reset  (reset),
         .r_out  (rob2r),
         .c_in   (c2rob),
-        .d_out  (rob2d),
-        .d_in   (d2rob)
+        .d_out  (rob2dis),
+        .d_in   (dis2rob)
     );
 
     //////////////////////////////////////////////////
@@ -498,12 +498,15 @@ module cpu (
 
     // retire (read)
 
+    map_table2ROBandRS mt2rob_rs;
+    complete2map_table c2mt;
+
     map_table map_table_0 (
         .clock(clock),
         .reset(reset),
-        .c_in(),
-        .d_in(),
-        .rs_out()
+        .c_in(c2mt),
+        .d_in(dis2mt),
+        .rs_out(mt2rob_rs)
     );
 
     //////////////////////////////////////////////////

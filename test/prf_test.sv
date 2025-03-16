@@ -25,8 +25,8 @@ prf #(
     .BYPASS_EN(BYPASS_EN)
 ) dut (
     .clock(clock),
-    .reset(reset),
-    .flush(flush),
+    //.reset(reset),
+    //.flush(flush),
     .c_en(c_en),
     .c_ts(c_ts),
     .c_vs(c_vs),
@@ -41,14 +41,14 @@ prf #(
 always begin
     #(`CLOCK_PERIOD/2.0);
     clock = ~clock;
-    $display(" clock %d  reset %d | c_en0: %d  c_ts0: %d  c_vs0: %d | c_en1: %d  c_ts1: %d  c_vs1: %d | s_en0: %d   s_t1s0: %d  s_t2s0: %d  s_v1s0: %d  sv2s0: %d  |  s_en1: %d   s_t1s1: %d  s_t2s1: %d  s_v1s1: %d  sv2s1: %d",
-                clock,  reset,       c_en[0], c_ts[0], c_vs[0],       c_en[1], c_ts[1], c_vs[1],        s_en[0], s_t1s[0], s_t2s[0], s_v1s[0], s_v2s[0],             s_en[1], s_t1s[1], s_t2s[1], s_v1s[1], s_v2s[1]);
+    $display(" clock %d   | c_en0: %d  c_ts0: %d  c_vs0: %d | c_en1: %d  c_ts1: %d  c_vs1: %d | s_en0: %d   s_t1s0: %d  s_t2s0: %d  s_v1s0: %d  sv2s0: %d  |  s_en1: %d   s_t1s1: %d  s_t2s1: %d  s_v1s1: %d  sv2s1: %d",
+                clock,         c_en[0], c_ts[0], c_vs[0],       c_en[1], c_ts[1], c_vs[1],        s_en[0], s_t1s[0], s_t2s[0], s_v1s[0], s_v2s[0],             s_en[1], s_t1s[1], s_t2s[1], s_v1s[1], s_v2s[1]);
 end
 
 initial begin
     clock = 1'b0;
-    reset = 1'b1;
-    flush = 1'b1;
+    reset = 1'b0;
+    flush = 1'b0;
     @(negedge clock);
     @(negedge clock);
     reset = 1'b0;
@@ -91,6 +91,19 @@ initial begin
     s_t1s[1] = 'd22;
     s_t2s[0] = 'd20;
     s_t2s[1] = 'd16;
+
+    @(negedge clock);
+    s_t1s[0] = 'd0;
+    s_t1s[1] = 'd22;
+
+    @(negedge clock);
+    s_t1s[0] = 'd0;
+    s_t1s[1] = 'd0;
+
+
+    @(negedge clock);
+    s_t1s[0] = 'd20;
+    s_t1s[1] = 'd0;
 
 
     @(negedge clock);
