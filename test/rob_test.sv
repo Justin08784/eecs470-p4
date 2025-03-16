@@ -16,7 +16,7 @@ module rob_test();
     rob2retire r_out;
 
     // complete (write)
-    complete2rob c_in;
+    execute2complete c_in;
 
     // dispatch (write)
     rob2dispatch d_out;
@@ -58,12 +58,14 @@ module rob_test();
     logic DEBUG = 1;
     always @(posedge clock) begin
         if (DEBUG) begin
-            $display("  %3d | d_in: [(%d, %d), (%d, %d)]   wr_en_cnt: %d  rd_en_cnt: %d  |  d_out: [(%d, %d), (%d, %d)]",
+            $display("  %3d | d_in: [(%d, %d, %d), (%d, %d, %d)]   wr_en_cnt: %d  rd_en_cnt: %d  |  d_out: [(%d, %d, %d), (%d, %d, %d)]",
                 $time,
                 d_in.tag[0],
                 d_in.t_old[0],
+                d_in.dst[0],
                 d_in.tag[1],
                 d_in.t_old[1],
+                d_in.dst[1],
                 // d_in.d_en_cnt > 0 ? d_in.tag[0] : 0,
                 // d_in.d_en_cnt > 0 ? d_in.t_old[0] : 0,
                 // d_in.d_en_cnt > 1 ? d_in.tag[1] : 0,
@@ -72,8 +74,10 @@ module rob_test();
                 r_out.r_en_cnt,
                 r_out.tag[0], 
                 r_out.t_old[0], 
+                r_out.dst[0], 
                 r_out.tag[1], 
-                r_out.t_old[1]);
+                r_out.t_old[1],
+                r_out.dst[1]);
         end
     end
     

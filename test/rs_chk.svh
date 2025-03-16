@@ -17,17 +17,12 @@ module rs_chk #(parameter
     input reset,
     input flush,
     // dispatch
-    input   logic           [$clog2(N):0] rs_scnt, // to dispatcher
-    input   logic           [$clog2(N):0] d_en_cnt,     // number of enabled dispatch lines? (from dispatcher; dep. on rs_scnt)
-    input   ID_RESULT       [N-1:0] d_dat,
+    input   rs2dispatch     d_out_dut,
+    input   dispatch2rs     d_in,
     // issue
-    input   logic           [NUM_FU_ALU-1:0]    fu_rdy_alu,
-    input   logic           [NUM_FU_MULT-1:0]   fu_rdy_mult,
-    input   logic           [NUM_FU_STORE-1:0]  fu_rdy_store,
-    input   logic           [NUM_FU_LOAD-1:0]   fu_rdy_load,
+    input   execute2rs      ex_in,
     // complete
-    input   logic           [N-1:0] c_en,
-    input   PHYS_REG_IDX    [N-1:0] c_ts,
+    input   execute2complete c_in,
 
     // delicious spaghetti for print debugging
     // input   logic           [RS_SZ-1:0]   to_t1_rdy_dut,
@@ -36,14 +31,7 @@ module rs_chk #(parameter
     // input   logic           [FU_IDX_NUM-1:0][RS_SZ-1:0]   can_issues_dut,
 
     // ==== dut lines for comparison
-    input   logic           [NUM_FU_ALU-1:0]    fu_vld_alu_dut,
-    input   logic           [NUM_FU_MULT-1:0]   fu_vld_mult_dut,
-    input   logic           [NUM_FU_STORE-1:0]  fu_vld_store_dut,
-    input   logic           [NUM_FU_LOAD-1:0]   fu_vld_load_dut,
-    input   ID_RESULT       [NUM_FU_ALU-1:0]    fu_dat_alu_dut,
-    input   ID_RESULT       [NUM_FU_MULT-1:0]   fu_dat_mult_dut,
-    input   ID_RESULT       [NUM_FU_STORE-1:0]  fu_dat_store_dut,
-    input   ID_RESULT       [NUM_FU_LOAD-1:0]   fu_dat_load_dut,
+    input   rs2execute      ex_out_dut,
     input   RS_ENTRY        [RS_SZ-1:0]         entries_dut
 );
     localparam DEBUG = 1;
@@ -102,67 +90,35 @@ module rs_chk #(parameter
     endfunction
 
     struct packed {
-        logic           [$clog2(N):0] d_en_cnt;     // number of enabled dispatch lines? (from dispatcher; dep. on rs_scnt)
-        ID_RESULT       [N-1:0] d_dat;
+        dispatch2rs     d_in;
         // issue
-        logic           [NUM_FU_ALU-1:0]    fu_rdy_alu;
-        logic           [NUM_FU_MULT-1:0]   fu_rdy_mult;
-        logic           [NUM_FU_STORE-1:0]  fu_rdy_store;
-        logic           [NUM_FU_LOAD-1:0]   fu_rdy_load;
+        execute2rs      ex_in;
         // complete
-        logic           [N-1:0] c_en;
-        PHYS_REG_IDX    [N-1:0] c_ts;
+        execute2complete c_in;
     } ins_pre, ins_cur; 
 
     struct packed {
-        logic       [$clog2(N):0]       rs_scnt;
+        rs2dispatch d_out;
         
-        logic       [NUM_FU_ALU-1:0]    fu_vld_alu;
-        logic       [NUM_FU_MULT-1:0]   fu_vld_mult;
-        logic       [NUM_FU_STORE-1:0]  fu_vld_store;
-        logic       [NUM_FU_LOAD-1:0]   fu_vld_load;
-        ID_RESULT   [NUM_FU_ALU-1:0]    fu_dat_alu;
-        ID_RESULT   [NUM_FU_MULT-1:0]   fu_dat_mult;
-        ID_RESULT   [NUM_FU_STORE-1:0]  fu_dat_store;
-        ID_RESULT   [NUM_FU_LOAD-1:0]   fu_dat_load;
+        rs2execute  ex_out;
     } outs_pre, outs_cur; 
 
     // This syntax is so fucking gorgeous btw.
     assign ins_cur = '{
-        d_en_cnt:d_en_cnt,
-        d_dat:d_dat,
-        fu_rdy_alu:fu_rdy_alu,
-        fu_rdy_mult:fu_rdy_mult,
-        fu_rdy_load:fu_rdy_load,
-        fu_rdy_store:fu_rdy_store,
-        c_en:c_en,
-        c_ts:c_ts
+        d_in:d_in,
+        ex_in:ex_in,
+        c_in:c_in
     };
 
     assign outs_cur = '{
-        rs_scnt:rs_scnt,
-        fu_vld_alu:fu_vld_alu_dut,
-        fu_vld_mult:fu_vld_mult_dut,
-        fu_vld_load:fu_vld_load_dut,
-        fu_vld_store:fu_vld_store_dut,
-        fu_dat_alu:fu_dat_alu_dut,
-        fu_dat_mult:fu_dat_mult_dut,
-        fu_dat_load:fu_dat_load_dut,
-        fu_dat_store:fu_dat_store_dut
+        d_out:d_out_dut,
+        ex_out:ex_out_dut
     };
     
-    logic               [NUM_FU_ALU-1:0]    fu_vld_alu;
-    logic               [NUM_FU_MULT-1:0]   fu_vld_mult;
-    logic               [NUM_FU_STORE-1:0]  fu_vld_store;
-    logic               [NUM_FU_LOAD-1:0]   fu_vld_load;
-    ID_RESULT           [NUM_FU_ALU-1:0]    fu_dat_alu;
-    ID_RESULT           [NUM_FU_MULT-1:0]   fu_dat_mult;
-    ID_RESULT           [NUM_FU_STORE-1:0]  fu_dat_store;
-    ID_RESULT           [NUM_FU_LOAD-1:0]   fu_dat_load;
     int num_free_fus    [FU_IDX_NUM];
     int num_issue_fus   [FU_IDX_NUM];
 
-    int rs_scnt_sva;
+    int rs_rdy_scnt_sva;
     RS_ENTRY [RS_SZ-1:0] 
         entries_pre,      // prev value (updated to entries_cur on posedge)
         entries_mut,      // scratchpad (entries_pre with some modifications)
@@ -248,10 +204,10 @@ module rs_chk #(parameter
 
         // check ready correctness 
         cdb_tags_pre.delete();
-        foreach (c_ts[i]) begin
-            if (!ins_pre.c_en[i])
+        foreach (c_in.c_ts[i]) begin
+            if (!ins_pre.c_in.c_en[i])
                 continue;
-            cdb_tags_pre[ins_pre.c_ts[i]] = 1;
+            cdb_tags_pre[ins_pre.c_in.c_ts[i]] = 1;
         end
         ready_correct = 1;
         for (int rs = 0, PHYS_REG_IDX t1 = 0, PHYS_REG_IDX t2 = 0; rs < RS_SZ; ++rs) begin
@@ -282,11 +238,11 @@ module rs_chk #(parameter
         for (int rs = 0, PHYS_REG_IDX t1 = 0, PHYS_REG_IDX t2 = 0; rs < RS_SZ; ++rs) begin
             t1 = entries_pre[rs].dat.t1;
             t2 = entries_pre[rs].dat.t2;
-            foreach (ins_pre.c_en[i]) begin
-                if (!ins_pre.c_en[i])
+            foreach (ins_pre.c_in.c_en[i]) begin
+                if (!ins_pre.c_in.c_en[i])
                     continue;
-                entries_mut[rs].dat.t1_rdy |= (ins_pre.c_ts[i] == t1);
-                entries_mut[rs].dat.t2_rdy |= (ins_pre.c_ts[i] == t2);
+                entries_mut[rs].dat.t1_rdy |= (ins_pre.c_in.c_ts[i] == t1);
+                entries_mut[rs].dat.t2_rdy |= (ins_pre.c_in.c_ts[i] == t2);
             end
         end
 
@@ -315,10 +271,10 @@ module rs_chk #(parameter
         issue_cnt_correct = 1;
         for (int fu = 0, int rdy_num = 0; fu < FU_IDX_NUM; ++fu) begin
             case (fu) 
-            FU_ALU:     rdy_num = $countones(ins_pre.fu_rdy_alu);
-            FU_MULT:    rdy_num = $countones(ins_pre.fu_rdy_mult);
-            FU_LOAD:    rdy_num = $countones(ins_pre.fu_rdy_load);
-            FU_STORE:   rdy_num = $countones(ins_pre.fu_rdy_store);
+            FU_ALU:     rdy_num = $countones(ins_pre.ex_in.fu_rdy_alu);
+            FU_MULT:    rdy_num = $countones(ins_pre.ex_in.fu_rdy_mult);
+            FU_LOAD:    rdy_num = $countones(ins_pre.ex_in.fu_rdy_load);
+            FU_STORE:   rdy_num = $countones(ins_pre.ex_in.fu_rdy_store);
             endcase
             // $display("fu=%0d: issd:      %0b", fu, issd_by_fu_cur[fu]);
             // $display("fu=%0d: can_issue: %0b", fu, can_issue_by_fu_mut[fu]);
@@ -331,47 +287,47 @@ module rs_chk #(parameter
         issue_asg_correct = 1; // is data assigned to a read fu?
         issue_dat_correct = 1;
         for (int i = 0, int id = 0, int rs = 0; i < NUM_FU_ALU; ++i) begin
-            if (!outs_pre.fu_vld_alu[i])
+            if (!outs_pre.ex_out.fu_vld_alu[i])
                 continue;
-            issue_asg_correct &= ins_pre.fu_rdy_alu[i];
-            id = outs_pre.fu_dat_alu[i].id;
+            issue_asg_correct &= ins_pre.ex_in.fu_rdy_alu[i];
+            id = outs_pre.ex_out.fu_dat_alu[i].id;
             if (!id2idx_pre.exists(id)) begin
                 $display("WHAT THE FUCK?");
                 $finish;
             end
             rs = id2idx_pre[id];
-            issue_dat_correct &= (outs_pre.fu_dat_alu[i] == entries_pre[rs].dat);
+            issue_dat_correct &= (outs_pre.ex_out.fu_dat_alu[i] == entries_pre[rs].dat);
         end
         for (int i = 0, int id = 0, int rs = 0; i < NUM_FU_MULT; ++i) begin
-            if (!outs_pre.fu_vld_mult[i])
+            if (!outs_pre.ex_out.fu_vld_mult[i])
                 continue;
-            issue_asg_correct &= ins_pre.fu_rdy_mult[i];
-            id = outs_pre.fu_dat_mult[i].id;
+            issue_asg_correct &= ins_pre.ex_in.fu_rdy_mult[i];
+            id = outs_pre.ex_out.fu_dat_mult[i].id;
             rs = id2idx_pre[id];
-            issue_dat_correct &= (outs_pre.fu_dat_mult[i] == entries_pre[rs].dat);
+            issue_dat_correct &= (outs_pre.ex_out.fu_dat_mult[i] == entries_pre[rs].dat);
         end
         for (int i = 0, int id = 0, int rs = 0; i < NUM_FU_LOAD; ++i) begin
-            if (!outs_pre.fu_vld_load[i])
+            if (!outs_pre.ex_out.fu_vld_load[i])
                 continue;
-            issue_asg_correct &= ins_pre.fu_rdy_load[i];
-            id = outs_pre.fu_dat_load[i].id;
+            issue_asg_correct &= ins_pre.ex_in.fu_rdy_load[i];
+            id = outs_pre.ex_out.fu_dat_load[i].id;
             rs = id2idx_pre[id];
-            issue_dat_correct &= (outs_pre.fu_dat_load[i] == entries_pre[rs].dat);
+            issue_dat_correct &= (outs_pre.ex_out.fu_dat_load[i] == entries_pre[rs].dat);
         end
         for (int i = 0, int id = 0, int rs = 0; i < NUM_FU_STORE; ++i) begin
-            if (!outs_pre.fu_vld_store[i])
+            if (!outs_pre.ex_out.fu_vld_store[i])
                 continue;
-            issue_asg_correct &= ins_pre.fu_rdy_store[i];
-            id = outs_pre.fu_dat_store[i].id;
+            issue_asg_correct &= ins_pre.ex_in.fu_rdy_store[i];
+            id = outs_pre.ex_out.fu_dat_store[i].id;
             rs = id2idx_pre[id];
-            issue_dat_correct &= (outs_pre.fu_dat_store[i] == entries_pre[rs].dat);
+            issue_dat_correct &= (outs_pre.ex_out.fu_dat_store[i] == entries_pre[rs].dat);
         end
         
         // check dispatch correctness
         d_find_id_pre.delete();
         for (int i = 0; i < N; ++i) begin
-            if (i < ins_pre.d_en_cnt) begin
-                d_find_id_pre[ins_pre.d_dat[i].id] = i;
+            if (i < ins_pre.d_in.d_en_cnt) begin
+                d_find_id_pre[ins_pre.d_in.d_dat[i].id] = i;
             end
         end
         num_free = 0;
@@ -391,9 +347,9 @@ module rs_chk #(parameter
                 continue;
             
             dispatch_asg_correct &= d_find_id_pre.exists(id);
-            dispatch_dat_correct &= (ins_pre.d_dat[d_find_id_pre[id]] == entries_cur[rs].dat);
+            dispatch_dat_correct &= (ins_pre.d_in.d_dat[d_find_id_pre[id]] == entries_cur[rs].dat);
         end
-        dispatch_cnt_correct = num_dispatches == $min(int'(ins_pre.d_en_cnt), num_free);
+        dispatch_cnt_correct = num_dispatches == $min(int'(ins_pre.d_in.d_en_cnt), num_free);
 
         @(posedge clock);
 

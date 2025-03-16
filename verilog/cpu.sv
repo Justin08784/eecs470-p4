@@ -379,41 +379,51 @@ module cpu (
 
     //////////////////////////////////////////////////
     //                                              //
+    //                   Decode                     //
+    //                                              //
+    //////////////////////////////////////////////////   
+    // decode2dispatch d2dis;
+    // dispatch2decode dis2d;
+
+    stage_id_p4 decoder0 (
+        // TODO: Sam's commit
+    );
+
+    //////////////////////////////////////////////////
+    //                                              //
     //                   Dispatch                   //
     //                                              //
     //////////////////////////////////////////////////   
 
-    decode2dispatch d2dis;
-    dispatch2decode dis2d;
-    rs2dispatch rs2dis;
-    dispatch2rs dis2rs;
-    rob2dispatch rob2dis;
-    dispatch2rob dis2rob;
-    free_list2dispatch fl2dis;
-    dispatch2free_list dis2fl; // TODO
-    dispatch2map_table dis2mt; // TODO
+    // rs2dispatch rs2dis;
+    // dispatch2rs dis2rs;
+    // rob2dispatch rob2dis;
+    // dispatch2rob dis2rob;
+    // free_list2dispatch fl2dis;
+    // dispatch2free_list dis2fl; // TODO
+    // dispatch2map_table dis2mt; // TODO
 
     dispatch dispatcher(
-        .clock(clock),
-        .reset(reset),
-        .flush(),
+        // .clock(clock),
+        // .reset(reset),
+        // .flush(),
 
-        .decode_in(d2dis),
-        .decode_out(dis2d),
+        // .decode_in(d2dis),
+        // .decode_out(dis2d),
 
-        .rs_in(rs2dis),
-        .rs_out(dis2rs),
+        // .rs_in(rs2dis),
+        // .rs_out(dis2rs),
 
-        .rob_in(rob2dis),
-        .rob_out(dis2rob),
+        // .rob_in(rob2dis),
+        // .rob_out(dis2rob),
 
-        .free_in(fl2dis),
-        .free_out(dis2fl),
+        // .free_in(fl2dis),
+        // .free_out(dis2fl),
 
-        .lsq_in('0),
-        .lsq_out(),
+        // .lsq_in('0),
+        // .lsq_out(),
 
-        .map_out(dis2mt)
+        // .map_out(dis2mt)
     );
 
     //////////////////////////////////////////////////
@@ -421,48 +431,48 @@ module cpu (
     //              Reservation Station             //
     //                                              //
     //////////////////////////////////////////////////  
-    logic       [$clog2(`N):0] rs_scnt;  // to dispatcher
-    logic       [$clog2(`N):0] d_en_cnt; // number of enabled dispatch lines? (from dispatcher; dep. on rs_scnt)
-    ID_RESULT   [`N-1:0] d_dat;
+    // logic       [$clog2(`N):0] rs_rdy_scnt;  // to dispatcher
+    // logic       [$clog2(`N):0] d_en_cnt; // number of enabled dispatch lines? (from dispatcher; dep. on rs_rdy_scnt)
+    // ID_RESULT   [`N-1:0] d_dat;
 
-    logic       [`NUM_FU_ALU-1:0]    fu_rdy_alu;
-    logic       [`NUM_FU_MULT-1:0]   fu_rdy_mult;
-    logic       [`NUM_FU_STORE-1:0]  fu_rdy_store;
-    logic       [`NUM_FU_LOAD-1:0]   fu_rdy_load;
-    logic           [`N-1:0] c_en;
-    PHYS_REG_IDX    [`N-1:0] c_ts;
+    // logic       [`NUM_FU_ALU-1:0]    fu_rdy_alu;
+    // logic       [`NUM_FU_MULT-1:0]   fu_rdy_mult;
+    // logic       [`NUM_FU_STORE-1:0]  fu_rdy_store;
+    // logic       [`NUM_FU_LOAD-1:0]   fu_rdy_load;
+    // logic           [`N-1:0] c_en;
+    // PHYS_REG_IDX    [`N-1:0] c_ts;
 
-    logic       [`NUM_FU_ALU-1:0]    fu_vld_alu;
-    logic       [`NUM_FU_MULT-1:0]   fu_vld_mult;
-    logic       [`NUM_FU_STORE-1:0]  fu_vld_store;
-    logic       [`NUM_FU_LOAD-1:0]   fu_vld_load;
-    ID_RESULT   [`NUM_FU_ALU-1:0]    fu_dat_alu;
-    ID_RESULT   [`NUM_FU_MULT-1:0]   fu_dat_mult;
-    ID_RESULT   [`NUM_FU_STORE-1:0]  fu_dat_store;
-    ID_RESULT   [`NUM_FU_LOAD-1:0]   fu_dat_load;
+    // logic       [`NUM_FU_ALU-1:0]    fu_vld_alu;
+    // logic       [`NUM_FU_MULT-1:0]   fu_vld_mult;
+    // logic       [`NUM_FU_STORE-1:0]  fu_vld_store;
+    // logic       [`NUM_FU_LOAD-1:0]   fu_vld_load;
+    // ID_RESULT   [`NUM_FU_ALU-1:0]    fu_dat_alu;
+    // ID_RESULT   [`NUM_FU_MULT-1:0]   fu_dat_mult;
+    // ID_RESULT   [`NUM_FU_STORE-1:0]  fu_dat_store;
+    // ID_RESULT   [`NUM_FU_LOAD-1:0]   fu_dat_load;
 
 
     rs rs_0(
-        .clock(clock),
-        .reset(reset),
-        .flush(),
+        // .clock(clock),
+        // .reset(reset),
+        // .flush(),
  
-        .rs_scnt(rs2dis.rs_rdy_scnt),
-        .d_en_cnt(dis2rs.rs_d_en_cnt),
-        .d_dat(d_dat),
+        // .rs_rdy_scnt(rs2dis.rs_rdy_scnt),
+        // .d_en_cnt(dis2rs.d_en_cnt),
+        // .d_dat(d_dat),
  
-        .fu_rdy_alu(fu_rdy_alu),
-        .fu_rdy_mult(fu_rdy_mult),
-        .fu_rdy_store(fu_rdy_store),
-        .fu_rdy_load(fu_rdy_load),
+        // .fu_rdy_alu(fu_rdy_alu),
+        // .fu_rdy_mult(fu_rdy_mult),
+        // .fu_rdy_store(fu_rdy_store),
+        // .fu_rdy_load(fu_rdy_load),
 
-        .fu_dat_alu(fu_dat_alu),
-        .fu_dat_mult(fu_dat_mult),
-        .fu_dat_store(fu_dat_store),
-        .fu_dat_load(fu_dat_load),
+        // .fu_dat_alu(fu_dat_alu),
+        // .fu_dat_mult(fu_dat_mult),
+        // .fu_dat_store(fu_dat_store),
+        // .fu_dat_load(fu_dat_load),
  
-        .c_en(c_en),
-        .c_ts(c_ts)
+        // .c_en(c_en),
+        // .c_ts(c_ts)
     );
 
     //////////////////////////////////////////////////
@@ -471,8 +481,8 @@ module cpu (
     //                                              //
     //////////////////////////////////////////////////  
 
-    rob2retire rob2r;
-    complete2rob c2rob;
+    // rob2retire rob2r;
+    // execute2complete c2rob;
     // typedef struct packed {logic dummy;} rob2decode;
     // typedef struct packed {logic dummy;} decode2rob;
     // rob2decode rob2d;
@@ -482,12 +492,12 @@ module cpu (
         .ROB_SZ(`ROB_SZ),
         .N(`N)
     ) rob_0 (
-        .clock  (clock),
-        .reset  (reset),
-        .r_out  (rob2r),
-        .c_in   (c2rob),
-        .d_out  (rob2dis),
-        .d_in   (dis2rob)
+        // .clock  (clock),
+        // .reset  (reset),
+        // .r_out  (rob2r),
+        // .c_in   (c2rob),
+        // .d_out  (rob2dis),
+        // .d_in   (dis2rob)
     );
 
     //////////////////////////////////////////////////
@@ -498,15 +508,15 @@ module cpu (
 
     // retire (read)
 
-    map_table2ROBandRS mt2rob_rs;
-    complete2map_table c2mt;
+    // map_table2robandRS mt2rob_rs;
+    // complete2map_table c2mt;
 
     map_table map_table_0 (
-        .clock(clock),
-        .reset(reset),
-        .c_in(c2mt),
-        .d_in(dis2mt),
-        .rs_out(mt2rob_rs)
+        // .clock(clock),
+        // .reset(reset),
+        // .c_in(c2mt),
+        // .d_in(dis2mt),
+        // .rs_out(mt2rob_rs)
     );
 
     //////////////////////////////////////////////////
@@ -560,21 +570,5 @@ module cpu (
         .s_v1s(),
         .s_v2s()
     );
-
-    //////////////////////////////////////////////////
-    //                                              //
-    //                      CDB                     //
-    //                                              //
-    //////////////////////////////////////////////////  
-
-    cdb #(
-        .N(`N)
-    ) cdb_0  (
-        .reset(reset),
-        .complete_tags(),
-        .cdb_en(),
-        .cdb_broadcast()
-    );
-
 
 endmodule // pipeline

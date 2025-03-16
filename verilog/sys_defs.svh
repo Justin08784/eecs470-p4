@@ -409,6 +409,7 @@ typedef struct packed {
     logic cpl;
     logic [$clog2(`PHYS_REG_SZ_R10K)-1:0] tag;
     logic [$clog2(`PHYS_REG_SZ_R10K)-1:0] t_old;
+    REG_IDX dst;
 } ROB_ENTRY;
 
 
@@ -444,7 +445,7 @@ typedef struct packed {
     ALU_OPA_SELECT opa_select; // ALU opa mux select (ALU_OPA_xxx *)
     ALU_OPB_SELECT opb_select; // ALU opb mux select (ALU_OPB_xxx *)
 
-    // REG_IDX  dest_reg_idx;  // destination (writeback) register index
+    REG_IDX  dest_reg_idx;  // destination (writeback) register index
     ALU_FUNC alu_func;      // ALU function select (ALU_xxx *)
     logic    mult;          // Is inst a multiply instruction?
     logic    rd_mem;        // Does inst read memory?
@@ -476,42 +477,28 @@ typedef struct packed {
     ID_RESULT   dat;
 } FU_ENTRY;
 
-// DISPATCH DECODE
+// By decode
 typedef struct packed {
-    ID_RESULT   [`N-1:0]     d_dat;
+    ID_RESULT   [$clog2(`N):0]  d_en_cnt;
+    ID_RESULT   [`N-1:0]        d_dat;
 } decode2dispatch;
 
+// By Dispatch
 typedef struct packed {
     logic       [$clog2(`N):0] decode_d_en_cnt;
 } dispatch2decode;
 
-
-// DISPATCH RS
 typedef struct packed {
-    logic       [$clog2(`N):0] rs_rdy_scnt;
-        // - From: RS
-} rs2dispatch;
-
-typedef struct packed {
-    logic       [$clog2(`N):0] rs_d_en_cnt;
+    logic       [$clog2(`N):0] d_en_cnt;
         // - To: RS
         // - Number of enabled dispatch lines? (replacement for d_vld)
         // - Question: permit
         // 1) only N dispatches, OR
         // 2) a different limit number of dispatches DIS_MAX: N ≤ DIS_MAX ≤ RS_SZ
         // (DIS_MAX will be a new sys_defs.svh constant) ?
-    // ID_RESULT   [N-1:0] d_dat, //shouldn't have dispatch feed to RS,
+    ID_RESULT   [`N-1:0] d_dat; //shouldn't have dispatch feed to RS,
         // - To: RS               //should come directly from dispatch
 } dispatch2rs;
-
-
-// DISPATCH ROB
-typedef struct packed {
-    logic    [$clog2(`N):0]    rob_rdy_scnt;
-        // From: ROB
-        // saturating counter for number of free rob entries
-    ROB_IDX [`N-1:0]         rob_idxs; //not needed, but putting here for testbench
-} rob2dispatch;
 
 typedef struct packed {
     logic   [$clog2(`N):0]            d_en_cnt;
@@ -519,25 +506,12 @@ typedef struct packed {
         // - Number of enabled dispatch lines?
     logic [`N-1:0][$clog2(`PHYS_REG_SZ_R10K)-1:0] tag;
     logic [`N-1:0][$clog2(`PHYS_REG_SZ_R10K)-1:0] t_old;
+        // From: dispatch
+        // - IMPORTANT: Set from lowest indices in program-order. NO GAPS!!!
     //THESE ARE NOT COMING FROM DISPATCH, GET THESE FROM MAP TABLE
     //(ONLY HERE FOR CURRENT ROB TESTBENCH)
+    REG_IDX [`N-1:0] dst;
 } dispatch2rob;
-
-
-// DISPATCH Free list
-typedef struct packed {
-    logic    [$clog2(`N):0]    free_rdy_scnt;
-    // From: Free list
-    // - sat. count of number of free pregs in free list;
-    //   count reflects any pregs returned in retire! (i.e. AFTER retires)
-    PHYS_REG_IDX [`N-1:0]     d_ts;
-    // From: Free list
-    // - newly allocated pregs
-    // THIS WILL BE 1 CLOCK CYCLE BEHIND. THIS IS DESIRED SO THAT
-    // TAGS ARE APPLIED AT THE CORRECT TIMES (paired with map table output)
-    // (means that tags will be applied when the dispatched insts actually get
-    // to RS/ROB)
-} free_list2dispatch;
 
 typedef struct packed {
     logic     [$clog2(`N):0]  free_d_en_cnt;
@@ -547,12 +521,6 @@ typedef struct packed {
         //   (i.e. may only be a strict subset of dispatching insns!)
 } dispatch2free_list;
 
-
-// DISPATCH LSQ
-typedef struct packed {
-    logic    [$clog2(`N):0]    lsq_rdy_scnt;
-} lsq2dispatch;
-
 typedef struct packed {
     logic     [$clog2(`N):0]  lsq_d_en_cnt;
         // To: LSQ
@@ -560,8 +528,6 @@ typedef struct packed {
         //   (i.e. may only be a strict subset of dispatching insns!)
 } dispatch2lsq;
 
-
-// DISPATCH Map table
 typedef struct packed {
     logic         [$clog2(`N):0] en_cnt;
         // - Number of enabled dispatch lines?
@@ -580,59 +546,11 @@ typedef struct packed {
 } dispatch2map_table;
 
 
-// retire (read)
-typedef struct packed {
-    logic [$clog2(`N):0]     r_en_cnt;
-    PHYS_REG_IDX [`N-1:0]    tag;
-    PHYS_REG_IDX [`N-1:0]    t_old;
-} rob2retire;
-
-// complete (write)
-typedef struct packed {
-    logic [`N-1:0]           c_en;
-    ROB_IDX [`N-1:0]         c_rob_idxs;
-} complete2rob;
-
-// Completion signals
-typedef struct packed {
-    logic         [`N-1:0] c_en;
-    PHYS_REG_IDX  [`N-1:0] c_ts;
-} complete2map_table;
-
-// Retire 
-// Retire to free list
-typedef struct packed {
-    logic     [$clog2(`N):0]   r_en_cnt;
-        // From: retire (ROB)
-        // - number of enabled retire lines WHO ARE RETURNING/DEALLOC'ING A PREG
-        //   (e.g. no stores)
-        //   (i.e. may only be a strict subset of retiring insns!)
-        // - Question: Does this really need to be an count? Surely there isn't
-        //   any serial dep. between returning pregs no? But again, the free list
-        //   itself is likely going to be FIFO so I'm not sure what's more performant...
-        //   enable bus vs. count?
-    PHYS_REG_IDX [`N-1:0]     r_tolds;
-        // From: retire (ROB)
-        // - pregs being returned to free list
-} retire2fl;
-
-typedef struct packed {
-    logic         [$clog2(`N):0] en_cnt;
-        // - Number of enabled retire lines?
-        // - Question: Does this need to be a count, or can we make it an enable
-        // bus? I fear that there can be serial dependencies and ordering issues
-        // e.g. if multiple insns retire to the same dest arch register.
-    REG_IDX       [`N-1:0] dsts;
-    PHYS_REG_IDX  [`N-1:0] ts;
-        // From: retire (ROB)
-        // - IMPORTANT: Set from lowest indices in program-order. NO GAPS!!!
-} retire2archmap;
-
-// Map table outputs
+// By Map Table
 typedef struct packed {
     PHYS_REG_IDX [`N-1:0] ts;
     PHYS_REG_IDX [`N-1:0] ts_old;
-}  map_table2ROB;
+} map_table2rob;
 
 typedef struct packed {
     logic        [`N-1:0] cpl1s;
@@ -641,6 +559,96 @@ typedef struct packed {
     PHYS_REG_IDX [`N-1:0] t2s;
     PHYS_REG_IDX [`N-1:0] ts;
 } map_table2dispatch;
+
+
+// By RS
+typedef struct packed {
+    logic       [$clog2(`N):0] rs_rdy_scnt;
+        // - From: RS
+} rs2dispatch;
+
+typedef struct packed {
+    logic       [`NUM_FU_ALU-1:0]    fu_vld_alu;
+    logic       [`NUM_FU_MULT-1:0]   fu_vld_mult;
+    logic       [`NUM_FU_STORE-1:0]  fu_vld_store;
+    logic       [`NUM_FU_LOAD-1:0]   fu_vld_load;
+    ID_RESULT   [`NUM_FU_ALU-1:0]    fu_dat_alu;
+    ID_RESULT   [`NUM_FU_MULT-1:0]   fu_dat_mult;
+    ID_RESULT   [`NUM_FU_STORE-1:0]  fu_dat_store;
+    ID_RESULT   [`NUM_FU_LOAD-1:0]   fu_dat_load;
+} rs2execute;
+
+// By ROB
+typedef struct packed {
+    logic    [$clog2(`N):0]     rob_rdy_scnt;
+        // From: ROB
+        // saturating counter for number of free rob entries
+    ROB_IDX [`N-1:0]            rob_idxs; //not needed, but putting here for testbench
+        // To: dispatch
+        // rob idxs of entries that can be allocated this cycle
+        // Option 1: This
+        // Option 2: expose HEAD pointer and let dispatcher generate these
+        // (main concern with option 2 is it could be wrong? idk)
+} rob2dispatch;
+
+typedef struct packed {
+    logic           [$clog2(`N):0]      r_en_cnt;
+        // From: retire (ROB)
+        // - number of enabled retire lines WHO ARE RETURNING/DEALLOC'ING A PREG
+        //   (e.g. no stores)
+        //   (i.e. may only be a strict subset of retiring insns!)
+        // - Question: Does this really need to be an count? Surely there isn't
+        //   any serial dep. between returning pregs no? But again, the free list
+        //   itself is likely going to be FIFO so I'm not sure what's more performant...
+        //   enable bus vs. count?
+    PHYS_REG_IDX    [`N-1:0]            tag;
+        // From: retire (ROB)
+        // - IMPORTANT: Set from lowest indices in program-order. NO GAPS!!!
+    PHYS_REG_IDX    [`N-1:0]            t_old;
+        // From: retire (ROB)
+        // - pregs being returned to free list
+    REG_IDX         [`N-1:0]            dst;
+} rob2retire;
+
+
+// By Execute
+typedef struct packed {
+    logic       [`NUM_FU_ALU-1:0]    fu_rdy_alu;
+    logic       [`NUM_FU_MULT-1:0]   fu_rdy_mult;
+    logic       [`NUM_FU_STORE-1:0]  fu_rdy_store;
+    logic       [`NUM_FU_LOAD-1:0]   fu_rdy_load;
+} execute2rs;
+
+typedef struct packed {
+    logic           [`N-1:0] c_en;
+        // - From: EX
+    PHYS_REG_IDX    [`N-1:0] c_ts;
+        // - From: EX
+    ROB_IDX         [`N-1:0] c_rob_idxs;
+        // - From: EX
+} execute2complete;
+
+// By Free List
+typedef struct packed {
+    logic    [$clog2(`N):0] free_rdy_scnt;
+        // From: Free list
+        // - sat. count of number of free pregs in free list;
+        //   count reflects any pregs returned in retire! (i.e. AFTER retires)
+    PHYS_REG_IDX [`N-1:0]   d_ts;
+        // From: Free list
+        // - newly allocated pregs
+        // THIS WILL BE 1 CLOCK CYCLE BEHIND. THIS IS DESIRED SO THAT
+        // TAGS ARE APPLIED AT THE CORRECT TIMES (paired with map table output)
+        // (means that tags will be applied when the dispatched insts actually get
+        // to RS/ROB)
+} free_list2dispatch;
+
+
+// By LSQ
+typedef struct packed {
+    logic    [$clog2(`N):0]    lsq_rdy_scnt;
+} lsq2dispatch;
+
 
 /* How can we implement this in the Makefile? */
 // comment out to disable DEBUG:

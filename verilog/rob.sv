@@ -13,7 +13,7 @@ module rob #(
     output rob2retire r_out,
 
     // complete (write)
-    input complete2rob c_in,
+    input execute2complete c_in,
 
     // dispatch (write)
     output rob2dispatch d_out,
@@ -50,6 +50,7 @@ module rob #(
         r_out.r_en_cnt  = '0;
         r_out.tag       = '0;
         r_out.t_old     = '0;
+        r_out.dst       = '0;
         for (int unsigned i = 0; i < NUM_RPORTS; ++i, ++r_out.r_en_cnt) begin
             // This computes r_en_cnt linear-time wrt NUM_RPORTS. (Fine if NUM_RPORTS
             // small; synthesizer may simply unroll this loop.)
@@ -59,6 +60,7 @@ module rob #(
             //     break;
             r_out.tag[i]    = state[r_idxs[i]].tag;
             r_out.t_old[i]  = state[r_idxs[i]].t_old;
+            r_out.dst[i]    = state[r_idxs[i]].dst;
         end
 
         // handle dispatch (outs)
@@ -115,6 +117,7 @@ module rob #(
                 cur_idx = d_idxs[i];
                 state[cur_idx].tag    <= d_in.tag[i];
                 state[cur_idx].t_old  <= d_in.t_old[i];
+                state[cur_idx].dst    <= d_in.dst[i];
             end
         end
     end

@@ -17,8 +17,8 @@ module rs_sva #(parameter
     input reset,
     input flush,
     // dispatch
-    input   logic           [$clog2(N):0] rs_scnt, // to dispatcher
-    input   logic           [N-1:0] d_vld,     // which dispatch lines are valid? (from dispatcher; dep. on rs_scnt)
+    input   logic           [$clog2(N):0] rs_rdy_scnt, // to dispatcher
+    input   logic           [N-1:0] d_vld,     // which dispatch lines are valid? (from dispatcher; dep. on rs_rdy_scnt)
     input   ID_RESULT       [N-1:0] d_dat,
     // issue
     input   logic           [NUM_FU_ALU-1:0]    fu_rdy_alu,
@@ -122,7 +122,7 @@ module rs_sva #(parameter
     end
     endgenerate
     
-    int rs_scnt_sva;
+    int rs_rdy_scnt_sva;
     // struct packed {
     //     int     idx; // idx of original element
     //     logic   busy;
@@ -262,7 +262,7 @@ module rs_sva #(parameter
                 break;
             end
         end
-        assign rs_scnt_sva = $min($countones(~busy_sva | issd_sva), N);
+        assign rs_rdy_scnt_sva = $min($countones(~busy_sva | issd_sva), N);
 
         /* IMPORTANT:
         This delay makes the fus_eq work. I dont know why!
@@ -417,9 +417,9 @@ module rs_sva #(parameter
             1;
         endproperty
 
-        property same_rs_scnt;
+        property same_rs_rdy_scnt;
             disable iff (reset || flush)
-            rs_scnt == rs_scnt_sva;
+            rs_rdy_scnt == rs_rdy_scnt_sva;
         endproperty
 
         property issue_cnts;
@@ -523,7 +523,7 @@ module rs_sva #(parameter
 
     // Same_Num_Busy:  assert property(cb.same_num_busy)
     //     else exit_on_error ("diff num busy");
-    Same_Rs_Scnt:  assert property(cb.same_rs_scnt)
+    Same_rs_rdy_scnt:  assert property(cb.same_rs_rdy_scnt)
         else exit_on_error ("diff rs scnt");
     // Issue_Cnts:  assert property(cb.issue_cnts)
     //     else exit_on_error ("diff issue cnts");

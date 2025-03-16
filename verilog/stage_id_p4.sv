@@ -1,19 +1,15 @@
-/////////////////////////////////////////////////////////////////////////
-//                                                                     //
-//   Modulename :  stage_id.sv                                         //
-//                                                                     //
-//  Description :  instruction decode (ID) stage of the pipeline;      //
-//                 decode the instruction fetch register operands, and //
-//                 compute immediate operand (if applicable)           //
-//                                                                     //
-/////////////////////////////////////////////////////////////////////////
+
+// The decoder, copied from project 3
+
+// This has a few changes, it now sets a "mult" flag for multiply instructions
+// Pass these to the mult module with inst.r.funct3 as the MULT_FUNC
 
 `include "sys_defs.svh"
 `include "ISA.svh"
 
 // Decode an instruction: generate useful datapath control signals by matching the RISC-V ISA
 // This module is purely combinational
-module decoder (
+module decoder_p4 (
     input INST  inst,
     input logic valid, // when low, ignore inst. Output will look like a NOP
 
@@ -191,33 +187,24 @@ module decoder (
 endmodule // decoder
 
 
-module stage_id (
-    input clock,           // system clock
-    input reset,           // system reset
+module stage_id_p4 (
+    input              clock,           // system clock
+    input              reset,           // system reset
+    input IF_ID_PACKET if_id_reg,
 
-    input IF_ID_PACKET  [N-1:0] if_id_reg,
-    input               [N-1:0] wb_regfile_en,   // Reg write enable from WB Stage
-    input REG_IDX       [N-1:0] wb_regfile_idx,  // Reg write index from WB Stage
-    input DATA          [N-1:0] wb_regfile_data, // Reg write data from WB Stage
-
-    output ID_EX_PACKET [N-1:0] id_packet
+    output ID_EX_PACKET id_packet
 );
 
-genvar i;
-    generate
-        for (i = 0; i < N; i = i + 1) begin : gen_loop
-            assign id_packet[i].inst = if_id_reg[i].inst;
-            assign id_packet[i].PC   = if_id_reg[i].PC;
-            assign id_packet[i].NPC  = if_id_reg[i].NPC;
-            assign id_packet[i].valid = if_id_reg[i].valid;
+    assign id_packet.inst = if_id_reg.inst;
+    assign id_packet.PC   = if_id_reg.PC;
+    assign id_packet.NPC  = if_id_reg.NPC;
+    assign id_packet.valid = if_id_reg.valid;
 
-            logic [N-1:0] has_dest_reg;
-            assign id_packet[i].dest_reg_idx = (has_dest_reg[i]) ? if_id_reg[i].inst.r.rd : `ZERO_REG;
-        end
-    endgenerate
+    logic has_dest_reg;
+    assign id_packet.dest_reg_idx = (has_dest_reg) ? if_id_reg.inst.r.rd : `ZERO_REG;
 
     // Instantiate the register file
-    regfile [N-1:0] regfile_0 (
+    regfile regfile_0 (
         .clock  (clock),
         .read_idx_1 (if_id_reg.inst.r.rs1),
         .read_idx_2 (if_id_reg.inst.r.rs2),
@@ -231,7 +218,7 @@ genvar i;
     );
 
     // Instantiate the instruction decoder
-    decoder [N-1:0] decoder_0 (
+    decoder decoder_0 (
         // Inputs
         .inst  (if_id_reg.inst),
         .valid (if_id_reg.valid),
@@ -252,3 +239,4 @@ genvar i;
     );
 
 endmodule // stage_id
+
