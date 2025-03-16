@@ -50,6 +50,7 @@ module rob #(
         r_out.r_en_cnt  = '0;
         r_out.tag       = '0;
         r_out.t_old     = '0;
+        r_out.dst       = '0;
         for (int unsigned i = 0; i < NUM_RPORTS; ++i, ++r_out.r_en_cnt) begin
             // This computes r_en_cnt linear-time wrt NUM_RPORTS. (Fine if NUM_RPORTS
             // small; synthesizer may simply unroll this loop.)

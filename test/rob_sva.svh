@@ -38,12 +38,15 @@ module rob_sva #(
     logic [$clog2(ROB_SZ):0] free;    // how full the buffer should be
     assign free = ROB_SZ - used;
 
-    struct packed {
-        logic [$clog2(N):0]     r_en_cnt;
+    // struct packed {
+    //     logic [$clog2(N):0]     r_en_cnt;
 
-        PHYS_REG_IDX [N-1:0]    tag;
-        PHYS_REG_IDX [N-1:0]    t_old;
-    } r_out_sva;
+    //     PHYS_REG_IDX [N-1:0]    tag;
+    //     PHYS_REG_IDX [N-1:0]    t_old;
+    //     REG_IDX     [N-1:0]            dst; // TODO: not handled by ROB
+    // } r_out_sva;
+
+    rob2retire r_out_sva;
     struct packed {
         logic [$clog2(N):0]     rob_rdy_scnt;
             // To: dispatch
