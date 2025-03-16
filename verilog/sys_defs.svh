@@ -589,10 +589,10 @@ typedef struct packed {
 } rob2dispatch;
 
 typedef struct packed {
-    logic [$clog2(`N):0]     r_en_cnt;
-    REG_IDX                 dst; // TODO: not handled by ROB
-    PHYS_REG_IDX [`N-1:0]    tag;
-    PHYS_REG_IDX [`N-1:0]    t_old;
+    logic           [$clog2(`N):0]      r_en_cnt;
+    PHYS_REG_IDX    [`N-1:0]            tag;
+    PHYS_REG_IDX    [`N-1:0]            t_old;
+    REG_IDX         [`N-1:0]            dst; // TODO: not handled by ROB
 } rob2retire;
 
 
