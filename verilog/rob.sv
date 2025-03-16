@@ -60,6 +60,7 @@ module rob #(
             //     break;
             r_out.tag[i]    = state[r_idxs[i]].tag;
             r_out.t_old[i]  = state[r_idxs[i]].t_old;
+            r_out.dst[i]    = state[r_idxs[i]].dst;
         end
 
         // handle dispatch (outs)
@@ -116,6 +117,7 @@ module rob #(
                 cur_idx = d_idxs[i];
                 state[cur_idx].tag    <= d_in.tag[i];
                 state[cur_idx].t_old  <= d_in.t_old[i];
+                state[cur_idx].dst    <= d_in.dst[i];
             end
         end
     end

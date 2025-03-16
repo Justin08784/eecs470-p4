@@ -409,6 +409,7 @@ typedef struct packed {
     logic cpl;
     logic [$clog2(`PHYS_REG_SZ_R10K)-1:0] tag;
     logic [$clog2(`PHYS_REG_SZ_R10K)-1:0] t_old;
+    REG_IDX dst;
 } ROB_ENTRY;
 
 
@@ -508,6 +509,7 @@ typedef struct packed {
         // - IMPORTANT: Set from lowest indices in program-order. NO GAPS!!!
     //THESE ARE NOT COMING FROM DISPATCH, GET THESE FROM MAP TABLE
     //(ONLY HERE FOR CURRENT ROB TESTBENCH)
+    REG_IDX [`N-1:0] dst;
 } dispatch2rob;
 
 typedef struct packed {
