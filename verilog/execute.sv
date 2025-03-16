@@ -214,7 +214,7 @@ module stage_ex (
         // Inputs
         .opa(opa_mux_out),
         .opb(opb_mux_out),
-        .alu_func(id_ex_reg.alu_func),
+        .alu_func(alu_func),
         .branch(branch), // is this a cond_branch
         .branch_func(branch_func), // Which branch condition to check
 
@@ -227,9 +227,9 @@ module stage_ex (
         .clock(clock),
         .reset(reset),
         .start(fu_vld_mult),
-        .rs1(id_ex_reg.rs1_value),
-        .rs2(id_ex_reg.rs2_value),
-        .func(id_ex_reg.inst.r.funct3), // which mult operation to perform
+        .rs1(mult_value1),
+        .rs2(mult_value2),
+        .func(mult_func), // which mult operation to perform
 
         // Output
         .result(mult_result),
@@ -269,6 +269,9 @@ module stage_ex (
                 fu_rdy_mult[i] <= fu_rdy_mult[i];
             end
         end
+
+        fu_rdy_store <= '0; //TODO: modify once memory functionality is implemented
+        fu_rdy_load  <= '0;
     end
 
 
