@@ -345,6 +345,29 @@ module stage_id_p4 (
         end else begin
             insn_id <= insn_id + f_in.f_en_cnt;
         end
+
+
+        if (!reset && DEBUG) begin
+            $display("ID >>");
+            $display("  %3d | f_in:  {f_en_cnt: %d, PC: [%x, %x], inst: [%x, %x]}",
+                $time,
+                f_in.f_en_cnt,
+                f_in.f_en_cnt > 0 ? f_in.f_dat[0].PC : 0,
+                f_in.f_en_cnt > 1 ? f_in.f_dat[1].PC : 0,
+                f_in.f_en_cnt > 0 ? f_in.f_dat[0].inst : 0,
+                f_in.f_en_cnt > 1 ? f_in.f_dat[1].inst : 0,
+            );
+
+            $display("  %3d | d_out: {d_en_cnt: %d, PC: [%x, %x], inst: [%x,%x]}",
+                $time,
+                d_in.dispatch_en_cnt,
+                d_out.d_dat[0].PC, 
+                d_out.d_dat[1].PC,
+                d_out.d_dat[0].inst, 
+                d_out.d_dat[1].inst
+            );
+            $display("ID <<");
+        end
     end
 
 endmodule // stage_id
