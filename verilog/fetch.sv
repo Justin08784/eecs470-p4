@@ -10,7 +10,7 @@
 
 `include "sys_defs.svh"
 
-module stage_if (
+module stage_if_p4 (
     input           clock,          // system clock
     input           reset,          // system reset
     //input     [1:0] if_valid,       // only go to next PC when true

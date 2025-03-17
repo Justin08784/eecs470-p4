@@ -290,6 +290,7 @@ CPU_SOURCES = verilog/cpu.sv \
 			  verilog/prf.sv \
 			  verilog/free_list.sv \
 			  verilog/stage_id_p4.sv \
+			  verilog/fetch.sv \
 			  verilog/fifo.sv
 
 build/cpu.simv: $(CPU_SOURCES) $(CPU_HEADERS) $(CPU_TESTBENCH)

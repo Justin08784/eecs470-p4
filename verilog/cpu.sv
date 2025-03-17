@@ -390,7 +390,7 @@ module cpu (
     fetch2decode f_2_decode;
     decode2fetch decode_2_f;
 
-    stage_if fetch_0(
+    stage_if_p4 fetch_0(
         .clock(clock),          // system clock
         .reset(reset),          // system reset
         //input     [1:0] if_valid,       // only go to next PC when true
