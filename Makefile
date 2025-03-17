@@ -275,11 +275,6 @@ CPU_SOURCES = verilog/cpu.sv \
 			  verilog/regfile.sv \
               verilog/icache.sv \
               verilog/memDP.sv \
-			  verilog/p3/stage_if.sv \
-			  verilog/p3/stage_id.sv \
-			  verilog/p3/stage_ex.sv \
-			  verilog/p3/stage_mem.sv \
-			  verilog/p3/stage_wb.sv \
 			  verilog/mult.sv \
 			  verilog/rs.sv \
 			  verilog/psel_gen.sv \
@@ -290,7 +285,9 @@ CPU_SOURCES = verilog/cpu.sv \
 			  verilog/prf.sv \
 			  verilog/free_list.sv \
 			  verilog/stage_id_p4.sv \
-			  verilog/fifo.sv
+			  verilog/fifo.sv \
+			  verilog/fetch.sv \
+			  verilog/execute.sv
 
 build/cpu.simv: $(CPU_SOURCES) $(CPU_HEADERS) $(CPU_TESTBENCH)
 synth/cpu.vg: $(CPU_SOURCES) $(CPU_HEADERS)
