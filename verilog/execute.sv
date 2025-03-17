@@ -332,7 +332,7 @@ module stage_ex (
 
 
 
-    /*
+    
 
         // Step 3: Find the two oldest completions without sorting everything
         oldest_id = 4'b1111;       // Large initial value for min search
@@ -392,7 +392,7 @@ module stage_ex (
             end
         endcase
 
-        */
+        
     end
 
 
