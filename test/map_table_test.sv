@@ -1,9 +1,8 @@
 `include "sys_defs.svh"
 
-`timescale 1ns / 1ps
 module map_table_testbench;
-    parameter N = 2;  // Single-issue architecture
-    localparam NUM_ARCH_REG = 32;
+    parameter   N = `N;  // Single-issue architecture
+    localparam  NUM_ARCH_REG = 32;
     
     logic clock, reset;
     
@@ -45,7 +44,9 @@ module map_table_testbench;
     );
 
     // Clock generation (period = 10ns)
-    always #5 clock = ~clock;
+    always begin
+        #(`CLOCK_PERIOD/2) clock = ~clock;
+    end
 
     // Test Procedure
     initial begin
@@ -58,7 +59,10 @@ module map_table_testbench;
         reset = 1;
         d_in = '0;
         c_in = '0;
-        #10 reset = 0;
+
+        @(negedge clock);
+        reset = 0;
+        @(negedge clock);
 
         // 🟢 **Test 1: Basic Register Mapping (Single Instruction)**
         d_in.en_cnt = 1;     // Single instruction dispatch
@@ -67,7 +71,7 @@ module map_table_testbench;
         d_in.dsts[0] = 3;    // Writing to logical register 3
         d_in.ts[0]   = 10;   // Mapping new physical register P10
 
-        #10;  // Wait for renaming to complete
+        @(negedge clock); // Wait for renaming to complete
 
         // Print debug info
         $display("DEBUG: Test 1 - Expected d_out.t1s[0] != 0");
@@ -83,8 +87,8 @@ module map_table_testbench;
         // 🟢 **Test 2: Register Completion (Single Instruction)**
         c_in.c_en[0] = 1;   // One instruction completes
         c_in.c_ts[0] = 10;  // Completed physical register P10
-
-        #10;  // Wait for update
+        
+        @(negedge clock); // Wait for update
 
         // Print debug info
         $display("DEBUG: Test 2 - Expected d_out.cpl1s[0] == 1");
@@ -105,7 +109,7 @@ module map_table_testbench;
         d_in.src2s[0] = `ZERO_REG;
         // << speculative correction
 
-        #10;
+        @(negedge clock);
 
         // Print debug info
         $display("DEBUG: Test 3 - Expected d_out.t1s[0] == 0");
@@ -123,7 +127,7 @@ module map_table_testbench;
         d_in.dsts  = '{7, 9};  // Writing to logical registers 7 and 9
         d_in.ts    = '{20, 21}; // Mapping new physical registers PR20, PR21
 
-        #10;  // Wait for renaming
+        @(negedge clock); // Wait for renaming
 
         // Print debug info
         $display("DEBUG: Test 4 - Checking multi-dispatch register renaming");
@@ -144,10 +148,10 @@ module map_table_testbench;
         d_in.src1s[0] = 10;
         d_in.dsts[0] = 10;
         d_in.ts[0] = 30;  // First mapping to PR30
-        #10;
+        @(negedge clock);
 
         d_in.ts[0] = 31;  // Overwrite with PR31
-        #10;
+        @(negedge clock);
 
         $display("DEBUG: Test 5 - Checking register overwrite behavior");
         $display("       src1: %0d -> mapped to t1: %0d (should be 31)", d_in.src1s[0], d_out.t1s[0]);
@@ -161,7 +165,7 @@ module map_table_testbench;
         c_in.c_ts = '{12, 13};
         d_in.en_cnt = 2'b00;
 
-        #10;  // Wait for update
+        @(negedge clock); // Wait for update
 
         // Print debug info
         $display("DEBUG: Test 6 - Checking multiple register completion");
