@@ -149,29 +149,32 @@ module mt_sva #(parameter
     endtask
 
     function automatic logic check_sources(
-         input int i,            // which dispatch slot
-         input PHYS_REG_IDX t1,
-         input PHYS_REG_IDX t2
-     );
-         REG_IDX src1;
-         PHYS_REG_IDX true_t1;
-         logic from_state1;
- 
-         src1 = ins_cur.d_in.src1s[i];
- 
-         from_state1 = `TRUE;
-         for (int j = i - 1; j >= 0; --j) begin
-             if (ins_cur.d_in.dsts[j] == src1) begin
-                 from_state1 = `FALSE;
-                 true_t1 = ins_cur.d_in.ts[j];
-                 break;
-             end
-         end
-         if (from_state1)
-             true_t1 = entries_pre[src1].t;
- 
-         return (t1 == true_t1);
-     endfunction
+        input int i,            // which dispatch slot
+
+        input REG_IDX src,
+        input PHYS_REG_IDX src_tag,
+        input logic src_cpl
+    );
+        PHYS_REG_IDX true_src_tag;
+        PHYS_REG_IDX true_src_cpl;
+        logic from_state;
+
+        from_state = `TRUE;
+        for (int j = i - 1; j >= 0; --j) begin
+            if (ins_cur.d_in.dsts[j] == src) begin
+                from_state = `FALSE;
+                true_src_tag = ins_cur.d_in.ts[j];
+                true_src_cpl = src == `ZERO_REG;
+                break;
+            end
+        end
+        if (from_state) begin
+            true_src_tag = entries_pre[src].t;
+            true_src_cpl = entries_pre[src].cpl;
+        end
+
+        return (src_tag == true_src_tag) && (src_cpl == true_src_cpl);
+    endfunction
 
 
     clocking cb @(posedge clock);
@@ -182,10 +185,18 @@ module mt_sva #(parameter
 
         property correct_deps(i);
             disable iff (reset)
-            (ins_cur.d_in.en_cnt > i) |->  (check_sources(
+            (ins_cur.d_in.en_cnt > i) |->  (
+            check_sources(
                 i,
+                ins_cur.d_in.src1s[i],
                 outs_cur.d_out.t1s[i],
-                '0
+                outs_cur.d_out.cpl1s[i]
+            ) && 
+            check_sources(
+                i,
+                ins_cur.d_in.src2s[i],
+                outs_cur.d_out.t2s[i],
+                outs_cur.d_out.cpl2s[i]
             ));
         endproperty
         // property ex_clear;
