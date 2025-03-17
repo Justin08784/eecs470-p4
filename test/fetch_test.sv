@@ -44,8 +44,9 @@ module fetch_test();
         //.Imem2proc_transaction_tag(Imem2proc_transaction_tag),
         //.Imem2proc_data_tag(Imem2proc_data_tag),
         //.Imem_command(Imem_command),
-        .fetch_out(fetch_out),
+        // .fetch_out(fetch_out),
         //.Imem_addr(Imem_addr)
+        .decode_out(fetch_out),
         .PC_reg(PC_reg),
         .PC_reg4(PC_reg4)
     );
