@@ -253,13 +253,13 @@ module cpu (
     //                                              //
     //////////////////////////////////////////////////
 
-    stage_ex stage_ex_0 (
-        // Input
-        .id_ex_reg (id_ex_reg),
+    // stage_ex stage_ex_0 (
+    //     // Input
+    //     .id_ex_reg (id_ex_reg),
 
-        // Output
-        .ex_packet (ex_packet)
-    );
+    //     // Output
+    //     .ex_packet (ex_packet)
+    // );
 
     //////////////////////////////////////////////////
     //                                              //
@@ -379,14 +379,52 @@ module cpu (
 
     //////////////////////////////////////////////////
     //                                              //
+    //                   Fetch                      //
+    //                                              //
+    //////////////////////////////////////////////////  
+
+    fetch2decode f_2_decode;
+    decode2fetch decode_2_f;
+
+    stage_if fetch_0(
+        .clock(clock),          // system clock
+        .reset(reset),          // system reset
+        //input     [1:0] if_valid,       // only go to next PC when true
+        .fetch_in(decode_2_f),
+        .take_branch(),    // taken-branch signal
+        .branch_target(),  // target pc: use if take_branch is TRUE
+        .Imem_data(),      // data coming back from Instruction memory
+
+        // tags from memory
+        // input MEM_TAG  Imem2proc_transaction_tag, // Should be zero unless there is a response
+        // input MEM_TAG  Imem2proc_data_tag,
+
+        // output MEM_COMMAND  Imem_command, // Command sent to memory
+        //output IF_ID_PACKET [1:0] if_packet,
+        // output ADDR         Imem_addr, // address sent to Instruction memory
+        .decode_out(f_2_decode),
+        .PC_reg(),
+        .PC_reg4()
+    );
+
+
+
+    //////////////////////////////////////////////////
+    //                                              //
     //                   Decode                     //
     //                                              //
     //////////////////////////////////////////////////   
-    // decode2dispatch d2dis;
-    // dispatch2decode dis2d;
+    decode2dispatch de_2_disp;
+    dispatch2decode disp_2_de;
 
     stage_id_p4 decoder0 (
         // TODO: Sam's commit
+        .clock(clock),
+        .reset(reset),
+        .f_in(f_2_decode),
+        .f_out(decode_2_f),
+        .d_in(disp_2_de),
+        .d_out(de_2_disp)
     );
 
     //////////////////////////////////////////////////
@@ -402,28 +440,38 @@ module cpu (
     // free_list2dispatch fl2dis;
     // dispatch2free_list dis2fl; // TODO
     // dispatch2map_table dis2mt; // TODO
+    rs2dispatch     rs_2_dispatch;
+    dispatch2rs     dispatch_2_rs;
+    rob2dispatch    rob_2_dispatch;
+    dispatch2rob    dispatch_2_rob;
+    dispatch2free_list dispatch_2_fl;
+    free_list2dispatch fl_2_dispatch;
+    dispatch2map_table dispatch_2_map;
+    // map_table2rob rob_out;
+    map_table2dispatch map_2_dispatch;
 
     dispatch dispatcher(
-        // .clock(clock),
-        // .reset(reset),
-        // .flush(),
+        .clock(clock),
+        .reset(reset),
+        .flush(),
 
-        // .decode_in(d2dis),
-        // .decode_out(dis2d),
+        .decode_in(d2dis),
+        .decode_out(dis2d),
 
-        // .rs_in(rs2dis),
-        // .rs_out(dis2rs),
+        .rs_in(rs_2_dispatch),
+        .rs_out(dispatch_2_rs),
 
-        // .rob_in(rob2dis),
-        // .rob_out(dis2rob),
+        .rob_in(rob_2_dispatch),
+        .rob_out(dispatch_2_rob),
 
-        // .free_in(fl2dis),
-        // .free_out(dis2fl),
+        .free_in(fl_2_dispatch),
+        .free_out(dispatch_2_fl),
 
-        // .lsq_in('0),
-        // .lsq_out(),
-
-        // .map_out(dis2mt)
+        .lsq_in('0),
+        .lsq_out(),
+        
+        .map_in(map_2_dispatch),
+        .map_out(dispatch_2_map)
     );
 
     //////////////////////////////////////////////////
@@ -451,8 +499,22 @@ module cpu (
     // ID_RESULT   [`NUM_FU_STORE-1:0]  fu_dat_store;
     // ID_RESULT   [`NUM_FU_LOAD-1:0]   fu_dat_load;
 
-
+    
+    execute2rs      ex_2_rs; 
+    rs2execute      rs_2_ex;
+    execute2complete ex_2_complete;
     rs rs_0(
+        .clock(clock),
+        .reset(reset),
+        .flush(1'b0),
+ 
+        .d_out(rs_2_dispatch),
+        .d_in(dispatch_2_rs),
+ 
+        .ex_in(ex_2_rs),
+        .ex_out(rs_2_ex),
+
+        .c_in(ex_2_complete)
         // .clock(clock),
         // .reset(reset),
         // .flush(),
@@ -487,18 +549,43 @@ module cpu (
     // typedef struct packed {logic dummy;} decode2rob;
     // rob2decode rob2d;
     // decode2rob d2rob;
+    rob2retire rob_2_retire;
+    //execute2complete ex_2_complete;
+    // rob2dispatch rob_2_dispatch;
+    // dispatch2rob dispatch_2_rob;
 
     rob #(
         .ROB_SZ(`ROB_SZ),
         .N(`N)
     ) rob_0 (
-        // .clock  (clock),
-        // .reset  (reset),
-        // .r_out  (rob2r),
-        // .c_in   (c2rob),
-        // .d_out  (rob2dis),
-        // .d_in   (dis2rob)
+        .clock  (clock),
+        .reset  (reset),
+        .r_out  (rob_2_retire),
+        .c_in   (ex_2_complete),
+        .d_out  (rob_2_dispatch),
+        .d_in   (dispatch_2_rob)
     );
+
+
+    //////////////////////////////////////////////////
+    //                                              //
+    //                  Execute                     //
+    //                                              //
+    ////////////////////////////////////////////////// 
+
+    
+    execute ex_0 (
+        .clock(clock),
+        .reset(reset),
+        .ex_fu_in(rs_2_ex),
+        .ex_rdy_out(ex_2_rs),
+        .ex_c_out(ex_2_complete)
+    );
+
+
+
+
+
 
     //////////////////////////////////////////////////
     //                                              //
@@ -511,12 +598,14 @@ module cpu (
     // map_table2robandRS mt2rob_rs;
     // complete2map_table c2mt;
 
-    map_table map_table_0 (
-        // .clock(clock),
-        // .reset(reset),
-        // .c_in(c2mt),
-        // .d_in(dis2mt),
-        // .rs_out(mt2rob_rs)
+    map_table #(
+        .N(`N)
+    ) map_table_0 (
+        .clock(clock),
+        .reset(reset),
+        .c_in(ex_2_complete),
+        .d_in(dispatch_2_map),
+        .dispatch_out(map_2_dispatch)
     );
 
     //////////////////////////////////////////////////
@@ -525,10 +614,12 @@ module cpu (
     //                                              //
     //////////////////////////////////////////////////  
 
-    arch_map arch_map_0 (
+    arch_map #(
+        .N(`N)
+    ) arch_map_0 (
         .clock(clock),
         .reset(reset),
-        .r_in()
+        .r_in(rob_2_retire)
     );
 
     //////////////////////////////////////////////////
@@ -537,13 +628,15 @@ module cpu (
     //                                              //
     //////////////////////////////////////////////////  
 
-    free_list free_list_0 (
+    free_list #(
+        .N(`N)
+    ) free_list_0 (
         .clock(clock),
         .reset(reset),
-        .flush(),
-        .r_in(),
-        .d_in(),
-        .d_out()
+        .flush(flush),
+        .r_in(rob_2_retire),
+        .d_in(dispatch_2_fl),
+        .d_out(fl_2_dispatch)
     );
 
     //////////////////////////////////////////////////
@@ -559,11 +652,11 @@ module cpu (
         .BYPASS_EN(1)
     ) prf_0 (
         .clock(clock),
-        .reset(reset),
-        .flush(),
-        .c_en(),
-        .c_ts(),
-        .c_vs(),
+        //.reset(reset),
+        //.flush(),
+        .c_en(ex_2_complete.c_en),
+        .c_ts(ex_2_complete.c_ts),
+        .c_vs(ex_2_complete.c_data),
         .s_en(),
         .s_t1s(),
         .s_t2s(),
