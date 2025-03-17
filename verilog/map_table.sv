@@ -103,6 +103,38 @@ module map_table #(parameter
                 );
             end
         end
+
+        if (!reset) begin
+            $display("MT >>");
+            $display("  %3d | dis_in:   {en_cnt: %d, [(%0d->%0d, %d, %d), (%0d->%0d, %d, %d)]}",
+                $time,
+                d_in.en_cnt,
+                d_in.dsts[0],
+                d_in.ts[0],
+                d_in.src1s[0],
+                d_in.src2s[0],
+                d_in.dsts[1],
+                d_in.ts[1],
+                d_in.src1s[1],
+                d_in.src2s[1]
+            );
+            $display("  %3d | dis_out:  {en_cnt: %d, [(told: %0d, t1: %0d<%b>, t2: %0d<%b>), (told: %0d, t1: %0d<%b>, t2: %0d<%b>)]}",
+                $time,
+                d_in.en_cnt,
+                d_out.ts_old[0],
+                d_out.t1s[0],
+                d_out.cpl1s[0],
+                d_out.t2s[0],
+                d_out.cpl2s[0],
+
+                d_out.ts_old[1],
+                d_out.t1s[1],
+                d_out.cpl1s[1],
+                d_out.t2s[1],
+                d_out.cpl2s[1]
+            );
+            $display("MT <<");
+        end
     end
 
 endmodule
