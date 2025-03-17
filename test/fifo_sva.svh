@@ -159,7 +159,7 @@ module fifo_sva #(
             logic [WIDTH-1:0] data_in;
             int               idx;
             (wr_en_cnt > i, data_in=wr_data[i], idx=(rd_count + used + i)) // value is written
-            ##[1:$] (rd_en_cnt > 0 && rd_count <= idx && idx < rd_count + rd_en_cnt) // wait for previous entries to be read
+            ##[0:$] (rd_en_cnt > 0 && rd_count <= idx && idx < rd_count + rd_en_cnt) // wait for previous entries to be read
             |-> rd_data[idx - rd_count] === data_in;              // ensure correct value out
         endproperty
 
@@ -178,7 +178,8 @@ module fifo_sva #(
         else exit_on_error;
     generate
         for (genvar wr_port = 0; wr_port < NUM_WPORTS; ++wr_port) begin : gen_wr_props
-            assert property(cb.write_read_correctly(wr_port));
+            assert property(cb.write_read_correctly(wr_port))
+                else exit_on_error;
         end
     endgenerate
   

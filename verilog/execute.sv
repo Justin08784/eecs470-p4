@@ -277,13 +277,17 @@ module stage_ex (
     logic [3:0] completed_ids;
     logic [3:0] completed_count;
     DATA [3:0] completed_data;
+    ROB_IDX [3:0] completed_rob_idx;
 
     logic [3:0] oldest_id;
     PHYS_REG_IDX oldest_tag;
     DATA oldest_data;
+    ROB_IDX [3:0] oldest_rob_idx;
     logic [3:0] second_oldest_id;
     PHYS_REG_IDX second_oldest_tag;
     DATA second_oldest_data;
+    ROB_IDX [3:0] second_oldest_rob_idx;
+
     always_comb begin        
         completed_count = 0;
         for (int i = 0; i < `NUM_FU_ALU; i++) begin
@@ -291,7 +295,8 @@ module stage_ex (
                 completed_tags[completed_count] = ex_fu_in.fu_dat_alu[i].t;
                 completed_ids[completed_count] = ex_fu_in.fu_dat_alu[i].id;
                 completed_count = completed_count + 1;
-                completed_data = alu_result;
+                completed_data[i] = alu_result[i];
+                completed_rob_idx = ex_fu_in.fu_dat_alu[i].rob_idx;
             end
         end
 
@@ -300,7 +305,8 @@ module stage_ex (
                 completed_tags[completed_count] = ex_fu_in.fu_dat_mult[i].t;
                 completed_ids[completed_count] = ex_fu_in.fu_dat_mult[i].id;
                 completed_count = completed_count + 1;
-                completed_data = mult_result;
+                completed_data[i] = mult_result;
+                completed_rob_idx = ex_fu_in.fu_dat_mult[i].rob_idx;
             end
         end
 
@@ -309,6 +315,7 @@ module stage_ex (
                 completed_tags[completed_count] = ex_fu_in.fu_dat_load[i].t;
                 completed_ids[completed_count] = ex_fu_in.fu_dat_load[i].id;
                 completed_count = completed_count + 1;
+                completed_rob_idx = ex_fu_in.fu_dat_load[i].rob_idx;
             end
         end
 
@@ -317,8 +324,15 @@ module stage_ex (
                 completed_tags[completed_count] = ex_fu_in.fu_dat_store[i].t;
                 completed_ids[completed_count] = ex_fu_in.fu_dat_store[i].id;
                 completed_count = completed_count + 1;
+                completed_rob_idx = ex_fu_in.fu_dat_load[i].rob_idx;
             end
         end
+
+
+
+
+
+    
 
         // Step 3: Find the two oldest completions without sorting everything
         oldest_id = 4'b1111;       // Large initial value for min search
@@ -327,18 +341,22 @@ module stage_ex (
         second_oldest_tag = '0; // Default to zero
 
 
+
         for (int i = 0; i < completed_count; i++) begin
             if (completed_ids[i] < oldest_id) begin
                 second_oldest_id = oldest_id;
                 second_oldest_tag = oldest_tag;
                 second_oldest_data = oldest_data;
+                second_oldest_rob_idx = oldest_rob_idx;
                 oldest_id = completed_ids[i];
                 oldest_tag = completed_tags[i];
-                oldest_data = completed_data;
+                oldest_data = completed_data[i];
+                oldest_rob_idx = completed_rob_idx[i];
             end else if (completed_ids[i] < second_oldest_id) begin
                 second_oldest_id = completed_ids[i];
                 second_oldest_tag = completed_tags[i];
-                second_oldest_data = completed_data;
+                second_oldest_data = completed_data[i];
+                second_oldest_rob_idx = completed_rob_idx[i];
             end
         end
 
@@ -346,6 +364,7 @@ module stage_ex (
         ex_c_out.c_en = '0; // Initialize completion enable signals
         ex_c_out.c_ts = '0; // Initialize completed physical register tags
         ex_c_out.c_data = '0;
+        ex_c_out.c_rob_idxs = '0;
 
         case (completed_count)
             0: begin
@@ -353,12 +372,14 @@ module stage_ex (
                 ex_c_out.c_en = '0;
                 ex_c_out.c_ts = '0;
                 ex_c_out.c_data = '0;
+                ex_c_out.rob_idx = '0;
             end
             1: begin
                 // Only one instruction finished
                 ex_c_out.c_en[0] = 1'b1;
                 ex_c_out.c_ts[0] = oldest_tag;
                 ex_c_out.c_data[0] = oldest_data;
+                ex_c_out.rob_idx[0] 
             end
             default: begin
                 // Two or more completions: Take the two oldest
@@ -370,6 +391,8 @@ module stage_ex (
                 ex_c_out.c_data[1] = second_oldest_data;
             end
         endcase
+
+        
     end
 
 

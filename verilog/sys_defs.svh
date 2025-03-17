@@ -489,13 +489,16 @@ typedef struct packed {
 } decode2fetch;
 
 typedef struct packed {
-    logic       [$clog2(`N):0]  d_en_cnt;
+    logic       [$clog2(`N):0]  d_vld_scnt;
+    logic       [$clog2(`N):0]  prvw_has_dests;
     ID_RESULT   [`N-1:0]        d_dat;
 } decode2dispatch;
 
 // By Dispatch
 typedef struct packed {
-    logic       [$clog2(`N):0] dispatch_rdy_cnt;
+    // NOTE: This is the only place where a transaction is
+    // RECIEVER-decided!!! (i.e. receiver broadcasts enable signals)
+    logic       [$clog2(`N):0]  dispatch_en_cnt;
 } dispatch2decode;
 
 typedef struct packed {
@@ -557,10 +560,6 @@ typedef struct packed {
 
 
 // By Map Table
-typedef struct packed {
-    PHYS_REG_IDX [`N-1:0] ts;
-    PHYS_REG_IDX [`N-1:0] ts_old;
-} map_table2rob;
 
 typedef struct packed {
     logic        [`N-1:0] cpl1s;
@@ -635,8 +634,6 @@ typedef struct packed {
     PHYS_REG_IDX    [`N-1:0] c_ts;
         // - From: EX
     ROB_IDX         [`N-1:0] c_rob_idxs;
-        // - From: EX
-    DATA            [`N-1:0] c_data;
         // - From: EX
 } execute2complete;
 
