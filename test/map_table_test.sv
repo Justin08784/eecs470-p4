@@ -32,7 +32,6 @@ module map_table_testbench;
 
     execute2complete c_in;
     dispatch2map_table d_in;
-    map_table2rob rob_out;
     map_table2dispatch dispatch_out;
 
 

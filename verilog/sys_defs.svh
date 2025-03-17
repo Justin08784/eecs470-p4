@@ -560,10 +560,6 @@ typedef struct packed {
 
 
 // By Map Table
-typedef struct packed {
-    PHYS_REG_IDX [`N-1:0] ts;
-    PHYS_REG_IDX [`N-1:0] ts_old;
-} map_table2rob;
 
 typedef struct packed {
     logic        [`N-1:0] cpl1s;
