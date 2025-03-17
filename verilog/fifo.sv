@@ -12,6 +12,26 @@ module fifo #(
     },
     parameter int unsigned NUM_RPORTS=`N, // also cap for used_scnt
     parameter int unsigned NUM_WPORTS=`N, // also cap for free_scnt
+
+    /*
+    If ENABLE_READ_PREVIEW is set, the FIFO supports *previewing* entries at the head
+    (e.g., for dependency checks or early reads), even when rd_en_cnt is less than NUM_RPORTS.
+
+    Specifically:
+    - Normally, rd_data returns only the entries being read this cycle (i.e., up to rd_en_cnt).
+    - With read preview enabled, rd_data can expose up to NUM_RPORTS entries from the head,
+    regardless of rd_en_cnt.
+    - These previewed values are valid *only if* the corresponding slot index is < used count.
+
+    Use case:
+    - Allows downstream logic (e.g., dispatch or issue) to see upcoming instructions
+    or operands *without* formally dequeuing them.
+    - This will be used for the decode FIFO, which needs to broadcast number of insns
+    that need output regs to dispatch, and then dispatch to actually decide how many
+    insns to dispatch.
+    */
+    parameter logic ENABLE_READ_PREVIEW=`FALSE,
+    parameter logic ENABLE_INTR_FWD =`TRUE,
     parameter FIFO_STATE RESET_STATE='{default:0}
 ) (
     input                                           clock, 
@@ -22,6 +42,7 @@ module fifo #(
 
     input   logic   [$clog2(NUM_RPORTS):0]          rd_en_cnt,
     output  logic   [NUM_RPORTS-1:0][WIDTH-1:0]     rd_data,
+    output  logic   [$clog2(NUM_RPORTS):0]          prvw_vld_cnt, // only valid if ENABLE_READ_PREVIEW set
 
     output  logic   [$clog2(NUM_WPORTS):0]          free_scnt,
     output  logic   [$clog2(NUM_RPORTS):0]          used_scnt
@@ -33,13 +54,16 @@ module fifo #(
     logic [$clog2(DEPTH)-1:0]       tail;
     logic [DEPTH-1:0][WIDTH-1:0]    state;
     logic [$clog2(DEPTH):0]         used, free;
+    logic [$clog2(NUM_RPORTS):0]    show_limit;   // how many entries we display in rd_data
 
     logic [NUM_RPORTS-1:0][$clog2(DEPTH)-1:0] rd_idxs;
     logic [NUM_WPORTS-1:0][$clog2(DEPTH)-1:0] wr_idxs;
 
     assign free         = DEPTH - used;
-    assign free_scnt    = free > NUM_WPORTS ? NUM_WPORTS : free;
-    assign used_scnt    = used > NUM_RPORTS ? NUM_RPORTS : used;
+    assign free_scnt    = `MIN(free, NUM_WPORTS);
+    assign used_scnt    = `MIN(used, NUM_RPORTS);
+    assign prvw_vld_cnt = ENABLE_READ_PREVIEW ? `MIN(used + wr_en_cnt, NUM_RPORTS) : '0;
+    assign show_limit   = ENABLE_READ_PREVIEW ? prvw_vld_cnt : rd_en_cnt;
 
     // Version 1:
     // always_comb begin
@@ -71,11 +95,11 @@ module fifo #(
         for (int unsigned i = 0; i < NUM_WPORTS; ++i)
             wr_idxs[i] = (tail + i) % DEPTH;
         for (int unsigned i = 0; i < NUM_RPORTS; ++i)
-            fwd_dat[i] = i >= used;
+            fwd_dat[i] = i >= used && ENABLE_INTR_FWD;
 
         // fwding logic
         for (int unsigned i = 0; i < NUM_RPORTS; ++i) begin
-            if (i >= rd_en_cnt) begin
+            if (i >= show_limit) begin
                 rd_data[i] = '0;
             end else if (fwd_dat[i] && (i - used) < wr_en_cnt) begin
                 rd_data[i] = wr_data[i - used];
@@ -92,9 +116,9 @@ module fifo #(
             tail    <= RESET_STATE.tail;
             state   <= RESET_STATE.state;
         end else begin
-            if (wr_en_cnt > free + rd_en_cnt)
+            if (wr_en_cnt > (ENABLE_INTR_FWD ? free + rd_en_cnt : free))
                 $error("FIFO overflow!");
-            if (rd_en_cnt > used + wr_en_cnt)
+            if (rd_en_cnt > (ENABLE_INTR_FWD ? used + wr_en_cnt : used))
                 $error("FIFO underflow!");
             used    <= used + wr_en_cnt - rd_en_cnt;
             head    <= (head + rd_en_cnt) % DEPTH;

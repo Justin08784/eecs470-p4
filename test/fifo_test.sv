@@ -9,7 +9,6 @@ module fifo_test();
     localparam WIDTH = $bits(PHYS_REG_IDX);
     localparam NUM_RPORTS = 2;
     localparam NUM_WPORTS = 2;
-    localparam MAX_SCNT   = 2;
 
     typedef struct packed {
         logic [$clog2(DEPTH)-1:0] head;
@@ -39,8 +38,8 @@ module fifo_test();
     logic   [NUM_WPORTS-1:0][WIDTH-1:0] wr_data;
     logic   [$clog2(NUM_RPORTS):0]      rd_en_cnt;
     logic   [NUM_RPORTS-1:0][WIDTH-1:0] rd_data;
-    logic   [$clog2(MAX_SCNT):0]        free_scnt;
-    logic   [$clog2(MAX_SCNT):0]        used_scnt;
+    logic   [$clog2(NUM_WPORTS):0]      free_scnt;
+    logic   [$clog2(NUM_RPORTS):0]      used_scnt;
     
     // Variable to count values written to FIFO
     int cnt;
@@ -80,7 +79,6 @@ module fifo_test();
         .WIDTH(WIDTH),
         .NUM_RPORTS(NUM_RPORTS),
         .NUM_WPORTS(NUM_WPORTS),
-        .MAX_SCNT(MAX_SCNT),
         .RESET_STATE('{default:0})
     ) dut (
         .clock      (clock),
@@ -97,8 +95,7 @@ module fifo_test();
         .DEPTH(DEPTH),
         .WIDTH(WIDTH),
         .NUM_RPORTS(NUM_RPORTS),
-        .NUM_WPORTS(NUM_WPORTS),
-        .MAX_SCNT(MAX_SCNT)
+        .NUM_WPORTS(NUM_WPORTS)
     ) sva (
         .clock      (clock),
         .reset      (reset),
