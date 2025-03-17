@@ -32,7 +32,7 @@ module map_table_testbench;
 
     execute2complete c_in;
     dispatch2map_table d_in;
-    map_table2dispatch dispatch_out;
+    map_table2dispatch d_out;
 
 
     // Instantiate the DUT (Device Under Test)
@@ -41,7 +41,7 @@ module map_table_testbench;
         .reset(reset),
         .c_in(c_in),
         .d_in(d_in),
-        .dispatch_out(dispatch_out)
+        .d_out(d_out)
     );
 
     // Clock generation (period = 10ns)
@@ -70,14 +70,14 @@ module map_table_testbench;
         #10;  // Wait for renaming to complete
 
         // Print debug info
-        $display("DEBUG: Test 1 - Expected dispatch_out.t1s[0] != 0");
-        $display("       src1: %0d -> mapped to t1: %0d", d_in.src1s[0], dispatch_out.t1s[0]);
-        $display("       src2: %0d -> mapped to t2: %0d", d_in.src2s[0], dispatch_out.t2s[0]);
+        $display("DEBUG: Test 1 - Expected d_out.t1s[0] != 0");
+        $display("       src1: %0d -> mapped to t1: %0d", d_in.src1s[0], d_out.t1s[0]);
+        $display("       src2: %0d -> mapped to t2: %0d", d_in.src2s[0], d_out.t2s[0]);
         $display("       dst: %0d -> mapped to new ts: %0d", d_in.dsts[0], d_in.ts[0]);
 
-        if (dispatch_out.t1s[0] == 1 && dispatch_out.t2s[0] == 2) $display("✅ Test 1 Passed: Register renamed!");
+        if (d_out.t1s[0] == 1 && d_out.t2s[0] == 2) $display("✅ Test 1 Passed: Register renamed!");
         else begin
-            $error("❌ Test 1 Failed! Expected dispatch_out.t1s[0] != 0, but got: %0d", dispatch_out.t1s[0]);
+            $error("❌ Test 1 Failed! Expected d_out.t1s[0] != 0, but got: %0d", d_out.t1s[0]);
         end
 
         // 🟢 **Test 2: Register Completion (Single Instruction)**
@@ -87,13 +87,13 @@ module map_table_testbench;
         #10;  // Wait for update
 
         // Print debug info
-        $display("DEBUG: Test 2 - Expected dispatch_out.cpl1s[0] == 1");
+        $display("DEBUG: Test 2 - Expected d_out.cpl1s[0] == 1");
         $display("       Completed physical reg: %0d", c_in.c_ts[0]);
-        $display("       Completion status (cpl1s[0]): %0d", dispatch_out.cpl1s[0]);
+        $display("       Completion status (cpl1s[0]): %0d", d_out.cpl1s[0]);
 
-        if (dispatch_out.cpl1s[0] == 1) $display("✅ Test 2 Passed: Register completion correct!");
+        if (d_out.cpl1s[0] == 1) $display("✅ Test 2 Passed: Register completion correct!");
         else begin
-            $error("❌ Test 2 Failed! Expected dispatch_out.cpl1s[0] == 1, but got: %0d", dispatch_out.cpl1s[0]);
+            $error("❌ Test 2 Failed! Expected d_out.cpl1s[0] == 1, but got: %0d", d_out.cpl1s[0]);
         end
 
         // 🟢 **Test 3: Zero Register Handling**
@@ -108,12 +108,12 @@ module map_table_testbench;
         #10;
 
         // Print debug info
-        $display("DEBUG: Test 3 - Expected dispatch_out.t1s[0] == 0");
-        $display("       Zero register mapping: %0d", dispatch_out.t1s[0]);
+        $display("DEBUG: Test 3 - Expected d_out.t1s[0] == 0");
+        $display("       Zero register mapping: %0d", d_out.t1s[0]);
 
-        if (dispatch_out.t1s[0] == 0) $display("✅ Test 3 Passed: ZERO_REG handling correct!");
+        if (d_out.t1s[0] == 0) $display("✅ Test 3 Passed: ZERO_REG handling correct!");
         else begin
-            $error("❌ Test 3 Failed! Expected dispatch_out.t1s[0] == 0, but got: %0d", dispatch_out.t1s[0]);
+            $error("❌ Test 3 Failed! Expected d_out.t1s[0] == 0, but got: %0d", d_out.t1s[0]);
         end
 
         // 🟢 **Test 4: Multi-Dispatch Renaming**
@@ -127,16 +127,16 @@ module map_table_testbench;
 
         // Print debug info
         $display("DEBUG: Test 4 - Checking multi-dispatch register renaming");
-        $display("       src1[0]: %0d -> mapped to t1: %0d", d_in.src1s[0], dispatch_out.t1s[0]);
-        $display("       src2[0]: %0d -> mapped to t2: %0d", d_in.src2s[0], dispatch_out.t2s[0]);
+        $display("       src1[0]: %0d -> mapped to t1: %0d", d_in.src1s[0], d_out.t1s[0]);
+        $display("       src2[0]: %0d -> mapped to t2: %0d", d_in.src2s[0], d_out.t2s[0]);
         $display("       dst[0]: %0d -> new mapping: %0d", d_in.dsts[0], d_in.ts[0]);
 
-        $display("       src1[1]: %0d -> mapped to t1: %0d (should be 20)", d_in.src1s[1], dispatch_out.t1s[1]);
-        $display("       src2[1]: %0d -> mapped to t2: %0d", d_in.src2s[1], dispatch_out.t2s[1]);
+        $display("       src1[1]: %0d -> mapped to t1: %0d (should be 20)", d_in.src1s[1], d_out.t1s[1]);
+        $display("       src2[1]: %0d -> mapped to t2: %0d", d_in.src2s[1], d_out.t2s[1]);
         $display("       dst[1]: %0d -> new mapping: %0d", d_in.dsts[1], d_in.ts[1]);
 
-        if (dispatch_out.t1s[0] == 20) $display("✅ Test 4 Passed: Multi-dispatch renaming correct!");
-        else $error("❌ Test 4 Failed! Expected dispatch_out.t1s[1] == 20, but got: %0d", dispatch_out.t1s[0]);
+        if (d_out.t1s[0] == 20) $display("✅ Test 4 Passed: Multi-dispatch renaming correct!");
+        else $error("❌ Test 4 Failed! Expected d_out.t1s[1] == 20, but got: %0d", d_out.t1s[0]);
 
 
         // 🟢 **Test 5: Overwriting a Register Mapping**
@@ -150,10 +150,10 @@ module map_table_testbench;
         #10;
 
         $display("DEBUG: Test 5 - Checking register overwrite behavior");
-        $display("       src1: %0d -> mapped to t1: %0d (should be 31)", d_in.src1s[0], dispatch_out.t1s[0]);
+        $display("       src1: %0d -> mapped to t1: %0d (should be 31)", d_in.src1s[0], d_out.t1s[0]);
 
-        if (dispatch_out.t1s[0] == 31) $display("✅ Test 5 Passed: Register overwrite handled correctly!");
-        else $error("❌ Test 5 Failed! Expected dispatch_out.t1s[0] == 31, but got: %0d", dispatch_out.t1s[0]);
+        if (d_out.t1s[0] == 31) $display("✅ Test 5 Passed: Register overwrite handled correctly!");
+        else $error("❌ Test 5 Failed! Expected d_out.t1s[0] == 31, but got: %0d", d_out.t1s[0]);
 
 
         // 🟢 **Test 6: Completing multiple registers in one cycle**
@@ -165,10 +165,10 @@ module map_table_testbench;
 
         // Print debug info
         $display("DEBUG: Test 6 - Checking multiple register completion");
-        $display("       Completed physical reg: %0d -> cpl1s: %0d", c_in.c_ts[0], dispatch_out.cpl1s[0]);
-        $display("       Completed physical reg: %0d -> cpl1s: %0d", c_in.c_ts[1], dispatch_out.cpl1s[1]);
+        $display("       Completed physical reg: %0d -> cpl1s: %0d", c_in.c_ts[0], d_out.cpl1s[0]);
+        $display("       Completed physical reg: %0d -> cpl1s: %0d", c_in.c_ts[1], d_out.cpl1s[1]);
 
-        if (dispatch_out.cpl1s[0] && dispatch_out.cpl1s[1]) $display("✅ Test 6 Passed: Multi-completion correct!");
+        if (d_out.cpl1s[0] && d_out.cpl1s[1]) $display("✅ Test 6 Passed: Multi-completion correct!");
         else $error("❌ Test 6 Failed! Completion status incorrect!");
 
 
