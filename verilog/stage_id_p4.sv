@@ -327,6 +327,11 @@ module stage_id_p4 (
         .wr_data    (tmp),
         .rd_en_cnt  (d_in.dispatch_en_cnt),
         .rd_data    (d_out.d_dat),
+        /*
+        TODO: prvw_vld_cnt and used_scnt seem to do the same thing. This makes
+        the dispatch_cnt computation in dispatch.sv not perfectly optimal.
+        Find the minimal solution.
+        */
         .prvw_vld_cnt (prvw_vld_cnt),
         .free_scnt  (free_scnt),
         .used_scnt  (used_scnt)
@@ -358,7 +363,7 @@ module stage_id_p4 (
                 f_in.f_en_cnt > 1 ? f_in.f_dat[1].inst : 0,
             );
 
-            $display("  %3d | d_out: {d_en_cnt: %d, PC: [%x, %x], inst: [%x,%x]}",
+            $display("  %3d | d_out: {d_en_cnt: %d, PC: [%x, %x], inst: [%x, %x]}",
                 $time,
                 d_in.dispatch_en_cnt,
                 d_out.d_dat[0].PC, 
