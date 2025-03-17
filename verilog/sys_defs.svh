@@ -410,6 +410,9 @@ typedef struct packed {
     logic [$clog2(`PHYS_REG_SZ_R10K)-1:0] tag;
     logic [$clog2(`PHYS_REG_SZ_R10K)-1:0] t_old;
     REG_IDX dst;
+    logic halt;
+    logic illegal;
+    ADDR NPC;
 } ROB_ENTRY;
 
 
@@ -524,6 +527,9 @@ typedef struct packed {
     //THESE ARE NOT COMING FROM DISPATCH, GET THESE FROM MAP TABLE
     //(ONLY HERE FOR CURRENT ROB TESTBENCH)
     REG_IDX [`N-1:0] dst;
+    logic [`N-1:0] halt;
+    logic [`N-1:0] illegal;
+    ADDR [`N-1:0] NPC;
 } dispatch2rob;
 
 typedef struct packed {
