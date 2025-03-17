@@ -118,25 +118,25 @@ module stage_id_p4_sva (
             INST inst_in;
             ADDR PC_in;
             int  idx;
-            (f_in.f_en_cnt > i, inst_in=f_in.f_dat[i].inst, PC_in=f_in.f_dat[i].PC, idx=(rd_count + used + i),
-                $display("INP f_en_cnt: %d, i: %0d, f_in[%0d].PC: %x, rd_count: %0d, used: %0d, idx: %0d",
-                    f_in.f_en_cnt,
-                    i,
-                    i,
-                    f_in.f_dat[i].PC,
-                    rd_count,
-                    used,
-                    idx
-                )
+            (f_in.f_en_cnt > i, inst_in=f_in.f_dat[i].inst, PC_in=f_in.f_dat[i].PC, idx=(rd_count + used + i)
+                // , $display("INP f_en_cnt: %d, i: %0d, f_in[%0d].PC: %x, rd_count: %0d, used: %0d, idx: %0d",
+                //     f_in.f_en_cnt,
+                //     i,
+                //     i,
+                //     f_in.f_dat[i].PC,
+                //     rd_count,
+                //     used,
+                //     idx
+                // )
             ) // value is written
-            ##[0:$] (d_in.dispatch_en_cnt > 0 && rd_count <= idx && idx < rd_count + d_in.dispatch_en_cnt,
-                $display("CHK d_en_cnt: %d, PC: [%x, %x], rd_count: %0d, used: %0d",
-                    d_in.dispatch_en_cnt,
-                    d_out.d_dat[0].PC,
-                    d_out.d_dat[1].PC,
-                    rd_count,
-                    used
-                )
+            ##[0:$] (d_in.dispatch_en_cnt > 0 && rd_count <= idx && idx < rd_count + d_in.dispatch_en_cnt
+                // , $display("CHK d_en_cnt: %d, PC: [%x, %x], rd_count: %0d, used: %0d",
+                //     d_in.dispatch_en_cnt,
+                //     d_out.d_dat[0].PC,
+                //     d_out.d_dat[1].PC,
+                //     rd_count,
+                //     used
+                // )
             ) // wait for previous entries to be read
             |-> (
                 d_out_delayed.d_dat[idx - rd_count].PC === PC_in

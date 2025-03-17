@@ -139,25 +139,17 @@ module stage_id_p4_test();
 
 
 
-        // ---------- Test 16 ---------- //
-        // $display("\nTest 16: Randomized stress testing");
-        // DEBUG = 0; // disable debugs
-        // for (int i = 0; i < 10000; ++i) begin
-        //     if (free_scnt < NUM_WPORTS) begin
-        //         wr_en_cnt = $urandom_range(`MIN(NUM_WPORTS, free_scnt + NUM_RPORTS), 0);
-        //     end else begin
-        //         wr_en_cnt = $urandom_range(NUM_WPORTS, 0);
-        //     end
+        // ---------- Test N ---------- //
+        $display("\nTest N: Randomized stress testing");
+        DEBUG = 0; // disable debugs
+        for (int i = 0; i < 10000; ++i) begin
+            f_in.f_en_cnt = $urandom_range(`MIN(NUM_WPORTS, f_out.d_rdy_cnt), 0);
+            d_in.dispatch_en_cnt = $urandom_range(`MIN(NUM_WPORTS, d_out.d_vld_scnt), 0);
 
-        //     if (free_scnt < wr_en_cnt) begin
-        //         rd_en_cnt = $urandom_range(`MIN(NUM_RPORTS, used_scnt + wr_en_cnt), wr_en_cnt - free_scnt);
-        //     end else begin
-        //         rd_en_cnt = $urandom_range(`MIN(NUM_RPORTS, used_scnt + wr_en_cnt), 0);
-        //     end
-        //     @(negedge clock);
-        //     wr_en_cnt = 0;
-        //     rd_en_cnt = 0;
-        // end
+            @(negedge clock);
+            f_in.f_en_cnt = 0;
+            d_in.dispatch_en_cnt = 0;
+        end
 
 
 
