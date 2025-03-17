@@ -30,7 +30,8 @@ module fifo #(
     that need output regs to dispatch, and then dispatch to actually decide how many
     insns to dispatch.
     */
-    parameter logic unsigned ENABLE_READ_PREVIEW=`FALSE,
+    parameter logic ENABLE_READ_PREVIEW=`FALSE,
+    parameter logic ENABLE_INTR_FWD =`TRUE,
     parameter FIFO_STATE RESET_STATE='{default:0}
 ) (
     input                                           clock, 
@@ -59,8 +60,8 @@ module fifo #(
     logic [NUM_WPORTS-1:0][$clog2(DEPTH)-1:0] wr_idxs;
 
     assign free         = DEPTH - used;
-    assign free_scnt    = free > NUM_WPORTS ? NUM_WPORTS : free;
-    assign used_scnt    = used > NUM_RPORTS ? NUM_RPORTS : used;
+    assign free_scnt    = `MIN(free, NUM_WPORTS);
+    assign used_scnt    = `MIN(used, NUM_RPORTS);
     assign prvw_vld_cnt = ENABLE_READ_PREVIEW ? `MIN(used + wr_en_cnt, NUM_RPORTS) : '0;
     assign show_limit   = ENABLE_READ_PREVIEW ? prvw_vld_cnt : rd_en_cnt;
 
@@ -94,7 +95,7 @@ module fifo #(
         for (int unsigned i = 0; i < NUM_WPORTS; ++i)
             wr_idxs[i] = (tail + i) % DEPTH;
         for (int unsigned i = 0; i < NUM_RPORTS; ++i)
-            fwd_dat[i] = i >= used;
+            fwd_dat[i] = i >= used && ENABLE_INTR_FWD;
 
         // fwding logic
         for (int unsigned i = 0; i < NUM_RPORTS; ++i) begin
