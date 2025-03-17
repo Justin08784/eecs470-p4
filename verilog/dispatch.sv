@@ -1,4 +1,5 @@
 `include "sys_defs.svh"
+`include "psel_gen.sv"
 
 
 module dispatch #(parameter 
@@ -30,10 +31,6 @@ module dispatch #(parameter
     input   map_table2dispatch map_in,
     output  dispatch2map_table map_out
     
-    //dispatch shouldn't need to read from the map table.
-    //dispatch will pair a new tag (from free list) with
-    //the dest reg (from decode), and output the paired
-    //item to the map table for it to decide how to update.
 );
 
 logic [$clog2(N):0] dispatch_cnt;
@@ -138,6 +135,7 @@ end
 
 // handle rob output 
 always_comb begin
+    rob_out = '0;
     rob_out.d_en_cnt = dispatch_cnt;
 
     for (int i = 0; i < dispatch_cnt; i++) begin
