@@ -233,7 +233,7 @@ build/free_list.simv: $(FREE_LIST_FILES)
 build/free_list.cov: $(FREE_LIST_FILES)
 synth/free_list.vg: $(FREE_LIST_FILES)
 
-DISPATCH_FILES = verilog/sys_defs.svh
+DISPATCH_FILES = verilog/sys_defs.svh verilog/psel_gen.sv
 build/dispatch.simv: $(DISPATCH_FILES)
 build/dispatch.cov: $(DISPATCH_FILES)
 build/dispatch.vg: $(DISPATCH_FILES)
