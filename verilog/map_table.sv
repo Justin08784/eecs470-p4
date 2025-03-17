@@ -77,6 +77,7 @@ module map_table #(parameter
             if (d_in.dsts[i] != `ZERO_REG) begin
                 // $display("DEBUG: Set entries[%0d] -> t = %0d, cpl = %0b", d_in.dsts[i], d_in.ts[i], entries_n[d_in.dsts[i]].cpl);
                 // $display("DEBUG: entries[0].t at cycle %0t = %0d", $time, entries[0].t);
+                d_out.ts_old[i]             = entries_n[d_in.dsts[i]].t;
                 entries_n[d_in.dsts[i]].t   = d_in.ts[i];
                 entries_n[d_in.dsts[i]].cpl = 0;
             end
