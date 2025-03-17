@@ -3,6 +3,7 @@
 module dispatch #(parameter 
     N=`N
 ) (
+    input clock, reset, flush,
     // DECODE
     input   decode2dispatch decode_in,
     output  dispatch2decode decode_out,

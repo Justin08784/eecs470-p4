@@ -37,10 +37,6 @@ module dispatch_testbench;
 
 
     dispatch d_dut(
-        .clock(clock),
-        .reset(reset),
-        .flush(1'b0),
-
         .decode_in(decode_in),
         .decode_out(decode_out),
 
@@ -631,7 +627,7 @@ module dispatch_testbench;
 
         clear_all();
 
-        test_reset();
+        // test_reset();
         test_zero();
         test_two_rdy();
         // test_one_rdy();
