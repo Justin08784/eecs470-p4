@@ -243,7 +243,7 @@ build/prf.simv: $(PRF_FILES)
 build/prf.cov: $(PRF_FILES)
 build/prf.vg: $(PRF_FILES)
 
-FETCH_FILES = verilog/sys_defs.svh verilog/mem.sv verilog/icache.sv verilog/memDP.sv
+FETCH_FILES = verilog/sys_defs.svh test/mem.sv verilog/icache.sv verilog/memDP.sv
 build/fetch.simv: $(FETCH_FILES)
 build/fetch.cov: $(FETCH_FILES)
 build/fetch.vg: $(FETCH_FILES)
@@ -290,6 +290,7 @@ CPU_SOURCES = verilog/cpu.sv \
 			  verilog/prf.sv \
 			  verilog/free_list.sv \
 			  verilog/stage_id_p4.sv \
+			  verilog/fetch.sv \
 			  verilog/fifo.sv
 
 build/cpu.simv: $(CPU_SOURCES) $(CPU_HEADERS) $(CPU_TESTBENCH)
