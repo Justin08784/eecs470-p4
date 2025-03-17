@@ -189,7 +189,7 @@ GREP = grep -E --color=auto
 # ---- Modules to Test ---- #
 
 # TODO: add more modules here
-MODULES = cpu mult rob rs fifo free_list dispatch prf map_table stage_id_p4 execute
+MODULES = cpu mult rob rs fifo free_list dispatch prf map_table stage_id_p4 execute fetch
 
 # TODO: update this if you add more header files
 ALL_HEADERS = $(CPU_HEADERS)
@@ -233,7 +233,7 @@ build/free_list.simv: $(FREE_LIST_FILES)
 build/free_list.cov: $(FREE_LIST_FILES)
 synth/free_list.vg: $(FREE_LIST_FILES)
 
-DISPATCH_FILES = verilog/sys_defs.svh
+DISPATCH_FILES = verilog/sys_defs.svh verilog/psel_gen.sv
 build/dispatch.simv: $(DISPATCH_FILES)
 build/dispatch.cov: $(DISPATCH_FILES)
 build/dispatch.vg: $(DISPATCH_FILES)
@@ -243,7 +243,7 @@ build/prf.simv: $(PRF_FILES)
 build/prf.cov: $(PRF_FILES)
 build/prf.vg: $(PRF_FILES)
 
-FETCH_FILES = verilog/sys_defs.svh verilog/mem.sv verilog/icache.sv verilog/memDP.sv
+FETCH_FILES = verilog/sys_defs.svh test/mem.sv verilog/icache.sv verilog/memDP.sv
 build/fetch.simv: $(FETCH_FILES)
 build/fetch.cov: $(FETCH_FILES)
 build/fetch.vg: $(FETCH_FILES)
@@ -252,6 +252,7 @@ MAP_TABLE_FILES = verilog/sys_defs.svh
 build/map_table.simv: $(MAP_TABLE_FILES)
 build/map_table.cov: $(MAP_TABLE_FILES)
 build/map_table.vg: $(MAP_TABLE_FILES)
+
 
 #################################
 # ---- Main CPU Definition ---- #
@@ -289,6 +290,7 @@ CPU_SOURCES = verilog/cpu.sv \
 			  verilog/prf.sv \
 			  verilog/free_list.sv \
 			  verilog/stage_id_p4.sv \
+			  verilog/fetch.sv \
 			  verilog/fifo.sv
 
 build/cpu.simv: $(CPU_SOURCES) $(CPU_HEADERS) $(CPU_TESTBENCH)

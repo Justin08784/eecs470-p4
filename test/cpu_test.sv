@@ -81,7 +81,7 @@ module testbench;
         .clock (clock),
         .reset (reset),
         //.mem2proc_transaction_tag (mem2proc_transaction_tag),
-        .mem2proc_data            ({memory.unified_memory[PC_reg[15:3]].word_level[PC_reg[2]], memory.unified_memory[PC_reg4[15:3]].word_level[PC_reg[2]]}),
+        .mem2proc_data            ({memory.unified_memory[PC_reg[15:3]], memory.unified_memory[PC_reg4[15:3]]}),
         //.mem2proc_data_tag        (mem2proc_data_tag),
 
         // Outputs

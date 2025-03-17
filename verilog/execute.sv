@@ -69,35 +69,35 @@ endmodule // alu
 
 // endmodule // conditional_branch
 
-// module mult_no_pipeline (
-//     input clock, reset, start,
-//     input DATA rs1, rs2,
-//     input MULT_FUNC func,
+/*module mult_no_pipeline (
+     input clock, reset, start,
+     input DATA rs1, rs2,
+     input MULT_FUNC func,
 
-//     output DATA  result,
-//     output logic done
-// );
+     output DATA  result,
+     output logic done
+ );
 
-//     logic [63:0] mcand, mplier, product;
+     logic [63:0] mcand, mplier, product;
 
-//     assign product = mcand * mplier;
+     assign product = mcand * mplier;
 
-//     // Sign-extend the multiplier inputs based on the operation
-//     always_comb begin
-//         case (func)
-//             M_MUL, M_MULH, M_MULHSU: mcand = {{(32){rs1[31]}}, rs1};
-//             default:                 mcand = {32'b0, rs1};
-//         endcase
-//         case (func)
-//             M_MUL, M_MULH: mplier = {{(32){rs2[31]}}, rs2};
-//             default:       mplier = {32'b0, rs2};
-//         endcase
-//     end
+     // Sign-extend the multiplier inputs based on the operation
+     always_comb begin
+         case (func)
+             M_MUL, M_MULH, M_MULHSU: mcand = {{(32){rs1[31]}}, rs1};
+             default:                 mcand = {32'b0, rs1};
+         endcase
+         case (func)
+             M_MUL, M_MULH: mplier = {{(32){rs2[31]}}, rs2};
+             default:       mplier = {32'b0, rs2};
+         endcase
+     end
 
-//     // Use the high or low bits of the product based on the output func
-//     assign result = (func == M_MUL) ? product[31:0] : product[63:32];
+     // Use the high or low bits of the product based on the output func
+     assign result = (func == M_MUL) ? product[31:0] : product[63:32];
 
-// endmodule
+ endmodule*/
 
 
 
@@ -221,7 +221,7 @@ module stage_ex (
         .result(alu_result) // will return 32'hfacebeec if branch is high (Sentinel, hopefully none of our alu computations result in that value)
     );
     // Instantiate the multiplier
-    mult mults [`NUM_FU_MULT-1:0] (
+    /*mult mults [`NUM_FU_MULT-1:0] (
         // Inputs
         .clock(clock),
         .reset(reset),
@@ -233,7 +233,7 @@ module stage_ex (
         // Output
         .result(mult_result),
         .done(mult_done)
-    );
+    );*/
 
     // // Instantiate the conditional branch module
     // conditional_branch conditional_branchs [NUM_FU_BRANCH-1:0] (
@@ -273,6 +273,8 @@ module stage_ex (
         ex_rdy_out.fu_rdy_load  <= '0;
     end
 
+    //assign ex_c_out.c_data = alu_result[0];
+
     PHYS_REG_IDX [3:0] completed_tags;
     logic [3:0] completed_ids;
     logic [3:0] completed_count;
@@ -288,7 +290,13 @@ module stage_ex (
     DATA second_oldest_data;
     ROB_IDX [3:0] second_oldest_rob_idx;
 
-    always_comb begin        
+    always_comb begin     
+
+        ex_c_out.c_en = '0; // Initialize completion enable signals
+        ex_c_out.c_ts = '0; // Initialize completed physical register tags
+        ex_c_out.c_data = '0;
+        ex_c_out.c_rob_idxs = '0;
+
         completed_count = 0;
         for (int i = 0; i < `NUM_FU_ALU; i++) begin
             if (alu_result[i] != 32'hfacebeec || branch[i]) begin
@@ -361,10 +369,6 @@ module stage_ex (
         end
 
         // Step 4: Assign the selected oldest completions
-        ex_c_out.c_en = '0; // Initialize completion enable signals
-        ex_c_out.c_ts = '0; // Initialize completed physical register tags
-        ex_c_out.c_data = '0;
-        ex_c_out.c_rob_idxs = '0;
 
         case (completed_count)
             0: begin
@@ -372,23 +376,25 @@ module stage_ex (
                 ex_c_out.c_en = '0;
                 ex_c_out.c_ts = '0;
                 ex_c_out.c_data = '0;
-                ex_c_out.rob_idx = '0;
+                ex_c_out.c_rob_idxs = '0;
             end
             1: begin
                 // Only one instruction finished
                 ex_c_out.c_en[0] = 1'b1;
                 ex_c_out.c_ts[0] = oldest_tag;
                 ex_c_out.c_data[0] = oldest_data;
-                ex_c_out.rob_idx[0] 
+                ex_c_out.c_rob_idxs[0] = oldest_rob_idx; 
             end
             default: begin
                 // Two or more completions: Take the two oldest
                 ex_c_out.c_en[0] = 1'b1;
                 ex_c_out.c_ts[0] = oldest_tag;
                 ex_c_out.c_data[0] = oldest_data;
+                ex_c_out.c_rob_idxs[0] = oldest_rob_idx;
                 ex_c_out.c_en[1] = 1'b1;
                 ex_c_out.c_ts[1] = second_oldest_tag;
                 ex_c_out.c_data[1] = second_oldest_data;
+                ex_c_out.c_rob_idxs[0] = second_oldest_rob_idx;
             end
         endcase
 

@@ -2,7 +2,7 @@
 // This module generates the test vectors
 // Correctness checking is in FIFO_sva.svh
 `include "sys_defs.svh"
-
+// `include "../verilog/mem.sv"
 
 
 module fetch_test();
@@ -11,12 +11,13 @@ module fetch_test();
     decode2fetch       fetch_in;
     logic        [1:0] Imem_command;
     logic              take_branch;
-    ADDR               branch_target, pc1, pc2, PC_reg;
+    ADDR               branch_target, pc1, pc2, PC_reg, PC_reg4;
     MEM_BLOCK          Imem_data;
     MEM_TAG            Imem2proc_transaction_tag, Imem2proc_data_tag;
     fetch2decode       fetch_out;
     ADDR               Imem_addr;
     INST               inst1, inst2;
+    MEM_BLOCK unified_memory [`MEM_64BIT_LINES-1:0];
 
     // INSTANCE is from the sys_defs.svh file
     // it renames the module if SYNTH is defined in
@@ -29,22 +30,25 @@ module fetch_test();
         .proc2mem_command(MEM_LOAD), //MEM_LOAD
         .mem2proc_transaction_tag(Imem2proc_transaction_tag),
         .mem2proc_data(Imem_data),
-        .mem2proc_data_tag(Imem2proc_data_tag)
+        .mem2proc_data_tag(Imem2proc_data_tag),
+        .unified_memory(unified_memory)
     );
 
-    stage_if dut (
+    stage_if_p4 dut (
         .clock    (clock),
         .reset    (reset),
         .fetch_in (fetch_in),
         .take_branch(take_branch),
         .branch_target(branch_target),
-        .Imem_data({memory.unified_memory[PC_reg[15:3]], memory.unified_memory[PC_reg[15:3] + 4]}),
+        .Imem_data({memory.unified_memory[PC_reg[15:3]], memory.unified_memory[PC_reg4[15:3]]}),
         //.Imem2proc_transaction_tag(Imem2proc_transaction_tag),
         //.Imem2proc_data_tag(Imem2proc_data_tag),
         //.Imem_command(Imem_command),
-        .fetch_out(fetch_out),
+        // .fetch_out(fetch_out),
         //.Imem_addr(Imem_addr)
-        .PC_reg(PC_reg)
+        .decode_out(fetch_out),
+        .PC_reg(PC_reg),
+        .PC_reg4(PC_reg4)
     );
 
     // bind dut rob_sva #(
@@ -93,8 +97,8 @@ module fetch_test();
         take_branch = 0;
         branch_target = 0;
 
-        $monitor("  %3d | branch?: %b  target: %d  |  mem_data: %h  | inst1: %h  inst2: %h  pc1: %d  pc2: %d  valid1: %b  valid2: %b  pc: %d",
-                  $time,  take_branch, branch_target, memory.unified_memory[PC_reg[15:3]], inst1, inst2, pc1, pc2, valid1, valid2, PC_reg);
+        $monitor("  %3d | branch?: %b  target: %d  |  mem_data: %h  mem_data2: %h  | inst1: %h  inst2: %h  valid1: %b  valid2: %b  pc: %d  pc4: %d",
+                  $time,  take_branch, branch_target, memory.unified_memory[PC_reg[15:3]], memory.unified_memory[PC_reg4[15:3]], inst1, inst2, valid1, valid2, PC_reg, PC_reg4);
 
         @(negedge clock);
         @(negedge clock);

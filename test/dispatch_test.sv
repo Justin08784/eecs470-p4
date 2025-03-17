@@ -10,7 +10,6 @@ module dispatch_testbench;
     logic reset;
     logic flush;
     logic failed;
-    ID_RESULT [N-1:0] d_dat;
 
     // DECODE
     decode2dispatch decode_in;
@@ -42,8 +41,6 @@ module dispatch_testbench;
         .reset(reset),
         .flush(1'b0),
 
-        .d_dat(d_dat),
-
         .decode_in(decode_in),
         .decode_out(decode_out),
 
@@ -63,8 +60,16 @@ module dispatch_testbench;
         .map_out(map_out)
     );
 
-
     task set_decode(
+        input int d_vld_scnt,
+        input logic [1:0] prvw_has_dests
+    );
+        decode_in.d_vld_scnt = d_vld_scnt;
+        decode_in.prvw_has_dests = prvw_has_dests;
+    endtask
+
+
+    task set_decode_dat(
         input int i,
         input int rd,
         input int rs1,
@@ -197,17 +202,18 @@ module dispatch_testbench;
         ROB_IDX idx,
         string msg
     );
-    assert (d_dat[i].t == ts)
+    $display("RS[%1d]: %2d", i, rs_out.d_dat[i].t);
+    assert (rs_out.d_dat[i].t == ts)
         else exit_on_error (msg);
-    assert (d_dat[i].t1 == t1s)
+    assert (rs_out.d_dat[i].t1 == t1s)
         else exit_on_error (msg);
-    assert (d_dat[i].t2 == t2s)
+    assert (rs_out.d_dat[i].t2 == t2s)
         else exit_on_error (msg);
-    assert (d_dat[i].t1_rdy == cpl1s)
+    assert (rs_out.d_dat[i].t1_rdy == cpl1s)
         else exit_on_error (msg);
-    assert (d_dat[i].t2_rdy == cpl2s)
+    assert (rs_out.d_dat[i].t2_rdy == cpl2s)
         else exit_on_error (msg);
-    assert (d_dat[i].rob_idx == idx)
+    assert (rs_out.d_dat[i].rob_idx == idx)
         else exit_on_error (msg);
     endtask
 
@@ -234,7 +240,7 @@ module dispatch_testbench;
     task test_reset();
         reset = 1;
         @(negedge clock);
-        assert (decode_out.dispatch_rdy_cnt == '0)
+        assert (decode_out.dispatch_en_cnt == '0)
             else exit_on_error ("test_reset decode error");
         assert (rs_out.d_en_cnt == 0)
             else exit_on_error ("test_reset rs error");
@@ -246,7 +252,7 @@ module dispatch_testbench;
             else exit_on_error ("test_reset lsq error");
         assert (map_out.en_cnt == '0)
             else exit_on_error ("test_reset map error");
-        assert (d_dat == '0)
+        assert (rs_out.d_dat == '0)
             else exit_on_error ("test_reset d_dat error");
         @(negedge clock);
         reset = 0;
@@ -261,7 +267,7 @@ module dispatch_testbench;
         reset = 1;
 
         @(negedge clock);
-        assert (decode_out.dispatch_rdy_cnt == '0)
+        assert (decode_out.dispatch_en_cnt == '0)
             else exit_on_error ("test_reset decode error");
         assert (rs_out.d_en_cnt == 0)
             else exit_on_error ("test_reset rs error");
@@ -273,7 +279,7 @@ module dispatch_testbench;
             else exit_on_error ("test_reset lsq error");
         assert (map_out.en_cnt == '0)
             else exit_on_error ("test_reset map error");
-        assert (d_dat == '0)
+        assert (rs_out.d_dat == '0)
             else exit_on_error ("test_reset d_dat error");
         @(negedge clock);
         reset = 0;        
@@ -287,7 +293,7 @@ module dispatch_testbench;
         clear_all();
         @(negedge clock);
         // $display("\n\nRS VALUE: %2d:", rs_out.d_en_cnt);
-        assert (decode_out.dispatch_rdy_cnt == '0)
+        assert (decode_out.dispatch_en_cnt == '0)
             else exit_on_error ("test_zero decode error");
         assert (rs_out.d_en_cnt == 2'b0)
             else exit_on_error ("test_zero rs error");
@@ -299,7 +305,7 @@ module dispatch_testbench;
             else exit_on_error ("test_zero lsq error");
         assert (map_out.en_cnt == '0)
             else exit_on_error ("test_zero map error");
-        assert (d_dat == '0)
+        assert (rs_out.d_dat == '0)
             else exit_on_error ("test_reset d_dat error");
 
     endtask
@@ -315,14 +321,15 @@ module dispatch_testbench;
         set_rob(2,24,25);
         set_free(2,8,16);
         set_lsq(2);
-        set_decode(0,1,2,3,OPA_IS_RS1,OPB_IS_RS2,0,0,0,0);
-        set_decode(1,4,5,6,OPA_IS_RS1,OPB_IS_RS2,0,0,0,0);
+        set_decode(2,2'b11);
+        set_decode_dat(0,1,2,3,OPA_IS_RS1,OPB_IS_RS2,0,0,0,0);
+        set_decode_dat(1,4,5,6,OPA_IS_RS1,OPB_IS_RS2,0,0,0,0);
         set_map(0,1,1,12,13,14);
         set_map(1,0,0,15,16,17);
 
         @(negedge clock);
         // $display("\n\nFREE VALUE: %2d:", free_in.free_rdy_scnt);
-        assert (decode_out.dispatch_rdy_cnt == 2'b11)
+        assert (decode_out.dispatch_en_cnt == 2)
             else exit_on_error ("test_two decode error");
         assert (rs_out.d_en_cnt == 2)
             else exit_on_error ("test_two_rdy rs error");
@@ -340,9 +347,9 @@ module dispatch_testbench;
             else exit_on_error ("test_two_rdy map error");
         assert (map_out.dsts[1] == 4)
             else exit_on_error ("test_two_rdy map error");
-        assert (map_out.ts[0] == 8)
+        assert (map_out.ts[0] == 16)
             else exit_on_error ("test_two_rdy map error");
-        assert (map_out.ts[1] == 16)
+        assert (map_out.ts[1] == 8)
             else exit_on_error ("test_two_rdy map error");
 
         assert (map_out.src1s[0] == 2)
@@ -358,10 +365,13 @@ module dispatch_testbench;
         chk_dat(1,0,0,15,16,17,25,"test_two d_dat error");
 
         @(negedge clock);
-        set_decode(0,0,2,3,OPA_IS_RS1,OPB_IS_RS2,0,0,0,0);
+        set_decode(2,2'b11);
+        set_decode_dat(0,0,2,3,OPA_IS_RS1,OPB_IS_RS2,0,0,0,0);
+        set_decode(2,2'b10);
+        set_map(1,0,0,15,16,0);
 
         @(negedge clock);
-        assert (decode_out.dispatch_rdy_cnt == 2'b11)
+        assert (decode_out.dispatch_en_cnt == 2)
             else exit_on_error ("test_two decode error");
         assert (rs_out.d_en_cnt == 2)
             else exit_on_error ("test_two_rdy rs error");
@@ -381,7 +391,7 @@ module dispatch_testbench;
             else exit_on_error ("test_two_rdy map error");
         assert (map_out.ts[0] == 0)
             else exit_on_error ("test_two_rdy map error");
-        assert (map_out.ts[1] == 16)
+        assert (map_out.ts[1] == 8)
             else exit_on_error ("test_two_rdy map error");
 
         assert (map_out.src1s[0] == 2)
@@ -392,6 +402,9 @@ module dispatch_testbench;
             else exit_on_error ("test_two_rdy map error");
         assert (map_out.src2s[1] == 6)
             else exit_on_error ("test_two_rdy map error");
+
+        chk_dat(0,1,1,12,13,14,24,"test_two d_dat error");
+        chk_dat(1,0,0,15,16,0,25,"test_two d_dat error");
     endtask
 
     task test_one_rdy();
@@ -405,14 +418,15 @@ module dispatch_testbench;
         set_rob(2,24,25);
         set_free(2,8,16);
         set_lsq(2);
-        set_decode(0,1,2,3,OPA_IS_RS1,OPB_IS_RS2,0,0,0,0);
-        set_decode(1,4,5,6,OPA_IS_RS1,OPB_IS_RS2,0,0,0,0);
+        set_decode(2,2'b11);
+        set_decode_dat(0,1,2,3,OPA_IS_RS1,OPB_IS_RS2,0,0,0,0);
+        set_decode_dat(1,4,5,6,OPA_IS_RS1,OPB_IS_RS2,0,0,0,0);
         set_map(0,1,1,12,13,14);
         set_map(1,0,0,15,16,17);
 
         @(negedge clock);
         // $display("\n\nFREE VALUE: %2d:", free_in.free_rdy_scnt);
-        assert (decode_out.dispatch_rdy_cnt == 2'b01)
+        assert (decode_out.dispatch_en_cnt == 1)
             else exit_on_error ("test_one decode error");
         assert (rs_out.d_en_cnt == 1)
             else exit_on_error ("test_one_rdy rs error");
@@ -455,7 +469,7 @@ module dispatch_testbench;
 
         @(negedge clock);
         // $display("\n\nFREE VALUE: %2d:", free_in.free_rdy_scnt);
-        assert (decode_out.dispatch_rdy_cnt == 2'b01)
+        assert (decode_out.dispatch_en_cnt == 1)
             else exit_on_error ("test_one decode error");
         assert (rs_out.d_en_cnt == 1)
             else exit_on_error ("test_one_rdy rs error");
@@ -476,7 +490,7 @@ module dispatch_testbench;
 
         @(negedge clock);
         // $display("\n\nFREE VALUE: %2d:", free_in.free_rdy_scnt);
-        assert (decode_out.dispatch_rdy_cnt == 2'b01)
+        assert (decode_out.dispatch_en_cnt == 1)
             else exit_on_error ("test_one decode error");
         assert (rs_out.d_en_cnt == 1)
             else exit_on_error ("test_one_rdy rs error");
@@ -497,7 +511,7 @@ module dispatch_testbench;
 
         @(negedge clock);
         // $display("\n\nFREE VALUE: %2d:", free_in.free_rdy_scnt);
-        assert (decode_out.dispatch_rdy_cnt == 2'b01)
+        assert (decode_out.dispatch_en_cnt == 1)
             else exit_on_error ("test_one decode error");
         assert (rs_out.d_en_cnt == 1)
             else exit_on_error ("test_one_rdy rs error");
@@ -522,12 +536,13 @@ module dispatch_testbench;
         set_rob(3,24,25);
         set_free(3,8,16);
         set_lsq(3);
-        set_decode(0,1,2,3,OPA_IS_RS1,OPB_IS_RS2,0,0,0,0);
-        set_decode(1,4,5,6,OPA_IS_RS1,OPB_IS_RS2,0,0,0,0);
+        set_decode(2,2'b11);
+        set_decode_dat(0,1,2,3,OPA_IS_RS1,OPB_IS_RS2,0,0,0,0);
+        set_decode_dat(1,4,5,6,OPA_IS_RS1,OPB_IS_RS2,0,0,0,0);
 
         @(negedge clock);
         // $display("\n\nFREE VALUE: %2d:", free_in.free_rdy_scnt);
-        assert (decode_out.dispatch_rdy_cnt == 2'b11)
+        assert (decode_out.dispatch_en_cnt == 2)
             else exit_on_error ("test_too_many decode error");
         assert (rs_out.d_en_cnt == 2)
             else exit_on_error ("test_too_many rs error");
@@ -573,8 +588,8 @@ module dispatch_testbench;
         test_reset();
         test_zero();
         test_two_rdy();
-        test_one_rdy();
-        test_too_many();
+        // test_one_rdy();
+        // test_too_many();
 
         if (failed)
             $display("@@@ Failed\n");

@@ -1,6 +1,5 @@
 `include "sys_defs.svh"
 
-
 module dispatch #(parameter 
     N=`N
 ) (
@@ -30,10 +29,6 @@ module dispatch #(parameter
     input   map_table2dispatch map_in,
     output  dispatch2map_table map_out
     
-    //dispatch shouldn't need to read from the map table.
-    //dispatch will pair a new tag (from free list) with
-    //the dest reg (from decode), and output the paired
-    //item to the map table for it to decide how to update.
 );
 
 logic [$clog2(N):0] dispatch_cnt;
@@ -46,6 +41,7 @@ always_comb begin
     dispatch_cnt = free_in.free_rdy_scnt < $countones(decode_in.prvw_has_dests)
         ? `MIN(dispatch_cnt, free_in.free_rdy_scnt)
         : dispatch_cnt;
+    dispatch_cnt = (reset || flush) ? 0 : dispatch_cnt;
     
     //assigning output #'s
     decode_out.dispatch_en_cnt  = dispatch_cnt;
@@ -126,7 +122,7 @@ always_comb begin
     for (int i = 0; i < dispatch_cnt; i++) begin
         rs_out.d_dat[i]            = decode_in.d_dat[i];
 
-        rs_out.d_dat[i].t          = map_out.ts[i];
+        rs_out.d_dat[i].t          = map_in.ts[i];
         rs_out.d_dat[i].t1         = map_in.t1s[i];
         rs_out.d_dat[i].t2         = map_in.t2s[i];
         rs_out.d_dat[i].t1_rdy     = map_in.cpl1s[i];
@@ -138,14 +134,20 @@ end
 
 // handle rob output 
 always_comb begin
+    rob_out = '0;
     rob_out.d_en_cnt = dispatch_cnt;
+
+    // foreach (gbus_preg2insn[i, j]) begin
+    //     if (gbus_preg2insn[i][j])
+    //         rob_out.tag[j] |= free_in.d_ts[i];
+    // end
 
     for (int i = 0; i < dispatch_cnt; i++) begin
         //handling dest register
         rob_out.dst[i]      = decode_in.d_dat[i].inst.r.rd;
         //handling src tags
-        rob_out.tag[i]      = map_out.ts[i];
-        rob_out.t_old[i]    = map_in.ts[i];
+        rob_out.tag[i]      = free_in.[i];
+        rob_out.t_old[i]    = map_in.ts_old[i];
     end
 end
 
