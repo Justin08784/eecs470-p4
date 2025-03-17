@@ -1,4 +1,5 @@
 `include "sys_defs.svh"
+`include "test/map_table_sva.svh"
 
 module map_table_testbench;
     parameter   N = `N;  // Single-issue architecture

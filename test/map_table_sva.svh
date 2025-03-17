@@ -4,10 +4,15 @@
 `define MT_SVA_SVH
 
 module mt_sva #(parameter 
-    N=`N
+    N=`N,
+    localparam NUM_ARCH_REG=32
 ) (
     input   clock, reset,
     // retire ??
+    input struct packed {
+        PHYS_REG_IDX t;
+        logic cpl;
+    } [NUM_ARCH_REG-1:0]        entries_dut,
 
     // complete
     input   execute2complete    c_in,
@@ -35,62 +40,68 @@ module mt_sva #(parameter
         endcase
     endfunction
 
-    function print_entries(input RS_ENTRY [RS_SZ-1:0] entries);
-        for (int i = 0; i < RS_SZ; ++i) begin
-            string fu_name;
-            get_fu_name(entries[i].dat.fu_idx, fu_name);
+    // function print_entries(input RS_ENTRY [RS_SZ-1:0] entries);
+    //     for (int i = 0; i < RS_SZ; ++i) begin
+    //         string fu_name;
+    //         get_fu_name(entries[i].dat.fu_idx, fu_name);
 
-            if (!entries[i].busy) begin
-                $display("Entry [%0d]:", i);
-                continue;
-            end
+    //         if (!entries[i].busy) begin
+    //             $display("Entry [%0d]:", i);
+    //             continue;
+    //         end
 
-            $display("Entry [%0d]: id=%0d, busy=%b, issued=%b, t=%0d, t1=%0d, t2=%0d, t1_rdy=%b, t2_rdy=%b, fu=%s(%0d)",
-                i, 
-                entries[i].dat.id, 
-                entries[i].busy, 
-                entries[i].issued, 
-                entries[i].dat.t, 
-                entries[i].dat.t1, 
-                entries[i].dat.t2, 
-                entries[i].dat.t1_rdy, 
-                entries[i].dat.t2_rdy, 
+    //         $display("Entry [%0d]: id=%0d, busy=%b, issued=%b, t=%0d, t1=%0d, t2=%0d, t1_rdy=%b, t2_rdy=%b, fu=%s(%0d)",
+    //             i, 
+    //             entries[i].dat.id, 
+    //             entries[i].busy, 
+    //             entries[i].issued, 
+    //             entries[i].dat.t, 
+    //             entries[i].dat.t1, 
+    //             entries[i].dat.t2, 
+    //             entries[i].dat.t1_rdy, 
+    //             entries[i].dat.t2_rdy, 
                 
-                entries[i].busy ? fu_name : "*",
-                entries[i].dat.fu_idx,
-                // entries[i].dat.PC, 
-                // entries[i].dat.NPC, 
-                // entries[i].dat.alu_func, 
-                // entries[i].dat.mult, 
-                // entries[i].dat.rd_mem, 
-                // entries[i].dat.wr_mem, 
-                // entries[i].dat.cond_branch, 
-                // entries[i].dat.uncond_branch, 
-                // entries[i].dat.halt, 
-                // entries[i].dat.illegal, 
-                // entries[i].dat.csr_op
-            );
-        end
-    endfunction
+    //             entries[i].busy ? fu_name : "*",
+    //             entries[i].dat.fu_idx,
+    //             // entries[i].dat.PC, 
+    //             // entries[i].dat.NPC, 
+    //             // entries[i].dat.alu_func, 
+    //             // entries[i].dat.mult, 
+    //             // entries[i].dat.rd_mem, 
+    //             // entries[i].dat.wr_mem, 
+    //             // entries[i].dat.cond_branch, 
+    //             // entries[i].dat.uncond_branch, 
+    //             // entries[i].dat.halt, 
+    //             // entries[i].dat.illegal, 
+    //             // entries[i].dat.csr_op
+    //         );
+    //     end
+    // endfunction
 
     struct packed {
         execute2complete    c_in;
         dispatch2map_table  d_in;
     } ins_pre, ins_cur; 
-
     struct packed {
         map_table2dispatch  d_out;
     } outs_pre, outs_cur; 
+    struct packed {
+        PHYS_REG_IDX t;
+        logic cpl;
+    } [NUM_ARCH_REG-1:0]
+        entries_pre,
+        entries_mut,
+        entries_cur;
 
     // This syntax is so fucking gorgeous btw.
     assign ins_cur = '{
         c_in:c_in,
         d_in:d_in
     };
-
     assign outs_cur = '{
         d_out:d_out_dut
     };
+    assign entries_cur = entries_dut;
     
 
     initial begin
@@ -101,18 +112,14 @@ module mt_sva #(parameter
         @(negedge clock);   
         @(negedge clock);   
     forever begin
+        entries_mut = entries_pre;
 
         @(posedge clock);
-
         @(negedge clock);
-
-
-
-
     end end
 
     always_ff @(posedge clock) begin
-        if (reset || flush) begin
+        if (reset) begin
             entries_pre <= '0;
             ins_pre     <= '0;
             outs_pre    <= '0;

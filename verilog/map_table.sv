@@ -12,9 +12,18 @@ Map Table
 // - map table is more complicated than a simple lookup. forall i < j,
 // src1s[j], src2s[j] may potentially be dsts[i]. i.e. there is a serial dependency
 module map_table #(parameter 
-    N=`N
+    N=`N,
+    NUM_ARCH_REG=32
 ) (
     input clock, reset,
+
+    `ifdef DEBUG
+    output struct packed {
+        PHYS_REG_IDX t;
+        logic cpl;
+    } [NUM_ARCH_REG-1:0] entries_dbg,
+    `endif
+
     // retire ??
 
     // complete
@@ -26,11 +35,13 @@ module map_table #(parameter
     input dispatch2map_table d_in,
     output map_table2dispatch d_out
 );
-    localparam NUM_ARCH_REG = 32;
     struct packed {
         PHYS_REG_IDX t;
         logic cpl;
     } [NUM_ARCH_REG-1:0] entries, entries_n;
+    `ifdef DEBUG
+    assign entries_dbg = entries;
+    `endif
 
     always_comb begin
         entries_n = entries;
