@@ -100,6 +100,10 @@ module map_table_testbench;
         d_in.en_cnt = 1;
         d_in.dsts[0] = `ZERO_REG;  // Trying to rename ZERO_REG
         d_in.ts[0] = 20;           // Attempt to assign P20
+        // >> speculative correction
+        d_in.src1s[0] = `ZERO_REG;
+        d_in.src2s[0] = `ZERO_REG;
+        // << speculative correction
 
         #10;
 
