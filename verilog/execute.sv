@@ -69,7 +69,7 @@ endmodule // alu
 
 // endmodule // conditional_branch
 
-/*module mult_no_pipeline (
+module mult_no_pipeline (
      input clock, reset, start,
      input DATA rs1, rs2,
      input MULT_FUNC func,
@@ -97,7 +97,7 @@ endmodule // alu
      // Use the high or low bits of the product based on the output func
      assign result = (func == M_MUL) ? product[31:0] : product[63:32];
 
- endmodule*/
+ endmodule
 
 
 
@@ -220,8 +220,11 @@ module stage_ex_p4 (
         .take(take_conditional), // True/False condition result (will return FALSE if branch is low)
         .result(alu_result) // will return 32'hfacebeec if branch is high (Sentinel, hopefully none of our alu computations result in that value)
     );
+
+
+    
     // Instantiate the multiplier
-    /*mult mults [`NUM_FU_MULT-1:0] (
+    mult_no_pipeline mults [`NUM_FU_MULT-1:0] (
         // Inputs
         .clock(clock),
         .reset(reset),
@@ -233,7 +236,7 @@ module stage_ex_p4 (
         // Output
         .result(mult_result),
         .done(mult_done)
-    );*/
+    );
 
     // // Instantiate the conditional branch module
     // conditional_branch conditional_branchs [NUM_FU_BRANCH-1:0] (
