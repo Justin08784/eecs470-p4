@@ -1,6 +1,4 @@
 `include "sys_defs.svh"
-`include "psel_gen.sv"
-
 
 module dispatch #(parameter 
     N=`N
