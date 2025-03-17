@@ -49,8 +49,6 @@ always_comb begin
     
     //assigning output #'s
     decode_out.dispatch_en_cnt  = dispatch_cnt;
-    rs_out.d_en_cnt             = dispatch_cnt;
-    rob_out.d_en_cnt            = dispatch_cnt;
     lsq_out.lsq_d_en_cnt        = dispatch_cnt; //this will likely need to be changed once memory operations are introduced
 end
 
@@ -120,20 +118,34 @@ always_comb begin
     end
 end
 
-// handle map table input
+// handle rs output 
 always_comb begin
+    rs_out.d_en_cnt = dispatch_cnt;
     rs_out.d_dat = '0;
 
     for (int i = 0; i < dispatch_cnt; i++) begin
         rs_out.d_dat[i]            = decode_in.d_dat[i];
 
-        rs_out.d_dat[i].t          = map_in.ts[i];
+        rs_out.d_dat[i].t          = map_out.ts[i];
         rs_out.d_dat[i].t1         = map_in.t1s[i];
         rs_out.d_dat[i].t2         = map_in.t2s[i];
         rs_out.d_dat[i].t1_rdy     = map_in.cpl1s[i];
         rs_out.d_dat[i].t2_rdy     = map_in.cpl2s[i];
 
         rs_out.d_dat[i].rob_idx    = rob_in.rob_idxs[i];
+    end
+end
+
+// handle rob output 
+always_comb begin
+    rob_out.d_en_cnt = dispatch_cnt;
+
+    for (int i = 0; i < dispatch_cnt; i++) begin
+        //handling dest register
+        rob_out.dst[i]      = decode_in.d_dat[i].inst.r.rd;
+        //handling src tags
+        rob_out.tag[i]      = map_out.ts[i];
+        rob_out.t_old[i]    = map_in.ts[i];
     end
 end
 
