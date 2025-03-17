@@ -104,12 +104,12 @@ module stage_id_p4_test();
         @(negedge clock);
         d_in.dispatch_en_cnt = 0;
 
-        $display("1 read: fwded");
-        f_in.f_en_cnt = 1;
-        d_in.dispatch_en_cnt = 1;
-        @(negedge clock);
-        f_in.f_en_cnt = 0;
-        d_in.dispatch_en_cnt = 0;
+        // $display("1 read: fwded");
+        // f_in.f_en_cnt = 1;
+        // d_in.dispatch_en_cnt = 1;
+        // @(negedge clock);
+        // f_in.f_en_cnt = 0;
+        // d_in.dispatch_en_cnt = 0;
 
         $display("2 reads: both from state");
         f_in.f_en_cnt = 2;
@@ -120,21 +120,21 @@ module stage_id_p4_test();
         @(negedge clock);
         d_in.dispatch_en_cnt = 0;
 
-        $display("2 reads: 1 from state, 1 fwded");
-        f_in.f_en_cnt = 1;
-        @(negedge clock);
+        // $display("2 reads: 1 from state, 1 fwded");
+        // f_in.f_en_cnt = 1;
+        // @(negedge clock);
 
-        d_in.dispatch_en_cnt = 2;
-        @(negedge clock);
-        f_in.f_en_cnt = 0;
-        d_in.dispatch_en_cnt = 0;
+        // d_in.dispatch_en_cnt = 2;
+        // @(negedge clock);
+        // f_in.f_en_cnt = 0;
+        // d_in.dispatch_en_cnt = 0;
 
-        $display("2 reads: both fwded");
-        f_in.f_en_cnt = 2;
-        d_in.dispatch_en_cnt = 2;
-        @(negedge clock);
-        f_in.f_en_cnt = 0;
-        d_in.dispatch_en_cnt = 0;
+        // $display("2 reads: both fwded");
+        // f_in.f_en_cnt = 2;
+        // d_in.dispatch_en_cnt = 2;
+        // @(negedge clock);
+        // f_in.f_en_cnt = 0;
+        // d_in.dispatch_en_cnt = 0;
 
 
 

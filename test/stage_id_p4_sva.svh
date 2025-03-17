@@ -21,7 +21,7 @@ module stage_id_p4_sva (
     assign  free = DEPTH - used;
 
 
-    decode2dispatch f_out_delayed;
+    decode2fetch    f_out_delayed;
     decode2dispatch d_out_delayed;
     initial begin
         // wait until 1st reset: ensures no Xs are floating around
@@ -91,23 +91,23 @@ module stage_id_p4_sva (
     clocking cb @(posedge clock);
         property rd_en_correct;
             disable iff (reset)
-            d_in.dispatch_en_cnt <= used + f_in.f_en_cnt;
+            d_in.dispatch_en_cnt <= used;
         endproperty
 
         property wr_en_correct;
             disable iff (reset)
-            f_in.f_en_cnt <= free + d_in.dispatch_en_cnt;
+            f_in.f_en_cnt <= free;
         endproperty
 
-        // property used_scnt_correct;
-        //     disable iff (reset)
-        //     used_scnt == used < NUM_RPORTS ? used : NUM_RPORTS;
-        // endproperty
+        property free_scnt_correct;
+            disable iff (reset)
+            f_out_delayed.d_rdy_cnt == `MIN(free, `N);
+        endproperty
 
-        // property free_scnt_correct;
-        //     disable iff (reset)
-        //     free_scnt == free < NUM_WPORTS ? free : NUM_WPORTS;
-        // endproperty
+        property used_scnt_correct;
+            disable iff (reset)
+            d_out_delayed.d_vld_scnt == `MIN(used, `N);
+        endproperty
 
         // property rd_data_correct;
         //     disable iff (reset)
@@ -145,6 +145,16 @@ module stage_id_p4_sva (
             );
         endproperty
 
+        property set_has_dest_correctly(i);
+            logic has_dest;
+            int  idx;
+            (f_in.f_en_cnt > i, has_dest=f_in.f_dat[i].inst.r.rd != `ZERO_REG, idx=(rd_count + used + i))
+            ##[0:$] (rd_count <= idx && idx < rd_count + d_in.dispatch_en_cnt)
+            |-> (
+                d_out_delayed.prvw_has_dests[idx - rd_count] == has_dest
+            );
+        endproperty
+
     endclocking
 
     // Assert properties
@@ -152,15 +162,16 @@ module stage_id_p4_sva (
         else exit_on_error;
     WrEn: assert property(cb.wr_en_correct)
         else exit_on_error;
-    // UsedScnt: assert property(cb.used_scnt_correct)
-    //     else exit_on_error;
-    // FreeScnt: assert property(cb.free_scnt_correct)
-    //     else exit_on_error;
-    // RdData: assert property(cb.rd_data_correct)
-    //     else exit_on_error;
+    UsedScnt: assert property(cb.used_scnt_correct)
+        else exit_on_error;
+    FreeScnt: assert property(cb.free_scnt_correct)
+        else exit_on_error;
+
     generate
         for (genvar wr_port = 0; wr_port < `N; ++wr_port) begin : gen_wr_props
             assert property(cb.write_read_correctly(wr_port))
+                else exit_on_error;
+            assert property(cb.set_has_dest_correctly(wr_port))
                 else exit_on_error;
         end
     endgenerate
