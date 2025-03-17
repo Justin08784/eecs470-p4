@@ -347,7 +347,7 @@ module stage_id_p4 (
         end
 
 
-        if (!reset && DEBUG) begin
+        if (!reset) begin
             $display("ID >>");
             $display("  %3d | f_in:  {f_en_cnt: %d, PC: [%x, %x], inst: [%x, %x]}",
                 $time,
