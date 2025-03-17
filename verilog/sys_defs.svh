@@ -635,7 +635,14 @@ typedef struct packed {
         // - From: EX
     ROB_IDX         [`N-1:0] c_rob_idxs;
         // - From: EX
+    DATA            [`N-1:0] c_data;
 } execute2complete;
+
+
+typedef struct packed{
+    ADDR            [31:0] PC;
+    DATA           alu_result;
+} execute2fetch;
 
 // By Free List
 typedef struct packed {
