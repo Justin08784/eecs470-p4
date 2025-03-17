@@ -116,9 +116,9 @@ module fifo #(
             tail    <= RESET_STATE.tail;
             state   <= RESET_STATE.state;
         end else begin
-            if (wr_en_cnt > free + rd_en_cnt)
+            if (ENABLE_INTR_FWD ? wr_en_cnt > free + rd_en_cnt : free)
                 $error("FIFO overflow!");
-            if (rd_en_cnt > used + wr_en_cnt)
+            if (ENABLE_INTR_FWD ? rd_en_cnt > used + wr_en_cnt : used)
                 $error("FIFO underflow!");
             used    <= used + wr_en_cnt - rd_en_cnt;
             head    <= (head + rd_en_cnt) % DEPTH;
