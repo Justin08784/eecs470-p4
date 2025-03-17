@@ -37,6 +37,7 @@ logic [$clog2(N):0] dispatch_cnt;
 always_comb begin
     //logic to find the minimum # of spots free across the 4 inputs
     dispatch_cnt = `MIN(rs_in.rs_rdy_scnt, rob_in.rob_rdy_scnt);
+    dispatch_cnt = `MIN(dispatch_cnt, decode_in.d_vld_scnt);
     // dispatch_cnt = `MIN(dispatch_cnt, lsq_in.lsq_rdy_scnt); // TODO: enable later
     dispatch_cnt = free_in.free_rdy_scnt < $countones(decode_in.prvw_has_dests)
         ? `MIN(dispatch_cnt, free_in.free_rdy_scnt)
