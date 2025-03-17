@@ -71,6 +71,7 @@ module rob #(
             wb_packet[i].halt       = state[r_idxs[i]].halt;
             wb_packet[i].illegal    = state[r_idxs[i]].illegal;
             wb_packet[i].valid      = ~state[r_idxs[i]].illegal;
+            $display("RETIRING FROM ROB");
         end
 
         // handle dispatch (outs)
@@ -131,6 +132,7 @@ module rob #(
                 state[cur_idx].halt     <= d_in.halt[i];
                 state[cur_idx].illegal  <= d_in.illegal[i];
                 state[cur_idx].NPC      <= d_in.NPC[i];
+                $display("PUTTING INTO ROB");
             end
         end
     end
