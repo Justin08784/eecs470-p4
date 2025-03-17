@@ -44,7 +44,7 @@ module execute_test();
     // it renames the module if SYNTH is defined in
     // order to rename the module to FIFO_svsim
 
-    stage_ex dut (
+    stage_ex_p4 dut (
         .clock    (clock),
         .reset    (reset),
         .ex_fu_in (ex_fu_in),

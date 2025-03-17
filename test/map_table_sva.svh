@@ -148,10 +148,45 @@ module mt_sva #(parameter
         end
     endtask
 
+    function automatic logic check_sources(
+         input int i,            // which dispatch slot
+         input PHYS_REG_IDX t1,
+         input PHYS_REG_IDX t2
+     );
+         REG_IDX src1;
+         PHYS_REG_IDX true_t1;
+         logic from_state1;
+ 
+         src1 = ins_cur.d_in.src1s[i];
+ 
+         from_state1 = `TRUE;
+         for (int j = i - 1; j >= 0; --j) begin
+             if (ins_cur.d_in.dsts[j] == src1) begin
+                 from_state1 = `FALSE;
+                 true_t1 = ins_cur.d_in.ts[j];
+                 break;
+             end
+         end
+         if (from_state1)
+             true_t1 = entries_pre[src1].t;
+ 
+         return (t1 == true_t1);
+     endfunction
+
+
     clocking cb @(posedge clock);
         property zero_reg_invariant;
             disable iff (reset)
             (entries_cur[`ZERO_REG].t == '0) && entries_cur[`ZERO_REG].cpl;
+        endproperty
+
+        property correct_deps(i);
+            disable iff (reset)
+            (ins_cur.d_in.en_cnt > i) |->  (check_sources(
+                i,
+                outs_cur.d_out.t1s[i],
+                '0
+            ));
         endproperty
         // property ex_clear;
         //     disable iff (reset || flush)
@@ -161,6 +196,12 @@ module mt_sva #(parameter
 
     Zero_Reg_Invariant: assert property(cb.zero_reg_invariant)
         else exit_on_error ("zero reg changed");
+    generate
+        for (genvar i = 0; i < `N; ++i) begin : gen_correct_deps
+            assert property(cb.correct_deps(i))
+                else exit_on_error("shit");
+        end
+    endgenerate
 
 endmodule
 `endif // MT_SVA_SVH
