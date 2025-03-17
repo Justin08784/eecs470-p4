@@ -33,15 +33,29 @@ module map_table_testbench;
     execute2complete c_in;
     dispatch2map_table d_in;
     map_table2dispatch d_out;
+    struct packed {
+        PHYS_REG_IDX t;
+        logic cpl;
+    } [NUM_ARCH_REG-1:0] entries_dut;
 
 
     // Instantiate the DUT (Device Under Test)
     map_table #(N) dut (
         .clock(clock),
         .reset(reset),
+        .entries_dbg(entries_dut),
         .c_in(c_in),
         .d_in(d_in),
         .d_out(d_out)
+    );
+
+    mt_sva #(N) sva (
+        .clock(clock),
+        .reset(reset),
+        .entries_dut(entries_dut),
+        .c_in(c_in),
+        .d_in(d_in),
+        .d_out_dut(d_out)
     );
 
     // Clock generation (period = 10ns)
@@ -63,6 +77,8 @@ module map_table_testbench;
 
         @(negedge clock);
         reset = 0;
+        @(negedge clock);
+        @(negedge clock);
         @(negedge clock);
 
         // 🟢 **Test 1: Basic Register Mapping (Single Instruction)**

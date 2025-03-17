@@ -113,6 +113,7 @@ module mt_sva #(parameter
         @(negedge clock);   
     forever begin
         entries_mut = entries_pre;
+        $display("sdlkajf: %b", entries_cur);
 
         @(posedge clock);
         @(negedge clock);
@@ -148,14 +149,18 @@ module mt_sva #(parameter
     endtask
 
     clocking cb @(posedge clock);
+        property zero_reg_invariant;
+            disable iff (reset)
+            (entries_cur[`ZERO_REG].t == '0) && entries_cur[`ZERO_REG].cpl;
+        endproperty
         // property ex_clear;
         //     disable iff (reset || flush)
         //     clear_correct;
         // endproperty
     endclocking
 
-    // Ex_Clear: assert property(cb.ex_clear)
-    //     else exit_on_error ("did not clear");
+    Zero_Reg_Invariant: assert property(cb.zero_reg_invariant)
+        else exit_on_error ("zero reg changed");
 
 endmodule
 `endif // MT_SVA_SVH
