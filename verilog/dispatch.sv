@@ -4,32 +4,32 @@
 module dispatch #(parameter 
     N=`N
 ) (
-    input clock, reset, flush,
-    output ID_RESULT [N-1:0] d_dat,
+    input   clock, reset, flush,
+    output  ID_RESULT [N-1:0] d_dat,
 
     // DECODE
-    input decode2dispatch decode_in,
-    output dispatch2decode decode_out,
+    input   decode2dispatch decode_in,
+    output  dispatch2decode decode_out,
     
     // RS
-    input rs2dispatch rs_in,
-    output dispatch2rs rs_out,
+    input   rs2dispatch rs_in,
+    output  dispatch2rs rs_out,
 
     // ROB
-    input rob2dispatch rob_in,
-    output dispatch2rob rob_out,
+    input   rob2dispatch rob_in,
+    output  dispatch2rob rob_out,
     
     // Free list
-    input free_list2dispatch free_in,
-    output dispatch2free_list free_out,
+    input   free_list2dispatch free_in,
+    output  dispatch2free_list free_out,
 
     // LSQ
-    input lsq2dispatch lsq_in,
-    output dispatch2lsq lsq_out,
+    input   lsq2dispatch lsq_in,
+    output  dispatch2lsq lsq_out,
     
     // Map table
-    input map_table2dispatch map_in,
-    output dispatch2map_table map_out
+    input   map_table2dispatch map_in,
+    output  dispatch2map_table map_out
     
     //dispatch shouldn't need to read from the map table.
     //dispatch will pair a new tag (from free list) with
@@ -49,6 +49,8 @@ always_comb begin
     //assigning output #'s
     decode_out.dispatch_rdy_cnt = (dispatch_cnt == 2) ? 2'b11 : ((dispatch_cnt == 1) ? 2'b01 : 2'b00);
     rs_out.d_en_cnt = dispatch_cnt;
+    rs_out.d_dat.t1 = map_in.t1s; // source tag 1 from map table
+    rs_out.d_dat.t2 = map_in.t2s; // source tag 1 from map table
     rob_out.d_en_cnt = dispatch_cnt;
     lsq_out.lsq_d_en_cnt = dispatch_cnt; //this will likely need to be changed once memory operations are introduced
 
