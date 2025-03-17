@@ -203,8 +203,9 @@ module decoder_p4 (
                 default: begin
                     illegal = `TRUE;
                 end
-        endcase // casez (inst)
+            endcase // casez (inst)
         end // if (valid)
+        $display("DECODE: %1d",halt);
     end // always
 
 endmodule // decoder
@@ -340,6 +341,7 @@ module stage_id_p4 (
     end
 
     always_ff @(posedge clock) begin
+        $display("DECODE COUNT: %2d", used_scnt);
         if (reset) begin
             insn_id <= 0;
         end else begin

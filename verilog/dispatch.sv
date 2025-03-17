@@ -1,4 +1,5 @@
 `include "sys_defs.svh"
+// `include "psel_gen.sv"
 
 module dispatch #(parameter 
     N=`N
@@ -40,10 +41,12 @@ always_comb begin
     dispatch_cnt = free_in.free_rdy_scnt < $countones(decode_in.prvw_has_dests)
         ? `MIN(dispatch_cnt, free_in.free_rdy_scnt)
         : dispatch_cnt;
+    dispatch_cnt = `MIN(dispatch_cnt,decode_in.d_vld_scnt);
     
     //assigning output #'s
     decode_out.dispatch_en_cnt  = dispatch_cnt;
     lsq_out.lsq_d_en_cnt        = dispatch_cnt; //this will likely need to be changed once memory operations are introduced
+    $display("DISPATCH COUNT: %2d", dispatch_cnt);
 end
 
 //logic for free list
@@ -145,6 +148,8 @@ always_comb begin
         rob_out.halt[i]     = decode_in.d_dat[i].halt;
         rob_out.illegal[i]  = decode_in.d_dat[i].illegal;
         rob_out.NPC[i]      = decode_in.d_dat[i].NPC;
+        $display("DISPATCH: %1d", rob_out.halt[i]);
+        $display("DISPATCH ILLEGAL: %1d",rob_out.illegal[i]);
     end
 end
 
