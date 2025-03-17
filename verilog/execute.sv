@@ -101,7 +101,7 @@ endmodule // alu
 
 
 
-module stage_ex (
+module stage_ex_p4 (
     input clock,
     input reset,
 

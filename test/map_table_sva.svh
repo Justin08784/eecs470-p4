@@ -148,10 +148,58 @@ module mt_sva #(parameter
         end
     endtask
 
+    function automatic logic compute_expected_src_tag(
+        input int i,            // which dispatch slot
+        input PHYS_REG_IDX t1,
+        input PHYS_REG_IDX t2
+    );
+        REG_IDX src1, src2;
+        PHYS_REG_IDX true_t1, true_t2;
+        logic from_state1, from_state2;
+
+        src1 = ins_cur.d_in.src1s[i];
+        src2 = ins_cur.d_in.src2s[i];
+
+        from_state1 = `TRUE;
+        for (int j = i - 1; j >= 0; --j) begin
+            if (ins_cur.d_in.dsts[j] == src1) begin
+                from_state1 = `FALSE;
+                true_t1 = ins_cur.d_in.ts[j];
+                break;
+            end
+        end
+        if (from_state1)
+            true_t1 = entries_pre[src1].t;
+
+        from_state2 = `TRUE;
+        for (int j = i - 1; j >= 0; --j) begin
+            if (ins_cur.d_in.dsts[j] == src2) begin
+                from_state2 = `FALSE;
+                true_t2 = ins_cur.d_in.ts[j];
+                break;
+            end
+        end
+        if (from_state2)
+            true_t2 = entries_pre[src2].t;
+
+        $display("%d %d %d %d", t1, true_t1, t2, true_t2);
+
+        return (t1 == true_t1 && t2 == true_t2);
+    endfunction
+
     clocking cb @(posedge clock);
         property zero_reg_invariant;
             disable iff (reset)
             (entries_cur[`ZERO_REG].t == '0) && entries_cur[`ZERO_REG].cpl;
+        endproperty
+
+        property correct_deps(i);
+            disable iff (reset)
+            (ins_cur.d_in.en_cnt > i) |-> (compute_expected_src_tag(
+                i,
+                outs_cur.d_out.t1s[i],
+                outs_cur.d_out.t2s[i]
+            ));
         endproperty
         // property ex_clear;
         //     disable iff (reset || flush)
@@ -161,6 +209,12 @@ module mt_sva #(parameter
 
     Zero_Reg_Invariant: assert property(cb.zero_reg_invariant)
         else exit_on_error ("zero reg changed");
+    generate
+        for (genvar i = 0; i < `N; ++i) begin : gen_correct_deps
+            assert property(cb.correct_deps(i))
+                else exit_on_error("shit");
+        end
+    endgenerate
 
 endmodule
 `endif // MT_SVA_SVH
