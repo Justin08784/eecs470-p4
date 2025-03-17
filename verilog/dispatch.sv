@@ -141,6 +141,10 @@ always_comb begin
         //handling src tags
         rob_out.tag[i]      = map_out.ts[i];
         rob_out.t_old[i]    = map_in.ts_old[i];
+
+        rob_out.halt[i]     = decode_in.d_dat[i].halt;
+        rob_out.illegal[i]  = decode_in.d_dat[i].illegal;
+        rob_out.NPC[i]      = decode_in.d_dat[i].NPC;
     end
 end
 
