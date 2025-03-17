@@ -15,7 +15,7 @@ module cpu (
     input reset, // System reset
 
     //input MEM_TAG   mem2proc_transaction_tag, // Memory tag for current transaction
-    input MEM_BLOCK mem2proc_data,            // Data coming back from memory
+    input MEM_BLOCK [1:0] mem2proc_data,            // Data coming back from memory
     //input MEM_TAG   mem2proc_data_tag,        // Tag for which transaction data is for
 
     //output MEM_COMMAND proc2mem_command, // Command sent to memory
@@ -644,7 +644,7 @@ module cpu (
     ) free_list_0 (
         .clock(clock),
         .reset(reset),
-        .flush(0),
+        .flush(1'b0),
         .r_in(rob_2_retire),
         .d_in(dispatch_2_fl),
         .d_out(fl_2_dispatch)
