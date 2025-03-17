@@ -189,7 +189,7 @@ GREP = grep -E --color=auto
 # ---- Modules to Test ---- #
 
 # TODO: add more modules here
-MODULES = cpu mult rob rs fifo free_list dispatch prf map_table stage_id_p4 
+MODULES = cpu mult rob rs fifo free_list dispatch prf map_table stage_id_p4 fetch
 
 # TODO: update this if you add more header files
 ALL_HEADERS = $(CPU_HEADERS)
@@ -252,6 +252,7 @@ MAP_TABLE_FILES = verilog/sys_defs.svh
 build/map_table.simv: $(MAP_TABLE_FILES)
 build/map_table.cov: $(MAP_TABLE_FILES)
 build/map_table.vg: $(MAP_TABLE_FILES)
+
 
 #################################
 # ---- Main CPU Definition ---- #
