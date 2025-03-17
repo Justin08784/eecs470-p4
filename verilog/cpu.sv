@@ -14,17 +14,19 @@ module cpu (
     input clock, // System clock
     input reset, // System reset
 
-    input MEM_TAG   mem2proc_transaction_tag, // Memory tag for current transaction
+    //input MEM_TAG   mem2proc_transaction_tag, // Memory tag for current transaction
     input MEM_BLOCK mem2proc_data,            // Data coming back from memory
-    input MEM_TAG   mem2proc_data_tag,        // Tag for which transaction data is for
+    //input MEM_TAG   mem2proc_data_tag,        // Tag for which transaction data is for
 
-    output MEM_COMMAND proc2mem_command, // Command sent to memory
-    output ADDR        proc2mem_addr,    // Address sent to memory
-    output MEM_BLOCK   proc2mem_data,    // Data sent to memory
-    output MEM_SIZE    proc2mem_size,    // Data size sent to memory
+    //output MEM_COMMAND proc2mem_command, // Command sent to memory
+    //output ADDR        proc2mem_addr,    // Address sent to memory
+    //output MEM_BLOCK   proc2mem_data,    // Data sent to memory
+    //output MEM_SIZE    proc2mem_size,    // Data size sent to memory
 
     // Note: these are assigned at the very bottom of the module
     output COMMIT_PACKET [`N-1:0] committed_insts,
+    output ADDR PC_reg,
+    output ADDR PC_reg4,
 
     // Debug outputs: these signals are solely used for debugging in testbenches
     // Do not change for project 3
@@ -150,13 +152,15 @@ module cpu (
         .branch_target (ex_mem_reg.alu_result),
         .Imem_data     (mem2proc_data),
         
-        .Imem2proc_transaction_tag(mem2proc_transaction_tag),
-        .Imem2proc_data_tag       (mem2proc_data_tag),
+        //.Imem2proc_transaction_tag(mem2proc_transaction_tag),
+        //.Imem2proc_data_tag       (mem2proc_data_tag),
 
         // Outputs
-        .Imem_command  (Imem_command),
+        //.Imem_command  (Imem_command),
         .if_packet     (if_packet),
-        .Imem_addr     (Imem_addr)
+        //.Imem_addr     (Imem_addr)
+        .PC_reg        (PC_reg),
+        .PC_reg4       (PC_reg4)
     );
 
     // debug outputs

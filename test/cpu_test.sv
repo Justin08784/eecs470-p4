@@ -1,3 +1,4 @@
+
 /////////////////////////////////////////////////////////////////////////
 //                                                                     //
 //   Modulename :  cpu_test.sv                                         //
@@ -54,6 +55,7 @@ module testbench;
     MEM_SIZE    proc2mem_size;
 
     COMMIT_PACKET [`N-1:0] committed_insts;
+    ADDR PC_reg, PC_reg4;
     EXCEPTION_CODE error_status = NO_ERROR;
 
     ADDR  if_NPC_dbg;
@@ -78,19 +80,21 @@ module testbench;
         // Inputs
         .clock (clock),
         .reset (reset),
-        .mem2proc_transaction_tag (mem2proc_transaction_tag),
-        .mem2proc_data            (mem2proc_data),
-        .mem2proc_data_tag        (mem2proc_data_tag),
+        //.mem2proc_transaction_tag (mem2proc_transaction_tag),
+        .mem2proc_data            ({memory.unified_memory[PC_reg[15:3]].word_level[PC_reg[2]], memory.unified_memory[PC_reg4[15:3]].word_level[PC_reg[2]]}),
+        //.mem2proc_data_tag        (mem2proc_data_tag),
 
         // Outputs
-        .proc2mem_command (proc2mem_command),
-        .proc2mem_addr    (proc2mem_addr),
-        .proc2mem_data    (proc2mem_data),
+        //.proc2mem_command (proc2mem_command),
+        //.proc2mem_addr    (proc2mem_addr),
+        //.proc2mem_data    (proc2mem_data),
 `ifndef CACHE_MODE
-        .proc2mem_size    (proc2mem_size),
+        //.proc2mem_size    (proc2mem_size),
 `endif
 
         .committed_insts (committed_insts),
+        .PC_reg(PC_reg),
+        .PC_reg4(PC_reg4),
 
         .if_NPC_dbg       (if_NPC_dbg),
         .if_inst_dbg      (if_inst_dbg),
@@ -111,21 +115,21 @@ module testbench;
 
 
     // Instantiate the Data Memory
-    mem memory (
-        // Inputs
-        .clock            (clock),
-        .proc2mem_command (proc2mem_command),
-        .proc2mem_addr    (proc2mem_addr),
-        .proc2mem_data    (proc2mem_data),
-`ifndef CACHE_MODE
-        .proc2mem_size    (proc2mem_size),
-`endif
+//     mem memory (
+//         // Inputs
+//         .clock            (clock),
+//         .proc2mem_command (proc2mem_command),
+//         .proc2mem_addr    (proc2mem_addr),
+//         .proc2mem_data    (proc2mem_data),
+// `ifndef CACHE_MODE
+//         .proc2mem_size    (proc2mem_size),
+// `endif
 
-        // Outputs
-        .mem2proc_transaction_tag (mem2proc_transaction_tag),
-        .mem2proc_data            (mem2proc_data),
-        .mem2proc_data_tag        (mem2proc_data_tag)
-    );
+//         // Outputs
+//         .mem2proc_transaction_tag (mem2proc_transaction_tag),
+//         .mem2proc_data            (mem2proc_data),
+//         .mem2proc_data_tag        (mem2proc_data_tag)
+//     );
 
 
     // Generate System Clock
