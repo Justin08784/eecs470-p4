@@ -189,7 +189,7 @@ GREP = grep -E --color=auto
 # ---- Modules to Test ---- #
 
 # TODO: add more modules here
-MODULES = cpu mult rob rs fifo free_list dispatch prf map_table stage_id_p4 
+MODULES = cpu mult rob rs fifo free_list dispatch prf map_table stage_id_p4 execute
 
 # TODO: update this if you add more header files
 ALL_HEADERS = $(CPU_HEADERS)
