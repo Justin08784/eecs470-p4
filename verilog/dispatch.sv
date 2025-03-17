@@ -3,8 +3,6 @@
 module dispatch #(parameter 
     N=`N
 ) (
-    input   clock, reset, flush,
-
     // DECODE
     input   decode2dispatch decode_in,
     output  dispatch2decode decode_out,
@@ -41,7 +39,6 @@ always_comb begin
     dispatch_cnt = free_in.free_rdy_scnt < $countones(decode_in.prvw_has_dests)
         ? `MIN(dispatch_cnt, free_in.free_rdy_scnt)
         : dispatch_cnt;
-    dispatch_cnt = (reset || flush) ? 0 : dispatch_cnt;
     
     //assigning output #'s
     decode_out.dispatch_en_cnt  = dispatch_cnt;

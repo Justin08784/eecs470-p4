@@ -224,9 +224,11 @@ build/fifo.cov: $(FIFO_FILES)
 synth/fifo.vg: $(FIFO_FILES)
 
 ID_FILES = verilog/sys_defs.svh verilog/fifo.sv
+# ID_FILES = verilog/sys_defs.svh verilog/fifo.sv test/stage_id_p4_sva.svh test/stage_id_p4_test.sv
 build/stage_id_p4.simv: $(ID_FILES)
 build/stage_id_p4.cov: $(ID_FILES)
 synth/stage_id_p4.vg: $(ID_FILES)
+build/stage_id_p4.out: $(ID_FILES)
 
 FREE_LIST_FILES = verilog/sys_defs.svh verilog/fifo.sv
 build/free_list.simv: $(FREE_LIST_FILES)
@@ -248,10 +250,12 @@ build/fetch.simv: $(FETCH_FILES)
 build/fetch.cov: $(FETCH_FILES)
 build/fetch.vg: $(FETCH_FILES)
 
-MAP_TABLE_FILES = verilog/sys_defs.svh
+# MAP_TABLE_FILES = verilog/sys_defs.svh
+MAP_TABLE_FILES = verilog/sys_defs.svh test/map_table_sva.svh test/map_table_test.sv
 build/map_table.simv: $(MAP_TABLE_FILES)
 build/map_table.cov: $(MAP_TABLE_FILES)
 build/map_table.vg: $(MAP_TABLE_FILES)
+build/stage_id_p4.out: $(MAP_TABLE_FILES)
 
 
 #################################

@@ -170,7 +170,7 @@ module dispatch_testbench;
         PHYS_REG_IDX t2s,
         PHYS_REG_IDX ts
     );
-        // map_in.ts[i] = ts;
+        map_in.ts_old[i] = ts;
         map_in.t1s[i] = t1s;
         map_in.t2s[i] = t2s;
         map_in.cpl1s[i] = cpl1s;
@@ -309,6 +309,52 @@ module dispatch_testbench;
             else exit_on_error ("test_reset d_dat error");
 
     endtask
+
+    function print_all();
+        $display("decode_in: {d_vld_scnt: %d, has_dests: %b, [(t: %d, t1: %d, t2: %d), (t: %d, t1: %d, t2: %d)]}",
+            decode_in.d_vld_scnt,
+            decode_in.prvw_has_dests,
+            decode_in.d_dat[0].t,
+            decode_in.d_dat[0].t1,
+            decode_in.d_dat[0].t2,
+            decode_in.d_dat[1].t,
+            decode_in.d_dat[1].t1,
+            decode_in.d_dat[1].t2
+        );
+
+        $display("map_in: [(told: %d, t1: %d <%b>, t2: %d <%b>), (told: %d, t1: %d <%b>, t2: %d <%b>)]",
+            map_in.ts_old[0],
+            map_in.t1s[0],
+            map_in.cpl1s[0],
+            map_in.t2s[0],
+            map_in.cpl2s[0],
+
+            map_in.ts_old[1],
+            map_in.t1s[1],
+            map_in.cpl1s[1],
+            map_in.t2s[1],
+            map_in.cpl2s[1]
+        );
+
+        $display("rs_in: {rs_rdy_scnt: %d}",
+            rs_in.rs_rdy_scnt
+        );
+
+        $display("rob_in: {rob_rdy_scnt: %d, rob_idxs: [%d, %d]}",
+            rob_in.rob_rdy_scnt,
+            rob_in.rob_idxs[0],
+            rob_in.rob_idxs[1]
+        );
+
+        $display("free_in: {free_rdy_scnt: %d, d_ts: [%d, %d]}",
+            free_in.free_rdy_scnt,
+            free_in.d_ts[0],
+            free_in.d_ts[1]
+        );
+
+
+
+    endfunction
 
     task test_two_rdy();
         reset = 1;
