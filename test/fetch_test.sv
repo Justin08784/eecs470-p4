@@ -34,7 +34,7 @@ module fetch_test();
         .unified_memory(unified_memory)
     );
 
-    stage_if dut (
+    stage_if_p4 dut (
         .clock    (clock),
         .reset    (reset),
         .fetch_in (fetch_in),

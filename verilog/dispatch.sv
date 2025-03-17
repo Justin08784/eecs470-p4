@@ -3,8 +3,7 @@
 module dispatch #(parameter 
     N=`N
 ) (
-    input   clock, reset, flush,
-
+    input clock, reset, flush,
     // DECODE
     input   decode2dispatch decode_in,
     output  dispatch2decode decode_out,
@@ -141,7 +140,7 @@ always_comb begin
         rob_out.dst[i]      = decode_in.d_dat[i].inst.r.rd;
         //handling src tags
         rob_out.tag[i]      = map_out.ts[i];
-        rob_out.t_old[i]    = map_in.ts[i];
+        rob_out.t_old[i]    = map_in.ts_old[i];
     end
 end
 

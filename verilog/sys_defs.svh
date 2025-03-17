@@ -566,7 +566,7 @@ typedef struct packed {
     logic        [`N-1:0] cpl2s;
     PHYS_REG_IDX [`N-1:0] t1s;
     PHYS_REG_IDX [`N-1:0] t2s;
-    PHYS_REG_IDX [`N-1:0] ts;
+    PHYS_REG_IDX [`N-1:0] ts_old;
 } map_table2dispatch;
 
 
@@ -634,11 +634,15 @@ typedef struct packed {
     PHYS_REG_IDX    [`N-1:0] c_ts;
         // - From: EX
     ROB_IDX         [`N-1:0] c_rob_idxs;
-
-    DATA            [`N-1:0] c_data;
         // - From: EX
-        
+    DATA            [`N-1:0] c_data;
 } execute2complete;
+
+
+typedef struct packed{
+    ADDR            [31:0] PC;
+    DATA           alu_result;
+} execute2fetch;
 
 // By Free List
 typedef struct packed {
