@@ -329,11 +329,49 @@ module rs #(parameter
         end
     end
 
+    function get_fu_name(input FU_IDX fu_idx, output string name);
+        case (fu_idx)
+            FU_ALU:     name = "ALU";
+            FU_MULT:    name = "MULT";
+            FU_LOAD:    name = "LOAD";
+            FU_STORE:   name = "STORE";
+            default:    name = "Unknown FU";
+        endcase
+    endfunction
+
     always_ff @(posedge clock) begin
         if (reset || flush) begin
             entries <= '0;
         end else begin
             entries <= entries_n;
+        end
+
+        if (!reset) begin
+            for (int i = 0; i < RS_SZ; ++i) begin
+                string fu_name;
+                get_fu_name(entries[i].dat.fu_idx, fu_name);
+
+                if (!entries[i].busy) begin
+                    $display("Entry [%0d]:", i);
+                    continue;
+                end
+
+                $display("Entry [%0d]: id=%0d (%x), busy=%b, issued=%b, t=%0d, t1=%0d, t2=%0d, t1_rdy=%b, t2_rdy=%b, fu=%s(%0d)",
+                    i, 
+                    entries[i].dat.id, 
+                    entries[i].dat.inst,
+                    entries[i].busy, 
+                    entries[i].issued, 
+                    entries[i].dat.t, 
+                    entries[i].dat.t1, 
+                    entries[i].dat.t2, 
+                    entries[i].dat.t1_rdy, 
+                    entries[i].dat.t2_rdy, 
+                    
+                    entries[i].busy ? fu_name : "*",
+                    entries[i].dat.fu_idx,
+                );
+            end
         end
     end
 
