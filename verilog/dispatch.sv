@@ -42,7 +42,6 @@ always_comb begin
     dispatch_cnt = free_in.free_rdy_scnt < $countones(decode_in.prvw_has_dests)
         ? `MIN(dispatch_cnt, free_in.free_rdy_scnt)
         : dispatch_cnt;
-    dispatch_cnt = `MIN(dispatch_cnt,decode_in.d_vld_scnt);
     
     //assigning output #'s
     decode_out.dispatch_en_cnt  = dispatch_cnt;
