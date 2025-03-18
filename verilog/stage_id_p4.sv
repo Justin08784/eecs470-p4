@@ -318,6 +318,7 @@ module stage_id_p4 (
     - It breaks the dependency between fetch and dispatch, improving timing.
     */
     fifo #(
+        .INSTANCE_ID(1),
         .DEPTH(2*`N),
         .WIDTH($bits(ID_RESULT)),
         .NUM_RPORTS(`N),

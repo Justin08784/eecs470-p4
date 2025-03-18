@@ -32,6 +32,7 @@ module fifo #(
     */
     parameter logic ENABLE_READ_PREVIEW=`FALSE,
     parameter logic ENABLE_INTR_FWD =`TRUE,
+    parameter int INSTANCE_ID=-1,
     parameter FIFO_STATE RESET_STATE='{default:0}
 ) (
     input                                           clock, 
@@ -117,9 +118,9 @@ module fifo #(
             state   <= RESET_STATE.state;
         end else begin
             if (wr_en_cnt > (ENABLE_INTR_FWD ? free + rd_en_cnt : free))
-                $error("FIFO overflow!");
+                $error("FIFO overflow! instance: %d", INSTANCE_ID);
             if (rd_en_cnt > (ENABLE_INTR_FWD ? used + wr_en_cnt : used))
-                $error("FIFO underflow!");
+                $error("FIFO underflow! instance: %d", INSTANCE_ID);
             used    <= used + wr_en_cnt - rd_en_cnt;
             head    <= (head + rd_en_cnt) % DEPTH;
             tail    <= (tail + wr_en_cnt) % DEPTH;

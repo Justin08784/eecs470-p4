@@ -46,6 +46,7 @@ module free_list #(parameter
    
 
     fifo #(
+        .INSTANCE_ID(0),
         .DEPTH(DEPTH),
         .WIDTH(WIDTH),
         .NUM_RPORTS(`N),
