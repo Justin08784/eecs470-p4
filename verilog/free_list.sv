@@ -62,8 +62,8 @@ module free_list #(parameter
         .rd_en_cnt(d_in.free_d_en_cnt),
         .rd_data(d_out.d_ts),
 
-        .free_scnt(d_out.free_rdy_scnt),
-        .used_scnt() // do we need this? how would even retire return more pregs than in existence?
+        .free_scnt(), // do we need this? how would even retire return more pregs than in existence?
+        .used_scnt(d_out.free_rdy_scnt)
     );
 
     // debugging

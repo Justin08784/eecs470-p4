@@ -152,6 +152,17 @@ always_comb begin
     end
 end
 
+// debug
+always_ff @(posedge clock) begin
+    $display("  %3d | >> Dispatch", $time);
+    $display("rs_in.rs_rdy_scnt: %d",   rs_in.rs_rdy_scnt);
+    $display("rob_in.rob_rdy_scnt: %d",  rob_in.rob_rdy_scnt);
+    $display("decode_in.d_vld_scnt: %d",  decode_in.d_vld_scnt);
+    $display("free_in.free_rdy_scnt: %d",  free_in.free_rdy_scnt);
+    $display("decode_in.prvw_has_dests: %b", decode_in.prvw_has_dests);
+    $display("  %3d | << Dispatch", $time);
+
+end
 
 endmodule
 
