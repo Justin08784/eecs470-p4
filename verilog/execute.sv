@@ -12,6 +12,7 @@
 
 `include "sys_defs.svh"
 `include "ISA.svh"
+`include "psel_gen.sv"
 
 // ALU: computes the result of FUNC applied with operands A and B
 // This module is purely combinational
@@ -276,24 +277,25 @@ module stage_ex_p4 (
         ex_rdy_out.fu_rdy_load  <= '0;
     end
 
-    //assign ex_c_out.c_data = alu_result[0];
-
-    PHYS_REG_IDX [3:0] completed_tags;
-    logic [3:0] completed_ids;
-    logic [3:0] completed_count;
-    DATA [3:0] completed_data;
-    ROB_IDX [3:0] completed_rob_idx;
-
-    logic [3:0] oldest_id;
-    PHYS_REG_IDX oldest_tag;
-    DATA oldest_data;
-    ROB_IDX [3:0] oldest_rob_idx;
-    logic [3:0] second_oldest_id;
-    PHYS_REG_IDX second_oldest_tag;
-    DATA second_oldest_data;
-    ROB_IDX [3:0] second_oldest_rob_idx;
-
+    
     execute2complete next_ex2complete;
+
+    logic [`NUM_FU_MULT-1:0] alu_done;
+    logic [`NUM_FU_MULT-1:0] grant;
+    //logic [`NUM_FU_MULT-1:0] select;
+
+    logic [2][`NUM_FU_MULT-1:0] grant_bus;
+    logic empty;
+
+    psel_gen #(
+    .WIDTH  (`NUM_FU_ALU),
+    .REQS   (`N)
+    ) sel (
+    .req    (alu_done),
+    .gnt    (grant),
+    .gnt_bus(grant_bus),
+    .empty  (empty)
+    );
 
     always_comb begin     
 
@@ -302,127 +304,25 @@ module stage_ex_p4 (
         next_ex2complete.c_data = '0;
         next_ex2complete.c_rob_idxs = '0;
 
-        completed_count = 0;
-        /*for (int i = 0; i < `NUM_FU_ALU; i++) begin
-            if (alu_result[i] != 32'hfacebeec || branch[i]) begin
-                completed_tags[completed_count] = ex_fu_in.fu_dat_alu[i].t;
-                completed_ids[completed_count] = ex_fu_in.fu_dat_alu[i].id;
-                completed_count = completed_count + 1;
-                completed_data[i] = alu_result[i];
-                completed_rob_idx = ex_fu_in.fu_dat_alu[i].rob_idx;
-            end
-        end*/
-
-        // Step 3: Find the two oldest completions without sorting everything
-        /*oldest_id = 4'b1111;       // Large initial value for min search
-        oldest_tag = '0; // Default to zero to avoid uninitialized values
-        second_oldest_id = 4'b1111;
-        second_oldest_tag = '0; // Default to zero   */
-
-
-         next_ex2complete.c_data[0] = alu_result[0];
-         next_ex2complete.c_en[0] = (alu_result[0] != 32'hfacebeec);
-         next_ex2complete.c_ts[0] = ex_fu_in.fu_dat_alu[0].t;
-         next_ex2complete.c_rob_idxs[0] = ex_fu_in.fu_dat_alu[0].rob_idx;
-         //next_ex2complete.c_rob_idxs[0] = 
-
-
-         next_ex2complete.c_data[1] = alu_result[1];
-         next_ex2complete.c_en[1] = (alu_result[1] != 32'hfacebeec);
-         next_ex2complete.c_ts[1] = ex_fu_in.fu_dat_alu[1].t;
-         next_ex2complete.c_rob_idxs[1] = ex_fu_in.fu_dat_alu[1].rob_idx;
-        /*(for (int i = 0; i < `NUM_FU_MULT; i++) begin
-            if (mult_done[i]) begin
-                completed_tags[completed_count] = ex_fu_in.fu_dat_mult[i].t;
-                completed_ids[completed_count] = ex_fu_in.fu_dat_mult[i].id;
-                completed_count = completed_count + 1;
-                completed_data[i] = mult_result;
-                completed_rob_idx = ex_fu_in.fu_dat_mult[i].rob_idx;
-            end
-        end
-
-        for (int i = 0; i < `NUM_FU_LOAD; i++) begin
-            if (ex_fu_in.fu_vld_load[i]) begin
-                completed_tags[completed_count] = ex_fu_in.fu_dat_load[i].t;
-                completed_ids[completed_count] = ex_fu_in.fu_dat_load[i].id;
-                completed_count = completed_count + 1;
-                completed_rob_idx = ex_fu_in.fu_dat_load[i].rob_idx;
-            end
-        end
-
-        for (int i = 0; i < `NUM_FU_STORE; i++) begin
-            if (ex_fu_in.fu_vld_store[i]) begin
-                completed_tags[completed_count] = ex_fu_in.fu_dat_store[i].t;
-                completed_ids[completed_count] = ex_fu_in.fu_dat_store[i].id;
-                completed_count = completed_count + 1;
-                completed_rob_idx = ex_fu_in.fu_dat_load[i].rob_idx;
-            end
-        end*/
-
-
-
-
-
-    
-
-        // Step 3: Find the two oldest completions without sorting everything
-        oldest_id = 4'b1111;       // Large initial value for min search
-        oldest_tag = '0; // Default to zero to avoid uninitialized values
-        second_oldest_id = 4'b1111;
-        second_oldest_tag = '0; // Default to zero
-
-
-
-        /*  for (int i = 0; i < completed_count; i++) begin
-            if (completed_ids[i] < oldest_id) begin
-                second_oldest_id = oldest_id;
-                second_oldest_tag = oldest_tag;
-                second_oldest_data = oldest_data;
-                second_oldest_rob_idx = oldest_rob_idx;
-                oldest_id = completed_ids[i];
-                oldest_tag = completed_tags[i];
-                oldest_data = completed_data[i];
-                oldest_rob_idx = completed_rob_idx[i];
-            end else if (completed_ids[i] < second_oldest_id) begin
-                second_oldest_id = completed_ids[i];
-                second_oldest_tag = completed_tags[i];
-                second_oldest_data = completed_data[i];
-                second_oldest_rob_idx = completed_rob_idx[i];
-            end
-        end
-
-        // Step 4: Assign the selected oldest completions
-
-        case (completed_count)
-            0: begin
-                // Default case: No completions this cycle
-                next_ex2complete.c_en = '0;
-                next_ex2complete.c_ts = '0;
-                next_ex2complete.c_data = '0;
-                next_ex2complete.c_rob_idxs = '0;
-            end
-            1: begin
-                // Only one instruction finished
-                next_ex2complete.c_en[0] = 1'b1;
-                next_ex2complete.c_ts[0] = oldest_tag;
-                next_ex2complete.c_data[0] = oldest_data;
-                next_ex2complete.c_rob_idxs[0] = oldest_rob_idx; 
-            end
-            default: begin
-                // Two or more completions: Take the two oldest
-                next_ex2complete.c_en[0] = 1'b1;
-                next_ex2complete.c_ts[0] = oldest_tag;
-                next_ex2complete.c_data[0] = oldest_data;
-                next_ex2complete.c_rob_idxs[0] = oldest_rob_idx;
-                next_ex2complete.c_en[1] = 1'b1;
-                next_ex2complete.c_ts[1] = second_oldest_tag;
-                next_ex2complete.c_data[1] = second_oldest_data;
-                next_ex2complete.c_rob_idxs[0] = second_oldest_rob_idx;
-            end
-        endcase*/
-
-
         
+        foreach(alu_result[i]) begin
+            $display("DEBUG: alu_result[i] at cycle %0t = %0d", $time, alu_result[i]);
+            alu_done[i] = (alu_result[i] != 32'hfacebeec);
+        end
+
+      
+        next_ex2complete.c_en[0] =  grant > 4'b0000 ? grant_bus[0] : '0;
+        next_ex2complete.c_en[1] =  grant > 4'b0100 ? grant_bus[1] : '0;
+
+
+        if (next_ex2complete.c_en[0]) begin
+            next_ex2complete.c_data[0] = alu_result[grant_bus[0]]; 
+        end 
+
+        if(next_ex2complete.c_en[1]) begin
+            next_ex2complete.c_data[1] = alu_result[grant_bus[1]]; 
+        end
+
     end
 
     always_ff @(posedge clock) begin
@@ -431,6 +331,12 @@ module stage_ex_p4 (
             ex_c_out.c_ts <= '0; // Initialize completed physical register tags
             ex_c_out.c_data <= '0;
             ex_c_out.c_rob_idxs <= '0;
+
+
+            /*ex_rdy_out.fu_rdy_alu <= '0;
+            ex_rdy_out.fu_rdy_mult <= '0;
+            ex_rdy_out.fu_rdy_load <= '0;
+            ex_rdy_out.fu_rdy_store <= '0;*/
         end else begin
             ex_c_out.c_en <= next_ex2complete.c_en; // Initialize completion enable signals
             ex_c_out.c_ts <= next_ex2complete.c_ts; // Initialize completed physical register tags
