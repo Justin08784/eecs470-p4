@@ -19,7 +19,7 @@ module stage_if_p4 (
 
     input           take_branch,    // taken-branch signal
     input ADDR      branch_target,  // target pc: use if take_branch is TRUE
-    input MEM_BLOCK [1:0] Imem_data,      // data coming back from Instruction memory
+    input MEM_BLOCK Imem_data,      // data coming back from Instruction memory
 
     // tags from memory
     // input MEM_TAG  Imem2proc_transaction_tag, // Should be zero unless there is a response
@@ -28,15 +28,13 @@ module stage_if_p4 (
     // output MEM_COMMAND  Imem_command, // Command sent to memory
     //output IF_ID_PACKET [1:0] if_packet,
     // output ADDR         Imem_addr, // address sent to Instruction memory
-    output ADDR PC_reg,
-    output ADDR PC_reg4
+    output ADDR PC_reg
 );
 
     // ADDR PC_reg; // PCs we are currently fetching
     // MEM_BLOCK icache_out;
     // logic  icache_valid;
     // INST [1:0] fifo_insns;
-    logic [$clog2(`N):0] free_scnt, used_scnt;
 
     //logic [1:0] valid_out;
 
@@ -87,47 +85,63 @@ module stage_if_p4 (
     //     end
     // end
 
-    //RE-EVALUATE
-    always_comb begin
-        //if (icache_valid) begin
-            if (/*if_valid_q*/d_in.d_rdy_cnt == 2'b10 && PC_reg % 8 != 0) begin
-                d_out.f_en_cnt = 2'b01;
-            end else begin
-                d_out.f_en_cnt = d_in.d_rdy_cnt;
-            end
-        //end else begin
-        //    d_out.f_en_cnt = 2'b00;
-        //end
-    end
-    // assign valid_out = icache_valid ? (if_valid_q) : '0 && (if_valid_q[0] || if_valid_q[1]);
-    // assign valid_out[1] = icache_valid && if_valid_q[1] && (PC_reg % 8 == 0);
+    logic [$clog2(`N):0]    free_scnt, used_scnt, f_cnt;
+    IF_ID_PACKET [`N-1:0]   f_dat;
 
-    always_ff @(posedge clock) begin
-        if (reset) begin
-            PC_reg <= 0;             // initial PC value is 0 (the memory address where our program starts)
-            PC_reg4 <= 4;
-        end else if (take_branch) begin
-            PC_reg <= branch_target; // update to a taken branch (does not depend on valid bit)
-            PC_reg4 <= branch_target + 4;
-        end else begin
-            PC_reg <= PC_reg + (d_out.f_en_cnt * 4);    // or transition to next PC if valid
-            PC_reg4 <= PC_reg4 + (d_out.f_en_cnt * 4);
+    always_comb begin
+        d_out.f_en_cnt = `MIN(used_scnt, d_in.d_rdy_cnt);
+
+        f_cnt = free_scnt < `N ? 0 : `N;
+        f_dat = '0;
+        for (int unsigned i = 0, logic vld = 0; i < `N; ++i) begin
+            vld = i < f_cnt;
+            f_dat[i].inst   = vld ? Imem_data.word_level[i] : `NOP;
+            f_dat[i].PC     = PC_reg + 4*i;
+            f_dat[i].NPC    = PC_reg + 4*(i+1);
+            f_dat[i].valid  = vld;
         end
     end
 
-    // index into the word (32-bits) of memory that matches this instruction
-    // FOR SUPERSCALAR: take ENTIRE BLOCK instead of pulling based on PC_reg % 8
-    assign d_out.f_dat[0].inst = (d_out.f_en_cnt != 2'b00) ? Imem_data[1].word_level[PC_reg[2]] : `NOP;
-    assign d_out.f_dat[1].inst = (d_out.f_en_cnt == 2'b10) ? Imem_data[0].word_level[PC_reg4[2]] : `NOP;
+    fifo #(
+        .DEPTH(4*`N),
+        .WIDTH($bits(IF_ID_PACKET)),
+        .NUM_RPORTS(`N),
+        .NUM_WPORTS(`N),
+        .ENABLE_INTR_FWD(`FALSE),
+        .INSTANCE_ID(2)
+    ) dut (
+        .clock      (clock),
+        .reset      (reset),
+        .wr_en_cnt  (f_cnt),
+        .wr_data    (f_dat),
+        .rd_en_cnt  (d_out.f_en_cnt),
+        .rd_data    (d_out.f_dat),
+        .free_scnt  (free_scnt),
+        .used_scnt  (used_scnt)
+    );
 
-    assign d_out.f_dat[0].PC  = PC_reg;
-    assign d_out.f_dat[0].NPC = PC_reg + 4; // pass PC+4 down pipeline w/instruction
-    assign d_out.f_dat[1].PC  = PC_reg4;
-    assign d_out.f_dat[1].NPC = PC_reg4 + 4; // pass PC+4 down pipeline w/instruction
+    always_ff @(posedge clock) begin
+        if (reset) begin
+            PC_reg <= 0;                // initial PC value is 0 (the memory address where our program starts)
+        end else if (take_branch) begin
+            PC_reg <= branch_target;    // update to a taken branch (does not depend on valid bit)...
+        end else begin
+            PC_reg <= PC_reg + (4*d_out.f_en_cnt);    // ...or transition to next PC if valid
+        end
+    end
 
-    assign d_out.f_dat[0].valid = |d_out.f_en_cnt;
-    assign d_out.f_dat[1].valid = d_out.f_en_cnt == 2'b10;
-    //     end
-    // endgenerate
+    // debugging
+    always_ff @(posedge clock) begin
+        if (!reset) begin
+            $display("  %3d | Fetch >>", $time);
+            $display("PC_reg:  %x", PC_reg);
+            $display("Imem_data: %x", Imem_data);
+            $display("  %3d | Fetch <<", $time);
+        end
+    end
+
+    // //RE-EVALUATE
+    // // assign valid_out = icache_valid ? (if_valid_q) : '0 && (if_valid_q[0] || if_valid_q[1]);
+    // // assign valid_out[1] = icache_valid && if_valid_q[1] && (PC_reg % 8 == 0);
 
 endmodule // stage_if

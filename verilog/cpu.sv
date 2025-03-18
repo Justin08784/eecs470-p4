@@ -15,7 +15,7 @@ module cpu (
     input reset, // System reset
 
     //input MEM_TAG   mem2proc_transaction_tag, // Memory tag for current transaction
-    input MEM_BLOCK [1:0] mem2proc_data,            // Data coming back from memory
+    input MEM_BLOCK mem2proc_data,            // Data coming back from memory
     //input MEM_TAG   mem2proc_data_tag,        // Tag for which transaction data is for
 
     //output MEM_COMMAND proc2mem_command, // Command sent to memory
@@ -26,7 +26,6 @@ module cpu (
     // Note: these are assigned at the very bottom of the module
     output COMMIT_PACKET [`N-1:0] committed_insts,
     output ADDR PC_reg,
-    output ADDR PC_reg4,
 
     // Debug outputs: these signals are solely used for debugging in testbenches
     // Do not change for project 3
@@ -407,8 +406,7 @@ module cpu (
         // output MEM_COMMAND  Imem_command, // Command sent to memory
         //output IF_ID_PACKET [1:0] if_packet,
         // output ADDR         Imem_addr, // address sent to Instruction memory
-        .PC_reg(PC_reg),
-        .PC_reg4(PC_reg4)
+        .PC_reg(PC_reg)
     );
 
 
