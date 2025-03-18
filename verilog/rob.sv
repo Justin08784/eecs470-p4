@@ -61,6 +61,35 @@ module rob #(
                 break;
             // if (i >= used)
             //     break;
+            /*
+            TODO: *IMPORTANT* retire zero_reg edge case!
+            If the retiring insn has no real output register (e.g. hlt, store), then
+            its destination will be the zero preg. You MUST NOT allow a zero preg
+            to be added to the free list (this is causing the free_list FIFO
+            overflow in the commit in which this comment was added.
+            SHA: f24016e5a7d6a931ac32b72020fd154b3cfcc57c). 
+            
+            This presents a problem: our fifo.sv impl operates on counts, and assumes
+            wr_data is contiguously filled from lowest indices. However, not all
+            retiring insns with valid output pregs will be at the lowest indices
+            (e.g. vld_preg_out? : [0, 1]). Two solutions for this:
+            1. Form another intermediate N-wide array that compresses all retiring
+            insns with valid output registers to the lowest indices, before sending
+            it to free_list (a "packing loop" logic).
+
+            e.g., In a 3-wide processor. retire stage sees:
+              [0] -> valid, dst = 5
+              [1] -> valid, dst = 0 (zero_reg - must skip!)
+              [2] -> valid, dst = 6
+            Must compress to [5, 6] before sending to free_list.
+
+            2. Rewrite FIFO to accept valid buses instead of counts (however I believe
+            lowest-index contiguity via counts offers performance advantages which
+            other FIFOs like the decode or fetch FIFOs can, and *should*, exploit.)
+
+            In addition, it seems 2 is only shifting the work of the "packing loop" into
+            the FIFO (you still have to do it *somewhere*).
+            */
             r_out.tag[i]    = state[r_idxs[i]].tag;
             r_out.t_old[i]  = state[r_idxs[i]].t_old;
             r_out.dst[i]    = state[r_idxs[i]].dst;
