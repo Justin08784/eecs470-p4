@@ -115,6 +115,8 @@ module stage_ex_p4 (
     // input   ID_RESULT   [`NUM_FU_STORE-1:0]  fu_dat_store,
     // input   ID_RESULT   [`NUM_FU_LOAD-1:0]   fu_dat_load,
 
+    input   prf2execute prf_2_ex,
+
     output  execute2rs ex_rdy_out,
     // output  logic       [`NUM_FU_ALU-1:0]    fu_rdy_alu,
     // output  logic       [`NUM_FU_MULT-1:0]   fu_rdy_mult,
@@ -122,10 +124,12 @@ module stage_ex_p4 (
     // output  logic       [`NUM_FU_LOAD-1:0]   fu_rdy_load,
 
     // TODO: wrap this stuff into execute2complete. Wrap crap here in general.
-    output  execute2complete ex_c_out
+    output  execute2complete ex_c_out,
     // output  logic       [`N-1:0]             c_en,
     // output  PHYS_REG_IDX[`N-1:0]             c_ts,
     // output  DATA        [`N-1:0]             c_data
+
+    output  execute2prf ex_2_prf
 );
     logic   [`NUM_FU_ALU-1:0]    fu_rdy_alu;
     logic   [`NUM_FU_MULT-1:0]   fu_rdy_mult;
@@ -141,6 +145,12 @@ module stage_ex_p4 (
     assign ex_rdy_out.fu_rdy_mult = fu_rdy_mult;
     assign ex_rdy_out.fu_rdy_load = fu_rdy_load;
     assign ex_rdy_out.fu_rdy_store = fu_rdy_store;
+
+
+    always_comb begin
+        
+    end
+
 
     always_comb begin
         ex_c_out = '0;
@@ -220,38 +230,44 @@ module stage_ex_p4 (
 
     always_comb begin
         foreach(ex_fu_in.fu_dat_alu[i]) begin
-            if(ex_fu_in.fu_vld_alu[i]) begin
-                if (ex_fu_in.fu_dat_alu[i].cond_branch) begin
-                    opa_mux_out[i] = ex_fu_in.fu_dat_alu[i].rs1_value;
-                    opb_mux_out[i] = ex_fu_in.fu_dat_alu[i].rs2_value;
-                    alu_func[i] = 4'ha; //SENTINEL VALUE
-                    branch_func[i] = ex_fu_in.fu_dat_alu[i].inst.b.funct3;
-                    branch[i] = 1;
-                end else begin
-                    // ALU opA mux
-                    case (ex_fu_in.fu_dat_alu[i].opa_select)
-                        OPA_IS_RS1:  opa_mux_out[i] = ex_fu_in.fu_dat_alu[i].rs1_value;
-                        OPA_IS_NPC:  opa_mux_out[i] = ex_fu_in.fu_dat_alu[i].NPC;
-                        OPA_IS_PC:   opa_mux_out[i] = ex_fu_in.fu_dat_alu[i].PC;
-                        OPA_IS_ZERO: opa_mux_out[i] = 0;
-                        default:     opa_mux_out[i]= 32'hdeadface; // dead face
-                    endcase
+            if(!ex_fu_in.fu_vld_alu[i]) 
+                continue;
 
-                    // ALU opB mux
-                    case (ex_fu_in.fu_dat_alu[i].opb_select)
-                        OPB_IS_RS2:   opb_mux_out[i] = ex_fu_in.fu_dat_alu[i].rs2_value;
-                        OPB_IS_I_IMM: opb_mux_out[i] = `RV32_signext_Iimm(ex_fu_in.fu_dat_alu[i].inst);
-                        OPB_IS_S_IMM: opb_mux_out[i] = `RV32_signext_Simm(ex_fu_in.fu_dat_alu[i].inst);
-                        OPB_IS_B_IMM: opb_mux_out[i] = `RV32_signext_Bimm(ex_fu_in.fu_dat_alu[i].inst);
-                        OPB_IS_U_IMM: opb_mux_out[i] = `RV32_signext_Uimm(ex_fu_in.fu_dat_alu[i].inst);
-                        OPB_IS_J_IMM: opb_mux_out[i] = `RV32_signext_Jimm(ex_fu_in.fu_dat_alu[i].inst);
-                        default:      opb_mux_out[i] = 32'hfacefeed; // face feed
-                    endcase
+            ex_2_prf.s_t1s[i] = fu_dat_alu[i].t1;
+            ex_2_prf.s_t2s[i] = fu_dat_alu[i].t2;
 
-                    alu_func[i] = ex_fu_in.fu_dat_alu[i].alu_func;
-                    branch_func[i] = 3'b011; //SENTINEL VALUE
-                    branch[i] = 0;
-                end
+            if (ex_fu_in.fu_dat_alu[i].cond_branch) begin
+                opa_mux_out[i] = prf_2_ex.s_v1s[i];
+                opb_mux_out[i] = prf_2_ex.s_v2s[i];
+                alu_func[i] = 4'ha; //SENTINEL VALUE
+                branch_func[i] = ex_fu_in.fu_dat_alu[i].inst.b.funct3;
+                branch[i] = 1;
+            end else begin
+                // ALU opA mux
+                case (ex_fu_in.fu_dat_alu[i].opa_select)
+                    OPA_IS_RS1:  opa_mux_out[i] = ex_fu_in.fu_dat_alu[i].rs1_value;
+                    //OPA_IS_RS1:  opa_mux_out[i] = prf2execute.s_v1s;
+                    OPA_IS_NPC:  opa_mux_out[i] = ex_fu_in.fu_dat_alu[i].NPC;
+                    OPA_IS_PC:   opa_mux_out[i] = ex_fu_in.fu_dat_alu[i].PC;
+                    OPA_IS_ZERO: opa_mux_out[i] = 0;
+                    default:     opa_mux_out[i]= 32'hdeadface; // dead face
+                endcase
+
+                // ALU opB mux
+                case (ex_fu_in.fu_dat_alu[i].opb_select)
+                    OPB_IS_RS2:   opb_mux_out[i] = ex_fu_in.fu_dat_alu[i].rs2_value;
+                    //OPA_IS_RS2:  opa_mux_out[i] = prf2execute.s_v2s;
+                    OPB_IS_I_IMM: opb_mux_out[i] = `RV32_signext_Iimm(ex_fu_in.fu_dat_alu[i].inst);
+                    OPB_IS_S_IMM: opb_mux_out[i] = `RV32_signext_Simm(ex_fu_in.fu_dat_alu[i].inst);
+                    OPB_IS_B_IMM: opb_mux_out[i] = `RV32_signext_Bimm(ex_fu_in.fu_dat_alu[i].inst);
+                    OPB_IS_U_IMM: opb_mux_out[i] = `RV32_signext_Uimm(ex_fu_in.fu_dat_alu[i].inst);
+                    OPB_IS_J_IMM: opb_mux_out[i] = `RV32_signext_Jimm(ex_fu_in.fu_dat_alu[i].inst);
+                    default:      opb_mux_out[i] = 32'hfacefeed; // face feed
+                endcase
+
+                alu_func[i] = ex_fu_in.fu_dat_alu[i].alu_func;
+                branch_func[i] = 3'b011; //SENTINEL VALUE
+                branch[i] = 0;
             end
         end
 

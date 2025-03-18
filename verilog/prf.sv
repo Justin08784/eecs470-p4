@@ -4,12 +4,13 @@ module prf #(
     parameter WIDTH      = 32,
     parameter DEPTH      = `PHYS_REG_SZ_R10K,
     parameter N = 2,
-    parameter BYPASS_EN  = 0   // 0: Read data will update at positive edge
-                               // 1: Read data will update combinationally if
+    parameter BYPASS_EN  = 0,   // 0: Read data will update at positive edge
+    parameter NUM_RPORTS = `NUM_RPORTS                            // 1: Read data will update combinationally if
                                //    write to same address
    )(
     input clock, //reset, flush, // QUESTION: do we need reset? or should we force write to happen before read at the same addr?
     // retire ??
+    //localparam NUM_RPORTS = `NUM_FU_ALU + `NUM_FU_BRANCH + `NUM_FU_LOAD + `NUM_FU_MULT + `NUM_FU_STORE;
 
     // complete (write)
     input logic         [N-1:0] c_en,
@@ -28,11 +29,11 @@ module prf #(
         //   into the prf and get the operands it needs. So if there are 32 FUs,
         //   is this like 32 * 2 implicit read ports? (Same implicit read port
         //   concern as cpl_lst's)
-    input logic         [N-1:0] s_en,
-    input PHYS_REG_IDX  [N-1:0] s_t1s,
-    input PHYS_REG_IDX  [N-1:0] s_t2s,
-    output DATA        [N-1:0] s_v1s,
-    output DATA        [N-1:0] s_v2s
+    input logic         [NUM_RPORTS-1:0] s_en,
+    input PHYS_REG_IDX  [NUM_RPORTS-1:0] s_t1s,
+    input PHYS_REG_IDX  [NUM_RPORTS-1:0] s_t2s,
+    output DATA        [NUM_RPORTS-1:0] s_v1s,
+    output DATA        [NUM_RPORTS-1:0] s_v2s
         // To: EX/RS/issuer idk
         // - Explicit read ports for issuing insns to collect operands (alternative to state) 
         // - Have 2N read ports and only allow N issues per cycle. But problem: 

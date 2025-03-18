@@ -506,6 +506,10 @@ module cpu (
     
     execute2rs      ex_2_rs; 
     rs2execute      rs_2_ex;
+
+    execute2prf     ex_2_prf;
+    prf2execute     prf_2_execute;
+
     execute2complete ex_2_complete;
     rs rs_0(
         .clock(clock),
@@ -668,11 +672,11 @@ module cpu (
         .c_en(ex_2_complete.c_en),
         .c_ts(ex_2_complete.c_ts),
         .c_vs(ex_2_complete.c_data),
-        .s_en(),
-        .s_t1s(),
-        .s_t2s(),
-        .s_v1s(),
-        .s_v2s()
+        .s_en(ex_2_prf.prf_en),
+        .s_t1s(ex_2_prf.s_t1s),   //execute2prf.t1
+        .s_t2s(ex_2_prf.s_t2s),   //execute2prf.t2
+        .s_v1s(prf_2_execute.s_v1s),   //prf2execute.s_v1s
+        .s_v2s(prf_2_execute.s_v2s)    //prf2execute.s_v1s
     );
 
 endmodule // pipeline
