@@ -126,7 +126,7 @@ module stage_if_p4 (
         end else if (take_branch) begin
             PC_reg <= branch_target;    // update to a taken branch (does not depend on valid bit)...
         end else begin
-            PC_reg <= PC_reg + (4*d_out.f_en_cnt);    // ...or transition to next PC if valid
+            PC_reg <= PC_reg + 4*f_cnt; // ...or transition to next PC if valid
         end
     end
 
