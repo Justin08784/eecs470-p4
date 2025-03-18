@@ -462,6 +462,38 @@ typedef struct packed {
     // logic    valid;
 } ID_RESULT;
 
+
+// TODO: remember to remove for synthesis? does this prevent synthesis?
+function print_id_result(input ID_RESULT x);
+    $display("ID_RESULT: id=%0d t=%0d t1=%0d t2=%0d t1_rdy=%b t2_rdy=%b fu_idx=%0d rob_idx=%0d inst=%h PC=%h NPC=%h rs1_value=%h rs2_value=%h opa_select=%0d opb_select=%0d dest_reg_idx=%0d alu_func=%0d mult=%b rd_mem=%b wr_mem=%b cond_branch=%b uncond_branch=%b halt=%b illegal=%b csr_op=%b",
+        x.id,
+        x.t,
+        x.t1,
+        x.t2,
+        x.t1_rdy,
+        x.t2_rdy,
+        x.fu_idx,
+        x.rob_idx,
+        x.inst,
+        x.PC,
+        x.NPC,
+        x.rs1_value,
+        x.rs2_value,
+        x.opa_select,
+        x.opb_select,
+        x.dest_reg_idx,
+        x.alu_func,
+        x.mult,
+        x.rd_mem,
+        x.wr_mem,
+        x.cond_branch,
+        x.uncond_branch,
+        x.halt,
+        x.illegal,
+        x.csr_op
+    );
+endfunction
+
 typedef struct packed {
     logic           busy;
     logic           issued;
