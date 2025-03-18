@@ -200,6 +200,10 @@ module decoder_p4 (
                 `WFI: begin
                     fu_idx      = FU_ALU;
                     halt = `TRUE;
+                    has_dest   = `FALSE;
+                    alu_func   = ALU_ADD;
+                    opa_select = OPA_IS_ZERO;
+                    opb_select = OPB_IS_I_IMM;
                 end
                 default: begin
                     illegal = `TRUE;
