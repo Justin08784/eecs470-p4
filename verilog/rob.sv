@@ -20,7 +20,9 @@ module rob #(
 
     input dispatch2rob d_in,
 
-    output COMMIT_PACKET [`N-1:0] wb_packet
+    output COMMIT_PACKET [`N-1:0] wb_packet,
+    input PHYS_REG_IDX [`N-1:0] prf_in,
+    output PHYS_REG_IDX [`N-1:0] prf_out
 );
     localparam NUM_DPORTS = N; // dispatch ports (in-order)
     localparam NUM_RPORTS = N; // retire ports (in-order)
@@ -94,8 +96,10 @@ module rob #(
             r_out.t_old[i]  = state[r_idxs[i]].t_old;
             r_out.dst[i]    = state[r_idxs[i]].dst;
 
+            prf_out[i] = state[r_idxs[i]].tag;
+
             wb_packet[i].NPC        = state[r_idxs[i]].NPC;
-            wb_packet[i].data       = 0;//(mem_wb_reg.take_branch) ? mem_wb_reg.NPC : mem_wb_reg.result;
+            wb_packet[i].data       = prf_in[i];//(mem_wb_reg.take_branch) ? mem_wb_reg.NPC : mem_wb_reg.result;
             wb_packet[i].reg_idx    = state[r_idxs[i]].dst;
             wb_packet[i].halt       = state[r_idxs[i]].halt;
             wb_packet[i].illegal    = state[r_idxs[i]].illegal;

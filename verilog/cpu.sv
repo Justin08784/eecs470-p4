@@ -559,6 +559,8 @@ module cpu (
     // decode2rob d2rob;
     rob2retire rob_2_retire;
     COMMIT_PACKET [`N-1:0] wb_packet;
+    PHYS_REG_IDX [`N-1:0] retire2prf;
+    PHYS_REG_IDX [`N-1:0] prf2retire;
     //execute2complete ex_2_complete;
     // rob2dispatch rob_2_dispatch;
     // dispatch2rob dispatch_2_rob;
@@ -573,7 +575,9 @@ module cpu (
         .c_in       (ex_2_complete),
         .d_out      (rob_2_dispatch),
         .d_in       (dispatch_2_rob),
-        .wb_packet  (wb_packet)
+        .wb_packet  (wb_packet),
+        .prf_out    (retire2prf),
+        .prf_in     (prf2retire)
     );
 
     always_comb begin
@@ -678,7 +682,9 @@ module cpu (
         .s_t1s(ex_2_prf.s_t1s),   //execute2prf.t1
         .s_t2s(ex_2_prf.s_t2s),   //execute2prf.t2
         .s_v1s(prf_2_ex.s_v1s),   //prf2execute.s_v1s
-        .s_v2s(prf_2_ex.s_v2s)    //prf2execute.s_v1s
+        .s_v2s(prf_2_ex.s_v2s),    //prf2execute.s_v1s
+        .r_in(retire2prf),
+        .r_out(prf2retire)
     );
 
 endmodule // pipeline

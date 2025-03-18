@@ -10,6 +10,8 @@ module prf #(
    )(
     input clock, //reset, flush, // QUESTION: do we need reset? or should we force write to happen before read at the same addr?
     // retire ??
+    input PHYS_REG_IDX [`N-1:0] r_in,
+    output PHYS_REG_IDX [`N-1:0] r_out,
     //localparam NUM_RPORTS = `NUM_FU_ALU + `NUM_FU_BRANCH + `NUM_FU_LOAD + `NUM_FU_MULT + `NUM_FU_STORE;
 
     // complete (write)
@@ -102,6 +104,12 @@ module prf #(
         end
     end
     // endgenerate
+
+    always_comb begin
+        foreach(r_in[i]) begin
+            r_out[i] = phys_reg_file[r_in[i]];
+        end
+    end
 
     // Write port
     always_ff @(posedge clock) begin
