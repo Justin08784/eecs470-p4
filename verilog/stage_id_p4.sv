@@ -362,6 +362,11 @@ module stage_id_p4 (
 
         if (!reset) begin
             $display("ID >>");
+            // $display("  %3d | FIFO: {used_scnt: %d, free_scnt: %d}",
+            //     $time,
+            //     used_scnt,
+            //     free_scnt
+            // );
             $display("  %3d | f_in:  {f_en_cnt: %d, PC: [%x, %x], inst: [%x, %x]}",
                 $time,
                 f_in.f_en_cnt,

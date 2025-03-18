@@ -163,6 +163,19 @@ module rob #(
                 state[cur_idx].NPC      <= d_in.NPC[i];
                 $display("PUTTING INTO ROB");
             end
+
+            // $display(">> ROB");
+            // $display("  %3d | rob: {r_en_cnt: %d, [(t: %0d, told: %0d, dst: %0d), (t: %0d, told: %0d, dst: %0d)]}",
+            //     $time,
+            //     r_out.r_en_cnt,
+            //     r_out.tag[0],
+            //     r_out.t_old[0],
+            //     r_out.dst[0],
+            //     r_out.tag[1],
+            //     r_out.t_old[1],
+            //     r_out.dst[1]
+            // );
+            // $display("<< ROB");
         end
     end
 
