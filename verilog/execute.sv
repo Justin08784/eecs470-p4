@@ -264,6 +264,7 @@ module stage_ex_p4 (
                     OPA_IS_ZERO: opa_mux_out[i] = 0;
                     default:     opa_mux_out[i]= 32'hdeadface; // dead face
                 endcase
+                $display("OPA ASSIGNMENT: %2d", opa_mux_out[i]);
 
                 // ALU opB mux
                 case (ex_fu_in.fu_dat_alu[i].opb_select)

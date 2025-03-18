@@ -594,7 +594,9 @@ module cpu (
         .reset(reset),
         .ex_fu_in(rs_2_ex),
         .ex_rdy_out(ex_2_rs),
-        .ex_c_out(ex_2_complete)
+        .ex_c_out(ex_2_complete),
+        .ex_2_prf(ex_2_prf),
+        .prf_2_ex(prf_2_ex)
     );
 
 
