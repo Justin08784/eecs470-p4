@@ -346,6 +346,9 @@ module rs #(parameter
             entries <= entries_n;
         end
 
+        $display("  %3d | RS >>", $time);
+        print_id_result(d_in.d_dat[0]);
+        print_id_result(d_in.d_dat[1]);
         if (!reset) begin
             for (int i = 0; i < RS_SZ; ++i) begin
                 string fu_name;
@@ -373,6 +376,7 @@ module rs #(parameter
                 );
             end
         end
+        $display("  %3d | RS <<", $time);
     end
 
 

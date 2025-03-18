@@ -210,7 +210,6 @@ module decoder_p4 (
                 end
             endcase // casez (inst)
         end // if (valid)
-        $display("DECODE: %1d",halt);
     end // always
 
 endmodule // decoder
@@ -353,7 +352,6 @@ module stage_id_p4 (
     end
 
     always_ff @(posedge clock) begin
-        $display("DECODE COUNT: %2d", used_scnt);
         if (reset) begin
             insn_id <= 0;
         end else begin
@@ -362,14 +360,13 @@ module stage_id_p4 (
 
 
         if (!reset) begin
-            $display("ID >>");
+            $display("  %3d | ID >>", $time);
             // $display("  %3d | FIFO: {used_scnt: %d, free_scnt: %d}",
             //     $time,
             //     used_scnt,
             //     free_scnt
             // );
-            $display("  %3d | f_in:  {f_en_cnt: %d, PC: [%x, %x], inst: [%x, %x]}",
-                $time,
+            $display("f_in:  {f_en_cnt: %d, PC: [%x, %x], inst: [%x, %x]}",
                 f_in.f_en_cnt,
                 f_in.f_en_cnt > 0 ? f_in.f_dat[0].PC : 0,
                 f_in.f_en_cnt > 1 ? f_in.f_dat[1].PC : 0,
@@ -377,15 +374,18 @@ module stage_id_p4 (
                 f_in.f_en_cnt > 1 ? f_in.f_dat[1].inst : 0,
             );
 
-            $display("  %3d | d_out: {d_en_cnt: %d, PC: [%x, %x], inst: [%x, %x]}",
-                $time,
+            $display("d_out: {d_en_cnt: %d, PC: [%x, %x], inst: [%x, %x]}",
                 d_in.dispatch_en_cnt,
                 d_out.d_dat[0].PC, 
                 d_out.d_dat[1].PC,
                 d_out.d_dat[0].inst, 
                 d_out.d_dat[1].inst
             );
-            $display("ID <<");
+            print_id_result(d_out.d_dat[0]);
+            print_id_result(d_out.d_dat[1]);
+            // $display("d_out.d_dat[0]: %b", d_out.d_dat[0]);
+            // $display("d_out.d_dat[1]: %b", d_out.d_dat[1]);
+            $display("  %3d | ID <<", $time);
         end
     end
 

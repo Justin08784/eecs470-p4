@@ -102,9 +102,8 @@ module map_table #(parameter
     // debugging
     always_ff @(posedge clock) begin
         if (!reset) begin
-            $display("MT >>");
-            $display("  %3d | dis_in:   {en_cnt: %d, [(%0d->%0d, %d, %d), (%0d->%0d, %d, %d)]}",
-                $time,
+            $display("  %3d | MT >>", $time);
+            $display("dis_in:   {en_cnt: %d, [(%0d->%0d, %d, %d), (%0d->%0d, %d, %d)]}",
                 d_in.en_cnt,
                 d_in.dsts[0],
                 d_in.ts[0],
@@ -115,8 +114,7 @@ module map_table #(parameter
                 d_in.src1s[1],
                 d_in.src2s[1]
             );
-            $display("  %3d | dis_out:  {en_cnt: %d, [(told: %0d, t1: %0d<%b>, t2: %0d<%b>), (told: %0d, t1: %0d<%b>, t2: %0d<%b>)]}",
-                $time,
+            $display("dis_out:  {en_cnt: %d, [(told: %0d, t1: %0d<%b>, t2: %0d<%b>), (told: %0d, t1: %0d<%b>, t2: %0d<%b>)]}",
                 d_in.en_cnt,
                 d_out.ts_old[0],
                 d_out.t1s[0],
@@ -130,7 +128,7 @@ module map_table #(parameter
                 d_out.t2s[1],
                 d_out.cpl2s[1]
             );
-            $display("MT <<");
+            $display("  %3d | MT <<", $time);
         end
     end
 

@@ -47,7 +47,6 @@ always_comb begin
     //assigning output #'s
     decode_out.dispatch_en_cnt  = dispatch_cnt;
     lsq_out.lsq_d_en_cnt        = dispatch_cnt; //this will likely need to be changed once memory operations are introduced
-    $display("DISPATCH COUNT: %2d", dispatch_cnt);
 end
 
 //logic for free list

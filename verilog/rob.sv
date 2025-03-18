@@ -100,7 +100,6 @@ module rob #(
             wb_packet[i].halt       = state[r_idxs[i]].halt;
             wb_packet[i].illegal    = state[r_idxs[i]].illegal;
             wb_packet[i].valid      = ~state[r_idxs[i]].illegal;
-            $display("RETIRING FROM ROB");
         end
 
         // handle dispatch (outs)
@@ -164,18 +163,17 @@ module rob #(
                 $display("PUTTING INTO ROB");
             end
 
-            // $display(">> ROB");
-            // $display("  %3d | rob: {r_en_cnt: %d, [(t: %0d, told: %0d, dst: %0d), (t: %0d, told: %0d, dst: %0d)]}",
-            //     $time,
-            //     r_out.r_en_cnt,
-            //     r_out.tag[0],
-            //     r_out.t_old[0],
-            //     r_out.dst[0],
-            //     r_out.tag[1],
-            //     r_out.t_old[1],
-            //     r_out.dst[1]
-            // );
-            // $display("<< ROB");
+            $display("  %3d | >> ROB", $time);
+            $display("{r_en_cnt: %d, [(t: %0d, told: %0d, dst: %0d), (t: %0d, told: %0d, dst: %0d)]}",
+                r_out.r_en_cnt,
+                r_out.tag[0],
+                r_out.t_old[0],
+                r_out.dst[0],
+                r_out.tag[1],
+                r_out.t_old[1],
+                r_out.dst[1]
+            );
+            $display("  %3d | << ROB", $time);
         end
     end
 
