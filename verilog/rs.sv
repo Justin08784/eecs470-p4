@@ -314,7 +314,7 @@ module rs #(parameter
                 continue;
             end
 
-            if (entries_n[rs].issued) begin
+            if (entries[rs].issued) begin
                 // going to EX; clear entry
                 entries_n[rs] = '0; // optimize later: only clear busy bit
             end
