@@ -41,6 +41,9 @@ module alu (
             // here to prevent latches:
             default:  result = 32'hfacebeec;
         endcase
+        $display("ALU OPA: %20d",opa);
+        $display("ALU OPB: %20d",opb);
+        $display("ALU RESULT: %20d",result);
     end
 
     always_comb begin
@@ -165,9 +168,10 @@ module stage_ex_p4 (
             fu_dat_load     <= '0;
         end else begin
             foreach (fu_rdy_alu[i]) begin
-                $display("DEBUG: alu_done at cycle %0t = %2d", $time, alu_done);
-                fu_rdy_alu[i]   <= ex_fu_in.fu_vld_alu[i] ? 0 : (alu_done[i] ? '1 : fu_rdy_alu[i]);// || ex_c_out.c_en[i]; //OR'ing this will work to reset the flag, just have to make sure it is coming from the right FU so that we don't accidentally reset the ALU with a mult flag or something
+                fu_rdy_alu[i]   <= ex_fu_in.fu_vld_alu[i] ? 0 : (alu_done[i] || fu_rdy_alu[i]);// || ex_c_out.c_en[i]; //OR'ing this will work to reset the flag, just have to make sure it is coming from the right FU so that we don't accidentally reset the ALU with a mult flag or something
                 fu_dat_alu[i]   <= ex_fu_in.fu_vld_alu[i] ? ex_fu_in.fu_dat_alu[i] : '0;
+                $display("DEBUG: alu_done at cycle %0t = %2d", $time, alu_done);
+                $display("DEBUG: fu_rdy_alu[%2d] at cycle %0t = %2d", i, $time, alu_done);
                 $display("assign: %d vld:%b insn:%x", i, ex_fu_in.fu_vld_alu[i], ex_fu_in.fu_dat_alu[i].inst);
             end
 
@@ -230,16 +234,17 @@ module stage_ex_p4 (
                 end else begin
                     // ALU opA mux
                     case (ex_fu_in.fu_dat_alu[i].opa_select)
-                        OPA_IS_RS1:  opa_mux_out[i] = ex_fu_in.fu_dat_alu[i].rs1_value;
+                        OPA_IS_RS1:  opa_mux_out[i] = 0;//ex_fu_in.fu_dat_alu[i].rs1_value;
                         OPA_IS_NPC:  opa_mux_out[i] = ex_fu_in.fu_dat_alu[i].NPC;
                         OPA_IS_PC:   opa_mux_out[i] = ex_fu_in.fu_dat_alu[i].PC;
                         OPA_IS_ZERO: opa_mux_out[i] = 0;
                         default:     opa_mux_out[i]= 32'hdeadface; // dead face
                     endcase
+                    $display("OPA_SELECT: %2d", ex_fu_in.fu_dat_alu[i].opa_select);
 
                     // ALU opB mux
                     case (ex_fu_in.fu_dat_alu[i].opb_select)
-                        OPB_IS_RS2:   opb_mux_out[i] = ex_fu_in.fu_dat_alu[i].rs2_value;
+                        OPB_IS_RS2:   opb_mux_out[i] = 0;//ex_fu_in.fu_dat_alu[i].rs2_value;
                         OPB_IS_I_IMM: opb_mux_out[i] = `RV32_signext_Iimm(ex_fu_in.fu_dat_alu[i].inst);
                         OPB_IS_S_IMM: opb_mux_out[i] = `RV32_signext_Simm(ex_fu_in.fu_dat_alu[i].inst);
                         OPB_IS_B_IMM: opb_mux_out[i] = `RV32_signext_Bimm(ex_fu_in.fu_dat_alu[i].inst);
