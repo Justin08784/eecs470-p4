@@ -135,6 +135,8 @@ module stage_ex_p4 (
     ID_RESULT   [`NUM_FU_MULT-1:0]   fu_dat_mult;
     ID_RESULT   [`NUM_FU_STORE-1:0]  fu_dat_store;
     ID_RESULT   [`NUM_FU_LOAD-1:0]   fu_dat_load;
+    // DATA [`NUM_FU_ALU-1:0] opa_mux_out, opb_mux_out, alu_result;
+    logic [`NUM_FU_ALU-1:0] alu_done;
     assign ex_rdy_out.fu_rdy_alu = fu_rdy_alu;
     assign ex_rdy_out.fu_rdy_mult = fu_rdy_mult;
     assign ex_rdy_out.fu_rdy_load = fu_rdy_load;
@@ -163,7 +165,8 @@ module stage_ex_p4 (
             fu_dat_load     <= '0;
         end else begin
             foreach (fu_rdy_alu[i]) begin
-                fu_rdy_alu[i]   <= ex_fu_in.fu_vld_alu[i] ? 0 : fu_rdy_alu[i];
+                $display("DEBUG: alu_done at cycle %0t = %2d", $time, alu_done);
+                fu_rdy_alu[i]   <= ex_fu_in.fu_vld_alu[i] ? 0 : (alu_done[i] ? '1 : fu_rdy_alu[i]);// || ex_c_out.c_en[i]; //OR'ing this will work to reset the flag, just have to make sure it is coming from the right FU so that we don't accidentally reset the ALU with a mult flag or something
                 fu_dat_alu[i]   <= ex_fu_in.fu_vld_alu[i] ? ex_fu_in.fu_dat_alu[i] : '0;
                 $display("assign: %d vld:%b insn:%x", i, ex_fu_in.fu_vld_alu[i], ex_fu_in.fu_dat_alu[i].inst);
             end
@@ -180,98 +183,98 @@ module stage_ex_p4 (
         end
     end
 
-    // ALU_FUNC [`NUM_FU_ALU-1:0] alu_func;
-    // DATA [`NUM_FU_ALU-1:0] opa_mux_out, opb_mux_out, alu_result;
-    // logic [`NUM_FU_ALU-1:0] branch;
-    // logic [`NUM_FU_MULT-1:0] [2:0] mult_func;
-    // logic [`NUM_FU_MULT-1:0] mult_done;
-    // DATA [`NUM_FU_MULT-1:0] mult_value1, mult_value2, mult_result;
-    // logic [`NUM_FU_ALU-1:0] [2:0] branch_func;
-    // logic [`NUM_FU_ALU-1:0] take_conditional;
-    // // DATA [NUM_FU_BRANCH-1:0] branch_value1, branch_value2;
+    ALU_FUNC [`NUM_FU_ALU-1:0] alu_func;
+    DATA [`NUM_FU_ALU-1:0] opa_mux_out, opb_mux_out, alu_result;
+    logic [`NUM_FU_ALU-1:0] branch;
+    logic [`NUM_FU_MULT-1:0] [2:0] mult_func;
+    logic [`NUM_FU_MULT-1:0] mult_done;
+    DATA [`NUM_FU_MULT-1:0] mult_value1, mult_value2, mult_result;
+    logic [`NUM_FU_ALU-1:0] [2:0] branch_func;
+    logic [`NUM_FU_ALU-1:0] take_conditional;
+    // DATA [NUM_FU_BRANCH-1:0] branch_value1, branch_value2;
 
-    // /* I don't know what to do with these yet
-    // // Pass-throughs
-    // assign ex_packet.NPC          = id_ex_reg.NPC;
-    // assign ex_packet.rd_mem       = id_ex_reg.rd_mem;
-    // assign ex_packet.wr_mem       = id_ex_reg.wr_mem;
-    // assign ex_packet.dest_reg_idx = id_ex_reg.dest_reg_idx;
-    // assign ex_packet.halt         = id_ex_reg.halt;
-    // assign ex_packet.illegal      = id_ex_reg.illegal;
-    // assign ex_packet.csr_op       = id_ex_reg.csr_op;
-    // assign ex_packet.valid        = id_ex_reg.valid;
+    /* I don't know what to do with these yet
+    // Pass-throughs
+    assign ex_packet.NPC          = id_ex_reg.NPC;
+    assign ex_packet.rd_mem       = id_ex_reg.rd_mem;
+    assign ex_packet.wr_mem       = id_ex_reg.wr_mem;
+    assign ex_packet.dest_reg_idx = id_ex_reg.dest_reg_idx;
+    assign ex_packet.halt         = id_ex_reg.halt;
+    assign ex_packet.illegal      = id_ex_reg.illegal;
+    assign ex_packet.csr_op       = id_ex_reg.csr_op;
+    assign ex_packet.valid        = id_ex_reg.valid;
 
-    // // Send rs2_value to the mem stage as the data for a store
-    // assign ex_packet.rs2_value = id_ex_reg.rs2_value;
+    // Send rs2_value to the mem stage as the data for a store
+    assign ex_packet.rs2_value = id_ex_reg.rs2_value;
 
-    // // Break out the signed/unsigned bit and memory read/write size
-    // assign ex_packet.rd_unsigned = id_ex_reg.inst.r.funct3[2]; // 1 if unsigned, 0 if signed
-    // assign ex_packet.mem_size    = MEM_SIZE'(id_ex_reg.inst.r.funct3[1:0]);
+    // Break out the signed/unsigned bit and memory read/write size
+    assign ex_packet.rd_unsigned = id_ex_reg.inst.r.funct3[2]; // 1 if unsigned, 0 if signed
+    assign ex_packet.mem_size    = MEM_SIZE'(id_ex_reg.inst.r.funct3[1:0]);
 
-    // // Ultimate "take branch" signal:
-    // // unconditional, or conditional and the condition is true
-    // assign ex_packet.take_branch = id_ex_reg.uncond_branch || (id_ex_reg.cond_branch && take_conditional);
+    // Ultimate "take branch" signal:
+    // unconditional, or conditional and the condition is true
+    assign ex_packet.take_branch = id_ex_reg.uncond_branch || (id_ex_reg.cond_branch && take_conditional);
 
-    // // We split the alu and mult here since they will be split in the final project
-    // assign ex_packet.alu_result = (id_ex_reg.mult) ? mult_result : alu_result; */
+    // We split the alu and mult here since they will be split in the final project
+    assign ex_packet.alu_result = (id_ex_reg.mult) ? mult_result : alu_result; */
 
-    // always_comb begin
-    //     foreach(ex_fu_in.fu_dat_alu[i]) begin
-    //         if(ex_fu_in.fu_vld_alu[i]) begin
-    //             if (ex_fu_in.fu_dat_alu[i].cond_branch) begin
-    //                 opa_mux_out[i] = ex_fu_in.fu_dat_alu[i].rs1_value;
-    //                 opb_mux_out[i] = ex_fu_in.fu_dat_alu[i].rs2_value;
-    //                 alu_func[i] = 4'ha; //SENTINEL VALUE
-    //                 branch_func[i] = ex_fu_in.fu_dat_alu[i].inst.b.funct3;
-    //                 branch[i] = 1;
-    //             end else begin
-    //                 // ALU opA mux
-    //                 case (ex_fu_in.fu_dat_alu[i].opa_select)
-    //                     OPA_IS_RS1:  opa_mux_out[i] = ex_fu_in.fu_dat_alu[i].rs1_value;
-    //                     OPA_IS_NPC:  opa_mux_out[i] = ex_fu_in.fu_dat_alu[i].NPC;
-    //                     OPA_IS_PC:   opa_mux_out[i] = ex_fu_in.fu_dat_alu[i].PC;
-    //                     OPA_IS_ZERO: opa_mux_out[i] = 0;
-    //                     default:     opa_mux_out[i]= 32'hdeadface; // dead face
-    //                 endcase
+    always_comb begin
+        foreach(ex_fu_in.fu_dat_alu[i]) begin
+            if(ex_fu_in.fu_vld_alu[i]) begin
+                if (ex_fu_in.fu_dat_alu[i].cond_branch) begin
+                    opa_mux_out[i] = ex_fu_in.fu_dat_alu[i].rs1_value;
+                    opb_mux_out[i] = ex_fu_in.fu_dat_alu[i].rs2_value;
+                    alu_func[i] = 4'ha; //SENTINEL VALUE
+                    branch_func[i] = ex_fu_in.fu_dat_alu[i].inst.b.funct3;
+                    branch[i] = 1;
+                end else begin
+                    // ALU opA mux
+                    case (ex_fu_in.fu_dat_alu[i].opa_select)
+                        OPA_IS_RS1:  opa_mux_out[i] = ex_fu_in.fu_dat_alu[i].rs1_value;
+                        OPA_IS_NPC:  opa_mux_out[i] = ex_fu_in.fu_dat_alu[i].NPC;
+                        OPA_IS_PC:   opa_mux_out[i] = ex_fu_in.fu_dat_alu[i].PC;
+                        OPA_IS_ZERO: opa_mux_out[i] = 0;
+                        default:     opa_mux_out[i]= 32'hdeadface; // dead face
+                    endcase
 
-    //                 // ALU opB mux
-    //                 case (ex_fu_in.fu_dat_alu[i].opb_select)
-    //                     OPB_IS_RS2:   opb_mux_out[i] = ex_fu_in.fu_dat_alu[i].rs2_value;
-    //                     OPB_IS_I_IMM: opb_mux_out[i] = `RV32_signext_Iimm(ex_fu_in.fu_dat_alu[i].inst);
-    //                     OPB_IS_S_IMM: opb_mux_out[i] = `RV32_signext_Simm(ex_fu_in.fu_dat_alu[i].inst);
-    //                     OPB_IS_B_IMM: opb_mux_out[i] = `RV32_signext_Bimm(ex_fu_in.fu_dat_alu[i].inst);
-    //                     OPB_IS_U_IMM: opb_mux_out[i] = `RV32_signext_Uimm(ex_fu_in.fu_dat_alu[i].inst);
-    //                     OPB_IS_J_IMM: opb_mux_out[i] = `RV32_signext_Jimm(ex_fu_in.fu_dat_alu[i].inst);
-    //                     default:      opb_mux_out[i] = 32'hfacefeed; // face feed
-    //                 endcase
+                    // ALU opB mux
+                    case (ex_fu_in.fu_dat_alu[i].opb_select)
+                        OPB_IS_RS2:   opb_mux_out[i] = ex_fu_in.fu_dat_alu[i].rs2_value;
+                        OPB_IS_I_IMM: opb_mux_out[i] = `RV32_signext_Iimm(ex_fu_in.fu_dat_alu[i].inst);
+                        OPB_IS_S_IMM: opb_mux_out[i] = `RV32_signext_Simm(ex_fu_in.fu_dat_alu[i].inst);
+                        OPB_IS_B_IMM: opb_mux_out[i] = `RV32_signext_Bimm(ex_fu_in.fu_dat_alu[i].inst);
+                        OPB_IS_U_IMM: opb_mux_out[i] = `RV32_signext_Uimm(ex_fu_in.fu_dat_alu[i].inst);
+                        OPB_IS_J_IMM: opb_mux_out[i] = `RV32_signext_Jimm(ex_fu_in.fu_dat_alu[i].inst);
+                        default:      opb_mux_out[i] = 32'hfacefeed; // face feed
+                    endcase
 
-    //                 alu_func[i] = ex_fu_in.fu_dat_alu[i].alu_func;
-    //                 branch_func[i] = 3'b011; //SENTINEL VALUE
-    //                 branch[i] = 0;
-    //             end
-    //         end
-    //     end
+                    alu_func[i] = ex_fu_in.fu_dat_alu[i].alu_func;
+                    branch_func[i] = 3'b011; //SENTINEL VALUE
+                    branch[i] = 0;
+                end
+            end
+        end
 
     //     foreach(ex_fu_in.fu_dat_mult[i]) begin
     //         mult_func[i] = ex_fu_in.fu_vld_mult[i] ? ex_fu_in.fu_dat_mult[i].inst.r.funct3 : '0;
     //         mult_value1[i] = ex_fu_in.fu_vld_mult[i] ? ex_fu_in.fu_dat_mult[i].rs1_value : '0;
     //         mult_value2[i] = ex_fu_in.fu_vld_mult[i] ? ex_fu_in.fu_dat_mult[i].rs2_value : '0;
     //     end
-    // end
+    end
 
    
     // // Instantiate the ALU
-    // alu alu_0 [`NUM_FU_ALU-1:0] (
-    //     // Inputs
-    //     .opa(opa_mux_out),
-    //     .opb(opb_mux_out),
-    //     .alu_func(alu_func),
-    //     .branch(branch), // is this a cond_branch
-    //     .branch_func(branch_func), // Which branch condition to check
+    alu alu_0 [`NUM_FU_ALU-1:0] ( 
+        // Inputs
+        .opa(opa_mux_out),
+        .opb(opb_mux_out),
+        .alu_func(alu_func),
+        .branch(branch), // is this a cond_branch
+        .branch_func(branch_func), // Which branch condition to check
 
-    //     .take(take_conditional), // True/False condition result (will return FALSE if branch is low)
-    //     .result(alu_result) // will return 32'hfacebeec if branch is high (Sentinel, hopefully none of our alu computations result in that value)
-    // );
+        .take(take_conditional), // True/False condition result (will return FALSE if branch is low)
+        .result(alu_result) // will return 32'hfacebeec if branch is high (Sentinel, hopefully none of our alu computations result in that value)
+    );
 
 
     
@@ -329,7 +332,7 @@ module stage_ex_p4 (
     // end
 
     
-    // execute2complete next_ex2complete;
+    execute2complete next_ex2complete;
 
     // logic [`NUM_FU_ALU-1:0] alu_done;
     // logic [`NUM_FU_ALU-1:0] grant;
@@ -356,38 +359,38 @@ module stage_ex_p4 (
     
 
 
-    // always_comb begin     
+    always_comb begin     
 
-    //     next_ex2complete.c_en = '0; // Initialize completion enable signals
-    //     next_ex2complete.c_ts = '0; // Initialize completed physical register tags
-    //     next_ex2complete.c_data = '0;
-    //     next_ex2complete.c_rob_idxs = '0;
+        next_ex2complete.c_en = '0; // Initialize completion enable signals
+        next_ex2complete.c_ts = '0; // Initialize completed physical register tags
+        next_ex2complete.c_data = '0;
+        next_ex2complete.c_rob_idxs = '0;
 
-    //     alu_done = 2'b00;
-    //     foreach(alu_result[i]) begin
-    //         $display("DEBUG: alu_result[i] at cycle %0t = %0d", $time, alu_result[i]);
-    //         alu_done[i] |= (alu_result[i] != 32'hfacebeec);
-    //         $display("DEBUG: alu_done at cycle %0t = %2b", $time, alu_done);
-    //         $display("DEBUG: gnt at cycle %0t = %2b", $time, grant);
-    //         $display("DEBUG: gnt_bus at cycle %0t = %2b", $time, grant_bus);
-    //     end
+        alu_done = '0;//2'b00;
+        foreach(alu_result[i]) begin
+            // $display("DEBUG: alu_result[i] at cycle %0t = %0d", $time, alu_result[i]);
+            alu_done[i] |= (alu_result[i] != 32'hfacebeec);
+            // $display("DEBUG: alu_done at cycle %0t = %2b", $time, alu_done);
+            // $display("DEBUG: gnt at cycle %0t = %2b", $time, grant);
+            // $display("DEBUG: gnt_bus at cycle %0t = %2b", $time, grant_bus);
+        end
 
-    //   
-    //     next_ex2complete.c_en[0] =  grant_bus[0];
-    //     next_ex2complete.c_en[1] =  grant_bus[1];
+      
+        // next_ex2complete.c_en[0] =  grant_bus[0];
+        // next_ex2complete.c_en[1] =  grant_bus[1];
 
-    //     next_ex2complete.c_data[0] = alu_result[0];
-    //     next_ex2complete.c_data[1] = alu_result[1];
+        next_ex2complete.c_data[0] = alu_result[0];
+        // next_ex2complete.c_data[1] = alu_result[1];
 
-    //     /*if (next_ex2complete.c_en[0]) begin
-    //         next_ex2complete.c_data[0] = grant_bus[0] ? alu_result[0] : '0; 
-    //     end 
+        /*if (next_ex2complete.c_en[0]) begin
+            next_ex2complete.c_data[0] = grant_bus[0] ? alu_result[0] : '0; 
+        end 
 
-    //     if(next_ex2complete.c_en[1]) begin
-    //         next_ex2complete.c_data[1] =  grant_bus[1] ?  alu_result[grant_bus[1]]; 
-    //     end*/
+        if(next_ex2complete.c_en[1]) begin
+            next_ex2complete.c_data[1] =  grant_bus[1] ?  alu_result[grant_bus[1]]; 
+        end*/
 
-    // end
+    end
 
     // always_ff @(posedge clock) begin
     //     if(reset) begin

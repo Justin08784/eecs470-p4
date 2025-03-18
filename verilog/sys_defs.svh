@@ -39,7 +39,7 @@
 `define LSQ_SZ xx
 
 // functional units (you should decide if you want more or fewer types of FUs)
-`define NUM_FU_ALU 2
+`define NUM_FU_ALU 1
 `define NUM_FU_MULT 2
 `define NUM_FU_LOAD 4
 `define NUM_FU_STORE 4
