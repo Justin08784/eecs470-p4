@@ -56,7 +56,7 @@ module free_list #(parameter
         .clock(clock),
         .reset(reset),
 
-        .wr_en_cnt(r_in.r_en_cnt),
+        .wr_en_cnt(r_in.r_free_cnt),
         .wr_data(r_in.t_old),
 
         .rd_en_cnt(d_in.free_d_en_cnt),

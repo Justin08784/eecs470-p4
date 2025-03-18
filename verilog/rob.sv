@@ -50,6 +50,7 @@ module rob #(
 
         // handle retire (outs)
         r_out.r_en_cnt  = '0;
+        r_out.r_free_cnt  = '0;
         r_out.tag       = '0;
         r_out.t_old     = '0;
         r_out.dst       = '0;
@@ -62,7 +63,7 @@ module rob #(
             // if (i >= used)
             //     break;
             /*
-            TODO: *IMPORTANT* retire zero_reg edge case!
+            TODO [RESOLVED]: *IMPORTANT* retire zero_reg edge case!
             If the retiring insn has no real output register (e.g. hlt, store), then
             its destination will be the zero preg. You MUST NOT allow a zero preg
             to be added to the free list (this is causing the free_list FIFO
@@ -91,7 +92,8 @@ module rob #(
             the FIFO (you still have to do it *somewhere*).
             */
             r_out.tag[i]    = state[r_idxs[i]].tag;
-            r_out.t_old[i]  = state[r_idxs[i]].t_old;
+            if (state[r_idxs[i]].dst != `ZERO_REG) // pack all returning pregs to lowest indices
+                r_out.t_old[r_out.r_free_cnt++] = state[r_idxs[i]].t_old;
             r_out.dst[i]    = state[r_idxs[i]].dst;
 
             wb_packet[i].NPC        = state[r_idxs[i]].NPC;
@@ -164,8 +166,8 @@ module rob #(
             end
 
             $display("  %3d | >> ROB", $time);
-            $display("{r_en_cnt: %d, [(t: %0d, told: %0d, dst: %0d), (t: %0d, told: %0d, dst: %0d)]}",
-                r_out.r_en_cnt,
+            $display("{r_free_cnt: %d, [(t: %0d, told: %0d, dst: %0d), (t: %0d, told: %0d, dst: %0d)]}",
+                r_out.r_free_cnt,
                 r_out.tag[0],
                 r_out.t_old[0],
                 r_out.dst[0],
