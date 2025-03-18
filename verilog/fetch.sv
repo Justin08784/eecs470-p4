@@ -32,10 +32,10 @@ module stage_if_p4 (
     output ADDR PC_reg4
 );
 
-    //ADDR PC_reg; // PCs we are currently fetching
-    MEM_BLOCK icache_out;
-    logic  icache_valid;
-    INST [1:0] fifo_insns;
+    // ADDR PC_reg; // PCs we are currently fetching
+    // MEM_BLOCK icache_out;
+    // logic  icache_valid;
+    // INST [1:0] fifo_insns;
     logic [$clog2(`N):0] free_scnt, used_scnt;
 
     //logic [1:0] valid_out;
@@ -55,7 +55,7 @@ module stage_if_p4 (
     //     .Icache_valid_out           (icache_valid) // When valid is high
     // );
 
-    logic [$clog2(`N):0] if_valid_q;
+    // logic [$clog2(`N):0] if_valid_q;
 
     // fifo #(
     //     .DEPTH(16),
