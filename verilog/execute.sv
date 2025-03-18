@@ -254,8 +254,8 @@ module stage_ex_p4 (
         foreach(ex_fu_in.fu_dat_alu[i]) begin
             if (reset) begin
                 ex_rdy_out.fu_rdy_alu[i] <= 0;
-            end else if ((!branch[i] && alu_result[i] != 32'hfacebeec) || branch[i]) begin
-                ex_rdy_out.fu_rdy_alu[i] <= 0;
+            /*end else if ((!branch[i] && alu_result[i] != 32'hfacebeec) || branch[i]) begin
+                ex_rdy_out.fu_rdy_alu[i] <= 0;*/
             end else begin
                 ex_rdy_out.fu_rdy_alu[i] <= 1;
             end
@@ -315,7 +315,7 @@ module stage_ex_p4 (
         alu_done = 2'b00;
         foreach(alu_result[i]) begin
             $display("DEBUG: alu_result[i] at cycle %0t = %0d", $time, alu_result[i]);
-            alu_done |= (alu_result[i] != 32'hfacebeec);
+            alu_done[i] |= (alu_result[i] != 32'hfacebeec);
             $display("DEBUG: alu_done at cycle %0t = %2b", $time, alu_done);
             $display("DEBUG: gnt at cycle %0t = %2b", $time, grant);
             $display("DEBUG: gnt_bus at cycle %0t = %2b", $time, grant_bus);
