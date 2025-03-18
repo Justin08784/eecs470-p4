@@ -44,7 +44,7 @@
 `define NUM_FU_LOAD 4
 `define NUM_FU_STORE 4
 
-`define NUM_RPORTS (`NUM_FU_ALU + `NUM_FU_BRANCH + `NUM_FU_LOAD + `NUM_FU_MULT + `NUM_FU_STORE)
+`define NUM_RPORTS (`NUM_FU_ALU + `NUM_FU_LOAD + `NUM_FU_MULT + `NUM_FU_STORE)
 
 // number of mult stages (2, 4) (you likely don't need 8)
 `define MULT_STAGES 4
@@ -444,8 +444,8 @@ typedef struct packed {
     ADDR PC;
     ADDR NPC; // PC + 4
 
-    //DATA rs1_value; // reg A value
-    //DATA rs2_value; // reg B value
+    DATA rs1_value; // reg A value
+    DATA rs2_value; // reg B value
 
     ALU_OPA_SELECT opa_select; // ALU opa mux select (ALU_OPA_xxx *)
     ALU_OPB_SELECT opb_select; // ALU opb mux select (ALU_OPB_xxx *)
@@ -702,13 +702,13 @@ typedef struct packed {
 
 typedef struct packed {
     logic [`NUM_RPORTS-1:0] prf_en;
-    PHYS_REG_IDX  [NUM_RPORTS-1:0] s_t1s;
-    PHYS_REG_IDX  [NUM_RPORTS-1:0] s_t2s;
+    PHYS_REG_IDX  [`NUM_RPORTS-1:0] s_t1s;
+    PHYS_REG_IDX  [`NUM_RPORTS-1:0] s_t2s;
 } execute2prf;
 
 typedef struct packed{
-    DATA        [NUM_RPORTS-1:0] s_v1s;
-    DATA        [NUM_RPORTS-1:0] s_v2s;
+    DATA        [`NUM_RPORTS-1:0] s_v1s;
+    DATA        [`NUM_RPORTS-1:0] s_v2s;
 } prf2execute;
 
 // By LSQ

@@ -237,8 +237,16 @@ module stage_ex_p4 (
             if(!ex_fu_in.fu_vld_alu[i]) 
                 continue;
 
-            ex_2_prf.s_t1s[i] = fu_dat_alu[i].t1;
-            ex_2_prf.s_t2s[i] = fu_dat_alu[i].t2;
+            ex_2_prf.prf_en[i] = ex_fu_in.fu_vld_alu[i];
+            ex_2_prf.s_t1s[i] = ex_fu_in.fu_dat_alu[i].t1;
+            ex_2_prf.s_t2s[i] = ex_fu_in.fu_dat_alu[i].t2;
+            $display("DEBUG: prf_enable[i] at cycle %0t = %0d", $time, ex_2_prf.prf_en[i]);
+            $display("DEBUG: s_t1s[i] at cycle %0t = %0d", $time, ex_2_prf.s_t1s[i]);
+            $display("DEBUG: s_t2s[i] at cycle %0t = %0d", $time, ex_2_prf.s_t2s[i]);
+
+            $display("DEBUG: s_v1s[i] at cycle %0t = %0d", $time, prf_2_ex.s_v1s[i]);
+            $display("DEBUG: s_v2s[i] at cycle %0t = %0d", $time, prf_2_ex.s_v2s[i]);
+
 
             if (ex_fu_in.fu_dat_alu[i].cond_branch) begin
                 opa_mux_out[i] = prf_2_ex.s_v1s[i];
@@ -249,8 +257,8 @@ module stage_ex_p4 (
             end else begin
                 // ALU opA mux
                 case (ex_fu_in.fu_dat_alu[i].opa_select)
-                    OPA_IS_RS1:  opa_mux_out[i] = ex_fu_in.fu_dat_alu[i].rs1_value;
-                    //OPA_IS_RS1:  opa_mux_out[i] = prf2execute.s_v1s;
+                    // OPA_IS_RS1:  opa_mux_out[i] = ex_fu_in.fu_dat_alu[i].rs1_value;
+                    OPA_IS_RS1:  opa_mux_out[i] = prf_2_ex.s_v1s[i];
                     OPA_IS_NPC:  opa_mux_out[i] = ex_fu_in.fu_dat_alu[i].NPC;
                     OPA_IS_PC:   opa_mux_out[i] = ex_fu_in.fu_dat_alu[i].PC;
                     OPA_IS_ZERO: opa_mux_out[i] = 0;
@@ -259,8 +267,8 @@ module stage_ex_p4 (
 
                 // ALU opB mux
                 case (ex_fu_in.fu_dat_alu[i].opb_select)
-                    OPB_IS_RS2:   opb_mux_out[i] = ex_fu_in.fu_dat_alu[i].rs2_value;
-                    //OPA_IS_RS2:  opa_mux_out[i] = prf2execute.s_v2s;
+                    // OPB_IS_RS2:   opb_mux_out[i] = ex_fu_in.fu_dat_alu[i].rs2_value;
+                    OPB_IS_RS2:   opb_mux_out[i] =  prf_2_ex.s_v2s[i];
                     OPB_IS_I_IMM: opb_mux_out[i] = `RV32_signext_Iimm(ex_fu_in.fu_dat_alu[i].inst);
                     OPB_IS_S_IMM: opb_mux_out[i] = `RV32_signext_Simm(ex_fu_in.fu_dat_alu[i].inst);
                     OPB_IS_B_IMM: opb_mux_out[i] = `RV32_signext_Bimm(ex_fu_in.fu_dat_alu[i].inst);
