@@ -280,22 +280,30 @@ module stage_ex_p4 (
     
     execute2complete next_ex2complete;
 
-    logic [`NUM_FU_MULT-1:0] alu_done;
-    logic [`NUM_FU_MULT-1:0] grant;
+    logic [`NUM_FU_ALU-1:0] alu_done;
+    logic [`NUM_FU_ALU-1:0] grant;
     //logic [`NUM_FU_MULT-1:0] select;
 
-    logic [2][`NUM_FU_MULT-1:0] grant_bus;
+    logic [`N-1:0][`NUM_FU_ALU-1:0] grant_bus;
     logic empty;
+
+    //assign alu_done = 4'b0000;
+    //assign grant = 4'b0000;
 
     psel_gen #(
     .WIDTH  (`NUM_FU_ALU),
     .REQS   (`N)
-    ) sel (
+    ) sel_alu (
     .req    (alu_done),
     .gnt    (grant),
     .gnt_bus(grant_bus),
     .empty  (empty)
     );
+
+    
+
+    
+
 
     always_comb begin     
 
@@ -304,24 +312,29 @@ module stage_ex_p4 (
         next_ex2complete.c_data = '0;
         next_ex2complete.c_rob_idxs = '0;
 
-        
+        alu_done = 2'b00;
         foreach(alu_result[i]) begin
             $display("DEBUG: alu_result[i] at cycle %0t = %0d", $time, alu_result[i]);
-            alu_done[i] = (alu_result[i] != 32'hfacebeec);
+            alu_done |= (alu_result[i] != 32'hfacebeec);
+            $display("DEBUG: alu_done at cycle %0t = %2b", $time, alu_done);
+            $display("DEBUG: gnt at cycle %0t = %2b", $time, grant);
+            $display("DEBUG: gnt_bus at cycle %0t = %2b", $time, grant_bus);
         end
 
       
-        next_ex2complete.c_en[0] =  grant > 4'b0000 ? grant_bus[0] : '0;
-        next_ex2complete.c_en[1] =  grant > 4'b0100 ? grant_bus[1] : '0;
+        next_ex2complete.c_en[0] =  grant_bus[0];
+        next_ex2complete.c_en[1] =  grant_bus[1];
 
+        next_ex2complete.c_data[0] = alu_result[0];
+        next_ex2complete.c_data[1] = alu_result[1];
 
-        if (next_ex2complete.c_en[0]) begin
-            next_ex2complete.c_data[0] = alu_result[grant_bus[0]]; 
+        /*if (next_ex2complete.c_en[0]) begin
+            next_ex2complete.c_data[0] = grant_bus[0] ? alu_result[0] : '0; 
         end 
 
         if(next_ex2complete.c_en[1]) begin
-            next_ex2complete.c_data[1] = alu_result[grant_bus[1]]; 
-        end
+            next_ex2complete.c_data[1] =  grant_bus[1] ?  alu_result[grant_bus[1]]; 
+        end*/
 
     end
 
