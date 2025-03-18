@@ -14,7 +14,9 @@ module stage_if_p4 (
     input           clock,          // system clock
     input           reset,          // system reset
     //input     [1:0] if_valid,       // only go to next PC when true
-    input decode2fetch fetch_in,
+    input   decode2fetch d_in,
+    output  fetch2decode d_out,
+
     input           take_branch,    // taken-branch signal
     input ADDR      branch_target,  // target pc: use if take_branch is TRUE
     input MEM_BLOCK [1:0] Imem_data,      // data coming back from Instruction memory
@@ -26,7 +28,6 @@ module stage_if_p4 (
     // output MEM_COMMAND  Imem_command, // Command sent to memory
     //output IF_ID_PACKET [1:0] if_packet,
     // output ADDR         Imem_addr, // address sent to Instruction memory
-    output fetch2decode decode_out,
     output ADDR PC_reg,
     output ADDR PC_reg4
 );
@@ -67,7 +68,7 @@ module stage_if_p4 (
     //     .reset      (reset),
     //     .wr_en_cnt  (free_scnt),
     //     .wr_data    (Imem_data),
-    //     .rd_en_cnt  (fetch_in.d_rdy_cnt),
+    //     .rd_en_cnt  (d_in.d_rdy_cnt),
     //     .rd_data    (fifo_insns),
     //     .free_scnt  (free_scnt),
     //     .used_scnt  (used_scnt)
@@ -82,20 +83,20 @@ module stage_if_p4 (
     //     if (reset) begin
     //         if_valid_q <= '0;
     //     end else begin
-    //         if_valid_q <= fetch_in.d_rdy_cnt || (if_valid_q && decode_out.f_en_cnt == 0);
+    //         if_valid_q <= d_in.d_rdy_cnt || (if_valid_q && d_out.f_en_cnt == 0);
     //     end
     // end
 
     //RE-EVALUATE
     always_comb begin
         //if (icache_valid) begin
-            if (/*if_valid_q*/fetch_in.d_rdy_cnt == 2'b10 && PC_reg % 8 != 0) begin
-                decode_out.f_en_cnt = 2'b01;
+            if (/*if_valid_q*/d_in.d_rdy_cnt == 2'b10 && PC_reg % 8 != 0) begin
+                d_out.f_en_cnt = 2'b01;
             end else begin
-                decode_out.f_en_cnt = fetch_in.d_rdy_cnt;
+                d_out.f_en_cnt = d_in.d_rdy_cnt;
             end
         //end else begin
-        //    decode_out.f_en_cnt = 2'b00;
+        //    d_out.f_en_cnt = 2'b00;
         //end
     end
     // assign valid_out = icache_valid ? (if_valid_q) : '0 && (if_valid_q[0] || if_valid_q[1]);
@@ -109,23 +110,23 @@ module stage_if_p4 (
             PC_reg <= branch_target; // update to a taken branch (does not depend on valid bit)
             PC_reg4 <= branch_target + 4;
         end else begin
-            PC_reg <= PC_reg + (decode_out.f_en_cnt * 4);    // or transition to next PC if valid
-            PC_reg4 <= PC_reg4 + (decode_out.f_en_cnt * 4);
+            PC_reg <= PC_reg + (d_out.f_en_cnt * 4);    // or transition to next PC if valid
+            PC_reg4 <= PC_reg4 + (d_out.f_en_cnt * 4);
         end
     end
 
     // index into the word (32-bits) of memory that matches this instruction
     // FOR SUPERSCALAR: take ENTIRE BLOCK instead of pulling based on PC_reg % 8
-    assign decode_out.f_dat[0].inst = (decode_out.f_en_cnt != 2'b00) ? Imem_data[1].word_level[PC_reg[2]] : `NOP;
-    assign decode_out.f_dat[1].inst = (decode_out.f_en_cnt == 2'b10) ? Imem_data[0].word_level[PC_reg4[2]] : `NOP;
+    assign d_out.f_dat[0].inst = (d_out.f_en_cnt != 2'b00) ? Imem_data[1].word_level[PC_reg[2]] : `NOP;
+    assign d_out.f_dat[1].inst = (d_out.f_en_cnt == 2'b10) ? Imem_data[0].word_level[PC_reg4[2]] : `NOP;
 
-    assign decode_out.f_dat[0].PC  = PC_reg;
-    assign decode_out.f_dat[0].NPC = PC_reg + 4; // pass PC+4 down pipeline w/instruction
-    assign decode_out.f_dat[1].PC  = PC_reg4;
-    assign decode_out.f_dat[1].NPC = PC_reg4 + 4; // pass PC+4 down pipeline w/instruction
+    assign d_out.f_dat[0].PC  = PC_reg;
+    assign d_out.f_dat[0].NPC = PC_reg + 4; // pass PC+4 down pipeline w/instruction
+    assign d_out.f_dat[1].PC  = PC_reg4;
+    assign d_out.f_dat[1].NPC = PC_reg4 + 4; // pass PC+4 down pipeline w/instruction
 
-    assign decode_out.f_dat[0].valid = |decode_out.f_en_cnt;
-    assign decode_out.f_dat[1].valid = decode_out.f_en_cnt == 2'b10;
+    assign d_out.f_dat[0].valid = |d_out.f_en_cnt;
+    assign d_out.f_dat[1].valid = d_out.f_en_cnt == 2'b10;
     //     end
     // endgenerate
 

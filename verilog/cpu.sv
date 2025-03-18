@@ -394,7 +394,8 @@ module cpu (
         .clock(clock),          // system clock
         .reset(reset),          // system reset
         //input     [1:0] if_valid,       // only go to next PC when true
-        .fetch_in(decode_2_f),
+        .d_in   (decode_2_f),
+        .d_out  (f_2_decode),
         .take_branch('0),    // taken-branch signal CHANGE!!!!!!
         .branch_target('0),  // target pc: use if take_branch is TRUE CHANGE!!!!!!
         .Imem_data(mem2proc_data),      // data coming back from Instruction memory
@@ -406,7 +407,6 @@ module cpu (
         // output MEM_COMMAND  Imem_command, // Command sent to memory
         //output IF_ID_PACKET [1:0] if_packet,
         // output ADDR         Imem_addr, // address sent to Instruction memory
-        .decode_out(f_2_decode),
         .PC_reg(PC_reg),
         .PC_reg4(PC_reg4)
     );
