@@ -198,6 +198,7 @@ module decoder_p4 (
                     csr_op = `TRUE;
                 end
                 `WFI: begin
+                    fu_idx      = FU_ALU;
                     halt = `TRUE;
                 end
                 default: begin
@@ -245,6 +246,7 @@ module stage_id_p4 (
             .valid (f_in.f_dat[i].valid),
 
             // Outputs
+            .fu_idx        (tmp[i].fu_idx),
             .opa_select    (tmp[i].opa_select),
             .opb_select    (tmp[i].opb_select),
             .alu_func      (tmp[i].alu_func),
