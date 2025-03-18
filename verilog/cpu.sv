@@ -15,7 +15,7 @@ module cpu (
     input reset, // System reset
 
     //input MEM_TAG   mem2proc_transaction_tag, // Memory tag for current transaction
-    input MEM_BLOCK mem2proc_data,            // Data coming back from memory
+    input MEM_BLOCK [1:0] mem2proc_data,            // Data coming back from memory
     //input MEM_TAG   mem2proc_data_tag,        // Tag for which transaction data is for
 
     //output MEM_COMMAND proc2mem_command, // Command sent to memory
@@ -554,6 +554,7 @@ module cpu (
     // rob2decode rob2d;
     // decode2rob d2rob;
     rob2retire rob_2_retire;
+    COMMIT_PACKET [`N-1:0] wb_packet;
     //execute2complete ex_2_complete;
     // rob2dispatch rob_2_dispatch;
     // dispatch2rob dispatch_2_rob;
@@ -562,14 +563,20 @@ module cpu (
         .ROB_SZ(`ROB_SZ),
         .N(`N)
     ) rob_0 (
-        .clock  (clock),
-        .reset  (reset),
-        .r_out  (rob_2_retire),
-        .c_in   (ex_2_complete),
-        .d_out  (rob_2_dispatch),
-        .d_in   (dispatch_2_rob)
+        .clock      (clock),
+        .reset      (reset),
+        .r_out      (rob_2_retire),
+        .c_in       (ex_2_complete),
+        .d_out      (rob_2_dispatch),
+        .d_in       (dispatch_2_rob),
+        .wb_packet  (wb_packet)
     );
 
+    always_comb begin
+        for (int i = 0; i < `N; i++) begin
+            committed_insts[i] = wb_packet[i];
+        end
+    end
 
     //////////////////////////////////////////////////
     //                                              //
@@ -637,7 +644,7 @@ module cpu (
     ) free_list_0 (
         .clock(clock),
         .reset(reset),
-        .flush(flush),
+        .flush(1'b0),
         .r_in(rob_2_retire),
         .d_in(dispatch_2_fl),
         .d_out(fl_2_dispatch)

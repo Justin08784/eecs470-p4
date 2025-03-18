@@ -18,7 +18,9 @@ module rob #(
     // dispatch (write)
     output rob2dispatch d_out,
 
-    input dispatch2rob d_in
+    input dispatch2rob d_in,
+
+    output COMMIT_PACKET [`N-1:0] wb_packet
 );
     localparam NUM_DPORTS = N; // dispatch ports (in-order)
     localparam NUM_RPORTS = N; // retire ports (in-order)
@@ -51,6 +53,7 @@ module rob #(
         r_out.tag       = '0;
         r_out.t_old     = '0;
         r_out.dst       = '0;
+        wb_packet       = '0;
         for (int unsigned i = 0; i < NUM_RPORTS; ++i, ++r_out.r_en_cnt) begin
             // This computes r_en_cnt linear-time wrt NUM_RPORTS. (Fine if NUM_RPORTS
             // small; synthesizer may simply unroll this loop.)
@@ -61,6 +64,14 @@ module rob #(
             r_out.tag[i]    = state[r_idxs[i]].tag;
             r_out.t_old[i]  = state[r_idxs[i]].t_old;
             r_out.dst[i]    = state[r_idxs[i]].dst;
+
+            wb_packet[i].NPC        = state[r_idxs[i]].NPC;
+            wb_packet[i].data       = 0;//(mem_wb_reg.take_branch) ? mem_wb_reg.NPC : mem_wb_reg.result;
+            wb_packet[i].reg_idx    = state[r_idxs[i]].dst;
+            wb_packet[i].halt       = state[r_idxs[i]].halt;
+            wb_packet[i].illegal    = state[r_idxs[i]].illegal;
+            wb_packet[i].valid      = ~state[r_idxs[i]].illegal;
+            $display("RETIRING FROM ROB");
         end
 
         // handle dispatch (outs)
@@ -115,9 +126,13 @@ module rob #(
                 if (i >= d_in.d_en_cnt)
                     continue;
                 cur_idx = d_idxs[i];
-                state[cur_idx].tag    <= d_in.tag[i];
-                state[cur_idx].t_old  <= d_in.t_old[i];
-                state[cur_idx].dst    <= d_in.dst[i];
+                state[cur_idx].tag      <= d_in.tag[i];
+                state[cur_idx].t_old    <= d_in.t_old[i];
+                state[cur_idx].dst      <= d_in.dst[i];
+                state[cur_idx].halt     <= d_in.halt[i];
+                state[cur_idx].illegal  <= d_in.illegal[i];
+                state[cur_idx].NPC      <= d_in.NPC[i];
+                $display("PUTTING INTO ROB");
             end
         end
     end

@@ -198,13 +198,19 @@ module decoder_p4 (
                     csr_op = `TRUE;
                 end
                 `WFI: begin
+                    fu_idx      = FU_ALU;
                     halt = `TRUE;
+                    has_dest   = `FALSE;
+                    alu_func   = ALU_ADD;
+                    opa_select = OPA_IS_ZERO;
+                    opb_select = OPB_IS_I_IMM;
                 end
                 default: begin
                     illegal = `TRUE;
                 end
-        endcase // casez (inst)
+            endcase // casez (inst)
         end // if (valid)
+        $display("DECODE: %1d",halt);
     end // always
 
 endmodule // decoder
@@ -244,6 +250,7 @@ module stage_id_p4 (
             .valid (f_in.f_dat[i].valid),
 
             // Outputs
+            .fu_idx        (tmp[i].fu_idx),
             .opa_select    (tmp[i].opa_select),
             .opb_select    (tmp[i].opb_select),
             .alu_func      (tmp[i].alu_func),
@@ -327,6 +334,11 @@ module stage_id_p4 (
         .wr_data    (tmp),
         .rd_en_cnt  (d_in.dispatch_en_cnt),
         .rd_data    (d_out.d_dat),
+        /*
+        TODO: prvw_vld_cnt and used_scnt seem to do the same thing. This makes
+        the dispatch_cnt computation in dispatch.sv not perfectly optimal.
+        Find the minimal solution.
+        */
         .prvw_vld_cnt (prvw_vld_cnt),
         .free_scnt  (free_scnt),
         .used_scnt  (used_scnt)
@@ -340,10 +352,34 @@ module stage_id_p4 (
     end
 
     always_ff @(posedge clock) begin
+        $display("DECODE COUNT: %2d", used_scnt);
         if (reset) begin
             insn_id <= 0;
         end else begin
             insn_id <= insn_id + f_in.f_en_cnt;
+        end
+
+
+        if (!reset) begin
+            $display("ID >>");
+            $display("  %3d | f_in:  {f_en_cnt: %d, PC: [%x, %x], inst: [%x, %x]}",
+                $time,
+                f_in.f_en_cnt,
+                f_in.f_en_cnt > 0 ? f_in.f_dat[0].PC : 0,
+                f_in.f_en_cnt > 1 ? f_in.f_dat[1].PC : 0,
+                f_in.f_en_cnt > 0 ? f_in.f_dat[0].inst : 0,
+                f_in.f_en_cnt > 1 ? f_in.f_dat[1].inst : 0,
+            );
+
+            $display("  %3d | d_out: {d_en_cnt: %d, PC: [%x, %x], inst: [%x, %x]}",
+                $time,
+                d_in.dispatch_en_cnt,
+                d_out.d_dat[0].PC, 
+                d_out.d_dat[1].PC,
+                d_out.d_dat[0].inst, 
+                d_out.d_dat[1].inst
+            );
+            $display("ID <<");
         end
     end
 
