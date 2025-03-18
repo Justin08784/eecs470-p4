@@ -91,7 +91,7 @@ module stage_if_p4 (
     always_comb begin
         d_out.f_en_cnt = `MIN(used_scnt, d_in.d_rdy_cnt);
 
-        f_cnt = free_scnt < `N ? 0 : `N;
+        f_cnt = free_scnt < `N ? 0 : `N; // no partial fetches (for simplicity)! 
         f_dat = '0;
         for (int unsigned i = 0, logic vld = 0; i < `N; ++i) begin
             vld = i < f_cnt;
