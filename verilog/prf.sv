@@ -57,6 +57,7 @@ module prf #(
             
             always_comb begin
                 if (s_t1s[i] == `ZERO_REG) begin
+                    $display("ZERO REGISTER");
                     s_v1s[i] = 0;
                 end else if (c_en[0] && (c_ts[0] == s_t1s[i])) begin
                     s_v1s[i] = c_vs[0]; // internal forwarding
@@ -99,10 +100,10 @@ module prf #(
 
     // Write port
     always_ff @(posedge clock) begin
-        if (c_en[0] && c_ts[0] != `ZERO_REG) begin
+        if (c_en[0] && (c_ts[0] != `ZERO_REG)) begin
             phys_reg_file[c_ts[0]] <= c_vs[0];
         end
-        if (c_en[1] && c_ts[1] != `ZERO_REG) begin
+        if (c_en[1] && (c_ts[1] != `ZERO_REG)) begin
             phys_reg_file[c_ts[1]] <= c_vs[1];
         end
         $display("DEBUG: prf[0] at cycle %0t = %0d", $time, phys_reg_file[s_t1s[0]]);
