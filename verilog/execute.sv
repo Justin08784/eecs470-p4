@@ -135,11 +135,20 @@ module stage_ex_p4 (
     ID_RESULT   [`NUM_FU_MULT-1:0]   fu_dat_mult;
     ID_RESULT   [`NUM_FU_STORE-1:0]  fu_dat_store;
     ID_RESULT   [`NUM_FU_LOAD-1:0]   fu_dat_load;
-    assign ex_c_out = '0;
     assign ex_rdy_out.fu_rdy_alu = fu_rdy_alu;
     assign ex_rdy_out.fu_rdy_mult = fu_rdy_mult;
     assign ex_rdy_out.fu_rdy_load = fu_rdy_load;
     assign ex_rdy_out.fu_rdy_store = fu_rdy_store;
+
+    always_comb begin
+        ex_c_out = '0;
+        for (int i = 0; i < `N; ++i) begin
+            ex_c_out.c_en[i]        = !fu_rdy_alu[i];
+            ex_c_out.c_ts[i]        = fu_dat_alu[i].t;
+            ex_c_out.c_rob_idxs[i]  = fu_dat_alu[i].rob_idx;
+            ex_c_out.c_data[i]      = '0;
+        end
+    end
 
     always_ff @(posedge clock) begin
         if (reset) begin
@@ -156,6 +165,17 @@ module stage_ex_p4 (
             foreach (fu_rdy_alu[i]) begin
                 fu_rdy_alu[i]   <= ex_fu_in.fu_vld_alu[i] ? 0 : fu_rdy_alu[i];
                 fu_dat_alu[i]   <= ex_fu_in.fu_vld_alu[i] ? ex_fu_in.fu_dat_alu[i] : '0;
+                $display("assign: %d vld:%b insn:%x", i, ex_fu_in.fu_vld_alu[i], ex_fu_in.fu_dat_alu[i].inst);
+            end
+
+            for (int i = 0; i < `N; ++i) begin
+                $display("ex_c_out[%d]: (en: %b, t: %d, rob_idx: %d, dat: %d)",
+                    i,
+                    ex_c_out.c_en[i],
+                    ex_c_out.c_ts[i],
+                    ex_c_out.c_rob_idxs[i],
+                    ex_c_out.c_data[i]
+                );
             end
         end
     end
