@@ -45,6 +45,7 @@ module map_table #(parameter
 
     always_comb begin
         entries_n = entries;
+        d_out = '0;
         // handle completes
         for (int i = 0; i < N; ++i) begin
             /* Checking for preg#0 is presumably not necessary since it cannot
@@ -54,29 +55,22 @@ module map_table #(parameter
             if (!c_in.c_en[i])
                 continue;
             for (int r = 0; r < NUM_ARCH_REG; ++r) begin
-                // $display("DEBUG: Completing reg[%0d] because t = %0d matches c_ts[%0d] = %0d", r, entries_n[r].t, i, c_in.c_ts[i]);
-                // $display("DEBUG: Not Completing reg[%0d]  t = %0d  c_ts[%0d] = %0d, %0d", r, entries_n[r].t, i, c_in.c_ts[i], entries_n[r].cpl);
                 entries_n[r].cpl |= (entries_n[r].t == c_in.c_ts[i]);
             end
         end
 
         // handle renames
         for (int i = 0; i < d_in.en_cnt; ++i) begin
-            // $display("DEBUG: Dispatching - dsts[%0d] = %0d, new tag = %0d", i, d_in.dsts[i], d_in.ts[i]);
             /*
             Idea: how about we always map ZERO_REG -> preg #0, cpl=1,
             and it cannot be edited?
             */
-            // $display("DEBUG: d_out.cpl1s[%0d] = %0d (entries[%0d].cpl = %0d)", i, d_out.cpl1s[i], d_in.src1s[i], entries_n[d_in.src1s[i]].cpl);
-            // $display("DEBUG: d_out.cpl2s[%0d] = %0d (entries[%0d].cpl = %0d)", i, d_out.cpl2s[i], d_in.src2s[i], entries_n[d_in.src2s[i]].cpl);
             d_out.t1s[i]    = entries_n[d_in.src1s[i]].t;
             d_out.t2s[i]    = entries_n[d_in.src2s[i]].t;
             d_out.cpl1s[i]  = entries_n[d_in.src1s[i]].cpl;
             d_out.cpl2s[i]  = entries_n[d_in.src2s[i]].cpl;
 
             if (d_in.dsts[i] != `ZERO_REG) begin
-                // $display("DEBUG: Set entries[%0d] -> t = %0d, cpl = %0b", d_in.dsts[i], d_in.ts[i], entries_n[d_in.dsts[i]].cpl);
-                // $display("DEBUG: entries[0].t at cycle %0t = %0d", $time, entries[0].t);
                 d_out.ts_old[i]             = entries_n[d_in.dsts[i]].t;
                 entries_n[d_in.dsts[i]].t   = d_in.ts[i];
                 entries_n[d_in.dsts[i]].cpl = 0;
@@ -103,7 +97,10 @@ module map_table #(parameter
                 );
             end
         end
+    end
 
+    // debugging
+    always_ff @(posedge clock) begin
         if (!reset) begin
             $display("MT >>");
             $display("  %3d | dis_in:   {en_cnt: %d, [(%0d->%0d, %d, %d), (%0d->%0d, %d, %d)]}",

@@ -66,4 +66,29 @@ module free_list #(parameter
         .used_scnt() // do we need this? how would even retire return more pregs than in existence?
     );
 
+    // debugging
+    // always_ff @(posedge clock) begin
+    //     if (!reset) begin
+    //         $display("  %3d | >> Free list", $time);
+    //         $display("rob2retire: {r_en_cnt: %d, [(t: %0d, told: %0d, dst: %0d), (t: %0d, told: %0d, dst: %0d)]}",
+    //             r_in.r_en_cnt,
+    //             r_in.tag[0],
+    //             r_in.t_old[0],
+    //             r_in.dst[0],
+    //             r_in.tag[1],
+    //             r_in.t_old[1],
+    //             r_in.dst[1]
+    //         );
+    //         $display("d_in:  {d_en_cnt: %d}",
+    //             d_in.free_d_en_cnt
+    //         );
+    //         $display("d_out: {free_rdy_scnt: %d, [%0d, %0d]}",
+    //             d_out.free_rdy_scnt,
+    //             d_out.d_ts[0],
+    //             d_out.d_ts[1]
+    //         );
+    //         $display("  %3d | << Free list", $time);
+    //     end
+    // end
+
 endmodule
