@@ -142,7 +142,7 @@ module stage_ex_p4 (
     ID_RESULT   [`NUM_FU_MULT-1:0]   fu_dat_mult;
     ID_RESULT   [`NUM_FU_STORE-1:0]  fu_dat_store;
     ID_RESULT   [`NUM_FU_LOAD-1:0]   fu_dat_load;
-    // DATA [`NUM_FU_ALU-1:0] opa_mux_out, opb_mux_out, alu_result;
+    DATA [`NUM_FU_ALU-1:0] opa_mux_out, opb_mux_out, alu_result;
     logic [`NUM_FU_ALU-1:0] alu_done;
     assign ex_rdy_out.fu_rdy_alu = fu_rdy_alu;
     assign ex_rdy_out.fu_rdy_mult = fu_rdy_mult;
@@ -161,7 +161,7 @@ module stage_ex_p4 (
             ex_c_out.c_en[i]        = !fu_rdy_alu[i];
             ex_c_out.c_ts[i]        = fu_dat_alu[i].t;
             ex_c_out.c_rob_idxs[i]  = fu_dat_alu[i].rob_idx;
-            ex_c_out.c_data[i]      = '0;
+            ex_c_out.c_data[i]      = alu_result[i];
         end
     end
 
@@ -198,7 +198,7 @@ module stage_ex_p4 (
     end
 
     ALU_FUNC [`NUM_FU_ALU-1:0] alu_func;
-    DATA [`NUM_FU_ALU-1:0] opa_mux_out, opb_mux_out, alu_result;
+ //   DATA [`NUM_FU_ALU-1:0] opa_mux_out, opb_mux_out, alu_result;
     logic [`NUM_FU_ALU-1:0] branch;
     logic [`NUM_FU_MULT-1:0] [2:0] mult_func;
     logic [`NUM_FU_MULT-1:0] mult_done;
