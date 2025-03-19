@@ -418,9 +418,9 @@ typedef struct packed {
 // ROB stuff
 typedef logic [$clog2(`ROB_SZ)-1:0] ROB_IDX;
 typedef struct packed {
-    INST inst;
     // logic [4:0] rob_num;
     logic cpl;
+    logic is_brch;
     logic [$clog2(`PHYS_REG_SZ_R10K)-1:0] tag;
     logic [$clog2(`PHYS_REG_SZ_R10K)-1:0] t_old;
     REG_IDX dst;
@@ -576,6 +576,7 @@ typedef struct packed {
     REG_IDX [`N-1:0] dst;
     logic [`N-1:0] halt;
     logic [`N-1:0] illegal;
+    logic [`N-1:0] is_brch;
     ADDR [`N-1:0] NPC;
 } dispatch2rob;
 

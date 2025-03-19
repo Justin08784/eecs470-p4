@@ -99,6 +99,7 @@ module rob #(
                 ++r_out.r_free_cnt;
             end
             r_out.dst[i]    = state[r_idxs[i]].dst;
+            r_out.brch_vld  = state[r_idxs[i]].is_brch;
 
             prf_out[i] = state[r_idxs[i]].tag;
 
@@ -111,6 +112,17 @@ module rob #(
         end
 
         // handle dispatch (outs)
+        /*
+        TODO: This tradeoff needs consideration for performance
+        Option 1: 
+        d_out.rob_rdy_scnt = `MIN(free + r_out.r_en_cnt, NUM_DPORTS);
+        + avoids dispatch stalls when ROB is full if N branches retire per cycle
+        - longer combinational delay due to dependency on r_en_cnt
+
+        Option 2: 
+        d_out.rob_rdy_scnt = `MIN(free, NUM_DPORTS);
+        (opposite of above points)
+        */
         // The true number of same-cycle free slots is free + r_en_cnt
         d_out.rob_rdy_scnt = `MIN(free + r_out.r_en_cnt, NUM_DPORTS);
         d_out.rob_idxs     = d_idxs;
@@ -164,12 +176,16 @@ module rob #(
                 if (i >= d_in.d_en_cnt)
                     continue;
                 cur_idx = d_idxs[i];
-                state[cur_idx].tag      <= d_in.tag[i];
-                state[cur_idx].t_old    <= d_in.t_old[i];
-                state[cur_idx].dst      <= d_in.dst[i];
-                state[cur_idx].halt     <= d_in.halt[i];
-                state[cur_idx].illegal  <= d_in.illegal[i];
-                state[cur_idx].NPC      <= d_in.NPC[i];
+                state[cur_idx] <= '{
+                    cpl     :0,
+                    is_brch :d_in.is_brch[i],
+                    tag     :d_in.tag[i],
+                    t_old   :d_in.t_old[i],
+                    dst     :d_in.dst[i],
+                    halt    :d_in.halt[i],
+                    illegal :d_in.illegal[i],
+                    NPC     :d_in.NPC[i]
+                };
             end
 
             `ifndef SYNTH

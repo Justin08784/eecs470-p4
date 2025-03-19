@@ -40,13 +40,9 @@ module btq #(
     logic [$clog2(BTQ_SZ)-1:0]  tail;
     logic [$clog2(BTQ_SZ):0]    used;
 
-    logic [$clog2(BTQ_SZ):0]        free;
-    logic [$clog2(NUM_DPORTS):0]    free_scnt;
-    logic [$clog2(NUM_RPORTS):0]    used_scnt;
-    assign state_dbg    = state;
+    logic [$clog2(BTQ_SZ):0]    free;
     assign free         = BTQ_SZ - used;
-    assign free_scnt    = `MIN(free, NUM_DPORTS);
-    assign used_scnt    = `MIN(used, NUM_RPORTS);
+    assign state_dbg    = state;
 
     logic [$clog2(NUM_DPORTS):0]    wr_cnt;
     logic [$clog2(NUM_RPORTS):0]    rd_cnt;
@@ -74,7 +70,18 @@ module btq #(
         end
 
         // handle dispatch (outs)
+        /*
+        TODO: This tradeoff needs consideration for performance
+        Option 1: 
+        d_out.btq_rdy_scnt = `MIN(free + rd_cnt, NUM_DPORTS);
+        + avoids dispatch stalls when BTQ is full if N branches retire per cycle
+        - longer combinational delay due to dependency on rd_cnt
+
+        Option 2: 
         d_out.btq_rdy_scnt = `MIN(free, NUM_DPORTS);
+        (opposite of above points)
+        */
+        d_out.btq_rdy_scnt = `MIN(free + rd_cnt, NUM_DPORTS);
         d_out.btq_idxs     = d_idxs;
     end
 
