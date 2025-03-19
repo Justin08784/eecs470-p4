@@ -252,6 +252,11 @@ build/map_table.cov: $(MAP_TABLE_FILES)
 build/map_table.vg: $(MAP_TABLE_FILES)
 build/stage_id_p4.out: $(MAP_TABLE_FILES)
 
+EXECUTE_FILES = verilog/sys_defs.svh verilog/mult.sv
+build/execute.simv: $(EXECUTE_FILES)
+build/execute.cov: $(EXECUTE_FILES)
+build/execute.vg: $(EXECUTE_FILES)
+
 
 #################################
 # ---- Main CPU Definition ---- #
@@ -286,7 +291,7 @@ CPU_SOURCES = verilog/cpu.sv \
 			  verilog/stage_id_p4.sv \
 			  verilog/fifo.sv \
 			  verilog/fetch.sv \
-			  verilog/execute.sv
+			  verilog/execute.sv 
 
 build/cpu.simv: $(CPU_SOURCES) $(CPU_HEADERS) $(CPU_TESTBENCH)
 synth/cpu.vg: $(CPU_SOURCES) $(CPU_HEADERS)

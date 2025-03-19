@@ -12,6 +12,7 @@
 
 `include "sys_defs.svh"
 `include "ISA.svh"
+//`include "mult.sv"
 
 // ALU: computes the result of FUNC applied with operands A and B
 // This module is purely combinational
@@ -288,21 +289,25 @@ module stage_ex_p4 (
     );
 
 
-    
-    // // Instantiate the multiplier
-    // mult mults [`NUM_FU_MULT-1:0] (
-    //     // Inputs
-    //     .clock(clock),
-    //     .reset(reset),
-    //     .start(ex_fu_in.fu_vld_mult),
-    //     .rs1(mult_value1),
-    //     .rs2(mult_value2),
-    //     .func(mult_func), // which mult operation to perform
+    generate 
+        for(genvar i = 0; i < `NUM_FU_MULT; i++ ) begin
+        // Instantiate the multiplier
+            mult mult_0 (
+                // Inputs
+                .clock(clock),
+                .reset(reset),
+                .start(ex_fu_in.fu_vld_mult[i]),
+                .rs1(prf_2_ex.s_v1s[i]),
+                .rs2(prf_2_ex.s_v2s[i]),
+                .func(ex_fu_in.fu_dat_mult[i].inst.r.funct3), // which mult operation to perform
 
-    //     // Output
-    //     .result(mult_result),
-    //     .done(mult_done)
-    // );
+                // Output
+                .result(mult_result[i]),
+                .done(mult_done[i])
+            );
+        end
+
+    endgenerate
 
     // // // Instantiate the conditional branch module
     // // conditional_branch conditional_branchs [NUM_FU_BRANCH-1:0] (
