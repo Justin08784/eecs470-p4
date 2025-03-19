@@ -351,7 +351,7 @@
                     default:      mult_value2[i] = 32'hfacefeed; // face feed
                 endcase
 
-                mult_func[i] = ex_fu_in.fu_dat_mult[i].alu_func;
+                mult_func[i] = ex_fu_in.fu_dat_mult[i].inst.r.funct3;
                 // branch_func[i] = 3'b011; //SENTINEL VALUE
                 // branch[i] = 0;
             // end
