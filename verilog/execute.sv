@@ -1,165 +1,166 @@
 /////////////////////////////////////////////////////////////////////////
-//                                                                     //
-//   Modulename :  stage_ex.sv                                         //
-//                                                                     //
-//  Description :  instruction execute (EX) stage of the pipeline;     //
-//                 given the instruction command code CMD, select the  //
-//                 proper input A and B for the ALU, compute the       //
-//                 result, and compute the condition for branches, and //
-//                 pass all the results down the pipeline.             //
-//                                                                     //
-/////////////////////////////////////////////////////////////////////////
-
-`include "sys_defs.svh"
-`include "ISA.svh"
-
-// ALU: computes the result of FUNC applied with operands A and B
-// This module is purely combinational
-module alu (
-    input DATA     opa,
-    input DATA     opb,
-    input ALU_FUNC alu_func,
-    input logic branch, // is this a cond_branch
-    input [2:0] branch_func, // Which branch condition to check
-
-    output logic take, // True/False condition result
-    output DATA result
-);
-
-    always_comb begin
-        case (alu_func)
-            ALU_ADD:  result = opa + opb;
-            ALU_SUB:  result = opa - opb;
-            ALU_AND:  result = opa & opb;
-            ALU_SLT:  result = signed'(opa) < signed'(opb);
-            ALU_SLTU: result = opa < opb;
-            ALU_OR:   result = opa | opb;
-            ALU_XOR:  result = opa ^ opb;
-            ALU_SRL:  result = opa >> opb[4:0];
-            ALU_SLL:  result = opa << opb[4:0];
-            ALU_SRA:  result = signed'(opa) >>> opb[4:0]; // arithmetic from logical shift
-            // here to prevent latches:
-            default:  result = 32'hfacebeec;
-        endcase
-    end
-
-    always_comb begin
-        case (branch_func)
-            3'b000:  take = signed'(opa) == signed'(opb); // BEQ
-            3'b001:  take = signed'(opa) != signed'(opb); // BNE
-            3'b100:  take = signed'(opa) <  signed'(opb); // BLT
-            3'b101:  take = signed'(opa) >= signed'(opb); // BGE
-            3'b110:  take = opa < opb;                    // BLTU
-            3'b111:  take = opa >= opb;                   // BGEU
-            default: take = `FALSE;
-        endcase
-    end
-
-endmodule // alu
-
-// // Conditional branch module: compute whether to take conditional branches
-// // This module is purely combinational
-// module conditional_branch (
-//     input DATA  rs1,
-//     input DATA  rs2,
-    
-// );
-
-    
-
-// endmodule // conditional_branch
-
-/*module mult_no_pipeline (
-     input clock, reset, start,
-     input DATA rs1, rs2,
-     input MULT_FUNC func,
-
-     output DATA  result,
-     output logic done
+ //                                                                     //
+ //   Modulename :  stage_ex.sv                                         //
+ //                                                                     //
+ //  Description :  instruction execute (EX) stage of the pipeline;     //
+ //                 given the instruction command code CMD, select the  //
+ //                 proper input A and B for the ALU, compute the       //
+ //                 result, and compute the condition for branches, and //
+ //                 pass all the results down the pipeline.             //
+ //                                                                     //
+ /////////////////////////////////////////////////////////////////////////
+ 
+ `include "sys_defs.svh"
+ `include "ISA.svh"
+ 
+ // ALU: computes the result of FUNC applied with operands A and B
+ // This module is purely combinational
+ module alu (
+     input DATA     opa,
+     input DATA     opb,
+     input ALU_FUNC alu_func,
+     input logic branch, // is this a cond_branch
+     input [2:0] branch_func, // Which branch condition to check
+ 
+     output logic take, // True/False condition result
+     output DATA result
  );
-
-     logic [63:0] mcand, mplier, product;
-
-     assign product = mcand * mplier;
-
-     // Sign-extend the multiplier inputs based on the operation
+ 
      always_comb begin
-         case (func)
-             M_MUL, M_MULH, M_MULHSU: mcand = {{(32){rs1[31]}}, rs1};
-             default:                 mcand = {32'b0, rs1};
-         endcase
-         case (func)
-             M_MUL, M_MULH: mplier = {{(32){rs2[31]}}, rs2};
-             default:       mplier = {32'b0, rs2};
+         case (alu_func)
+             ALU_ADD:  result = opa + opb;
+             ALU_SUB:  result = opa - opb;
+             ALU_AND:  result = opa & opb;
+             ALU_SLT:  result = signed'(opa) < signed'(opb);
+             ALU_SLTU: result = opa < opb;
+             ALU_OR:   result = opa | opb;
+             ALU_XOR:  result = opa ^ opb;
+             ALU_SRL:  result = opa >> opb[4:0];
+             ALU_SLL:  result = opa << opb[4:0];
+             ALU_SRA:  result = signed'(opa) >>> opb[4:0]; // arithmetic from logical shift
+             // here to prevent latches:
+             default:  result = 32'hfacebeec;
          endcase
      end
-
-     // Use the high or low bits of the product based on the output func
-     assign result = (func == M_MUL) ? product[31:0] : product[63:32];
-
- endmodule*/
-
-
-
-module stage_ex_p4 (
-    input clock,
-    input reset,
-
-    input   rs2execute ex_fu_in,
-    // input   logic       [`NUM_FU_ALU-1:0]    fu_vld_alu,
-    // input   logic       [`NUM_FU_MULT-1:0]   fu_vld_mult,
-    // input   logic       [`NUM_FU_STORE-1:0]  fu_vld_store,
-    // input   logic       [`NUM_FU_LOAD-1:0]   fu_vld_load,
-    // input   ID_RESULT   [`NUM_FU_ALU-1:0]    fu_dat_alu,
-    // input   ID_RESULT   [`NUM_FU_MULT-1:0]   fu_dat_mult,
-    // input   ID_RESULT   [`NUM_FU_STORE-1:0]  fu_dat_store,
-    // input   ID_RESULT   [`NUM_FU_LOAD-1:0]   fu_dat_load,
-
-    input   prf2execute prf_2_ex,
-
-    output  execute2rs ex_rdy_out,
-    // output  logic       [`NUM_FU_ALU-1:0]    fu_rdy_alu,
-    // output  logic       [`NUM_FU_MULT-1:0]   fu_rdy_mult,
-    // output  logic       [`NUM_FU_STORE-1:0]  fu_rdy_store,
-    // output  logic       [`NUM_FU_LOAD-1:0]   fu_rdy_load,
-
-    // TODO: wrap this stuff into execute2complete. Wrap crap here in general.
-    output  execute2complete ex_c_out,
-    // output  logic       [`N-1:0]             c_en,
-    // output  PHYS_REG_IDX[`N-1:0]             c_ts,
-    // output  DATA        [`N-1:0]             c_data
-
-    output  execute2prf ex_2_prf
-);
-    logic   [`NUM_FU_ALU-1:0]    fu_rdy_alu;
-    logic   [`NUM_FU_MULT-1:0]   fu_rdy_mult;
-    logic   [`NUM_FU_STORE-1:0]  fu_rdy_store;
-    logic   [`NUM_FU_LOAD-1:0]   fu_rdy_load;
-    ID_RESULT   [`NUM_FU_ALU-1:0]    fu_dat_alu;
-    ID_RESULT   [`NUM_FU_MULT-1:0]   fu_dat_mult;
-    ID_RESULT   [`NUM_FU_STORE-1:0]  fu_dat_store;
-    ID_RESULT   [`NUM_FU_LOAD-1:0]   fu_dat_load;
-    DATA [`NUM_FU_ALU-1:0] opa_mux_out, opb_mux_out, alu_result;
-    ALU_FUNC [`NUM_FU_ALU-1:0] alu_func;
-    logic [`NUM_FU_ALU-1:0] alu_done;
-    logic [`NUM_FU_ALU-1:0] branch;
-    logic [`NUM_FU_MULT-1:0] [2:0] mult_func;
-    logic [`NUM_FU_MULT-1:0] mult_done;
-    DATA [`NUM_FU_MULT-1:0] mult_value1, mult_value2, mult_result;
-    logic [`NUM_FU_ALU-1:0] [2:0] branch_func;
-    logic [`NUM_FU_ALU-1:0] take_conditional;
-
-    assign ex_rdy_out.fu_rdy_alu = fu_rdy_alu;
-    assign ex_rdy_out.fu_rdy_mult = fu_rdy_mult;
-    assign ex_rdy_out.fu_rdy_load = fu_rdy_load;
-    assign ex_rdy_out.fu_rdy_store = fu_rdy_store;
-
-    always_ff @( posedge clock ) begin
-        
-        $display("DEBUG: mult_done[0] at cycle %0t = %b", $time, mult_done[0]);
-        $display("DEBUG: mult_result[0] at cycle %0t = %b", $time, mult_result[0]);
-    end
-
+ 
+     always_comb begin
+         case (branch_func)
+             3'b000:  take = signed'(opa) == signed'(opb); // BEQ
+             3'b001:  take = signed'(opa) != signed'(opb); // BNE
+             3'b100:  take = signed'(opa) <  signed'(opb); // BLT
+             3'b101:  take = signed'(opa) >= signed'(opb); // BGE
+             3'b110:  take = opa < opb;                    // BLTU
+             3'b111:  take = opa >= opb;                   // BGEU
+             default: take = `FALSE;
+         endcase
+     end
+ 
+ endmodule // alu
+ 
+ // // Conditional branch module: compute whether to take conditional branches
+ // // This module is purely combinational
+ // module conditional_branch (
+ //     input DATA  rs1,
+ //     input DATA  rs2,
+ 
+ // );
+ 
+ 
+ 
+ // endmodule // conditional_branch
+ 
+ /*module mult_no_pipeline (
+      input clock, reset, start,
+      input DATA rs1, rs2,
+      input MULT_FUNC func,
+ 
+      output DATA  result,
+      output logic done
+  );
+ 
+      logic [63:0] mcand, mplier, product;
+ 
+      assign product = mcand * mplier;
+ 
+      // Sign-extend the multiplier inputs based on the operation
+      always_comb begin
+          case (func)
+              M_MUL, M_MULH, M_MULHSU: mcand = {{(32){rs1[31]}}, rs1};
+              default:                 mcand = {32'b0, rs1};
+          endcase
+          case (func)
+              M_MUL, M_MULH: mplier = {{(32){rs2[31]}}, rs2};
+              default:       mplier = {32'b0, rs2};
+          endcase
+      end
+ 
+      // Use the high or low bits of the product based on the output func
+      assign result = (func == M_MUL) ? product[31:0] : product[63:32];
+ 
+  endmodule*/
+ 
+ 
+ 
+ module stage_ex_p4 (
+     input clock,
+     input reset,
+     input flush,
+ 
+     input   rs2execute ex_fu_in,
+     // input   logic       [`NUM_FU_ALU-1:0]    fu_vld_alu,
+     // input   logic       [`NUM_FU_MULT-1:0]   fu_vld_mult,
+     // input   logic       [`NUM_FU_STORE-1:0]  fu_vld_store,
+     // input   logic       [`NUM_FU_LOAD-1:0]   fu_vld_load,
+     // input   ID_RESULT   [`NUM_FU_ALU-1:0]    fu_dat_alu,
+     // input   ID_RESULT   [`NUM_FU_MULT-1:0]   fu_dat_mult,
+     // input   ID_RESULT   [`NUM_FU_STORE-1:0]  fu_dat_store,
+     // input   ID_RESULT   [`NUM_FU_LOAD-1:0]   fu_dat_load,
+ 
+     input   prf2execute prf_2_ex,
+ 
+     output  execute2rs ex_rdy_out,
+     // output  logic       [`NUM_FU_ALU-1:0]    fu_rdy_alu,
+     // output  logic       [`NUM_FU_MULT-1:0]   fu_rdy_mult,
+     // output  logic       [`NUM_FU_STORE-1:0]  fu_rdy_store,
+     // output  logic       [`NUM_FU_LOAD-1:0]   fu_rdy_load,
+ 
+     // TODO: wrap this stuff into execute2complete. Wrap crap here in general.
+     output  execute2complete ex_c_out,
+     // output  logic       [`N-1:0]             c_en,
+     // output  PHYS_REG_IDX[`N-1:0]             c_ts,
+     // output  DATA        [`N-1:0]             c_data
+ 
+     output  execute2prf ex_2_prf
+ );
+     logic   [`NUM_FU_ALU-1:0]    fu_rdy_alu;
+     logic   [`NUM_FU_MULT-1:0]   fu_rdy_mult;
+     logic   [`NUM_FU_STORE-1:0]  fu_rdy_store;
+     logic   [`NUM_FU_LOAD-1:0]   fu_rdy_load;
+     ID_RESULT   [`NUM_FU_ALU-1:0]    fu_dat_alu;
+     ID_RESULT   [`NUM_FU_MULT-1:0]   fu_dat_mult;
+     ID_RESULT   [`NUM_FU_STORE-1:0]  fu_dat_store;
+     ID_RESULT   [`NUM_FU_LOAD-1:0]   fu_dat_load;
+     DATA [`NUM_FU_ALU-1:0] opa_mux_out, opb_mux_out, alu_result;
+     ALU_FUNC [`NUM_FU_ALU-1:0] alu_func;
+     logic [`NUM_FU_ALU-1:0] alu_done;
+     logic [`NUM_FU_ALU-1:0] branch;
+     logic [`NUM_FU_MULT-1:0] [2:0] mult_func;
+     logic [`NUM_FU_MULT-1:0] mult_done;
+     DATA [`NUM_FU_MULT-1:0] mult_value1, mult_value2, mult_result;
+     logic [`NUM_FU_ALU-1:0] [2:0] branch_func;
+     logic [`NUM_FU_ALU-1:0] take_conditional;
+ 
+     assign ex_rdy_out.fu_rdy_alu = fu_rdy_alu;
+     assign ex_rdy_out.fu_rdy_mult = fu_rdy_mult;
+     assign ex_rdy_out.fu_rdy_load = fu_rdy_load;
+     assign ex_rdy_out.fu_rdy_store = fu_rdy_store;
+ 
+     always_ff @( posedge clock ) begin
+         
+         $display("DEBUG: mult_done[0] at cycle %0t = %b", $time, mult_done[0]);
+         $display("DEBUG: mult_result[0] at cycle %0t = %b", $time, mult_result[0]);
+     end
+ 
     always_comb begin
         ex_c_out = '0;
         for (int i = 0; i < `NUM_FU_MULT; ++i) begin
@@ -169,66 +170,9 @@ module stage_ex_p4 (
             ex_c_out.c_data[i]      = mult_result[i];
         end
     end
-    /*
-    execute2complete next_ex2complete;
-
-
-    logic [3:0] alu_done;
-    logic [3:0] grant;
-    //logic [`NUM_FU_MULT-1:0] select;
-
-    logic [`N-1:0][3:0] grant_bus;
-    logic empty;
-
-
-    psel_gen #(
-    .WIDTH  (4),
-    .REQS   (`N)
-    ) sel_alu (
-    .req    (alu_done),
-    .gnt    (grant),
-    .gnt_bus(grant_bus),
-    .empty  (empty)
-    );
-
-    assign fu_done = 4'b0000;
-    assign grant = 4'b0000;
-
-
-
-
-    always_comb begin     
-
-        next_ex2complete.c_en = '0; // Initialize completion enable signals
-        next_ex2complete.c_ts = '0; // Initialize completed physical register tags
-        next_ex2complete.c_data = '0;
-        next_ex2complete.c_rob_idxs = '0;
-
-        alu_done = '0;//2'b00;
-        foreach(alu_result[i]) begin
-            // $display("DEBUG: alu_result[i] at cycle %0t = %0d", $time, alu_result[i]);
-            fu_done[i] |= (alu_result[i] != 32'hfacebeec);
-            // $display("DEBUG: alu_done at cycle %0t = %2b", $time, alu_done);
-            // $display("DEBUG: gnt at cycle %0t = %2b", $time, grant);
-            // $display("DEBUG: gnt_bus at cycle %0t = %2b", $time, grant_bus);
-        end
-
-        foreach(mult_result[i]) begin
-            fu_done[i] |= (mult_done[i]);
-        end
-
-
-        //next_ex2complete.c_data[0] = alu_result[0];
-
-    end*/
-
-
-    
-
-
 
     always_ff @(posedge clock) begin
-        if (reset) begin
+        if (reset || flush) begin
             fu_rdy_alu      <= '1;
             fu_rdy_mult     <= '1;
             fu_rdy_store    <= '0;
@@ -239,7 +183,6 @@ module stage_ex_p4 (
             fu_dat_store    <= '0;
             fu_dat_load     <= '0;
         end else begin
-            //RDY LOGIC TO BE CHANGED WHEN PROCESSING MORE IPC THAN CDB WIDTH
             foreach (fu_rdy_alu[i]) begin
                 fu_rdy_alu[i]   <= ex_fu_in.fu_vld_alu[i] ? 0 : (alu_done[i] || fu_rdy_alu[i]);// || ex_c_out.c_en[i]; //OR'ing this will work to reset the flag, just have to make sure it is coming from the right FU so that we don't accidentally reset the ALU with a mult flag or something
                 fu_dat_alu[i]   <= ex_fu_in.fu_vld_alu[i] ? ex_fu_in.fu_dat_alu[i] : '0;
@@ -381,7 +324,6 @@ module stage_ex_p4 (
         end
     end
 
-
     generate 
         for(genvar i = 0; i < `NUM_FU_MULT; i++ ) begin
         // Instantiate the multiplier
@@ -400,6 +342,7 @@ module stage_ex_p4 (
         );
         end
     endgenerate
+
     // // // Instantiate the conditional branch module
     // // conditional_branch conditional_branchs [NUM_FU_BRANCH-1:0] (
     // //     // Inputs
