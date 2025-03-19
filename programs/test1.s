@@ -1,4 +1,3 @@
-    addi x2, x0, 2
-    addi x3, x2, 3
+    mul x4, x0, x0
     wfi
     

@@ -715,6 +715,11 @@ typedef struct packed {
     logic    [$clog2(`N):0]    lsq_rdy_scnt;
 } lsq2dispatch;
 
+typedef struct packed {
+    PHYS_REG_IDX    t;
+    ROB_IDX         rob_idx;
+} internalEXbuffer;
+
 
 /* How can we implement this in the Makefile? */
 // comment out to disable DEBUG:

@@ -252,6 +252,11 @@ build/map_table.cov: $(MAP_TABLE_FILES)
 build/map_table.vg: $(MAP_TABLE_FILES)
 build/stage_id_p4.out: $(MAP_TABLE_FILES)
 
+EXECUTE_FILES = verilog/mult.sv
+build/execute.simv: $(EXECUTE_FILES)
+build/execute.cov: $(EXECUTE_FILES)
+build/execute.vg: $(EXECUTE_FILES)
+
 
 #################################
 # ---- Main CPU Definition ---- #
