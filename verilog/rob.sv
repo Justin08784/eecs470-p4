@@ -103,7 +103,7 @@ module rob #(
 
             prf_out[i] = state[r_idxs[i]].tag;
 
-            wb_packet[i] <= '{
+            wb_packet[i] = '{
                 NPC     : state[r_idxs[i]].NPC,
                 data    : prf_in[i], //(mem_wb_reg.take_branch) ? mem_wb_reg.NPC : mem_wb_reg.result;
                 reg_idx : state[r_idxs[i]].dst,
