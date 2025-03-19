@@ -480,7 +480,6 @@ module cpu (
         .map_out(dispatch_2_map)
     );
 
-
     //////////////////////////////////////////////////
     //                                              //
     //              Reservation Station             //
@@ -548,8 +547,6 @@ module cpu (
         // .c_ts(c_ts)
     );
     
-    rob2retire rob_2_retire;
-
     //////////////////////////////////////////////////
     //                                              //
     //                Re-Order Buffer               //
@@ -562,6 +559,7 @@ module cpu (
     // typedef struct packed {logic dummy;} decode2rob;
     // rob2decode rob2d;
     // decode2rob d2rob;
+    rob2retire rob_2_retire;
     COMMIT_PACKET [`N-1:0] wb_packet;
     PHYS_REG_IDX [`N-1:0] retire2prf;
     PHYS_REG_IDX [`N-1:0] prf2retire;
