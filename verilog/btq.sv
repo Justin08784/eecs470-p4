@@ -51,6 +51,7 @@ module btq #(
 
     logic [NUM_RPORTS-1:0][$clog2(BTQ_SZ)-1:0] r_idxs;
     logic [NUM_DPORTS-1:0][$clog2(BTQ_SZ)-1:0] d_idxs;
+    BTQ_ENTRY cur_entry;
     always_comb begin
         for (int unsigned i = 0; i < NUM_RPORTS; ++i)
             r_idxs[i] = (head + i) % BTQ_SZ;
@@ -59,12 +60,12 @@ module btq #(
 
         // handle fetch (outs)
         f_out = '0;
-        for (int unsigned i = 0, BTQ_ENTRY cur = '0; i < NUM_RPORTS; ++i) begin
-            cur = state[r_idxs[i]];
+        for (int unsigned i = 0; i < NUM_RPORTS; ++i) begin
+            cur_entry = state[r_idxs[i]];
 
-            if (cur.pred != cur.take) begin
+            if (cur_entry.pred != cur_entry.take) begin
                 f_out.mispred = 1;
-                f_out.brch_tgt = cur.tgt;
+                f_out.brch_tgt = cur_entry.tgt;
                 break;
             end
         end
