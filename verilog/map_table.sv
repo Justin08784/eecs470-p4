@@ -11,6 +11,7 @@ Map Table
 // else references it...?
 // - map table is more complicated than a simple lookup. forall i < j,
 // src1s[j], src2s[j] may potentially be dsts[i]. i.e. there is a serial dependency
+// TODO: implement internal forwarding ala fifo.sv?
 module map_table #(parameter 
     N=`N,
     NUM_ARCH_REG=32
