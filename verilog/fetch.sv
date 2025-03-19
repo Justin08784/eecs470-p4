@@ -94,7 +94,7 @@ module stage_if_p4 (
         f_cnt = free_scnt < `N ? 0 : `N; // no partial fetches (for simplicity)! 
         for (int unsigned i = 0, logic vld = 0; i < `N; ++i) begin
             vld = i < f_cnt;
-            f_dat[i] <= '{
+            f_dat[i] = '{
                 inst  : vld ? Imem_data.word_level[i] : `NOP,
                 PC    : PC_reg + 4*i,
                 NPC   : PC_reg + 4*(i+1),
