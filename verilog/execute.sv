@@ -159,7 +159,7 @@ module stage_ex_p4 (
     end
 
     always_ff @(posedge clock) begin
-        if (reset) begin
+        if (reset || flush) begin
             fu_rdy_alu      <= '1;
             fu_rdy_mult     <= '0;
             fu_rdy_store    <= '0;
@@ -296,7 +296,7 @@ module stage_ex_p4 (
             mult mult_0 (
                 // Inputs
                 .clock(clock),
-                .reset(reset),
+                .reset(reset), // TODO: do we need to flush this?
                 .start(ex_fu_in.fu_vld_mult[i]),
                 .rs1(prf_2_ex.s_v1s[i]),
                 .rs2(prf_2_ex.s_v2s[i]),

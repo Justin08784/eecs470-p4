@@ -54,7 +54,7 @@ module free_list #(parameter
         .RESET_STATE(RESET_STATE)
     ) lst (
         .clock(clock),
-        .reset(reset),
+        .reset(reset || flush), // TODO: how to handle flush? This is NOT the proper handling
 
         .wr_en_cnt(r_in.r_free_cnt),
         .wr_data(r_in.t_old),

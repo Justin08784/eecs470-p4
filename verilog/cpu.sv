@@ -13,6 +13,7 @@
 module cpu (
     input clock, // System clock
     input reset, // System reset
+    input flush, // mispred flush
 
     //input MEM_TAG   mem2proc_transaction_tag, // Memory tag for current transaction
     input MEM_BLOCK mem2proc_data,            // Data coming back from memory
@@ -379,6 +380,8 @@ module cpu (
     // // Output the committed instruction to the testbench for counting
     // assign committed_insts[0] = wb_packet;
 
+    /* Global controls*/
+    assign flush = 1'b0;
 
     //////////////////////////////////////////////////
     //                                              //
@@ -394,6 +397,7 @@ module cpu (
         .clock(clock),          // system clock
         .reset(reset),          // system reset
         //input     [1:0] if_valid,       // only go to next PC when true
+        .flush(flush),
         .d_in   (decode_2_f),
         .d_out  (f_2_decode),
         .take_branch('0),    // taken-branch signal CHANGE!!!!!!
@@ -424,6 +428,7 @@ module cpu (
         // TODO: Sam's commit
         .clock(clock),
         .reset(reset),
+        .flush(flush),
         .f_in(f_2_decode),
         .f_out(decode_2_f),
         .d_in(disp_2_de),
@@ -518,7 +523,7 @@ module cpu (
     rs rs_0(
         .clock(clock),
         .reset(reset),
-        .flush(1'b0),
+        .flush(flush),
  
         .d_out(rs_2_dispatch),
         .d_in(dispatch_2_rs),
@@ -560,6 +565,7 @@ module cpu (
     btq btq_0(
         .clock  (clock),
         .reset  (reset),
+        .flush  (flush),
         .r_in   (rob_2_retire),
         .f_out  (btq_2_fetch),
         .c_in   (ex_2_complete),
@@ -592,6 +598,7 @@ module cpu (
     ) rob_0 (
         .clock      (clock),
         .reset      (reset),
+        .flush      (flush),
         .r_out      (rob_2_retire),
         .c_in       (ex_2_complete),
         .d_out      (rob_2_dispatch),
@@ -617,6 +624,7 @@ module cpu (
     stage_ex_p4 ex_0 (
         .clock(clock),
         .reset(reset),
+        .flush(flush),
         .ex_fu_in(rs_2_ex),
         .ex_rdy_out(ex_2_rs),
         .ex_c_out(ex_2_complete),
@@ -645,6 +653,7 @@ module cpu (
     ) map_table_0 (
         .clock(clock),
         .reset(reset),
+        .flush(flush),
         .c_in(ex_2_complete),
         .d_in(dispatch_2_map),
         .d_out(map_2_dispatch)
@@ -675,7 +684,7 @@ module cpu (
     ) free_list_0 (
         .clock(clock),
         .reset(reset),
-        .flush(1'b0),
+        .flush(flush),
         .r_in(rob_2_retire),
         .d_in(dispatch_2_fl),
         .d_out(fl_2_dispatch)

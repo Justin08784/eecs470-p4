@@ -91,6 +91,8 @@ module map_table #(parameter
                 t   : '0,
                 cpl : 1
             }; // Ensure ZERO_REG always maps to PR0
+        end else if (flush) begin
+            //  TODO: handle
         end else begin
             entries <= entries_n;
             `ifndef SYNTH

@@ -134,7 +134,7 @@ module rob #(
     end
 
     always_ff @(posedge clock) begin
-        if (reset) begin
+        if (reset || flush) begin
             used    <= 0;
             head    <= 0;
             tail    <= 0;

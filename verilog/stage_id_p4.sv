@@ -330,7 +330,7 @@ module stage_id_p4 (
         .ENABLE_INTR_FWD(`FALSE)
     ) id_buf(
         .clock      (clock),
-        .reset      (reset),
+        .reset      (reset || flush),
         .wr_en_cnt  (f_in.f_en_cnt),
         .wr_data    (tmp),
         .rd_en_cnt  (d_in.dispatch_en_cnt),

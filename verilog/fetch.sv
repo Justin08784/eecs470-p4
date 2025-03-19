@@ -13,7 +13,7 @@
 module stage_if_p4 (
     input           clock,          // system clock
     input           reset,          // system reset
-    input           flush,          // system reset
+    input           flush,
     //input     [1:0] if_valid,       // only go to next PC when true
     input   decode2fetch d_in,
     output  fetch2decode d_out,
@@ -113,7 +113,7 @@ module stage_if_p4 (
         .INSTANCE_ID(2)
     ) dut (
         .clock      (clock),
-        .reset      (reset),
+        .reset      (reset || flush),
         .wr_en_cnt  (f_cnt),
         .wr_data    (f_dat),
         .rd_en_cnt  (d_out.f_en_cnt),
@@ -123,7 +123,7 @@ module stage_if_p4 (
     );
 
     always_ff @(posedge clock) begin
-        if (reset) begin
+        if (reset || flush) begin
             PC_reg <= 0;                // initial PC value is 0 (the memory address where our program starts)
         end else if (take_branch) begin
             PC_reg <= branch_target;    // update to a taken branch (does not depend on valid bit)...
