@@ -9,6 +9,10 @@ module arch_map #(parameter
     N=`N
 ) (
     input clock, reset,
+
+    // flush
+    output arch_map2map_table mt_out,
+
     // retire
     input rob2retire r_in
 
@@ -16,10 +20,11 @@ module arch_map #(parameter
     // issue ??
     // dispatch ??
 );
-    localparam NUM_ARCH_REG = 32;
     struct packed {
         PHYS_REG_IDX    t;
-    } [NUM_ARCH_REG-1:0] entries, entries_n;
+    } [`NUM_ARCH_REG-1:0] entries, entries_n;
+
+    assign mt_out = entries;
 
     always_comb begin
         entries_n = entries;
@@ -38,7 +43,7 @@ module arch_map #(parameter
     always_ff @(posedge clock) begin
         if (reset) begin
             entries[`ZERO_REG] <= '{t : '0};
-            for (int r = 1; r < NUM_ARCH_REG; ++r) begin
+            for (int r = 1; r < `NUM_ARCH_REG; ++r) begin
                 entries[r] <= '{t : r}; // ✅ Map PRx = Rx (Arch Reg x → PRx)
             end
         end else begin

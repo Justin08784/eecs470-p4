@@ -13,8 +13,7 @@ Map Table
 // src1s[j], src2s[j] may potentially be dsts[i]. i.e. there is a serial dependency
 // TODO: implement internal forwarding ala fifo.sv?
 module map_table #(parameter 
-    N=`N,
-    NUM_ARCH_REG=32
+    N=`N
 ) (
     input clock, reset, flush,
 
@@ -22,8 +21,11 @@ module map_table #(parameter
     output struct packed {
         PHYS_REG_IDX t;
         logic cpl;
-    } [NUM_ARCH_REG-1:0] entries_dbg,
+    } [`NUM_ARCH_REG-1:0] entries_dbg,
     `endif
+
+    // flush
+    input arch_map2map_table am_in,
 
     // retire ??
 
@@ -39,7 +41,7 @@ module map_table #(parameter
     struct packed {
         PHYS_REG_IDX t;
         logic cpl;
-    } [NUM_ARCH_REG-1:0] entries, entries_n;
+    } [`NUM_ARCH_REG-1:0] entries, entries_n;
     `ifdef DEBUG
     assign entries_dbg = entries;
     `endif
@@ -55,7 +57,7 @@ module map_table #(parameter
             //     continue;
             if (!c_in.c_en[i])
                 continue;
-            for (int r = 0; r < NUM_ARCH_REG; ++r) begin
+            for (int r = 0; r < `NUM_ARCH_REG; ++r) begin
                 entries_n[r].cpl |= (entries_n[r].t == c_in.c_ts[i]);
             end
         end
@@ -81,7 +83,7 @@ module map_table #(parameter
 
     always_ff @(posedge clock) begin
         if (reset) begin
-            for (int r = 1; r < NUM_ARCH_REG; ++r) begin
+            for (int r = 1; r < `NUM_ARCH_REG; ++r) begin
                 entries[r] <= '{
                     t   : r,    // ✅ Map PRx = Rx (Arch Reg x → PRx)
                     cpl : 1     // Mark all as initially completed
@@ -92,7 +94,12 @@ module map_table #(parameter
                 cpl : 1
             }; // Ensure ZERO_REG always maps to PR0
         end else if (flush) begin
-            //  TODO: handle
+            for (int unsigned r = 0; r < `NUM_ARCH_REG; ++r) begin
+                entries[r] <= '{
+                    t   : am_in.state[r].t,
+                    cpl : 1
+                };
+            end
         end else begin
             entries <= entries_n;
             `ifndef SYNTH

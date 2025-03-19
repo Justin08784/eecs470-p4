@@ -757,6 +757,14 @@ typedef struct packed {
 } free_list2dispatch;
 
 
+// By Arch Map
+`define NUM_ARCH_REG 32
+typedef struct packed {
+    struct packed {
+        PHYS_REG_IDX t;
+    } [`NUM_ARCH_REG-1:0] state; 
+} arch_map2map_table;
+
 typedef struct packed {
     logic [`PRF_NUM_RPORTS-1:0] prf_en;
     PHYS_REG_IDX  [`PRF_NUM_RPORTS-1:0] s_t1s;
