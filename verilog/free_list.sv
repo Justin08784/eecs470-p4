@@ -51,10 +51,12 @@ module free_list #(parameter
         .WIDTH(WIDTH),
         .NUM_RPORTS(`N),
         .NUM_WPORTS(`N),
+        .ENABLE_FREE_LIST_MODE(`TRUE),
         .RESET_STATE(RESET_STATE)
     ) lst (
         .clock(clock),
-        .reset(reset || flush), // TODO: how to handle flush? This is NOT the proper handling
+        .reset(reset),
+        .flush(flush),
 
         .wr_en_cnt(r_in.r_free_cnt),
         .wr_data(r_in.t_old),

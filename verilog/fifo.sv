@@ -32,11 +32,16 @@ module fifo #(
     */
     parameter logic ENABLE_READ_PREVIEW=`FALSE,
     parameter logic ENABLE_INTR_FWD =`TRUE,
+    /*
+    If free list mode is disabled, flush behaves the same as reset.
+    */
+    parameter logic ENABLE_FREE_LIST_MODE=`FALSE,
     parameter int INSTANCE_ID=-1,
     parameter FIFO_STATE RESET_STATE='{default:0}
 ) (
     input                                           clock, 
     input                                           reset,
+    input                                           flush,
 
     input   logic   [$clog2(NUM_WPORTS):0]          wr_en_cnt,
     input   logic   [NUM_WPORTS-1:0][WIDTH-1:0]     wr_data,
@@ -111,11 +116,15 @@ module fifo #(
     end
 
     always_ff @(posedge clock) begin
-        if (reset) begin
+        if (reset || (flush && !ENABLE_FREE_LIST_MODE)) begin
             used    <= RESET_STATE.used;
             head    <= RESET_STATE.head;
             tail    <= RESET_STATE.tail;
             state   <= RESET_STATE.state;
+        end else if (flush && ENABLE_FREE_LIST_MODE) begin
+            // advance tail to head and mark entire FIFO as used (i.e. full with entries)
+            used    <= DEPTH;
+            tail    <= head;
         end else begin
             if (wr_en_cnt > (ENABLE_INTR_FWD ? free + rd_en_cnt : free))
                 $error("FIFO overflow! instance: %d", INSTANCE_ID);
