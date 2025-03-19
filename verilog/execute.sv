@@ -140,26 +140,97 @@ module stage_ex_p4 (
     ID_RESULT   [`NUM_FU_STORE-1:0]  fu_dat_store;
     ID_RESULT   [`NUM_FU_LOAD-1:0]   fu_dat_load;
     DATA [`NUM_FU_ALU-1:0] opa_mux_out, opb_mux_out, alu_result;
+    ALU_FUNC [`NUM_FU_ALU-1:0] alu_func;
     logic [`NUM_FU_ALU-1:0] alu_done;
+    logic [`NUM_FU_ALU-1:0] branch;
+    logic [`NUM_FU_MULT-1:0] [2:0] mult_func;
+    logic [`NUM_FU_MULT-1:0] mult_done;
+    DATA [`NUM_FU_MULT-1:0] mult_value1, mult_value2, mult_result;
+    logic [`NUM_FU_ALU-1:0] [2:0] branch_func;
+    logic [`NUM_FU_ALU-1:0] take_conditional;
+
     assign ex_rdy_out.fu_rdy_alu = fu_rdy_alu;
     assign ex_rdy_out.fu_rdy_mult = fu_rdy_mult;
     assign ex_rdy_out.fu_rdy_load = fu_rdy_load;
     assign ex_rdy_out.fu_rdy_store = fu_rdy_store;
 
+    always_ff @( posedge clock ) begin
+        
+        $display("DEBUG: mult_done[0] at cycle %0t = %b", $time, mult_done[0]);
+        $display("DEBUG: mult_result[0] at cycle %0t = %b", $time, mult_result[0]);
+    end
+
     always_comb begin
         ex_c_out = '0;
-        for (int i = 0; i < `NUM_FU_ALU; ++i) begin
-            ex_c_out.c_en[i]        = !fu_rdy_alu[i];
-            ex_c_out.c_ts[i]        = fu_dat_alu[i].t;
-            ex_c_out.c_rob_idxs[i]  = fu_dat_alu[i].rob_idx;
-            ex_c_out.c_data[i]      = alu_result[i];
+        for (int i = 0; i < `NUM_FU_MULT; ++i) begin
+            ex_c_out.c_en[i]        = mult_done[i];
+            ex_c_out.c_ts[i]        = fu_dat_mult[i].t;
+            ex_c_out.c_rob_idxs[i]  = fu_dat_mult[i].rob_idx;
+            ex_c_out.c_data[i]      = mult_result[i];
         end
     end
+    /*
+    execute2complete next_ex2complete;
+
+
+    logic [3:0] alu_done;
+    logic [3:0] grant;
+    //logic [`NUM_FU_MULT-1:0] select;
+
+    logic [`N-1:0][3:0] grant_bus;
+    logic empty;
+
+
+    psel_gen #(
+    .WIDTH  (4),
+    .REQS   (`N)
+    ) sel_alu (
+    .req    (alu_done),
+    .gnt    (grant),
+    .gnt_bus(grant_bus),
+    .empty  (empty)
+    );
+
+    assign fu_done = 4'b0000;
+    assign grant = 4'b0000;
+
+
+
+
+    always_comb begin     
+
+        next_ex2complete.c_en = '0; // Initialize completion enable signals
+        next_ex2complete.c_ts = '0; // Initialize completed physical register tags
+        next_ex2complete.c_data = '0;
+        next_ex2complete.c_rob_idxs = '0;
+
+        alu_done = '0;//2'b00;
+        foreach(alu_result[i]) begin
+            // $display("DEBUG: alu_result[i] at cycle %0t = %0d", $time, alu_result[i]);
+            fu_done[i] |= (alu_result[i] != 32'hfacebeec);
+            // $display("DEBUG: alu_done at cycle %0t = %2b", $time, alu_done);
+            // $display("DEBUG: gnt at cycle %0t = %2b", $time, grant);
+            // $display("DEBUG: gnt_bus at cycle %0t = %2b", $time, grant_bus);
+        end
+
+        foreach(mult_result[i]) begin
+            fu_done[i] |= (mult_done[i]);
+        end
+
+
+        //next_ex2complete.c_data[0] = alu_result[0];
+
+    end*/
+
+
+    
+
+
 
     always_ff @(posedge clock) begin
         if (reset) begin
             fu_rdy_alu      <= '1;
-            fu_rdy_mult     <= '0;
+            fu_rdy_mult     <= '1;
             fu_rdy_store    <= '0;
             fu_rdy_load     <= '0;
 
@@ -168,10 +239,16 @@ module stage_ex_p4 (
             fu_dat_store    <= '0;
             fu_dat_load     <= '0;
         end else begin
+            //RDY LOGIC TO BE CHANGED WHEN PROCESSING MORE IPC THAN CDB WIDTH
             foreach (fu_rdy_alu[i]) begin
                 fu_rdy_alu[i]   <= ex_fu_in.fu_vld_alu[i] ? 0 : (alu_done[i] || fu_rdy_alu[i]);// || ex_c_out.c_en[i]; //OR'ing this will work to reset the flag, just have to make sure it is coming from the right FU so that we don't accidentally reset the ALU with a mult flag or something
                 fu_dat_alu[i]   <= ex_fu_in.fu_vld_alu[i] ? ex_fu_in.fu_dat_alu[i] : '0;
                 $display("assign: %d vld:%b insn:%x", i, ex_fu_in.fu_vld_alu[i], ex_fu_in.fu_dat_alu[i].inst);
+            end
+
+            foreach(fu_rdy_mult[i]) begin
+                fu_rdy_mult[i] <= ex_fu_in.fu_vld_mult[i] ? 0 : (mult_done[i] || fu_rdy_mult[i]);
+                fu_dat_mult[i]   <= ex_fu_in.fu_vld_mult[i] ? ex_fu_in.fu_dat_mult[i] : '0; //internal_mul_dat
             end
 
             for (int i = 0; i < `N; ++i) begin
@@ -186,14 +263,14 @@ module stage_ex_p4 (
         end
     end
 
-    ALU_FUNC [`NUM_FU_ALU-1:0] alu_func;
+    // ALU_FUNC [`NUM_FU_ALU-1:0] alu_func;
  //   DATA [`NUM_FU_ALU-1:0] opa_mux_out, opb_mux_out, alu_result;
-    logic [`NUM_FU_ALU-1:0] branch;
-    logic [`NUM_FU_MULT-1:0] [2:0] mult_func;
-    logic [`NUM_FU_MULT-1:0] mult_done;
-    DATA [`NUM_FU_MULT-1:0] mult_value1, mult_value2, mult_result;
-    logic [`NUM_FU_ALU-1:0] [2:0] branch_func;
-    logic [`NUM_FU_ALU-1:0] take_conditional;
+    // logic [`NUM_FU_ALU-1:0] branch;
+    // logic [`NUM_FU_MULT-1:0] [2:0] mult_func;
+    // logic [`NUM_FU_MULT-1:0] mult_done;
+    // DATA [`NUM_FU_MULT-1:0] mult_value1, mult_value2, mult_result;
+    // logic [`NUM_FU_ALU-1:0] [2:0] branch_func;
+    // logic [`NUM_FU_ALU-1:0] take_conditional;
     // DATA [NUM_FU_BRANCH-1:0] branch_value1, branch_value2;
 
     /* I don't know what to do with these yet
@@ -287,23 +364,42 @@ module stage_ex_p4 (
         .result(alu_result) // will return 32'hfacebeec if branch is high (Sentinel, hopefully none of our alu computations result in that value)
     );
 
+    logic trdy;
+    logic [2:0] funct3;
+    DATA [1:0] temp;
+    always_ff @( posedge clock ) begin
+        if (reset) begin
+            temp <= '0;
+            trdy <= '0;
+            funct3 <= '0;
+        end
+        else begin
+            temp[0] <= prf_2_ex.s_v1s[0];
+            temp[1] <= prf_2_ex.s_v2s[0];
+            trdy <= ex_fu_in.fu_vld_mult[0];
+            funct3 <= ex_fu_in.fu_dat_mult[0].inst.r.funct3;
+        end
+    end
 
-    
-    // // Instantiate the multiplier
-    // mult mults [`NUM_FU_MULT-1:0] (
-    //     // Inputs
-    //     .clock(clock),
-    //     .reset(reset),
-    //     .start(ex_fu_in.fu_vld_mult),
-    //     .rs1(mult_value1),
-    //     .rs2(mult_value2),
-    //     .func(mult_func), // which mult operation to perform
+
+    generate 
+        for(genvar i = 0; i < `NUM_FU_MULT; i++ ) begin
+        // Instantiate the multiplier
+            mult mult_0 (
+                // Inputs
+                .clock(clock),
+                .reset(reset),
+                .start(trdy),//ex_fu_in.fu_vld_mult[i]),
+                .rs1(temp[0]),//prf_2_ex.s_v1s[i]),
+                .rs2(temp[1]),//prf_2_ex.s_v2s[i]),
+                .func(funct3),//ex_fu_in.fu_dat_mult[i].inst.r.funct3), // which mult operation to perform
 
     //     // Output
-    //     .result(mult_result),
-    //     .done(mult_done)
-    // );
-
+                .result(mult_result[i]),
+                .done(mult_done[i])
+        );
+        end
+    endgenerate
     // // // Instantiate the conditional branch module
     // // conditional_branch conditional_branchs [NUM_FU_BRANCH-1:0] (
     // //     // Inputs
@@ -343,7 +439,7 @@ module stage_ex_p4 (
     // end
 
     
-    execute2complete next_ex2complete;
+    // execute2complete next_ex2complete;
 
     // logic [`NUM_FU_ALU-1:0] alu_done;
     // logic [`NUM_FU_ALU-1:0] grant;
@@ -370,38 +466,38 @@ module stage_ex_p4 (
     
 
 
-    always_comb begin     
+    // always_comb begin     
 
-        next_ex2complete.c_en = '0; // Initialize completion enable signals
-        next_ex2complete.c_ts = '0; // Initialize completed physical register tags
-        next_ex2complete.c_data = '0;
-        next_ex2complete.c_rob_idxs = '0;
+    //     next_ex2complete.c_en = '0; // Initialize completion enable signals
+    //     next_ex2complete.c_ts = '0; // Initialize completed physical register tags
+    //     next_ex2complete.c_data = '0;
+    //     next_ex2complete.c_rob_idxs = '0;
 
-        alu_done = '0;//2'b00;
-        foreach(alu_result[i]) begin
-            // $display("DEBUG: alu_result[i] at cycle %0t = %0d", $time, alu_result[i]);
-            alu_done[i] |= (alu_result[i] != 32'hfacebeec);
-            // $display("DEBUG: alu_done at cycle %0t = %2b", $time, alu_done);
-            // $display("DEBUG: gnt at cycle %0t = %2b", $time, grant);
-            // $display("DEBUG: gnt_bus at cycle %0t = %2b", $time, grant_bus);
-        end
+    //     alu_done = '0;//2'b00;
+    //     foreach(alu_result[i]) begin
+    //         // $display("DEBUG: alu_result[i] at cycle %0t = %0d", $time, alu_result[i]);
+    //         alu_done[i] |= (alu_result[i] != 32'hfacebeec);
+    //         // $display("DEBUG: alu_done at cycle %0t = %2b", $time, alu_done);
+    //         // $display("DEBUG: gnt at cycle %0t = %2b", $time, grant);
+    //         // $display("DEBUG: gnt_bus at cycle %0t = %2b", $time, grant_bus);
+    //     end
 
       
-        // next_ex2complete.c_en[0] =  grant_bus[0];
-        // next_ex2complete.c_en[1] =  grant_bus[1];
+    //     // next_ex2complete.c_en[0] =  grant_bus[0];
+    //     // next_ex2complete.c_en[1] =  grant_bus[1];
 
-        next_ex2complete.c_data[0] = alu_result[0];
-        // next_ex2complete.c_data[1] = alu_result[1];
+    //     next_ex2complete.c_data[0] = alu_result[0];
+    //     // next_ex2complete.c_data[1] = alu_result[1];
 
-        /*if (next_ex2complete.c_en[0]) begin
-            next_ex2complete.c_data[0] = grant_bus[0] ? alu_result[0] : '0; 
-        end 
+    //     /*if (next_ex2complete.c_en[0]) begin
+    //         next_ex2complete.c_data[0] = grant_bus[0] ? alu_result[0] : '0; 
+    //     end 
 
-        if(next_ex2complete.c_en[1]) begin
-            next_ex2complete.c_data[1] =  grant_bus[1] ?  alu_result[grant_bus[1]]; 
-        end*/
+    //     if(next_ex2complete.c_en[1]) begin
+    //         next_ex2complete.c_data[1] =  grant_bus[1] ?  alu_result[grant_bus[1]]; 
+    //     end*/
 
-    end
+    // end
 
     // always_ff @(posedge clock) begin
     //     if(reset) begin
