@@ -105,6 +105,7 @@ endmodule // alu
 module stage_ex_p4 (
     input clock,
     input reset,
+    input flush,
 
     input   rs2execute ex_fu_in,
     // input   logic       [`NUM_FU_ALU-1:0]    fu_vld_alu,

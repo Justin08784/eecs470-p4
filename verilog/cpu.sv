@@ -458,7 +458,6 @@ module cpu (
     dispatch dispatcher(
         .clock(clock),
         .reset(reset),
-        .flush(),
 
         .decode_in(de_2_disp),
         .decode_out(disp_2_de),

@@ -7,7 +7,7 @@ module rob #(
     `ifdef DEBUG
     output  ROB_ENTRY   [ROB_SZ-1:0]    state_dbg,
     `endif 
-    input                       clock, reset,
+    input                       clock, reset, flush,
 
     // retire (read)
     output rob2retire r_out,

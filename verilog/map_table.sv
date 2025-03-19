@@ -16,7 +16,7 @@ module map_table #(parameter
     N=`N,
     NUM_ARCH_REG=32
 ) (
-    input clock, reset,
+    input clock, reset, flush,
 
     `ifdef DEBUG
     output struct packed {

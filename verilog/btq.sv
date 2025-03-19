@@ -15,7 +15,7 @@ module btq #(
     parameter BTQ_SZ = `BTQ_SZ,  // num elements
     parameter N=`N
 ) (
-    input clock, reset,
+    input clock, reset, flush,
     `ifdef DEBUG
     output BTQ_ENTRY [BTQ_SZ-1:0]   state_dbg,
     `endif 

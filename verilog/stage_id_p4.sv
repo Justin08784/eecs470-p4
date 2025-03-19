@@ -218,6 +218,7 @@ endmodule // decoder
 module stage_id_p4 (
     input              clock,           // system clock
     input              reset,           // system reset
+    input              flush,
 
     input   fetch2decode f_in,
     output  decode2fetch f_out,
