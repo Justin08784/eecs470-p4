@@ -245,12 +245,12 @@ build/fetch.simv: $(FETCH_FILES)
 build/fetch.cov: $(FETCH_FILES)
 build/fetch.vg: $(FETCH_FILES)
 
-# MAP_TABLE_FILES = verilog/sys_defs.svh
-MAP_TABLE_FILES = verilog/sys_defs.svh test/map_table_sva.svh test/map_table_test.sv
+MAP_TABLE_FILES = verilog/sys_defs.svh
+# MAP_TABLE_FILES = verilog/sys_defs.svh test/map_table_sva.svh test/map_table_test.sv
 build/map_table.simv: $(MAP_TABLE_FILES)
 build/map_table.cov: $(MAP_TABLE_FILES)
 build/map_table.vg: $(MAP_TABLE_FILES)
-build/stage_id_p4.out: $(MAP_TABLE_FILES)
+# build/stage_id_p4.out: $(MAP_TABLE_FILES)
 
 EXECUTE_FILES = verilog/sys_defs.svh verilog/mult.sv
 build/execute.simv: $(EXECUTE_FILES)
