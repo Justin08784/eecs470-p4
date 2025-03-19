@@ -165,10 +165,17 @@
     always_comb begin
         ex_c_out = '0;
         for (int i = 0; i < `NUM_FU_MULT; ++i) begin
-            ex_c_out.c_en[i]        = mult_done[i];
-            ex_c_out.c_ts[i]        = internal_mul_dat[i].t;
-            ex_c_out.c_rob_idxs[i]  = internal_mul_dat[i].rob_idx;
-            ex_c_out.c_data[i]      = mult_result[i];
+            ex_c_out.c_en[i]        = !fu_rdy_alu[i];//mult_done[i];
+            ex_c_out.c_ts[i]        = fu_dat_alu[i].t;//internal_mul_dat[i].t;
+            ex_c_out.c_rob_idxs[i]  = fu_dat_alu[i].rob_idx;//internal_mul_dat[i].rob_idx;
+            ex_c_out.c_data[i]      = alu_result[i];//mult_result[i];
+
+            if (mult_done[i]) begin
+                ex_c_out.c_en[i]        = mult_done[i];
+                ex_c_out.c_ts[i]        = internal_mul_dat[i].t;
+                ex_c_out.c_rob_idxs[i]  = internal_mul_dat[i].rob_idx;
+                ex_c_out.c_data[i]      = mult_result[i];
+            end
         end
     end
 
@@ -245,57 +252,73 @@
     // We split the alu and mult here since they will be split in the final project
     assign ex_packet.alu_result = (id_ex_reg.mult) ? mult_result : alu_result; */
 
-    // always_comb begin
-    //     foreach(ex_fu_in.fu_dat_alu[i]) begin
-    //         if(!ex_fu_in.fu_vld_alu[i]) 
-    //             continue;
+    always_comb begin
+        foreach(ex_fu_in.fu_dat_alu[i]) begin
+            if(!ex_fu_in.fu_vld_alu[i]) 
+                continue;
 
-    //         ex_2_prf.prf_en[i] = ex_fu_in.fu_vld_alu[i];
-    //         ex_2_prf.s_t1s[i] = ex_fu_in.fu_dat_alu[i].t1;
-    //         ex_2_prf.s_t2s[i] = ex_fu_in.fu_dat_alu[i].t2;
+            ex_2_prf.prf_en[i] = ex_fu_in.fu_vld_alu[i];
+            ex_2_prf.s_t1s[i] = ex_fu_in.fu_dat_alu[i].t1;
+            ex_2_prf.s_t2s[i] = ex_fu_in.fu_dat_alu[i].t2;
 
 
-    //         if (ex_fu_in.fu_dat_alu[i].cond_branch) begin
-    //             opa_mux_out[i] = prf_2_ex.s_v1s[i];
-    //             opb_mux_out[i] = prf_2_ex.s_v2s[i];
-    //             alu_func[i] = 4'ha; //SENTINEL VALUE
-    //             branch_func[i] = ex_fu_in.fu_dat_alu[i].inst.b.funct3;
-    //             branch[i] = 1;
-    //         end else begin
-    //             // ALU opA mux
-    //             case (ex_fu_in.fu_dat_alu[i].opa_select)
-    //                 // OPA_IS_RS1:  opa_mux_out[i] = ex_fu_in.fu_dat_alu[i].rs1_value;
-    //                 OPA_IS_RS1:  opa_mux_out[i] = prf_2_ex.s_v1s[i];
-    //                 OPA_IS_NPC:  opa_mux_out[i] = ex_fu_in.fu_dat_alu[i].NPC;
-    //                 OPA_IS_PC:   opa_mux_out[i] = ex_fu_in.fu_dat_alu[i].PC;
-    //                 OPA_IS_ZERO: opa_mux_out[i] = 0;
-    //                 default:     opa_mux_out[i]= 32'hdeadface; // dead face
-    //             endcase
+            if (ex_fu_in.fu_dat_alu[i].cond_branch) begin
+                opa_mux_out[i] = prf_2_ex.s_v1s[i];
+                opb_mux_out[i] = prf_2_ex.s_v2s[i];
+                alu_func[i] = 4'ha; //SENTINEL VALUE
+                branch_func[i] = ex_fu_in.fu_dat_alu[i].inst.b.funct3;
+                branch[i] = 1;
+            end else begin
+                // ALU opA mux
+                case (ex_fu_in.fu_dat_alu[i].opa_select)
+                    // OPA_IS_RS1:  opa_mux_out[i] = ex_fu_in.fu_dat_alu[i].rs1_value;
+                    OPA_IS_RS1:  opa_mux_out[i] = prf_2_ex.s_v1s[i];
+                    OPA_IS_NPC:  opa_mux_out[i] = ex_fu_in.fu_dat_alu[i].NPC;
+                    OPA_IS_PC:   opa_mux_out[i] = ex_fu_in.fu_dat_alu[i].PC;
+                    OPA_IS_ZERO: opa_mux_out[i] = 0;
+                    default:     opa_mux_out[i]= 32'hdeadface; // dead face
+                endcase
 
-    //             // ALU opB mux
-    //             case (ex_fu_in.fu_dat_alu[i].opb_select)
-    //                 // OPB_IS_RS2:   opb_mux_out[i] = ex_fu_in.fu_dat_alu[i].rs2_value;
-    //                 OPB_IS_RS2:   opb_mux_out[i] =  prf_2_ex.s_v2s[i];
-    //                 OPB_IS_I_IMM: opb_mux_out[i] = `RV32_signext_Iimm(ex_fu_in.fu_dat_alu[i].inst);
-    //                 OPB_IS_S_IMM: opb_mux_out[i] = `RV32_signext_Simm(ex_fu_in.fu_dat_alu[i].inst);
-    //                 OPB_IS_B_IMM: opb_mux_out[i] = `RV32_signext_Bimm(ex_fu_in.fu_dat_alu[i].inst);
-    //                 OPB_IS_U_IMM: opb_mux_out[i] = `RV32_signext_Uimm(ex_fu_in.fu_dat_alu[i].inst);
-    //                 OPB_IS_J_IMM: opb_mux_out[i] = `RV32_signext_Jimm(ex_fu_in.fu_dat_alu[i].inst);
-    //                 default:      opb_mux_out[i] = 32'hfacefeed; // face feed
-    //             endcase
+                // ALU opB mux
+                case (ex_fu_in.fu_dat_alu[i].opb_select)
+                    // OPB_IS_RS2:   opb_mux_out[i] = ex_fu_in.fu_dat_alu[i].rs2_value;
+                    OPB_IS_RS2:   opb_mux_out[i] =  prf_2_ex.s_v2s[i];
+                    OPB_IS_I_IMM: opb_mux_out[i] = `RV32_signext_Iimm(ex_fu_in.fu_dat_alu[i].inst);
+                    OPB_IS_S_IMM: opb_mux_out[i] = `RV32_signext_Simm(ex_fu_in.fu_dat_alu[i].inst);
+                    OPB_IS_B_IMM: opb_mux_out[i] = `RV32_signext_Bimm(ex_fu_in.fu_dat_alu[i].inst);
+                    OPB_IS_U_IMM: opb_mux_out[i] = `RV32_signext_Uimm(ex_fu_in.fu_dat_alu[i].inst);
+                    OPB_IS_J_IMM: opb_mux_out[i] = `RV32_signext_Jimm(ex_fu_in.fu_dat_alu[i].inst);
+                    default:      opb_mux_out[i] = 32'hfacefeed; // face feed
+                endcase
 
-    //             alu_func[i] = ex_fu_in.fu_dat_alu[i].alu_func;
-    //             branch_func[i] = 3'b011; //SENTINEL VALUE
-    //             branch[i] = 0;
-    //         end
-    //     end
+                alu_func[i] = ex_fu_in.fu_dat_alu[i].alu_func;
+                branch_func[i] = 3'b011; //SENTINEL VALUE
+                branch[i] = 0;
+            end
+        end
+
+        //mult prf interaction
+        foreach(ex_fu_in.fu_dat_mult[i]) begin
+            if(!ex_fu_in.fu_vld_mult[i]) 
+                continue;
+
+            ex_2_prf.prf_en[i+`NUM_FU_ALU] = ex_fu_in.fu_vld_mult[i];
+            
+            ex_2_prf.s_t1s[i+`NUM_FU_ALU] = ex_fu_in.fu_dat_mult[i].t1;
+            ex_2_prf.s_t2s[i+`NUM_FU_ALU] = ex_fu_in.fu_dat_mult[i].t2;
+
+            mult_value1[i] = prf_2_ex.s_v1s[i+`NUM_FU_ALU];
+            mult_value2[i] =  prf_2_ex.s_v2s[i+`NUM_FU_ALU];
+
+            mult_func[i] = ex_fu_in.fu_dat_mult[i].inst.r.funct3;
+        end
 
     // //     foreach(ex_fu_in.fu_dat_mult[i]) begin
     // //         mult_func[i] = ex_fu_in.fu_vld_mult[i] ? ex_fu_in.fu_dat_mult[i].inst.r.funct3 : '0;
     // //         mult_value1[i] = ex_fu_in.fu_vld_mult[i] ? ex_fu_in.fu_dat_mult[i].rs1_value : '0;
     // //         mult_value2[i] = ex_fu_in.fu_vld_mult[i] ? ex_fu_in.fu_dat_mult[i].rs2_value : '0;
     // //     end
-    // end
+    end
 
    
     // // Instantiate the ALU
@@ -311,52 +334,22 @@
         .result(alu_result) // will return 32'hfacebeec if branch is high (Sentinel, hopefully none of our alu computations result in that value)
     );
 
+    //mult operand logic
+    // always_comb begin
+    //     foreach(ex_fu_in.fu_dat_mult[i]) begin
+    //         if(!ex_fu_in.fu_vld_mult[i]) 
+    //             continue;
 
-    always_comb begin
-        foreach(ex_fu_in.fu_dat_mult[i]) begin
-            if(!ex_fu_in.fu_vld_mult[i]) 
-                continue;
+    //         ex_2_prf.prf_en[i] = ex_fu_in.fu_vld_mult[i];
+    //         ex_2_prf.s_t1s[i] = ex_fu_in.fu_dat_mult[i].t1;
+    //         ex_2_prf.s_t2s[i] = ex_fu_in.fu_dat_mult[i].t2;
 
-            ex_2_prf.prf_en[i] = ex_fu_in.fu_vld_mult[i];
-            ex_2_prf.s_t1s[i] = ex_fu_in.fu_dat_mult[i].t1;
-            ex_2_prf.s_t2s[i] = ex_fu_in.fu_dat_mult[i].t2;
+    //         mult_value1[i] = prf_2_ex.s_v1s[i];
+    //         mult_value2[i] =  prf_2_ex.s_v2s[i];
 
-
-            // if (ex_fu_in.fu_dat_mult[i].cond_branch) begin
-            //     opa_mux_out[i] = prf_2_ex.s_v1s[i];
-            //     opb_mux_out[i] = prf_2_ex.s_v2s[i];
-            //     mult_func[i] = 4'ha; //SENTINEL VALUE
-            //     // branch_func[i] = ex_fu_in.fu_dat_mult[i].inst.b.funct3;
-            //     // branch[i] = 1;
-            // end else begin
-                // mult opA mux
-                case (ex_fu_in.fu_dat_mult[i].opa_select)
-                    // OPA_IS_RS1:  opa_mux_out[i] = ex_fu_in.fu_dat_mult[i].rs1_value;
-                    OPA_IS_RS1:  mult_value1[i] = prf_2_ex.s_v1s[i];
-                    OPA_IS_NPC:  mult_value1[i] = ex_fu_in.fu_dat_mult[i].NPC;
-                    OPA_IS_PC:   mult_value1[i] = ex_fu_in.fu_dat_mult[i].PC;
-                    OPA_IS_ZERO: mult_value1[i] = 0;
-                    default:     mult_value1[i]= 32'hdeadface; // dead face
-                endcase
-
-                // mult opB mux
-                case (ex_fu_in.fu_dat_mult[i].opb_select)
-                    // OPB_IS_RS2:   opb_mux_out[i] = ex_fu_in.fu_dat_mult[i].rs2_value;
-                    OPB_IS_RS2:   mult_value2[i] =  prf_2_ex.s_v2s[i];
-                    OPB_IS_I_IMM: mult_value2[i] = `RV32_signext_Iimm(ex_fu_in.fu_dat_mult[i].inst);
-                    OPB_IS_S_IMM: mult_value2[i] = `RV32_signext_Simm(ex_fu_in.fu_dat_mult[i].inst);
-                    OPB_IS_B_IMM: mult_value2[i] = `RV32_signext_Bimm(ex_fu_in.fu_dat_mult[i].inst);
-                    OPB_IS_U_IMM: mult_value2[i] = `RV32_signext_Uimm(ex_fu_in.fu_dat_mult[i].inst);
-                    OPB_IS_J_IMM: mult_value2[i] = `RV32_signext_Jimm(ex_fu_in.fu_dat_mult[i].inst);
-                    default:      mult_value2[i] = 32'hfacefeed; // face feed
-                endcase
-
-                mult_func[i] = ex_fu_in.fu_dat_mult[i].inst.r.funct3;
-                // branch_func[i] = 3'b011; //SENTINEL VALUE
-                // branch[i] = 0;
-            // end
-        end
-    end
+    //         mult_func[i] = ex_fu_in.fu_dat_mult[i].inst.r.funct3;
+    //     end
+    // end
 
     generate 
         for(genvar i = 0; i < `NUM_FU_MULT; i++ ) begin
@@ -368,7 +361,7 @@
                 .start(ex_fu_in.fu_vld_mult[i]),
                 .rs1(mult_value1[i]),
                 .rs2(mult_value2[i]),
-                .func(ex_fu_in.fu_dat_mult[i].inst.r.funct3), // which mult operation to perform
+                .func(mult_func[i]), // which mult operation to perform
 
     //     // Output
                 .result(mult_result[i]),

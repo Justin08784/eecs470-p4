@@ -596,7 +596,7 @@ module cpu (
     stage_ex_p4 ex_0 (
         .clock(clock),
         .reset(reset),
-        .flush(0),
+        .flush('0),
         .ex_fu_in(rs_2_ex),
         .ex_rdy_out(ex_2_rs),
         .ex_c_out(ex_2_complete),
