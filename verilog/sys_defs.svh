@@ -541,6 +541,7 @@ typedef struct packed {
 typedef struct packed {
     logic       [$clog2(`N):0]  d_vld_scnt;
     logic       [$clog2(`N):0]  prvw_has_dests;
+    logic       [$clog2(`N):0]  prvw_is_brch;
     ID_RESULT   [`N-1:0]        d_dat;
 } decode2dispatch;
 

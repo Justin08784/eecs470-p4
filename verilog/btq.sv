@@ -22,10 +22,10 @@ module btq #(
 
     // retire (read & write)
     input  rob2retire r_in,
-    output btq2fetch  f_out,
+    output btq2fetch  f_out, // TODO: handling at fetch
 
     // complete (write)
-    input  execute2complete c_in,
+    input  execute2complete c_in, // TODO: handling from EX
 
     // dispatch (write)
     input  dispatch2btq d_in,
@@ -82,8 +82,10 @@ module btq #(
         d_out.btq_rdy_scnt = `MIN(free, NUM_DPORTS);
         (opposite of above points)
         */
-        d_out.btq_rdy_scnt = `MIN(free + rd_cnt, NUM_DPORTS);
-        d_out.btq_idxs     = d_idxs;
+        d_out = '{
+            btq_rdy_scnt : `MIN(free + rd_cnt, NUM_DPORTS),
+            btq_idxs     : d_idxs
+        };
     end
 
     always_ff @(posedge clock) begin

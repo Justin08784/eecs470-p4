@@ -16,6 +16,10 @@ module dispatch #(parameter
     // ROB
     input   rob2dispatch rob_in,
     output  dispatch2rob rob_out,
+
+    // BTQ
+    input   btq2dispatch btq_in,
+    output  dispatch2btq btq_out,
     
     // Free list
     input   free_list2dispatch free_in,
@@ -38,6 +42,9 @@ always_comb begin
     //logic to find the minimum # of spots free across the 4 inputs
     dispatch_cnt = `MIN(rs_in.rs_rdy_scnt, rob_in.rob_rdy_scnt);
     dispatch_cnt = `MIN(dispatch_cnt, decode_in.d_vld_scnt);
+    dispatch_cnt = btq_in.btq_rdy_scnt < $countones(decode_in.prvw_is_brch)
+        ? `MIN(dispatch_cnt, btq_in.btq_rdy_scnt)
+        : dispatch_cnt;
     // dispatch_cnt = `MIN(dispatch_cnt, lsq_in.lsq_rdy_scnt); // TODO: enable later
     dispatch_cnt = free_in.free_rdy_scnt < $countones(decode_in.prvw_has_dests)
         ? `MIN(dispatch_cnt, free_in.free_rdy_scnt)
@@ -46,6 +53,7 @@ always_comb begin
     //assigning output #'s
     decode_out.dispatch_en_cnt  = dispatch_cnt;
     lsq_out.lsq_d_en_cnt        = dispatch_cnt; //this will likely need to be changed once memory operations are introduced
+    btq_out.en_cnt              = dispatch_cnt;
 end
 
 //logic for free list
@@ -160,6 +168,7 @@ always_ff @(posedge clock) begin
     $display("decode_in.d_vld_scnt: %d",  decode_in.d_vld_scnt);
     $display("free_in.free_rdy_scnt: %d",  free_in.free_rdy_scnt);
     $display("decode_in.prvw_has_dests: %b", decode_in.prvw_has_dests);
+    $display("btq_in.btq_rdy_scnt: %d",   btq_in.btq_rdy_scnt);
     $display("  %3d | << Dispatch", $time);
 
 end
