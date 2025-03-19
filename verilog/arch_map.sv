@@ -31,17 +31,15 @@ module arch_map #(parameter
             */
             if (r_in.dst[i] == `ZERO_REG)
                 continue;
-            entries_n[r_in.dst[i]] = r_in.tag[i];
+            entries_n[r_in.dst[i]] = '{t : r_in.tag[i]};
         end
     end
 
     always_ff @(posedge clock) begin
         if (reset) begin
-            entries[`ZERO_REG] <= '{
-                t : '0
-            };
+            entries[`ZERO_REG] <= '{t : '0};
             for (int r = 1; r < NUM_ARCH_REG; ++r) begin
-                entries[r].t <= r;  // ✅ Map PRx = Rx (Arch Reg x → PRx)
+                entries[r] <= '{t : r}; // ✅ Map PRx = Rx (Arch Reg x → PRx)
             end
         end else begin
             entries <= entries_n;

@@ -81,12 +81,14 @@ module map_table #(parameter
     always_ff @(posedge clock) begin
         if (reset) begin
             for (int r = 1; r < NUM_ARCH_REG; ++r) begin
-                entries[r].t    <= r;   // ✅ Map PRx = Rx (Arch Reg x → PRx)
-                entries[r].cpl  <= 1;   // Mark all as initially completed
+                entries[r] <= '{
+                    t   : r,    // ✅ Map PRx = Rx (Arch Reg x → PRx)
+                    cpl : 1     // Mark all as initially completed
+                };
             end
             entries[`ZERO_REG]  <= '{
-                t: '0,
-                cpl: 1
+                t   : '0,
+                cpl : 1
             }; // Ensure ZERO_REG always maps to PR0
         end else begin
             entries <= entries_n;

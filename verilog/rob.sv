@@ -103,12 +103,15 @@ module rob #(
 
             prf_out[i] = state[r_idxs[i]].tag;
 
-            wb_packet[i].NPC        = state[r_idxs[i]].NPC;
-            wb_packet[i].data       = prf_in[i];//(mem_wb_reg.take_branch) ? mem_wb_reg.NPC : mem_wb_reg.result;
-            wb_packet[i].reg_idx    = state[r_idxs[i]].dst;
-            wb_packet[i].halt       = state[r_idxs[i]].halt;
-            wb_packet[i].illegal    = state[r_idxs[i]].illegal;
-            wb_packet[i].valid      = ~state[r_idxs[i]].illegal;
+            wb_packet[i] <= '{
+                NPC     : state[r_idxs[i]].NPC,
+                data    : prf_in[i], //(mem_wb_reg.take_branch) ? mem_wb_reg.NPC : mem_wb_reg.result;
+                reg_idx : state[r_idxs[i]].dst,
+                halt    : state[r_idxs[i]].halt,
+                illegal : state[r_idxs[i]].illegal,
+                valid   : ~state[r_idxs[i]].illegal
+            };
+
         end
 
         // handle dispatch (outs)
@@ -124,8 +127,10 @@ module rob #(
         (opposite of above points)
         */
         // The true number of same-cycle free slots is free + r_en_cnt
-        d_out.rob_rdy_scnt = `MIN(free + r_out.r_en_cnt, NUM_DPORTS);
-        d_out.rob_idxs     = d_idxs;
+        d_out <= '{
+            rob_rdy_scnt : `MIN(free + r_out.r_en_cnt, NUM_DPORTS),
+            rob_idxs     : d_idxs
+        };
     end
 
     always_ff @(posedge clock) begin
@@ -177,14 +182,14 @@ module rob #(
                     continue;
                 cur_idx = d_idxs[i];
                 state[cur_idx] <= '{
-                    cpl     :0,
-                    is_brch :d_in.is_brch[i],
-                    tag     :d_in.tag[i],
-                    t_old   :d_in.t_old[i],
-                    dst     :d_in.dst[i],
-                    halt    :d_in.halt[i],
-                    illegal :d_in.illegal[i],
-                    NPC     :d_in.NPC[i]
+                    cpl     : 0,
+                    is_brch : d_in.is_brch[i],
+                    tag     : d_in.tag[i],
+                    t_old   : d_in.t_old[i],
+                    dst     : d_in.dst[i],
+                    halt    : d_in.halt[i],
+                    illegal : d_in.illegal[i],
+                    NPC     : d_in.NPC[i]
                 };
             end
 

@@ -92,13 +92,14 @@ module stage_if_p4 (
         d_out.f_en_cnt = `MIN(used_scnt, d_in.d_rdy_cnt);
 
         f_cnt = free_scnt < `N ? 0 : `N; // no partial fetches (for simplicity)! 
-        f_dat = '0;
         for (int unsigned i = 0, logic vld = 0; i < `N; ++i) begin
             vld = i < f_cnt;
-            f_dat[i].inst   = vld ? Imem_data.word_level[i] : `NOP;
-            f_dat[i].PC     = PC_reg + 4*i;
-            f_dat[i].NPC    = PC_reg + 4*(i+1);
-            f_dat[i].valid  = vld;
+            f_dat[i] <= '{
+                inst  : vld ? Imem_data.word_level[i] : `NOP,
+                PC    : PC_reg + 4*i,
+                NPC   : PC_reg + 4*(i+1),
+                valid : vld
+            };
         end
     end
 
