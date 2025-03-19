@@ -25,6 +25,8 @@ module execute_test();
     ID_RESULT   [NUM_FU_STORE-1:0]  fu_dat_store;
     ID_RESULT   [NUM_FU_LOAD-1:0]   fu_dat_load;*/
 
+    prf2execute prf_2_ex;
+
 
     execute2rs ex_rdy_out;
 
@@ -48,6 +50,7 @@ module execute_test();
         .clock    (clock),
         .reset    (reset),
         .ex_fu_in (ex_fu_in),
+        .prf_2_ex (prf_2_ex),
         .ex_rdy_out(ex_rdy_out),
         .ex_c_out(ex_c_out)
 
@@ -107,8 +110,8 @@ module execute_test();
         // ---------- Test 1 ---------- //
         $display("Test 1: 1 ALU instruction");
         ex_fu_in.fu_vld_alu[0] = 1;
-        ex_fu_in.fu_dat_alu[0].rs1_value = 1;
-        ex_fu_in.fu_dat_alu[0].rs2_value = 2;
+        prf_2_ex.s_v1s[0] = 1;
+        prf_2_ex.s_v2s[0] = 2;
         ex_fu_in.fu_dat_alu[0].alu_func = ALU_ADD;
         @(negedge clock);
         ex_fu_in.fu_vld_alu[0] = 0;
@@ -118,8 +121,11 @@ module execute_test();
         $display("Test 2: 2 ALU instructions");
         ex_fu_in.fu_vld_alu[0] = 1;
         ex_fu_in.fu_vld_alu[1] = 1;
-        ex_fu_in.fu_dat_alu[1].rs1_value = 1;
-        ex_fu_in.fu_dat_alu[1].rs2_value = 0;
+        prf_2_ex.s_v1s[0] = 7;
+        prf_2_ex.s_v2s[0] = 5;
+        ex_fu_in.fu_dat_alu[0].alu_func = ALU_SUB;
+        prf_2_ex.s_v1s[1] = 1;
+        prf_2_ex.s_v2s[1] = 0;
         ex_fu_in.fu_dat_alu[1].alu_func = ALU_XOR;
         @(negedge clock);
         ex_fu_in.fu_vld_alu[0] = 0;
@@ -129,8 +135,8 @@ module execute_test();
         // ---------- Test 3 ---------- //
         $display("Test 3: 1 mult instruction");
         ex_fu_in.fu_vld_mult[0] = 1;
-        ex_fu_in.fu_dat_mult[0].rs1_value = 3;
-        ex_fu_in.fu_dat_mult[0].rs2_value = 4;
+        prf_2_ex.s_v1s[0] = 3;
+        prf_2_ex.s_v2s[0] = 4;
         ex_fu_in.fu_dat_mult[0].inst.r.funct3 = M_MUL;
         @(negedge clock);
         ex_fu_in.fu_vld_mult[0] = 0;
@@ -140,9 +146,12 @@ module execute_test();
         $display("Test 4: 2 mult instructions");
         ex_fu_in.fu_vld_mult[0] = 1;
         ex_fu_in.fu_vld_mult[1] = 1;
-        ex_fu_in.fu_dat_mult[1].rs1_value = 2;
-        ex_fu_in.fu_dat_mult[1].rs2_value = 5;
+        prf_2_ex.s_v1s[0] = 24;
+        prf_2_ex.s_v2s[0] = 2;
         ex_fu_in.fu_dat_mult[0].inst.r.funct3 = M_MUL; 
+        prf_2_ex.s_v1s[1] = 2;
+        prf_2_ex.s_v2s[1] = 5;
+        ex_fu_in.fu_dat_mult[1].inst.r.funct3 = M_MUL; 
         @(negedge clock);
         ex_fu_in.fu_vld_mult[0] = 0;
         ex_fu_in.fu_vld_mult[1] = 0;
@@ -152,11 +161,19 @@ module execute_test();
         $display("Test 5: conditional branch");
         ex_fu_in.fu_vld_alu[0] = 1;
         ex_fu_in.fu_dat_alu[0].cond_branch = 1;
-        ex_fu_in.fu_dat_alu[0].rs1_value = 4;
-        ex_fu_in.fu_dat_alu[0].rs2_value = 5;
-        ex_fu_in.fu_dat_mult[0].inst.r.funct3 = 3'b100;
+        prf_2_ex.s_v1s[0] = 4;
+        prf_2_ex.s_v2s[0] = 5;
+        ex_fu_in.fu_dat_mult[0].inst.b.funct3 = 3'b100;
         @(negedge clock);
         ex_fu_in.fu_vld_mult[1] = 0;
+        @(negedge clock);
+        @(negedge clock);
+        @(negedge clock);
+        @(negedge clock);
+        @(negedge clock);
+        @(negedge clock);
+        @(negedge clock);
+        @(negedge clock);
         @(negedge clock);
 
         $finish;

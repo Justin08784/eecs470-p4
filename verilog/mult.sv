@@ -10,10 +10,12 @@ module mult (
     input clock, reset, start,
     input DATA rs1, rs2,
     input MULT_FUNC func,
+    input MULT_DEST dst_in,
     // input logic [TODO] dest_tag_in,
 
     // output logic [TODO] dest_tag_out,
     output DATA result,
+    output MULT_DEST dst_out,
     output done
 );
 
@@ -26,6 +28,8 @@ module mult (
     logic [63:0] mcand, mplier, product;
     logic [63:0] mcand_out, mplier_out; // unused, just for wiring
 
+    MULT_DEST [`MULT_STAGES-2:0] internal_dsts;
+
     // instantiate an array of mult_stage modules
     // this uses concatenation syntax for internal wiring, see lab 2 slides
     mult_stage mstage [`MULT_STAGES-1:0] (
@@ -36,10 +40,12 @@ module mult (
         .prev_sum    ({internal_sums,    64'h0}), // start the sum at 0
         .mplier      ({internal_mpliers, mplier}),
         .mcand       ({internal_mcands,  mcand}),
+        .dst         ({internal_dsts,    dst_in}),
         .product_sum ({product,    internal_sums}),
         .next_mplier ({mplier_out, internal_mpliers}),
         .next_mcand  ({mcand_out,  internal_mcands}),
         .next_func   ({func_out,   internal_funcs}),
+        .next_dst    ({dst_out,    internal_dsts}),
         .done        ({done,       internal_dones}) // done when the final stage is done
     );
 
@@ -64,10 +70,12 @@ endmodule // mult
 module mult_stage (
     input clock, reset, start,
     input [63:0] prev_sum, mplier, mcand,
+    input MULT_DEST dst,
     input MULT_FUNC func,
 
     output logic [63:0] product_sum, next_mplier, next_mcand,
     output MULT_FUNC next_func,
+    output MULT_DEST next_dst,
     output logic done
 );
 
@@ -85,6 +93,7 @@ module mult_stage (
         next_mplier <= shifted_mplier;
         next_mcand  <= shifted_mcand;
         next_func   <= func;
+        next_dst    <= dst;
     end
 
     always_ff @(posedge clock) begin

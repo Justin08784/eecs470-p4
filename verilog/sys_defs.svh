@@ -738,4 +738,9 @@ typedef struct packed {
     logic    [$clog2(`N):0]    lsq_rdy_scnt;
 } lsq2dispatch;
 
+typedef struct packed {
+    ROB_IDX rob_idx;
+    PHYS_REG_IDX tag;
+} MULT_DEST;
+
 `endif // __SYS_DEFS_SVH__
