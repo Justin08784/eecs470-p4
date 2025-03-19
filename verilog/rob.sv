@@ -99,7 +99,6 @@ module rob #(
                 ++r_out.r_free_cnt;
             end
             r_out.dst[i]    = state[r_idxs[i]].dst;
-            r_out.brch_vld  = state[r_idxs[i]].is_brch;
 
             prf_out[i] = state[r_idxs[i]].tag;
 
@@ -183,7 +182,6 @@ module rob #(
                 cur_idx = d_idxs[i];
                 state[cur_idx] <= '{
                     cpl     : 0,
-                    is_brch : d_in.is_brch[i],
                     tag     : d_in.tag[i],
                     t_old   : d_in.t_old[i],
                     dst     : d_in.dst[i],

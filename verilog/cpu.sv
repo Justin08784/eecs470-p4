@@ -391,7 +391,6 @@ module cpu (
 
     fetch2decode f_2_decode;
     decode2fetch decode_2_f;
-    btq2fetch  btq_2_fetch;
 
     stage_if_p4 fetch_0(
         .clock(clock),          // system clock
@@ -457,8 +456,6 @@ module cpu (
     dispatch2map_table dispatch_2_map;
     // map_table2rob rob_out;
     map_table2dispatch map_2_dispatch;
-    dispatch2btq dis_2_btq;
-    btq2dispatch btq_2_dis;
 
     dispatch dispatcher(
         .clock(clock),
@@ -479,9 +476,6 @@ module cpu (
         .lsq_in('0),
         .lsq_out(),
 
-        .btq_in(btq_2_dis),
-        .btq_out(dis_2_btq),
-        
         .map_in(map_2_dispatch),
         .map_out(dispatch_2_map)
     );
@@ -554,24 +548,7 @@ module cpu (
         // .c_ts(c_ts)
     );
     
-    //////////////////////////////////////////////////
-    //                                              //
-    //                      BTQ                     //
-    //                                              //
-    //////////////////////////////////////////////////   
-
-    // retire (read & write)
     rob2retire rob_2_retire;
-    btq btq_0(
-        .clock  (clock),
-        .reset  (reset),
-        .flush  (flush),
-        .r_in   (rob_2_retire),
-        .f_out  (btq_2_fetch),
-        .c_in   (ex_2_complete),
-        .d_in   (dis_2_btq),
-        .d_out  (btq_2_dis)
-    );
 
     //////////////////////////////////////////////////
     //                                              //

@@ -257,11 +257,6 @@ build/execute.simv: $(EXECUTE_FILES)
 build/execute.cov: $(EXECUTE_FILES)
 build/execute.vg: $(EXECUTE_FILES)
 
-BTQ_FILES = verilog/sys_defs.svh
-build/btq.simv: $(BTQ_FILES)
-build/btq.cov: $(BTQ_FILES)
-build/btq.vg: $(BTQ_FILES)
-
 
 #################################
 # ---- Main CPU Definition ---- #
@@ -296,7 +291,6 @@ CPU_SOURCES = verilog/cpu.sv \
 			  verilog/stage_id_p4.sv \
 			  verilog/fifo.sv \
 			  verilog/fetch.sv \
-			  verilog/btq.sv \
 			  verilog/execute.sv 
 
 build/cpu.simv: $(CPU_SOURCES) $(CPU_HEADERS) $(CPU_TESTBENCH)
