@@ -147,12 +147,11 @@ always_comb begin
         rob_out.halt[i]     = decode_in.d_dat[i].halt;
         rob_out.illegal[i]  = decode_in.d_dat[i].illegal;
         rob_out.NPC[i]      = decode_in.d_dat[i].NPC;
-        $display("DISPATCH: %1d", rob_out.halt[i]);
-        $display("DISPATCH ILLEGAL: %1d",rob_out.illegal[i]);
     end
 end
 
 // debug
+`ifndef SYNTH
 always_ff @(posedge clock) begin
     $display("  %3d | >> Dispatch", $time);
     $display("rs_in.rs_rdy_scnt: %d",   rs_in.rs_rdy_scnt);
@@ -163,6 +162,7 @@ always_ff @(posedge clock) begin
     $display("  %3d | << Dispatch", $time);
 
 end
+`endif
 
 endmodule
 

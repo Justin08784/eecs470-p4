@@ -359,6 +359,7 @@ module stage_id_p4 (
         end
 
 
+        `ifndef SYNTH
         if (!reset) begin
             $display("  %3d | ID >>", $time);
             // $display("  %3d | FIFO: {used_scnt: %d, free_scnt: %d}",
@@ -371,7 +372,7 @@ module stage_id_p4 (
                 f_in.f_en_cnt > 0 ? f_in.f_dat[0].PC : 0,
                 f_in.f_en_cnt > 1 ? f_in.f_dat[1].PC : 0,
                 f_in.f_en_cnt > 0 ? f_in.f_dat[0].inst : 0,
-                f_in.f_en_cnt > 1 ? f_in.f_dat[1].inst : 0,
+                f_in.f_en_cnt > 1 ? f_in.f_dat[1].inst : 0,:
             );
 
             $display("d_out: {d_en_cnt: %d, PC: [%x, %x], inst: [%x, %x]}",
@@ -387,6 +388,7 @@ module stage_id_p4 (
             // $display("d_out.d_dat[1]: %b", d_out.d_dat[1]);
             $display("  %3d | ID <<", $time);
         end
+        `endif
     end
 
 endmodule // stage_id

@@ -94,8 +94,10 @@ module rob #(
             the FIFO (you still have to do it *somewhere*).
             */
             r_out.tag[i]    = state[r_idxs[i]].tag;
-            if (state[r_idxs[i]].dst != `ZERO_REG) // pack all returning pregs to lowest indices
-                r_out.t_old[r_out.r_free_cnt++] = state[r_idxs[i]].t_old;
+            if (state[r_idxs[i]].dst != `ZERO_REG) begin // pack all returning pregs to lowest indices
+                r_out.t_old[r_out.r_free_cnt] = state[r_idxs[i]].t_old;
+                ++r_out.r_free_cnt;
+            end
             r_out.dst[i]    = state[r_idxs[i]].dst;
 
             prf_out[i] = state[r_idxs[i]].tag;
@@ -125,10 +127,12 @@ module rob #(
             // tail    <= RESET_STATE.tail;
             // state   <= RESET_STATE.state;
         end else begin
+            `ifndef SYNTH
             if (d_in.d_en_cnt > free + r_out.r_en_cnt)
                 $error("ROB overflow!");
             if (r_out.r_en_cnt > used + d_in.d_en_cnt)
                 $error("ROB underflow!");
+            `endif
             used    <= used + d_in.d_en_cnt - r_out.r_en_cnt;
             head    <= (head + r_out.r_en_cnt) % ROB_SZ;
             tail    <= (tail + d_in.d_en_cnt) % ROB_SZ;
@@ -166,9 +170,9 @@ module rob #(
                 state[cur_idx].halt     <= d_in.halt[i];
                 state[cur_idx].illegal  <= d_in.illegal[i];
                 state[cur_idx].NPC      <= d_in.NPC[i];
-                $display("PUTTING INTO ROB");
             end
 
+            `ifndef SYNTH
             $display("  %3d | >> ROB", $time);
             $display("{r_free_cnt: %d, [(t: %0d, told: %0d, dst: %0d), (t: %0d, told: %0d, dst: %0d)]}",
                 r_out.r_free_cnt,
@@ -180,6 +184,7 @@ module rob #(
                 r_out.dst[1]
             );
             $display("  %3d | << ROB", $time);
+            `endif
         end
     end
 

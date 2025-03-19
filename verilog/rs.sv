@@ -329,6 +329,7 @@ module rs #(parameter
         end
     end
 
+    `ifndef SYNTH
     function get_fu_name(input FU_IDX fu_idx, output string name);
         case (fu_idx)
             FU_ALU:     name = "ALU";
@@ -338,6 +339,7 @@ module rs #(parameter
             default:    name = "Unknown FU";
         endcase
     endfunction
+    `endif
 
     always_ff @(posedge clock) begin
         if (reset || flush) begin
@@ -346,6 +348,7 @@ module rs #(parameter
             entries <= entries_n;
         end
 
+        `ifndef SYNTH
         $display("  %3d | RS >>", $time);
         print_id_result(d_in.d_dat[0]);
         print_id_result(d_in.d_dat[1]);
@@ -377,6 +380,7 @@ module rs #(parameter
             end
         end
         $display("  %3d | RS <<", $time);
+        `endif
     end
 
 

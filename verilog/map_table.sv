@@ -90,15 +90,18 @@ module map_table #(parameter
             }; // Ensure ZERO_REG always maps to PR0
         end else begin
             entries <= entries_n;
+            `ifndef SYNTH
             if (entries[`ZERO_REG].t != '0 || !entries[`ZERO_REG].cpl) begin
                 $error("ERROR: entries[0] was modified! Got: {t:%0d, cpl:%b}", 
                     entries[`ZERO_REG].t,
                     entries[`ZERO_REG].cpl
                 );
             end
+            `endif
         end
     end
 
+    `ifndef SYNTH
     // debugging
     always_ff @(posedge clock) begin
         if (!reset) begin
@@ -131,5 +134,6 @@ module map_table #(parameter
             $display("  %3d | MT <<", $time);
         end
     end
+    `endif
 
 endmodule
