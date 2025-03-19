@@ -504,6 +504,10 @@ module cpu (
     
     execute2rs      ex_2_rs; 
     rs2execute      rs_2_ex;
+
+    execute2prf     ex_2_prf;
+    prf2execute     prf_2_ex;
+
     execute2complete ex_2_complete;
     rs rs_0(
         .clock(clock),
@@ -553,6 +557,8 @@ module cpu (
     // decode2rob d2rob;
     rob2retire rob_2_retire;
     COMMIT_PACKET [`N-1:0] wb_packet;
+    PHYS_REG_IDX [`N-1:0] retire2prf;
+    PHYS_REG_IDX [`N-1:0] prf2retire;
     //execute2complete ex_2_complete;
     // rob2dispatch rob_2_dispatch;
     // dispatch2rob dispatch_2_rob;
@@ -567,7 +573,9 @@ module cpu (
         .c_in       (ex_2_complete),
         .d_out      (rob_2_dispatch),
         .d_in       (dispatch_2_rob),
-        .wb_packet  (wb_packet)
+        .wb_packet  (wb_packet),
+        .prf_out    (retire2prf),
+        .prf_in     (prf2retire)
     );
 
     always_comb begin
@@ -588,7 +596,9 @@ module cpu (
         .reset(reset),
         .ex_fu_in(rs_2_ex),
         .ex_rdy_out(ex_2_rs),
-        .ex_c_out(ex_2_complete)
+        .ex_c_out(ex_2_complete),
+        .ex_2_prf(ex_2_prf),
+        .prf_2_ex(prf_2_ex)
     );
 
 
@@ -666,11 +676,13 @@ module cpu (
         .c_en(ex_2_complete.c_en),
         .c_ts(ex_2_complete.c_ts),
         .c_vs(ex_2_complete.c_data),
-        .s_en(),
-        .s_t1s(),
-        .s_t2s(),
-        .s_v1s(),
-        .s_v2s()
+        .s_en(ex_2_prf.prf_en),
+        .s_t1s(ex_2_prf.s_t1s),   //execute2prf.t1
+        .s_t2s(ex_2_prf.s_t2s),   //execute2prf.t2
+        .s_v1s(prf_2_ex.s_v1s),   //prf2execute.s_v1s
+        .s_v2s(prf_2_ex.s_v2s),    //prf2execute.s_v1s
+        .r_in(retire2prf),
+        .r_out(prf2retire)
     );
 
 endmodule // pipeline
