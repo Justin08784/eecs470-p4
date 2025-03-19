@@ -41,9 +41,6 @@ module alu (
             // here to prevent latches:
             default:  result = 32'hfacebeec;
         endcase
-        $display("ALU OPA: %20d",opa);
-        $display("ALU OPB: %20d",opb);
-        $display("ALU RESULT: %20d",result);
     end
 
     always_comb begin
@@ -149,12 +146,6 @@ module stage_ex_p4 (
     assign ex_rdy_out.fu_rdy_load = fu_rdy_load;
     assign ex_rdy_out.fu_rdy_store = fu_rdy_store;
 
-
-    always_comb begin
-        
-    end
-
-
     always_comb begin
         ex_c_out = '0;
         for (int i = 0; i < `NUM_FU_ALU; ++i) begin
@@ -180,8 +171,6 @@ module stage_ex_p4 (
             foreach (fu_rdy_alu[i]) begin
                 fu_rdy_alu[i]   <= ex_fu_in.fu_vld_alu[i] ? 0 : (alu_done[i] || fu_rdy_alu[i]);// || ex_c_out.c_en[i]; //OR'ing this will work to reset the flag, just have to make sure it is coming from the right FU so that we don't accidentally reset the ALU with a mult flag or something
                 fu_dat_alu[i]   <= ex_fu_in.fu_vld_alu[i] ? ex_fu_in.fu_dat_alu[i] : '0;
-                $display("DEBUG: alu_done at cycle %0t = %2d", $time, alu_done);
-                $display("DEBUG: fu_rdy_alu[%2d] at cycle %0t = %2d", i, $time, alu_done);
                 $display("assign: %d vld:%b insn:%x", i, ex_fu_in.fu_vld_alu[i], ex_fu_in.fu_dat_alu[i].inst);
             end
 
@@ -240,12 +229,6 @@ module stage_ex_p4 (
             ex_2_prf.prf_en[i] = ex_fu_in.fu_vld_alu[i];
             ex_2_prf.s_t1s[i] = ex_fu_in.fu_dat_alu[i].t1;
             ex_2_prf.s_t2s[i] = ex_fu_in.fu_dat_alu[i].t2;
-            $display("DEBUG: prf_enable[i] at cycle %0t = %0d", $time, ex_2_prf.prf_en[i]);
-            $display("DEBUG: s_t1s[i] at cycle %0t = %0d", $time, ex_2_prf.s_t1s[i]);
-            $display("DEBUG: s_t2s[i] at cycle %0t = %0d", $time, ex_2_prf.s_t2s[i]);
-
-            $display("DEBUG: s_v1s[i] at cycle %0t = %0d", $time, prf_2_ex.s_v1s[i]);
-            $display("DEBUG: s_v2s[i] at cycle %0t = %0d", $time, prf_2_ex.s_v2s[i]);
 
 
             if (ex_fu_in.fu_dat_alu[i].cond_branch) begin
@@ -264,7 +247,6 @@ module stage_ex_p4 (
                     OPA_IS_ZERO: opa_mux_out[i] = 0;
                     default:     opa_mux_out[i]= 32'hdeadface; // dead face
                 endcase
-                $display("OPA ASSIGNMENT: %2d", opa_mux_out[i]);
 
                 // ALU opB mux
                 case (ex_fu_in.fu_dat_alu[i].opb_select)

@@ -5,7 +5,7 @@ module prf #(
     parameter DEPTH      = `PHYS_REG_SZ_R10K,
     parameter N = 2,
     parameter BYPASS_EN  = 0,   // 0: Read data will update at positive edge
-    parameter NUM_RPORTS = `NUM_RPORTS                            // 1: Read data will update combinationally if
+    parameter NUM_RPORTS = `PRF_NUM_RPORTS                            // 1: Read data will update combinationally if
                                //    write to same address
    )(
     input clock, //reset, flush, // QUESTION: do we need reset? or should we force write to happen before read at the same addr?
@@ -72,14 +72,6 @@ module prf #(
             end else begin
                 s_v1s[i] = phys_reg_file[s_t1s[i]];
             end
-            // if (s_t1s[i] == `ZERO_REG) begin
-            //     s_v1s[i] = 0;
-            // end else if (c_en[1] && (c_ts[1] == s_t1s[i])) begin
-            //     s_v1s[i] = c_vs[1]; // internal forwarding
-            // else begin
-            //     s_v1s[i] = phys_reg_file[s_t1s[i]];
-            // end
-            // end
 
             // Read port 2
             // always_comb begin
@@ -92,14 +84,6 @@ module prf #(
             end else begin
                 s_v2s[i] = phys_reg_file[s_t2s[i]];
             end
-            // if (s_t2s[i] == `ZERO_REG) begin
-            //     s_v2s[i] = 0;
-            // end else if (c_en[1] && (c_ts[1] == s_t2s[i])) begin
-            //     s_v2s[i] = c_vs[1]; // internal forwarding
-            // end else begin
-            //     s_v2s[i] = phys_reg_file[s_t2s[i]];
-            // end
-            // end
             
         end
     end
@@ -119,7 +103,6 @@ module prf #(
         if (c_en[1] && (c_ts[1] != `ZERO_REG)) begin
             phys_reg_file[c_ts[1]] <= c_vs[1];
         end
-        $display("DEBUG: prf[0] at cycle %0t = %2d", $time, s_v1s[0]);
     end
 
 
