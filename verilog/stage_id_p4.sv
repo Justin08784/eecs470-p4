@@ -372,7 +372,7 @@ module stage_id_p4 (
                 f_in.f_en_cnt > 0 ? f_in.f_dat[0].PC : 0,
                 f_in.f_en_cnt > 1 ? f_in.f_dat[1].PC : 0,
                 f_in.f_en_cnt > 0 ? f_in.f_dat[0].inst : 0,
-                f_in.f_en_cnt > 1 ? f_in.f_dat[1].inst : 0,:
+                f_in.f_en_cnt > 1 ? f_in.f_dat[1].inst : 0,
             );
 
             $display("d_out: {d_en_cnt: %d, PC: [%x, %x], inst: [%x, %x]}",

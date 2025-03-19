@@ -49,6 +49,18 @@
 `define MULT_STAGES 4
 
 ///////////////////////////////
+// --- Compil. Controls ---- //
+///////////////////////////////
+/* How can we implement this in the Makefile? */
+// comment out to enable synth only constructions
+`define SYNTH
+
+`ifndef SYNTH
+// comment out to disable DEBUG:
+`define DEBUG
+`endif
+
+///////////////////////////////
 // ---- Basic Constants ---- //
 ///////////////////////////////
 
@@ -463,8 +475,6 @@ typedef struct packed {
     // logic    valid;
 } ID_RESULT;
 
-`define SYNTH
-
 // TODO: remember to remove for synthesis? does this prevent synthesis?
 `ifndef SYNTH
 function print_id_result(input ID_RESULT x);
@@ -720,11 +730,5 @@ typedef struct packed{
 typedef struct packed {
     logic    [$clog2(`N):0]    lsq_rdy_scnt;
 } lsq2dispatch;
-
-
-/* How can we implement this in the Makefile? */
-// comment out to disable DEBUG:
-`define DEBUG
-
 
 `endif // __SYS_DEFS_SVH__
