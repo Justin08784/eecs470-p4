@@ -43,6 +43,7 @@ always_comb begin
         ? `MIN(dispatch_cnt, free_in.free_rdy_scnt)
         : dispatch_cnt;
     dispatch_cnt = `MIN(dispatch_cnt,decode_in.d_vld_scnt);
+
     //assigning output #'s
     decode_out.dispatch_en_cnt  = dispatch_cnt;
     lsq_out.lsq_d_en_cnt        = dispatch_cnt; //this will likely need to be changed once memory operations are introduced
