@@ -72,7 +72,7 @@ endmodule // alu
 
 // endmodule // conditional_branch
 
-module mult_no_pipeline (
+/*module mult_no_pipeline (
      input clock, reset, start,
      input DATA rs1, rs2,
      input MULT_FUNC func,
@@ -100,7 +100,7 @@ module mult_no_pipeline (
      // Use the high or low bits of the product based on the output func
      assign result = (func == M_MUL) ? product[31:0] : product[63:32];
 
- endmodule
+ endmodule*/
 
 
 
@@ -157,7 +157,7 @@ module stage_ex_p4 (
 
     always_comb begin
         ex_c_out = '0;
-        for (int i = 0; i < `N; ++i) begin
+        for (int i = 0; i < `NUM_FU_ALU; ++i) begin
             ex_c_out.c_en[i]        = !fu_rdy_alu[i];
             ex_c_out.c_ts[i]        = fu_dat_alu[i].t;
             ex_c_out.c_rob_idxs[i]  = fu_dat_alu[i].rob_idx;
@@ -308,7 +308,7 @@ module stage_ex_p4 (
 
     
     // // Instantiate the multiplier
-    // mult_no_pipeline mults [`NUM_FU_MULT-1:0] (
+    // mult mults [`NUM_FU_MULT-1:0] (
     //     // Inputs
     //     .clock(clock),
     //     .reset(reset),
