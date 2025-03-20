@@ -90,12 +90,16 @@ module mult_stage (
     assign shifted_mcand = {mcand[63-SHIFT:0], SHIFT'('b0)};
     // assign next_dst = dst;
 
+    always_ff @(negedge clock) begin
+        next_dst    <= dst;
+    end
+
     always_ff @(posedge clock) begin
         product_sum <= prev_sum + partial_product;
         next_mplier <= shifted_mplier;
         next_mcand  <= shifted_mcand;
         next_func   <= func;
-        next_dst    <= dst;
+        // next_dst    <= dst;
     end
 
     always_ff @(posedge clock) begin

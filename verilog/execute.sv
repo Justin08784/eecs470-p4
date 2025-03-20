@@ -122,10 +122,10 @@ module stage_ex_p4 (
             // if (!mult_bundle[i].mult_done)
             //     continue;
             if (mult_bundle[i].mult_done) begin
-            ex_c_out.c_en[i]        = mult_bundle[i].mult_done;
-            ex_c_out.c_ts[i]        = mult_bundle[i].mul_dst_out.tag;
-            ex_c_out.c_rob_idxs[i]  = mult_bundle[i].mul_dst_out.rob_idx;
-            ex_c_out.c_data[i]      = mult_bundle[i].mult_result;
+                ex_c_out.c_en[i]        = mult_bundle[i].mult_done;
+                ex_c_out.c_ts[i]        = mult_bundle[i].mul_dst_out.tag;
+                ex_c_out.c_rob_idxs[i]  = mult_bundle[i].mul_dst_out.rob_idx;
+                ex_c_out.c_data[i]      = mult_bundle[i].mult_result;
             end
         end
     end
