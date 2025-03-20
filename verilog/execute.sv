@@ -87,22 +87,37 @@ module stage_ex_p4 (
 
     // <FU>_outs: where executed insns wait until completion
     struct packed {
+        // ff
         logic   [`NUM_FU_ALU-1:0]   rdy;
         DATA    [`NUM_FU_ALU-1:0]   res;
         DST     [`NUM_FU_ALU-1:0]   dst;
+        // comb
+        logic   [`NUM_FU_ALU-1:0]   cpl;
     } alu_outs;
     struct packed {
+        // ff
         logic   [`NUM_FU_MULT-1:0]  rdy;
         DATA    [`NUM_FU_MULT-1:0]  res;
         DST     [`NUM_FU_MULT-1:0]  dst;
+        // comb
+        logic   [`NUM_FU_MULT-1:0]  cpl;
     } mul_outs;
 
+    localparam NUM_FU_TOTAL = `NUM_FU_ALU + `NUM_FU_MULT;
+    logic [NUM_FU_TOTAL-1:0] all_cpl;
     always_comb begin
         rs_out = '{
             fu_rdy_alu      : ~alu_ins.bsy,
             fu_rdy_mult     : ~mul_ins.bsy,
             fu_rdy_load     : '1,
             fu_rdy_store    : '1
+        };
+
+        alu_outs.cpl = 2'b11;
+        mul_outs.cpl = 2'b01;
+        all_cpl = {
+            mul_outs.cpl,
+            alu_outs.cpl
         };
     end
 
@@ -112,7 +127,14 @@ module stage_ex_p4 (
             alu_ins     <= '0;
             mul_ins     <= '0;
         end else begin
-            alu_ins.bsy <= alu_ins.bsy ? 
+            foreach (alu_ins.bsy[i]) begin
+                alu_ins.bsy[i] <= alu_ins.bsy[i]
+                    ? !(alu_outs.rdy[i] && alu_outs.cpl[i]) // if busy, did it complete
+                    : rs_in.fu_vld_alu[i];                  // if not busy, did it issue?
+            end
+            $display("alu: %b", alu_outs.cpl);
+            $display("mul: %b", mul_outs.cpl);
+            $display("all: %b", all_cpl);
         end
     end
 

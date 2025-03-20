@@ -42,11 +42,27 @@ module execute_test();
         prf_in  = '0;
 
         $monitor("  %3d | rdy_alu: %b  rdy_mult: %b  rdy_store: %b  rdy_load: %b  |  c_en: %b  c_ts: %d  c_data: %h c_rob_idxs: %d",
-                  $time,  rs_out.fu_rdy_alu, rs_out.fu_rdy_mult, rs_out.fu_rdy_store, rs_out.fu_rdy_load, c_out.c_en, c_out.c_ts, c_out.c_data, c_out.c_rob_idxs);
+            $time,
+            rs_out.fu_rdy_alu,
+            rs_out.fu_rdy_mult,
+            rs_out.fu_rdy_store,
+            rs_out.fu_rdy_load,
+            c_out.c_en,
+            c_out.c_ts,
+            c_out.c_data,
+            c_out.c_rob_idxs
+        );
 
         @(negedge clock);
         reset = 0;
         @(negedge clock);
+        @(negedge clock);
+        @(negedge clock);
+        @(negedge clock);
+        @(negedge clock);
+        @(negedge clock);
+
+        $finish;
 
         // ---------- Test 1 ---------- //
         $display("Test 1: 1 ALU instruction");
