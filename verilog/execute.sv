@@ -73,16 +73,15 @@ module stage_ex_p4 (
 
 );
     assign prf_out  = '0;
-    assign c_out    = '0;
 
     // <FU>_ins: staging; where just-issued insns wait for 1 cycle to pull their operands
     struct packed {
-        logic   [`NUM_FU_ALU-1:0]   rdy;
-        logic   [`NUM_FU_ALU-1:0]   dat;
+        logic       [`NUM_FU_ALU-1:0]   rdy;
+        ID_RESULT   [`NUM_FU_ALU-1:0]   dat;
     } alu_ins;
     struct packed {
-        logic   [`NUM_FU_MULT-1:0]  rdy;
-        logic   [`NUM_FU_MULT-1:0]  dat;
+        logic       [`NUM_FU_MULT-1:0]  rdy;
+        ID_RESULT   [`NUM_FU_MULT-1:0]  dat;
     } mul_ins;
 
     // <FU>_outs: where executed insns wait until completion
@@ -91,20 +90,54 @@ module stage_ex_p4 (
         logic   [`NUM_FU_ALU-1:0]   rdy;
         DATA    [`NUM_FU_ALU-1:0]   res;
         DST     [`NUM_FU_ALU-1:0]   dst;
-        // comb
-        logic   [`NUM_FU_ALU-1:0]   cpl;
     } alu_outs;
+    DATA [`NUM_FU_ALU-1:0] alu_res_n;
+
     struct packed {
         // ff
         logic   [`NUM_FU_MULT-1:0]  rdy;
         DATA    [`NUM_FU_MULT-1:0]  res;
         DST     [`NUM_FU_MULT-1:0]  dst;
-        // comb
-        logic   [`NUM_FU_MULT-1:0]  cpl;
     } mul_outs;
+    DATA [`NUM_FU_MULT-1:0] mul_res_n;
+
+    generate
+        for (genvar i = 0; i < `NUM_FU_ALU; ++i) begin : gen_alus
+            // // Instantiate the ALU
+            // TODO: These ALU inputs were kinda hardcoded. Need mux stuff to select which type.
+            alu alu_0 ( 
+                // Inputs
+                .opa(prf_in.s_v1s[i]),
+                .opb(prf_in.s_v2s[i]),
+                .alu_func(alu_ins.dat[i].alu_func),
+                .branch(alu_ins.dat[i].cond_branch), // is this a cond_branch
+                .branch_func(3'b011), // Which branch condition to check
+
+                .take(), // True/False condition result (will return FALSE if branch is low)
+                .result(alu_res_n[i]) // will return 32'hfacebeec if branch is high (Sentinel, hopefully none of our alu computations result in that value)
+            );
+        end
+    endgenerate
 
     localparam NUM_FU_TOTAL = `NUM_FU_ALU + `NUM_FU_MULT;
-    logic [NUM_FU_TOTAL-1:0] all_cpl;
+    logic [NUM_FU_TOTAL-1:0] all_rdy;
+    logic [NUM_FU_TOTAL-1:0] cpl_gnt;
+    logic [`N-1:0][NUM_FU_TOTAL-1:0] cdb2fu_gbus;
+    assign all_rdy = {
+        mul_outs.rdy,
+        alu_outs.rdy
+    };
+
+    psel_gen #(
+        .WIDTH(NUM_FU_TOTAL),
+        .REQS(`N)
+    ) sel_cpl (
+        .req(all_rdy),
+        .gnt(cpl_gnt),
+        .gnt_bus(cdb2fu_gbus)
+    );
+
+    int unsigned off;
     always_comb begin
         rs_out = '{
             fu_rdy_alu      : alu_ins.rdy,
@@ -113,27 +146,57 @@ module stage_ex_p4 (
             fu_rdy_store    : '0
         };
 
-        all_cpl = {
-            mul_outs.cpl,
-            alu_outs.cpl
-        };
+        c_out = '0;
+        foreach (cdb2fu_gbus[c, f]) begin
+            if (!cdb2fu_gbus[c][f])
+                continue;
+
+            if (f < `NUM_FU_ALU) begin
+                off = f;
+                c_out.c_en[off]         |= 1;
+                c_out.c_ts[off]         |= alu_outs.dst[off].tag;
+                c_out.c_rob_idxs[off]   |= alu_outs.dst[off].rob_idx;
+                c_out.c_data[off]       |= alu_outs.res[off];
+            end else begin
+                if (!(reset || flush))
+                    $error("TODO: implement completion of MULT");
+                // off = f - `NUM_FU_MULT;
+                // c_out.c_en[off]         |= 1;
+                // c_out.c_ts[off]         |= mul_outs.dst[off].tag;
+                // c_out.c_rob_idxs[off]   |= mul_outs.dst[off].rob_idx;
+                // c_out.c_data[off]       |= mul_outs.res[off];
+            end
+        end
     end
 
 
     always_ff @(posedge clock) begin
         if (reset || flush) begin
             alu_ins     <= '0;
-            mul_ins     <= '1; // mark as busy
+            mul_ins     <= '0; // mark as busy
 
             alu_outs    <= '0;
             mul_outs    <= '0;
         end else begin
             // foreach (alu_ins.bsy[i]) begin
             for (int i = 0; i < `NUM_FU_ALU; ++i) begin
-                alu_ins.rdy[i] <= alu_ins.rdy[i]
-                    ? !(alu_outs.rdy[i] && alu_outs.cpl[i]) // if busy, did it complete
-                    : rs_in.fu_vld_alu[i];                  // if not busy, did it issue?
+
+                if (alu_ins.rdy[i] && !alu_outs.rdy[i]) begin
+                    alu_outs.rdy[i] <= 1;
+                    alu_outs.res[i] <= alu_res_n[i];
+                    alu_outs.dst[i] <= '{
+                        tag     :   alu_ins.dat[i].t,
+                        rob_idx :   alu_ins.dat[i].rob_idx
+                    };
+                end else begin
+                    alu_ins.rdy[i] <= alu_ins.rdy[i]
+                        ? !(alu_outs.rdy[i] && cpl_gnt[i]) // if busy, did it complete
+                        : rs_in.fu_vld_alu[i];             // if not busy, did it issue?
+                    alu_outs.rdy[i] <= alu_outs.rdy[i] && !cpl_gnt[i];
+                end
+
             end
+
         end
     end
 
