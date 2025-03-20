@@ -108,45 +108,45 @@ module stage_ex_p4 (
 
 
     always_comb begin
-        foreach(rs_in.fu_dat_alu[i]) begin
-            if(!rs_in.fu_vld_alu[i]) 
+        foreach(alu_ins.dat[i]) begin
+            if(!alu_ins.bsy[i]) 
                 continue;
 
             // ex_2_prf.prf_en[i] = rs_in.fu_vld_alu[i];
-            // ex_2_prf.s_t1s[i] = rs_in.fu_dat_alu[i].t1;
-            // ex_2_prf.s_t2s[i] = rs_in.fu_dat_alu[i].t2;
+            // ex_2_prf.s_t1s[i] = alu_ins.dat[i].t1;
+            // ex_2_prf.s_t2s[i] = alu_ins.dat[i].t2;
 
 
             if (alu_ins.dat[i].cond_branch) begin
                 alu_operands.opa_mux_out[i] = prf_in.s_v1s[i];
                 alu_operands.opb_mux_out[i] = prf_in.s_v2s[i];
                 // alu_func = 4'ha; //SENTINEL VALUE
-                alu_operands.branch_func[i] = rs_in.fu_dat_alu[i].inst.b.funct3;
+                alu_operands.branch_func[i] = alu_ins.dat[i].inst.b.funct3;
                 // branch = 1;
             end else begin
                 // ALU opA mux
-                case (rs_in.fu_dat_alu[i].opa_select)
-                    // OPA_IS_RS1:  alu_operands.opa_mux_out[i][i] = rs_in.fu_dat_alu[i].rs1_value;
+                case (alu_ins.dat[i].opa_select)
+                    // OPA_IS_RS1:  alu_operands.opa_mux_out[i][i] = alu_ins.dat[i].rs1_value;
                     OPA_IS_RS1:  alu_operands.opa_mux_out[i] = prf_in.s_v1s[i];
-                    OPA_IS_NPC:  alu_operands.opa_mux_out[i] = rs_in.fu_dat_alu[i].NPC;
-                    OPA_IS_PC:   alu_operands.opa_mux_out[i] = rs_in.fu_dat_alu[i].PC;
+                    OPA_IS_NPC:  alu_operands.opa_mux_out[i] = alu_ins.dat[i].NPC;
+                    OPA_IS_PC:   alu_operands.opa_mux_out[i] = alu_ins.dat[i].PC;
                     OPA_IS_ZERO: alu_operands.opa_mux_out[i] = 0;
                     default:     alu_operands.opa_mux_out[i]= 32'hdeadface; // dead face
                 endcase
 
                 // ALU opB mux
-                case (rs_in.fu_dat_alu[i].opb_select)
-                    // OPB_IS_RS2:   alu_operands.opb_mux_out[i][i] = rs_in.fu_dat_alu[i].rs2_value;
+                case (alu_ins.dat[i].opb_select)
+                    // OPB_IS_RS2:   alu_operands.opb_mux_out[i][i] = alu_ins.dat[i].rs2_value;
                     OPB_IS_RS2:   alu_operands.opb_mux_out[i] =  prf_in.s_v2s[i];
-                    OPB_IS_I_IMM: alu_operands.opb_mux_out[i] = `RV32_signext_Iimm(rs_in.fu_dat_alu[i].inst);
-                    OPB_IS_S_IMM: alu_operands.opb_mux_out[i] = `RV32_signext_Simm(rs_in.fu_dat_alu[i].inst);
-                    OPB_IS_B_IMM: alu_operands.opb_mux_out[i] = `RV32_signext_Bimm(rs_in.fu_dat_alu[i].inst);
-                    OPB_IS_U_IMM: alu_operands.opb_mux_out[i] = `RV32_signext_Uimm(rs_in.fu_dat_alu[i].inst);
-                    OPB_IS_J_IMM: alu_operands.opb_mux_out[i] = `RV32_signext_Jimm(rs_in.fu_dat_alu[i].inst);
+                    OPB_IS_I_IMM: alu_operands.opb_mux_out[i] = `RV32_signext_Iimm(alu_ins.dat[i].inst);
+                    OPB_IS_S_IMM: alu_operands.opb_mux_out[i] = `RV32_signext_Simm(alu_ins.dat[i].inst);
+                    OPB_IS_B_IMM: alu_operands.opb_mux_out[i] = `RV32_signext_Bimm(alu_ins.dat[i].inst);
+                    OPB_IS_U_IMM: alu_operands.opb_mux_out[i] = `RV32_signext_Uimm(alu_ins.dat[i].inst);
+                    OPB_IS_J_IMM: alu_operands.opb_mux_out[i] = `RV32_signext_Jimm(alu_ins.dat[i].inst);
                     default:      alu_operands.opb_mux_out[i] = 32'hfacefeed; // face feed
                 endcase
 
-                // alu_func = rs_in.fu_dat_alu[i].alu_func;
+                // alu_func = alu_ins.dat[i].alu_func;
                 alu_operands.branch_func[i] = 3'b011; //SENTINEL VALUE
                 // branch = 0;
             end
@@ -247,11 +247,11 @@ module stage_ex_p4 (
 
         prf_out = '0;
         for (int unsigned i = 0; i < `NUM_FU_ALU; ++i) begin
-            if (!rs_in.fu_vld_alu[i])//!alu_ins.bsy[i])
+            if (!alu_ins.bsy[i])
                 continue;
             prf_out.prf_en[i]   = 1;
-            prf_out.s_t1s[i]    = rs_in.fu_dat_alu[i].t1; 
-            prf_out.s_t2s[i]    = rs_in.fu_dat_alu[i].t2; 
+            prf_out.s_t1s[i]    = alu_ins.dat[i].t1; 
+            prf_out.s_t2s[i]    = alu_ins.dat[i].t2; 
         end
         for (int unsigned i = 0; i < `NUM_FU_MULT; ++i) begin
             if (!mul_ins.bsy[i])
