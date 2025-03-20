@@ -100,6 +100,8 @@ module stage_ex_p4 (
         DST     [`NUM_FU_MULT-1:0]  dst;
     } mul_outs;
     DATA [`NUM_FU_MULT-1:0] mul_res_n;
+    DST     [`NUM_FU_MULT-1:0] mul_dst_n;
+    logic   [`NUM_FU_MULT-1:0] mul_vld_n;
 
     generate
         for (genvar i = 0; i < `NUM_FU_ALU; ++i) begin : gen_alus
@@ -115,6 +117,30 @@ module stage_ex_p4 (
 
                 .take(), // True/False condition result (will return FALSE if branch is low)
                 .result(alu_res_n[i]) // will return 32'hfacebeec if branch is high (Sentinel, hopefully none of our alu computations result in that value)
+            );
+        end
+    endgenerate
+
+    generate
+        for (genvar i = 0; i < `NUM_FU_MULT; ++i) begin : gen_mults
+            // // Instantiate the ALU
+            // TODO: These ALU inputs were kinda hardcoded. Need mux stuff to select which type.
+            mult mult_0 ( 
+                .clock(clock),
+                .reset(reset),
+                .start(mul_ins.rdy[i]),
+                .dst_in('{
+                    rob_idx : mul_ins.dat[i].rob_idx,
+                    tag     : mul_ins.dat[i].t
+                }),
+                .rs1(prf_in.s_v1s[i + `NUM_FU_ALU]),
+                .rs2(prf_in.s_v2s[i + `NUM_FU_ALU]),
+                .func(mul_ins.dat[i].inst.r.funct3), // which mult operation to perform
+
+                // Output
+                .dst_out(mul_dst_n[i]),
+                .result (mul_res_n[i]),
+                .done   (mul_vld_n[i])
             );
         end
     endgenerate
@@ -160,11 +186,11 @@ module stage_ex_p4 (
             end else begin
                 if (!(reset || flush))
                     $error("TODO: implement completion of MULT");
-                // off = f - `NUM_FU_MULT;
-                // c_out.c_en[off]         |= 1;
-                // c_out.c_ts[off]         |= mul_outs.dst[off].tag;
-                // c_out.c_rob_idxs[off]   |= mul_outs.dst[off].rob_idx;
-                // c_out.c_data[off]       |= mul_outs.res[off];
+                off = f - `NUM_FU_MULT;
+                c_out.c_en[off]         |= 1;
+                c_out.c_ts[off]         |= mul_outs.dst[off].tag;
+                c_out.c_rob_idxs[off]   |= mul_outs.dst[off].rob_idx;
+                c_out.c_data[off]       |= mul_outs.res[off];
             end
         end
     end
@@ -173,14 +199,13 @@ module stage_ex_p4 (
     always_ff @(posedge clock) begin
         if (reset || flush) begin
             alu_ins     <= '0;
-            mul_ins     <= '0; // mark as busy
+            mul_ins     <= '0;
 
             alu_outs    <= '0;
             mul_outs    <= '0;
         end else begin
-            // foreach (alu_ins.bsy[i]) begin
-            for (int i = 0; i < `NUM_FU_ALU; ++i) begin
 
+            for (int i = 0; i < `NUM_FU_ALU; ++i) begin
                 if (alu_ins.rdy[i] && !alu_outs.rdy[i]) begin
                     alu_outs.rdy[i] <= 1;
                     alu_outs.res[i] <= alu_res_n[i];
@@ -197,7 +222,21 @@ module stage_ex_p4 (
                         : alu_ins.dat[i];
                     alu_outs.rdy[i] <= alu_outs.rdy[i] && !cpl_gnt[i];
                 end
+            end
 
+            for (int i = 0; i < `NUM_FU_MULT; ++i) begin
+                mul_outs.rdy[i] <= mul_vld_n[i];
+                if (mul_vld_n[i]) begin
+                    mul_outs.dst[i] <= mul_dst_n[i];
+                    mul_outs.res[i] <= mul_res_n[i];
+                end
+
+                mul_ins.rdy[i] <= mul_ins.rdy[i]
+                    ? !(mul_outs.rdy[i] && cpl_gnt[i + `NUM_FU_ALU]) // if busy, did it complete
+                    : rs_in.fu_vld_mult[i];             // if not busy, did it issue?
+                mul_ins.dat[i] <= rs_in.fu_vld_mult[i]
+                    ? rs_in.fu_dat_mult[i]
+                    : mul_ins.dat[i];
             end
 
         end

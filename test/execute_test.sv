@@ -78,7 +78,7 @@ module execute_test();
         @(negedge clock);
         @(negedge clock);
 
-        $finish;
+        // $finish;
 
         // // ---------- Test 2 ---------- //
         // $display("Test 2: 2 ALU instructions");
@@ -95,15 +95,27 @@ module execute_test();
         // rs_in.fu_vld_alu[1] = 0;
         // @(negedge clock);
 
-        // // ---------- Test 3 ---------- //
-        // $display("Test 3: 1 mult instruction");
-        // rs_in.fu_vld_mult[0] = 1;
-        // prf_in.s_v1s[0] = 3;
-        // prf_in.s_v2s[0] = 4;
-        // rs_in.fu_dat_mult[0].inst.r.funct3 = M_MUL;
-        // @(negedge clock);
-        // rs_in.fu_vld_mult[0] = 0;
-        // @(negedge clock);
+        // ---------- Test 3 ---------- //
+        $display("Test 3: 1 mult instruction");
+        rs_in.fu_vld_mult[0] = 1;
+        prf_in.s_v1s[0 + `NUM_FU_ALU] = 105;
+        prf_in.s_v2s[0 + `NUM_FU_ALU] = 257;
+        rs_in.fu_dat_mult[0].inst.r.funct3 = M_MUL;
+        @(negedge clock);
+        rs_in.fu_vld_mult[0] = 0;
+        @(negedge clock);
+
+        @(negedge clock);
+        @(negedge clock);
+        @(negedge clock);
+        @(negedge clock);
+        @(negedge clock);
+        @(negedge clock);
+        @(negedge clock);
+        @(negedge clock);
+        @(negedge clock);
+
+        $finish;
 
         // // ---------- Test 4 ---------- //
         // $display("Test 4: 2 mult instructions");
