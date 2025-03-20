@@ -72,7 +72,6 @@ module stage_ex_p4 (
     output  execute2complete c_out
 
 );
-    assign prf_out  = '0;
 
     // <FU>_ins: staging; where just-issued insns wait for 1 cycle to pull their operands
     struct packed {
@@ -193,6 +192,22 @@ module stage_ex_p4 (
                 c_out.c_data[off]       |= mul_outs.res[off];
             end
         end
+
+        prf_out = '0;
+        for (int unsigned i = 0; i < `NUM_FU_ALU; ++i) begin
+            if (!alu_ins.bsy[i])
+                continue;
+            prf_out.prf_en[i]   = 1;
+            prf_out.s_t1s[i]    = alu_ins.dat[i].t1; 
+            prf_out.s_t2s[i]    = alu_ins.dat[i].t2; 
+        end
+        for (int unsigned i = 0; i < `NUM_FU_MULT; ++i) begin
+            if (!mul_ins.bsy[i])
+                continue;
+            prf_out.prf_en[i + `NUM_FU_ALU]   = 1;
+            prf_out.s_t1s[i + `NUM_FU_ALU]    = mul_ins.dat[i].t1; 
+            prf_out.s_t2s[i + `NUM_FU_ALU]    = mul_ins.dat[i].t2; 
+        end
     end
 
 
@@ -253,6 +268,21 @@ module stage_ex_p4 (
                 c_out.c_ts[1],
                 c_out.c_data,
                 c_out.c_rob_idxs
+            );
+            $display("  %3d |||| <prf_out> en: %b s_t1s: [%0d, %0d] s_t2s: [%0d, %0d]",
+                $time,
+                prf_out.prf_en,
+                prf_out.s_t1s[1],
+                prf_out.s_t1s[0],
+                prf_out.s_t2s[1],
+                prf_out.s_t2s[0]
+            );
+            $display("  %3d |||| <prf_in >        s_v1s: [%0d, %0d] s_v2s: [%0d, %0d]",
+                $time,
+                prf_in.s_v1s[1],
+                prf_in.s_v1s[0],
+                prf_in.s_v2s[1],
+                prf_in.s_v2s[0]
             );
 
         end
