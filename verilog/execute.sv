@@ -247,11 +247,11 @@ module stage_ex_p4 (
 
         prf_out = '0;
         for (int unsigned i = 0; i < `NUM_FU_ALU; ++i) begin
-            if (!alu_ins.bsy[i])
+            if (!rs_in.fu_vld_alu[i])//!alu_ins.bsy[i])
                 continue;
             prf_out.prf_en[i]   = 1;
-            prf_out.s_t1s[i]    = alu_ins.dat[i].t1; 
-            prf_out.s_t2s[i]    = alu_ins.dat[i].t2; 
+            prf_out.s_t1s[i]    = rs_in.fu_dat_alu[i].t1; 
+            prf_out.s_t2s[i]    = rs_in.fu_dat_alu[i].t2; 
         end
         for (int unsigned i = 0; i < `NUM_FU_MULT; ++i) begin
             if (!mul_ins.bsy[i])
