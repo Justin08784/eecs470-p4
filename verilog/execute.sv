@@ -72,22 +72,47 @@ module stage_ex_p4 (
     output  execute2complete c_out
 
 );
-    assign rs_out   = '0;
     assign prf_out  = '0;
     assign c_out    = '0;
 
-    logic       [`NUM_FU_ALU-1:0]    fu_bsy_alu;
-    logic       [`NUM_FU_MULT-1:0]   fu_bsy_mult;
-    // stg = staging; where just-issued insns wait for 1 cycle to pull their operands
-    ID_RESULT   [`NUM_FU_ALU-1:0]    fu_stg_alu;
-    ID_RESULT   [`NUM_FU_MULT-1:0]   fu_stg_mult;
+    // <FU>_ins: staging; where just-issued insns wait for 1 cycle to pull their operands
+    struct packed {
+        logic   [`NUM_FU_ALU-1:0]   bsy;
+        logic   [`NUM_FU_ALU-1:0]   dat;
+    } alu_ins;
+    struct packed {
+        logic   [`NUM_FU_MULT-1:0]   bsy;
+        logic   [`NUM_FU_MULT-1:0]   dat;
+    } mul_ins;
+
+    // <FU>_outs: where executed insns wait until completion
+    struct packed {
+        logic   [`NUM_FU_ALU-1:0]   rdy;
+        DATA    [`NUM_FU_ALU-1:0]   res;
+        DST     [`NUM_FU_ALU-1:0]   dst;
+    } alu_outs;
+    struct packed {
+        logic   [`NUM_FU_MULT-1:0]  rdy;
+        DATA    [`NUM_FU_MULT-1:0]  res;
+        DST     [`NUM_FU_MULT-1:0]  dst;
+    } mul_outs;
+
+    always_comb begin
+        rs_out = '{
+            fu_rdy_alu      : ~alu_ins.bsy,
+            fu_rdy_mult     : ~mul_ins.bsy,
+            fu_rdy_load     : '1,
+            fu_rdy_store    : '1
+        };
+    end
 
 
     always_ff @(posedge clock) begin
         if (reset || flush) begin
-
+            alu_ins     <= '0;
+            mul_ins     <= '0;
         end else begin
-            
+            alu_ins.bsy <= alu_ins.bsy ? 
         end
     end
 

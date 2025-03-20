@@ -741,6 +741,6 @@ typedef struct packed {
 typedef struct packed {
     ROB_IDX rob_idx;
     PHYS_REG_IDX tag;
-} MULT_DEST;
+} DST;
 
 `endif // __SYS_DEFS_SVH__
