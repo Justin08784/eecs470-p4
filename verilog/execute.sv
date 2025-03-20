@@ -81,8 +81,8 @@ module stage_ex_p4 (
         logic   [`NUM_FU_ALU-1:0]   dat;
     } alu_ins;
     struct packed {
-        logic   [`NUM_FU_MULT-1:0]   bsy;
-        logic   [`NUM_FU_MULT-1:0]   dat;
+        logic   [`NUM_FU_MULT-1:0]  bsy;
+        logic   [`NUM_FU_MULT-1:0]  dat;
     } mul_ins;
 
     // <FU>_outs: where executed insns wait until completion
@@ -107,14 +107,14 @@ module stage_ex_p4 (
     logic [NUM_FU_TOTAL-1:0] all_cpl;
     always_comb begin
         rs_out = '{
-            fu_rdy_alu      : ~alu_ins.bsy,
-            fu_rdy_mult     : ~mul_ins.bsy,
-            fu_rdy_load     : '1,
-            fu_rdy_store    : '1
+            // fu_rdy_alu      : ~alu_ins.bsy,
+            // fu_rdy_mult     : ~mul_ins.bsy,
+            fu_rdy_alu      : '0,
+            fu_rdy_mult     : '0,
+            fu_rdy_load     : '0,
+            fu_rdy_store    : '0
         };
 
-        alu_outs.cpl = 2'b11;
-        mul_outs.cpl = 2'b01;
         all_cpl = {
             mul_outs.cpl,
             alu_outs.cpl
@@ -125,9 +125,15 @@ module stage_ex_p4 (
     always_ff @(posedge clock) begin
         if (reset || flush) begin
             alu_ins     <= '0;
-            mul_ins     <= '0;
+            mul_ins     <= '1; // mark as busy
+
+            alu_outs    <= '0;
+            mul_outs    <= '0;
         end else begin
-            foreach (alu_ins.bsy[i]) begin
+            alu_outs    <= '0;
+            alu_ins     <= '0;
+            // foreach (alu_ins.bsy[i]) begin
+            for (int i = 0; i < `NUM_FU_ALU; ++i) begin
                 alu_ins.bsy[i] <= alu_ins.bsy[i]
                     ? !(alu_outs.rdy[i] && alu_outs.cpl[i]) // if busy, did it complete
                     : rs_in.fu_vld_alu[i];                  // if not busy, did it issue?
@@ -135,6 +141,9 @@ module stage_ex_p4 (
             $display("alu: %b", alu_outs.cpl);
             $display("mul: %b", mul_outs.cpl);
             $display("all: %b", all_cpl);
+            $display("yoo: %b %b", alu_ins.bsy, mul_ins.bsy);
+            $display("ding: %b", rs_in.fu_vld_alu);
+            $display("");
         end
     end
 

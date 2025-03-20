@@ -33,14 +33,7 @@ module execute_test();
         #(`CLOCK_PERIOD/2) clock = ~clock;
     end
 
-    initial begin
-        $display("\nStart Testbench");
-
-        clock = 0;
-        reset = 1;
-        rs_in   = '0;
-        prf_in  = '0;
-
+    always @(posedge clock) begin
         $monitor("  %3d | rdy_alu: %b  rdy_mult: %b  rdy_store: %b  rdy_load: %b  |  c_en: %b  c_ts: %d  c_data: %h c_rob_idxs: %d",
             $time,
             rs_out.fu_rdy_alu,
@@ -52,17 +45,20 @@ module execute_test();
             c_out.c_data,
             c_out.c_rob_idxs
         );
+    end
+
+    initial begin
+        $display("\nStart Testbench");
+
+        clock   = 0;
+        reset   = 1;
+        rs_in   = '0;
+        prf_in  = '0;
+
 
         @(negedge clock);
         reset = 0;
         @(negedge clock);
-        @(negedge clock);
-        @(negedge clock);
-        @(negedge clock);
-        @(negedge clock);
-        @(negedge clock);
-
-        $finish;
 
         // ---------- Test 1 ---------- //
         $display("Test 1: 1 ALU instruction");
@@ -72,6 +68,14 @@ module execute_test();
         rs_in.fu_dat_alu[0].alu_func = ALU_ADD;
         @(negedge clock);
         rs_in.fu_vld_alu[0] = 0;
+        
+        @(negedge clock);
+        @(negedge clock);
+        @(negedge clock);
+        @(negedge clock);
+        @(negedge clock);
+
+        $finish;
 
         // // ---------- Test 2 ---------- //
         // $display("Test 2: 2 ALU instructions");
