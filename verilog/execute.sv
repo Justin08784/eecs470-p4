@@ -192,6 +192,9 @@ module stage_ex_p4 (
                     alu_ins.rdy[i] <= alu_ins.rdy[i]
                         ? !(alu_outs.rdy[i] && cpl_gnt[i]) // if busy, did it complete
                         : rs_in.fu_vld_alu[i];             // if not busy, did it issue?
+                    alu_ins.dat[i] <= rs_in.fu_vld_alu[i]
+                        ? rs_in.fu_dat_alu[i]
+                        : alu_ins.dat[i];
                     alu_outs.rdy[i] <= alu_outs.rdy[i] && !cpl_gnt[i];
                 end
 

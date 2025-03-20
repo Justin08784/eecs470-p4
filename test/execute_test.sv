@@ -68,6 +68,7 @@ module execute_test();
         prf_in.s_v1s[0] = 1;
         prf_in.s_v2s[0] = 2;
         rs_in.fu_dat_alu[0].alu_func = ALU_ADD;
+        rs_in.fu_dat_alu[0].t = 33;
         @(negedge clock);
         rs_in.fu_vld_alu[0] = 0;
         
