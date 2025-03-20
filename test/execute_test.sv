@@ -22,6 +22,7 @@ module execute_test();
     stage_ex_p4 dut (
         .clock  (clock),
         .reset  (reset),
+        .flush  (1'b0),
         .rs_in  (rs_in),
         .rs_out (rs_out),
         .prf_in (prf_in),
@@ -59,15 +60,19 @@ module execute_test();
         @(negedge clock);
         reset = 0;
         @(negedge clock);
+        @(negedge clock);
 
         // ---------- Test 1 ---------- //
         $display("Test 1: 1 ALU instruction");
         rs_in.fu_vld_alu[0] = 1;
-        prf_in.s_v1s[0] = 1;
-        prf_in.s_v2s[0] = 2;
-        rs_in.fu_dat_alu[0].alu_func = ALU_ADD;
+        // prf_in.s_v1s[0] = 1;
+        // prf_in.s_v2s[0] = 2;
+        // rs_in.fu_dat_alu[0].alu_func = ALU_ADD;
         @(negedge clock);
         rs_in.fu_vld_alu[0] = 0;
+        $display(
+            "yado: %b", rs_in
+        );
         
         @(negedge clock);
         @(negedge clock);
