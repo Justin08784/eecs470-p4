@@ -76,6 +76,22 @@ module stage_ex_p4 (
     assign prf_out  = '0;
     assign c_out    = '0;
 
+    logic       [`NUM_FU_ALU-1:0]    fu_bsy_alu;
+    logic       [`NUM_FU_MULT-1:0]   fu_bsy_mult;
+    // stg = staging; where just-issued insns wait for 1 cycle to pull their operands
+    ID_RESULT   [`NUM_FU_ALU-1:0]    fu_stg_alu;
+    ID_RESULT   [`NUM_FU_MULT-1:0]   fu_stg_mult;
+
+
+    always_ff @(posedge clock) begin
+        if (reset || flush) begin
+
+        end else begin
+            
+        end
+    end
+
+
 
     // logic       [`NUM_FU_ALU-1:0]    fu_rdy_alu;
     // logic       [`NUM_FU_MULT-1:0]   fu_rdy_mult;
