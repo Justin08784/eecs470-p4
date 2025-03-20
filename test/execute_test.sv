@@ -65,14 +65,11 @@ module execute_test();
         // ---------- Test 1 ---------- //
         $display("Test 1: 1 ALU instruction");
         rs_in.fu_vld_alu[0] = 1;
-        // prf_in.s_v1s[0] = 1;
-        // prf_in.s_v2s[0] = 2;
-        // rs_in.fu_dat_alu[0].alu_func = ALU_ADD;
+        prf_in.s_v1s[0] = 1;
+        prf_in.s_v2s[0] = 2;
+        rs_in.fu_dat_alu[0].alu_func = ALU_ADD;
         @(negedge clock);
         rs_in.fu_vld_alu[0] = 0;
-        $display(
-            "yado: %b", rs_in
-        );
         
         @(negedge clock);
         @(negedge clock);
