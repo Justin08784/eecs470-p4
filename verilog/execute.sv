@@ -72,32 +72,26 @@ module stage_ex_p4 (
     output  execute2complete ex_c_out
 
 );
-    logic       [`NUM_FU_ALU-1:0]    fu_rdy_alu;
-    logic       [`NUM_FU_MULT-1:0]   fu_rdy_mult;
-    logic       [`NUM_FU_STORE-1:0]  fu_rdy_store;
-    logic       [`NUM_FU_LOAD-1:0]   fu_rdy_load;
+    logic   [`NUM_FU_ALU-1:0]    fu_rdy_alu;
+    logic   [`NUM_FU_MULT-1:0]   fu_rdy_mult;
+    logic   [`NUM_FU_STORE-1:0]  fu_rdy_store;
+    logic   [`NUM_FU_LOAD-1:0]   fu_rdy_load;
     ID_RESULT   [`NUM_FU_ALU-1:0]    fu_dat_alu;
     ID_RESULT   [`NUM_FU_MULT-1:0]   fu_dat_mult;
     ID_RESULT   [`NUM_FU_STORE-1:0]  fu_dat_store;
     ID_RESULT   [`NUM_FU_LOAD-1:0]   fu_dat_load;
+    DATA [`NUM_FU_ALU-1:0] opa_mux_out, opb_mux_out, alu_result;
+    ALU_FUNC [`NUM_FU_ALU-1:0] alu_func;
+    logic [`NUM_FU_ALU-1:0] alu_done;
+    logic [`NUM_FU_ALU-1:0] branch;
+    logic [`NUM_FU_ALU-1:0] [2:0] branch_func;
+    logic [`NUM_FU_ALU-1:0] take_conditional;
 
-    struct packed {
-        DATA        opa_mux_out, opb_mux_out, alu_result;
-        ALU_FUNC    alu_func;
-        logic       alu_done;
-        logic       branch;
-        logic       [2:0] branch_func;
-        logic       take_conditional;
-    } [`NUM_FU_ALU-1:0] alu_bundle;
-
-    struct packed {
-        logic       [2:0] mult_func;
-        logic       mult_done;
-        MULT_DEST   mul_dst_in;
-        MULT_DEST   mul_dst_out;
-        DATA        mult_value1, mult_value2, mult_result;
-    } [`NUM_FU_MULT-1:0] mult_bundle;
-
+    logic [`NUM_FU_MULT-1:0] [2:0] mult_func;
+    logic [`NUM_FU_MULT-1:0] mult_done;
+    MULT_DEST [`NUM_FU_MULT-1:0] mul_dst_in;
+    MULT_DEST [`NUM_FU_MULT-1:0] mul_dst_out;
+    DATA  [`NUM_FU_MULT-1:0] mult_value1, mult_value2, mult_result;
 
     assign ex_rdy_out.fu_rdy_alu = fu_rdy_alu;
     assign ex_rdy_out.fu_rdy_mult = fu_rdy_mult;
@@ -105,142 +99,92 @@ module stage_ex_p4 (
     assign ex_rdy_out.fu_rdy_store = fu_rdy_store;
 
     always_ff @(posedge clock) begin
-        $display("DEBUG: mult_done[0] at cycle %0t = %b", $time,    mult_bundle[0].mult_done);
-        $display("DEBUG: mult_result[0] at cycle %0t = %b", $time,  mult_bundle[0].mult_result);
+        $display("DEBUG: mult_done[0] at cycle %0t = %b", $time, mult_done[0]);
+        $display("DEBUG: mult_result[0] at cycle %0t = %b", $time, mult_result[0]);
     end
  
     always_comb begin
         ex_c_out = '0;
         for (int i = 0; i < `NUM_FU_MULT; ++i) begin
-        $display("MULT_RESULT: %2d",mult_bundle[i].mult_result);
-        $display("MULT_DONE: %2d",mult_bundle[i].mult_done);
-            ex_c_out.c_en[i]        = !fu_rdy_alu[i];//mult_done[i];
-            ex_c_out.c_ts[i]        = fu_dat_alu[i].t;//internal_mul_dat[i].t;
-            ex_c_out.c_rob_idxs[i]  = fu_dat_alu[i].rob_idx;//internal_mul_dat[i].rob_idx;
-            ex_c_out.c_data[i]      = alu_bundle[i].alu_result;//mult_result[i];
-            
-            // if (!mult_bundle[i].mult_done)
-            //     continue;
-            if (mult_bundle[i].mult_done) begin
-            ex_c_out.c_en[i]        = mult_bundle[i].mult_done;
-            ex_c_out.c_ts[i]        = mult_bundle[i].mul_dst_out.tag;
-            ex_c_out.c_rob_idxs[i]  = mult_bundle[i].mul_dst_out.rob_idx;
-            ex_c_out.c_data[i]      = mult_bundle[i].mult_result;
-            end
+            if (!mult_done[i])
+                continue;
+
+            ex_c_out.c_en[i]        = mult_done[i];
+            ex_c_out.c_ts[i]        = mul_dst_out[i].tag;
+            ex_c_out.c_rob_idxs[i]  = mul_dst_out[i].rob_idx;
+            ex_c_out.c_data[i]      = mult_result[i];
         end
     end
-   
-    generate 
-        for(genvar i = 0; i < `NUM_FU_MULT; i++ ) begin
-            // Instantiate the ALU
-            alu alu_0 ( 
-                // Inputs
-                .opa        (alu_bundle[i].opa_mux_out),
-                .opb        (alu_bundle[i].opb_mux_out),
-                .alu_func   (alu_bundle[i].alu_func),
-                .branch     (alu_bundle[i].branch), // is this a cond_branch
-                .branch_func(alu_bundle[i].branch_func), // Which branch condition to check
 
-                .take       (alu_bundle[i].take_conditional), // True/False condition result (will return FALSE if branch is low)
-                .result     (alu_bundle[i].alu_result) // will return 32'hfacebeec if branch is high (Sentinel, hopefully none of our 
-            );
+   
+    // // Instantiate the ALU
+    alu alu_0 [`NUM_FU_ALU-1:0] ( 
+        // Inputs
+        .opa(opa_mux_out),
+        .opb(opb_mux_out),
+        .alu_func(alu_func),
+        .branch(branch), // is this a cond_branch
+        .branch_func(branch_func), // Which branch condition to check
+
+        .take(take_conditional), // True/False condition result (will return FALSE if branch is low)
+        .result(alu_result) // will return 32'hfacebeec if branch is high (Sentinel, hopefully none of our alu computations result in that value)
+    );
+
+
+    always_comb begin
+        foreach(ex_fu_in.fu_dat_mult[i]) begin
+            if(!ex_fu_in.fu_vld_mult[i]) 
+                continue;
+
+            ex_2_prf.prf_en[i] = ex_fu_in.fu_vld_mult[i];
+            ex_2_prf.s_t1s[i] = ex_fu_in.fu_dat_mult[i].t1;
+            ex_2_prf.s_t2s[i] = ex_fu_in.fu_dat_mult[i].t2;
+
+            case (ex_fu_in.fu_dat_mult[i].opa_select)
+                // OPA_IS_RS1:  opa_mux_out[i] = ex_fu_in.fu_dat_mult[i].rs1_value;
+                OPA_IS_RS1:  mult_value1[i] = prf_2_ex.s_v1s[i];
+                OPA_IS_NPC:  mult_value1[i] = ex_fu_in.fu_dat_mult[i].NPC;
+                OPA_IS_PC:   mult_value1[i] = ex_fu_in.fu_dat_mult[i].PC;
+                OPA_IS_ZERO: mult_value1[i] = 0;
+                default:     mult_value1[i]= 32'hdeadface; // dead face
+            endcase
+
+            // mult opB mux
+            case (ex_fu_in.fu_dat_mult[i].opb_select)
+                // OPB_IS_RS2:   opb_mux_out[i] = ex_fu_in.fu_dat_mult[i].rs2_value;
+                OPB_IS_RS2:   mult_value2[i] =  prf_2_ex.s_v2s[i];
+                OPB_IS_I_IMM: mult_value2[i] = `RV32_signext_Iimm(ex_fu_in.fu_dat_mult[i].inst);
+                OPB_IS_S_IMM: mult_value2[i] = `RV32_signext_Simm(ex_fu_in.fu_dat_mult[i].inst);
+                OPB_IS_B_IMM: mult_value2[i] = `RV32_signext_Bimm(ex_fu_in.fu_dat_mult[i].inst);
+                OPB_IS_U_IMM: mult_value2[i] = `RV32_signext_Uimm(ex_fu_in.fu_dat_mult[i].inst);
+                OPB_IS_J_IMM: mult_value2[i] = `RV32_signext_Jimm(ex_fu_in.fu_dat_mult[i].inst);
+                default:      mult_value2[i] = 32'hfacefeed; // face feed
+            endcase
+
+            mult_func[i] = ex_fu_in.fu_dat_mult[i].alu_func;
         end
-    endgenerate
+    end
 
     generate 
         for(genvar i = 0; i < `NUM_FU_MULT; i++ ) begin
             // Instantiate the multiplier
             mult mult_0 (
                 // Inputs
-                .clock  (clock),
-                .reset  (reset),
-                .start  (ex_fu_in.fu_vld_mult[i]),
-                .dst_in (mult_bundle[i].mul_dst_in),
-                .rs1    (mult_bundle[i].mult_value1),
-                .rs2    (mult_bundle[i].mult_value2),
-                .func   (mult_bundle[i].mult_func), // which mult operation to perform
+                .clock(clock),
+                .reset(reset),
+                .start(ex_fu_in.fu_vld_mult[i]),
+                .dst_in(mul_dst_in[i]),
+                .rs1(mult_value1[i]),
+                .rs2(mult_value2[i]),
+                .func(ex_fu_in.fu_dat_mult[i].inst.r.funct3), // which mult operation to perform
 
                 // Output
-                .dst_out(mult_bundle[i].mul_dst_out),
-                .result (mult_bundle[i].mult_result),
-                .done   (mult_bundle[i].mult_done)
+                .dst_out(mul_dst_out[i]),
+                .result(mult_result[i]),
+                .done(mult_done[i])
         );
         end
     endgenerate
-
-
-    always_comb begin
-        foreach(ex_fu_in.fu_dat_alu[i]) begin
-            if(!ex_fu_in.fu_vld_alu[i]) 
-                continue;
-
-            ex_2_prf.prf_en[i] = ex_fu_in.fu_vld_alu[i];
-            ex_2_prf.s_t1s[i] = ex_fu_in.fu_dat_alu[i].t1;
-            ex_2_prf.s_t2s[i] = ex_fu_in.fu_dat_alu[i].t2;
-
-
-            if (ex_fu_in.fu_dat_alu[i].cond_branch) begin
-                alu_bundle[i].opa_mux_out = prf_2_ex.s_v1s[i];
-                alu_bundle[i].opb_mux_out = prf_2_ex.s_v2s[i];
-                alu_bundle[i].alu_func = 4'ha; //SENTINEL VALUE
-                alu_bundle[i].branch_func = ex_fu_in.fu_dat_alu[i].inst.b.funct3;
-                alu_bundle[i].branch = 1;
-            end else begin
-                // ALU opA mux
-                case (ex_fu_in.fu_dat_alu[i].opa_select)
-                    // OPA_IS_RS1:  opa_mux_out[i] = ex_fu_in.fu_dat_alu[i].rs1_value;
-                    OPA_IS_RS1:  alu_bundle[i].opa_mux_out = prf_2_ex.s_v1s[i];
-                    OPA_IS_NPC:  alu_bundle[i].opa_mux_out = ex_fu_in.fu_dat_alu[i].NPC;
-                    OPA_IS_PC:   alu_bundle[i].opa_mux_out = ex_fu_in.fu_dat_alu[i].PC;
-                    OPA_IS_ZERO: alu_bundle[i].opa_mux_out = 0;
-                    default:     alu_bundle[i].opa_mux_out= 32'hdeadface; // dead face
-                endcase
-
-                // ALU opB mux
-                case (ex_fu_in.fu_dat_alu[i].opb_select)
-                    // OPB_IS_RS2:   opb_mux_out[i] = ex_fu_in.fu_dat_alu[i].rs2_value;
-                    OPB_IS_RS2:   alu_bundle[i].opb_mux_out =  prf_2_ex.s_v2s[i];
-                    OPB_IS_I_IMM: alu_bundle[i].opb_mux_out = `RV32_signext_Iimm(ex_fu_in.fu_dat_alu[i].inst);
-                    OPB_IS_S_IMM: alu_bundle[i].opb_mux_out = `RV32_signext_Simm(ex_fu_in.fu_dat_alu[i].inst);
-                    OPB_IS_B_IMM: alu_bundle[i].opb_mux_out = `RV32_signext_Bimm(ex_fu_in.fu_dat_alu[i].inst);
-                    OPB_IS_U_IMM: alu_bundle[i].opb_mux_out = `RV32_signext_Uimm(ex_fu_in.fu_dat_alu[i].inst);
-                    OPB_IS_J_IMM: alu_bundle[i].opb_mux_out = `RV32_signext_Jimm(ex_fu_in.fu_dat_alu[i].inst);
-                    default:      alu_bundle[i].opb_mux_out = 32'hfacefeed; // face feed
-                endcase
-
-                alu_bundle[i].alu_func = ex_fu_in.fu_dat_alu[i].alu_func;
-                alu_bundle[i].branch_func = 3'b011; //SENTINEL VALUE
-                alu_bundle[i].branch = 0;
-            end
-        end
-
-        //mult prf interaction
-        foreach(ex_fu_in.fu_dat_mult[i]) begin
-            if (reset || flush) begin
-                mult_bundle[i].mult_value1 = '0;
-                mult_bundle[i].mult_value2 = '0;
-                mult_bundle[i].mult_func = '0;
-            end
-            else begin
-                if(!ex_fu_in.fu_vld_mult[i]) 
-                    continue;
-
-                ex_2_prf.prf_en[i+`NUM_FU_ALU] = ex_fu_in.fu_vld_mult[i];
-                
-                ex_2_prf.s_t1s[i+`NUM_FU_ALU] = ex_fu_in.fu_dat_mult[i].t1;
-                ex_2_prf.s_t2s[i+`NUM_FU_ALU] = ex_fu_in.fu_dat_mult[i].t2;
-
-                mult_bundle[i].mult_value1 = prf_2_ex.s_v1s[i+`NUM_FU_ALU];
-                mult_bundle[i].mult_value2 =  prf_2_ex.s_v2s[i+`NUM_FU_ALU];
-
-                mult_bundle[i].mult_func = ex_fu_in.fu_dat_mult[i].inst.r.funct3;
-            end
-
-            $display("MULT_VALUE1: %2d",mult_bundle[i].mult_value1);
-            $display("MULT_VALUE2: %2d",mult_bundle[i].mult_value2);
-        end
-    end
-
     
     always_ff @(posedge clock) begin
         if (reset || flush) begin
@@ -253,27 +197,20 @@ module stage_ex_p4 (
             fu_dat_mult     <= '0;
             fu_dat_store    <= '0;
             fu_dat_load     <= '0;
-
-            foreach(mult_bundle[i]) begin
-                mult_bundle[i].mul_dst_in.tag <= '0;
-                mult_bundle[i].mul_dst_in.rob_idx <= '0;
-            end
             // internal_mul_dat <= '0;
         end else begin
             foreach (fu_rdy_alu[i]) begin
-                fu_rdy_alu[i]   <= ex_fu_in.fu_vld_alu[i] ? 0 : (alu_bundle[i].alu_done || fu_rdy_alu[i]);// || ex_c_out.c_en[i]; //OR'ing this will work to reset the flag, just have to make sure it is coming from the right FU so that we don't accidentally reset the ALU with a mult flag or something
+                fu_rdy_alu[i]   <= ex_fu_in.fu_vld_alu[i] ? 0 : (alu_done[i] || fu_rdy_alu[i]);// || ex_c_out.c_en[i]; //OR'ing this will work to reset the flag, just have to make sure it is coming from the right FU so that we don't accidentally reset the ALU with a mult flag or something
                 fu_dat_alu[i]   <= ex_fu_in.fu_vld_alu[i] ? ex_fu_in.fu_dat_alu[i] : '0;
                 $display("assign: %d vld:%b insn:%x", i, ex_fu_in.fu_vld_alu[i], ex_fu_in.fu_dat_alu[i].inst);
             end
 
             foreach(fu_rdy_mult[i]) begin
-                fu_rdy_mult[i]  <= ex_fu_in.fu_vld_mult[i] ? 0 : (mult_bundle[i].mult_done || fu_rdy_mult[i]);
+                fu_rdy_mult[i]  <= ex_fu_in.fu_vld_mult[i] ? 0 : (mult_done[i] || fu_rdy_mult[i]);
                 fu_dat_mult[i]  <= ex_fu_in.fu_vld_mult[i] ? ex_fu_in.fu_dat_mult[i] : '0;
 
-                mult_bundle[i].mul_dst_in.tag
-                    <= ex_fu_in.fu_vld_mult[i] ? ex_fu_in.fu_dat_mult[i].t : mult_bundle[i].mul_dst_in.tag;
-                mult_bundle[i].mul_dst_in.rob_idx
-                    <= ex_fu_in.fu_vld_mult[i] ? ex_fu_in.fu_dat_mult[i].rob_idx : mult_bundle[i].mul_dst_in.rob_idx; //internal_mul_dat
+                mul_dst_in[i].tag       <= ex_fu_in.fu_vld_mult[i] ? ex_fu_in.fu_dat_mult[i].t : mul_dst_in[i].tag;
+                mul_dst_in[i].rob_idx   <= ex_fu_in.fu_vld_mult[i] ? ex_fu_in.fu_dat_mult[i].rob_idx : mul_dst_in[i].rob_idx; //internal_mul_dat
             end
 
             for (int i = 0; i < `N; ++i) begin

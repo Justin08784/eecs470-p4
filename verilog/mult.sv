@@ -59,7 +59,6 @@ module mult (
             M_MUL, M_MULH: mplier = {{(32){rs2[31]}}, rs2};
             default:       mplier = {32'b0, rs2};
         endcase
-        $display("INTERNAL MULT RESULT: %2d", result);
     end
 
     // Use the high or low bits of the product based on the output func
@@ -88,7 +87,6 @@ module mult_stage (
 
     assign shifted_mplier = {SHIFT'('b0), mplier[63:SHIFT]};
     assign shifted_mcand = {mcand[63-SHIFT:0], SHIFT'('b0)};
-    // assign next_dst = dst;
 
     always_ff @(posedge clock) begin
         product_sum <= prev_sum + partial_product;

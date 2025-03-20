@@ -257,11 +257,6 @@ build/execute.simv: $(EXECUTE_FILES)
 build/execute.cov: $(EXECUTE_FILES)
 build/execute.vg: $(EXECUTE_FILES)
 
-EXECUTE_FILES = verilog/mult.sv
-build/execute.simv: $(EXECUTE_FILES)
-build/execute.cov: $(EXECUTE_FILES)
-build/execute.vg: $(EXECUTE_FILES)
-
 
 #################################
 # ---- Main CPU Definition ---- #
