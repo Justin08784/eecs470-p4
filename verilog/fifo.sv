@@ -70,8 +70,8 @@ module fifo #(
     assign free         = DEPTH - used;
     assign free_scnt    = `MIN(free, NUM_WPORTS);
     assign used_scnt    = `MIN(used, NUM_RPORTS);
-    assign empty        = empty == 0;
-    assign full         = full == DEPTH;
+    assign empty        = used == 0;
+    assign full         = used == DEPTH;
     assign prvw_vld_cnt = ENABLE_READ_PREVIEW ? `MIN(used + wr_en_cnt, NUM_RPORTS) : '0;
     assign show_limit   = ENABLE_READ_PREVIEW ? prvw_vld_cnt : rd_en_cnt;
 
