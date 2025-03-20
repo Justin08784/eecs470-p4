@@ -509,8 +509,8 @@ module cpu (
     execute2rs      ex_2_rs; 
     rs2execute      rs_2_ex;
 
-    execute2prf     ex_2_prf;
-    prf2execute     prf_2_ex;
+    execute2prf     prf_out;
+    prf2execute     prf_in;
 
     execute2complete ex_2_complete;
     rs rs_0(
@@ -600,11 +600,11 @@ module cpu (
         .clock(clock),
         .reset(reset),
         .flush(flush),
-        .ex_fu_in(rs_2_ex),
-        .ex_rdy_out(ex_2_rs),
-        .ex_c_out(ex_2_complete),
-        .ex_2_prf(ex_2_prf),
-        .prf_2_ex(prf_2_ex)
+        .rs_in(rs_2_ex),
+        .rs_out(ex_2_rs),
+        .c_out(ex_2_complete),
+        .prf_out(prf_out),
+        .prf_in(prf_in)
     );
 
 
@@ -683,11 +683,11 @@ module cpu (
         .c_en(ex_2_complete.c_en),
         .c_ts(ex_2_complete.c_ts),
         .c_vs(ex_2_complete.c_data),
-        .s_en(ex_2_prf.prf_en),
-        .s_t1s(ex_2_prf.s_t1s),   //execute2prf.t1
-        .s_t2s(ex_2_prf.s_t2s),   //execute2prf.t2
-        .s_v1s(prf_2_ex.s_v1s),   //prf2execute.s_v1s
-        .s_v2s(prf_2_ex.s_v2s),    //prf2execute.s_v1s
+        .s_en(prf_out.prf_en),
+        .s_t1s(prf_out.s_t1s),   //execute2prf.t1
+        .s_t2s(prf_out.s_t2s),   //execute2prf.t2
+        .s_v1s(prf_in.s_v1s),   //prf2execute.s_v1s
+        .s_v2s(prf_in.s_v2s),    //prf2execute.s_v1s
         .r_in(retire2prf),
         .r_out(prf2retire)
     );

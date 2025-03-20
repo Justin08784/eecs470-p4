@@ -62,14 +62,14 @@ module stage_ex_p4 (
     input reset,
     input flush,
 
-    input   rs2execute ex_fu_in,
-    output  execute2rs ex_rdy_out,
+    input   rs2execute rs_in,
+    output  execute2rs rs_out,
 
-    input   prf2execute prf_2_ex,
-    output  execute2prf ex_2_prf,
+    input   prf2execute prf_in,
+    output  execute2prf prf_out,
 
     // TODO: wrap this stuff into execute2complete. Wrap crap here in general.
-    output  execute2complete ex_c_out
+    output  execute2complete c_out
 
 );
     logic   [`NUM_FU_ALU-1:0]    fu_rdy_alu;
@@ -93,10 +93,10 @@ module stage_ex_p4 (
     MULT_DEST [`NUM_FU_MULT-1:0] mul_dst_out;
     DATA  [`NUM_FU_MULT-1:0] mult_value1, mult_value2, mult_result;
 
-    assign ex_rdy_out.fu_rdy_alu = fu_rdy_alu;
-    assign ex_rdy_out.fu_rdy_mult = fu_rdy_mult;
-    assign ex_rdy_out.fu_rdy_load = fu_rdy_load;
-    assign ex_rdy_out.fu_rdy_store = fu_rdy_store;
+    assign rs_out.fu_rdy_alu = fu_rdy_alu;
+    assign rs_out.fu_rdy_mult = fu_rdy_mult;
+    assign rs_out.fu_rdy_load = fu_rdy_load;
+    assign rs_out.fu_rdy_store = fu_rdy_store;
 
     always_ff @(posedge clock) begin
         $display("DEBUG: mult_done[0] at cycle %0t = %b", $time, mult_done[0]);
@@ -104,15 +104,15 @@ module stage_ex_p4 (
     end
  
     always_comb begin
-        ex_c_out = '0;
+        c_out = '0;
         for (int i = 0; i < `NUM_FU_MULT; ++i) begin
             if (!mult_done[i])
                 continue;
 
-            ex_c_out.c_en[i]        = mult_done[i];
-            ex_c_out.c_ts[i]        = mul_dst_out[i].tag;
-            ex_c_out.c_rob_idxs[i]  = mul_dst_out[i].rob_idx;
-            ex_c_out.c_data[i]      = mult_result[i];
+            c_out.c_en[i]        = mult_done[i];
+            c_out.c_ts[i]        = mul_dst_out[i].tag;
+            c_out.c_rob_idxs[i]  = mul_dst_out[i].rob_idx;
+            c_out.c_data[i]      = mult_result[i];
         end
     end
 
@@ -132,36 +132,36 @@ module stage_ex_p4 (
 
 
     always_comb begin
-        foreach(ex_fu_in.fu_dat_mult[i]) begin
-            if(!ex_fu_in.fu_vld_mult[i]) 
+        foreach(rs_in.fu_dat_mult[i]) begin
+            if(!rs_in.fu_vld_mult[i]) 
                 continue;
 
-            ex_2_prf.prf_en[i] = ex_fu_in.fu_vld_mult[i];
-            ex_2_prf.s_t1s[i] = ex_fu_in.fu_dat_mult[i].t1;
-            ex_2_prf.s_t2s[i] = ex_fu_in.fu_dat_mult[i].t2;
+            prf_out.prf_en[i] = rs_in.fu_vld_mult[i];
+            prf_out.s_t1s[i] = rs_in.fu_dat_mult[i].t1;
+            prf_out.s_t2s[i] = rs_in.fu_dat_mult[i].t2;
 
-            case (ex_fu_in.fu_dat_mult[i].opa_select)
-                // OPA_IS_RS1:  opa_mux_out[i] = ex_fu_in.fu_dat_mult[i].rs1_value;
-                OPA_IS_RS1:  mult_value1[i] = prf_2_ex.s_v1s[i];
-                OPA_IS_NPC:  mult_value1[i] = ex_fu_in.fu_dat_mult[i].NPC;
-                OPA_IS_PC:   mult_value1[i] = ex_fu_in.fu_dat_mult[i].PC;
+            case (rs_in.fu_dat_mult[i].opa_select)
+                // OPA_IS_RS1:  opa_mux_out[i] = rs_in.fu_dat_mult[i].rs1_value;
+                OPA_IS_RS1:  mult_value1[i] = prf_in.s_v1s[i];
+                OPA_IS_NPC:  mult_value1[i] = rs_in.fu_dat_mult[i].NPC;
+                OPA_IS_PC:   mult_value1[i] = rs_in.fu_dat_mult[i].PC;
                 OPA_IS_ZERO: mult_value1[i] = 0;
                 default:     mult_value1[i]= 32'hdeadface; // dead face
             endcase
 
             // mult opB mux
-            case (ex_fu_in.fu_dat_mult[i].opb_select)
-                // OPB_IS_RS2:   opb_mux_out[i] = ex_fu_in.fu_dat_mult[i].rs2_value;
-                OPB_IS_RS2:   mult_value2[i] =  prf_2_ex.s_v2s[i];
-                OPB_IS_I_IMM: mult_value2[i] = `RV32_signext_Iimm(ex_fu_in.fu_dat_mult[i].inst);
-                OPB_IS_S_IMM: mult_value2[i] = `RV32_signext_Simm(ex_fu_in.fu_dat_mult[i].inst);
-                OPB_IS_B_IMM: mult_value2[i] = `RV32_signext_Bimm(ex_fu_in.fu_dat_mult[i].inst);
-                OPB_IS_U_IMM: mult_value2[i] = `RV32_signext_Uimm(ex_fu_in.fu_dat_mult[i].inst);
-                OPB_IS_J_IMM: mult_value2[i] = `RV32_signext_Jimm(ex_fu_in.fu_dat_mult[i].inst);
+            case (rs_in.fu_dat_mult[i].opb_select)
+                // OPB_IS_RS2:   opb_mux_out[i] = rs_in.fu_dat_mult[i].rs2_value;
+                OPB_IS_RS2:   mult_value2[i] =  prf_in.s_v2s[i];
+                OPB_IS_I_IMM: mult_value2[i] = `RV32_signext_Iimm(rs_in.fu_dat_mult[i].inst);
+                OPB_IS_S_IMM: mult_value2[i] = `RV32_signext_Simm(rs_in.fu_dat_mult[i].inst);
+                OPB_IS_B_IMM: mult_value2[i] = `RV32_signext_Bimm(rs_in.fu_dat_mult[i].inst);
+                OPB_IS_U_IMM: mult_value2[i] = `RV32_signext_Uimm(rs_in.fu_dat_mult[i].inst);
+                OPB_IS_J_IMM: mult_value2[i] = `RV32_signext_Jimm(rs_in.fu_dat_mult[i].inst);
                 default:      mult_value2[i] = 32'hfacefeed; // face feed
             endcase
 
-            mult_func[i] = ex_fu_in.fu_dat_mult[i].alu_func;
+            mult_func[i] = rs_in.fu_dat_mult[i].alu_func;
         end
     end
 
@@ -172,11 +172,11 @@ module stage_ex_p4 (
                 // Inputs
                 .clock(clock),
                 .reset(reset),
-                .start(ex_fu_in.fu_vld_mult[i]),
+                .start(rs_in.fu_vld_mult[i]),
                 .dst_in(mul_dst_in[i]),
                 .rs1(mult_value1[i]),
                 .rs2(mult_value2[i]),
-                .func(ex_fu_in.fu_dat_mult[i].inst.r.funct3), // which mult operation to perform
+                .func(rs_in.fu_dat_mult[i].inst.r.funct3), // which mult operation to perform
 
                 // Output
                 .dst_out(mul_dst_out[i]),
@@ -200,26 +200,26 @@ module stage_ex_p4 (
             // internal_mul_dat <= '0;
         end else begin
             foreach (fu_rdy_alu[i]) begin
-                fu_rdy_alu[i]   <= ex_fu_in.fu_vld_alu[i] ? 0 : (alu_done[i] || fu_rdy_alu[i]);// || ex_c_out.c_en[i]; //OR'ing this will work to reset the flag, just have to make sure it is coming from the right FU so that we don't accidentally reset the ALU with a mult flag or something
-                fu_dat_alu[i]   <= ex_fu_in.fu_vld_alu[i] ? ex_fu_in.fu_dat_alu[i] : '0;
-                $display("assign: %d vld:%b insn:%x", i, ex_fu_in.fu_vld_alu[i], ex_fu_in.fu_dat_alu[i].inst);
+                fu_rdy_alu[i]   <= rs_in.fu_vld_alu[i] ? 0 : (alu_done[i] || fu_rdy_alu[i]);// || c_out.c_en[i]; //OR'ing this will work to reset the flag, just have to make sure it is coming from the right FU so that we don't accidentally reset the ALU with a mult flag or something
+                fu_dat_alu[i]   <= rs_in.fu_vld_alu[i] ? rs_in.fu_dat_alu[i] : '0;
+                $display("assign: %d vld:%b insn:%x", i, rs_in.fu_vld_alu[i], rs_in.fu_dat_alu[i].inst);
             end
 
             foreach(fu_rdy_mult[i]) begin
-                fu_rdy_mult[i]  <= ex_fu_in.fu_vld_mult[i] ? 0 : (mult_done[i] || fu_rdy_mult[i]);
-                fu_dat_mult[i]  <= ex_fu_in.fu_vld_mult[i] ? ex_fu_in.fu_dat_mult[i] : '0;
+                fu_rdy_mult[i]  <= rs_in.fu_vld_mult[i] ? 0 : (mult_done[i] || fu_rdy_mult[i]);
+                fu_dat_mult[i]  <= rs_in.fu_vld_mult[i] ? rs_in.fu_dat_mult[i] : '0;
 
-                mul_dst_in[i].tag       <= ex_fu_in.fu_vld_mult[i] ? ex_fu_in.fu_dat_mult[i].t : mul_dst_in[i].tag;
-                mul_dst_in[i].rob_idx   <= ex_fu_in.fu_vld_mult[i] ? ex_fu_in.fu_dat_mult[i].rob_idx : mul_dst_in[i].rob_idx; //internal_mul_dat
+                mul_dst_in[i].tag       <= rs_in.fu_vld_mult[i] ? rs_in.fu_dat_mult[i].t : mul_dst_in[i].tag;
+                mul_dst_in[i].rob_idx   <= rs_in.fu_vld_mult[i] ? rs_in.fu_dat_mult[i].rob_idx : mul_dst_in[i].rob_idx; //internal_mul_dat
             end
 
             for (int i = 0; i < `N; ++i) begin
-                $display("ex_c_out[%d]: (en: %b, t: %d, rob_idx: %d, dat: %d)",
+                $display("c_out[%d]: (en: %b, t: %d, rob_idx: %d, dat: %d)",
                     i,
-                    ex_c_out.c_en[i],
-                    ex_c_out.c_ts[i],
-                    ex_c_out.c_rob_idxs[i],
-                    ex_c_out.c_data[i]
+                    c_out.c_en[i],
+                    c_out.c_ts[i],
+                    c_out.c_rob_idxs[i],
+                    c_out.c_data[i]
                 );
             end
         end
