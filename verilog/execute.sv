@@ -76,11 +76,11 @@ module stage_ex_p4 (
 
     // <FU>_ins: staging; where just-issued insns wait for 1 cycle to pull their operands
     struct packed {
-        logic       [`NUM_FU_ALU-1:0]   rdy;
+        logic       [`NUM_FU_ALU-1:0]   bsy;
         ID_RESULT   [`NUM_FU_ALU-1:0]   dat;
     } alu_ins;
     struct packed {
-        logic       [`NUM_FU_MULT-1:0]  rdy;
+        logic       [`NUM_FU_MULT-1:0]  bsy;
         ID_RESULT   [`NUM_FU_MULT-1:0]  dat;
     } mul_ins;
 
@@ -128,7 +128,7 @@ module stage_ex_p4 (
             mult mult_0 ( 
                 .clock(clock),
                 .reset(reset),
-                .start(mul_ins.rdy[i]),
+                .start(mul_ins.bsy[i]),
                 .dst_in('{
                     rob_idx : mul_ins.dat[i].rob_idx,
                     tag     : mul_ins.dat[i].t
@@ -166,8 +166,8 @@ module stage_ex_p4 (
     int unsigned off;
     always_comb begin
         rs_out = '{
-            fu_rdy_alu      : alu_ins.rdy,
-            fu_rdy_mult     : mul_ins.rdy,
+            fu_rdy_alu      : ~alu_ins.bsy,
+            fu_rdy_mult     : ~mul_ins.bsy,
             fu_rdy_load     : '0,
             fu_rdy_store    : '0
         };
@@ -186,7 +186,7 @@ module stage_ex_p4 (
             end else begin
                 if (!(reset || flush))
                     $error("TODO: implement completion of MULT");
-                off = f - `NUM_FU_MULT;
+                off = f - `NUM_FU_ALU;
                 c_out.c_en[off]         |= 1;
                 c_out.c_ts[off]         |= mul_outs.dst[off].tag;
                 c_out.c_rob_idxs[off]   |= mul_outs.dst[off].rob_idx;
@@ -206,7 +206,7 @@ module stage_ex_p4 (
         end else begin
 
             for (int i = 0; i < `NUM_FU_ALU; ++i) begin
-                if (alu_ins.rdy[i] && !alu_outs.rdy[i]) begin
+                if (alu_ins.bsy[i] && !alu_outs.rdy[i]) begin
                     alu_outs.rdy[i] <= 1;
                     alu_outs.res[i] <= alu_res_n[i];
                     alu_outs.dst[i] <= '{
@@ -214,7 +214,7 @@ module stage_ex_p4 (
                         rob_idx :   alu_ins.dat[i].rob_idx
                     };
                 end else begin
-                    alu_ins.rdy[i] <= alu_ins.rdy[i]
+                    alu_ins.bsy[i] <= alu_ins.bsy[i]
                         ? !(alu_outs.rdy[i] && cpl_gnt[i]) // if busy, did it complete
                         : rs_in.fu_vld_alu[i];             // if not busy, did it issue?
                     alu_ins.dat[i] <= rs_in.fu_vld_alu[i]
@@ -231,13 +231,29 @@ module stage_ex_p4 (
                     mul_outs.res[i] <= mul_res_n[i];
                 end
 
-                mul_ins.rdy[i] <= mul_ins.rdy[i]
-                    ? !(mul_outs.rdy[i] && cpl_gnt[i + `NUM_FU_ALU]) // if busy, did it complete
+                mul_ins.bsy[i] <= mul_ins.bsy[i]
+                    // Option 1: clear only when complete (will re-issue the same insn if inputs the same)
+                    // ? !(mul_outs.rdy[i] && cpl_gnt[i + `NUM_FU_ALU]) // if busy, did it complete
+                    // Option 2: clear as soon as issue done (might overwrite someone ahead)
+                    ? 0
                     : rs_in.fu_vld_mult[i];             // if not busy, did it issue?
                 mul_ins.dat[i] <= rs_in.fu_vld_mult[i]
                     ? rs_in.fu_dat_mult[i]
                     : mul_ins.dat[i];
             end
+
+            $display("  %3d | rdy_alu: %b  rdy_mult: %b  rdy_store: %b  rdy_load: %b  |  c_en: %b  c_ts: %d %d c_data: %h c_rob_idxs: %d",
+                $time,
+                rs_out.fu_rdy_alu,
+                rs_out.fu_rdy_mult,
+                rs_out.fu_rdy_store,
+                rs_out.fu_rdy_load,
+                c_out.c_en,
+                c_out.c_ts[0],
+                c_out.c_ts[1],
+                c_out.c_data,
+                c_out.c_rob_idxs
+            );
 
         end
     end
