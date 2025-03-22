@@ -104,7 +104,6 @@ module stage_ex_p4 (
     DST     [`NUM_FU_MULT-1:0] mul_dst_n;
     logic   [`NUM_FU_MULT-1:0] mul_vld_n;
 
-
     // extract ALU operands
     always_comb begin
         foreach(alu_ins.dat[i]) begin
