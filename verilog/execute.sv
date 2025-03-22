@@ -16,14 +16,13 @@
 // ALU: computes the result of FUNC applied with operands A and B
 // This module is purely combinational
 module alu (
-    input DATA     opa,
-    input DATA     opb,
-    input ALU_FUNC alu_func,
-    input logic branch, // is this a cond_branch
-    input [2:0] branch_func, // Which branch condition to check
+    input DATA      opa,
+    input DATA      opb,
+    input ALU_FUNC  alu_func,
+    input [2:0]     branch_func, // Which branch condition to check
 
-    output logic take, // True/False condition result
-    output DATA result
+    output logic    take, // True/False condition result
+    output DATA     result
 );
 
     always_comb begin
@@ -79,8 +78,7 @@ module stage_ex_p4 (
         ID_RESULT   [`NUM_FU_ALU-1:0]   dat;
     } alu_ins;
     struct packed {
-        DATA [`NUM_FU_ALU-1:0] opa_mux_out, opb_mux_out;
-        logic [`NUM_FU_ALU-1:0] [2:0] branch_func;
+        DATA [`NUM_FU_ALU-1:0] opa, opb;
     } alu_operands;
     struct packed {
         logic       [`NUM_FU_MULT-1:0]  bsy;
@@ -107,49 +105,32 @@ module stage_ex_p4 (
     logic   [`NUM_FU_MULT-1:0] mul_vld_n;
 
 
+    // extract ALU operands
     always_comb begin
         foreach(alu_ins.dat[i]) begin
             if(!alu_ins.bsy[i]) 
                 continue;
 
-            // ex_2_prf.prf_en[i] = rs_in.fu_vld_alu[i];
-            // ex_2_prf.s_t1s[i] = alu_ins.dat[i].t1;
-            // ex_2_prf.s_t2s[i] = alu_ins.dat[i].t2;
+            // ALU opA mux
+            case (alu_ins.dat[i].opa_select)
+                OPA_IS_RS1:  alu_operands.opa[i] = prf_in.s_v1s[i];
+                OPA_IS_NPC:  alu_operands.opa[i] = alu_ins.dat[i].NPC;
+                OPA_IS_PC:   alu_operands.opa[i] = alu_ins.dat[i].PC;
+                OPA_IS_ZERO: alu_operands.opa[i] = 0;
+                default:     alu_operands.opa[i]= 32'hdeadface; // dead face
+            endcase
 
+            // ALU opB mux
+            case (alu_ins.dat[i].opb_select)
+                OPB_IS_RS2:   alu_operands.opb[i] =  prf_in.s_v2s[i];
+                OPB_IS_I_IMM: alu_operands.opb[i] = `RV32_signext_Iimm(alu_ins.dat[i].inst);
+                OPB_IS_S_IMM: alu_operands.opb[i] = `RV32_signext_Simm(alu_ins.dat[i].inst);
+                OPB_IS_B_IMM: alu_operands.opb[i] = `RV32_signext_Bimm(alu_ins.dat[i].inst);
+                OPB_IS_U_IMM: alu_operands.opb[i] = `RV32_signext_Uimm(alu_ins.dat[i].inst);
+                OPB_IS_J_IMM: alu_operands.opb[i] = `RV32_signext_Jimm(alu_ins.dat[i].inst);
+                default:      alu_operands.opb[i] = 32'hfacefeed; // face feed
+            endcase
 
-            if (alu_ins.dat[i].cond_branch) begin
-                alu_operands.opa_mux_out[i] = prf_in.s_v1s[i];
-                alu_operands.opb_mux_out[i] = prf_in.s_v2s[i];
-                // alu_func = 4'ha; //SENTINEL VALUE
-                alu_operands.branch_func[i] = alu_ins.dat[i].inst.b.funct3;
-                // branch = 1;
-            end else begin
-                // ALU opA mux
-                case (alu_ins.dat[i].opa_select)
-                    // OPA_IS_RS1:  alu_operands.opa_mux_out[i][i] = alu_ins.dat[i].rs1_value;
-                    OPA_IS_RS1:  alu_operands.opa_mux_out[i] = prf_in.s_v1s[i];
-                    OPA_IS_NPC:  alu_operands.opa_mux_out[i] = alu_ins.dat[i].NPC;
-                    OPA_IS_PC:   alu_operands.opa_mux_out[i] = alu_ins.dat[i].PC;
-                    OPA_IS_ZERO: alu_operands.opa_mux_out[i] = 0;
-                    default:     alu_operands.opa_mux_out[i]= 32'hdeadface; // dead face
-                endcase
-
-                // ALU opB mux
-                case (alu_ins.dat[i].opb_select)
-                    // OPB_IS_RS2:   alu_operands.opb_mux_out[i][i] = alu_ins.dat[i].rs2_value;
-                    OPB_IS_RS2:   alu_operands.opb_mux_out[i] =  prf_in.s_v2s[i];
-                    OPB_IS_I_IMM: alu_operands.opb_mux_out[i] = `RV32_signext_Iimm(alu_ins.dat[i].inst);
-                    OPB_IS_S_IMM: alu_operands.opb_mux_out[i] = `RV32_signext_Simm(alu_ins.dat[i].inst);
-                    OPB_IS_B_IMM: alu_operands.opb_mux_out[i] = `RV32_signext_Bimm(alu_ins.dat[i].inst);
-                    OPB_IS_U_IMM: alu_operands.opb_mux_out[i] = `RV32_signext_Uimm(alu_ins.dat[i].inst);
-                    OPB_IS_J_IMM: alu_operands.opb_mux_out[i] = `RV32_signext_Jimm(alu_ins.dat[i].inst);
-                    default:      alu_operands.opb_mux_out[i] = 32'hfacefeed; // face feed
-                endcase
-
-                // alu_func = alu_ins.dat[i].alu_func;
-                alu_operands.branch_func[i] = 3'b011; //SENTINEL VALUE
-                // branch = 0;
-            end
         end
     end
 
@@ -160,11 +141,10 @@ module stage_ex_p4 (
             // TODO: These ALU inputs were kinda hardcoded. Need mux stuff to select which type.
             alu alu_0 ( 
                 // Inputs
-                .opa(alu_operands.opa_mux_out[i]),
-                .opb(alu_operands.opb_mux_out[i]),
-                .alu_func(alu_ins.dat[i].alu_func),
-                .branch(alu_ins.dat[i].cond_branch), // is this a cond_branch
-                .branch_func(alu_operands.branch_func[i]), // Which branch condition to check
+                .opa(alu_operands.opa[i]),
+                .opb(alu_operands.opb[i]),
+                .alu_func   (alu_ins.dat[i].alu_func),
+                .branch_func(alu_ins.dat[i].inst.r.funct3), // Which branch condition to check
 
                 .take(), // True/False condition result (will return FALSE if branch is low)
                 .result(alu_res_n[i]) // will return 32'hfacebeec if branch is high (Sentinel, hopefully none of our alu computations result in that value)
