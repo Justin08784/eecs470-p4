@@ -64,6 +64,7 @@ module alu_group (
     output logic        [`NUM_FU_ALU-1:0] ins_rdy,
     input  logic        [`NUM_FU_ALU-1:0] ins_en, // sender-side (RS issue) enable
     input  ID_RESULT    [`NUM_FU_ALU-1:0] ins_dat,
+    rs2execute          rs_in,
 
     struct packed {
         logic           [`NUM_FU_ALU-1:0] prf_en;
@@ -82,11 +83,11 @@ module alu_group (
 );
     struct packed {
         DATA [`NUM_FU_ALU-1:0] opa, opb;
-    } alu_operands;
+    } ops;
 
     // <FU>_ins: staging; where just-issued insns wait for 1 cycle to pull their operands
     struct packed {
-        logic     [`NUM_FU_ALU-1:0] rdy;
+        logic     [`NUM_FU_ALU-1:0] bsy;
         logic     [`NUM_FU_ALU-1:0] en;
         ID_RESULT [`NUM_FU_ALU-1:0] dat;
     } ins;
@@ -101,31 +102,32 @@ module alu_group (
 
     DATA [`NUM_FU_ALU-1:0] alu_res_n;
 
+    assign ins_rdy = ~ins.bsy;
 
     // extract ALU operands
     always_comb begin
-        foreach(ins_dat[i]) begin
-            if(!alu_ins.bsy[i]) 
+        foreach(ins.dat[i]) begin
+            if(!ins.bsy[i]) 
                 continue;
 
             // ALU opA mux
-            case (ins_dat[i].opa_select)
-                OPA_IS_RS1:  alu_operands.opa[i] = prf_in.s_v1s[i];
-                OPA_IS_NPC:  alu_operands.opa[i] = ins_dat[i].NPC;
-                OPA_IS_PC:   alu_operands.opa[i] = ins_dat[i].PC;
-                OPA_IS_ZERO: alu_operands.opa[i] = 0;
-                default:     alu_operands.opa[i]= 32'hdeadface; // dead face
+            case (ins.dat[i].opa_select)
+                OPA_IS_RS1:  ops.opa[i] = prf2alu.s_v1s[i];
+                OPA_IS_NPC:  ops.opa[i] = ins.dat[i].NPC;
+                OPA_IS_PC:   ops.opa[i] = ins.dat[i].PC;
+                OPA_IS_ZERO: ops.opa[i] = 0;
+                default:     ops.opa[i]= 32'hdeadface; // dead face
             endcase
 
             // ALU opB mux
-            case (ins_dat[i].opb_select)
-                OPB_IS_RS2:   alu_operands.opb[i] =  prf_in.s_v2s[i];
-                OPB_IS_I_IMM: alu_operands.opb[i] = `RV32_signext_Iimm(ins_dat[i].inst);
-                OPB_IS_S_IMM: alu_operands.opb[i] = `RV32_signext_Simm(ins_dat[i].inst);
-                OPB_IS_B_IMM: alu_operands.opb[i] = `RV32_signext_Bimm(ins_dat[i].inst);
-                OPB_IS_U_IMM: alu_operands.opb[i] = `RV32_signext_Uimm(ins_dat[i].inst);
-                OPB_IS_J_IMM: alu_operands.opb[i] = `RV32_signext_Jimm(ins_dat[i].inst);
-                default:      alu_operands.opb[i] = 32'hfacefeed; // face feed
+            case (ins.dat[i].opb_select)
+                OPB_IS_RS2:   ops.opb[i] =  prf2alu.s_v2s[i];
+                OPB_IS_I_IMM: ops.opb[i] = `RV32_signext_Iimm(ins.dat[i].inst);
+                OPB_IS_S_IMM: ops.opb[i] = `RV32_signext_Simm(ins.dat[i].inst);
+                OPB_IS_B_IMM: ops.opb[i] = `RV32_signext_Bimm(ins.dat[i].inst);
+                OPB_IS_U_IMM: ops.opb[i] = `RV32_signext_Uimm(ins.dat[i].inst);
+                OPB_IS_J_IMM: ops.opb[i] = `RV32_signext_Jimm(ins.dat[i].inst);
+                default:      ops.opb[i] = 32'hfacefeed; // face feed
             endcase
 
         end
@@ -138,10 +140,10 @@ module alu_group (
             // TODO: These ALU inputs were kinda hardcoded. Need mux stuff to select which type.
             alu alu_0 ( 
                 // Inputs
-                .opa(alu_operands.opa[i]),
-                .opb(alu_operands.opb[i]),
-                .alu_func   (ins_dat[i].alu_func),
-                .branch_func(ins_dat[i].inst.b.funct3), // Which branch condition to check
+                .opa(ops.opa[i]),
+                .opb(ops.opb[i]),
+                .alu_func   (ins.dat[i].alu_func),
+                .branch_func(ins.dat[i].inst.b.funct3), // Which branch condition to check
 
                 .take(), // True/False condition result (will return FALSE if branch is low)
                 .result(alu_res_n[i]) // will return 32'hfacebeec if branch is high (Sentinel, hopefully none of our alu computations result in that value)
@@ -149,33 +151,32 @@ module alu_group (
         end
     endgenerate
 
-    always_ff @(posedge clock) begin
-        if (reset || flush) begin
-            alu_ins     <= '0;
+    // always_ff @(posedge clock) begin
+    //     if (reset || flush) begin
+    //         ins  <= '0;
+    //         outs <= '0;
+    //     end else begin
 
-            alu_outs    <= '0;
-        end else begin
-
-            for (int i = 0; i < `NUM_FU_ALU; ++i) begin
-                if (alu_ins.bsy[i] && !alu_outs.rdy[i]) begin
-                    alu_outs.rdy[i] <= 1;
-                    alu_outs.res[i] <= alu_res_n[i];
-                    alu_outs.dst[i] <= '{
-                        tag     :   ins_dat[i].t,
-                        rob_idx :   ins_dat[i].rob_idx
-                    };
-                end else begin
-                    alu_ins.bsy[i] <= alu_ins.bsy[i]
-                        ? !(alu_outs.rdy[i] && cpl_gnt.alu[i]) // if busy, did it complete
-                        : rs_in.fu_vld_alu[i];             // if not busy, did it issue?
-                    ins_dat[i] <= rs_in.fu_vld_alu[i]
-                        ? rs_in.fu_dat_alu[i]
-                        : ins_dat[i];
-                    alu_outs.rdy[i] <= alu_outs.rdy[i] && !cpl_gnt.alu[i];
-                end
-            end
-        end
-    end
+    //         for (int i = 0; i < `NUM_FU_ALU; ++i) begin
+    //             if (ins.bsy[i] && !outs.vld[i]) begin
+    //                 outs.vld[i] <= 1;
+    //                 outs.res[i] <= alu_res_n[i];
+    //                 outs.dst[i] <= '{
+    //                     tag     :   ins.dat[i].t,
+    //                     rob_idx :   ins.dat[i].rob_idx
+    //                 };
+    //             end else begin
+    //                 ins.bsy[i] <= ins.bsy[i]
+    //                     ? !(outs.vld[i] && cpl_gnt.alu[i]) // if busy, did it complete
+    //                     : rs_in.fu_vld_alu[i];             // if not busy, did it issue?
+    //                 ins.dat[i] <= rs_in.fu_vld_alu[i]
+    //                     ? rs_in.fu_dat_alu[i]
+    //                     : ins.dat[i];
+    //                 outs.vld[i] <= outs.vld[i] && !cpl_gnt.alu[i];
+    //             end
+    //         end
+    //     end
+    // end
 
 endmodule
 
@@ -187,6 +188,7 @@ module mul_group (
     output logic        [`NUM_FU_ALU-1:0] ins_rdy,
     input  logic        [`NUM_FU_ALU-1:0] ins_en, // sender-side (RS issue) enable
     input  ID_RESULT    [`NUM_FU_ALU-1:0] ins_dat,
+    rs2execute          rs_in,
 
     struct packed {
         logic           [`NUM_FU_ALU-1:0] prf_en;
@@ -209,7 +211,7 @@ module mul_group (
 
     // <FU>_ins: staging; where just-issued insns wait for 1 cycle to pull their operands
     struct packed {
-        logic     [`NUM_FU_MULT-1:0] rdy;
+        logic     [`NUM_FU_MULT-1:0] bsy;
         logic     [`NUM_FU_MULT-1:0] en;
         ID_RESULT [`NUM_FU_MULT-1:0] dat;
     } ins;
@@ -222,6 +224,8 @@ module mul_group (
         logic [`NUM_FU_MULT-1:0] en;
     } outs;
 
+    assign ins_rdy = ~ins.bsy;
+
     generate
         for (genvar i = 0; i < `NUM_FU_MULT; ++i) begin : gen_mults
             // // Instantiate the ALU
@@ -229,14 +233,14 @@ module mul_group (
             mult mult_0 ( 
                 .clock(clock),
                 .reset(reset),
-                .start(mul_ins.bsy[i]),
+                .start(ins.bsy[i]),
                 .dst_in('{
-                    rob_idx : mul_ins.dat[i].rob_idx,
-                    tag     : mul_ins.dat[i].t
+                    rob_idx : ins.dat[i].rob_idx,
+                    tag     : ins.dat[i].t
                 }),
-                .rs1(prf_in.s_v1s[i + `NUM_FU_ALU]),
-                .rs2(prf_in.s_v2s[i + `NUM_FU_ALU]),
-                .func(mul_ins.dat[i].inst.r.funct3), // which mult operation to perform
+                .rs1(prf2mul.s_v1s[i + `NUM_FU_ALU]),
+                .rs2(prf2mul.s_v2s[i + `NUM_FU_ALU]),
+                .func(ins.dat[i].inst.r.funct3), // which mult operation to perform
 
                 // Output
                 .dst_out(mul_dst_n[i]),
@@ -248,26 +252,25 @@ module mul_group (
 
     always_ff @(posedge clock) begin
         if (reset || flush) begin
-            mul_ins     <= '0;
-
-            mul_outs    <= '0;
+            ins     <= '0;
+            outs    <= '0;
         end else begin
             for (int i = 0; i < `NUM_FU_MULT; ++i) begin
-                mul_outs.rdy[i] <= mul_vld_n[i];
+                outs.vld[i] <= mul_vld_n[i];
                 if (mul_vld_n[i]) begin
-                    mul_outs.dst[i] <= mul_dst_n[i];
-                    mul_outs.res[i] <= mul_res_n[i];
+                    outs.dst[i] <= mul_dst_n[i];
+                    outs.res[i] <= mul_res_n[i];
                 end
 
-                mul_ins.bsy[i] <= mul_ins.bsy[i]
+                ins.bsy[i] <= ins.bsy[i]
                     // Option 1: clear only when complete (will re-issue the same insn if inputs the same)
-                    // ? !(mul_outs.rdy[i] && cpl_gnt[i + `NUM_FU_ALU]) // if busy, did it complete
+                    // ? !(outs.vld[i] && cpl_gnt[i + `NUM_FU_ALU]) // if busy, did it complete
                     // Option 2: clear as soon as issue done (might overwrite someone ahead)
                     ? 0
                     : rs_in.fu_vld_mult[i];             // if not busy, did it issue?
-                mul_ins.dat[i] <= rs_in.fu_vld_mult[i]
+                ins.dat[i] <= rs_in.fu_vld_mult[i]
                     ? rs_in.fu_dat_mult[i]
-                    : mul_ins.dat[i];
+                    : ins.dat[i];
             end
         end
     end
@@ -289,38 +292,56 @@ module stage_ex_p4 (
 
 );
     localparam NUM_FU_TOTAL = `NUM_FU_ALU + `NUM_FU_MULT;
+    struct packed {
+        logic [`NUM_FU_ALU-1:0]  alu;
+        logic [`NUM_FU_MULT-1:0] mul;
+    } outs_vld;
+    struct packed {
+        DATA  [`NUM_FU_ALU-1:0]  alu;
+        DATA  [`NUM_FU_MULT-1:0] mul;
+    } outs_res;
+    struct packed {
+        DST   [`NUM_FU_ALU-1:0]  alu;
+        DST   [`NUM_FU_MULT-1:0] mul;
+    } outs_dst;
+    struct packed {
+        logic [`NUM_FU_ALU-1:0]  alu;
+        logic [`NUM_FU_MULT-1:0] mul;
+    } outs_en;
 
     alu_group alu_group0 (
         .clock(clock),
         .reset(reset),
         .flush(flush),
 
-        .ins_rdy(ins_rdy.alu),
-        .ins_en (ins_en.alu),
-        .ins_dat(ins_dat.alu),
+        .ins_rdy(rs_out.fu_rdy_alu),
+        .ins_en (rs_in.fu_vld_alu),
+        .ins_dat(rs_in.fu_dat_alu),
 
+        // TODO: change this to struct access; dont want indexing magic
         .alu2prf('{
-            prf_out.prf_en.alu,
-            prf_out.s_t1s.alu,
-            prf_out.s_t2s.alu
+            prf_out.prf_en[`NUM_FU_ALU-1:0],
+            prf_out.s_t1s[`NUM_FU_ALU-1:0],
+            prf_out.s_t2s[`NUM_FU_ALU-1:0]
         }),
         .prf2alu('{
-            prf_in.s_v1s.alu,
-            prf_in.s_v2s.alu
-        })
+            prf_in.s_v1s[`NUM_FU_ALU-1:0],
+            prf_in.s_v2s[`NUM_FU_ALU-1:0]
+        }),
 
+        // .outs_vld(outs_vld.alu),
+        // .outs_res(outs_res.alu),
+        // .outs_dst(outs_dst.alu),
+        // .outs_en (outs_en.alu)
+        // TODO: build a outs struct here to comb. sample outgoing stuff
         .outs_vld(outs_vld.alu),
         .outs_res(outs_res.alu),
         .outs_dst(outs_dst.alu),
         .outs_en (outs_en.alu)
     );
 
-    assign rs_out = '{
-        fu_rdy_alu      : ins_rdy.alu,
-        fu_rdy_mult     : ins_rdy.mul,
-        fu_rdy_load     : '0,
-        fu_rdy_store    : '0
-    };
+    assign rs_out.fu_rdy_load   = '0;
+    assign rs_out.fu_rdy_store  = '0;
 
     typedef struct packed {
         logic [`NUM_FU_ALU-1:0]     alu;
@@ -328,8 +349,8 @@ module stage_ex_p4 (
     } FU_rdy;
     FU_rdy outs_rdy;
     assign outs_rdy = '{
-        alu:alu_outs.rdy,
-        mul:mul_outs.rdy
+        alu:outs_vld.alu,
+        mul:outs_vld.mul
     };
 
     FU_rdy cpl_gnt;
@@ -350,37 +371,37 @@ module stage_ex_p4 (
             for (int unsigned a_i = 0; a_i < `NUM_FU_ALU; ++a_i) begin
                 if (cdb2fu_gbus[c].alu[a_i]) begin
                     c_out.c_en[c]           |= 1;
-                    c_out.c_ts[c]           |= alu_outs.dst[a_i].tag;
-                    c_out.c_rob_idxs[c]     |= alu_outs.dst[a_i].rob_idx;
-                    c_out.c_data[c]         |= alu_outs.res[a_i];
+                    c_out.c_ts[c]           |= outs_dst.alu[a_i].tag;
+                    c_out.c_rob_idxs[c]     |= outs_dst.alu[a_i].rob_idx;
+                    c_out.c_data[c]         |= outs_res.alu[a_i];
                 end
             end
 
             for (int unsigned m_i = 0; m_i < `NUM_FU_MULT; ++m_i) begin
                 if (cdb2fu_gbus[c].mul[m_i]) begin
                     c_out.c_en[c]           |= 1;
-                    c_out.c_ts[c]           |= mul_outs.dst[m_i].tag;
-                    c_out.c_rob_idxs[c]     |= mul_outs.dst[m_i].rob_idx;
-                    c_out.c_data[c]         |= mul_outs.res[m_i];
+                    c_out.c_ts[c]           |= outs_dst.mul[m_i].tag;
+                    c_out.c_rob_idxs[c]     |= outs_dst.mul[m_i].rob_idx;
+                    c_out.c_data[c]         |= outs_res.mul[m_i];
                 end
             end
         end
 
-        prf_out = '0;
-        for (int unsigned i = 0; i < `NUM_FU_ALU; ++i) begin
-            if (!alu_ins.bsy[i])
-                continue;
-            prf_out.prf_en[i]   = 1;
-            prf_out.s_t1s[i]    = alu_ins.dat[i].t1; 
-            prf_out.s_t2s[i]    = alu_ins.dat[i].t2; 
-        end
-        for (int unsigned i = 0; i < `NUM_FU_MULT; ++i) begin
-            if (!mul_ins.bsy[i])
-                continue;
-            prf_out.prf_en[i + `NUM_FU_ALU]   = 1;
-            prf_out.s_t1s[i + `NUM_FU_ALU]    = mul_ins.dat[i].t1; 
-            prf_out.s_t2s[i + `NUM_FU_ALU]    = mul_ins.dat[i].t2; 
-        end
+        // prf_out = '0;
+        // for (int unsigned i = 0; i < `NUM_FU_ALU; ++i) begin
+        //     if (!alu_ins.bsy[i])
+        //         continue;
+        //     prf_out.prf_en[i]   = 1;
+        //     prf_out.s_t1s[i]    = alu_ins.dat[i].t1; 
+        //     prf_out.s_t2s[i]    = alu_ins.dat[i].t2; 
+        // end
+        // for (int unsigned i = 0; i < `NUM_FU_MULT; ++i) begin
+        //     if (!mul_ins.bsy[i])
+        //         continue;
+        //     prf_out.prf_en[i + `NUM_FU_ALU]   = 1;
+        //     prf_out.s_t1s[i + `NUM_FU_ALU]    = mul_ins.dat[i].t1; 
+        //     prf_out.s_t2s[i + `NUM_FU_ALU]    = mul_ins.dat[i].t2; 
+        // end
     end
 
 
@@ -420,14 +441,14 @@ module stage_ex_p4 (
     //             prf_out.s_t2s[3]
     //         );
     //         $display("alu: (rdy: %b, res: %x), (rdy: %b, res: %x), mul: (rdy: %b, res: %x), (rdy: %b, res: %x)",
-    //             alu_outs.rdy[0],
-    //             alu_outs.res[0],
-    //             alu_outs.rdy[1],
-    //             alu_outs.res[1],
-    //             mul_outs.rdy[0],
-    //             mul_outs.res[0],
-    //             mul_outs.rdy[1],
-    //             mul_outs.res[1]
+    //             outs_vld.alu[0],
+    //             outs_res.alu[0],
+    //             outs_vld.alu[1],
+    //             outs_res.alu[1],
+    //             outs_vld.mul[0],
+    //             outs_res.mul[0],
+    //             outs_vld.mul[1],
+    //             outs_res.mul[1]
     //         );
     //         $display("<prf_in >        s_v1s: [%0d, %0d] s_v2s: [%0d, %0d]",
     //             prf_in.s_v1s[0],
