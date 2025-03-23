@@ -78,9 +78,6 @@ module stage_ex_p4 (
         ID_RESULT   [`NUM_FU_ALU-1:0]   dat;
     } alu_ins;
     struct packed {
-        DATA [`NUM_FU_ALU-1:0] opa, opb;
-    } alu_operands;
-    struct packed {
         logic       [`NUM_FU_MULT-1:0]  bsy;
         ID_RESULT   [`NUM_FU_MULT-1:0]  dat;
     } mul_ins;
@@ -104,8 +101,20 @@ module stage_ex_p4 (
     DST     [`NUM_FU_MULT-1:0] mul_dst_n;
     logic   [`NUM_FU_MULT-1:0] mul_vld_n;
 
-    // extract ALU operands
+
+    // extract operands
+    struct packed {
+        DATA        [`NUM_FU_ALU-1:0]   opa, opb;
+        ALU_FUNC    [`NUM_FU_ALU]       alu_func;
+        logic       [`NUM_FU_ALU][2:0]  branch_func; // Which branch condition to check
+    } alu_operands;
+    struct packed {
+        DATA        [`NUM_FU_MULT-1:0]  rs1, rs2;
+        MULT_FUNC   [`NUM_FU_MULT]      func;
+        DST         [`NUM_FU_MULT]      dst;
+    } mul_operands;
     always_comb begin
+        alu_operands = '0;
         foreach(alu_ins.dat[i]) begin
             if(!alu_ins.bsy[i]) 
                 continue;
@@ -130,6 +139,19 @@ module stage_ex_p4 (
                 default:      alu_operands.opb[i] = 32'hfacefeed; // face feed
             endcase
 
+            alu_operands.alu_func[i]    = alu_ins.dat[i].alu_func;
+            alu_operands.branch_func[i] = alu_ins.dat[i].inst.b.funct3;
+        end
+
+        mul_operands = '0;
+        foreach (mul_ins.dat[i]) begin
+            mul_operands.rs1[i] = prf_in.s_v1s[i + `NUM_FU_ALU];
+            mul_operands.rs2[i] = prf_in.s_v2s[i + `NUM_FU_ALU];
+            mul_operands.func[i] = mul_ins.dat[i].inst.r.funct3;
+            mul_operands.dst[i] = '{
+                rob_idx : mul_ins.dat[i].rob_idx,
+                tag     : mul_ins.dat[i].t
+            };
         end
     end
 
@@ -140,10 +162,10 @@ module stage_ex_p4 (
             // TODO: These ALU inputs were kinda hardcoded. Need mux stuff to select which type.
             alu alu_0 ( 
                 // Inputs
-                .opa(alu_operands.opa[i]),
-                .opb(alu_operands.opb[i]),
-                .alu_func   (alu_ins.dat[i].alu_func),
-                .branch_func(alu_ins.dat[i].inst.b.funct3), // Which branch condition to check
+                .opa        (alu_operands.opa[i]),
+                .opb        (alu_operands.opb[i]),
+                .alu_func   (alu_operands.alu_func[i]),
+                .branch_func(alu_operands.branch_func[i]), // Which branch condition to check
 
                 .take(), // True/False condition result (will return FALSE if branch is low)
                 .result(alu_res_n[i]) // will return 32'hfacebeec if branch is high (Sentinel, hopefully none of our alu computations result in that value)
@@ -156,16 +178,13 @@ module stage_ex_p4 (
             // // Instantiate the ALU
             // TODO: These ALU inputs were kinda hardcoded. Need mux stuff to select which type.
             mult mult_0 ( 
-                .clock(clock),
-                .reset(reset),
-                .start(mul_ins.bsy[i]),
-                .dst_in('{
-                    rob_idx : mul_ins.dat[i].rob_idx,
-                    tag     : mul_ins.dat[i].t
-                }),
-                .rs1(prf_in.s_v1s[i + `NUM_FU_ALU]),
-                .rs2(prf_in.s_v2s[i + `NUM_FU_ALU]),
-                .func(mul_ins.dat[i].inst.r.funct3), // which mult operation to perform
+                .clock  (clock),
+                .reset  (reset),
+                .start  (mul_ins.bsy[i]),
+                .dst_in (mul_operands.dst[i]),
+                .rs1    (mul_operands.rs1[i]),
+                .rs2    (mul_operands.rs2[i]),
+                .func   (mul_operands.func[i]), // which mult operation to perform
 
                 // Output
                 .dst_out(mul_dst_n[i]),
