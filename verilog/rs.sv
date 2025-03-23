@@ -377,8 +377,8 @@ module rs #(parameter
                     entries[i].busy ? fu_name : "*",
                     entries[i].dat.fu_idx,
                 );
-                $display("  %3d | RS <<", $time);
             end
+            $display("  %3d | RS <<", $time);
         end
         `endif
     end
