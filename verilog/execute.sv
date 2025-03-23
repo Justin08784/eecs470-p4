@@ -176,21 +176,25 @@ module stage_ex_p4 (
     endgenerate
 
     localparam NUM_FU_TOTAL = `NUM_FU_ALU + `NUM_FU_MULT;
-    logic [NUM_FU_TOTAL-1:0] all_rdy;
-    logic [NUM_FU_TOTAL-1:0] cpl_gnt;
-    logic [`N-1:0][NUM_FU_TOTAL-1:0] cdb2fu_gbus;
-    assign all_rdy = {
-        mul_outs.rdy,
-        alu_outs.rdy
+    typedef struct packed {
+        logic [`NUM_FU_ALU-1:0]     alu;
+        logic [`NUM_FU_MULT-1:0]    mul;
+    } FU_rdy;
+    FU_rdy outs_rdy;
+    assign outs_rdy = '{
+        alu:alu_outs.rdy,
+        mul:mul_outs.rdy
     };
 
+    FU_rdy cpl_gnt;
+    FU_rdy [`N-1:0] cdb2fu_gbus;
     psel_gen #(
         .WIDTH(NUM_FU_TOTAL),
         .REQS(`N)
     ) sel_cpl (
-        .req(all_rdy),
-        .gnt(cpl_gnt),
-        .gnt_bus(cdb2fu_gbus)
+        .req(outs_rdy),         // coercion: FU_rdy -> logic [`NUM_FU_TOTAL-1:0]
+        .gnt(cpl_gnt),          // coercion: logic [`NUM_FU_TOTAL-1:0] -> FU_rdy
+        .gnt_bus(cdb2fu_gbus)   // coercion: logic [`N-1:0][`NUM_FU_TOTAL-1:0] -> FU_rdy [`N-1:0]
     );
 
     int unsigned off;
@@ -203,24 +207,23 @@ module stage_ex_p4 (
         };
 
         c_out = '0;
-        foreach (cdb2fu_gbus[c, f]) begin
-            if (!cdb2fu_gbus[c][f])
-                continue;
+        foreach (cdb2fu_gbus[c]) begin
+            for (int unsigned a_i = 0; a_i < `NUM_FU_ALU; ++a_i) begin
+                if (cdb2fu_gbus[c].alu[a_i]) begin
+                    c_out.c_en[c]           |= 1;
+                    c_out.c_ts[c]           |= alu_outs.dst[a_i].tag;
+                    c_out.c_rob_idxs[c]     |= alu_outs.dst[a_i].rob_idx;
+                    c_out.c_data[c]         |= alu_outs.res[a_i];
+                end
+            end
 
-            if (f < `NUM_FU_ALU) begin
-                off = f;
-                c_out.c_en[c]         |= 1;
-                c_out.c_ts[c]         |= alu_outs.dst[off].tag;
-                c_out.c_rob_idxs[c]   |= alu_outs.dst[off].rob_idx;
-                c_out.c_data[c]       |= alu_outs.res[off];
-            end else begin
-                if (!(reset || flush))
-                    $error("TODO: implement completion of MULT");
-                off = f - `NUM_FU_ALU;
-                c_out.c_en[c]         |= 1;
-                c_out.c_ts[c]         |= mul_outs.dst[off].tag;
-                c_out.c_rob_idxs[c]   |= mul_outs.dst[off].rob_idx;
-                c_out.c_data[c]       |= mul_outs.res[off];
+            for (int unsigned m_i = 0; m_i < `NUM_FU_MULT; ++m_i) begin
+                if (cdb2fu_gbus[c].mul[m_i]) begin
+                    c_out.c_en[c]           |= 1;
+                    c_out.c_ts[c]           |= mul_outs.dst[m_i].tag;
+                    c_out.c_rob_idxs[c]     |= mul_outs.dst[m_i].rob_idx;
+                    c_out.c_data[c]         |= mul_outs.res[m_i];
+                end
             end
         end
 
@@ -261,12 +264,12 @@ module stage_ex_p4 (
                     };
                 end else begin
                     alu_ins.bsy[i] <= alu_ins.bsy[i]
-                        ? !(alu_outs.rdy[i] && cpl_gnt[i]) // if busy, did it complete
+                        ? !(alu_outs.rdy[i] && cpl_gnt.alu[i]) // if busy, did it complete
                         : rs_in.fu_vld_alu[i];             // if not busy, did it issue?
                     alu_ins.dat[i] <= rs_in.fu_vld_alu[i]
                         ? rs_in.fu_dat_alu[i]
                         : alu_ins.dat[i];
-                    alu_outs.rdy[i] <= alu_outs.rdy[i] && !cpl_gnt[i];
+                    alu_outs.rdy[i] <= alu_outs.rdy[i] && !cpl_gnt.alu[i];
                 end
             end
 
@@ -289,7 +292,7 @@ module stage_ex_p4 (
             end
 
             $display("  %3d | >> EXECUTE", $time);
-            $display("rdy_alu: %b  rdy_mult: %b  rdy_store: %b  rdy_load: %b  |  c_en: [%b %b] c_ts: [%d %d] c_data: [%h %h] c_rob_idxs: [%d %d]",
+            $display("rdy_alu: %b  rdy_mult: %b  rdy_store: %b  rdy_load: %b  |  c_en: [%b %b] c_ts: [%d %d] c_data: [%h %h] c_rob_idxs: [%d %d] cpl_gnt: %b",
                 rs_out.fu_rdy_alu,
                 rs_out.fu_rdy_mult,
                 rs_out.fu_rdy_store,
@@ -301,7 +304,8 @@ module stage_ex_p4 (
                 c_out.c_data[0],
                 c_out.c_data[1],
                 c_out.c_rob_idxs[0],
-                c_out.c_rob_idxs[1]
+                c_out.c_rob_idxs[1],
+                cpl_gnt
             );
             $display("<prf_out> en: %b s_t1s: [%0d, %0d, %0d, %0d] s_t2s: [%0d, %0d, %0d, %0d]",
                 prf_out.prf_en,
