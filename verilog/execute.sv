@@ -289,16 +289,19 @@ module stage_ex_p4 (
             end
 
             $display("  %3d | >> EXECUTE", $time);
-            $display("rdy_alu: %b  rdy_mult: %b  rdy_store: %b  rdy_load: %b  |  c_en: %b  c_ts: %d %d c_data: %h c_rob_idxs: %d",
+            $display("rdy_alu: %b  rdy_mult: %b  rdy_store: %b  rdy_load: %b  |  c_en: [%b %b] c_ts: [%d %d] c_data: [%h %h] c_rob_idxs: [%d %d]",
                 rs_out.fu_rdy_alu,
                 rs_out.fu_rdy_mult,
                 rs_out.fu_rdy_store,
                 rs_out.fu_rdy_load,
-                c_out.c_en,
+                c_out.c_en[0],
+                c_out.c_en[1],
                 c_out.c_ts[0],
                 c_out.c_ts[1],
-                c_out.c_data,
-                c_out.c_rob_idxs
+                c_out.c_data[0],
+                c_out.c_data[1],
+                c_out.c_rob_idxs[0],
+                c_out.c_rob_idxs[1]
             );
             $display("<prf_out> en: %b s_t1s: [%0d, %0d] s_t2s: [%0d, %0d]",
                 prf_out.prf_en,
