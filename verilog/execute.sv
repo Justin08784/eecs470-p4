@@ -288,8 +288,8 @@ module stage_ex_p4 (
                     : mul_ins.dat[i];
             end
 
-            $display("  %3d | rdy_alu: %b  rdy_mult: %b  rdy_store: %b  rdy_load: %b  |  c_en: %b  c_ts: %d %d c_data: %h c_rob_idxs: %d",
-                $time,
+            $display("  %3d | >> EXECUTE", $time);
+            $display("rdy_alu: %b  rdy_mult: %b  rdy_store: %b  rdy_load: %b  |  c_en: %b  c_ts: %d %d c_data: %h c_rob_idxs: %d",
                 rs_out.fu_rdy_alu,
                 rs_out.fu_rdy_mult,
                 rs_out.fu_rdy_store,
@@ -300,21 +300,20 @@ module stage_ex_p4 (
                 c_out.c_data,
                 c_out.c_rob_idxs
             );
-            $display("  %3d |||| <prf_out> en: %b s_t1s: [%0d, %0d] s_t2s: [%0d, %0d]",
-                $time,
+            $display("<prf_out> en: %b s_t1s: [%0d, %0d] s_t2s: [%0d, %0d]",
                 prf_out.prf_en,
                 prf_out.s_t1s[1],
                 prf_out.s_t1s[0],
                 prf_out.s_t2s[1],
                 prf_out.s_t2s[0]
             );
-            $display("  %3d |||| <prf_in >        s_v1s: [%0d, %0d] s_v2s: [%0d, %0d]",
-                $time,
+            $display("<prf_in >        s_v1s: [%0d, %0d] s_v2s: [%0d, %0d]",
                 prf_in.s_v1s[1],
                 prf_in.s_v1s[0],
                 prf_in.s_v2s[1],
                 prf_in.s_v2s[0]
             );
+            $display("  %3d | << EXECUTE", $time);
 
         end
     end
