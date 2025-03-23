@@ -209,18 +209,18 @@ module stage_ex_p4 (
 
             if (f < `NUM_FU_ALU) begin
                 off = f;
-                c_out.c_en[off]         |= 1;
-                c_out.c_ts[off]         |= alu_outs.dst[off].tag;
-                c_out.c_rob_idxs[off]   |= alu_outs.dst[off].rob_idx;
-                c_out.c_data[off]       |= alu_outs.res[off];
+                c_out.c_en[c]         |= 1;
+                c_out.c_ts[c]         |= alu_outs.dst[off].tag;
+                c_out.c_rob_idxs[c]   |= alu_outs.dst[off].rob_idx;
+                c_out.c_data[c]       |= alu_outs.res[off];
             end else begin
                 if (!(reset || flush))
                     $error("TODO: implement completion of MULT");
                 off = f - `NUM_FU_ALU;
-                c_out.c_en[off]         |= 1;
-                c_out.c_ts[off]         |= mul_outs.dst[off].tag;
-                c_out.c_rob_idxs[off]   |= mul_outs.dst[off].rob_idx;
-                c_out.c_data[off]       |= mul_outs.res[off];
+                c_out.c_en[c]         |= 1;
+                c_out.c_ts[c]         |= mul_outs.dst[off].tag;
+                c_out.c_rob_idxs[c]   |= mul_outs.dst[off].rob_idx;
+                c_out.c_data[c]       |= mul_outs.res[off];
             end
         end
 
