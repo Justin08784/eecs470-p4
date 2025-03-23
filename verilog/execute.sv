@@ -101,15 +101,33 @@ module stage_ex_p4 (
     DST     [`NUM_FU_MULT-1:0] mul_dst_n;
     logic   [`NUM_FU_MULT-1:0] mul_vld_n;
 
+    // request operands from PRF
+    always_comb begin
+        prf_out = '0;
+        foreach (alu_ins.dat[i]) begin
+            if (!alu_ins.bsy[i])
+                continue;
+            prf_out.prf_en[i]   = 1;
+            prf_out.s_t1s[i]    = alu_ins.dat[i].t1; 
+            prf_out.s_t2s[i]    = alu_ins.dat[i].t2; 
+        end
+        foreach (mul_ins.dat[i]) begin
+            if (!mul_ins.bsy[i])
+                continue;
+            prf_out.prf_en[i + `NUM_FU_ALU]   = 1;
+            prf_out.s_t1s[i + `NUM_FU_ALU]    = mul_ins.dat[i].t1; 
+            prf_out.s_t2s[i + `NUM_FU_ALU]    = mul_ins.dat[i].t2; 
+        end
+    end
 
-    // extract operands
+    // receive/decode operands from PRF
     struct packed {
-        DATA        [`NUM_FU_ALU-1:0]   opa, opb;
+        DATA        [`NUM_FU_ALU]       opa, opb;
         ALU_FUNC    [`NUM_FU_ALU]       alu_func;
         logic       [`NUM_FU_ALU][2:0]  branch_func; // Which branch condition to check
     } alu_operands;
     struct packed {
-        DATA        [`NUM_FU_MULT-1:0]  rs1, rs2;
+        DATA        [`NUM_FU_MULT]      rs1, rs2;
         MULT_FUNC   [`NUM_FU_MULT]      func;
         DST         [`NUM_FU_MULT]      dst;
     } mul_operands;
@@ -244,22 +262,6 @@ module stage_ex_p4 (
                     c_out.c_data[c]         |= mul_outs.res[m_i];
                 end
             end
-        end
-
-        prf_out = '0;
-        for (int unsigned i = 0; i < `NUM_FU_ALU; ++i) begin
-            if (!alu_ins.bsy[i])
-                continue;
-            prf_out.prf_en[i]   = 1;
-            prf_out.s_t1s[i]    = alu_ins.dat[i].t1; 
-            prf_out.s_t2s[i]    = alu_ins.dat[i].t2; 
-        end
-        for (int unsigned i = 0; i < `NUM_FU_MULT; ++i) begin
-            if (!mul_ins.bsy[i])
-                continue;
-            prf_out.prf_en[i + `NUM_FU_ALU]   = 1;
-            prf_out.s_t1s[i + `NUM_FU_ALU]    = mul_ins.dat[i].t1; 
-            prf_out.s_t2s[i + `NUM_FU_ALU]    = mul_ins.dat[i].t2; 
         end
     end
 
