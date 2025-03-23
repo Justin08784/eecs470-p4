@@ -60,7 +60,7 @@ module alu_group (
     input clock,
     input reset,
     input flush,
-    
+
     output logic        [`NUM_FU_ALU-1:0] ins_rdy,
     input  logic        [`NUM_FU_ALU-1:0] ins_en, // sender-side (RS issue) enable
     input  ID_RESULT    [`NUM_FU_ALU-1:0] ins_dat,
@@ -80,56 +80,11 @@ module alu_group (
     output  DST         [`NUM_FU_ALU-1:0] outs_dst,
     input   logic       [`NUM_FU_ALU-1:0] outs_en   // receiver-side (execute completion) enable
 );
-
-endmodule
-
-module stage_ex_p4 (
-    input clock,
-    input reset,
-    input flush,
-
-    input   rs2execute rs_in,
-    output  execute2rs rs_out,
-
-    input   prf2execute prf_in,
-    output  execute2prf prf_out,
-
-    // TODO: wrap this stuff into execute2complete. Wrap crap here in general.
-    output  execute2complete c_out
-
-);
-
-    // <FU>_ins: staging; where just-issued insns wait for 1 cycle to pull their operands
-    struct packed {
-        logic       [`NUM_FU_ALU-1:0]   bsy;
-        ID_RESULT   [`NUM_FU_ALU-1:0]   dat;
-    } alu_ins;
     struct packed {
         DATA [`NUM_FU_ALU-1:0] opa, opb;
     } alu_operands;
-    struct packed {
-        logic       [`NUM_FU_MULT-1:0]  bsy;
-        ID_RESULT   [`NUM_FU_MULT-1:0]  dat;
-    } mul_ins;
 
-    // <FU>_outs: where executed insns wait until completion
-    struct packed {
-        // ff
-        logic   [`NUM_FU_ALU-1:0]   rdy;
-        DATA    [`NUM_FU_ALU-1:0]   res;
-        DST     [`NUM_FU_ALU-1:0]   dst;
-    } alu_outs;
     DATA [`NUM_FU_ALU-1:0] alu_res_n;
-
-    struct packed {
-        // ff
-        logic   [`NUM_FU_MULT-1:0]  rdy;
-        DATA    [`NUM_FU_MULT-1:0]  res;
-        DST     [`NUM_FU_MULT-1:0]  dst;
-    } mul_outs;
-    DATA [`NUM_FU_MULT-1:0] mul_res_n;
-    DST     [`NUM_FU_MULT-1:0] mul_dst_n;
-    logic   [`NUM_FU_MULT-1:0] mul_vld_n;
 
     // extract ALU operands
     always_comb begin
@@ -178,6 +133,64 @@ module stage_ex_p4 (
         end
     endgenerate
 
+    always_ff @(posedge clock) begin
+        if (reset || flush) begin
+            alu_ins     <= '0;
+
+            alu_outs    <= '0;
+        end else begin
+
+            for (int i = 0; i < `NUM_FU_ALU; ++i) begin
+                if (alu_ins.bsy[i] && !alu_outs.rdy[i]) begin
+                    alu_outs.rdy[i] <= 1;
+                    alu_outs.res[i] <= alu_res_n[i];
+                    alu_outs.dst[i] <= '{
+                        tag     :   alu_ins.dat[i].t,
+                        rob_idx :   alu_ins.dat[i].rob_idx
+                    };
+                end else begin
+                    alu_ins.bsy[i] <= alu_ins.bsy[i]
+                        ? !(alu_outs.rdy[i] && cpl_gnt.alu[i]) // if busy, did it complete
+                        : rs_in.fu_vld_alu[i];             // if not busy, did it issue?
+                    alu_ins.dat[i] <= rs_in.fu_vld_alu[i]
+                        ? rs_in.fu_dat_alu[i]
+                        : alu_ins.dat[i];
+                    alu_outs.rdy[i] <= alu_outs.rdy[i] && !cpl_gnt.alu[i];
+                end
+            end
+        end
+    end
+
+endmodule
+
+module mul_group (
+    input clock,
+    input reset,
+    input flush,
+
+    output logic        [`NUM_FU_ALU-1:0] ins_rdy,
+    input  logic        [`NUM_FU_ALU-1:0] ins_en, // sender-side (RS issue) enable
+    input  ID_RESULT    [`NUM_FU_ALU-1:0] ins_dat,
+
+    struct packed {
+        logic           [`NUM_FU_ALU-1:0] prf_en;
+        PHYS_REG_IDX    [`NUM_FU_ALU-1:0] s_t1s;
+        PHYS_REG_IDX    [`NUM_FU_ALU-1:0] s_t2s;
+    } mul2prf,
+    struct packed {
+        DATA            [`NUM_FU_ALU-1:0] s_v1s;
+        DATA            [`NUM_FU_ALU-1:0] s_v2s;
+    } prf2mul,
+
+    output  logic       [`NUM_FU_ALU-1:0] outs_vld, // equivalent of alu_outs.rdy; yes I renamed
+    output  DATA        [`NUM_FU_ALU-1:0] outs_res,
+    output  DST         [`NUM_FU_ALU-1:0] outs_dst,
+    input   logic       [`NUM_FU_ALU-1:0] outs_en   // receiver-side (execute completion) enable
+);
+    DATA [`NUM_FU_MULT-1:0] mul_res_n;
+    DST     [`NUM_FU_MULT-1:0] mul_dst_n;
+    logic   [`NUM_FU_MULT-1:0] mul_vld_n;
+
     generate
         for (genvar i = 0; i < `NUM_FU_MULT; ++i) begin : gen_mults
             // // Instantiate the ALU
@@ -202,7 +215,76 @@ module stage_ex_p4 (
         end
     endgenerate
 
+    always_ff @(posedge clock) begin
+        if (reset || flush) begin
+            mul_ins     <= '0;
+
+            mul_outs    <= '0;
+        end else begin
+            for (int i = 0; i < `NUM_FU_MULT; ++i) begin
+                mul_outs.rdy[i] <= mul_vld_n[i];
+                if (mul_vld_n[i]) begin
+                    mul_outs.dst[i] <= mul_dst_n[i];
+                    mul_outs.res[i] <= mul_res_n[i];
+                end
+
+                mul_ins.bsy[i] <= mul_ins.bsy[i]
+                    // Option 1: clear only when complete (will re-issue the same insn if inputs the same)
+                    // ? !(mul_outs.rdy[i] && cpl_gnt[i + `NUM_FU_ALU]) // if busy, did it complete
+                    // Option 2: clear as soon as issue done (might overwrite someone ahead)
+                    ? 0
+                    : rs_in.fu_vld_mult[i];             // if not busy, did it issue?
+                mul_ins.dat[i] <= rs_in.fu_vld_mult[i]
+                    ? rs_in.fu_dat_mult[i]
+                    : mul_ins.dat[i];
+            end
+        end
+    end
+endmodule
+
+module stage_ex_p4 (
+    input clock,
+    input reset,
+    input flush,
+
+    input   rs2execute rs_in,
+    output  execute2rs rs_out,
+
+    input   prf2execute prf_in,
+    output  execute2prf prf_out,
+
+    // TODO: wrap this stuff into execute2complete. Wrap crap here in general.
+    output  execute2complete c_out
+
+);
     localparam NUM_FU_TOTAL = `NUM_FU_ALU + `NUM_FU_MULT;
+
+    // <FU>_ins: staging; where just-issued insns wait for 1 cycle to pull their operands
+    struct packed {
+        logic [`NUM_FU_ALU-1:0]  alu;
+        logic [`NUM_FU_MULT-1:0] mul;
+    } ins_rdy;
+    struct packed {
+        ID_RESULT [`NUM_FU_ALU-1:0]  alu;
+        ID_RESULT [`NUM_FU_MULT-1:0] mul;
+    } ins_dat;
+
+    // <FU>_outs: where executed insns wait until completion
+    struct packed {
+        logic [`NUM_FU_ALU-1:0]  alu;
+        logic [`NUM_FU_MULT-1:0] mul;
+    } outs_vld;
+    struct packed {
+        DATA  [`NUM_FU_ALU-1:0]  alu;
+        DATA  [`NUM_FU_MULT-1:0] mul;
+    } outs_res;
+    struct packed {
+        DST   [`NUM_FU_ALU-1:0]  alu;
+        DST   [`NUM_FU_MULT-1:0] mul;
+    } outs_dst;
+
+
+
     typedef struct packed {
         logic [`NUM_FU_ALU-1:0]     alu;
         logic [`NUM_FU_MULT-1:0]    mul;
@@ -272,98 +354,60 @@ module stage_ex_p4 (
     end
 
 
-    always_ff @(posedge clock) begin
-        if (reset || flush) begin
-            alu_ins     <= '0;
-            mul_ins     <= '0;
+    // always_ff @(posedge clock) begin
+    //     if (reset || flush) begin
+    //         alu_ins     <= '0;
+    //         mul_ins     <= '0;
 
-            alu_outs    <= '0;
-            mul_outs    <= '0;
-        end else begin
+    //         alu_outs    <= '0;
+    //         mul_outs    <= '0;
+    //     end else begin
+    //         $display("  %3d | >> EXECUTE", $time);
+    //         $display("rdy_alu: %b  rdy_mult: %b  rdy_store: %b  rdy_load: %b  |  c_en: [%b %b] c_ts: [%d %d] c_data: [%h %h] c_rob_idxs: [%d %d] cpl_gnt: %b",
+    //             rs_out.fu_rdy_alu,
+    //             rs_out.fu_rdy_mult,
+    //             rs_out.fu_rdy_store,
+    //             rs_out.fu_rdy_load,
+    //             c_out.c_en[0],
+    //             c_out.c_en[1],
+    //             c_out.c_ts[0],
+    //             c_out.c_ts[1],
+    //             c_out.c_data[0],
+    //             c_out.c_data[1],
+    //             c_out.c_rob_idxs[0],
+    //             c_out.c_rob_idxs[1],
+    //             cpl_gnt
+    //         );
+    //         $display("<prf_out> en: %b s_t1s: [%0d, %0d, %0d, %0d] s_t2s: [%0d, %0d, %0d, %0d]",
+    //             prf_out.prf_en,
+    //             prf_out.s_t1s[0],
+    //             prf_out.s_t1s[1],
+    //             prf_out.s_t1s[2],
+    //             prf_out.s_t1s[3],
+    //             prf_out.s_t2s[0],
+    //             prf_out.s_t2s[1],
+    //             prf_out.s_t2s[2],
+    //             prf_out.s_t2s[3]
+    //         );
+    //         $display("alu: (rdy: %b, res: %x), (rdy: %b, res: %x), mul: (rdy: %b, res: %x), (rdy: %b, res: %x)",
+    //             alu_outs.rdy[0],
+    //             alu_outs.res[0],
+    //             alu_outs.rdy[1],
+    //             alu_outs.res[1],
+    //             mul_outs.rdy[0],
+    //             mul_outs.res[0],
+    //             mul_outs.rdy[1],
+    //             mul_outs.res[1]
+    //         );
+    //         $display("<prf_in >        s_v1s: [%0d, %0d] s_v2s: [%0d, %0d]",
+    //             prf_in.s_v1s[0],
+    //             prf_in.s_v1s[1],
+    //             prf_in.s_v2s[0],
+    //             prf_in.s_v2s[1]
+    //         );
+    //         $display("  %3d | << EXECUTE", $time);
 
-            for (int i = 0; i < `NUM_FU_ALU; ++i) begin
-                if (alu_ins.bsy[i] && !alu_outs.rdy[i]) begin
-                    alu_outs.rdy[i] <= 1;
-                    alu_outs.res[i] <= alu_res_n[i];
-                    alu_outs.dst[i] <= '{
-                        tag     :   alu_ins.dat[i].t,
-                        rob_idx :   alu_ins.dat[i].rob_idx
-                    };
-                end else begin
-                    alu_ins.bsy[i] <= alu_ins.bsy[i]
-                        ? !(alu_outs.rdy[i] && cpl_gnt.alu[i]) // if busy, did it complete
-                        : rs_in.fu_vld_alu[i];             // if not busy, did it issue?
-                    alu_ins.dat[i] <= rs_in.fu_vld_alu[i]
-                        ? rs_in.fu_dat_alu[i]
-                        : alu_ins.dat[i];
-                    alu_outs.rdy[i] <= alu_outs.rdy[i] && !cpl_gnt.alu[i];
-                end
-            end
-
-            for (int i = 0; i < `NUM_FU_MULT; ++i) begin
-                mul_outs.rdy[i] <= mul_vld_n[i];
-                if (mul_vld_n[i]) begin
-                    mul_outs.dst[i] <= mul_dst_n[i];
-                    mul_outs.res[i] <= mul_res_n[i];
-                end
-
-                mul_ins.bsy[i] <= mul_ins.bsy[i]
-                    // Option 1: clear only when complete (will re-issue the same insn if inputs the same)
-                    // ? !(mul_outs.rdy[i] && cpl_gnt[i + `NUM_FU_ALU]) // if busy, did it complete
-                    // Option 2: clear as soon as issue done (might overwrite someone ahead)
-                    ? 0
-                    : rs_in.fu_vld_mult[i];             // if not busy, did it issue?
-                mul_ins.dat[i] <= rs_in.fu_vld_mult[i]
-                    ? rs_in.fu_dat_mult[i]
-                    : mul_ins.dat[i];
-            end
-
-            $display("  %3d | >> EXECUTE", $time);
-            $display("rdy_alu: %b  rdy_mult: %b  rdy_store: %b  rdy_load: %b  |  c_en: [%b %b] c_ts: [%d %d] c_data: [%h %h] c_rob_idxs: [%d %d] cpl_gnt: %b",
-                rs_out.fu_rdy_alu,
-                rs_out.fu_rdy_mult,
-                rs_out.fu_rdy_store,
-                rs_out.fu_rdy_load,
-                c_out.c_en[0],
-                c_out.c_en[1],
-                c_out.c_ts[0],
-                c_out.c_ts[1],
-                c_out.c_data[0],
-                c_out.c_data[1],
-                c_out.c_rob_idxs[0],
-                c_out.c_rob_idxs[1],
-                cpl_gnt
-            );
-            $display("<prf_out> en: %b s_t1s: [%0d, %0d, %0d, %0d] s_t2s: [%0d, %0d, %0d, %0d]",
-                prf_out.prf_en,
-                prf_out.s_t1s[0],
-                prf_out.s_t1s[1],
-                prf_out.s_t1s[2],
-                prf_out.s_t1s[3],
-                prf_out.s_t2s[0],
-                prf_out.s_t2s[1],
-                prf_out.s_t2s[2],
-                prf_out.s_t2s[3]
-            );
-            $display("alu: (rdy: %b, res: %x), (rdy: %b, res: %x), mul: (rdy: %b, res: %x), (rdy: %b, res: %x)",
-                alu_outs.rdy[0],
-                alu_outs.res[0],
-                alu_outs.rdy[1],
-                alu_outs.res[1],
-                mul_outs.rdy[0],
-                mul_outs.res[0],
-                mul_outs.rdy[1],
-                mul_outs.res[1]
-            );
-            $display("<prf_in >        s_v1s: [%0d, %0d] s_v2s: [%0d, %0d]",
-                prf_in.s_v1s[0],
-                prf_in.s_v1s[1],
-                prf_in.s_v2s[0],
-                prf_in.s_v2s[1]
-            );
-            $display("  %3d | << EXECUTE", $time);
-
-        end
-    end
+    //     end
+    // end
 
 endmodule // stage_ex
