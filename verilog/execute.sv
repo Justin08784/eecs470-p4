@@ -303,18 +303,32 @@ module stage_ex_p4 (
                 c_out.c_rob_idxs[0],
                 c_out.c_rob_idxs[1]
             );
-            $display("<prf_out> en: %b s_t1s: [%0d, %0d] s_t2s: [%0d, %0d]",
+            $display("<prf_out> en: %b s_t1s: [%0d, %0d, %0d, %0d] s_t2s: [%0d, %0d, %0d, %0d]",
                 prf_out.prf_en,
-                prf_out.s_t1s[1],
                 prf_out.s_t1s[0],
+                prf_out.s_t1s[1],
+                prf_out.s_t1s[2],
+                prf_out.s_t1s[3],
+                prf_out.s_t2s[0],
                 prf_out.s_t2s[1],
-                prf_out.s_t2s[0]
+                prf_out.s_t1s[2],
+                prf_out.s_t1s[3]
+            );
+            $display("alu: (rdy: %b, res: %x), (rdy: %b, res: %x), mul: (rdy: %b, res: %x), (rdy: %b, res: %x)",
+                alu_outs.rdy[0],
+                alu_outs.res[0],
+                alu_outs.rdy[1],
+                alu_outs.res[1],
+                mul_outs.rdy[0],
+                mul_outs.res[0],
+                mul_outs.rdy[1],
+                mul_outs.res[1]
             );
             $display("<prf_in >        s_v1s: [%0d, %0d] s_v2s: [%0d, %0d]",
-                prf_in.s_v1s[1],
                 prf_in.s_v1s[0],
-                prf_in.s_v2s[1],
-                prf_in.s_v2s[0]
+                prf_in.s_v1s[1],
+                prf_in.s_v2s[0],
+                prf_in.s_v2s[1]
             );
             $display("  %3d | << EXECUTE", $time);
 
