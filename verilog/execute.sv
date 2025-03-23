@@ -57,6 +57,10 @@ module alu (
 endmodule // alu
 
 module alu_group (
+    input clock,
+    input reset,
+    input flush,
+    
     output logic        [`NUM_FU_ALU-1:0] ins_rdy,
     input  logic        [`NUM_FU_ALU-1:0] ins_en, // sender-side (RS issue) enable
     input  ID_RESULT    [`NUM_FU_ALU-1:0] ins_dat,
