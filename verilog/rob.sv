@@ -51,12 +51,7 @@ module rob #(
             d_idxs[i] = (tail + i) % ROB_SZ;
 
         // handle retire (outs)
-        r_out.r_en_cnt  = '0;
-        r_out.r_free_cnt  = '0;
-        r_out.tag       = '0;
-        r_out.t_old     = '0;
-        r_out.dst       = '0;
-        wb_packet       = '0;
+        r_out = '0;
         for (int unsigned i = 0; i < NUM_RPORTS; ++i, ++r_out.r_en_cnt) begin
             // This computes r_en_cnt linear-time wrt NUM_RPORTS. (Fine if NUM_RPORTS
             // small; synthesizer may simply unroll this loop.)
@@ -99,7 +94,11 @@ module rob #(
                 ++r_out.r_free_cnt;
             end
             r_out.dst[i]    = state[r_idxs[i]].dst;
+        end
 
+        prf_out     = '0;
+        wb_packet   = '0;
+        for (int unsigned i = 0; i < r_out.r_en_cnt; ++i) begin
             prf_out[i] = state[r_idxs[i]].tag;
 
             wb_packet[i] = '{
@@ -110,7 +109,6 @@ module rob #(
                 illegal : state[r_idxs[i]].illegal,
                 valid   : ~state[r_idxs[i]].illegal
             };
-
         end
 
         // handle dispatch (outs)
@@ -138,10 +136,6 @@ module rob #(
             head    <= 0;
             tail    <= 0;
             state   <= '0;
-            // used    <= RESET_STATE.used;
-            // head    <= RESET_STATE.head;
-            // tail    <= RESET_STATE.tail;
-            // state   <= RESET_STATE.state;
         end else begin
             `ifndef SYNTH
             if (d_in.d_en_cnt > free + r_out.r_en_cnt)
