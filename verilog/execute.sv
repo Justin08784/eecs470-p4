@@ -143,7 +143,7 @@ module stage_ex_p4 (
                 .opa(alu_operands.opa[i]),
                 .opb(alu_operands.opb[i]),
                 .alu_func   (alu_ins.dat[i].alu_func),
-                .branch_func(alu_ins.dat[i].inst.r.funct3), // Which branch condition to check
+                .branch_func(alu_ins.dat[i].inst.b.funct3), // Which branch condition to check
 
                 .take(), // True/False condition result (will return FALSE if branch is low)
                 .result(alu_res_n[i]) // will return 32'hfacebeec if branch is high (Sentinel, hopefully none of our alu computations result in that value)
