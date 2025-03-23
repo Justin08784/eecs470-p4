@@ -167,10 +167,10 @@ module rob #(
                 // );
 
                 /* V1: This doesn't actually update the cpl bit... */
-                // state[cur_idx].cpl <= state[cur_idx].cpl | c_in.c_en[i];
+                state[cur_idx].cpl <= state[cur_idx].cpl || c_in.c_en[i];
                 /* V2: ...but this one does???! Make this make sense? */
-                if (c_in.c_en[i])
-                    state[cur_idx].cpl <= 1;
+                // if (c_in.c_en[i])
+                //     state[cur_idx].cpl <= 1;
             end
 
             // handle dispatch (ins)
