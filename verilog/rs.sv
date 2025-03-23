@@ -349,10 +349,10 @@ module rs #(parameter
         end
 
         `ifndef SYNTH
-        $display("  %3d | RS >>", $time);
-        print_id_result(d_in.d_dat[0]);
-        print_id_result(d_in.d_dat[1]);
         if (!reset) begin
+            $display("  %3d | RS >>", $time);
+            print_id_result(d_in.d_dat[0]);
+            print_id_result(d_in.d_dat[1]);
             for (int i = 0; i < RS_SZ; ++i) begin
                 string fu_name;
                 get_fu_name(entries[i].dat.fu_idx, fu_name);
@@ -377,9 +377,9 @@ module rs #(parameter
                     entries[i].busy ? fu_name : "*",
                     entries[i].dat.fu_idx,
                 );
+                $display("  %3d | RS <<", $time);
             end
         end
-        $display("  %3d | RS <<", $time);
         `endif
     end
 
