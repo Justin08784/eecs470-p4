@@ -84,31 +84,47 @@ module alu_group (
         DATA [`NUM_FU_ALU-1:0] opa, opb;
     } alu_operands;
 
+    // <FU>_ins: staging; where just-issued insns wait for 1 cycle to pull their operands
+    struct packed {
+        logic     [`NUM_FU_ALU-1:0] rdy;
+        logic     [`NUM_FU_ALU-1:0] en;
+        ID_RESULT [`NUM_FU_ALU-1:0] dat;
+    } ins;
+
+    // <FU>_outs: where executed insns wait until completion
+    struct packed {
+        logic [`NUM_FU_ALU-1:0] vld;
+        DATA  [`NUM_FU_ALU-1:0] res;
+        DST   [`NUM_FU_ALU-1:0] dst;
+        logic [`NUM_FU_ALU-1:0] en;
+    } outs;
+
     DATA [`NUM_FU_ALU-1:0] alu_res_n;
+
 
     // extract ALU operands
     always_comb begin
-        foreach(alu_ins.dat[i]) begin
+        foreach(ins_dat[i]) begin
             if(!alu_ins.bsy[i]) 
                 continue;
 
             // ALU opA mux
-            case (alu_ins.dat[i].opa_select)
+            case (ins_dat[i].opa_select)
                 OPA_IS_RS1:  alu_operands.opa[i] = prf_in.s_v1s[i];
-                OPA_IS_NPC:  alu_operands.opa[i] = alu_ins.dat[i].NPC;
-                OPA_IS_PC:   alu_operands.opa[i] = alu_ins.dat[i].PC;
+                OPA_IS_NPC:  alu_operands.opa[i] = ins_dat[i].NPC;
+                OPA_IS_PC:   alu_operands.opa[i] = ins_dat[i].PC;
                 OPA_IS_ZERO: alu_operands.opa[i] = 0;
                 default:     alu_operands.opa[i]= 32'hdeadface; // dead face
             endcase
 
             // ALU opB mux
-            case (alu_ins.dat[i].opb_select)
+            case (ins_dat[i].opb_select)
                 OPB_IS_RS2:   alu_operands.opb[i] =  prf_in.s_v2s[i];
-                OPB_IS_I_IMM: alu_operands.opb[i] = `RV32_signext_Iimm(alu_ins.dat[i].inst);
-                OPB_IS_S_IMM: alu_operands.opb[i] = `RV32_signext_Simm(alu_ins.dat[i].inst);
-                OPB_IS_B_IMM: alu_operands.opb[i] = `RV32_signext_Bimm(alu_ins.dat[i].inst);
-                OPB_IS_U_IMM: alu_operands.opb[i] = `RV32_signext_Uimm(alu_ins.dat[i].inst);
-                OPB_IS_J_IMM: alu_operands.opb[i] = `RV32_signext_Jimm(alu_ins.dat[i].inst);
+                OPB_IS_I_IMM: alu_operands.opb[i] = `RV32_signext_Iimm(ins_dat[i].inst);
+                OPB_IS_S_IMM: alu_operands.opb[i] = `RV32_signext_Simm(ins_dat[i].inst);
+                OPB_IS_B_IMM: alu_operands.opb[i] = `RV32_signext_Bimm(ins_dat[i].inst);
+                OPB_IS_U_IMM: alu_operands.opb[i] = `RV32_signext_Uimm(ins_dat[i].inst);
+                OPB_IS_J_IMM: alu_operands.opb[i] = `RV32_signext_Jimm(ins_dat[i].inst);
                 default:      alu_operands.opb[i] = 32'hfacefeed; // face feed
             endcase
 
@@ -124,8 +140,8 @@ module alu_group (
                 // Inputs
                 .opa(alu_operands.opa[i]),
                 .opb(alu_operands.opb[i]),
-                .alu_func   (alu_ins.dat[i].alu_func),
-                .branch_func(alu_ins.dat[i].inst.b.funct3), // Which branch condition to check
+                .alu_func   (ins_dat[i].alu_func),
+                .branch_func(ins_dat[i].inst.b.funct3), // Which branch condition to check
 
                 .take(), // True/False condition result (will return FALSE if branch is low)
                 .result(alu_res_n[i]) // will return 32'hfacebeec if branch is high (Sentinel, hopefully none of our alu computations result in that value)
@@ -145,16 +161,16 @@ module alu_group (
                     alu_outs.rdy[i] <= 1;
                     alu_outs.res[i] <= alu_res_n[i];
                     alu_outs.dst[i] <= '{
-                        tag     :   alu_ins.dat[i].t,
-                        rob_idx :   alu_ins.dat[i].rob_idx
+                        tag     :   ins_dat[i].t,
+                        rob_idx :   ins_dat[i].rob_idx
                     };
                 end else begin
                     alu_ins.bsy[i] <= alu_ins.bsy[i]
                         ? !(alu_outs.rdy[i] && cpl_gnt.alu[i]) // if busy, did it complete
                         : rs_in.fu_vld_alu[i];             // if not busy, did it issue?
-                    alu_ins.dat[i] <= rs_in.fu_vld_alu[i]
+                    ins_dat[i] <= rs_in.fu_vld_alu[i]
                         ? rs_in.fu_dat_alu[i]
-                        : alu_ins.dat[i];
+                        : ins_dat[i];
                     alu_outs.rdy[i] <= alu_outs.rdy[i] && !cpl_gnt.alu[i];
                 end
             end
@@ -190,6 +206,21 @@ module mul_group (
     DATA [`NUM_FU_MULT-1:0] mul_res_n;
     DST     [`NUM_FU_MULT-1:0] mul_dst_n;
     logic   [`NUM_FU_MULT-1:0] mul_vld_n;
+
+    // <FU>_ins: staging; where just-issued insns wait for 1 cycle to pull their operands
+    struct packed {
+        logic     [`NUM_FU_MULT-1:0] rdy;
+        logic     [`NUM_FU_MULT-1:0] en;
+        ID_RESULT [`NUM_FU_MULT-1:0] dat;
+    } ins;
+
+    // <FU>_outs: where executed insns wait until completion
+    struct packed {
+        logic [`NUM_FU_MULT-1:0] vld;
+        DATA  [`NUM_FU_MULT-1:0] res;
+        DST   [`NUM_FU_MULT-1:0] dst;
+        logic [`NUM_FU_MULT-1:0] en;
+    } outs;
 
     generate
         for (genvar i = 0; i < `NUM_FU_MULT; ++i) begin : gen_mults
@@ -259,31 +290,37 @@ module stage_ex_p4 (
 );
     localparam NUM_FU_TOTAL = `NUM_FU_ALU + `NUM_FU_MULT;
 
-    // <FU>_ins: staging; where just-issued insns wait for 1 cycle to pull their operands
-    struct packed {
-        logic [`NUM_FU_ALU-1:0]  alu;
-        logic [`NUM_FU_MULT-1:0] mul;
-    } ins_rdy;
-    struct packed {
-        ID_RESULT [`NUM_FU_ALU-1:0]  alu;
-        ID_RESULT [`NUM_FU_MULT-1:0] mul;
-    } ins_dat;
+    alu_group alu_group0 (
+        .clock(clock),
+        .reset(reset),
+        .flush(flush),
 
-    // <FU>_outs: where executed insns wait until completion
-    struct packed {
-        logic [`NUM_FU_ALU-1:0]  alu;
-        logic [`NUM_FU_MULT-1:0] mul;
-    } outs_vld;
-    struct packed {
-        DATA  [`NUM_FU_ALU-1:0]  alu;
-        DATA  [`NUM_FU_MULT-1:0] mul;
-    } outs_res;
-    struct packed {
-        DST   [`NUM_FU_ALU-1:0]  alu;
-        DST   [`NUM_FU_MULT-1:0] mul;
-    } outs_dst;
+        .ins_rdy(ins_rdy.alu),
+        .ins_en (ins_en.alu),
+        .ins_dat(ins_dat.alu),
 
+        .alu2prf('{
+            prf_out.prf_en.alu,
+            prf_out.s_t1s.alu,
+            prf_out.s_t2s.alu
+        }),
+        .prf2alu('{
+            prf_in.s_v1s.alu,
+            prf_in.s_v2s.alu
+        })
 
+        .outs_vld(outs_vld.alu),
+        .outs_res(outs_res.alu),
+        .outs_dst(outs_dst.alu),
+        .outs_en (outs_en.alu)
+    );
+
+    assign rs_out = '{
+        fu_rdy_alu      : ins_rdy.alu,
+        fu_rdy_mult     : ins_rdy.mul,
+        fu_rdy_load     : '0,
+        fu_rdy_store    : '0
+    };
 
     typedef struct packed {
         logic [`NUM_FU_ALU-1:0]     alu;
@@ -308,13 +345,6 @@ module stage_ex_p4 (
 
     int unsigned off;
     always_comb begin
-        rs_out = '{
-            fu_rdy_alu      : ~alu_ins.bsy,
-            fu_rdy_mult     : ~mul_ins.bsy,
-            fu_rdy_load     : '0,
-            fu_rdy_store    : '0
-        };
-
         c_out = '0;
         foreach (cdb2fu_gbus[c]) begin
             for (int unsigned a_i = 0; a_i < `NUM_FU_ALU; ++a_i) begin
