@@ -311,8 +311,8 @@ module stage_ex_p4 (
                 prf_out.s_t1s[3],
                 prf_out.s_t2s[0],
                 prf_out.s_t2s[1],
-                prf_out.s_t1s[2],
-                prf_out.s_t1s[3]
+                prf_out.s_t2s[2],
+                prf_out.s_t2s[3]
             );
             $display("alu: (rdy: %b, res: %x), (rdy: %b, res: %x), mul: (rdy: %b, res: %x), (rdy: %b, res: %x)",
                 alu_outs.rdy[0],
