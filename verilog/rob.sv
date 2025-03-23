@@ -187,6 +187,16 @@ module rob #(
 
             `ifndef SYNTH
             $display("  %3d | >> ROB", $time);
+            $display("c_en: [%b %b] c_ts: [%d %d] c_data: [%h %h] c_rob_idxs: [%d %d]",
+                c_in.c_en[0],
+                c_in.c_en[1],
+                c_in.c_ts[0],
+                c_in.c_ts[1],
+                c_in.c_data[0],
+                c_in.c_data[1],
+                c_in.c_rob_idxs[0],
+                c_in.c_rob_idxs[1]
+            );
             $display("{r_free_cnt: %d, [(t: %0d, told: %0d, dst: %0d), (t: %0d, told: %0d, dst: %0d)]}",
                 r_out.r_free_cnt,
                 r_out.tag[0],
@@ -196,6 +206,18 @@ module rob #(
                 r_out.t_old[1],
                 r_out.dst[1]
             );
+            for (int i = head; i < 10; ++i) begin
+                $display("Rob[%0d]: cpl %b, t: %0d, t_old: %0d, dst: %0d, halt: %0b, illegal: %0b, NPC: %h",
+                    i,
+                    state[i].cpl,
+                    state[i].tag,
+                    state[i].t_old,
+                    state[i].dst,
+                    state[i].halt,
+                    state[i].illegal,
+                    state[i].NPC
+                );
+            end
             $display("  %3d | << ROB", $time);
             `endif
         end
