@@ -56,6 +56,29 @@ module alu (
 
 endmodule // alu
 
+module alu_group (
+    output logic        [`NUM_FU_ALU-1:0] ins_rdy,
+    input  logic        [`NUM_FU_ALU-1:0] ins_en, // sender-side (RS issue) enable
+    input  ID_RESULT    [`NUM_FU_ALU-1:0] ins_dat,
+
+    struct packed {
+        logic           [`NUM_FU_ALU-1:0] prf_en;
+        PHYS_REG_IDX    [`NUM_FU_ALU-1:0] s_t1s;
+        PHYS_REG_IDX    [`NUM_FU_ALU-1:0] s_t2s;
+    } alu2prf,
+    struct packed {
+        DATA            [`NUM_FU_ALU-1:0] s_v1s;
+        DATA            [`NUM_FU_ALU-1:0] s_v2s;
+    } prf2alu,
+
+    output  logic       [`NUM_FU_ALU-1:0] outs_vld, // equivalent of alu_outs.rdy; yes I renamed
+    output  DATA        [`NUM_FU_ALU-1:0] outs_res,
+    output  DST         [`NUM_FU_ALU-1:0] outs_dst,
+    input   logic       [`NUM_FU_ALU-1:0] outs_en   // receiver-side (execute completion) enable
+);
+
+endmodule
+
 module stage_ex_p4 (
     input clock,
     input reset,
