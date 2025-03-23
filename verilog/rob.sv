@@ -161,10 +161,23 @@ module rob #(
                 // );
 
                 /* V1: This doesn't actually update the cpl bit... */
-                state[cur_idx].cpl <= state[cur_idx].cpl || c_in.c_en[i];
+                // state[cur_idx].cpl <= state[cur_idx].cpl || c_in.c_en[i];
                 /* V2: ...but this one does???! Make this make sense? */
-                // if (c_in.c_en[i])
-                //     state[cur_idx].cpl <= 1;
+                if (c_in.c_en[i])
+                    state[cur_idx].cpl <= 1;
+                /*
+                V1 is incorrect due to the following edge case:
+                If the same `rob_idx`appears multiple times in the CDB (e.g., [0, 0]),
+                and only the first entry has `c_en[i] == 1`, the second will
+                overwrite the intended update.
+                
+                For example: c_rob_idxs = [0, 0], c_en = [1, 0]
+                  - i = 0: state[0].cpl <= 0 || 1 -> schedules state[0].cpl = 1
+                  - i = 1: state[0].cpl <= 0 || 0 -> *overwrites* with state[0].cpl = 0
+                
+                This edge case seems only possible (as far as we can tell) for rob_idx 0,
+                since the CDB defaults to 0 at the start of each cycle.
+                */
             end
 
             // handle dispatch (ins)
