@@ -69,7 +69,7 @@ module alu_ex(
     input flush,
 
     /* FRONTEND */
-    output logic [`NUM_FU_ALU-1:0]      alu_ex_rdy,
+    output logic [`NUM_FU_ALU-1:0]          ex_rdy,
         // ready to accept from alu_ins?
     input [`NUM_FU_ALU-1:0]                 en,
         // insns to accept from alu_ins
@@ -80,12 +80,12 @@ module alu_ex(
 
         PHYS_REG_IDX [`NUM_FU_ALU-1:0]  t;
         ROB_IDX      [`NUM_FU_ALU-1:0]  rob_idx;
-    } alu_operands,
+    } ops,
         // insn metadata/operands
 
     /* BACKEND */
-    output logic [`NUM_FU_ALU-1:0]      alu_vld,
-    output CPL_CAND [`NUM_FU_ALU-1:0]   alu_cands,
+    output logic [`NUM_FU_ALU-1:0]      vld,
+    output CPL_CAND [`NUM_FU_ALU-1:0]   cands,
         // completion requests
     input  logic [`NUM_FU_ALU-1:0]      cpl_gnt
         // completion grant
@@ -96,8 +96,7 @@ module alu_ex(
         logic   [`NUM_FU_ALU-1:0]   bsy;
         DATA    [`NUM_FU_ALU-1:0]   res;
         DST     [`NUM_FU_ALU-1:0]   dst;
-    } alu_outs;
-    DATA [`NUM_FU_ALU-1:0] alu_res_n;
+    } outs, outs_n;
 
     // execute
     generate
@@ -106,48 +105,48 @@ module alu_ex(
             // TODO: These ALU inputs were kinda hardcoded. Need mux stuff to select which type.
             alu alu_0 ( 
                 // Inputs
-                .opa        (alu_operands.opa[i]),
-                .opb        (alu_operands.opb[i]),
-                .alu_func   (alu_operands.alu_func[i]),
-                .branch_func(alu_operands.branch_func[i]), // Which branch condition to check
+                .opa        (ops.opa[i]),
+                .opb        (ops.opb[i]),
+                .alu_func   (ops.alu_func[i]),
+                .branch_func(ops.branch_func[i]), // Which branch condition to check
 
                 .take(), // True/False condition result (will return FALSE if branch is low)
-                .result(alu_res_n[i]) // will return 32'hfacebeec if branch is high (Sentinel, hopefully none of our alu computations result in that value)
+                .result(outs_n.res[i]) // will return 32'hfacebeec if branch is high (Sentinel, hopefully none of our alu computations result in that value)
             );
         end
     endgenerate
 
-
     always_comb begin
-        alu_ex_rdy = ~alu_outs.bsy | cpl_gnt; // complete frees for same-cycle alu_ex acceptances
+        vld = outs.bsy;
+        foreach (cands[i]) begin
+            cands[i] = '{
+                t       : outs.dst[i].tag,
+                rob_idx : outs.dst[i].rob_idx,
+                data    : outs.res[i]
+            };
+        end
 
-        alu_vld    = alu_outs.bsy;
-        foreach (alu_cands[i]) begin
-            alu_cands[i] <= '{
-                t       : alu_outs.dst[i].tag,
-                rob_idx : alu_outs.dst[i].rob_idx,
-                data    : alu_outs.res[i]
+        ex_rdy = ~outs.bsy | cpl_gnt; // complete frees for same-cycle ex acceptances
+
+        outs_n.bsy = en | (outs.bsy & ~cpl_gnt);
+        outs_n.dst = outs.dst;
+        foreach (outs_n.dst[i]) begin
+            if (!en[i])
+                continue;
+            outs_n.dst[i] = '{
+                tag     : ops.t[i],
+                rob_idx : ops.rob_idx[i]
             };
         end
     end
 
     always_ff @(posedge clock) begin
         if (reset || flush) begin
-            alu_outs <= '0;
+            outs <= '0;
         end else begin
-            alu_outs.bsy <= en | (alu_outs.bsy & ~cpl_gnt);
-            for (int i = 0; i < `NUM_FU_ALU; ++i) begin
-                if (en[i]) begin
-                    alu_outs.res[i] <= alu_res_n[i];
-                    alu_outs.dst[i] <= '{
-                        tag     :   alu_operands.t[i],
-                        rob_idx :   alu_operands.rob_idx[i]
-                    };
-                end
-            end
+            outs <= outs_n;
         end
     end
-    
 endmodule
 
 module stage_ex_p4 (
@@ -216,50 +215,50 @@ module stage_ex_p4 (
         // 
         PHYS_REG_IDX [`NUM_FU_ALU-1:0]  t;
         ROB_IDX      [`NUM_FU_ALU-1:0]  rob_idx;
-    } alu_operands;
+    } alu_ops;
     struct packed {
         DATA        [`NUM_FU_MULT-1:0]      rs1, rs2;
         MULT_FUNC   [`NUM_FU_MULT-1:0]      func;
         DST         [`NUM_FU_MULT-1:0]      dst;
-    } mul_operands;
+    } mul_ops;
     always_comb begin
-        alu_operands = '0;
+        alu_ops = '0;
         foreach(alu_ins.dat[i]) begin
             if(!alu_ins.bsy[i]) 
                 continue;
 
             // ALU opA mux
             case (alu_ins.dat[i].opa_select)
-                OPA_IS_RS1:  alu_operands.opa[i] = prf_in.s_v1s[i];
-                OPA_IS_NPC:  alu_operands.opa[i] = alu_ins.dat[i].NPC;
-                OPA_IS_PC:   alu_operands.opa[i] = alu_ins.dat[i].PC;
-                OPA_IS_ZERO: alu_operands.opa[i] = 0;
-                default:     alu_operands.opa[i]= 32'hdeadface; // dead face
+                OPA_IS_RS1:  alu_ops.opa[i] = prf_in.s_v1s[i];
+                OPA_IS_NPC:  alu_ops.opa[i] = alu_ins.dat[i].NPC;
+                OPA_IS_PC:   alu_ops.opa[i] = alu_ins.dat[i].PC;
+                OPA_IS_ZERO: alu_ops.opa[i] = 0;
+                default:     alu_ops.opa[i]= 32'hdeadface; // dead face
             endcase
 
             // ALU opB mux
             case (alu_ins.dat[i].opb_select)
-                OPB_IS_RS2:   alu_operands.opb[i] =  prf_in.s_v2s[i];
-                OPB_IS_I_IMM: alu_operands.opb[i] = `RV32_signext_Iimm(alu_ins.dat[i].inst);
-                OPB_IS_S_IMM: alu_operands.opb[i] = `RV32_signext_Simm(alu_ins.dat[i].inst);
-                OPB_IS_B_IMM: alu_operands.opb[i] = `RV32_signext_Bimm(alu_ins.dat[i].inst);
-                OPB_IS_U_IMM: alu_operands.opb[i] = `RV32_signext_Uimm(alu_ins.dat[i].inst);
-                OPB_IS_J_IMM: alu_operands.opb[i] = `RV32_signext_Jimm(alu_ins.dat[i].inst);
-                default:      alu_operands.opb[i] = 32'hfacefeed; // face feed
+                OPB_IS_RS2:   alu_ops.opb[i] =  prf_in.s_v2s[i];
+                OPB_IS_I_IMM: alu_ops.opb[i] = `RV32_signext_Iimm(alu_ins.dat[i].inst);
+                OPB_IS_S_IMM: alu_ops.opb[i] = `RV32_signext_Simm(alu_ins.dat[i].inst);
+                OPB_IS_B_IMM: alu_ops.opb[i] = `RV32_signext_Bimm(alu_ins.dat[i].inst);
+                OPB_IS_U_IMM: alu_ops.opb[i] = `RV32_signext_Uimm(alu_ins.dat[i].inst);
+                OPB_IS_J_IMM: alu_ops.opb[i] = `RV32_signext_Jimm(alu_ins.dat[i].inst);
+                default:      alu_ops.opb[i] = 32'hfacefeed; // face feed
             endcase
 
-            alu_operands.alu_func[i]    = alu_ins.dat[i].alu_func;
-            alu_operands.branch_func[i] = alu_ins.dat[i].inst.b.funct3;
-            alu_operands.t[i]           = alu_ins.dat[i].t;
-            alu_operands.rob_idx[i]     = alu_ins.dat[i].rob_idx;
+            alu_ops.alu_func[i]    = alu_ins.dat[i].alu_func;
+            alu_ops.branch_func[i] = alu_ins.dat[i].inst.b.funct3;
+            alu_ops.t[i]           = alu_ins.dat[i].t;
+            alu_ops.rob_idx[i]     = alu_ins.dat[i].rob_idx;
         end
 
-        mul_operands = '0;
+        mul_ops = '0;
         foreach (mul_ins.dat[i]) begin
-            mul_operands.rs1[i] = prf_in.s_v1s[i + `NUM_FU_ALU];
-            mul_operands.rs2[i] = prf_in.s_v2s[i + `NUM_FU_ALU];
-            mul_operands.func[i] = mul_ins.dat[i].inst.r.funct3;
-            mul_operands.dst[i] = '{
+            mul_ops.rs1[i] = prf_in.s_v1s[i + `NUM_FU_ALU];
+            mul_ops.rs2[i] = prf_in.s_v2s[i + `NUM_FU_ALU];
+            mul_ops.func[i] = mul_ins.dat[i].inst.r.funct3;
+            mul_ops.dst[i] = '{
                 rob_idx : mul_ins.dat[i].rob_idx,
                 tag     : mul_ins.dat[i].t
             };
@@ -276,10 +275,10 @@ module stage_ex_p4 (
                 .clock  (clock),
                 .reset  (reset),
                 .start  (mul_ins.bsy[i]),
-                .dst_in (mul_operands.dst[i]),
-                .rs1    (mul_operands.rs1[i]),
-                .rs2    (mul_operands.rs2[i]),
-                .func   (mul_operands.func[i]), // which mult operation to perform
+                .dst_in (mul_ops.dst[i]),
+                .rs1    (mul_ops.rs1[i]),
+                .rs2    (mul_ops.rs2[i]),
+                .func   (mul_ops.func[i]), // which mult operation to perform
 
                 // Output
                 .dst_out(mul_dst_n[i]),
@@ -332,12 +331,12 @@ module stage_ex_p4 (
         .reset  (reset),
         .flush  (flush),
 
-        .en(alu_ex_en),
-        .alu_operands(alu_operands),
-        .alu_ex_rdy(alu_ex_rdy),
+        .en     (alu_ex_en),
+        .ops    (alu_ops),
+        .ex_rdy (alu_ex_rdy),
 
-        .alu_vld(alu_vld),
-        .alu_cands(alu_cands),
+        .vld    (alu_vld),
+        .cands  (alu_cands),
         .cpl_gnt(cpl_gnt.alu)
     );
 
