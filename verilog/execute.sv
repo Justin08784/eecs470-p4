@@ -68,27 +68,32 @@ module alu_ex(
     input reset,
     input flush,
 
+    /* FRONTEND */
+    output logic [`NUM_FU_ALU-1:0]      alu_ex_rdy,
+        // ready to accept from alu_ins?
     input [`NUM_FU_ALU-1:0]                 en,
+        // insns to accept from alu_ins
     input struct packed {
         DATA        [`NUM_FU_ALU-1:0]       opa, opb;
         ALU_FUNC    [`NUM_FU_ALU-1:0]       alu_func;
         logic       [`NUM_FU_ALU-1:0][2:0]  branch_func; // Which branch condition to check
 
-        // 
         PHYS_REG_IDX [`NUM_FU_ALU-1:0]  t;
         ROB_IDX      [`NUM_FU_ALU-1:0]  rob_idx;
     } alu_operands,
-    output logic [`NUM_FU_ALU-1:0]      alu_rdy,
+        // insn metadata/operands
 
+    /* BACKEND */
     output logic [`NUM_FU_ALU-1:0]      alu_vld,
     output CPL_CAND [`NUM_FU_ALU-1:0]   alu_cands,
-
+        // completion requests
     input  logic [`NUM_FU_ALU-1:0]      cpl_gnt
+        // completion grant
 );
     // <FU>_outs: where executed insns wait until completion
     struct packed {
         // ff
-        logic   [`NUM_FU_ALU-1:0]   rdy;
+        logic   [`NUM_FU_ALU-1:0]   bsy;
         DATA    [`NUM_FU_ALU-1:0]   res;
         DST     [`NUM_FU_ALU-1:0]   dst;
     } alu_outs;
@@ -114,34 +119,30 @@ module alu_ex(
 
 
     always_comb begin
-        alu_rdy = '0;
-        alu_vld = '0;
-        alu_cands = '0;
+        alu_ex_rdy = ~alu_outs.bsy | cpl_gnt; // complete frees for same-cycle alu_ex acceptances
+
+        alu_vld    = alu_outs.bsy;
         foreach (alu_cands[i]) begin
-            alu_rdy[i]            = alu_outs.rdy[i];
-            alu_vld[i]            = alu_outs.rdy[i];
-            alu_cands[i].t        = alu_outs.dst[i].tag;
-            alu_cands[i].rob_idx  = alu_outs.dst[i].rob_idx;
-            alu_cands[i].data     = alu_outs.res[i];
+            alu_cands[i] <= '{
+                t       : alu_outs.dst[i].tag,
+                rob_idx : alu_outs.dst[i].rob_idx,
+                data    : alu_outs.res[i]
+            };
         end
     end
-
-
 
     always_ff @(posedge clock) begin
         if (reset || flush) begin
             alu_outs <= '0;
         end else begin
+            alu_outs.bsy <= en | (alu_outs.bsy & ~cpl_gnt);
             for (int i = 0; i < `NUM_FU_ALU; ++i) begin
                 if (en[i]) begin
-                    alu_outs.rdy[i] <= 1;
                     alu_outs.res[i] <= alu_res_n[i];
                     alu_outs.dst[i] <= '{
                         tag     :   alu_operands.t[i],
                         rob_idx :   alu_operands.rob_idx[i]
                     };
-                end else begin
-                    alu_outs.rdy[i] <= alu_outs.rdy[i] && !cpl_gnt[i];
                 end
             end
         end
@@ -323,15 +324,17 @@ module stage_ex_p4 (
         logic [`NUM_FU_MULT-1:0] mul;
     } cpl_gnt;
 
-    logic [`NUM_FU_ALU-1:0] alu_rdy;
+    logic [`NUM_FU_ALU-1:0] alu_ex_rdy;
+    logic [`NUM_FU_ALU-1:0] alu_ex_en;
+    assign alu_ex_en = alu_ins.bsy & alu_ex_rdy;
     alu_ex alu_ex0 (
         .clock  (clock),
         .reset  (reset),
         .flush  (flush),
 
-        .en(alu_ins.bsy),
+        .en(alu_ex_en),
         .alu_operands(alu_operands),
-        .alu_rdy(alu_rdy),
+        .alu_ex_rdy(alu_ex_rdy),
 
         .alu_vld(alu_vld),
         .alu_cands(alu_cands),
@@ -349,7 +352,7 @@ module stage_ex_p4 (
 
     always_comb begin
         rs_out = '{
-            fu_rdy_alu      : ~alu_ins.bsy,
+            fu_rdy_alu      : ~alu_ins.bsy | alu_ex_en,
             fu_rdy_mult     : ~mul_ins.bsy,
             fu_rdy_load     : '0,
             fu_rdy_store    : '0
@@ -374,13 +377,8 @@ module stage_ex_p4 (
 
             mul_outs    <= '0;
         end else begin
+            alu_ins.bsy <= rs_in.fu_vld_alu | (alu_ins.bsy & ~alu_ex_en);
             for (int i = 0; i < `NUM_FU_ALU; ++i) begin
-                if (alu_ins.bsy[i]) begin
-                    alu_ins.bsy[i] <= !(alu_rdy[i] && cpl_gnt.alu[i]); // if busy, did it complete
-                end else begin
-                    alu_ins.bsy[i] <= rs_in.fu_vld_alu[i];              // if not busy, did it issue?
-                end
-
                 if (rs_in.fu_vld_alu[i])
                     alu_ins.dat[i] <= rs_in.fu_dat_alu[i];
             end
