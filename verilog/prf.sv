@@ -59,14 +59,23 @@ module prf #(
         s_v2s = '0;
         for (int i = 0; i < NUM_RPORTS; i++) begin
             
+            // TODO: enable should be more granular–– per t1/t2. Some insns only need to read 1 value.
             if (s_t1s[i] == `ZERO_REG) begin
                 s_v1s[i] = 0;
+            // end else if (c_en[0] && (c_ts[0] == s_t1s[i])) begin
+            //     s_v1s[i] = c_vs[0]; // internal forwarding
+            // end else if (c_en[1] && (c_ts[1] == s_t1s[i])) begin
+            //     s_v1s[i] = c_vs[1]; // internal forwarding
             end else begin
                 s_v1s[i] = phys_reg_file[s_t1s[i]];
             end
 
             if (s_t2s[i] == `ZERO_REG) begin
                 s_v2s[i] = 0;
+            // end else if (c_en[0] && (c_ts[0] == s_t2s[i])) begin
+            //     s_v2s[i] = c_vs[0]; // internal forwarding
+            // end else if (c_en[1] && (c_ts[1] == s_t2s[i])) begin
+            //     s_v2s[i] = c_vs[1]; // internal forwarding 
             end else begin
                 s_v2s[i] = phys_reg_file[s_t2s[i]];
             end
