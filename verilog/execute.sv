@@ -160,11 +160,9 @@ module mul_ex(
     input [`NUM_FU_MULT-1:0]            en,
         // insns to accept from mul_ins
     input struct packed {
-        DATA        [`NUM_FU_MULT-1:0]  rs1, rs2;
-        MULT_FUNC   [`NUM_FU_MULT-1:0]  func;
-
-        PHYS_REG_IDX[`NUM_FU_MULT-1:0]  t;
-        ROB_IDX     [`NUM_FU_MULT-1:0]  rob_idx;
+        DATA      [`NUM_FU_MULT-1:0]    rs1, rs2;
+        MULT_FUNC [`NUM_FU_MULT-1:0]    func;
+        DST       [`NUM_FU_MULT-1:0]    dst;
     } ops,
         // insn metadata/operands
 
@@ -196,10 +194,7 @@ module mul_ex(
                 .clock  (clock),
                 .reset  (reset),
                 .start  (en[i]),
-                .dst_in ('{
-                    tag     : ops.t[i],
-                    rob_idx : ops.rob_idx[i]
-                }),
+                .dst_in (ops.dst[i]),
                 .rs1    (ops.rs1[i]),
                 .rs2    (ops.rs2[i]),
                 .func   (ops.func[i]), // which mult operation to perform
@@ -230,7 +225,7 @@ module mul_ex(
             (outs.bsy & ~(done & cpl_gnt))
             // OR if we are not busy, but a new instruction arrives
             //    we become busy
-            | en;
+            | done; // TODO: this is an extremely hacky fix
         outs_n.dst = outs.dst;
         outs_n.res = outs.res;
         for (int unsigned i = 0; i < `NUM_FU_MULT; ++i) begin
@@ -275,17 +270,6 @@ module stage_ex_p4 (
         logic       [`NUM_FU_MULT-1:0]  bsy;
         ID_RESULT   [`NUM_FU_MULT-1:0]  dat;
     } mul_ins;
-
-    // <FU>_outs: where executed insns wait until completion
-    struct packed {
-        // ff
-        logic   [`NUM_FU_MULT-1:0]  rdy;
-        DATA    [`NUM_FU_MULT-1:0]  res;
-        DST     [`NUM_FU_MULT-1:0]  dst;
-    } mul_outs;
-    DATA [`NUM_FU_MULT-1:0] mul_res_n;
-    DST     [`NUM_FU_MULT-1:0] mul_dst_n;
-    logic   [`NUM_FU_MULT-1:0] mul_vld_n;
 
     // request operands from PRF
     always_comb begin
@@ -367,28 +351,6 @@ module stage_ex_p4 (
     end
 
 
-    // execute
-    generate
-        for (genvar i = 0; i < `NUM_FU_MULT; ++i) begin : gen_mults
-            // // Instantiate the ALU
-            // TODO: These ALU inputs were kinda hardcoded. Need mux stuff to select which type.
-            mult mult_0 ( 
-                .clock  (clock),
-                .reset  (reset),
-                .start  (mul_ins.bsy[i]),
-                .dst_in (mul_ops.dst[i]),
-                .rs1    (mul_ops.rs1[i]),
-                .rs2    (mul_ops.rs2[i]),
-                .func   (mul_ops.func[i]), // which mult operation to perform
-
-                // Output
-                .dst_out(mul_dst_n[i]),
-                .result (mul_res_n[i]),
-                .done   (mul_vld_n[i])
-            );
-        end
-    endgenerate
-
     // structure results into generic cdb candidates array
     localparam NUM_FU_TOTAL = `NUM_FU_ALU + `NUM_FU_MULT;
 
@@ -406,17 +368,6 @@ module stage_ex_p4 (
         alu_vld,
         mul_vld
     };
-
-    always_comb begin
-        mul_vld = '0;
-        mul_cands = '0;
-        foreach (mul_cands[i]) begin
-            mul_vld[i]            = mul_outs.rdy[i];
-            mul_cands[i].t        = mul_outs.dst[i].tag;
-            mul_cands[i].rob_idx  = mul_outs.dst[i].rob_idx;
-            mul_cands[i].data     = mul_outs.res[i];
-        end
-    end
 
     logic [`N-1:0][NUM_FU_TOTAL-1:0] cdb2fu_gbus;
     struct packed {
@@ -441,6 +392,23 @@ module stage_ex_p4 (
         .cpl_gnt(cpl_gnt.alu)
     );
 
+    logic [`NUM_FU_MULT-1:0] mul_ex_rdy;
+    logic [`NUM_FU_MULT-1:0] mul_ex_en;
+    assign mul_ex_en = mul_ins.bsy & mul_ex_rdy;
+    mul_ex mul_ex0 (
+        .clock  (clock),
+        .reset  (reset),
+        .flush  (flush),
+
+        .en     (mul_ex_en),
+        .ops    (mul_ops),
+        .ex_rdy (mul_ex_rdy),
+
+        .vld    (mul_vld),
+        .cands  (mul_cands),
+        .cpl_gnt(cpl_gnt.mul)
+    );
+
     psel_gen #(
         .WIDTH(NUM_FU_TOTAL),
         .REQS(`N)
@@ -453,7 +421,7 @@ module stage_ex_p4 (
     always_comb begin
         rs_out = '{
             fu_rdy_alu      : ~alu_ins.bsy | alu_ex_en,
-            fu_rdy_mult     : ~mul_ins.bsy,
+            fu_rdy_mult     : ~mul_ins.bsy | mul_ex_en,
             fu_rdy_load     : '0,
             fu_rdy_store    : '0
         };
@@ -474,8 +442,6 @@ module stage_ex_p4 (
         if (reset || flush) begin
             alu_ins     <= '0;
             mul_ins     <= '0;
-
-            mul_outs    <= '0;
         end else begin
             alu_ins.bsy <= rs_in.fu_vld_alu | (alu_ins.bsy & ~alu_ex_en);
             for (int i = 0; i < `NUM_FU_ALU; ++i) begin
@@ -483,40 +449,28 @@ module stage_ex_p4 (
                     alu_ins.dat[i] <= rs_in.fu_dat_alu[i];
             end
 
+            mul_ins.bsy <= rs_in.fu_vld_mult | (mul_ins.bsy & ~mul_ex_en);
             for (int i = 0; i < `NUM_FU_MULT; ++i) begin
-                mul_outs.rdy[i] <= mul_vld_n[i];
-                if (mul_vld_n[i]) begin
-                    mul_outs.dst[i] <= mul_dst_n[i];
-                    mul_outs.res[i] <= mul_res_n[i];
-                end
-
-                mul_ins.bsy[i] <= mul_ins.bsy[i]
-                    // Option 1: clear only when complete (will re-issue the same insn if inputs the same)
-                    // ? !(mul_outs.rdy[i] && cpl_gnt[i + `NUM_FU_ALU]) // if busy, did it complete
-                    // Option 2: clear as soon as issue done (might overwrite someone ahead)
-                    ? 0
-                    : rs_in.fu_vld_mult[i];             // if not busy, did it issue?
-                mul_ins.dat[i] <= rs_in.fu_vld_mult[i]
-                    ? rs_in.fu_dat_mult[i]
-                    : mul_ins.dat[i];
+                if (rs_in.fu_vld_mult[i])
+                    mul_ins.dat[i] <= rs_in.fu_dat_mult[i];
             end
 
-            // $display("  %3d | >> EXECUTE", $time);
-            // $display("rdy_alu: %b  rdy_mult: %b  rdy_store: %b  rdy_load: %b  |  c_en: [%b %b] c_ts: [%d %d] c_data: [%h %h] c_rob_idxs: [%d %d] cpl_gnt: %b",
-            //     rs_out.fu_rdy_alu,
-            //     rs_out.fu_rdy_mult,
-            //     rs_out.fu_rdy_store,
-            //     rs_out.fu_rdy_load,
-            //     c_out.c_en[0],
-            //     c_out.c_en[1],
-            //     c_out.c_ts[0],
-            //     c_out.c_ts[1],
-            //     c_out.c_data[0],
-            //     c_out.c_data[1],
-            //     c_out.c_rob_idxs[0],
-            //     c_out.c_rob_idxs[1],
-            //     cpl_gnt
-            // );
+            $display("  %3d | >> EXECUTE", $time);
+            $display("rdy_alu: %b  rdy_mult: %b  rdy_store: %b  rdy_load: %b  |  c_en: [%b %b] c_ts: [%d %d] c_data: [%h %h] c_rob_idxs: [%d %d] cpl_gnt: %b",
+                rs_out.fu_rdy_alu,
+                rs_out.fu_rdy_mult,
+                rs_out.fu_rdy_store,
+                rs_out.fu_rdy_load,
+                c_out.c_en[0],
+                c_out.c_en[1],
+                c_out.c_ts[0],
+                c_out.c_ts[1],
+                c_out.c_data[0],
+                c_out.c_data[1],
+                c_out.c_rob_idxs[0],
+                c_out.c_rob_idxs[1],
+                cpl_gnt
+            );
             // for (int i = 0; i < 4; ++i) begin
             //     $display("all_vld[%0d]: %b", i, all_vld[i]);
             // end
@@ -557,13 +511,17 @@ module stage_ex_p4 (
             //     mul_outs.rdy[1],
             //     mul_outs.res[1]
             // );
-            // $display("<prf_in >        s_v1s: [%0d, %0d] s_v2s: [%0d, %0d]",
-            //     prf_in.s_v1s[0],
-            //     prf_in.s_v1s[1],
-            //     prf_in.s_v2s[0],
-            //     prf_in.s_v2s[1]
-            // );
-            // $display("  %3d | << EXECUTE", $time);
+            $display("<prf_in >        s_v1s: [%0d, %0d, %0d, %0d] s_v2s: [%0d, %0d, %0d, %0d]",
+                prf_in.s_v1s[0],
+                prf_in.s_v1s[1],
+                prf_in.s_v1s[2],
+                prf_in.s_v1s[3],
+                prf_in.s_v2s[0],
+                prf_in.s_v2s[1],
+                prf_in.s_v2s[2],
+                prf_in.s_v2s[3]
+            );
+            $display("  %3d | << EXECUTE", $time);
 
         end
     end
