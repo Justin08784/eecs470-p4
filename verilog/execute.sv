@@ -126,7 +126,7 @@ module stage_ex_p4 (
     struct packed {
         DATA        [`NUM_FU_ALU-1:0]       opa, opb;
         ALU_FUNC    [`NUM_FU_ALU-1:0]       alu_func;
-        logic       [`NUM_FU_ALU-1][2:0]  branch_func; // Which branch condition to check
+        logic       [`NUM_FU_ALU-1:0][2:0]  branch_func; // Which branch condition to check
     } alu_operands;
     struct packed {
         DATA        [`NUM_FU_MULT-1:0]      rs1, rs2;
