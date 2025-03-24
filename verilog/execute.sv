@@ -74,6 +74,7 @@ module alu_ex(
     input [`NUM_FU_ALU-1:0]                 en,
         // insns to accept from alu_ins
     input struct packed {
+        logic       [`NUM_FU_ALU-1:0]       bsy; // unused; same as en
         DATA        [`NUM_FU_ALU-1:0]       opa, opb;
         ALU_FUNC    [`NUM_FU_ALU-1:0]       alu_func;
         logic       [`NUM_FU_ALU-1:0][2:0]  branch_func; // Which branch condition to check
@@ -160,6 +161,7 @@ module mul_ex(
     input [`NUM_FU_MULT-1:0]            en,
         // insns to accept from mul_ins
     input struct packed {
+        logic     [`NUM_FU_MULT-1:0]    bsy; // unused; same as en
         DATA      [`NUM_FU_MULT-1:0]    rs1, rs2;
         MULT_FUNC [`NUM_FU_MULT-1:0]    func;
         DST       [`NUM_FU_MULT-1:0]    dst;
@@ -309,56 +311,60 @@ module stage_ex_p4 (
 
     // receive/decode operands from PRF
     struct packed {
+        logic       [`NUM_FU_ALU-1:0]       bsy;
         DATA        [`NUM_FU_ALU-1:0]       opa, opb;
         ALU_FUNC    [`NUM_FU_ALU-1:0]       alu_func;
         logic       [`NUM_FU_ALU-1:0][2:0]  branch_func; // Which branch condition to check
         // 
         PHYS_REG_IDX [`NUM_FU_ALU-1:0]  t;
         ROB_IDX      [`NUM_FU_ALU-1:0]  rob_idx;
-    } alu_ops;
+    } alu_ops, alu_ops_n;
     struct packed {
+        logic       [`NUM_FU_MULT-1:0]      bsy;
         DATA        [`NUM_FU_MULT-1:0]      rs1, rs2;
         MULT_FUNC   [`NUM_FU_MULT-1:0]      func;
         DST         [`NUM_FU_MULT-1:0]      dst;
-    } mul_ops;
+    } mul_ops, mul_ops_n;
     always_comb begin
-        alu_ops = '0;
+        alu_ops_n = '0;
         foreach(alu_ins.dat[i]) begin
             if(!alu_ins.bsy[i]) 
                 continue;
 
             // ALU opA mux
             case (alu_ins.dat[i].opa_select)
-                OPA_IS_RS1:  alu_ops.opa[i] = prf_in.s_v1s[i];
-                OPA_IS_NPC:  alu_ops.opa[i] = alu_ins.dat[i].NPC;
-                OPA_IS_PC:   alu_ops.opa[i] = alu_ins.dat[i].PC;
-                OPA_IS_ZERO: alu_ops.opa[i] = 0;
-                default:     alu_ops.opa[i]= 32'hdeadface; // dead face
+                OPA_IS_RS1:  alu_ops_n.opa[i] = prf_in.s_v1s[i];
+                OPA_IS_NPC:  alu_ops_n.opa[i] = alu_ins.dat[i].NPC;
+                OPA_IS_PC:   alu_ops_n.opa[i] = alu_ins.dat[i].PC;
+                OPA_IS_ZERO: alu_ops_n.opa[i] = 0;
+                default:     alu_ops_n.opa[i]= 32'hdeadface; // dead face
             endcase
 
             // ALU opB mux
             case (alu_ins.dat[i].opb_select)
-                OPB_IS_RS2:   alu_ops.opb[i] =  prf_in.s_v2s[i];
-                OPB_IS_I_IMM: alu_ops.opb[i] = `RV32_signext_Iimm(alu_ins.dat[i].inst);
-                OPB_IS_S_IMM: alu_ops.opb[i] = `RV32_signext_Simm(alu_ins.dat[i].inst);
-                OPB_IS_B_IMM: alu_ops.opb[i] = `RV32_signext_Bimm(alu_ins.dat[i].inst);
-                OPB_IS_U_IMM: alu_ops.opb[i] = `RV32_signext_Uimm(alu_ins.dat[i].inst);
-                OPB_IS_J_IMM: alu_ops.opb[i] = `RV32_signext_Jimm(alu_ins.dat[i].inst);
-                default:      alu_ops.opb[i] = 32'hfacefeed; // face feed
+                OPB_IS_RS2:   alu_ops_n.opb[i] =  prf_in.s_v2s[i];
+                OPB_IS_I_IMM: alu_ops_n.opb[i] = `RV32_signext_Iimm(alu_ins.dat[i].inst);
+                OPB_IS_S_IMM: alu_ops_n.opb[i] = `RV32_signext_Simm(alu_ins.dat[i].inst);
+                OPB_IS_B_IMM: alu_ops_n.opb[i] = `RV32_signext_Bimm(alu_ins.dat[i].inst);
+                OPB_IS_U_IMM: alu_ops_n.opb[i] = `RV32_signext_Uimm(alu_ins.dat[i].inst);
+                OPB_IS_J_IMM: alu_ops_n.opb[i] = `RV32_signext_Jimm(alu_ins.dat[i].inst);
+                default:      alu_ops_n.opb[i] = 32'hfacefeed; // face feed
             endcase
 
-            alu_ops.alu_func[i]    = alu_ins.dat[i].alu_func;
-            alu_ops.branch_func[i] = alu_ins.dat[i].inst.b.funct3;
-            alu_ops.t[i]           = alu_ins.dat[i].t;
-            alu_ops.rob_idx[i]     = alu_ins.dat[i].rob_idx;
+            alu_ops_n.bsy[i]         = alu_ins.bsy[i];
+            alu_ops_n.alu_func[i]    = alu_ins.dat[i].alu_func;
+            alu_ops_n.branch_func[i] = alu_ins.dat[i].inst.b.funct3;
+            alu_ops_n.t[i]           = alu_ins.dat[i].t;
+            alu_ops_n.rob_idx[i]     = alu_ins.dat[i].rob_idx;
         end
 
-        mul_ops = '0;
+        mul_ops_n = '0;
         foreach (mul_ins.dat[i]) begin
-            mul_ops.rs1[i] = prf_in.s_v1s[i + `NUM_FU_ALU];
-            mul_ops.rs2[i] = prf_in.s_v2s[i + `NUM_FU_ALU];
-            mul_ops.func[i] = mul_ins.dat[i].inst.r.funct3;
-            mul_ops.dst[i] = '{
+            mul_ops_n.bsy[i] = mul_ins.bsy[i];
+            mul_ops_n.rs1[i] = prf_in.s_v1s[i + `NUM_FU_ALU];
+            mul_ops_n.rs2[i] = prf_in.s_v2s[i + `NUM_FU_ALU];
+            mul_ops_n.func[i] = mul_ins.dat[i].inst.r.funct3;
+            mul_ops_n.dst[i] = '{
                 rob_idx : mul_ins.dat[i].rob_idx,
                 tag     : mul_ins.dat[i].t
             };
@@ -392,7 +398,7 @@ module stage_ex_p4 (
 
     logic [`NUM_FU_ALU-1:0] alu_ex_rdy;
     logic [`NUM_FU_ALU-1:0] alu_ex_en;
-    assign alu_ex_en = alu_ins.bsy & alu_ex_rdy;
+    assign alu_ex_en = alu_ops.bsy & alu_ex_rdy;
     alu_ex alu_ex0 (
         .clock  (clock),
         .reset  (reset),
@@ -409,7 +415,7 @@ module stage_ex_p4 (
 
     logic [`NUM_FU_MULT-1:0] mul_ex_rdy;
     logic [`NUM_FU_MULT-1:0] mul_ex_en;
-    assign mul_ex_en = mul_ins.bsy & mul_ex_rdy;
+    assign mul_ex_en = mul_ops.bsy & mul_ex_rdy;
     mul_ex mul_ex0 (
         .clock  (clock),
         .reset  (reset),
@@ -457,7 +463,12 @@ module stage_ex_p4 (
         if (reset || flush) begin
             alu_ins     <= '0;
             mul_ins     <= '0;
+            alu_ops     <= '0;
+            mul_ops     <= '0;
         end else begin
+            alu_ops     <= alu_ops_n;
+            mul_ops     <= mul_ops_n;
+
             alu_ins.bsy <= rs_in.fu_vld_alu | (alu_ins.bsy & ~alu_ex_en);
             for (int i = 0; i < `NUM_FU_ALU; ++i) begin
                 if (rs_in.fu_vld_alu[i])
