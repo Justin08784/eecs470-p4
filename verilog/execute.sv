@@ -273,6 +273,20 @@ module stage_ex_p4 (
     } mul_ins;
 
     // request operands from PRF
+    /*
+    TODO: Urgent optimization needed
+    In a single cycle:
+    1) request operands from PRF (via prf_out)
+    2) receive operands from PRF (via prf_in)
+    3) PERFORM THE FIRST STAGE OF MULTIPLY
+
+    (YES, THE MULTIPLIER IS ALWAYS RUNNING REGARDLESS)
+
+    We NEED to separate the PRF fetch/decode from the
+    first stage of multiply. Add another intervening pipeline register!
+    This is why this is currently on the LONGEST critical path (and we fail
+    to meet 7.5ns unless we increase MULT_STAGES to 8).
+    */
     always_comb begin
         prf_out = '0;
         // TODO: not all bsy/busy insns require PRF reads. Maybe enable prf_en iff
