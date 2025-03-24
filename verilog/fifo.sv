@@ -72,7 +72,9 @@ module fifo #(
     assign used_scnt    = `MIN(used, NUM_RPORTS);
     assign empty        = used == 0;
     assign full         = used == DEPTH;
-    assign prvw_vld_cnt = ENABLE_READ_PREVIEW ? `MIN(used + wr_en_cnt, NUM_RPORTS) : '0;
+    assign prvw_vld_cnt = ENABLE_READ_PREVIEW
+        ? `MIN(used + (ENABLE_INTR_FWD ? wr_en_cnt : 0), NUM_RPORTS)
+        : '0;
     assign show_limit   = ENABLE_READ_PREVIEW ? prvw_vld_cnt : rd_en_cnt;
 
     // Version 1:
