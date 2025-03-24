@@ -7,7 +7,7 @@
 // period than straight multiplication.
 
 module mult (
-    input clock, reset, start,
+    input clock, reset, flush, start,
     input DATA rs1, rs2,
     input MULT_FUNC func,
     input DST dst_in,
@@ -35,6 +35,7 @@ module mult (
     mult_stage mstage [`MULT_STAGES-1:0] (
         .clock (clock),
         .reset (reset),
+        .flush (flush),
         .func        ({internal_funcs,   func}),
         .start       ({internal_dones,   start}), // forward prev done as next start
         .prev_sum    ({internal_sums,    64'h0}), // start the sum at 0
@@ -68,7 +69,7 @@ endmodule // mult
 
 
 module mult_stage (
-    input clock, reset, start,
+    input clock, reset, flush, start,
     input [63:0] prev_sum, mplier, mcand,
     input DST dst,
     input MULT_FUNC func,
@@ -97,7 +98,7 @@ module mult_stage (
     end
 
     always_ff @(posedge clock) begin
-        if (reset) begin
+        if (reset || flush) begin
             done <= 1'b0;
         end else begin
             done <= start;

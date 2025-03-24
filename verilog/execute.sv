@@ -193,6 +193,7 @@ module mul_ex(
             mult mult_0 ( 
                 .clock  (clock),
                 .reset  (reset),
+                .flush  (flush),
                 .start  (en[i]),
                 .dst_in (ops.dst[i]),
                 .rs1    (ops.rs1[i]),
