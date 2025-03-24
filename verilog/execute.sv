@@ -122,14 +122,14 @@ module stage_ex_p4 (
 
     // receive/decode operands from PRF
     struct packed {
-        DATA        [`NUM_FU_ALU]       opa, opb;
-        ALU_FUNC    [`NUM_FU_ALU]       alu_func;
+        DATA        [`NUM_FU_ALU-1:0]       opa, opb;
+        ALU_FUNC    [`NUM_FU_ALU-1:0]       alu_func;
         logic       [`NUM_FU_ALU][2:0]  branch_func; // Which branch condition to check
     } alu_operands;
     struct packed {
-        DATA        [`NUM_FU_MULT]      rs1, rs2;
-        MULT_FUNC   [`NUM_FU_MULT]      func;
-        DST         [`NUM_FU_MULT]      dst;
+        DATA        [`NUM_FU_MULT-1:0]      rs1, rs2;
+        MULT_FUNC   [`NUM_FU_MULT-1:0]      func;
+        DST         [`NUM_FU_MULT-1:0]      dst;
     } mul_operands;
     always_comb begin
         alu_operands = '0;
