@@ -149,6 +149,107 @@ module alu_ex(
     end
 endmodule
 
+module mul_ex(
+    input clock,
+    input reset,
+    input flush,
+
+    /* FRONTEND */
+    output logic [`NUM_FU_MULT-1:0]     ex_rdy,
+        // ready to accept from mul_ins?
+    input [`NUM_FU_MULT-1:0]            en,
+        // insns to accept from mul_ins
+    input struct packed {
+        DATA        [`NUM_FU_MULT-1:0]  rs1, rs2;
+        MULT_FUNC   [`NUM_FU_MULT-1:0]  func;
+
+        PHYS_REG_IDX[`NUM_FU_MULT-1:0]  t;
+        ROB_IDX     [`NUM_FU_MULT-1:0]  rob_idx;
+    } ops,
+        // insn metadata/operands
+
+    /* BACKEND */
+    output logic [`NUM_FU_MULT-1:0]     vld,
+    output CPL_CAND [`NUM_FU_MULT-1:0]  cands,
+        // completion requests
+    input  logic [`NUM_FU_MULT-1:0]     cpl_gnt
+        // completion grant
+);
+    // <FU>_outs: where executed insns wait until completion
+    struct packed {
+        // ff
+        logic   [`NUM_FU_MULT-1:0]   bsy;
+        DATA    [`NUM_FU_MULT-1:0]   res;
+        DST     [`NUM_FU_MULT-1:0]   dst;
+    } outs, outs_n;
+
+    logic   [`NUM_FU_MULT-1:0]  done;
+    DATA    [`NUM_FU_MULT-1:0]  done_res;
+    DST     [`NUM_FU_MULT-1:0]  done_dst;
+
+    // execute
+    generate
+        for (genvar i = 0; i < `NUM_FU_MULT; ++i) begin : gen_mults
+            // // Instantiate the ALU
+            // TODO: These ALU inputs were kinda hardcoded. Need mux stuff to select which type.
+            mult mult_0 ( 
+                .clock  (clock),
+                .reset  (reset),
+                .start  (en[i]),
+                .dst_in ('{
+                    tag     : ops.t[i],
+                    rob_idx : ops.rob_idx[i]
+                }),
+                .rs1    (ops.rs1[i]),
+                .rs2    (ops.rs2[i]),
+                .func   (ops.func[i]), // which mult operation to perform
+
+                // Output
+                .dst_out(done_dst[i]),
+                .result (done_res[i]),
+                .done   (done[i])
+            );
+        end
+    endgenerate
+
+    always_comb begin
+        vld = outs.bsy;
+        foreach (cands[i]) begin
+            cands[i] = '{
+                t       : outs.dst[i].tag,
+                rob_idx : outs.dst[i].rob_idx,
+                data    : outs.res[i]
+            };
+        end
+
+        ex_rdy = ~outs.bsy | (done & cpl_gnt);
+
+        outs_n.bsy =
+            // If we are already busy, remain busy
+            //    until we see done & cpl_gnt
+            (outs.bsy & ~(done & cpl_gnt))
+            // OR if we are not busy, but a new instruction arrives
+            //    we become busy
+            | en;
+        outs_n.dst = outs.dst;
+        outs_n.res = outs.res;
+        for (int unsigned i = 0; i < `NUM_FU_MULT; ++i) begin
+            if (!done[i])
+                continue;
+            outs_n.dst[i] = done_dst[i];
+            outs_n.res[i] = done_res[i];
+        end
+    end
+
+    always_ff @(posedge clock) begin
+        if (reset || flush) begin
+            outs <= '0;
+        end else begin
+            outs <= outs_n;
+        end
+    end
+endmodule
+
 module stage_ex_p4 (
     input clock,
     input reset,
