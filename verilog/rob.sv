@@ -125,7 +125,8 @@ module rob #(
         */
         // The true number of same-cycle free slots is free + r_en_cnt
         d_out <= '{
-            rob_rdy_scnt : `MIN(free + r_out.r_en_cnt, NUM_DPORTS),
+            // rob_rdy_scnt : `MIN(free + r_out.r_en_cnt, NUM_DPORTS),
+            rob_rdy_scnt : `MIN(free, NUM_DPORTS),
             rob_idxs     : d_idxs
         };
     end
