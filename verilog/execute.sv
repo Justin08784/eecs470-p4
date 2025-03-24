@@ -230,27 +230,27 @@ module stage_ex_p4 (
         alu_cands,
         mul_cands
     };
-    logic [`NUM_FU_ALU-1:0]  alu_rdy;
-    logic [`NUM_FU_MULT-1:0] mul_rdy;
-    logic [NUM_FU_TOTAL-1:0] all_rdy;
-    assign all_rdy = {
-        alu_rdy,
-        mul_rdy
+    logic [`NUM_FU_ALU-1:0]  alu_vld;
+    logic [`NUM_FU_MULT-1:0] mul_vld;
+    logic [NUM_FU_TOTAL-1:0] all_vld;
+    assign all_vld = {
+        alu_vld,
+        mul_vld
     };
     always_comb begin
-        alu_rdy = '0;
+        alu_vld = '0;
         alu_cands = '0;
         foreach (alu_cands[i]) begin
-            alu_rdy[i]            = alu_outs.rdy[i];
+            alu_vld[i]            = alu_outs.rdy[i];
             alu_cands[i].t        = alu_outs.dst[i].tag;
             alu_cands[i].rob_idx  = alu_outs.dst[i].rob_idx;
             alu_cands[i].data     = alu_outs.res[i];
         end
 
-        mul_rdy = '0;
+        mul_vld = '0;
         mul_cands = '0;
         foreach (mul_cands[i]) begin
-            mul_rdy[i]            = mul_outs.rdy[i];
+            mul_vld[i]            = mul_outs.rdy[i];
             mul_cands[i].t        = mul_outs.dst[i].tag;
             mul_cands[i].rob_idx  = mul_outs.dst[i].rob_idx;
             mul_cands[i].data     = mul_outs.res[i];
@@ -267,7 +267,7 @@ module stage_ex_p4 (
         .WIDTH(NUM_FU_TOTAL),
         .REQS(`N)
     ) sel_cpl (
-        .req(all_rdy),
+        .req(all_vld),
         .gnt(cpl_gnt),      // type coercion: logic [NUM_FU_TOTAL-1:0] -> {logic [`NUM_FU_ALU-1:0] alu, logic [`NUM_FU_MULT-1:0] mul}
         .gnt_bus(cdb2fu_gbus)
     );
@@ -355,9 +355,9 @@ module stage_ex_p4 (
                 cpl_gnt
             );
             // for (int i = 0; i < 4; ++i) begin
-            //     $display("all_rdy[%0d]: %b", i, all_rdy[i]);
+            //     $display("all_vld[%0d]: %b", i, all_vld[i]);
             // end
-            // $display("all_rdy: %b", all_rdy);
+            // $display("all_vld: %b", all_vld);
             // $display("");
             // for (int i = 0; i < 4; ++i) begin
             //     $display("cpl_gnt[%0d]: %b", i, cpl_gnt[i]);
