@@ -104,6 +104,8 @@ module stage_ex_p4 (
     // request operands from PRF
     always_comb begin
         prf_out = '0;
+        // TODO: not all bsy/busy insns require PRF reads. Maybe enable prf_en iff
+        // opa_select == OPA_IS_RS1 || opb OPB_IS_RS2 ?
         foreach (alu_ins.dat[i]) begin
             if (!alu_ins.bsy[i])
                 continue;
@@ -174,6 +176,7 @@ module stage_ex_p4 (
     end
 
 
+    // execute
     generate
         for (genvar i = 0; i < `NUM_FU_ALU; ++i) begin : gen_alus
             // // Instantiate the ALU
@@ -212,29 +215,63 @@ module stage_ex_p4 (
         end
     endgenerate
 
+    // structure results into generic cdb candidates array
     localparam NUM_FU_TOTAL = `NUM_FU_ALU + `NUM_FU_MULT;
     typedef struct packed {
-        logic [`NUM_FU_ALU-1:0]     alu;
-        logic [`NUM_FU_MULT-1:0]    mul;
-    } FU_rdy;
-    FU_rdy outs_rdy;
-    assign outs_rdy = '{
-        alu:alu_outs.rdy,
-        mul:mul_outs.rdy
-    };
+        PHYS_REG_IDX t;
+        ROB_IDX rob_idx;
+        DATA data;
+    } CPL_CAND;
 
-    FU_rdy cpl_gnt;
-    FU_rdy [`N-1:0] cdb2fu_gbus;
+    CPL_CAND [`NUM_FU_ALU-1:0]  alu_cands;
+    CPL_CAND [`NUM_FU_MULT-1:0] mul_cands;
+    CPL_CAND [NUM_FU_TOTAL-1:0] all_cands;
+    assign all_cands = {
+        alu_cands,
+        mul_cands
+    };
+    logic [`NUM_FU_ALU-1:0]  alu_rdy;
+    logic [`NUM_FU_MULT-1:0] mul_rdy;
+    logic [NUM_FU_TOTAL-1:0] all_rdy;
+    assign all_rdy = {
+        alu_rdy,
+        mul_rdy
+    };
+    always_comb begin
+        alu_rdy = '0;
+        alu_cands = '0;
+        foreach (alu_cands[i]) begin
+            alu_rdy[i]            = alu_outs.rdy[i];
+            alu_cands[i].t        = alu_outs.dst[i].tag;
+            alu_cands[i].rob_idx  = alu_outs.dst[i].rob_idx;
+            alu_cands[i].data     = alu_outs.res[i];
+        end
+
+        mul_rdy = '0;
+        mul_cands = '0;
+        foreach (mul_cands[i]) begin
+            mul_rdy[i]            = mul_outs.rdy[i];
+            mul_cands[i].t        = mul_outs.dst[i].tag;
+            mul_cands[i].rob_idx  = mul_outs.dst[i].rob_idx;
+            mul_cands[i].data     = mul_outs.res[i];
+        end
+    end
+
+    logic [`N-1:0][NUM_FU_TOTAL-1:0] cdb2fu_gbus;
+    struct packed {
+        logic [`NUM_FU_ALU-1:0]  alu;
+        logic [`NUM_FU_MULT-1:0] mul;
+    } cpl_gnt;
+
     psel_gen #(
         .WIDTH(NUM_FU_TOTAL),
         .REQS(`N)
     ) sel_cpl (
-        .req(outs_rdy),         // coercion: FU_rdy -> logic [`NUM_FU_TOTAL-1:0]
-        .gnt(cpl_gnt),          // coercion: logic [`NUM_FU_TOTAL-1:0] -> FU_rdy
-        .gnt_bus(cdb2fu_gbus)   // coercion: logic [`N-1:0][`NUM_FU_TOTAL-1:0] -> FU_rdy [`N-1:0]
+        .req(all_rdy),
+        .gnt(cpl_gnt),      // type coercion: logic [NUM_FU_TOTAL-1:0] -> {logic [`NUM_FU_ALU-1:0] alu, logic [`NUM_FU_MULT-1:0] mul}
+        .gnt_bus(cdb2fu_gbus)
     );
 
-    int unsigned off;
     always_comb begin
         rs_out = '{
             fu_rdy_alu      : ~alu_ins.bsy,
@@ -244,23 +281,12 @@ module stage_ex_p4 (
         };
 
         c_out = '0;
-        foreach (cdb2fu_gbus[c]) begin
-            for (int unsigned a_i = 0; a_i < `NUM_FU_ALU; ++a_i) begin
-                if (cdb2fu_gbus[c].alu[a_i]) begin
-                    c_out.c_en[c]           |= 1;
-                    c_out.c_ts[c]           |= alu_outs.dst[a_i].tag;
-                    c_out.c_rob_idxs[c]     |= alu_outs.dst[a_i].rob_idx;
-                    c_out.c_data[c]         |= alu_outs.res[a_i];
-                end
-            end
-
-            for (int unsigned m_i = 0; m_i < `NUM_FU_MULT; ++m_i) begin
-                if (cdb2fu_gbus[c].mul[m_i]) begin
-                    c_out.c_en[c]           |= 1;
-                    c_out.c_ts[c]           |= mul_outs.dst[m_i].tag;
-                    c_out.c_rob_idxs[c]     |= mul_outs.dst[m_i].rob_idx;
-                    c_out.c_data[c]         |= mul_outs.res[m_i];
-                end
+        foreach (cdb2fu_gbus[c, f]) begin
+            if (cdb2fu_gbus[c][f]) begin
+                c_out.c_en[c]           |= 1;
+                c_out.c_ts[c]           |= all_cands[f].t;
+                c_out.c_rob_idxs[c]     |= all_cands[f].rob_idx;
+                c_out.c_data[c]         |= all_cands[f].data;
             end
         end
     end
@@ -328,6 +354,25 @@ module stage_ex_p4 (
                 c_out.c_rob_idxs[1],
                 cpl_gnt
             );
+            // for (int i = 0; i < 4; ++i) begin
+            //     $display("all_rdy[%0d]: %b", i, all_rdy[i]);
+            // end
+            // $display("all_rdy: %b", all_rdy);
+            // $display("");
+            // for (int i = 0; i < 4; ++i) begin
+            //     $display("cpl_gnt[%0d]: %b", i, cpl_gnt[i]);
+            // end
+            // $display("cpl_gnt: %b", cpl_gnt);
+            // $display("");
+            // for (int c = 0; c < 2; ++c) begin
+            //     for (int f = 0; f < 4; ++f) begin
+            //         $display("cdb2fu_gbus[%0d][%0d]: %b", c, f, cdb2fu_gbus[c][f]);
+            //     end
+            // end
+            // $display("");
+            // for (int i = 0; i < 4; ++i) begin
+            //     $display("cand[%0d]: t: %0d rob_idx: %0d data: %x", i, all_cands[i].t, all_cands[i].rob_idx, all_cands[i].data);
+            // end
             $display("<prf_out> en: %b s_t1s: [%0d, %0d, %0d, %0d] s_t2s: [%0d, %0d, %0d, %0d]",
                 prf_out.prf_en,
                 prf_out.s_t1s[0],
