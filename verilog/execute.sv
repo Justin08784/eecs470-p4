@@ -316,8 +316,8 @@ module stage_ex_p4 (
         ALU_FUNC    [`NUM_FU_ALU-1:0]       alu_func;
         logic       [`NUM_FU_ALU-1:0][2:0]  branch_func; // Which branch condition to check
         // 
-        PHYS_REG_IDX [`NUM_FU_ALU-1:0]  t;
-        ROB_IDX      [`NUM_FU_ALU-1:0]  rob_idx;
+        PHYS_REG_IDX [`NUM_FU_ALU-1:0]      t;
+        ROB_IDX      [`NUM_FU_ALU-1:0]      rob_idx;
     } alu_ops, alu_ops_n;
     struct packed {
         logic       [`NUM_FU_MULT-1:0]      bsy;
@@ -383,14 +383,14 @@ module stage_ex_p4 (
     LOGIC_BY_FU cpl_gnt;
 
     logic [`NUM_FU_ALU-1:0] alu_ex_rdy;
-    logic [`NUM_FU_ALU-1:0] alu_ex_en;
-    assign alu_ex_en = alu_ops.bsy & alu_ex_rdy;
+    logic [`NUM_FU_ALU-1:0] alu_ops2ex_en;
+    assign alu_ops2ex_en = alu_ops.bsy & alu_ex_rdy;
     alu_ex alu_ex0 (
         .clock  (clock),
         .reset  (reset),
         .flush  (flush),
 
-        .en     (alu_ex_en),
+        .en     (alu_ops2ex_en),
         .ops    (alu_ops),
         .ex_rdy (alu_ex_rdy),
 
@@ -400,14 +400,14 @@ module stage_ex_p4 (
     );
 
     logic [`NUM_FU_MULT-1:0] mul_ex_rdy;
-    logic [`NUM_FU_MULT-1:0] mul_ex_en;
-    assign mul_ex_en = mul_ops.bsy & mul_ex_rdy;
+    logic [`NUM_FU_MULT-1:0] mul_ops2ex_en;
+    assign mul_ops2ex_en = mul_ops.bsy & mul_ex_rdy;
     mul_ex mul_ex0 (
         .clock  (clock),
         .reset  (reset),
         .flush  (flush),
 
-        .en     (mul_ex_en),
+        .en     (mul_ops2ex_en),
         .ops    (mul_ops),
         .ex_rdy (mul_ex_rdy),
 
@@ -425,10 +425,15 @@ module stage_ex_p4 (
         .gnt_bus(cdb2fu_gbus)
     );
 
+    logic [`NUM_FU_ALU-1:0]     alu_ops_rdy;
+    logic [`NUM_FU_MULT-1:0]    mul_ops_rdy;
     always_comb begin
+        alu_ops_rdy = ~alu_ops.bsy | alu_ops2ex_en;
+        mul_ops_rdy = ~mul_ops.bsy | mul_ops2ex_en;
+
         rs_out = '{
-            fu_rdy_alu      : ~ins.bsy.alu | alu_ex_en,
-            fu_rdy_mult     : ~ins.bsy.mul | mul_ex_en,
+            fu_rdy_alu      : ~ins.bsy.alu | alu_ops_rdy,
+            fu_rdy_mult     : ~ins.bsy.mul | alu_ops_rdy,
             fu_rdy_load     : '0,
             fu_rdy_store    : '0
         };
@@ -454,13 +459,13 @@ module stage_ex_p4 (
             alu_ops     <= alu_ops_n;
             mul_ops     <= mul_ops_n;
 
-            ins.bsy.alu <= rs_in.fu_vld_alu | (ins.bsy.alu & ~alu_ex_en);
+            ins.bsy.alu <= rs_in.fu_vld_alu | (ins.bsy.alu & ~alu_ops_rdy);
             for (int i = 0; i < `NUM_FU_ALU; ++i) begin
                 if (rs_in.fu_vld_alu[i])
                     ins.dat.alu[i] <= rs_in.fu_dat_alu[i];
             end
 
-            ins.bsy.mul <= rs_in.fu_vld_mult | (ins.bsy.mul & ~mul_ex_en);
+            ins.bsy.mul <= rs_in.fu_vld_mult | (ins.bsy.mul & ~mul_ops_rdy);
             for (int i = 0; i < `NUM_FU_MULT; ++i) begin
                 if (rs_in.fu_vld_mult[i])
                     ins.dat.mul[i] <= rs_in.fu_dat_mult[i];
