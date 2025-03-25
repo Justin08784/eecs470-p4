@@ -24,6 +24,11 @@ typedef struct packed {
     CPL_CAND [`NUM_FU_MULT-1:0] mul;
 } CPL_CAND_BY_FU;
 
+typedef struct packed {
+    ID_RESULT [`NUM_FU_ALU-1:0]  alu;
+    ID_RESULT [`NUM_FU_MULT-1:0] mul;
+} ID_RESULT_BY_FU;
+
 // ALU: computes the result of FUNC applied with operands A and B
 // This module is purely combinational
 module alu (
@@ -271,32 +276,28 @@ module stage_ex_p4 (
 
     // <FU>_ins: staging; where just-issued insns wait for 1 cycle to pull their operands
     struct packed {
-        logic       [`NUM_FU_ALU-1:0]   bsy;
-        ID_RESULT   [`NUM_FU_ALU-1:0]   dat;
-    } alu_ins;
-    struct packed {
-        logic       [`NUM_FU_MULT-1:0]  bsy;
-        ID_RESULT   [`NUM_FU_MULT-1:0]  dat;
-    } mul_ins;
+        LOGIC_BY_FU     bsy;
+        ID_RESULT_BY_FU dat;
+    } ins;
 
     // request operands from PRF (separate stage)
     always_comb begin
         prf_out = '0;
-        foreach (alu_ins.dat[i]) begin
-            if (!alu_ins.bsy[i])
+        foreach (ins.dat.alu[i]) begin
+            if (!ins.bsy.alu[i])
                 continue;
-            prf_out.s_en1s.alu[i]   = alu_ins.dat[i].opa_select == OPA_IS_RS1;
-            prf_out.s_en2s.alu[i]   = alu_ins.dat[i].opb_select == OPB_IS_RS2;
-            prf_out.s_t1s.alu[i]    = alu_ins.dat[i].t1; 
-            prf_out.s_t2s.alu[i]    = alu_ins.dat[i].t2; 
+            prf_out.s_en1s.alu[i]   = ins.dat.alu[i].opa_select == OPA_IS_RS1;
+            prf_out.s_en2s.alu[i]   = ins.dat.alu[i].opb_select == OPB_IS_RS2;
+            prf_out.s_t1s.alu[i]    = ins.dat.alu[i].t1; 
+            prf_out.s_t2s.alu[i]    = ins.dat.alu[i].t2; 
         end
-        foreach (mul_ins.dat[i]) begin
-            if (!mul_ins.bsy[i])
+        foreach (ins.dat.mul[i]) begin
+            if (!ins.bsy.mul[i])
                 continue;
             prf_out.s_en1s.mul[i]   = 1;
             prf_out.s_en2s.mul[i]   = 1;
-            prf_out.s_t1s.mul[i]    = mul_ins.dat[i].t1; 
-            prf_out.s_t2s.mul[i]    = mul_ins.dat[i].t2; 
+            prf_out.s_t1s.mul[i]    = ins.dat.mul[i].t1; 
+            prf_out.s_t2s.mul[i]    = ins.dat.mul[i].t2; 
         end
     end
 
@@ -318,46 +319,46 @@ module stage_ex_p4 (
     } mul_ops, mul_ops_n;
     always_comb begin
         alu_ops_n = '0;
-        foreach(alu_ins.dat[i]) begin
-            if(!alu_ins.bsy[i]) 
+        foreach(ins.dat.alu[i]) begin
+            if(!ins.bsy.alu[i]) 
                 continue;
 
             // ALU opA mux
-            case (alu_ins.dat[i].opa_select)
+            case (ins.dat.alu[i].opa_select)
                 OPA_IS_RS1:  alu_ops_n.opa[i] = prf_in.s_v1s.alu[i];
-                OPA_IS_NPC:  alu_ops_n.opa[i] = alu_ins.dat[i].NPC;
-                OPA_IS_PC:   alu_ops_n.opa[i] = alu_ins.dat[i].PC;
+                OPA_IS_NPC:  alu_ops_n.opa[i] = ins.dat.alu[i].NPC;
+                OPA_IS_PC:   alu_ops_n.opa[i] = ins.dat.alu[i].PC;
                 OPA_IS_ZERO: alu_ops_n.opa[i] = 0;
                 default:     alu_ops_n.opa[i]= 32'hdeadface; // dead face
             endcase
 
             // ALU opB mux
-            case (alu_ins.dat[i].opb_select)
+            case (ins.dat.alu[i].opb_select)
                 OPB_IS_RS2:   alu_ops_n.opb[i] =  prf_in.s_v2s.alu[i];
-                OPB_IS_I_IMM: alu_ops_n.opb[i] = `RV32_signext_Iimm(alu_ins.dat[i].inst);
-                OPB_IS_S_IMM: alu_ops_n.opb[i] = `RV32_signext_Simm(alu_ins.dat[i].inst);
-                OPB_IS_B_IMM: alu_ops_n.opb[i] = `RV32_signext_Bimm(alu_ins.dat[i].inst);
-                OPB_IS_U_IMM: alu_ops_n.opb[i] = `RV32_signext_Uimm(alu_ins.dat[i].inst);
-                OPB_IS_J_IMM: alu_ops_n.opb[i] = `RV32_signext_Jimm(alu_ins.dat[i].inst);
+                OPB_IS_I_IMM: alu_ops_n.opb[i] = `RV32_signext_Iimm(ins.dat.alu[i].inst);
+                OPB_IS_S_IMM: alu_ops_n.opb[i] = `RV32_signext_Simm(ins.dat.alu[i].inst);
+                OPB_IS_B_IMM: alu_ops_n.opb[i] = `RV32_signext_Bimm(ins.dat.alu[i].inst);
+                OPB_IS_U_IMM: alu_ops_n.opb[i] = `RV32_signext_Uimm(ins.dat.alu[i].inst);
+                OPB_IS_J_IMM: alu_ops_n.opb[i] = `RV32_signext_Jimm(ins.dat.alu[i].inst);
                 default:      alu_ops_n.opb[i] = 32'hfacefeed; // face feed
             endcase
 
-            alu_ops_n.bsy[i]         = alu_ins.bsy[i];
-            alu_ops_n.alu_func[i]    = alu_ins.dat[i].alu_func;
-            alu_ops_n.branch_func[i] = alu_ins.dat[i].inst.b.funct3;
-            alu_ops_n.t[i]           = alu_ins.dat[i].t;
-            alu_ops_n.rob_idx[i]     = alu_ins.dat[i].rob_idx;
+            alu_ops_n.bsy[i]         = ins.bsy.alu[i];
+            alu_ops_n.alu_func[i]    = ins.dat.alu[i].alu_func;
+            alu_ops_n.branch_func[i] = ins.dat.alu[i].inst.b.funct3;
+            alu_ops_n.t[i]           = ins.dat.alu[i].t;
+            alu_ops_n.rob_idx[i]     = ins.dat.alu[i].rob_idx;
         end
 
         mul_ops_n = '0;
-        foreach (mul_ins.dat[i]) begin
-            mul_ops_n.bsy[i] = mul_ins.bsy[i];
+        foreach (ins.dat.mul[i]) begin
+            mul_ops_n.bsy[i] = ins.bsy.mul[i];
             mul_ops_n.rs1[i] = prf_in.s_v1s.mul[i];
             mul_ops_n.rs2[i] = prf_in.s_v2s.mul[i];
-            mul_ops_n.func[i] = mul_ins.dat[i].inst.r.funct3;
+            mul_ops_n.func[i] = ins.dat.mul[i].inst.r.funct3;
             mul_ops_n.dst[i] = '{
-                rob_idx : mul_ins.dat[i].rob_idx,
-                tag     : mul_ins.dat[i].t
+                rob_idx : ins.dat.mul[i].rob_idx,
+                tag     : ins.dat.mul[i].t
             };
         end
     end
@@ -418,8 +419,8 @@ module stage_ex_p4 (
 
     always_comb begin
         rs_out = '{
-            fu_rdy_alu      : ~alu_ins.bsy | alu_ex_en,
-            fu_rdy_mult     : ~mul_ins.bsy | mul_ex_en,
+            fu_rdy_alu      : ~ins.bsy.alu | alu_ex_en,
+            fu_rdy_mult     : ~ins.bsy.mul | mul_ex_en,
             fu_rdy_load     : '0,
             fu_rdy_store    : '0
         };
@@ -438,32 +439,31 @@ module stage_ex_p4 (
 
     always_ff @(posedge clock) begin
         if (reset || flush) begin
-            alu_ins     <= '0;
-            mul_ins     <= '0;
+            ins         <= '0;
             alu_ops     <= '0;
             mul_ops     <= '0;
         end else begin
             alu_ops     <= alu_ops_n;
             mul_ops     <= mul_ops_n;
 
-            alu_ins.bsy <= rs_in.fu_vld_alu | (alu_ins.bsy & ~alu_ex_en);
+            ins.bsy.alu <= rs_in.fu_vld_alu | (ins.bsy.alu & ~alu_ex_en);
             for (int i = 0; i < `NUM_FU_ALU; ++i) begin
                 if (rs_in.fu_vld_alu[i])
-                    alu_ins.dat[i] <= rs_in.fu_dat_alu[i];
+                    ins.dat.alu[i] <= rs_in.fu_dat_alu[i];
             end
 
-            mul_ins.bsy <= rs_in.fu_vld_mult | (mul_ins.bsy & ~mul_ex_en);
+            ins.bsy.mul <= rs_in.fu_vld_mult | (ins.bsy.mul & ~mul_ex_en);
             for (int i = 0; i < `NUM_FU_MULT; ++i) begin
                 if (rs_in.fu_vld_mult[i])
-                    mul_ins.dat[i] <= rs_in.fu_dat_mult[i];
+                    ins.dat.mul[i] <= rs_in.fu_dat_mult[i];
             end
 
             $display("  %3d | >> EXECUTE", $time);
             $display("alu_ins: bsy[%b, %b], mul_ins: bsy[%b, %b]",
-                alu_ins.bsy[0],
-                alu_ins.bsy[1],
-                mul_ins.bsy[0],
-                mul_ins.bsy[1]
+                ins.bsy.alu[0],
+                ins.bsy.alu[1],
+                ins.bsy.mul[0],
+                ins.bsy.mul[1]
             );
             $display("alu_ops: [%b {opa: %x opb: %x}, %b {opa: %x opb: %x}]",
                 alu_ops.bsy[0],
