@@ -412,8 +412,8 @@ module stage_ex_p4 (
         .WIDTH(`NUM_FU_TOTAL),
         .REQS(`N)
     ) sel_cpl (
-        .req(vld),
-        .gnt(cpl_gnt),      // type coercion: logic [NUM_FU_TOTAL-1:0] -> {logic [`NUM_FU_ALU-1:0] alu, logic [`NUM_FU_MULT-1:0] mul}
+        .req(vld),      // flatten (alu + mul bits) => single [NUM_FU_TOTAL-1:0] bus
+        .gnt(cpl_gnt),  // flatten => single bus
         .gnt_bus(cdb2fu_gbus)
     );
 
