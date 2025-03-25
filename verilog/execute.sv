@@ -13,6 +13,21 @@
 `include "sys_defs.svh"
 `include "ISA.svh"
 
+/*
+Flow chart
+[Reservation Station] 
+     ↓
+[Staging FIFO (s_buf)]  ← just buffers instruction for 1 cycle
+     ↓
+[ops register (alu_ops, mul_ops)]  ← PRF values fetched here
+     ↓
+[Functional Unit (ALU or MUL)]
+     ↓
+[Completion FIFO (cpl_buf)] ← waits for CDB slot
+     ↓
+[ CDB Output Reg (c_out) ] ← selected for writeback this cycle
+*/
+
 typedef struct packed {
     PHYS_REG_IDX t;
     ROB_IDX rob_idx;
@@ -547,6 +562,7 @@ module stage_ex_p4 (
         .gnt_bus(cdb2fu_gbus)
     );
 
+    execute2complete c_out_n;
     always_comb begin
         alu_ops_rdy = ~alu_ops.bsy | alu_ex_rdy;
         mul_ops_rdy = ~mul_ops.bsy | mul_ex_rdy;
@@ -558,13 +574,13 @@ module stage_ex_p4 (
             fu_rdy_store    : '0
         };
 
-        c_out = '0;
+        c_out_n = '0;
         foreach (cdb2fu_gbus[c, f]) begin
             if (cdb2fu_gbus[c][f]) begin
-                c_out.c_en[c]       |= 1;
-                c_out.c_ts[c]       |= cands_flat[f].t;
-                c_out.c_rob_idxs[c] |= cands_flat[f].rob_idx;
-                c_out.c_data[c]     |= cands_flat[f].data;
+                c_out_n.c_en[c]       |= 1;
+                c_out_n.c_ts[c]       |= cands_flat[f].t;
+                c_out_n.c_rob_idxs[c] |= cands_flat[f].rob_idx;
+                c_out_n.c_data[c]     |= cands_flat[f].data;
             end
         end
     end
@@ -574,9 +590,23 @@ module stage_ex_p4 (
         if (reset || flush) begin
             alu_ops     <= '0;
             mul_ops     <= '0;
+            c_out       <= '0;
         end else begin
             alu_ops     <= alu_ops_n;
             mul_ops     <= mul_ops_n;
+            /*
+            We buffer c_out for 1 cycle to break the comb. chain...
+            cpl_buf.used_scnt(vld) -> psel_gen(vld) -> cpl_buf.rd_en_cnt(cpl_gnt)
+            -> cpl_buf.rd_data(cands) -> c_out $#BREAK HERE#$ -> RS issue
+            -> FU sbuf.wr_data()
+
+            TODO: Buffering c_out for 1 cycle feels a little questionable.
+            Are you sure you're not adding an unnecessary cycle of latency for
+            free_list and rob who practically already wait for 1 cycle because
+            they have INTR_FWD disabled? Can you simply reenable INTR_FWD for
+            them with minimal latency cost?
+            */
+            c_out       <= c_out_n;
 
             $display("  %3d | >> EXECUTE", $time);
             $display("alu_ins: bsy[%b, %b], mul_ins: bsy[%b, %b]",
