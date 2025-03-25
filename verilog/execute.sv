@@ -101,19 +101,18 @@ module alu_ex(
     input  logic [`NUM_FU_ALU-1:0]      cpl_gnt
         // completion grant
 );
-    // <FU>_outs: where executed insns wait until completion
-    struct packed {
-        // ff
-        logic   [`NUM_FU_ALU-1:0]   bsy;
-        DATA    [`NUM_FU_ALU-1:0]   res;
-        DST     [`NUM_FU_ALU-1:0]   dst;
-    } outs, outs_n;
+    /*
+    credit[i] = num available slots in fifo[i]
+              = buf_sz - (num in-flight through FU[i] + num waiting in fifo[i])
+    */
+    localparam buf_sz = 4;
+    logic [`NUM_FU_ALU-1:0][$clog2(buf_sz):0] credits;
 
     // execute
     generate
+        CPL_CAND    [`NUM_FU_ALU-1:0] tmp_data;
+        DATA        [`NUM_FU_ALU-1:0] tmp_res;
         for (genvar i = 0; i < `NUM_FU_ALU; ++i) begin : gen_alus
-            // // Instantiate the ALU
-            // TODO: These ALU inputs were kinda hardcoded. Need mux stuff to select which type.
             alu alu_0 ( 
                 // Inputs
                 .opa        (ops.opa[i]),
@@ -122,40 +121,50 @@ module alu_ex(
                 .branch_func(ops.branch_func[i]), // Which branch condition to check
 
                 .take(), // True/False condition result (will return FALSE if branch is low)
-                .result(outs_n.res[i]) // will return 32'hfacebeec if branch is high (Sentinel, hopefully none of our alu computations result in that value)
+                .result(tmp_res[i]) // will return 32'hfacebeec if branch is high (Sentinel, hopefully none of our alu computations result in that value)
+            );
+
+            assign tmp_data[i] = '{
+                t       : ops.t[i],
+                rob_idx : ops.rob_idx[i],
+                data    : tmp_res[i]
+            };
+
+            // <FU>_outs: where executed insns wait until completion
+            fifo #(
+                .INSTANCE_ID(10+i),
+                .DEPTH(buf_sz),
+                .WIDTH($bits(CPL_CAND)),
+                .NUM_RPORTS(1),
+                .NUM_WPORTS(1),
+                .ENABLE_INTR_FWD(`FALSE)
+            ) id_buf(
+                .clock      (clock),
+                .reset      (reset),
+                .flush      (flush),
+                .wr_en_cnt  (en[i]),
+                .wr_data    (tmp_data[i]),
+                .rd_en_cnt  (cpl_gnt[i]),
+                .rd_data    (cands[i]),
+
+                .free_scnt  (),
+                .used_scnt  (vld[i])
             );
         end
     endgenerate
 
     always_comb begin
-        vld = outs.bsy;
-        foreach (cands[i]) begin
-            cands[i] = '{
-                t       : outs.dst[i].tag,
-                rob_idx : outs.dst[i].rob_idx,
-                data    : outs.res[i]
-            };
-        end
-
-        ex_rdy = ~outs.bsy | cpl_gnt; // complete frees for same-cycle ex acceptances
-
-        outs_n.bsy = en | (outs.bsy & ~cpl_gnt);
-        outs_n.dst = outs.dst;
-        foreach (outs_n.dst[i]) begin
-            if (!en[i])
-                continue;
-            outs_n.dst[i] = '{
-                tag     : ops.t[i],
-                rob_idx : ops.rob_idx[i]
-            };
-        end
+        foreach (ex_rdy[i])
+            ex_rdy[i] = credits[i] > 0;
     end
 
     always_ff @(posedge clock) begin
         if (reset || flush) begin
-            outs <= '0;
+            foreach(credits[i])
+                credits[i] <= buf_sz;
         end else begin
-            outs <= outs_n;
+            foreach(credits[i])
+                credits[i] <= credits[i] - en[i] + cpl_gnt[i];
         end
     end
 endmodule
