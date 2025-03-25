@@ -71,11 +71,8 @@ psel_gen #(
 
 // handle map table output 
 always_comb begin
+    map_out         = '0;
     map_out.en_cnt  = dispatch_cnt;
-    map_out.src1s   = '0;
-    map_out.src2s   = '0;
-    map_out.dsts    = '0;
-    map_out.ts      = '0;
 
     //handling dest tags
     foreach (gbus_preg2insn[i, j]) begin
@@ -87,6 +84,9 @@ always_comb begin
 
         //handling dest register
         map_out.dsts[i]     = decode_in.d_dat[i].inst.r.rd;
+        // actually need src tags?
+        map_out.is_rs1s[i]  = decode_in.d_dat[i].opa_select == OPA_IS_RS1;
+        map_out.is_rs2s[i]  = decode_in.d_dat[i].opb_select == OPB_IS_RS2;
         //handling src tags
         map_out.src1s[i]    = decode_in.d_dat[i].inst.r.rs1;
         map_out.src2s[i]    = decode_in.d_dat[i].inst.r.rs2;

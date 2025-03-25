@@ -70,8 +70,8 @@ module map_table #(parameter
             */
             d_out.t1s[i]    = entries_n[d_in.src1s[i]].t;
             d_out.t2s[i]    = entries_n[d_in.src2s[i]].t;
-            d_out.cpl1s[i]  = entries_n[d_in.src1s[i]].cpl;
-            d_out.cpl2s[i]  = entries_n[d_in.src2s[i]].cpl;
+            d_out.cpl1s[i]  = !d_in.is_rs1s[i] || entries_n[d_in.src1s[i]].cpl;
+            d_out.cpl2s[i]  = !d_in.is_rs2s[i] || entries_n[d_in.src2s[i]].cpl;
 
             if (d_in.dsts[i] != `ZERO_REG) begin
                 d_out.ts_old[i]             = entries_n[d_in.dsts[i]].t;
