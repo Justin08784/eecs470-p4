@@ -428,8 +428,8 @@ module stage_ex_p4 (
     logic [`NUM_FU_ALU-1:0]     alu_ops_rdy;
     logic [`NUM_FU_MULT-1:0]    mul_ops_rdy;
     always_comb begin
-        alu_ops_rdy = ~alu_ops.bsy | alu_ops2ex_en;
-        mul_ops_rdy = ~mul_ops.bsy | mul_ops2ex_en;
+        alu_ops_rdy = ~alu_ops.bsy | alu_ex_rdy;
+        mul_ops_rdy = ~mul_ops.bsy | mul_ex_rdy;
 
         rs_out = '{
             fu_rdy_alu      : ~ins.bsy.alu | alu_ops_rdy,
