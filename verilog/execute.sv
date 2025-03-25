@@ -138,7 +138,7 @@ module alu_ex(
                 .NUM_RPORTS(1),
                 .NUM_WPORTS(1),
                 .ENABLE_INTR_FWD(`FALSE)
-            ) id_buf(
+            ) cpl_buf (
                 .clock      (clock),
                 .reset      (reset),
                 .flush      (flush),
@@ -194,23 +194,16 @@ module mul_ex(
     input  logic [`NUM_FU_MULT-1:0]     cpl_gnt
         // completion grant
 );
-    // <FU>_outs: where executed insns wait until completion
-    struct packed {
-        // ff
-        logic   [`NUM_FU_MULT-1:0]   bsy;
-        DATA    [`NUM_FU_MULT-1:0]   res;
-        DST     [`NUM_FU_MULT-1:0]   dst;
-    } outs, outs_n;
-
-    logic   [`NUM_FU_MULT-1:0]  done;
-    DATA    [`NUM_FU_MULT-1:0]  done_res;
-    DST     [`NUM_FU_MULT-1:0]  done_dst;
+    localparam buf_sz = `MULT_STAGES;
+    logic [`NUM_FU_MULT-1:0][$clog2(buf_sz):0] credits;
 
     // execute
     generate
+        logic       [`NUM_FU_MULT-1:0] tmp_done;
+        DATA        [`NUM_FU_MULT-1:0] tmp_res;
+        DST         [`NUM_FU_MULT-1:0] tmp_dst;
+        CPL_CAND    [`NUM_FU_MULT-1:0] tmp_data;
         for (genvar i = 0; i < `NUM_FU_MULT; ++i) begin : gen_mults
-            // // Instantiate the ALU
-            // TODO: These ALU inputs were kinda hardcoded. Need mux stuff to select which type.
             mult mult_0 ( 
                 .clock  (clock),
                 .reset  (reset),
@@ -219,50 +212,56 @@ module mul_ex(
                 .dst_in (ops.dst[i]),
                 .rs1    (ops.rs1[i]),
                 .rs2    (ops.rs2[i]),
-                .func   (ops.func[i]), // which mult operation to perform
+                .func   (ops.func[i]),
 
                 // Output
-                .dst_out(done_dst[i]),
-                .result (done_res[i]),
-                .done   (done[i])
+                .dst_out(tmp_dst[i]),
+                .result (tmp_res[i]),
+                .done   (tmp_done[i])
             );
+
+            assign tmp_data[i] = '{
+                t       : tmp_dst[i].tag,
+                rob_idx : tmp_dst[i].rob_idx,
+                data    : tmp_res[i]
+            };
+
+            // <FU>_outs: where executed insns wait until completion
+            fifo #(
+                .INSTANCE_ID(20+i),
+                .DEPTH(buf_sz),
+                .WIDTH($bits(CPL_CAND)),
+                .NUM_RPORTS(1),
+                .NUM_WPORTS(1),
+                .ENABLE_INTR_FWD(`FALSE)
+            ) cpl_buf (
+                .clock      (clock),
+                .reset      (reset),
+                .flush      (flush),
+                .wr_en_cnt  (tmp_done[i]),
+                .wr_data    (tmp_data[i]),
+                .rd_en_cnt  (cpl_gnt[i]),
+                .rd_data    (cands[i]),
+
+                .free_scnt  (),
+                .used_scnt  (vld[i])
+            );
+           
         end
     endgenerate
 
     always_comb begin
-        vld = outs.bsy;
-        foreach (cands[i]) begin
-            cands[i] = '{
-                t       : outs.dst[i].tag,
-                rob_idx : outs.dst[i].rob_idx,
-                data    : outs.res[i]
-            };
-        end
-
-        ex_rdy = ~outs.bsy | (done & cpl_gnt);
-
-        outs_n.bsy =
-            // If we are already busy, remain busy
-            //    until we see done & cpl_gnt
-            (outs.bsy & ~(done & cpl_gnt))
-            // OR if we are not busy, but a new instruction arrives
-            //    we become busy
-            | done; // TODO: this is an extremely hacky fix
-        outs_n.dst = outs.dst;
-        outs_n.res = outs.res;
-        for (int unsigned i = 0; i < `NUM_FU_MULT; ++i) begin
-            if (!done[i])
-                continue;
-            outs_n.dst[i] = done_dst[i];
-            outs_n.res[i] = done_res[i];
-        end
+        foreach (ex_rdy[i])
+            ex_rdy[i] = credits[i] > 0;
     end
 
     always_ff @(posedge clock) begin
         if (reset || flush) begin
-            outs <= '0;
+            foreach(credits[i])
+                credits[i] <= buf_sz;
         end else begin
-            outs <= outs_n;
+            foreach(credits[i])
+                credits[i] <= credits[i] - en[i] + cpl_gnt[i];
         end
     end
 endmodule
