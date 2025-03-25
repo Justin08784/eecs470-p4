@@ -28,7 +28,7 @@ module decoder_p4 (
     always_comb begin
         // Default control values (looks like a NOP)
         // See sys_defs.svh for the constants used here
-        fu_idx        = 0;
+        fu_idx        = FU_ALU;
         opa_select    = OPA_IS_RS1;
         opb_select    = OPB_IS_RS2;
         alu_func      = ALU_ADD;
@@ -240,6 +240,8 @@ module stage_id_p4 (
     int insn_id;
 
     ID_RESULT [`N-1:0] tmp;
+    // number of legal fetched insns until the 1st illegal insn
+    logic [$clog2(`N):0] non_illegal_cnt; // TODO: do we need stall fetch when we get an illegal?
 
     // Instantiate the instruction decoder
     generate
@@ -276,6 +278,13 @@ module stage_id_p4 (
 
             tmp[i].dest_reg_idx = (has_dest_reg[i]) ? f_in.f_dat[i].inst.r.rd : `ZERO_REG;
         end
+
+        non_illegal_cnt = '0;
+        for (int unsigned i = 0; i < `N; ++i, ++non_illegal_cnt) begin
+            if (tmp[i].illegal)
+                break;
+        end
+        non_illegal_cnt = `MIN(non_illegal_cnt, f_in.f_en_cnt);
     end
 
 
@@ -332,7 +341,7 @@ module stage_id_p4 (
         .clock      (clock),
         .reset      (reset),
         .flush      (flush),
-        .wr_en_cnt  (f_in.f_en_cnt),
+        .wr_en_cnt  (non_illegal_cnt), // accept only legal insns into FIFO
         .wr_data    (tmp),
         .rd_en_cnt  (d_in.dispatch_en_cnt),
         .rd_data    (d_out.d_dat),
@@ -357,7 +366,7 @@ module stage_id_p4 (
         if (reset) begin
             insn_id <= 0;
         end else begin
-            insn_id <= insn_id + f_in.f_en_cnt;
+            insn_id <= insn_id + non_illegal_cnt;
         end
 
 

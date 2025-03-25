@@ -50,6 +50,8 @@ module fifo #(
     output  logic   [NUM_RPORTS-1:0][WIDTH-1:0]     rd_data,
     output  logic   [$clog2(NUM_RPORTS):0]          prvw_vld_cnt, // only valid if ENABLE_READ_PREVIEW set
 
+    output  logic                                   empty,
+    output  logic                                   full,
     output  logic   [$clog2(NUM_WPORTS):0]          free_scnt,
     output  logic   [$clog2(NUM_RPORTS):0]          used_scnt
 
@@ -68,7 +70,11 @@ module fifo #(
     assign free         = DEPTH - used;
     assign free_scnt    = `MIN(free, NUM_WPORTS);
     assign used_scnt    = `MIN(used, NUM_RPORTS);
-    assign prvw_vld_cnt = ENABLE_READ_PREVIEW ? `MIN(used + wr_en_cnt, NUM_RPORTS) : '0;
+    assign empty        = used == 0;
+    assign full         = used == DEPTH;
+    assign prvw_vld_cnt = ENABLE_READ_PREVIEW
+        ? `MIN(used + (ENABLE_INTR_FWD ? wr_en_cnt : 0), NUM_RPORTS)
+        : '0;
     assign show_limit   = ENABLE_READ_PREVIEW ? prvw_vld_cnt : rd_en_cnt;
 
     // Version 1:

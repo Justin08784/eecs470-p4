@@ -7,15 +7,15 @@
 // period than straight multiplication.
 
 module mult (
-    input clock, reset, start,
+    input clock, reset, flush, start,
     input DATA rs1, rs2,
     input MULT_FUNC func,
-    input MULT_DEST dst_in,
+    input DST dst_in,
     // input logic [TODO] dest_tag_in,
 
     // output logic [TODO] dest_tag_out,
     output DATA result,
-    output MULT_DEST dst_out,
+    output DST dst_out,
     output done
 );
 
@@ -28,13 +28,14 @@ module mult (
     logic [63:0] mcand, mplier, product;
     logic [63:0] mcand_out, mplier_out; // unused, just for wiring
 
-    MULT_DEST [`MULT_STAGES-2:0] internal_dsts;
+    DST [`MULT_STAGES-2:0] internal_dsts;
 
     // instantiate an array of mult_stage modules
     // this uses concatenation syntax for internal wiring, see lab 2 slides
     mult_stage mstage [`MULT_STAGES-1:0] (
         .clock (clock),
         .reset (reset),
+        .flush (flush),
         .func        ({internal_funcs,   func}),
         .start       ({internal_dones,   start}), // forward prev done as next start
         .prev_sum    ({internal_sums,    64'h0}), // start the sum at 0
@@ -59,7 +60,6 @@ module mult (
             M_MUL, M_MULH: mplier = {{(32){rs2[31]}}, rs2};
             default:       mplier = {32'b0, rs2};
         endcase
-        $display("INTERNAL MULT RESULT: %2d", result);
     end
 
     // Use the high or low bits of the product based on the output func
@@ -69,14 +69,14 @@ endmodule // mult
 
 
 module mult_stage (
-    input clock, reset, start,
+    input clock, reset, flush, start,
     input [63:0] prev_sum, mplier, mcand,
-    input MULT_DEST dst,
+    input DST dst,
     input MULT_FUNC func,
 
     output logic [63:0] product_sum, next_mplier, next_mcand,
     output MULT_FUNC next_func,
-    output MULT_DEST next_dst,
+    output DST next_dst,
     output logic done
 );
 
@@ -88,7 +88,6 @@ module mult_stage (
 
     assign shifted_mplier = {SHIFT'('b0), mplier[63:SHIFT]};
     assign shifted_mcand = {mcand[63-SHIFT:0], SHIFT'('b0)};
-    // assign next_dst = dst;
 
     always_ff @(posedge clock) begin
         product_sum <= prev_sum + partial_product;
@@ -99,7 +98,7 @@ module mult_stage (
     end
 
     always_ff @(posedge clock) begin
-        if (reset) begin
+        if (reset || flush) begin
             done <= 1'b0;
         end else begin
             done <= start;

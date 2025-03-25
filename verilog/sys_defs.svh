@@ -46,7 +46,8 @@
 
 `define PRF_NUM_RPORTS (`NUM_FU_ALU + `NUM_FU_LOAD + `NUM_FU_MULT + `NUM_FU_STORE)
 // number of mult stages (2, 4) (you likely don't need 8)
-`define MULT_STAGES 4
+`define MULT_STAGES 16
+// Justin: funny enough we need at least 8 or else multiply is on critical path
 
 ///////////////////////////////
 // --- Compil. Controls ---- //
@@ -417,14 +418,13 @@ typedef struct packed {
 // ROB stuff
 typedef logic [$clog2(`ROB_SZ)-1:0] ROB_IDX;
 typedef struct packed {
-    // logic [4:0] rob_num;
     logic cpl;
     logic [$clog2(`PHYS_REG_SZ_R10K)-1:0] tag;
     logic [$clog2(`PHYS_REG_SZ_R10K)-1:0] t_old;
     REG_IDX dst;
+    
     logic halt;
     logic illegal;
-    ADDR NPC;
 } ROB_ENTRY;
 
 
@@ -671,6 +671,10 @@ typedef struct packed {
         // From: retire (ROB)
         // - pregs being returned to free list
     REG_IDX         [`N-1:0]            dst;
+
+    // control signals for cpu.sv
+    logic           [`N-1:0]            halt;
+    logic           [`N-1:0]            illegal;
 } rob2retire;
 
 
@@ -741,6 +745,6 @@ typedef struct packed {
 typedef struct packed {
     ROB_IDX rob_idx;
     PHYS_REG_IDX tag;
-} MULT_DEST;
+} DST;
 
 `endif // __SYS_DEFS_SVH__

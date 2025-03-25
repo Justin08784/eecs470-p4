@@ -9,10 +9,6 @@ module prf #(
                                //    write to same address
    )(
     input clock, //reset, flush, // QUESTION: do we need reset? or should we force write to happen before read at the same addr?
-    // retire ??
-    input PHYS_REG_IDX [`N-1:0] r_in,
-    output PHYS_REG_IDX [`N-1:0] r_out,
-    //localparam NUM_RPORTS = `NUM_FU_ALU + `NUM_FU_BRANCH + `NUM_FU_LOAD + `NUM_FU_MULT + `NUM_FU_STORE;
 
     // complete (write)
     input logic         [N-1:0] c_en,
@@ -53,45 +49,33 @@ module prf #(
 
     logic [DEPTH-1:0][WIDTH-1:0]  phys_reg_file;
 
-    // genvar i;
-    // generate
+    // Read ports
     always_comb begin
         s_v1s = '0;
         s_v2s = '0;
         for (int i = 0; i < NUM_RPORTS; i++) begin
             
-            // always_comb begin
+            // TODO: enable should be more granular–– per t1/t2. Some insns only need to read 1 value.
             if (s_t1s[i] == `ZERO_REG) begin
-                // $display("ZERO REGISTER: %3d", i);
                 s_v1s[i] = 0;
-                // $display("REGISTER DATA: %2d", s_v1s[i]);
-            end else if (c_en[0] && (c_ts[0] == s_t1s[i])) begin
-                s_v1s[i] = c_vs[0]; // internal forwarding
-            end else if (c_en[1] && (c_ts[1] == s_t1s[i])) begin
-                s_v1s[i] = c_vs[1]; // internal forwarding
+            // end else if (c_en[0] && (c_ts[0] == s_t1s[i])) begin
+            //     s_v1s[i] = c_vs[0]; // internal forwarding
+            // end else if (c_en[1] && (c_ts[1] == s_t1s[i])) begin
+            //     s_v1s[i] = c_vs[1]; // internal forwarding
             end else begin
                 s_v1s[i] = phys_reg_file[s_t1s[i]];
             end
 
-            // Read port 2
-            // always_comb begin
             if (s_t2s[i] == `ZERO_REG) begin
                 s_v2s[i] = 0;
-            end else if (c_en[0] && (c_ts[0] == s_t2s[i])) begin
-                s_v2s[i] = c_vs[0]; // internal forwarding
-            end else if (c_en[1] && (c_ts[1] == s_t2s[i])) begin
-                s_v2s[i] = c_vs[1]; // internal forwarding
+            // end else if (c_en[0] && (c_ts[0] == s_t2s[i])) begin
+            //     s_v2s[i] = c_vs[0]; // internal forwarding
+            // end else if (c_en[1] && (c_ts[1] == s_t2s[i])) begin
+            //     s_v2s[i] = c_vs[1]; // internal forwarding 
             end else begin
                 s_v2s[i] = phys_reg_file[s_t2s[i]];
             end
             
-        end
-    end
-    // endgenerate
-
-    always_comb begin
-        foreach(r_in[i]) begin
-            r_out[i] = phys_reg_file[r_in[i]];
         end
     end
 
@@ -104,7 +88,5 @@ module prf #(
             phys_reg_file[c_ts[1]] <= c_vs[1];
         end
     end
-
-
 
 endmodule

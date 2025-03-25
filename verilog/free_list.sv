@@ -52,6 +52,7 @@ module free_list #(parameter
         .NUM_RPORTS(`N),
         .NUM_WPORTS(`N),
         .ENABLE_FREE_LIST_MODE(`TRUE),
+        .ENABLE_INTR_FWD(`FALSE),
         .RESET_STATE(RESET_STATE)
     ) lst (
         .clock(clock),

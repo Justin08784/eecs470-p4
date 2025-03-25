@@ -440,13 +440,6 @@ module cpu (
     //                                              //
     //////////////////////////////////////////////////   
 
-    // rs2dispatch rs2dis;
-    // dispatch2rs dis2rs;
-    // rob2dispatch rob2dis;
-    // dispatch2rob dis2rob;
-    // free_list2dispatch fl2dis;
-    // dispatch2free_list dis2fl; // TODO
-    // dispatch2map_table dis2mt; // TODO
     rs2dispatch     rs_2_dispatch;
     dispatch2rs     dispatch_2_rs;
     rob2dispatch    rob_2_dispatch;
@@ -485,32 +478,11 @@ module cpu (
     //              Reservation Station             //
     //                                              //
     //////////////////////////////////////////////////  
-    // logic       [$clog2(`N):0] rs_rdy_scnt;  // to dispatcher
-    // logic       [$clog2(`N):0] d_en_cnt; // number of enabled dispatch lines? (from dispatcher; dep. on rs_rdy_scnt)
-    // ID_RESULT   [`N-1:0] d_dat;
-
-    // logic       [`NUM_FU_ALU-1:0]    fu_rdy_alu;
-    // logic       [`NUM_FU_MULT-1:0]   fu_rdy_mult;
-    // logic       [`NUM_FU_STORE-1:0]  fu_rdy_store;
-    // logic       [`NUM_FU_LOAD-1:0]   fu_rdy_load;
-    // logic           [`N-1:0] c_en;
-    // PHYS_REG_IDX    [`N-1:0] c_ts;
-
-    // logic       [`NUM_FU_ALU-1:0]    fu_vld_alu;
-    // logic       [`NUM_FU_MULT-1:0]   fu_vld_mult;
-    // logic       [`NUM_FU_STORE-1:0]  fu_vld_store;
-    // logic       [`NUM_FU_LOAD-1:0]   fu_vld_load;
-    // ID_RESULT   [`NUM_FU_ALU-1:0]    fu_dat_alu;
-    // ID_RESULT   [`NUM_FU_MULT-1:0]   fu_dat_mult;
-    // ID_RESULT   [`NUM_FU_STORE-1:0]  fu_dat_store;
-    // ID_RESULT   [`NUM_FU_LOAD-1:0]   fu_dat_load;
-
-    
     execute2rs      ex_2_rs; 
     rs2execute      rs_2_ex;
 
-    execute2prf     ex_2_prf;
-    prf2execute     prf_2_ex;
+    execute2prf     prf_out;
+    prf2execute     prf_in;
 
     execute2complete ex_2_complete;
     rs rs_0(
@@ -525,26 +497,6 @@ module cpu (
         .ex_out(rs_2_ex),
 
         .c_in(ex_2_complete)
-        // .clock(clock),
-        // .reset(reset),
-        // .flush(),
- 
-        // .rs_rdy_scnt(rs2dis.rs_rdy_scnt),
-        // .d_en_cnt(dis2rs.d_en_cnt),
-        // .d_dat(d_dat),
- 
-        // .fu_rdy_alu(fu_rdy_alu),
-        // .fu_rdy_mult(fu_rdy_mult),
-        // .fu_rdy_store(fu_rdy_store),
-        // .fu_rdy_load(fu_rdy_load),
-
-        // .fu_dat_alu(fu_dat_alu),
-        // .fu_dat_mult(fu_dat_mult),
-        // .fu_dat_store(fu_dat_store),
-        // .fu_dat_load(fu_dat_load),
- 
-        // .c_en(c_en),
-        // .c_ts(c_ts)
     );
     
     //////////////////////////////////////////////////
@@ -553,20 +505,7 @@ module cpu (
     //                                              //
     //////////////////////////////////////////////////  
 
-    // rob2retire rob2r;
-    // execute2complete c2rob;
-    // typedef struct packed {logic dummy;} rob2decode;
-    // typedef struct packed {logic dummy;} decode2rob;
-    // rob2decode rob2d;
-    // decode2rob d2rob;
     rob2retire rob_2_retire;
-    COMMIT_PACKET [`N-1:0] wb_packet;
-    PHYS_REG_IDX [`N-1:0] retire2prf;
-    PHYS_REG_IDX [`N-1:0] prf2retire;
-    //execute2complete ex_2_complete;
-    // rob2dispatch rob_2_dispatch;
-    // dispatch2rob dispatch_2_rob;
-
     rob #(
         .ROB_SZ(`ROB_SZ),
         .N(`N)
@@ -577,17 +516,8 @@ module cpu (
         .r_out      (rob_2_retire),
         .c_in       (ex_2_complete),
         .d_out      (rob_2_dispatch),
-        .d_in       (dispatch_2_rob),
-        .wb_packet  (wb_packet),
-        .prf_out    (retire2prf),
-        .prf_in     (prf2retire)
+        .d_in       (dispatch_2_rob)
     );
-
-    always_comb begin
-        for (int i = 0; i < `N; i++) begin
-            committed_insts[i] = wb_packet[i];
-        end
-    end
 
     //////////////////////////////////////////////////
     //                                              //
@@ -600,15 +530,12 @@ module cpu (
         .clock(clock),
         .reset(reset),
         .flush(flush),
-        .ex_fu_in(rs_2_ex),
-        .ex_rdy_out(ex_2_rs),
-        .ex_c_out(ex_2_complete),
-        .ex_2_prf(ex_2_prf),
-        .prf_2_ex(prf_2_ex)
+        .rs_in(rs_2_ex),
+        .rs_out(ex_2_rs),
+        .c_out(ex_2_complete),
+        .prf_out(prf_out),
+        .prf_in(prf_in)
     );
-
-
-
 
 
 
@@ -617,11 +544,6 @@ module cpu (
     //                  Map Table                   //
     //                                              //
     //////////////////////////////////////////////////  
-
-    // retire (read)
-
-    // map_table2robandRS mt2rob_rs;
-    // complete2map_table c2mt;
 
     map_table #(
         .N(`N)
@@ -683,13 +605,23 @@ module cpu (
         .c_en(ex_2_complete.c_en),
         .c_ts(ex_2_complete.c_ts),
         .c_vs(ex_2_complete.c_data),
-        .s_en(ex_2_prf.prf_en),
-        .s_t1s(ex_2_prf.s_t1s),   //execute2prf.t1
-        .s_t2s(ex_2_prf.s_t2s),   //execute2prf.t2
-        .s_v1s(prf_2_ex.s_v1s),   //prf2execute.s_v1s
-        .s_v2s(prf_2_ex.s_v2s),    //prf2execute.s_v1s
-        .r_in(retire2prf),
-        .r_out(prf2retire)
+        .s_en(prf_out.prf_en),
+        .s_t1s(prf_out.s_t1s),   //execute2prf.t1
+        .s_t2s(prf_out.s_t2s),   //execute2prf.t2
+        .s_v1s(prf_in.s_v1s),   //prf2execute.s_v1s
+        .s_v2s(prf_in.s_v2s)    //prf2execute.s_v1s
     );
+
+    always_comb begin
+        committed_insts = '0;
+        foreach(committed_insts[i]) begin
+            if (i >= rob_2_retire.r_en_cnt)
+                continue;
+            committed_insts[i].valid      = 1;
+            committed_insts[i].halt       = rob_2_retire.halt[i];
+            committed_insts[i].illegal    = rob_2_retire.illegal[i];
+        end
+    end
+
 
 endmodule // pipeline

@@ -28,7 +28,7 @@ import "DPI-C" function string decode_inst(int inst);
 //import "DPI-C" function void close_pipeline_output_file();
 
 
-`define TB_MAX_CYCLES 8000//50000000
+`define TB_MAX_CYCLES 50000000
 
 
 module testbench;
@@ -190,6 +190,15 @@ module testbench;
         $display("  %16t : Running Processor", $realtime);
     end
 
+    `ifndef SYNTH
+    // shadow ROB containing only debug info
+    typedef struct packed {
+        logic halt;
+        logic illegal;
+        ADDR NPC;
+    } ROB_DEBUG_ENTRY;
+    ROB_DEBUG_ENTRY rob_debug[int];
+    `endif // SYNTH
 
     always @(negedge clock) begin
         if (reset) begin
@@ -221,6 +230,20 @@ module testbench;
 
             output_reg_writeback_and_maybe_halt();
 
+            `ifndef SYNTH
+            // Add new dispatches to rob
+            for (int i = 0, int cur_idx = 0; i < `N; ++i) begin
+                if (i >= verisimpleV.rob_0.d_in.d_en_cnt)
+                    break;
+                cur_idx = verisimpleV.rob_0.d_idxs[i];
+                rob_debug[cur_idx] = '{
+                    halt    : verisimpleV.rob_0.d_in.halt[i],
+                    illegal : verisimpleV.rob_0.d_in.illegal[i],
+                    NPC     : verisimpleV.rob_0.d_in.NPC[i]
+                };
+            end
+            `endif // SYNTH
+
             // stop the processor
             if (error_status != NO_ERROR || clock_count > `TB_MAX_CYCLES) begin
 
@@ -248,35 +271,86 @@ module testbench;
         ADDR pc;
         DATA inst;
         MEM_BLOCK block;
-        for (int n = 0; n < `N; ++n) begin
-            if (committed_insts[n].valid) begin
-                // update the count for every committed instruction
-                instr_count = instr_count + 1;
+        logic illegal;
+        logic halt;
+        REG_IDX reg_idx;
+        DATA data;
 
-                pc = committed_insts[n].NPC - 4;
-                block = memory.unified_memory[pc[31:3]];
-                inst = block.word_level[pc[2]];
-                // print the committed instructions to the writeback output file
-                if (committed_insts[n].reg_idx == `ZERO_REG) begin
-                    $fdisplay(wb_fileno, "PC %4x:%-8s| ---", pc, decode_inst(inst));
-                end else begin
-                    $fdisplay(wb_fileno, "PC %4x:%-8s| r%02d=%-8x",
-                              pc,
-                              decode_inst(inst),
-                              committed_insts[n].reg_idx,
-                              committed_insts[n].data);
-                end
+        /* V2: get retire data via hierarchial references
+        NOTE: we only get writeback value debug output in simulation mode
+        (only *.out is graded after all), since hierarchical references
+        do not work in synthesis
+        */
+        for (int n = 0, int cur_idx = 0; n < `N; ++n) begin
+            if (!committed_insts[n].valid)
+                continue;
+            // update the count for every committed instruction
+            ++instr_count;
+            halt    = committed_insts[n].halt;
+            illegal = committed_insts[n].illegal;
 
-                // exit if we have an illegal instruction or a halt
-                if (committed_insts[n].illegal) begin
-                    error_status = ILLEGAL_INST;
-                    break;
-                end else if(committed_insts[n].halt) begin
-                    error_status = HALTED_ON_WFI;
-                    break;
-                end
-            end // if valid
+            `ifndef SYNTH
+            cur_idx = verisimpleV.rob_0.r_idxs[n];
+            pc      = rob_debug[cur_idx].NPC - 4;
+            block   = memory.unified_memory[pc[31:3]];
+            inst    = block.word_level[pc[2]];
+            reg_idx = verisimpleV.rob_0.r_out.dst[n];
+            data    = verisimpleV.prf_0.phys_reg_file[
+                verisimpleV.arch_map_0.entries_n[reg_idx].t
+            ];
+            // print the committed instructions to the writeback output file
+            if (reg_idx == `ZERO_REG) begin
+                $fdisplay(wb_fileno, "PC %4x:%-8s| ---", pc, decode_inst(inst));
+            end else begin
+                $fdisplay(wb_fileno, "PC %4x:%-8s| r%02d=%-8x",
+                          pc,
+                          decode_inst(inst),
+                          reg_idx,
+                          data);
+            end
+            rob_debug.delete(cur_idx);
+            `endif // SYNTH
+
+            // exit if we have an illegal instruction or a halt
+            if (illegal) begin
+                error_status = ILLEGAL_INST;
+                break;
+            end else if(halt) begin
+                error_status = HALTED_ON_WFI;
+                break;
+            end
         end
+
+        // V1: original
+        // for (int n = 0; n < `N; ++n) begin
+        //     if (committed_insts[n].valid) begin
+        //         // update the count for every committed instruction
+        //         instr_count = instr_count + 1;
+
+        //         pc = committed_insts[n].NPC - 4;
+        //         block = memory.unified_memory[pc[31:3]];
+        //         inst = block.word_level[pc[2]];
+        //         // print the committed instructions to the writeback output file
+        //         if (committed_insts[n].reg_idx == `ZERO_REG) begin
+        //             $fdisplay(wb_fileno, "PC %4x:%-8s| ---", pc, decode_inst(inst));
+        //         end else begin
+        //             $fdisplay(wb_fileno, "PC %4x:%-8s| r%02d=%-8x",
+        //                       pc,
+        //                       decode_inst(inst),
+        //                       committed_insts[n].reg_idx,
+        //                       committed_insts[n].data);
+        //         end
+
+        //         // exit if we have an illegal instruction or a halt
+        //         if (committed_insts[n].illegal) begin
+        //             error_status = ILLEGAL_INST;
+        //             break;
+        //         end else if(committed_insts[n].halt) begin
+        //             error_status = HALTED_ON_WFI;
+        //             break;
+        //         end
+        //     end // if valid
+        // end
     endtask // task output_reg_writeback_and_maybe_halt
 
 

@@ -13,16 +13,12 @@ module rob #(
     output rob2retire r_out,
 
     // complete (write)
-    input execute2complete c_in,
+    input  execute2complete c_in,
 
     // dispatch (write)
     output rob2dispatch d_out,
 
-    input dispatch2rob d_in,
-
-    output COMMIT_PACKET [`N-1:0] wb_packet,
-    input PHYS_REG_IDX [`N-1:0] prf_in,
-    output PHYS_REG_IDX [`N-1:0] prf_out
+    input  dispatch2rob d_in
 );
     localparam NUM_DPORTS = N; // dispatch ports (in-order)
     localparam NUM_RPORTS = N; // retire ports (in-order)
@@ -51,12 +47,7 @@ module rob #(
             d_idxs[i] = (tail + i) % ROB_SZ;
 
         // handle retire (outs)
-        r_out.r_en_cnt  = '0;
-        r_out.r_free_cnt  = '0;
-        r_out.tag       = '0;
-        r_out.t_old     = '0;
-        r_out.dst       = '0;
-        wb_packet       = '0;
+        r_out = '0;
         for (int unsigned i = 0; i < NUM_RPORTS; ++i, ++r_out.r_en_cnt) begin
             // This computes r_en_cnt linear-time wrt NUM_RPORTS. (Fine if NUM_RPORTS
             // small; synthesizer may simply unroll this loop.)
@@ -99,18 +90,8 @@ module rob #(
                 ++r_out.r_free_cnt;
             end
             r_out.dst[i]    = state[r_idxs[i]].dst;
-
-            prf_out[i] = state[r_idxs[i]].tag;
-
-            wb_packet[i] = '{
-                NPC     : state[r_idxs[i]].NPC,
-                data    : prf_in[i], //(mem_wb_reg.take_branch) ? mem_wb_reg.NPC : mem_wb_reg.result;
-                reg_idx : state[r_idxs[i]].dst,
-                halt    : state[r_idxs[i]].halt,
-                illegal : state[r_idxs[i]].illegal,
-                valid   : ~state[r_idxs[i]].illegal
-            };
-
+            r_out.halt[i]   = state[r_idxs[i]].halt;
+            r_out.illegal[i]= state[r_idxs[i]].illegal;
         end
 
         // handle dispatch (outs)
@@ -127,7 +108,8 @@ module rob #(
         */
         // The true number of same-cycle free slots is free + r_en_cnt
         d_out <= '{
-            rob_rdy_scnt : `MIN(free + r_out.r_en_cnt, NUM_DPORTS),
+            // rob_rdy_scnt : `MIN(free + r_out.r_en_cnt, NUM_DPORTS),
+            rob_rdy_scnt : `MIN(free, NUM_DPORTS),
             rob_idxs     : d_idxs
         };
     end
@@ -138,10 +120,6 @@ module rob #(
             head    <= 0;
             tail    <= 0;
             state   <= '0;
-            // used    <= RESET_STATE.used;
-            // head    <= RESET_STATE.head;
-            // tail    <= RESET_STATE.tail;
-            // state   <= RESET_STATE.state;
         end else begin
             `ifndef SYNTH
             if (d_in.d_en_cnt > free + r_out.r_en_cnt)
@@ -167,10 +145,23 @@ module rob #(
                 // );
 
                 /* V1: This doesn't actually update the cpl bit... */
-                // state[cur_idx].cpl <= state[cur_idx].cpl | c_in.c_en[i];
+                // state[cur_idx].cpl <= state[cur_idx].cpl || c_in.c_en[i];
                 /* V2: ...but this one does???! Make this make sense? */
                 if (c_in.c_en[i])
                     state[cur_idx].cpl <= 1;
+                /*
+                V1 is incorrect due to the following edge case:
+                If the same `rob_idx`appears multiple times in the CDB (e.g., [0, 0]),
+                and only the first entry has `c_en[i] == 1`, the second will
+                overwrite the intended update.
+                
+                For example: c_rob_idxs = [0, 0], c_en = [1, 0]
+                  - i = 0: state[0].cpl <= 0 || 1 -> schedules state[0].cpl = 1
+                  - i = 1: state[0].cpl <= 0 || 0 -> *overwrites* with state[0].cpl = 0
+                
+                This edge case seems only possible (as far as we can tell) for rob_idx 0,
+                since the CDB defaults to 0 at the start of each cycle.
+                */
             end
 
             // handle dispatch (ins)
@@ -186,22 +177,43 @@ module rob #(
                     t_old   : d_in.t_old[i],
                     dst     : d_in.dst[i],
                     halt    : d_in.halt[i],
-                    illegal : d_in.illegal[i],
-                    NPC     : d_in.NPC[i]
+                    illegal : d_in.illegal[i]
                 };
             end
 
             `ifndef SYNTH
             $display("  %3d | >> ROB", $time);
-            $display("{r_free_cnt: %d, [(t: %0d, told: %0d, dst: %0d), (t: %0d, told: %0d, dst: %0d)]}",
-                r_out.r_free_cnt,
-                r_out.tag[0],
-                r_out.t_old[0],
-                r_out.dst[0],
-                r_out.tag[1],
-                r_out.t_old[1],
-                r_out.dst[1]
-            );
+            // $display("c_en: [%b %b] c_ts: [%d %d] c_data: [%h %h] c_rob_idxs: [%d %d]",
+            //     c_in.c_en[0],
+            //     c_in.c_en[1],
+            //     c_in.c_ts[0],
+            //     c_in.c_ts[1],
+            //     c_in.c_data[0],
+            //     c_in.c_data[1],
+            //     c_in.c_rob_idxs[0],
+            //     c_in.c_rob_idxs[1]
+            // );
+            // $display("{r_free_cnt: %d, [(t: %0d, told: %0d, dst: %0d), (t: %0d, told: %0d, dst: %0d)]}",
+            //     r_out.r_free_cnt,
+            //     r_out.tag[0],
+            //     r_out.t_old[0],
+            //     r_out.dst[0],
+            //     r_out.tag[1],
+            //     r_out.t_old[1],
+            //     r_out.dst[1]
+            // );
+            // for (int i = head; i < 10; ++i) begin
+            //     $display("Rob[%0d]: cpl %b, t: %0d, t_old: %0d, dst: %0d, halt: %0b, illegal: %0b, NPC: %h",
+            //         i,
+            //         state[i].cpl,
+            //         state[i].tag,
+            //         state[i].t_old,
+            //         state[i].dst,
+            //         state[i].halt,
+            //         state[i].illegal,
+            //         state[i].NPC
+            //     );
+            // end
             $display("  %3d | << ROB", $time);
             `endif
         end
