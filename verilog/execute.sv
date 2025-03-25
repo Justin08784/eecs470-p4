@@ -29,6 +29,32 @@ typedef struct packed {
     ID_RESULT [`NUM_FU_MULT-1:0] mul;
 } ID_RESULT_BY_FU;
 
+/* Slices (or "views") of ID_RESULT needed for each FU type */
+typedef struct packed {
+    PHYS_REG_IDX    t;
+    PHYS_REG_IDX    t1;
+    PHYS_REG_IDX    t2;
+    ROB_IDX         rob_idx;
+
+    INST inst;
+    ADDR PC;
+    ADDR NPC;
+
+    ALU_OPA_SELECT opa_select;
+    ALU_OPB_SELECT opb_select;
+    ALU_FUNC alu_func;
+    logic    cond_branch;
+    logic    uncond_branch;
+} ID_ALU_VIEW;
+
+typedef struct packed {
+    PHYS_REG_IDX    t;
+    PHYS_REG_IDX    t1;
+    PHYS_REG_IDX    t2;
+    ROB_IDX         rob_idx;
+    logic[2:0]      func;
+} ID_MUL_VIEW;
+
 // ALU: computes the result of FUNC applied with operands A and B
 // This module is purely combinational
 module alu (
@@ -286,7 +312,10 @@ module stage_ex_p4 (
     struct packed {
         LOGIC_BY_FU     rdy;
         LOGIC_BY_FU     vld;
-        ID_RESULT_BY_FU dat;
+        struct packed {
+            ID_ALU_VIEW [`NUM_FU_ALU-1:0]   alu;
+            ID_MUL_VIEW [`NUM_FU_MULT-1:0]  mul;
+        } dat;
     } ins;
 
     logic [`NUM_FU_ALU-1:0]     alu_ops_rdy;
@@ -305,21 +334,42 @@ module stage_ex_p4 (
             2) issue selection logic in RS
         Adding internal forwarding would defeat its entire purpose.
         */
+        // TODO: Make these into FIFOs with only the subset of fields needed
+        // for the ALU type. Conserve space.
         assign alu_in2ops_en = ins.vld.alu & alu_ops_rdy;
         assign mul_in2ops_en = ins.vld.mul & mul_ops_rdy;
+        ID_ALU_VIEW tmp_alu_el[`NUM_FU_ALU-1:0];
+        ID_MUL_VIEW tmp_mul_el[`NUM_FU_MULT-1:0];
+
         for (genvar i = 0; i < `NUM_FU_ALU; ++i) begin : gen_alu_sbufs
+            assign tmp_alu_el[i] = '{
+                t       : rs_in.fu_dat_alu[i].t,
+                t1      : rs_in.fu_dat_alu[i].t1,
+                t2      : rs_in.fu_dat_alu[i].t2,
+                rob_idx : rs_in.fu_dat_alu[i].rob_idx,
+
+                inst    : rs_in.fu_dat_alu[i].inst,
+                PC      : rs_in.fu_dat_alu[i].PC,
+                NPC     : rs_in.fu_dat_alu[i].NPC,
+
+                opa_select  : rs_in.fu_dat_alu[i].opa_select,
+                opb_select  : rs_in.fu_dat_alu[i].opb_select,
+                alu_func    : rs_in.fu_dat_alu[i].alu_func,
+                cond_branch : rs_in.fu_dat_alu[i].cond_branch,
+                uncond_branch : rs_in.fu_dat_alu[i].uncond_branch
+            };
             fifo #(
                 .DEPTH(2),
-                .WIDTH($bits(ID_RESULT)),
+                .WIDTH($bits(ID_ALU_VIEW)),
                 .NUM_RPORTS(1),
                 .NUM_WPORTS(1),
                 .ENABLE_INTR_FWD(`FALSE)
-            ) cpl_buf (
+            ) s_buf (
                 .clock      (clock),
                 .reset      (reset),
                 .flush      (flush),
                 .wr_en_cnt  (rs_in.fu_vld_alu[i]),
-                .wr_data    (rs_in.fu_dat_alu[i]),
+                .wr_data    (tmp_alu_el[i]),
                 .rd_en_cnt  (alu_in2ops_en[i]),
                 .rd_data    (ins.dat.alu[i]),
 
@@ -329,18 +379,25 @@ module stage_ex_p4 (
         end
         
         for (genvar i = 0; i < `NUM_FU_MULT; ++i) begin : gen_mul_sbufs
+            assign tmp_mul_el[i] = '{
+                t       : rs_in.fu_dat_mult[i].t,
+                t1      : rs_in.fu_dat_mult[i].t1,
+                t2      : rs_in.fu_dat_mult[i].t2,
+                rob_idx : rs_in.fu_dat_mult[i].rob_idx,
+                func    : rs_in.fu_dat_mult[i].inst.r.funct3
+            };
             fifo #(
                 .DEPTH(2),
-                .WIDTH($bits(ID_RESULT)),
+                .WIDTH($bits(ID_MUL_VIEW)),
                 .NUM_RPORTS(1),
                 .NUM_WPORTS(1),
                 .ENABLE_INTR_FWD(`FALSE)
-            ) cpl_buf (
+            ) s_buf (
                 .clock      (clock),
                 .reset      (reset),
                 .flush      (flush),
                 .wr_en_cnt  (rs_in.fu_vld_mult[i]),
-                .wr_data    (rs_in.fu_dat_mult[i]),
+                .wr_data    (tmp_mul_el[i]),
                 .rd_en_cnt  (mul_in2ops_en[i]),
                 .rd_data    (ins.dat.mul[i]),
 
@@ -430,7 +487,7 @@ module stage_ex_p4 (
             mul_ops_n.bsy[i] = ins.vld.mul[i] | (mul_ops.bsy & ~mul_ex_rdy);
             mul_ops_n.rs1[i] = prf_in.s_v1s.mul[i];
             mul_ops_n.rs2[i] = prf_in.s_v2s.mul[i];
-            mul_ops_n.func[i] = ins.dat.mul[i].inst.r.funct3;
+            mul_ops_n.func[i] = ins.dat.mul[i].func;
             mul_ops_n.dst[i] = '{
                 rob_idx : ins.dat.mul[i].rob_idx,
                 tag     : ins.dat.mul[i].t
