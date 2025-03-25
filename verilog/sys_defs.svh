@@ -727,14 +727,15 @@ typedef struct packed {
 } arch_map2map_table;
 
 typedef struct packed {
-    logic [`PRF_NUM_RPORTS-1:0] prf_en;
-    PHYS_REG_IDX  [`PRF_NUM_RPORTS-1:0] s_t1s;
-    PHYS_REG_IDX  [`PRF_NUM_RPORTS-1:0] s_t2s;
+    logic        [`PRF_NUM_RPORTS-1:0] s_en1s;
+    PHYS_REG_IDX [`PRF_NUM_RPORTS-1:0] s_t1s;
+    logic        [`PRF_NUM_RPORTS-1:0] s_en2s;
+    PHYS_REG_IDX [`PRF_NUM_RPORTS-1:0] s_t2s;
 } execute2prf;
 
 typedef struct packed{
-    DATA        [`PRF_NUM_RPORTS-1:0] s_v1s;
-    DATA        [`PRF_NUM_RPORTS-1:0] s_v2s;
+    DATA [`PRF_NUM_RPORTS-1:0] s_v1s;
+    DATA [`PRF_NUM_RPORTS-1:0] s_v2s;
 } prf2execute;
 
 // By LSQ

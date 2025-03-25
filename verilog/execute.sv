@@ -296,14 +296,16 @@ module stage_ex_p4 (
         foreach (alu_ins.dat[i]) begin
             if (!alu_ins.bsy[i])
                 continue;
-            prf_out.prf_en[i]   = 1;
+            prf_out.s_en1s[i]   = alu_ins.dat[i].opa_select == OPA_IS_RS1;
+            prf_out.s_en2s[i]   = alu_ins.dat[i].opb_select == OPB_IS_RS2;
             prf_out.s_t1s[i]    = alu_ins.dat[i].t1; 
             prf_out.s_t2s[i]    = alu_ins.dat[i].t2; 
         end
         foreach (mul_ins.dat[i]) begin
             if (!mul_ins.bsy[i])
                 continue;
-            prf_out.prf_en[i + `NUM_FU_ALU]   = 1;
+            prf_out.s_en1s[i + `NUM_FU_ALU]   = 1;
+            prf_out.s_en2s[i + `NUM_FU_ALU]   = 1;
             prf_out.s_t1s[i + `NUM_FU_ALU]    = mul_ins.dat[i].t1; 
             prf_out.s_t2s[i + `NUM_FU_ALU]    = mul_ins.dat[i].t2; 
         end

@@ -602,14 +602,16 @@ module cpu (
         .clock(clock),
         //.reset(reset),
         //.flush(),
-        .c_en(ex_2_complete.c_en),
-        .c_ts(ex_2_complete.c_ts),
-        .c_vs(ex_2_complete.c_data),
-        .s_en(prf_out.prf_en),
-        .s_t1s(prf_out.s_t1s),   //execute2prf.t1
-        .s_t2s(prf_out.s_t2s),   //execute2prf.t2
-        .s_v1s(prf_in.s_v1s),   //prf2execute.s_v1s
-        .s_v2s(prf_in.s_v2s)    //prf2execute.s_v1s
+        .c_en   (ex_2_complete.c_en),
+        .c_ts   (ex_2_complete.c_ts),
+        .c_vs   (ex_2_complete.c_data),
+
+        .s_en1s (prf_out.s_en1s),
+        .s_en2s (prf_out.s_en2s),
+        .s_t1s  (prf_out.s_t1s),
+        .s_t2s  (prf_out.s_t2s),
+        .s_v1s  (prf_in.s_v1s),
+        .s_v2s  (prf_in.s_v2s)
     );
 
     always_comb begin

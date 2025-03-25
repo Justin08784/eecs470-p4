@@ -1,7 +1,7 @@
 `include "sys_defs.svh"
 
 module prf #(
-    parameter WIDTH      = 32,
+    parameter WIDTH      = $bits(DATA),
     parameter DEPTH      = `PHYS_REG_SZ_R10K,
     parameter N = 2,
     parameter BYPASS_EN  = 0,   // 0: Read data will update at positive edge
@@ -27,9 +27,10 @@ module prf #(
         //   into the prf and get the operands it needs. So if there are 32 FUs,
         //   is this like 32 * 2 implicit read ports? (Same implicit read port
         //   concern as cpl_lst's)
-    input logic         [NUM_RPORTS-1:0] s_en,
-    input PHYS_REG_IDX  [NUM_RPORTS-1:0] s_t1s,
-    input PHYS_REG_IDX  [NUM_RPORTS-1:0] s_t2s,
+    input logic        [NUM_RPORTS-1:0] s_en1s,
+    input PHYS_REG_IDX [NUM_RPORTS-1:0] s_t1s,
+    input logic        [NUM_RPORTS-1:0] s_en2s,
+    input PHYS_REG_IDX [NUM_RPORTS-1:0] s_t2s,
     output DATA        [NUM_RPORTS-1:0] s_v1s,
     output DATA        [NUM_RPORTS-1:0] s_v2s
         // To: EX/RS/issuer idk
@@ -56,8 +57,8 @@ module prf #(
         for (int i = 0; i < NUM_RPORTS; i++) begin
             
             // TODO: enable should be more granular–– per t1/t2. Some insns only need to read 1 value.
-            if (s_t1s[i] == `ZERO_REG) begin
-                s_v1s[i] = 0;
+            if (s_t1s[i] == `ZERO_REG || !s_en1s[i]) begin
+                s_v1s[i] = '0;
             // end else if (c_en[0] && (c_ts[0] == s_t1s[i])) begin
             //     s_v1s[i] = c_vs[0]; // internal forwarding
             // end else if (c_en[1] && (c_ts[1] == s_t1s[i])) begin
@@ -66,8 +67,8 @@ module prf #(
                 s_v1s[i] = phys_reg_file[s_t1s[i]];
             end
 
-            if (s_t2s[i] == `ZERO_REG) begin
-                s_v2s[i] = 0;
+            if (s_t2s[i] == `ZERO_REG || !s_en2s[i]) begin
+                s_v2s[i] = '0;
             // end else if (c_en[0] && (c_ts[0] == s_t2s[i])) begin
             //     s_v2s[i] = c_vs[0]; // internal forwarding
             // end else if (c_en[1] && (c_ts[1] == s_t2s[i])) begin
@@ -81,11 +82,9 @@ module prf #(
 
     // Write port
     always_ff @(posedge clock) begin
-        if (c_en[0] && (c_ts[0] != `ZERO_REG)) begin
-            phys_reg_file[c_ts[0]] <= c_vs[0];
-        end
-        if (c_en[1] && (c_ts[1] != `ZERO_REG)) begin
-            phys_reg_file[c_ts[1]] <= c_vs[1];
+        foreach (c_en[i]) begin
+            if (c_en[i] && (c_ts[i] != `ZERO_REG))
+                phys_reg_file[c_ts[i]] <= c_vs[i];
         end
     end
 
