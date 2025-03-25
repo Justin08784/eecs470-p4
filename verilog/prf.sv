@@ -5,7 +5,7 @@ module prf #(
     parameter DEPTH      = `PHYS_REG_SZ_R10K,
     parameter N = 2,
     parameter BYPASS_EN  = 0,   // 0: Read data will update at positive edge
-    parameter NUM_RPORTS = `PRF_NUM_RPORTS                            // 1: Read data will update combinationally if
+    parameter NUM_RPORTS = `NUM_FU_TOTAL // 1: Read data will update combinationally if
                                //    write to same address
    )(
     input clock, //reset, flush, // QUESTION: do we need reset? or should we force write to happen before read at the same addr?

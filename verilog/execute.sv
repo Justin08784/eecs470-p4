@@ -19,6 +19,11 @@ typedef struct packed {
     DATA data;
 } CPL_CAND;
 
+typedef struct packed {
+    CPL_CAND [`NUM_FU_ALU-1:0]  alu;
+    CPL_CAND [`NUM_FU_MULT-1:0] mul;
+} CPL_CAND_BY_FU;
+
 // ALU: computes the result of FUNC applied with operands A and B
 // This module is purely combinational
 module alu (
@@ -359,28 +364,14 @@ module stage_ex_p4 (
 
 
     // structure results into generic cdb candidates array
-    localparam NUM_FU_TOTAL = `NUM_FU_ALU + `NUM_FU_MULT;
+    LOGIC_BY_FU vld;
 
-    CPL_CAND [`NUM_FU_ALU-1:0]  alu_cands;
-    CPL_CAND [`NUM_FU_MULT-1:0] mul_cands;
-    CPL_CAND [NUM_FU_TOTAL-1:0] all_cands;
-    assign all_cands = {
-        alu_cands,
-        mul_cands
-    };
-    logic [`NUM_FU_ALU-1:0]  alu_vld;
-    logic [`NUM_FU_MULT-1:0] mul_vld;
-    logic [NUM_FU_TOTAL-1:0] all_vld;
-    assign all_vld = {
-        alu_vld,
-        mul_vld
-    };
+    CPL_CAND_BY_FU cands;
+    CPL_CAND [`NUM_FU_TOTAL-1:0] cands_flat;
+    assign cands_flat = cands;
 
-    logic [`N-1:0][NUM_FU_TOTAL-1:0] cdb2fu_gbus;
-    struct packed {
-        logic [`NUM_FU_ALU-1:0]  alu;
-        logic [`NUM_FU_MULT-1:0] mul;
-    } cpl_gnt;
+    logic [`N-1:0][`NUM_FU_TOTAL-1:0] cdb2fu_gbus;
+    LOGIC_BY_FU cpl_gnt;
 
     logic [`NUM_FU_ALU-1:0] alu_ex_rdy;
     logic [`NUM_FU_ALU-1:0] alu_ex_en;
@@ -394,8 +385,8 @@ module stage_ex_p4 (
         .ops    (alu_ops),
         .ex_rdy (alu_ex_rdy),
 
-        .vld    (alu_vld),
-        .cands  (alu_cands),
+        .vld    (vld.alu),
+        .cands  (cands.alu),
         .cpl_gnt(cpl_gnt.alu)
     );
 
@@ -411,16 +402,16 @@ module stage_ex_p4 (
         .ops    (mul_ops),
         .ex_rdy (mul_ex_rdy),
 
-        .vld    (mul_vld),
-        .cands  (mul_cands),
+        .vld    (vld.mul),
+        .cands  (cands.mul),
         .cpl_gnt(cpl_gnt.mul)
     );
 
     psel_gen #(
-        .WIDTH(NUM_FU_TOTAL),
+        .WIDTH(`NUM_FU_TOTAL),
         .REQS(`N)
     ) sel_cpl (
-        .req(all_vld),
+        .req(vld),
         .gnt(cpl_gnt),      // type coercion: logic [NUM_FU_TOTAL-1:0] -> {logic [`NUM_FU_ALU-1:0] alu, logic [`NUM_FU_MULT-1:0] mul}
         .gnt_bus(cdb2fu_gbus)
     );
@@ -436,10 +427,10 @@ module stage_ex_p4 (
         c_out = '0;
         foreach (cdb2fu_gbus[c, f]) begin
             if (cdb2fu_gbus[c][f]) begin
-                c_out.c_en[c]           |= 1;
-                c_out.c_ts[c]           |= all_cands[f].t;
-                c_out.c_rob_idxs[c]     |= all_cands[f].rob_idx;
-                c_out.c_data[c]         |= all_cands[f].data;
+                c_out.c_en[c]       |= 1;
+                c_out.c_ts[c]       |= cands_flat[f].t;
+                c_out.c_rob_idxs[c] |= cands_flat[f].rob_idx;
+                c_out.c_data[c]     |= cands_flat[f].data;
             end
         end
     end
