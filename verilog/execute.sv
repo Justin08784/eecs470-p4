@@ -433,7 +433,7 @@ module stage_ex_p4 (
 
         rs_out = '{
             fu_rdy_alu      : ~ins.bsy.alu | alu_ops_rdy,
-            fu_rdy_mult     : ~ins.bsy.mul | alu_ops_rdy,
+            fu_rdy_mult     : ~ins.bsy.mul | mul_ops_rdy,
             fu_rdy_load     : '0,
             fu_rdy_store    : '0
         };
