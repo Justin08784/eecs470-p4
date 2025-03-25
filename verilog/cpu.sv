@@ -606,6 +606,7 @@ module cpu (
         .c_ts   (ex_2_complete.c_ts),
         .c_vs   (ex_2_complete.c_data),
 
+        // NOTE: Here each X_BY_FU type is coerced into a flat X array type
         .s_en1s (prf_out.s_en1s),
         .s_en2s (prf_out.s_en2s),
         .s_t1s  (prf_out.s_t1s),

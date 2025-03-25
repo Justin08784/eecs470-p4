@@ -44,7 +44,8 @@
 `define NUM_FU_LOAD 4
 `define NUM_FU_STORE 4
 
-`define PRF_NUM_RPORTS (`NUM_FU_ALU + `NUM_FU_LOAD + `NUM_FU_MULT + `NUM_FU_STORE)
+// `define PRF_NUM_RPORTS (`NUM_FU_ALU + `NUM_FU_LOAD + `NUM_FU_MULT + `NUM_FU_STORE)
+`define PRF_NUM_RPORTS (`NUM_FU_ALU + `NUM_FU_MULT) 
 // number of mult stages (2, 4) (you likely don't need 8)
 `define MULT_STAGES 16
 // Justin: funny enough we need at least 8 or else multiply is on critical path
@@ -727,15 +728,27 @@ typedef struct packed {
 } arch_map2map_table;
 
 typedef struct packed {
-    logic        [`PRF_NUM_RPORTS-1:0] s_en1s;
-    PHYS_REG_IDX [`PRF_NUM_RPORTS-1:0] s_t1s;
-    logic        [`PRF_NUM_RPORTS-1:0] s_en2s;
-    PHYS_REG_IDX [`PRF_NUM_RPORTS-1:0] s_t2s;
+    logic   [`NUM_FU_ALU-1:0]   alu;
+    logic   [`NUM_FU_MULT-1:0]  mul;
+} LOGIC_BY_FU;
+typedef struct packed {
+    PHYS_REG_IDX [`NUM_FU_ALU-1:0]   alu;
+    PHYS_REG_IDX [`NUM_FU_MULT-1:0]  mul;
+} PRI_BY_FU;
+typedef struct packed {
+    LOGIC_BY_FU s_en1s;
+    LOGIC_BY_FU s_en2s;
+    PRI_BY_FU   s_t1s;
+    PRI_BY_FU   s_t2s;
 } execute2prf;
 
+typedef struct packed {
+    DATA    [`NUM_FU_ALU-1:0]   alu;
+    DATA    [`NUM_FU_MULT-1:0]  mul;
+} DATA_BY_FU;
 typedef struct packed{
-    DATA [`PRF_NUM_RPORTS-1:0] s_v1s;
-    DATA [`PRF_NUM_RPORTS-1:0] s_v2s;
+    DATA_BY_FU s_v1s;
+    DATA_BY_FU s_v2s;
 } prf2execute;
 
 // By LSQ

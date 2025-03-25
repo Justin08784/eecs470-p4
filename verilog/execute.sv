@@ -274,40 +274,24 @@ module stage_ex_p4 (
         ID_RESULT   [`NUM_FU_MULT-1:0]  dat;
     } mul_ins;
 
-    // request operands from PRF
-    /*
-    TODO: Urgent optimization needed
-    In a single cycle:
-    1) request operands from PRF (via prf_out)
-    2) receive operands from PRF (via prf_in)
-    3) PERFORM THE FIRST STAGE OF MULTIPLY
-
-    (YES, THE MULTIPLIER IS ALWAYS RUNNING REGARDLESS)
-
-    We NEED to separate the PRF fetch/decode from the
-    first stage of multiply. Add another intervening pipeline register!
-    This is why this is currently on the LONGEST critical path (and we fail
-    to meet 7.5ns unless we increase MULT_STAGES to 8).
-    */
+    // request operands from PRF (separate stage)
     always_comb begin
         prf_out = '0;
-        // TODO: not all bsy/busy insns require PRF reads. Maybe enable prf_en iff
-        // opa_select == OPA_IS_RS1 || opb OPB_IS_RS2 ?
         foreach (alu_ins.dat[i]) begin
             if (!alu_ins.bsy[i])
                 continue;
-            prf_out.s_en1s[i]   = alu_ins.dat[i].opa_select == OPA_IS_RS1;
-            prf_out.s_en2s[i]   = alu_ins.dat[i].opb_select == OPB_IS_RS2;
-            prf_out.s_t1s[i]    = alu_ins.dat[i].t1; 
-            prf_out.s_t2s[i]    = alu_ins.dat[i].t2; 
+            prf_out.s_en1s.alu[i]   = alu_ins.dat[i].opa_select == OPA_IS_RS1;
+            prf_out.s_en2s.alu[i]   = alu_ins.dat[i].opb_select == OPB_IS_RS2;
+            prf_out.s_t1s.alu[i]    = alu_ins.dat[i].t1; 
+            prf_out.s_t2s.alu[i]    = alu_ins.dat[i].t2; 
         end
         foreach (mul_ins.dat[i]) begin
             if (!mul_ins.bsy[i])
                 continue;
-            prf_out.s_en1s[i + `NUM_FU_ALU]   = 1;
-            prf_out.s_en2s[i + `NUM_FU_ALU]   = 1;
-            prf_out.s_t1s[i + `NUM_FU_ALU]    = mul_ins.dat[i].t1; 
-            prf_out.s_t2s[i + `NUM_FU_ALU]    = mul_ins.dat[i].t2; 
+            prf_out.s_en1s.mul[i]   = 1;
+            prf_out.s_en2s.mul[i]   = 1;
+            prf_out.s_t1s.mul[i]    = mul_ins.dat[i].t1; 
+            prf_out.s_t2s.mul[i]    = mul_ins.dat[i].t2; 
         end
     end
 
@@ -335,7 +319,7 @@ module stage_ex_p4 (
 
             // ALU opA mux
             case (alu_ins.dat[i].opa_select)
-                OPA_IS_RS1:  alu_ops_n.opa[i] = prf_in.s_v1s[i];
+                OPA_IS_RS1:  alu_ops_n.opa[i] = prf_in.s_v1s.alu[i];
                 OPA_IS_NPC:  alu_ops_n.opa[i] = alu_ins.dat[i].NPC;
                 OPA_IS_PC:   alu_ops_n.opa[i] = alu_ins.dat[i].PC;
                 OPA_IS_ZERO: alu_ops_n.opa[i] = 0;
@@ -344,7 +328,7 @@ module stage_ex_p4 (
 
             // ALU opB mux
             case (alu_ins.dat[i].opb_select)
-                OPB_IS_RS2:   alu_ops_n.opb[i] =  prf_in.s_v2s[i];
+                OPB_IS_RS2:   alu_ops_n.opb[i] =  prf_in.s_v2s.alu[i];
                 OPB_IS_I_IMM: alu_ops_n.opb[i] = `RV32_signext_Iimm(alu_ins.dat[i].inst);
                 OPB_IS_S_IMM: alu_ops_n.opb[i] = `RV32_signext_Simm(alu_ins.dat[i].inst);
                 OPB_IS_B_IMM: alu_ops_n.opb[i] = `RV32_signext_Bimm(alu_ins.dat[i].inst);
@@ -363,8 +347,8 @@ module stage_ex_p4 (
         mul_ops_n = '0;
         foreach (mul_ins.dat[i]) begin
             mul_ops_n.bsy[i] = mul_ins.bsy[i];
-            mul_ops_n.rs1[i] = prf_in.s_v1s[i + `NUM_FU_ALU];
-            mul_ops_n.rs2[i] = prf_in.s_v2s[i + `NUM_FU_ALU];
+            mul_ops_n.rs1[i] = prf_in.s_v1s.mul[i];
+            mul_ops_n.rs2[i] = prf_in.s_v2s.mul[i];
             mul_ops_n.func[i] = mul_ins.dat[i].inst.r.funct3;
             mul_ops_n.dst[i] = '{
                 rob_idx : mul_ins.dat[i].rob_idx,
