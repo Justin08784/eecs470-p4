@@ -482,6 +482,30 @@ module stage_ex_p4 (
             end
 
             $display("  %3d | >> EXECUTE", $time);
+            $display("alu_ins: bsy[%b, %b], mul_ins: bsy[%b, %b]",
+                alu_ins.bsy[0],
+                alu_ins.bsy[1],
+                mul_ins.bsy[0],
+                mul_ins.bsy[1]
+            );
+            $display("alu_ops: [%b {opa: %x opb: %x}, %b {opa: %x opb: %x}]",
+                alu_ops.bsy[0],
+                alu_ops.opa[0],
+                alu_ops.opb[0],
+                alu_ops.bsy[1],
+                alu_ops.opa[1],
+                alu_ops.opb[1]
+            );
+            $display("mul_ops: [%b {rs1: %x rs2: %x dst: %0d}, %b {rs1: %x rs2: %x dst: %0d}]",
+                mul_ops.bsy[0],
+                mul_ops.rs1[0],
+                mul_ops.rs2[0],
+                mul_ops.dst[0].tag,
+                mul_ops.bsy[1],
+                mul_ops.rs1[1],
+                mul_ops.rs2[1],
+                mul_ops.dst[1].tag
+            );
             $display("rdy_alu: %b  rdy_mult: %b  rdy_store: %b  rdy_load: %b  |  c_en: [%b %b] c_ts: [%d %d] c_data: [%h %h] c_rob_idxs: [%d %d] cpl_gnt: %b",
                 rs_out.fu_rdy_alu,
                 rs_out.fu_rdy_mult,
