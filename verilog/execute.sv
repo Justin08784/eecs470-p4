@@ -284,23 +284,85 @@ module stage_ex_p4 (
 
     // <FU>_ins: staging; where just-issued insns wait for 1 cycle to pull their operands
     struct packed {
-        LOGIC_BY_FU     bsy;
+        LOGIC_BY_FU     rdy;
+        LOGIC_BY_FU     vld;
         ID_RESULT_BY_FU dat;
     } ins;
+
+    logic [`NUM_FU_ALU-1:0]     alu_ops_rdy;
+    logic [`NUM_FU_MULT-1:0]    mul_ops_rdy;
+    logic [`NUM_FU_ALU-1:0]     alu_in2ops_en;
+    logic [`NUM_FU_MULT-1:0]    mul_in2ops_en;
+    generate
+        /* Staging buffers (sbufs):
+
+        Size 2 is the minimum FIFO depth (without internal forwarding) that supports
+        a 1-write-per-cycle producer and 1-read-per-cycle consumer at steady state
+        with no bubbles.
+
+        The point of this staging buffer is to break comb. dependencies between:
+            1) backpressure emanating from <FU>_ops_rdy and
+            2) issue selection logic in RS
+        Adding internal forwarding would defeat its entire purpose.
+        */
+        assign alu_in2ops_en = ins.vld.alu & alu_ops_rdy;
+        assign mul_in2ops_en = ins.vld.mul & mul_ops_rdy;
+        for (genvar i = 0; i < `NUM_FU_ALU; ++i) begin : gen_alu_sbufs
+            fifo #(
+                .DEPTH(2),
+                .WIDTH($bits(ID_RESULT)),
+                .NUM_RPORTS(1),
+                .NUM_WPORTS(1),
+                .ENABLE_INTR_FWD(`FALSE)
+            ) cpl_buf (
+                .clock      (clock),
+                .reset      (reset),
+                .flush      (flush),
+                .wr_en_cnt  (rs_in.fu_vld_alu[i]),
+                .wr_data    (rs_in.fu_dat_alu[i]),
+                .rd_en_cnt  (alu_in2ops_en[i]),
+                .rd_data    (ins.dat.alu[i]),
+
+                .free_scnt  (ins.rdy.alu[i]),
+                .used_scnt  (ins.vld.alu[i])
+            );
+        end
+        
+        for (genvar i = 0; i < `NUM_FU_MULT; ++i) begin : gen_mul_sbufs
+            fifo #(
+                .DEPTH(2),
+                .WIDTH($bits(ID_RESULT)),
+                .NUM_RPORTS(1),
+                .NUM_WPORTS(1),
+                .ENABLE_INTR_FWD(`FALSE)
+            ) cpl_buf (
+                .clock      (clock),
+                .reset      (reset),
+                .flush      (flush),
+                .wr_en_cnt  (rs_in.fu_vld_mult[i]),
+                .wr_data    (rs_in.fu_dat_mult[i]),
+                .rd_en_cnt  (mul_in2ops_en[i]),
+                .rd_data    (ins.dat.mul[i]),
+
+                .free_scnt  (ins.rdy.mul[i]),
+                .used_scnt  (ins.vld.mul[i])
+            );
+        end
+    endgenerate
 
     // request operands from PRF (separate stage)
     always_comb begin
         prf_out = '0;
-        foreach (ins.dat.alu[i]) begin
-            if (!ins.bsy.alu[i])
+        foreach (alu_in2ops_en[i]) begin
+            if (!alu_in2ops_en[i])
                 continue;
             prf_out.s_en1s.alu[i]   = ins.dat.alu[i].opa_select == OPA_IS_RS1;
             prf_out.s_en2s.alu[i]   = ins.dat.alu[i].opb_select == OPB_IS_RS2;
             prf_out.s_t1s.alu[i]    = ins.dat.alu[i].t1; 
             prf_out.s_t2s.alu[i]    = ins.dat.alu[i].t2; 
         end
-        foreach (ins.dat.mul[i]) begin
-            if (!ins.bsy.mul[i])
+        foreach (mul_in2ops_en[i]) begin
+            if (!mul_in2ops_en[i])
                 continue;
             prf_out.s_en1s.mul[i]   = 1;
             prf_out.s_en2s.mul[i]   = 1;
@@ -325,10 +387,13 @@ module stage_ex_p4 (
         MULT_FUNC   [`NUM_FU_MULT-1:0]      func;
         DST         [`NUM_FU_MULT-1:0]      dst;
     } mul_ops, mul_ops_n;
+
+    logic [`NUM_FU_ALU-1:0]     alu_ex_rdy;
+    logic [`NUM_FU_MULT-1:0]    mul_ex_rdy;
     always_comb begin
         alu_ops_n = '0;
-        foreach(ins.dat.alu[i]) begin
-            if(!ins.bsy.alu[i]) 
+        foreach(alu_in2ops_en[i]) begin
+            if(!alu_in2ops_en[i]) 
                 continue;
 
             // ALU opA mux
@@ -351,7 +416,7 @@ module stage_ex_p4 (
                 default:      alu_ops_n.opb[i] = 32'hfacefeed; // face feed
             endcase
 
-            alu_ops_n.bsy[i]         = ins.bsy.alu[i];
+            alu_ops_n.bsy[i]         = ins.vld.alu[i] | (alu_ops.bsy & ~alu_ex_rdy);
             alu_ops_n.alu_func[i]    = ins.dat.alu[i].alu_func;
             alu_ops_n.branch_func[i] = ins.dat.alu[i].inst.b.funct3;
             alu_ops_n.t[i]           = ins.dat.alu[i].t;
@@ -359,8 +424,10 @@ module stage_ex_p4 (
         end
 
         mul_ops_n = '0;
-        foreach (ins.dat.mul[i]) begin
-            mul_ops_n.bsy[i] = ins.bsy.mul[i];
+        foreach (mul_in2ops_en[i]) begin
+            if (!mul_in2ops_en[i])
+                continue;
+            mul_ops_n.bsy[i] = ins.vld.mul[i] | (mul_ops.bsy & ~mul_ex_rdy);
             mul_ops_n.rs1[i] = prf_in.s_v1s.mul[i];
             mul_ops_n.rs2[i] = prf_in.s_v2s.mul[i];
             mul_ops_n.func[i] = ins.dat.mul[i].inst.r.funct3;
@@ -382,7 +449,6 @@ module stage_ex_p4 (
     logic [`N-1:0][`NUM_FU_TOTAL-1:0] cdb2fu_gbus;
     LOGIC_BY_FU cpl_gnt;
 
-    logic [`NUM_FU_ALU-1:0] alu_ex_rdy;
     logic [`NUM_FU_ALU-1:0] alu_ops2ex_en;
     assign alu_ops2ex_en = alu_ops.bsy & alu_ex_rdy;
     alu_ex alu_ex0 (
@@ -399,7 +465,6 @@ module stage_ex_p4 (
         .cpl_gnt(cpl_gnt.alu)
     );
 
-    logic [`NUM_FU_MULT-1:0] mul_ex_rdy;
     logic [`NUM_FU_MULT-1:0] mul_ops2ex_en;
     assign mul_ops2ex_en = mul_ops.bsy & mul_ex_rdy;
     mul_ex mul_ex0 (
@@ -425,15 +490,13 @@ module stage_ex_p4 (
         .gnt_bus(cdb2fu_gbus)
     );
 
-    logic [`NUM_FU_ALU-1:0]     alu_ops_rdy;
-    logic [`NUM_FU_MULT-1:0]    mul_ops_rdy;
     always_comb begin
         alu_ops_rdy = ~alu_ops.bsy | alu_ex_rdy;
         mul_ops_rdy = ~mul_ops.bsy | mul_ex_rdy;
 
         rs_out = '{
-            fu_rdy_alu      : ~ins.bsy.alu | alu_ops_rdy,
-            fu_rdy_mult     : ~ins.bsy.mul | mul_ops_rdy,
+            fu_rdy_alu      : ins.rdy.alu,
+            fu_rdy_mult     : ins.rdy.mul,
             fu_rdy_load     : '0,
             fu_rdy_store    : '0
         };
@@ -452,31 +515,18 @@ module stage_ex_p4 (
 
     always_ff @(posedge clock) begin
         if (reset || flush) begin
-            ins         <= '0;
             alu_ops     <= '0;
             mul_ops     <= '0;
         end else begin
             alu_ops     <= alu_ops_n;
             mul_ops     <= mul_ops_n;
 
-            ins.bsy.alu <= rs_in.fu_vld_alu | (ins.bsy.alu & ~alu_ops_rdy);
-            for (int i = 0; i < `NUM_FU_ALU; ++i) begin
-                if (rs_in.fu_vld_alu[i])
-                    ins.dat.alu[i] <= rs_in.fu_dat_alu[i];
-            end
-
-            ins.bsy.mul <= rs_in.fu_vld_mult | (ins.bsy.mul & ~mul_ops_rdy);
-            for (int i = 0; i < `NUM_FU_MULT; ++i) begin
-                if (rs_in.fu_vld_mult[i])
-                    ins.dat.mul[i] <= rs_in.fu_dat_mult[i];
-            end
-
             $display("  %3d | >> EXECUTE", $time);
             $display("alu_ins: bsy[%b, %b], mul_ins: bsy[%b, %b]",
-                ins.bsy.alu[0],
-                ins.bsy.alu[1],
-                ins.bsy.mul[0],
-                ins.bsy.mul[1]
+                ins.rdy.alu[0],
+                ins.rdy.alu[1],
+                ins.rdy.mul[0],
+                ins.rdy.mul[1]
             );
             $display("alu_ops: [%b {opa: %x opb: %x}, %b {opa: %x opb: %x}]",
                 alu_ops.bsy[0],
