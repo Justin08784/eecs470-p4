@@ -574,7 +574,6 @@ typedef struct packed {
     REG_IDX [`N-1:0] dst;
     logic [`N-1:0] halt;
     logic [`N-1:0] illegal;
-    ADDR [`N-1:0] NPC;
 } dispatch2rob;
 
 typedef struct packed {
@@ -697,12 +696,6 @@ typedef struct packed {
         // - From: EX
     DATA            [`N-1:0] c_data;
 } execute2complete;
-
-
-typedef struct packed{
-    ADDR            [31:0] PC;
-    DATA           alu_result;
-} execute2fetch;
 
 // By Free List
 typedef struct packed {

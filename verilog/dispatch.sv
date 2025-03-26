@@ -146,7 +146,6 @@ always_comb begin
 
         rob_out.halt[i]     = decode_in.d_dat[i].halt;
         rob_out.illegal[i]  = decode_in.d_dat[i].illegal;
-        rob_out.NPC[i]      = decode_in.d_dat[i].NPC;
     end
 end
 
