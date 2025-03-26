@@ -239,7 +239,7 @@ module testbench;
                 rob_debug[cur_idx] = '{
                     halt    : verisimpleV.rob_0.d_in.halt[i],
                     illegal : verisimpleV.rob_0.d_in.illegal[i],
-                    NPC     : verisimpleV.rob_0.d_in.NPC[i]
+                    NPC     : verisimpleV.rs_0.d_in.d_dat[i].NPC
                 };
             end
             `endif // SYNTH
