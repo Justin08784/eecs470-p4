@@ -263,6 +263,10 @@ build/btb.simv: $(BTB_FILES)
 build/btb.cov: $(BTB_FILES)
 build/btb.vg: $(BTB_FILES)
 
+BTQ_FILES = verilog/sys_defs.svh
+build/btq.simv: $(BTB_FILES)
+build/btq.cov: $(BTB_FILES)
+build/btq.vg: $(BTB_FILES)
 
 
 #################################
@@ -299,6 +303,7 @@ CPU_SOURCES = verilog/cpu.sv \
 			  verilog/fifo.sv \
 			  verilog/fetch.sv \
 			  verilog/execute.sv \
+			  verilog/btq.sv \
 			  verilog/btb.sv
 
 build/cpu.simv: $(CPU_SOURCES) $(CPU_HEADERS) $(CPU_TESTBENCH)

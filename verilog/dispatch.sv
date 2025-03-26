@@ -25,6 +25,10 @@ module dispatch #(parameter
     input   lsq2dispatch lsq_in,
     output  dispatch2lsq lsq_out,
     
+    // BTQ
+    input   btq2dispatch btq_in,
+    output  dispatch2btq btq_out,
+
     // Map table
     input   map_table2dispatch map_in,
     output  dispatch2map_table map_out
@@ -42,10 +46,18 @@ always_comb begin
     dispatch_cnt = free_in.free_rdy_scnt < $countones(decode_in.prvw_has_dests)
         ? `MIN(dispatch_cnt, free_in.free_rdy_scnt)
         : dispatch_cnt;
+    dispatch_cnt = btq_in.btq_rdy_scnt < $countones(decode_in.prvw_is_brch)
+        ? `MIN(dispatch_cnt, btq_in.btq_rdy_scnt)
+        : dispatch_cnt;
     
     //assigning output #'s
     decode_out.dispatch_en_cnt  = dispatch_cnt;
     lsq_out.lsq_d_en_cnt        = dispatch_cnt; //this will likely need to be changed once memory operations are introduced
+end
+
+// handle btq output
+always_comb begin
+    btq_out.en_cnt = dispatch_cnt;
 end
 
 //logic for free list
@@ -156,6 +168,7 @@ always_ff @(posedge clock) begin
     if (!reset) begin
         $display("  %3d | >> Dispatch", $time);
         $display("rs_in.rs_rdy_scnt: %d",   rs_in.rs_rdy_scnt);
+        $display("btq_in.btq_rdy_scnt: %d",   btq_in.btq_rdy_scnt);
         $display("rob_in.rob_rdy_scnt: %d",  rob_in.rob_rdy_scnt);
         $display("decode_in.d_vld_scnt: %d",  decode_in.d_vld_scnt);
         $display("free_in.free_rdy_scnt: %d",  free_in.free_rdy_scnt);
