@@ -31,7 +31,7 @@ module fifo #(
     insns to dispatch.
     */
     parameter logic ENABLE_READ_PREVIEW=`FALSE,
-    parameter logic ENABLE_INTR_FWD =`TRUE,
+    parameter logic ENABLE_INTR_FWD =`FALSE,
     /*
     If free list mode is disabled, flush behaves the same as reset.
     */
