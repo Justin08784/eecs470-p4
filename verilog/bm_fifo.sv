@@ -36,8 +36,13 @@ module fifo #(
     parameter int   INSTANCE_ID=-1
 ) (
     input                                           clock, 
+
     input                                           reset,
     input   FIFO_STATE                              reset_state,
+
+    input                                           flush,
+    input   BMASK                                   bmask_mask,
+    output  logic   [NUM_RPORTS-1:0]                rd_bm_vld,
 
     input   logic   [$clog2(NUM_WPORTS):0]          wr_en_cnt,
     input   logic   [NUM_WPORTS-1:0][WIDTH-1:0]     wr_data,
@@ -54,6 +59,15 @@ module fifo #(
     /*NOTE: By removing rd_valid, wr_valid, we force the caller to make sure
     the enabled cnts are correct. */
 );
+    typedef struct packed {
+        logic vld;
+        BMASK bmask;
+    } BM_TAG;
+    typedef struct packed {
+        BM_TAG bm_tag;
+        logic [(WIDTH-$bits(BM_TAG))-1:0] data;
+    } TAGGED_ENTRY;
+
     logic [$clog2(DEPTH)-1:0]       head;
     logic [$clog2(DEPTH)-1:0]       tail;
     logic [DEPTH-1:0][WIDTH-1:0]    state;
@@ -97,6 +111,7 @@ module fifo #(
 
     // Version 2:
     logic [NUM_RPORTS-1:0] fwd_dat;
+    TAGGED_ENTRY tmp;
     always_comb begin
         for (int unsigned i = 0; i < NUM_RPORTS; ++i)
             rd_idxs[i] = (head + i) % DEPTH;
@@ -111,8 +126,16 @@ module fifo #(
                 rd_data[i] = '0;
             end else if (fwd_dat[i] && (i - used) < wr_en_cnt) begin
                 rd_data[i] = wr_data[i - used];
+                if (ENABLE_BMASK_INVALIDATION) begin
+                    tmp = rd_data[i];
+                    rd_bm_vld[i] = tmp.bm_tag.vld;
+                end
             end else begin
                 rd_data[i] = state[rd_idxs[i]];
+                if (ENABLE_BMASK_INVALIDATION) begin
+                    tmp = rd_data[i];
+                    rd_bm_vld[i] = tmp.bm_tag.vld;
+                end
             end
         end
     end
@@ -130,6 +153,15 @@ module fifo #(
                 tail    <= '0;
                 state   <= '0;
             end
+        end else if (flush && ENABLE_BMASK_INVALIDATION) begin
+            /* assume lowest 5 bits is bm_valid */
+            foreach (state[i]) begin
+                tmp = state[i];
+                if (!(tmp.bm_tag.bmask & bmask_mask))
+                    continue;
+                tmp.bm_tag.vld = 0;
+                state[i] <= tmp;
+            end
         end else begin
             if (wr_en_cnt > (ENABLE_INTR_FWD ? free + rd_en_cnt : free))
                 $error("FIFO overflow! instance: %d", INSTANCE_ID);
@@ -141,6 +173,7 @@ module fifo #(
             for (int unsigned i = 0; i < NUM_WPORTS; ++i) begin
                 if (i >= wr_en_cnt) // suppresses oob index warning
                     continue;
+                // NOTE: writer should set the bm_tag
                 state[wr_idxs[i]] <= wr_data[i];
             end
         end
