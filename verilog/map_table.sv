@@ -41,6 +41,10 @@ module map_table #(parameter
     0: after completes
     1: after dispatch 0
     2: after dispatch 1
+
+    TODO: Do you really need a big fat intermediate state array entries_n or
+    can you simply sommehow "checkpoint" the desired intermediate state as you
+    incrementally update a single entries_n.
     */
     MAP_TABLE_ENTRY [`N:0][`NUM_ARCH_REG-1:0] entries_n;
     `ifdef DEBUG
