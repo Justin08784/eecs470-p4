@@ -18,10 +18,7 @@ module map_table #(parameter
     input clock, reset, flush,
 
     `ifdef DEBUG
-    output struct packed {
-        PHYS_REG_IDX t;
-        logic cpl;
-    } [`NUM_ARCH_REG-1:0] entries_dbg,
+    output MAP_TABLE_ENTRY [`NUM_ARCH_REG-1:0] entries_dbg,
     `endif
 
     // flush
@@ -38,10 +35,7 @@ module map_table #(parameter
     input dispatch2map_table d_in,
     output map_table2dispatch d_out
 );
-    struct packed {
-        PHYS_REG_IDX t;
-        logic cpl;
-    } [`NUM_ARCH_REG-1:0] entries, entries_n;
+    MAP_TABLE_ENTRY [`NUM_ARCH_REG-1:0] entries, entries_n;
     `ifdef DEBUG
     assign entries_dbg = entries;
     `endif

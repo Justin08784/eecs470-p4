@@ -622,6 +622,11 @@ typedef struct packed {
     PHYS_REG_IDX [`N-1:0] ts_old;
 } map_table2dispatch;
 
+typedef struct packed {
+    PHYS_REG_IDX t;
+    logic cpl;
+} MAP_TABLE_ENTRY;
+
 
 // By RS
 typedef struct packed {
