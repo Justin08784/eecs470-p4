@@ -50,6 +50,10 @@
 `define MULT_STAGES 16
 // Justin: funny enough we need at least 8 or else multiply is on critical path
 
+
+`define BTB_ENTRIES 256
+`define BTB_TAG_WIDTH 10
+
 ///////////////////////////////
 // --- Compil. Controls ---- //
 ///////////////////////////////
@@ -714,6 +718,24 @@ typedef struct packed {
         // (means that tags will be applied when the dispatched insts actually get
         // to RS/ROB)
 } free_list2dispatch;
+
+typedef struct packed {
+    logic [`N-1:0][31:0] PC;
+} fetch2btb;
+
+typedef struct packed {
+   // ADDR [`N-1:0]  PC,
+    logic [`N-1:0] [11:0] target;
+    logic [`N-1:0] hit;
+} btb2fetch;
+
+
+typedef struct packed {
+    logic [`N-1:0][31:0] PC;
+    logic [`N-1:0] is_taken;
+    logic [`N-1:0] [11:0] target;
+} execute2btb;
+
 
 
 // By Arch Map

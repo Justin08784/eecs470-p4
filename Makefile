@@ -189,7 +189,7 @@ GREP = grep -E --color=auto
 # ---- Modules to Test ---- #
 
 # TODO: add more modules here
-MODULES = cpu mult rob rs fifo free_list dispatch prf map_table stage_id_p4 execute fetch
+MODULES = cpu mult rob rs fifo free_list dispatch prf map_table stage_id_p4 execute fetch btb
 
 # TODO: update this if you add more header files
 ALL_HEADERS = $(CPU_HEADERS)
@@ -252,10 +252,17 @@ build/map_table.cov: $(MAP_TABLE_FILES)
 build/map_table.vg: $(MAP_TABLE_FILES)
 # build/stage_id_p4.out: $(MAP_TABLE_FILES)
 
+
 EXECUTE_FILES = verilog/sys_defs.svh verilog/mult.sv verilog/psel_gen.sv
 build/execute.simv: $(EXECUTE_FILES)
 build/execute.cov: $(EXECUTE_FILES)
 build/execute.vg: $(EXECUTE_FILES)
+
+BTB_FILES = verilog/sys_defs.svh verilog/btb.sv
+build/btb.simv: $(BTB_FILES)
+build/btb.cov: $(BTB_FILES)
+build/btb.vg: $(BTB_FILES)
+
 
 
 #################################
@@ -291,7 +298,8 @@ CPU_SOURCES = verilog/cpu.sv \
 			  verilog/stage_id_p4.sv \
 			  verilog/fifo.sv \
 			  verilog/fetch.sv \
-			  verilog/execute.sv 
+			  verilog/execute.sv \
+			  verilog/btb.sv
 
 build/cpu.simv: $(CPU_SOURCES) $(CPU_HEADERS) $(CPU_TESTBENCH)
 synth/cpu.vg: $(CPU_SOURCES) $(CPU_HEADERS)
