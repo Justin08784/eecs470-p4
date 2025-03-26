@@ -31,6 +31,7 @@
 // sizes
 `define ROB_SZ 64
 `define RS_SZ  16
+`define BTQ_SZ 8
 `define PHYS_REG_SZ_P6 32
 `define PHYS_REG_SZ_R10K (32 + `ROB_SZ)
 
@@ -428,9 +429,45 @@ typedef struct packed {
     logic [$clog2(`PHYS_REG_SZ_R10K)-1:0] t_old;
     REG_IDX dst;
     
+    logic is_brch;
     logic halt;
     logic illegal;
 } ROB_ENTRY;
+
+// BTQ stuff
+// typedef logic [$clog2(`BTQ_SZ)-1:0] BTQ_IDX;
+// typedef struct packed {
+//     logic   cpl;
+//     ADDR    addr;
+//     REG_IDX dst;
+//     
+//     logic halt;
+//     logic illegal;
+// } ROB_ENTRY;
+
+// By btq
+typedef logic [$clog2(`BTQ_SZ)-1:0] BTQ_IDX;
+typedef struct packed {
+    ADDR    tgt;   // can we actually store [29:0], since bottom bits of address are 0s anyways?
+    logic   pred;
+    logic   take;
+} BTQ_ENTRY;
+
+typedef struct packed {
+    logic   [$clog2(`N):0]  btq_rdy_scnt;
+    BTQ_IDX [`N-1:0]        btq_idxs;
+} btq2dispatch;
+
+typedef struct packed {
+    logic   [$clog2(`N):0] en_cnt;
+    // How many branch instructions dispatching?
+    // Sender must ensure branch insns packed to lowest indices.
+} dispatch2btq;
+
+typedef struct packed {
+    logic mispred;
+    ADDR  brch_tgt;
+} btq2fetch;
 
 
 // Reservation station stuff
@@ -539,6 +576,7 @@ typedef struct packed {
 typedef struct packed {
     logic       [$clog2(`N):0]  d_vld_scnt;
     logic       [`N-1:0]  prvw_has_dests;
+    logic       [`N-1:0]  prvw_is_brch;
     ID_RESULT   [`N-1:0]        d_dat;
 } decode2dispatch;
 
@@ -572,6 +610,7 @@ typedef struct packed {
     //THESE ARE NOT COMING FROM DISPATCH, GET THESE FROM MAP TABLE
     //(ONLY HERE FOR CURRENT ROB TESTBENCH)
     REG_IDX [`N-1:0] dst;
+    logic [`N-1:0] is_brch;
     logic [`N-1:0] halt;
     logic [`N-1:0] illegal;
 } dispatch2rob;
@@ -676,6 +715,10 @@ typedef struct packed {
     // control signals for cpu.sv
     logic           [`N-1:0]            halt;
     logic           [`N-1:0]            illegal;
+
+    // BTQ-specific retirement stuff
+    logic           [`N-1:0]            brch_vld;
+        // Bus: which of the insns are 1) retiring AND 2) branches?
 } rob2retire;
 
 
@@ -695,6 +738,17 @@ typedef struct packed {
     ROB_IDX         [`N-1:0] c_rob_idxs;
         // - From: EX
     DATA            [`N-1:0] c_data;
+
+    // BTQ-specific completion stuff
+    logic   [$clog2(`N):0] btq_en_cnt;
+        // How many branch instructions completing?
+        // *NOTE*: Sender must ensure branch insns are packed to lowest indices.
+    BTQ_IDX [`N-1:0] btq_idxs; 
+        // Entries to which we are completing
+    ADDR    [`N-1:0] tgts; 
+        // True branch targets
+    logic   [`N-1:0] take;
+        // Is bete;
 } execute2complete;
 
 // By Free List
