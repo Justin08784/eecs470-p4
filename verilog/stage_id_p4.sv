@@ -340,7 +340,6 @@ module stage_id_p4 (
     ) id_buf(
         .clock      (clock),
         .reset      (reset),
-        .flush      (flush),
         .wr_en_cnt  (non_illegal_cnt), // accept only legal insns into FIFO
         .wr_data    (tmp),
         .rd_en_cnt  (d_in.dispatch_en_cnt),

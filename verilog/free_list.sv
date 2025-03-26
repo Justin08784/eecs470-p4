@@ -51,13 +51,12 @@ module free_list #(parameter
         .WIDTH(WIDTH),
         .NUM_RPORTS(`N),
         .NUM_WPORTS(`N),
-        .ENABLE_FREE_LIST_MODE(`TRUE),
         .ENABLE_INTR_FWD(`FALSE),
-        .RESET_STATE(RESET_STATE)
+        .ENABLE_CUSTOM_RESET(`TRUE)
     ) lst (
         .clock(clock),
         .reset(reset),
-        .flush(flush),
+        .reset_state(RESET_STATE),
 
         .wr_en_cnt(r_in.r_free_cnt),
         .wr_data(r_in.t_old),

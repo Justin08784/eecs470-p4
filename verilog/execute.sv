@@ -182,7 +182,6 @@ module alu_ex(
             ) cpl_buf (
                 .clock      (clock),
                 .reset      (reset),
-                .flush      (flush),
                 .wr_en_cnt  (en[i]),
                 .wr_data    (tmp_data[i]),
                 .rd_en_cnt  (cpl_gnt[i]),
@@ -278,7 +277,6 @@ module mul_ex(
             ) cpl_buf (
                 .clock      (clock),
                 .reset      (reset),
-                .flush      (flush),
                 .wr_en_cnt  (tmp_done[i]),
                 .wr_data    (tmp_data[i]),
                 .rd_en_cnt  (cpl_gnt[i]),
@@ -382,7 +380,6 @@ module stage_ex_p4 (
             ) s_buf (
                 .clock      (clock),
                 .reset      (reset),
-                .flush      (flush),
                 .wr_en_cnt  (rs_in.fu_vld_alu[i]),
                 .wr_data    (tmp_alu_el[i]),
                 .rd_en_cnt  (alu_in2ops_en[i]),
@@ -410,7 +407,6 @@ module stage_ex_p4 (
             ) s_buf (
                 .clock      (clock),
                 .reset      (reset),
-                .flush      (flush),
                 .wr_en_cnt  (rs_in.fu_vld_mult[i]),
                 .wr_data    (tmp_mul_el[i]),
                 .rd_en_cnt  (mul_in2ops_en[i]),

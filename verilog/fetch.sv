@@ -114,7 +114,6 @@ module stage_if_p4 (
     ) dut (
         .clock      (clock),
         .reset      (reset),
-        .flush      (flush),
         .wr_en_cnt  (f_cnt),
         .wr_data    (f_dat),
         .rd_en_cnt  (d_out.f_en_cnt),

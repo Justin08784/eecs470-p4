@@ -79,8 +79,7 @@ module fifo_test();
         .WIDTH(WIDTH),
         .NUM_RPORTS(NUM_RPORTS),
         .NUM_WPORTS(NUM_WPORTS),
-        .ENABLE_INTR_FWD(`TRUE),
-        .RESET_STATE('{default:0})
+        .ENABLE_INTR_FWD(`TRUE)
     ) dut (
         .clock      (clock),
         .reset      (reset),
