@@ -1,8 +1,5 @@
 `include "sys_defs.svh"
 
-/* Branch target queue */
-
-
 /*
 TODO: I think there might need to be a retire module that interfaces with
 both ROB and BTQ. Like if a retiring branch insn is mispredicted,
@@ -11,6 +8,7 @@ the rob insns after it should not be committed!
 Maybe something that handles both rollback and retire?
 */
 
+/* Branch target queue */
 module btq #(
     parameter BTQ_SZ = `BTQ_SZ,  // num elements
     parameter N=`N
@@ -83,7 +81,7 @@ module btq #(
         (opposite of above points)
         */
         d_out = '{
-            btq_rdy_scnt : `MIN(free + rd_cnt, NUM_DPORTS),
+            btq_rdy_scnt : `MIN(free, NUM_DPORTS),
             btq_idxs     : d_idxs
         };
     end
