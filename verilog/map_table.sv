@@ -35,13 +35,20 @@ module map_table #(parameter
     input dispatch2map_table d_in,
     output map_table2dispatch d_out
 );
-    MAP_TABLE_ENTRY [`NUM_ARCH_REG-1:0] entries, entries_n;
+    MAP_TABLE_ENTRY [`NUM_ARCH_REG-1:0] entries;
+    /*
+    NOTE: We have N intermediate stages, not N-1!!
+    0: after completes
+    1: after dispatch 0
+    2: after dispatch 1
+    */
+    MAP_TABLE_ENTRY [`N:0][`NUM_ARCH_REG-1:0] entries_n;
     `ifdef DEBUG
     assign entries_dbg = entries;
     `endif
 
     always_comb begin
-        entries_n = entries;
+        entries_n[0] = entries;
         d_out = '0;
         // handle completes
         for (int i = 0; i < N; ++i) begin
@@ -52,25 +59,26 @@ module map_table #(parameter
             if (!c_in.c_en[i])
                 continue;
             for (int r = 0; r < `NUM_ARCH_REG; ++r) begin
-                entries_n[r].cpl |= (entries_n[r].t == c_in.c_ts[i]);
+                entries_n[0][r].cpl |= (entries[r].t == c_in.c_ts[i]);
             end
         end
 
         // handle renames
         for (int i = 0; i < d_in.en_cnt; ++i) begin
+            entries_n[i + 1] = entries_n[i];
             /*
             Idea: how about we always map ZERO_REG -> preg #0, cpl=1,
             and it cannot be edited?
             */
-            d_out.t1s[i]    = entries_n[d_in.src1s[i]].t;
-            d_out.t2s[i]    = entries_n[d_in.src2s[i]].t;
-            d_out.cpl1s[i]  = !d_in.is_rs1s[i] || entries_n[d_in.src1s[i]].cpl;
-            d_out.cpl2s[i]  = !d_in.is_rs2s[i] || entries_n[d_in.src2s[i]].cpl;
+            d_out.t1s[i]    = entries_n[i][d_in.src1s[i]].t;
+            d_out.t2s[i]    = entries_n[i][d_in.src2s[i]].t;
+            d_out.cpl1s[i]  = !d_in.is_rs1s[i] || entries_n[i][d_in.src1s[i]].cpl;
+            d_out.cpl2s[i]  = !d_in.is_rs2s[i] || entries_n[i][d_in.src2s[i]].cpl;
 
             if (d_in.dsts[i] != `ZERO_REG) begin
-                d_out.ts_old[i]             = entries_n[d_in.dsts[i]].t;
-                entries_n[d_in.dsts[i]].t   = d_in.ts[i];
-                entries_n[d_in.dsts[i]].cpl = 0;
+                d_out.ts_old[i] = entries_n[i][d_in.dsts[i]].t;
+                entries_n[i + 1][d_in.dsts[i]].t   = d_in.ts[i];
+                entries_n[i + 1][d_in.dsts[i]].cpl = 0;
             end
         end
     end
@@ -95,7 +103,7 @@ module map_table #(parameter
                 };
             end
         end else begin
-            entries <= entries_n;
+            entries <= entries_n[d_in.en_cnt];
             `ifndef SYNTH
             if (entries[`ZERO_REG].t != '0 || !entries[`ZERO_REG].cpl) begin
                 $error("ERROR: entries[0] was modified! Got: {t:%0d, cpl:%b}", 
@@ -137,6 +145,12 @@ module map_table #(parameter
                 d_out.t2s[1],
                 d_out.cpl2s[1]
             );
+            for (int i = 0; i <= `N; ++i) begin
+                for (int j = 0; j < `NUM_ARCH_REG; ++j) begin
+                    $display("chk[%0d] (r->t: %0d->%0d, cpl: %b)", i, j, entries_n[i][j].t, entries_n[i][j].cpl);
+                end
+                $display("");
+            end
             $display("  %3d | MT <<", $time);
         end
     end
