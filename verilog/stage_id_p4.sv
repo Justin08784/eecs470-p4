@@ -356,10 +356,14 @@ module stage_id_p4 (
     );
 
     always_comb begin
-        for (int i = 0; i < `N; ++i)
+        for (int i = 0; i < `N; ++i) begin
             d_out.prvw_has_dests[i] = 
                 (i < prvw_vld_cnt)
                 && (d_out.d_dat[i].inst.r.rd != `ZERO_REG);
+            d_out.prvw_is_brch[i] = 
+                (i < prvw_vld_cnt)
+                && (d_out.d_dat[i].uncond_branch || d_out.d_dat[i].cond_branch);
+        end
     end
 
     always_ff @(posedge clock) begin

@@ -608,6 +608,12 @@ module stage_ex_p4 (
             */
             c_out       <= c_out_n;
 
+        end
+    end
+
+    `ifndef SYNTH
+    always_ff @(posedge clock) begin
+        if (!reset) begin
             $display("  %3d | >> EXECUTE", $time);
             $display("alu_ins: bsy[%b, %b], mul_ins: bsy[%b, %b]",
                 ins.rdy.alu[0],
@@ -699,8 +705,8 @@ module stage_ex_p4 (
                 prf_in.s_v2s[3]
             );
             $display("  %3d | << EXECUTE", $time);
-
         end
     end
+    `endif // SYNTH
 
 endmodule // stage_ex

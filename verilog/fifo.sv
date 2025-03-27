@@ -31,7 +31,7 @@ module fifo #(
     insns to dispatch.
     */
     parameter logic ENABLE_READ_PREVIEW=`FALSE,
-    parameter logic ENABLE_INTR_FWD =`TRUE,
+    parameter logic ENABLE_INTR_FWD =`FALSE,
     /*
     If free list mode is disabled, flush behaves the same as reset.
     */
@@ -122,15 +122,22 @@ module fifo #(
     end
 
     always_ff @(posedge clock) begin
-        if (reset || (flush && !ENABLE_FREE_LIST_MODE)) begin
+        if (reset) begin
             used    <= RESET_STATE.used;
             head    <= RESET_STATE.head;
             tail    <= RESET_STATE.tail;
             state   <= RESET_STATE.state;
-        end else if (flush && ENABLE_FREE_LIST_MODE) begin
-            // advance tail to head and mark entire FIFO as used (i.e. full with entries)
-            used    <= DEPTH;
-            tail    <= head;
+        end else if (flush) begin
+            if (ENABLE_FREE_LIST_MODE) begin
+                // advance tail to head and mark entire FIFO as used (i.e. full with entries)
+                used    <= DEPTH;
+                tail    <= head;
+            end else begin
+                used    <= RESET_STATE.used;
+                head    <= RESET_STATE.head;
+                tail    <= RESET_STATE.tail;
+                state   <= RESET_STATE.state;
+            end
         end else begin
             if (wr_en_cnt > (ENABLE_INTR_FWD ? free + rd_en_cnt : free))
                 $error("FIFO overflow! instance: %d", INSTANCE_ID);
