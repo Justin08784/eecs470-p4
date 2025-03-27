@@ -13,10 +13,10 @@ module btb(
 
 );
 
-logic [`BTB_TAG_WIDTH-1:0] tag_array [`BTB_ENTRIES-1:0];
-logic [11:0]                target_array [`BTB_ENTRIES-1:0];
+logic [`BTB_ENTRIES-1:0] [`BTB_TAG_WIDTH-1:0] tag_array;
+logic [`BTB_ENTRIES-1:0] [11:0] target_array;
 //valid array stores whether index at target_array is a valid BTB entry
-logic                      valid_array [`BTB_ENTRIES-1:0];
+logic [`BTB_ENTRIES-1:0] valid_array;
 
 logic [7:0] index;
 logic [`BTB_TAG_WIDTH-1:0] tag;
