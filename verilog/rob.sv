@@ -62,6 +62,7 @@ module rob #(
             r_out.dst[i]    = state[r_idxs[i]].dst;
             r_out.halt[i]   = state[r_idxs[i]].halt;
             r_out.illegal[i]= state[r_idxs[i]].illegal;
+            r_out.brch_vld[i]= state[r_idxs[i]].is_brch;
         end
 
         // handle dispatch (outs)

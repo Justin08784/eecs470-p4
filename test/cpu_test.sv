@@ -232,6 +232,7 @@ module testbench;
 
             `ifndef SYNTH
             // Add new dispatches to rob
+            // TODO: Should this be cleared on branch mispredict?
             for (int i = 0, int cur_idx = 0; i < `N; ++i) begin
                 if (i >= verisimpleV.rob_0.d_in.d_en_cnt)
                     break;

@@ -459,16 +459,32 @@ typedef struct packed {
 } btq2dispatch;
 
 typedef struct packed {
+    logic   [$clog2(`N):0]  used_scnt;
+    ADDR    [`N-1:0]        tgt;
+    logic   [`N-1:0]        pred;
+    logic   [`N-1:0]        take;
+} btq2retire;
+
+typedef struct packed {
+    logic   [$clog2(`N):0]  rd_cnt;
+} retire2btq;
+
+// same as rob2retire, but with r_en_cnt potentially adjusted to account for branch mispredicts
+typedef struct {
+    logic [$clog2(`N):0]        r_en_cnt; // final final
+    PHYS_REG_IDX [`N-1:0]       tag;
+    PHYS_REG_IDX [`N-1:0]       t_old;
+    REG_IDX      [`N-1:0]       dst;
+    logic        [`N-1:0]       halt;
+    logic        [`N-1:0]       illegal;
+    logic        [`N-1:0]       brch_vld;
+} retire_final;
+
+typedef struct packed {
     logic   [$clog2(`N):0] en_cnt;
     // How many branch instructions dispatching?
     // Sender must ensure branch insns packed to lowest indices.
 } dispatch2btq;
-
-typedef struct packed {
-    logic mispred;
-    ADDR  brch_tgt;
-} btq2fetch;
-
 
 // Reservation station stuff
 typedef enum logic [1:0] {

@@ -13,7 +13,6 @@
 module cpu (
     input clock, // System clock
     input reset, // System reset
-    input flush, // mispred flush
 
     //input MEM_TAG   mem2proc_transaction_tag, // Memory tag for current transaction
     input MEM_BLOCK mem2proc_data,            // Data coming back from memory
@@ -381,7 +380,7 @@ module cpu (
     // assign committed_insts[0] = wb_packet;
 
     /* Global controls*/
-    assign flush = 1'b0;
+    logic flush;
 
     //////////////////////////////////////////////////
     //                                              //
@@ -485,6 +484,55 @@ module cpu (
     //////////////////////////////////////////////////  
     rob2retire rob_2_retire;
     // TODO: collects from both rob2retire and btq2retire
+    btq2retire btq_2_retire;
+    retire2btq retire_2_btq;
+    retire_final        retire_exec;
+    logic [$clog2(`N):0] btq_rd_cnt;
+    logic [$clog2(`N):0] allowed_retire_cnt; // FUCK ME
+    logic mispred;
+    logic mispred_target;
+    always_comb begin
+        mispred = 0;
+        mispred_target = '0;
+        btq_rd_cnt = 0;
+        allowed_retire_cnt = 0;
+        for (int unsigned i = 0; i < rob_2_retire.r_en_cnt; ++i) begin
+            ++allowed_retire_cnt;
+            if (!rob_2_retire.brch_vld[i])
+                continue;
+
+            if (btq_2_retire.pred[btq_rd_cnt] != btq_2_retire.take[btq_rd_cnt]) begin
+                mispred = 1;
+                mispred_target = btq_2_retire.tgt[btq_rd_cnt];
+                // don't increment btq_rd_cnt — we're going to flush
+                break;
+            end 
+            ++btq_rd_cnt;
+        end
+
+        retire_2_btq = '{
+            rd_cnt : btq_rd_cnt
+        };
+
+        retire_exec = '{
+            // only the count *may* be adjusted
+            r_en_cnt    : allowed_retire_cnt,
+
+            // the rest of the fields stay the same
+            tag         : rob_2_retire.tag,
+            t_old       : rob_2_retire.t_old,
+            dst         : rob_2_retire.dst,
+            halt        : rob_2_retire.halt,
+            illegal     : rob_2_retire.illegal,
+            brch_vld    : rob_2_retire.brch_vld
+        };
+    end
+
+    always_ff @(posedge clock) begin
+/* ======================================== */
+        flush <= mispred;
+/* ======================================== */
+    end
 
 
     //////////////////////////////////////////////////
@@ -497,8 +545,8 @@ module cpu (
         .clock(clock),
         .reset(reset),
         .flush(flush),
-        .r_in('0),
-        .f_out(),
+        .r_in (retire_2_btq),
+        .r_out(btq_2_retire),
         .c_in(ex_2_complete),
         .d_in(dispatch_2_btq),
         .d_out(btq_2_dispatch)
@@ -596,7 +644,7 @@ module cpu (
     ) arch_map_0 (
         .clock(clock),
         .reset(reset),
-        .r_in(rob_2_retire)
+        .r_in(retire_exec)
     );
 
     //////////////////////////////////////////////////
@@ -611,7 +659,7 @@ module cpu (
         .clock(clock),
         .reset(reset),
         .flush(flush),
-        .r_in(rob_2_retire),
+        .r_in(retire_exec),
         .d_in(dispatch_2_fl),
         .d_out(fl_2_dispatch)
     );
@@ -648,11 +696,11 @@ module cpu (
     always_comb begin
         committed_insts = '0;
         foreach(committed_insts[i]) begin
-            if (i >= rob_2_retire.r_en_cnt)
+            if (i >= retire_exec.r_en_cnt)
                 continue;
             committed_insts[i].valid      = 1;
-            committed_insts[i].halt       = rob_2_retire.halt[i];
-            committed_insts[i].illegal    = rob_2_retire.illegal[i];
+            committed_insts[i].halt       = retire_exec.halt[i];
+            committed_insts[i].illegal    = retire_exec.illegal[i];
         end
     end
 

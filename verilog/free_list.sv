@@ -10,7 +10,7 @@ module free_list #(parameter
 ) (
     input clock, reset, flush,
     // retire
-    input rob2retire r_in,
+    input retire_final r_in,
 
     // complete ?? 
     // issue ??
