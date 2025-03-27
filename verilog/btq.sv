@@ -103,11 +103,11 @@ module btq #(
 
             // handle complete (ins)
             for (int unsigned i = 0, int cur_idx = 0; i < NUM_CPORTS; ++i) begin
-                if (!c_in.c_en[i])
+                if (!c_in.c_en[i] || !c_in.is_branch[i])
                     continue;
                 cur_idx = c_in.btq_idxs[i];
 
-                state[cur_idx].tgt  <= c_in.tgts[i];
+                state[cur_idx].tgt  <= c_in.c_data[i];
                 state[cur_idx].take <= c_in.take[i];
             end
 

@@ -732,24 +732,22 @@ typedef struct packed {
 } execute2rs;
 
 typedef struct packed {
+    /* TODO: Better to make this a union, with shared c_en and is_branch
+    at the top, and union over non-branch and branch-specific stuff? */
     logic           [`N-1:0] c_en;
+    logic           [`N-1:0] is_branch;
         // - From: EX
     PHYS_REG_IDX    [`N-1:0] c_ts;
         // - From: EX
     ROB_IDX         [`N-1:0] c_rob_idxs;
         // - From: EX
     DATA            [`N-1:0] c_data;
+        // doubles as branch target if is_branch true
 
     // BTQ-specific completion stuff
-    logic   [$clog2(`N):0] btq_en_cnt;
-        // How many branch instructions completing?
-        // *NOTE*: Sender must ensure branch insns are packed to lowest indices.
     BTQ_IDX [`N-1:0] btq_idxs; 
         // Entries to which we are completing
-    ADDR    [`N-1:0] tgts; 
-        // True branch targets
     logic   [`N-1:0] take;
-        // Is bete;
 } execute2complete;
 
 // By Free List

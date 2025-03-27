@@ -32,6 +32,8 @@ typedef struct packed {
     PHYS_REG_IDX t;
     ROB_IDX rob_idx;
     DATA data;
+    logic take;
+    logic is_brch;
 } CPL_CAND;
 
 typedef struct packed {
@@ -69,6 +71,26 @@ typedef struct packed {
     ROB_IDX         rob_idx;
     logic[2:0]      func;
 } ID_MUL_VIEW;
+
+/* Operand data needed for each FU type */
+typedef struct packed {
+    logic       [`NUM_FU_ALU-1:0]       bsy; // unused; same as en
+    DATA        [`NUM_FU_ALU-1:0]       opa, opb;
+    ALU_FUNC    [`NUM_FU_ALU-1:0]       alu_func;
+    logic       [`NUM_FU_ALU-1:0][2:0]  branch_func; // Which branch condition to check
+    logic       [`NUM_FU_ALU-1:0]       cond_branch;
+    logic       [`NUM_FU_ALU-1:0]       uncond_branch;
+
+    PHYS_REG_IDX    [`NUM_FU_ALU-1:0]   t;
+    ROB_IDX         [`NUM_FU_ALU-1:0]   rob_idx;
+} ALU_OPS;
+
+typedef struct packed {
+    logic       [`NUM_FU_MULT-1:0]      bsy;
+    DATA        [`NUM_FU_MULT-1:0]      rs1, rs2;
+    MULT_FUNC   [`NUM_FU_MULT-1:0]      func;
+    DST         [`NUM_FU_MULT-1:0]      dst;
+} MUL_OPS;
 
 // ALU: computes the result of FUNC applied with operands A and B
 // This module is purely combinational
@@ -124,15 +146,7 @@ module alu_ex(
         // ready to accept from alu_ins?
     input [`NUM_FU_ALU-1:0]                 en,
         // insns to accept from alu_ins
-    input struct packed {
-        logic       [`NUM_FU_ALU-1:0]       bsy; // unused; same as en
-        DATA        [`NUM_FU_ALU-1:0]       opa, opb;
-        ALU_FUNC    [`NUM_FU_ALU-1:0]       alu_func;
-        logic       [`NUM_FU_ALU-1:0][2:0]  branch_func; // Which branch condition to check
-
-        PHYS_REG_IDX [`NUM_FU_ALU-1:0]  t;
-        ROB_IDX      [`NUM_FU_ALU-1:0]  rob_idx;
-    } ops,
+    ALU_OPS ops,
         // insn metadata/operands
 
     /* BACKEND */
@@ -153,6 +167,7 @@ module alu_ex(
     generate
         CPL_CAND    [`NUM_FU_ALU-1:0] tmp_data;
         DATA        [`NUM_FU_ALU-1:0] tmp_res;
+        logic       [`NUM_FU_ALU-1:0] tmp_take;
         for (genvar i = 0; i < `NUM_FU_ALU; ++i) begin : gen_alus
             alu alu_0 ( 
                 // Inputs
@@ -161,14 +176,16 @@ module alu_ex(
                 .alu_func   (ops.alu_func[i]),
                 .branch_func(ops.branch_func[i]), // Which branch condition to check
 
-                .take(), // True/False condition result (will return FALSE if branch is low)
+                .take(tmp_take[i]), // True/False condition result (will return FALSE if branch is low)
                 .result(tmp_res[i]) // will return 32'hfacebeec if branch is high (Sentinel, hopefully none of our alu computations result in that value)
             );
 
             assign tmp_data[i] = '{
                 t       : ops.t[i],
                 rob_idx : ops.rob_idx[i],
-                data    : tmp_res[i]
+                data    : tmp_res[i],
+                take    : tmp_take[i],
+                is_brch : ops.cond_branch || ops.uncond_branch
             };
 
             // <FU>_outs: where executed insns wait until completion
@@ -220,12 +237,7 @@ module mul_ex(
         // ready to accept from mul_ins?
     input [`NUM_FU_MULT-1:0]            en,
         // insns to accept from mul_ins
-    input struct packed {
-        logic     [`NUM_FU_MULT-1:0]    bsy; // unused; same as en
-        DATA      [`NUM_FU_MULT-1:0]    rs1, rs2;
-        MULT_FUNC [`NUM_FU_MULT-1:0]    func;
-        DST       [`NUM_FU_MULT-1:0]    dst;
-    } ops,
+    MUL_OPS ops,
         // insn metadata/operands
 
     /* BACKEND */
@@ -264,7 +276,9 @@ module mul_ex(
             assign tmp_data[i] = '{
                 t       : tmp_dst[i].tag,
                 rob_idx : tmp_dst[i].rob_idx,
-                data    : tmp_res[i]
+                data    : tmp_res[i],
+                take    : '0,
+                is_brch : '0
             };
 
             // <FU>_outs: where executed insns wait until completion
@@ -444,21 +458,8 @@ module stage_ex_p4 (
     end
 
     // receive/decode operands from PRF
-    struct packed {
-        logic       [`NUM_FU_ALU-1:0]       bsy;
-        DATA        [`NUM_FU_ALU-1:0]       opa, opb;
-        ALU_FUNC    [`NUM_FU_ALU-1:0]       alu_func;
-        logic       [`NUM_FU_ALU-1:0][2:0]  branch_func; // Which branch condition to check
-        // 
-        PHYS_REG_IDX [`NUM_FU_ALU-1:0]      t;
-        ROB_IDX      [`NUM_FU_ALU-1:0]      rob_idx;
-    } alu_ops, alu_ops_n;
-    struct packed {
-        logic       [`NUM_FU_MULT-1:0]      bsy;
-        DATA        [`NUM_FU_MULT-1:0]      rs1, rs2;
-        MULT_FUNC   [`NUM_FU_MULT-1:0]      func;
-        DST         [`NUM_FU_MULT-1:0]      dst;
-    } mul_ops, mul_ops_n;
+    ALU_OPS alu_ops, alu_ops_n;
+    MUL_OPS mul_ops, mul_ops_n;
 
     logic [`NUM_FU_ALU-1:0]     alu_ex_rdy;
     logic [`NUM_FU_MULT-1:0]    mul_ex_rdy;
@@ -581,6 +582,10 @@ module stage_ex_p4 (
                 c_out_n.c_ts[c]       |= cands_flat[f].t;
                 c_out_n.c_rob_idxs[c] |= cands_flat[f].rob_idx;
                 c_out_n.c_data[c]     |= cands_flat[f].data;
+                // TODO: fill these
+                c_out_n.btq_idxs[c]   = '0;
+                c_out_n.is_branch[c]  = '0;
+                c_out_n.take[c]       = '0;
             end
         end
     end

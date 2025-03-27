@@ -483,13 +483,14 @@ module cpu (
     //           Branch target queue (BTQ)          //
     //                                              //
     //////////////////////////////////////////////////  
+    execute2complete ex_2_complete;
     btq btq_0(
         .clock(clock),
         .reset(reset),
         .flush(flush),
         .r_in('0),
         .f_out(),
-        .c_in('0),
+        .c_in(ex_2_complete),
         .d_in(dispatch_2_btq),
         .d_out(btq_2_dispatch)
     );
@@ -505,7 +506,6 @@ module cpu (
     execute2prf     prf_out;
     prf2execute     prf_in;
 
-    execute2complete ex_2_complete;
     rs rs_0(
         .clock(clock),
         .reset(reset),
@@ -624,6 +624,7 @@ module cpu (
         //.reset(reset),
         //.flush(),
         .c_en   (ex_2_complete.c_en),
+        .c_is_branch (ex_2_complete.is_branch),
         .c_ts   (ex_2_complete.c_ts),
         .c_vs   (ex_2_complete.c_data),
 
