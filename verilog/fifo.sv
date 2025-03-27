@@ -130,9 +130,14 @@ module fifo #(
             state   <= RESET_STATE.state;
         end else if (flush) begin
             if (ENABLE_FREE_LIST_MODE) begin
+                // This is what Mustafa said to do, and I think it is patently wrong.
                 // advance tail to head and mark entire FIFO as used (i.e. full with entries)
-                used    <= DEPTH;
-                tail    <= head;
+                // used    <= DEPTH;
+                // tail    <= head;
+
+                // TODO: This is the right way???
+                used    <= (DEPTH - `NUM_ARCH_REG);
+                head    <= (tail + `NUM_ARCH_REG) % ROB_SZ;
             end else begin
                 used    <= RESET_STATE.used;
                 head    <= RESET_STATE.head;
