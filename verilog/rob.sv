@@ -173,6 +173,7 @@ module rob #(
                 cur_idx = d_idxs[i];
                 state[cur_idx] <= '{
                     cpl     : 0,
+                    is_brch : d_in.is_brch[i],
                     tag     : d_in.tag[i],
                     t_old   : d_in.t_old[i],
                     dst     : d_in.dst[i],

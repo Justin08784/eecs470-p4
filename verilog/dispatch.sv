@@ -61,15 +61,15 @@ always_comb begin
 end
 
 //logic for free list
+logic [N-1:0]           bus_alloc_free;
 logic [$clog2(N):0]     num_alloc_free;
-logic [N-1:0]           dispatch_en;
 logic [N-1:0][N-1:0]    gbus_preg2insn;
 always_comb begin
     //determining how many instructions have a dest reg
-    for (int unsigned i = 0; i < N; ++i)
-        dispatch_en[i] = i < dispatch_cnt;
+    foreach (bus_alloc_free[i])
+        bus_alloc_free[i] = (i < dispatch_cnt) && decode_in.prvw_has_dests[i]; 
 
-    num_alloc_free = $countones(decode_in.prvw_has_dests & dispatch_en);
+    num_alloc_free = $countones(bus_alloc_free);
     free_out.free_d_en_cnt = num_alloc_free;
 end
 
@@ -77,7 +77,7 @@ psel_gen #(
     .WIDTH  (N),
     .REQS   (N)
 ) sel (
-    .req    (decode_in.prvw_has_dests & dispatch_en),
+    .req    (bus_alloc_free),
     .gnt_bus(gbus_preg2insn)
 );
 
@@ -150,11 +150,12 @@ always_comb begin
     rob_out.d_en_cnt = dispatch_cnt;
 
     for (int i = 0; i < dispatch_cnt; i++) begin
-        //handling dest register
-        rob_out.dst[i]      = decode_in.d_dat[i].inst.r.rd;
         //handling src tags
+        rob_out.is_brch[i]  = decode_in.d_dat[i].is_branch;
         rob_out.tag[i]      = map_out.ts[i];
         rob_out.t_old[i]    = map_in.ts_old[i];
+        //handling dest register
+        rob_out.dst[i]      = decode_in.d_dat[i].inst.r.rd;
 
         rob_out.halt[i]     = decode_in.d_dat[i].halt;
         rob_out.illegal[i]  = decode_in.d_dat[i].illegal;
