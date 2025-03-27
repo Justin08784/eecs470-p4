@@ -32,6 +32,7 @@ typedef struct packed {
     PHYS_REG_IDX t;
     ROB_IDX rob_idx;
     DATA data;
+    BTQ_IDX btq_idx;
     logic take;
     logic is_brch;
 } CPL_CAND;
@@ -52,6 +53,7 @@ typedef struct packed {
     PHYS_REG_IDX    t1;
     PHYS_REG_IDX    t2;
     ROB_IDX         rob_idx;
+    BTQ_IDX         btq_idx;
 
     INST inst;
     ADDR PC;
@@ -83,6 +85,7 @@ typedef struct packed {
 
     PHYS_REG_IDX    [`NUM_FU_ALU-1:0]   t;
     ROB_IDX         [`NUM_FU_ALU-1:0]   rob_idx;
+    BTQ_IDX         [`NUM_FU_ALU-1:0]   btq_idx;
 } ALU_OPS;
 
 typedef struct packed {
@@ -184,6 +187,7 @@ module alu_ex(
                 t       : ops.t[i],
                 rob_idx : ops.rob_idx[i],
                 data    : tmp_res[i],
+                btq_idx : ops.btq_idx[i],
                 take    : tmp_take[i],
                 is_brch : ops.cond_branch || ops.uncond_branch
             };
@@ -277,6 +281,7 @@ module mul_ex(
                 t       : tmp_dst[i].tag,
                 rob_idx : tmp_dst[i].rob_idx,
                 data    : tmp_res[i],
+                btq_idx : '0,
                 take    : '0,
                 is_brch : '0
             };
@@ -376,6 +381,7 @@ module stage_ex_p4 (
                 t1      : rs_in.fu_dat_alu[i].t1,
                 t2      : rs_in.fu_dat_alu[i].t2,
                 rob_idx : rs_in.fu_dat_alu[i].rob_idx,
+                btq_idx : rs_in.fu_dat_alu[i].btq_idx,
 
                 inst    : rs_in.fu_dat_alu[i].inst,
                 PC      : rs_in.fu_dat_alu[i].PC,
@@ -494,6 +500,7 @@ module stage_ex_p4 (
             alu_ops_n.branch_func[i] = ins.dat.alu[i].inst.b.funct3;
             alu_ops_n.t[i]           = ins.dat.alu[i].t;
             alu_ops_n.rob_idx[i]     = ins.dat.alu[i].rob_idx;
+            alu_ops_n.btq_idx[i]     = ins.dat.alu[i].btq_idx;
         end
 
         mul_ops_n = '0;
@@ -583,9 +590,9 @@ module stage_ex_p4 (
                 c_out_n.c_rob_idxs[c] |= cands_flat[f].rob_idx;
                 c_out_n.c_data[c]     |= cands_flat[f].data;
                 // TODO: fill these
-                c_out_n.btq_idxs[c]   = '0;
-                c_out_n.is_branch[c]  = '0;
-                c_out_n.take[c]       = '0;
+                c_out_n.btq_idxs[c]   |= cands_flat[f].btq_idx;
+                c_out_n.is_branch[c]  |= cands_flat[f].is_brch;
+                c_out_n.take[c]       |= cands_flat[f].take;
             end
         end
     end

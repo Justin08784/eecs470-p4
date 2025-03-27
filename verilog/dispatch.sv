@@ -141,6 +141,7 @@ always_comb begin
         rs_out.d_dat[i].t2_rdy     = map_in.cpl2s[i];
 
         rs_out.d_dat[i].rob_idx    = rob_in.rob_idxs[i];
+        rs_out.d_dat[i].btq_idx    = decode_in.d_dat[i].is_branch ? btq_in.btq_idxs[i] : '0;
     end
 end
 
