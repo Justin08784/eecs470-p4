@@ -489,6 +489,7 @@ typedef struct packed {
     logic           t2_rdy;
     FU_IDX          fu_idx;
     ROB_IDX         rob_idx;
+    BTQ_IDX         btq_idx;
     logic           is_branch; // Is inst a branch?
     
 
