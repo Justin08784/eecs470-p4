@@ -90,8 +90,11 @@ module fifo_sva #(
         end
 
         rd_data_sva = '0;
+        for (int i = 0; i < `MIN(used + wr_en_cnt, NUM_RPORTS); ++i) begin
+            rd_data_sva[i] = entries[i];
+        end
         for (int i = 0; i < rd_en_cnt; ++i) begin
-            rd_data_sva[i] = entries.pop_front();
+            entries.pop_front();
         end
         // #0
         @(posedge clock);

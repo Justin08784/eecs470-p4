@@ -449,6 +449,7 @@ typedef struct packed {
 typedef logic [$clog2(`BTQ_SZ)-1:0] BTQ_IDX;
 typedef struct packed {
     ADDR    tgt;   // can we actually store [29:0], since bottom bits of address are 0s anyways?
+    ADDR    NPC;   // PC + 4 (i.e. address if we dont take the branch)
     logic   pred;
     logic   take;
 } BTQ_ENTRY;
@@ -459,16 +460,39 @@ typedef struct packed {
 } btq2dispatch;
 
 typedef struct packed {
-    logic   [$clog2(`N):0] en_cnt;
-    // How many branch instructions dispatching?
-    // Sender must ensure branch insns packed to lowest indices.
-} dispatch2btq;
+    logic   [$clog2(`N):0]  used_scnt;
+    ADDR    [`N-1:0]        tgt;
+    logic   [`N-1:0]        NPC;
+    logic   [`N-1:0]        pred;
+    logic   [`N-1:0]        take;
+} btq2retire;
 
 typedef struct packed {
-    logic mispred;
-    ADDR  brch_tgt;
-} btq2fetch;
+    logic   [$clog2(`N):0]  rd_cnt;
+} retire2btq;
 
+// same as rob2retire, but with r_en_cnt potentially adjusted to account for branch mispredicts
+typedef struct {
+    logic [$clog2(`N):0]        r_en_cnt; // final final
+    PHYS_REG_IDX [`N-1:0]       tag;
+    PHYS_REG_IDX [`N-1:0]       t_old;
+    REG_IDX      [`N-1:0]       dst;
+    logic        [`N-1:0]       halt;
+    logic        [`N-1:0]       illegal;
+    logic        [`N-1:0]       brch_vld;
+} retire_final;
+
+typedef struct {
+    logic   mispred;
+    ADDR    corrected_PC;
+} retire2fetch;
+
+typedef struct packed {
+    logic   [$clog2(`N):0] en_cnt;
+        // How many branch instructions dispatching?
+        // Sender must ensure branch insns packed to lowest indices.
+    ADDR    [`N-1:0]       NPC;
+} dispatch2btq;
 
 // Reservation station stuff
 typedef enum logic [1:0] {
@@ -489,6 +513,8 @@ typedef struct packed {
     logic           t2_rdy;
     FU_IDX          fu_idx;
     ROB_IDX         rob_idx;
+    BTQ_IDX         btq_idx;
+    logic           is_branch; // Is inst a branch?
     
 
     /* from ID_EX_PACKET */
@@ -698,15 +724,6 @@ typedef struct packed {
     PHYS_REG_IDX    [`N-1:0]            tag;
         // From: retire (ROB)
         // - IMPORTANT: Set from lowest indices in program-order. NO GAPS!!!
-    logic           [$clog2(`N):0]      r_free_cnt;
-        // From: retire (ROB)
-        // - number of enabled retire lines WHO ARE RETURNING/DEALLOC'ING A PREG
-        //   (e.g. no stores)
-        //   (i.e. may only be a strict subset of retiring insns!)
-        // - Question: Does this really need to be an count? Surely there isn't
-        //   any serial dep. between returning pregs no? But again, the free list
-        //   itself is likely going to be FIFO so I'm not sure what's more performant...
-        //   enable bus vs. count?
     PHYS_REG_IDX    [`N-1:0]            t_old;
         // From: retire (ROB)
         // - pregs being returned to free list
@@ -731,24 +748,22 @@ typedef struct packed {
 } execute2rs;
 
 typedef struct packed {
+    /* TODO: Better to make this a union, with shared c_en and is_branch
+    at the top, and union over non-branch and branch-specific stuff? */
     logic           [`N-1:0] c_en;
+    logic           [`N-1:0] is_branch;
         // - From: EX
     PHYS_REG_IDX    [`N-1:0] c_ts;
         // - From: EX
     ROB_IDX         [`N-1:0] c_rob_idxs;
         // - From: EX
     DATA            [`N-1:0] c_data;
+        // doubles as branch target if is_branch true
 
     // BTQ-specific completion stuff
-    logic   [$clog2(`N):0] btq_en_cnt;
-        // How many branch instructions completing?
-        // *NOTE*: Sender must ensure branch insns are packed to lowest indices.
     BTQ_IDX [`N-1:0] btq_idxs; 
         // Entries to which we are completing
-    ADDR    [`N-1:0] tgts; 
-        // True branch targets
     logic   [`N-1:0] take;
-        // Is bete;
 } execute2complete;
 
 // By Free List

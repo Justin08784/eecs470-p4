@@ -14,7 +14,7 @@ module arch_map #(parameter
     output arch_map2map_table mt_out,
 
     // retire
-    input rob2retire r_in
+    input  retire_final r_in
 
     // complete ??
     // issue ??

@@ -40,6 +40,7 @@ module fifo_test();
     logic   [NUM_RPORTS-1:0][WIDTH-1:0] rd_data;
     logic   [$clog2(NUM_WPORTS):0]      free_scnt;
     logic   [$clog2(NUM_RPORTS):0]      used_scnt;
+    logic   [$clog2(NUM_RPORTS):0]      prvw_vld_cnt;
     
     // Variable to count values written to FIFO
     int cnt;
@@ -60,7 +61,7 @@ module fifo_test();
     logic DEBUG = 1;
     always @(posedge clock) begin
         if (DEBUG) begin
-            $display("  %3d | d_in: [%d, %d]   wr_en_cnt: %d  rd_en_cnt: %d  |  d_out: [%d, %d]   used_scnt: %2d  free_scnt: %2d",
+            $display("  %3d | d_in: [%d, %d]   wr_en_cnt: %d  rd_en_cnt: %d  |  d_out: [%d, %d]   used_scnt: %2d  free_scnt: %2d  prvw_vld_cnt: %0d",
                 $time,
                 wr_en_cnt > 0 ? wr_data[0] : 0,
                 wr_en_cnt > 1 ? wr_data[1] : 0,
@@ -69,7 +70,8 @@ module fifo_test();
                 rd_data[0], 
                 rd_data[1], 
                 used_scnt, 
-                free_scnt);
+                free_scnt,
+                prvw_vld_cnt);
         end
     end
     
@@ -89,6 +91,7 @@ module fifo_test();
         .rd_en_cnt  (rd_en_cnt),
         .rd_data    (rd_data),
         .free_scnt  (free_scnt),
+        .prvw_vld_cnt(prvw_vld_cnt),
         .used_scnt  (used_scnt)
     );
 

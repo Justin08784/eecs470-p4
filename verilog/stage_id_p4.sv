@@ -18,7 +18,7 @@ module decoder_p4 (
     output ALU_OPB_SELECT opb_select,
     output logic          has_dest, // if there is a destination register
     output ALU_FUNC       alu_func,
-    output logic          mult, rd_mem, wr_mem, cond_branch, uncond_branch,
+    output logic          mult, rd_mem, wr_mem, is_branch, cond_branch, uncond_branch,
     output logic          csr_op, // used for CSR operations, we only use this as a cheap way to get the return code out
     output logic          halt,   // non-zero on a halt
     output logic          illegal // non-zero on an illegal instruction
@@ -37,6 +37,7 @@ module decoder_p4 (
         mult          = `FALSE;
         rd_mem        = `FALSE;
         wr_mem        = `FALSE;
+        is_branch     = cond_branch || uncond_branch;
         cond_branch   = `FALSE;
         uncond_branch = `FALSE;
         halt          = `FALSE;
@@ -240,6 +241,7 @@ module stage_id_p4 (
     int insn_id;
 
     ID_RESULT [`N-1:0] tmp;
+    ID_RESULT [`N-1:0] wr_fifo;
     // number of legal fetched insns until the 1st illegal insn
     logic [$clog2(`N):0] non_illegal_cnt; // TODO: do we need stall fetch when we get an illegal?
 
@@ -260,6 +262,7 @@ module stage_id_p4 (
             .mult          (tmp[i].mult),
             .rd_mem        (tmp[i].rd_mem),
             .wr_mem        (tmp[i].wr_mem),
+            .is_branch     (tmp[i].is_branch),
             .cond_branch   (tmp[i].cond_branch),
             .uncond_branch (tmp[i].uncond_branch),
             .csr_op        (tmp[i].csr_op),
@@ -270,18 +273,45 @@ module stage_id_p4 (
     endgenerate
 
     always_comb begin
+        wr_fifo = '0;
         for (int unsigned i = 0; i < `N; ++i) begin
-            tmp[i].inst = f_in.f_dat[i].inst;
-            tmp[i].PC   = f_in.f_dat[i].PC;
-            tmp[i].NPC  = f_in.f_dat[i].NPC;
-            tmp[i].id   = insn_id + i;
+            wr_fifo[i] = '{
+                id          : insn_id + i,
 
-            tmp[i].dest_reg_idx = (has_dest_reg[i]) ? f_in.f_dat[i].inst.r.rd : `ZERO_REG;
+                t           : '0,
+                t1          : '0,
+                t2          : '0,
+                t1_rdy      : '0,
+                t2_rdy      : '0,
+
+                fu_idx      : tmp[i].fu_idx,
+                rob_idx     : '0,
+                btq_idx     : '0,
+                is_branch   : tmp[i].is_branch,
+
+                inst        : f_in.f_dat[i].inst,
+                PC          : f_in.f_dat[i].PC,
+                NPC         : f_in.f_dat[i].NPC,
+
+                opa_select      : tmp[i].opa_select,
+                opb_select      : tmp[i].opb_select,
+
+                dest_reg_idx    : (has_dest_reg[i]) ? f_in.f_dat[i].inst.r.rd : `ZERO_REG,
+                alu_func        : tmp[i].alu_func,
+                mult            : tmp[i].mult,
+                rd_mem          : tmp[i].rd_mem,
+                wr_mem          : tmp[i].wr_mem,
+                cond_branch     : tmp[i].cond_branch,
+                uncond_branch   : tmp[i].uncond_branch,
+                halt            : tmp[i].halt,
+                illegal         : tmp[i].illegal,
+                csr_op          : tmp[i].csr_op
+            };
         end
 
         non_illegal_cnt = '0;
         for (int unsigned i = 0; i < `N; ++i, ++non_illegal_cnt) begin
-            if (tmp[i].illegal)
+            if (wr_fifo[i].illegal)
                 break;
         end
         non_illegal_cnt = `MIN(non_illegal_cnt, f_in.f_en_cnt);
@@ -332,8 +362,6 @@ module stage_id_p4 (
         .WIDTH($bits(ID_RESULT)),
         .NUM_RPORTS(`N),
         .NUM_WPORTS(`N),
-        .ENABLE_READ_PREVIEW(`TRUE),
-
         /* Disable internal forwarding just to make it 100% clear to the synthesizer
         that there are no dependencies between fetch and dispatch (across decode).*/
         .ENABLE_INTR_FWD(`FALSE)
@@ -342,7 +370,7 @@ module stage_id_p4 (
         .reset      (reset),
         .flush      (flush),
         .wr_en_cnt  (non_illegal_cnt), // accept only legal insns into FIFO
-        .wr_data    (tmp),
+        .wr_data    (wr_fifo),
         .rd_en_cnt  (d_in.dispatch_en_cnt),
         .rd_data    (d_out.d_dat),
         /*
@@ -357,12 +385,12 @@ module stage_id_p4 (
 
     always_comb begin
         for (int i = 0; i < `N; ++i) begin
-            d_out.prvw_has_dests[i] = 
-                (i < prvw_vld_cnt)
-                && (d_out.d_dat[i].inst.r.rd != `ZERO_REG);
-            d_out.prvw_is_brch[i] = 
-                (i < prvw_vld_cnt)
-                && (d_out.d_dat[i].uncond_branch || d_out.d_dat[i].cond_branch);
+            /*
+            NOTE: rd_data entries beyond prvw_vld_cnt are '0, and so we dont
+            need to check && (i < prvw_vld_cnt) for either condition!
+            */
+            d_out.prvw_has_dests[i] = d_out.d_dat[i].inst.r.rd != `ZERO_REG;
+            d_out.prvw_is_brch[i]   = d_out.d_dat[i].is_branch;
         end
     end
 

@@ -37,8 +37,8 @@ module rob #(
 
     assign state_dbg    = state;
     assign free         = ROB_SZ - used;
-    assign free_scnt    = free > NUM_DPORTS ? NUM_DPORTS : free;
-    assign used_scnt    = used > NUM_RPORTS ? NUM_RPORTS : used;
+    assign free_scnt    = `MIN(free, NUM_DPORTS);
+    assign used_scnt    = `MIN(used, NUM_RPORTS);
 
     always_comb begin
         for (int unsigned i = 0; i < NUM_RPORTS; ++i)
@@ -48,50 +48,21 @@ module rob #(
 
         // handle retire (outs)
         r_out = '0;
-        for (int unsigned i = 0; i < NUM_RPORTS; ++i, ++r_out.r_en_cnt) begin
-            // This computes r_en_cnt linear-time wrt NUM_RPORTS. (Fine if NUM_RPORTS
-            // small; synthesizer may simply unroll this loop.)
+        for (int unsigned i = 0; i < used_scnt; ++i) begin
             if (!state[r_idxs[i]].cpl)
                 break;
-            // if (i >= used)
-            //     break;
-            /*
-            TODO [RESOLVED]: *IMPORTANT* retire zero_reg edge case!
-            If the retiring insn has no real output register (e.g. hlt, store), then
-            its destination will be the zero preg. You MUST NOT allow a zero preg
-            to be added to the free list (this is causing the free_list FIFO
-            overflow in the commit in which this comment was added.
-            SHA: f24016e5a7d6a931ac32b72020fd154b3cfcc57c). 
-            
-            This presents a problem: our fifo.sv impl operates on counts, and assumes
-            wr_data is contiguously filled from lowest indices. However, not all
-            retiring insns with valid output pregs will be at the lowest indices
-            (e.g. vld_preg_out? : [0, 1]). Two solutions for this:
-            1. Form another intermediate N-wide array that compresses all retiring
-            insns with valid output registers to the lowest indices, before sending
-            it to free_list (a "packing loop" logic).
+            ++r_out.r_en_cnt;
+        end
 
-            e.g., In a 3-wide processor. retire stage sees:
-              [0] -> valid, dst = 5
-              [1] -> valid, dst = 0 (zero_reg - must skip!)
-              [2] -> valid, dst = 6
-            Must compress to [5, 6] before sending to free_list.
-
-            2. Rewrite FIFO to accept valid buses instead of counts (however I believe
-            lowest-index contiguity via counts offers performance advantages which
-            other FIFOs like the decode or fetch FIFOs can, and *should*, exploit.)
-
-            In addition, it seems 2 is only shifting the work of the "packing loop" into
-            the FIFO (you still have to do it *somewhere*).
-            */
+        for (int unsigned i = 0; i < used_scnt; ++i) begin
+            /* preview mode–– just display all valid entries in read window even
+            if not all will get retired this cycle */
             r_out.tag[i]    = state[r_idxs[i]].tag;
-            if (state[r_idxs[i]].dst != `ZERO_REG) begin // pack all returning pregs to lowest indices
-                r_out.t_old[r_out.r_free_cnt] = state[r_idxs[i]].t_old;
-                ++r_out.r_free_cnt;
-            end
+            r_out.t_old[i]  = state[r_idxs[i]].t_old;
             r_out.dst[i]    = state[r_idxs[i]].dst;
             r_out.halt[i]   = state[r_idxs[i]].halt;
             r_out.illegal[i]= state[r_idxs[i]].illegal;
+            r_out.brch_vld[i]= state[r_idxs[i]].is_brch;
         end
 
         // handle dispatch (outs)
@@ -173,6 +144,7 @@ module rob #(
                 cur_idx = d_idxs[i];
                 state[cur_idx] <= '{
                     cpl     : 0,
+                    is_brch : d_in.is_brch[i],
                     tag     : d_in.tag[i],
                     t_old   : d_in.t_old[i],
                     dst     : d_in.dst[i],

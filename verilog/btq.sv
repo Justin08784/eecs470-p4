@@ -18,9 +18,9 @@ module btq #(
     output BTQ_ENTRY [BTQ_SZ-1:0]   state_dbg,
     `endif 
 
-    // retire (read & write)
-    input  rob2retire r_in,
-    output btq2fetch  f_out, // TODO: handling at fetch
+    // retire
+    input  retire2btq       r_in,
+    output btq2retire       r_out,
 
     // complete (write)
     input  execute2complete c_in, // TODO: handling from EX
@@ -45,7 +45,7 @@ module btq #(
     logic [$clog2(NUM_DPORTS):0]    wr_cnt;
     logic [$clog2(NUM_RPORTS):0]    rd_cnt;
     assign wr_cnt = d_in.en_cnt;
-    assign rd_cnt = $countones(r_in.brch_vld);
+    assign rd_cnt = r_in.rd_cnt;
 
     logic [NUM_RPORTS-1:0][$clog2(BTQ_SZ)-1:0] r_idxs;
     logic [NUM_DPORTS-1:0][$clog2(BTQ_SZ)-1:0] d_idxs;
@@ -56,16 +56,15 @@ module btq #(
         for (int unsigned i = 0; i < NUM_DPORTS; ++i)
             d_idxs[i] = (tail + i) % BTQ_SZ;
 
-        // handle fetch (outs)
-        f_out = '0;
+        // handle retire (outs)
+        r_out = '0;
+        r_out.used_scnt = `MIN(used, NUM_RPORTS);
         for (int unsigned i = 0; i < NUM_RPORTS; ++i) begin
-            cur_entry = state[r_idxs[i]];
-
-            if (cur_entry.pred != cur_entry.take) begin
-                f_out.mispred = 1;
-                f_out.brch_tgt = cur_entry.tgt;
-                break;
-            end
+            cur_entry       = state[r_idxs[i]];
+            r_out.tgt[i]    = cur_entry.tgt;
+            r_out.NPC[i]    = cur_entry.NPC;
+            r_out.pred[i]   = cur_entry.pred;
+            r_out.take[i]   = cur_entry.take;
         end
 
         // handle dispatch (outs)
@@ -87,7 +86,7 @@ module btq #(
     end
 
     always_ff @(posedge clock) begin
-        if (reset || f_out.mispred) begin
+        if (reset || flush) begin
             used    <= 0;
             head    <= 0;
             tail    <= 0;
@@ -103,11 +102,11 @@ module btq #(
 
             // handle complete (ins)
             for (int unsigned i = 0, int cur_idx = 0; i < NUM_CPORTS; ++i) begin
-                if (!c_in.c_en[i])
+                if (!c_in.c_en[i] || !c_in.is_branch[i])
                     continue;
                 cur_idx = c_in.btq_idxs[i];
 
-                state[cur_idx].tgt  <= c_in.tgts[i];
+                state[cur_idx].tgt  <= c_in.c_data[i];
                 state[cur_idx].take <= c_in.take[i];
             end
 
@@ -116,7 +115,13 @@ module btq #(
                 if (i >= wr_cnt)
                     continue;
                 cur_idx = d_idxs[i];
-                state[cur_idx] <= '0;
+                state[cur_idx] <= '{
+                    tgt     : '0,
+                    NPC     : d_in.NPC[i],
+                    // TODO: pred and take need to be set by fetch! I think?
+                    pred    : '0,
+                    take    : '0
+                };
             end
         end
     end

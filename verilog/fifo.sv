@@ -13,7 +13,11 @@ module fifo #(
     parameter int unsigned NUM_RPORTS=`N, // also cap for used_scnt
     parameter int unsigned NUM_WPORTS=`N, // also cap for free_scnt
 
-    /*
+    /* UPDATE: Prevew has been made the default mode! The consumer may read as
+    many as they wish from rd_data. If they consume some rd_data they are obliged to
+    (but not mandated to) signal the number read/consumed via rd_en_cnt. This breaks
+    the old comb. path from rd_en_cnt to rd_data.
+
     If ENABLE_READ_PREVIEW is set, the FIFO supports *previewing* entries at the head
     (e.g., for dependency checks or early reads), even when rd_en_cnt is less than NUM_RPORTS.
 
@@ -30,7 +34,6 @@ module fifo #(
     that need output regs to dispatch, and then dispatch to actually decide how many
     insns to dispatch.
     */
-    parameter logic ENABLE_READ_PREVIEW=`FALSE,
     parameter logic ENABLE_INTR_FWD =`FALSE,
     /*
     If free list mode is disabled, flush behaves the same as reset.
@@ -46,9 +49,9 @@ module fifo #(
     input   logic   [$clog2(NUM_WPORTS):0]          wr_en_cnt,
     input   logic   [NUM_WPORTS-1:0][WIDTH-1:0]     wr_data,
 
-    input   logic   [$clog2(NUM_RPORTS):0]          rd_en_cnt,
+    input   logic   [$clog2(NUM_RPORTS):0]          rd_en_cnt, //
     output  logic   [NUM_RPORTS-1:0][WIDTH-1:0]     rd_data,
-    output  logic   [$clog2(NUM_RPORTS):0]          prvw_vld_cnt, // only valid if ENABLE_READ_PREVIEW set
+    output  logic   [$clog2(NUM_RPORTS):0]          prvw_vld_cnt, // how many entries "previewed" in rd_data are valid
 
     output  logic                                   empty,
     output  logic                                   full,
@@ -62,7 +65,6 @@ module fifo #(
     logic [$clog2(DEPTH)-1:0]       tail;
     logic [DEPTH-1:0][WIDTH-1:0]    state;
     logic [$clog2(DEPTH):0]         used, free;
-    logic [$clog2(NUM_RPORTS):0]    show_limit;   // how many entries we display in rd_data
 
     logic [NUM_RPORTS-1:0][$clog2(DEPTH)-1:0] rd_idxs;
     logic [NUM_WPORTS-1:0][$clog2(DEPTH)-1:0] wr_idxs;
@@ -72,10 +74,9 @@ module fifo #(
     assign used_scnt    = `MIN(used, NUM_RPORTS);
     assign empty        = used == 0;
     assign full         = used == DEPTH;
-    assign prvw_vld_cnt = ENABLE_READ_PREVIEW
-        ? `MIN(used + (ENABLE_INTR_FWD ? wr_en_cnt : 0), NUM_RPORTS)
-        : '0;
-    assign show_limit   = ENABLE_READ_PREVIEW ? prvw_vld_cnt : rd_en_cnt;
+    assign prvw_vld_cnt = ENABLE_INTR_FWD 
+        ? `MIN(used + wr_en_cnt, NUM_RPORTS)
+        : used_scnt;
 
     // Version 1:
     // always_comb begin
@@ -111,7 +112,7 @@ module fifo #(
 
         // fwding logic
         for (int unsigned i = 0; i < NUM_RPORTS; ++i) begin
-            if (i >= show_limit) begin
+            if (i >= prvw_vld_cnt) begin
                 rd_data[i] = '0;
             end else if (fwd_dat[i] && (i - used) < wr_en_cnt) begin
                 rd_data[i] = wr_data[i - used];

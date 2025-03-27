@@ -13,6 +13,7 @@ module prf #(
     // complete (write)
     input logic         [N-1:0] c_en,
         // - Enabled complete lines?
+    input logic         [N-1:0] c_is_branch,
     input PHYS_REG_IDX  [N-1:0] c_ts, // tags
     input DATA          [N-1:0] c_vs, // vals
         // From: complete (EX)
@@ -83,7 +84,7 @@ module prf #(
     // Write port
     always_ff @(posedge clock) begin
         foreach (c_en[i]) begin
-            if (c_en[i] && (c_ts[i] != `ZERO_REG))
+            if (c_en[i] && !c_is_branch[i] && (c_ts[i] != `ZERO_REG))
                 phys_reg_file[c_ts[i]] <= c_vs[i];
         end
     end
