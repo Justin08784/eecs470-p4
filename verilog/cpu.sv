@@ -390,6 +390,7 @@ module cpu (
 
     fetch2decode f_2_decode;
     decode2fetch decode_2_f;
+    retire2fetch retire_2_f;
 
     stage_if_p4 fetch_0(
         .clock(clock),          // system clock
@@ -398,8 +399,9 @@ module cpu (
         .flush(flush),
         .d_in   (decode_2_f),
         .d_out  (f_2_decode),
-        .take_branch('0),    // taken-branch signal CHANGE!!!!!!
-        .branch_target('0),  // target pc: use if take_branch is TRUE CHANGE!!!!!!
+        // .take_branch('0),    // taken-branch signal CHANGE!!!!!!
+        // .branch_target('0),  // target pc: use if take_branch is TRUE CHANGE!!!!!!
+        .r_in(retire_2_f),
         .Imem_data(mem2proc_data),      // data coming back from Instruction memory
 
         // tags from memory
@@ -496,6 +498,7 @@ module cpu (
         mispred_target = '0;
         btq_rd_cnt = 0;
         allowed_retire_cnt = 0;
+        retire_2_f = '{default:'0};
         for (int unsigned i = 0; i < rob_2_retire.r_en_cnt; ++i) begin
             ++allowed_retire_cnt;
             if (!rob_2_retire.brch_vld[i])
@@ -505,6 +508,12 @@ module cpu (
                 mispred = 1;
                 mispred_target = btq_2_retire.tgt[btq_rd_cnt];
                 // don't increment btq_rd_cnt — we're going to flush
+                retire_2_f = '{
+                    mispred : mispred,
+                    corrected_PC : btq_2_retire.pred[btq_rd_cnt]
+                        ? btq_2_retire.NPC[btq_rd_cnt]
+                        : btq_2_retire.tgt[btq_rd_cnt]
+                };
                 break;
             end 
             ++btq_rd_cnt;

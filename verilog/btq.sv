@@ -62,6 +62,7 @@ module btq #(
         for (int unsigned i = 0; i < NUM_RPORTS; ++i) begin
             cur_entry       = state[r_idxs[i]];
             r_out.tgt[i]    = cur_entry.tgt;
+            r_out.NPC[i]    = cur_entry.NPC;
             r_out.pred[i]   = cur_entry.pred;
             r_out.take[i]   = cur_entry.take;
         end
@@ -114,7 +115,13 @@ module btq #(
                 if (i >= wr_cnt)
                     continue;
                 cur_idx = d_idxs[i];
-                state[cur_idx] <= '0;
+                state[cur_idx] <= '{
+                    tgt     : '0,
+                    NPC     : d_in.NPC[i],
+                    // TODO: pred and take need to be set by fetch! I think?
+                    pred    : '0,
+                    take    : '0
+                };
             end
         end
     end

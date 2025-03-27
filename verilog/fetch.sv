@@ -18,8 +18,9 @@ module stage_if_p4 (
     input   decode2fetch d_in,
     output  fetch2decode d_out,
 
-    input           take_branch,    // taken-branch signal
-    input ADDR      branch_target,  // target pc: use if take_branch is TRUE
+    // input           take_branch,    // taken-branch signal
+    // input ADDR      branch_target,  // target pc: use if take_branch is TRUE
+    input retire2fetch r_in,
     input MEM_BLOCK Imem_data,      // data coming back from Instruction memory
 
     // tags from memory
@@ -126,8 +127,8 @@ module stage_if_p4 (
     always_ff @(posedge clock) begin
         if (reset || flush) begin
             PC_reg <= 0;                // initial PC value is 0 (the memory address where our program starts)
-        end else if (take_branch) begin
-            PC_reg <= branch_target;    // update to a taken branch (does not depend on valid bit)...
+        end else if (r_in.mispred) begin
+            PC_reg <= r_in.corrected_PC;
         end else begin
             PC_reg <= PC_reg + 4*f_cnt; // ...or transition to next PC if valid
         end

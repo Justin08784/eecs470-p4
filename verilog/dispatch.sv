@@ -58,6 +58,8 @@ end
 // handle btq output
 always_comb begin
     btq_out.en_cnt = dispatch_cnt;
+    for (int unsigned i = 0; i < `N; ++i)
+        btq_out.NPC = decode_in.d_dat[i].NPC;
 end
 
 //logic for free list

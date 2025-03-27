@@ -449,6 +449,7 @@ typedef struct packed {
 typedef logic [$clog2(`BTQ_SZ)-1:0] BTQ_IDX;
 typedef struct packed {
     ADDR    tgt;   // can we actually store [29:0], since bottom bits of address are 0s anyways?
+    ADDR    NPC;   // PC + 4 (i.e. address if we dont take the branch)
     logic   pred;
     logic   take;
 } BTQ_ENTRY;
@@ -461,6 +462,7 @@ typedef struct packed {
 typedef struct packed {
     logic   [$clog2(`N):0]  used_scnt;
     ADDR    [`N-1:0]        tgt;
+    logic   [`N-1:0]        NPC;
     logic   [`N-1:0]        pred;
     logic   [`N-1:0]        take;
 } btq2retire;
@@ -480,10 +482,16 @@ typedef struct {
     logic        [`N-1:0]       brch_vld;
 } retire_final;
 
+typedef struct {
+    logic   mispred;
+    ADDR    corrected_PC;
+} retire2fetch;
+
 typedef struct packed {
     logic   [$clog2(`N):0] en_cnt;
-    // How many branch instructions dispatching?
-    // Sender must ensure branch insns packed to lowest indices.
+        // How many branch instructions dispatching?
+        // Sender must ensure branch insns packed to lowest indices.
+    ADDR    [`N-1:0]       NPC;
 } dispatch2btq;
 
 // Reservation station stuff
