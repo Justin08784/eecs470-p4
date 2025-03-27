@@ -700,15 +700,6 @@ typedef struct packed {
     PHYS_REG_IDX    [`N-1:0]            tag;
         // From: retire (ROB)
         // - IMPORTANT: Set from lowest indices in program-order. NO GAPS!!!
-    logic           [$clog2(`N):0]      r_free_cnt;
-        // From: retire (ROB)
-        // - number of enabled retire lines WHO ARE RETURNING/DEALLOC'ING A PREG
-        //   (e.g. no stores)
-        //   (i.e. may only be a strict subset of retiring insns!)
-        // - Question: Does this really need to be an count? Surely there isn't
-        //   any serial dep. between returning pregs no? But again, the free list
-        //   itself is likely going to be FIFO so I'm not sure what's more performant...
-        //   enable bus vs. count?
     PHYS_REG_IDX    [`N-1:0]            t_old;
         // From: retire (ROB)
         // - pregs being returned to free list

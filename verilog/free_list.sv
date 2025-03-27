@@ -45,6 +45,49 @@ module free_list #(parameter
     localparam FIFO_STATE RESET_STATE = gen_reset_state();
    
 
+    /*
+    TODO [RESOLVED]: *IMPORTANT* retire zero_reg edge case!
+    If the retiring insn has no real output register (e.g. hlt, store), then
+    its destination will be the zero preg. You MUST NOT allow a zero preg
+    to be added to the free list (this is causing the free_list FIFO
+    overflow in the commit in which this comment was added.
+    SHA: f24016e5a7d6a931ac32b72020fd154b3cfcc57c). 
+    
+    This presents a problem: our fifo.sv impl operates on counts, and assumes
+    wr_data is contiguously filled from lowest indices. However, not all
+    retiring insns with valid output pregs will be at the lowest indices
+    (e.g. vld_preg_out? : [0, 1]). Two solutions for this:
+    1. Form another intermediate N-wide array that compresses all retiring
+    insns with valid output registers to the lowest indices, before sending
+    it to free_list (a "packing loop" logic).
+
+    e.g., In a 3-wide processor. retire stage sees:
+        [0] -> valid, dst = 5
+        [1] -> valid, dst = 0 (zero_reg - must skip!)
+        [2] -> valid, dst = 6
+    Must compress to [5, 6] before sending to free_list.
+
+    2. Rewrite FIFO to accept valid buses instead of counts (however I believe
+    lowest-index contiguity via counts offers performance advantages which
+    other FIFOs like the decode or fetch FIFOs can, and *should*, exploit.)
+
+    In addition, it seems 2 is only shifting the work of the "packing loop" into
+    the FIFO (you still have to do it *somewhere*).
+    */
+    logic [$clog2(`N):0] free_cnt;
+    PHYS_REG_IDX [`N-1:0] told_packed;
+    always_comb begin
+        free_cnt    = 0;
+        told_packed = '0;
+
+        // pack all returning pregs to lowest indices
+        for (int unsigned i = 0; i < r_in.r_en_cnt; ++i) begin
+            if (r_in.t_old[i] != `ZERO_REG)
+                told_packed[free_cnt++] = r_in.t_old[i]; // postfix ++ (important!)
+        end
+    end
+   
+
     fifo #(
         .INSTANCE_ID(0),
         .DEPTH(DEPTH),
@@ -59,8 +102,8 @@ module free_list #(parameter
         .reset(reset),
         .flush(flush),
 
-        .wr_en_cnt(r_in.r_free_cnt),
-        .wr_data(r_in.t_old),
+        .wr_en_cnt(free_cnt),
+        .wr_data(told_packed),
 
         .rd_en_cnt(d_in.free_d_en_cnt),
         .rd_data(d_out.d_ts),
