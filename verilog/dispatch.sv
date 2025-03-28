@@ -36,6 +36,7 @@ module dispatch #(parameter
 );
 
 logic [$clog2(N):0] dispatch_cnt;
+logic [N-1:0]       dispatch_en;
 
 // control logic
 always_comb begin
@@ -57,7 +58,9 @@ end
 
 // handle btq output
 always_comb begin
-    btq_out.en_cnt = dispatch_cnt;
+    foreach (dispatch_en[i])
+        dispatch_en[i] = i < dispatch_cnt;
+    btq_out.en_cnt = $countones(dispatch_en & decode_in.prvw_is_brch);
     for (int unsigned i = 0; i < `N; ++i)
         btq_out.NPC = decode_in.d_dat[i].NPC;
 end
@@ -97,10 +100,13 @@ always_comb begin
     for (int i = 0; i < dispatch_cnt; i++) begin
 
         //handling dest register
-        map_out.dsts[i]     = decode_in.d_dat[i].inst.r.rd;
+        map_out.dsts[i]      = decode_in.d_dat[i].dest_reg_idx;
         // actually need src tags?
-        map_out.is_rs1s[i]  = decode_in.d_dat[i].opa_select == OPA_IS_RS1;
-        map_out.is_rs2s[i]  = decode_in.d_dat[i].opb_select == OPB_IS_RS2;
+        map_out.rd_src1s[i]  = decode_in.d_dat[i].opa_select == OPA_IS_RS1
+            || decode_in.d_dat[i].cond_branch;
+        map_out.rd_src2s[i]  = decode_in.d_dat[i].opb_select == OPB_IS_RS2
+            || decode_in.d_dat[i].cond_branch
+            || decode_in.d_dat[i].wr_mem;
         //handling src tags
         map_out.src1s[i]    = decode_in.d_dat[i].inst.r.rs1;
         map_out.src2s[i]    = decode_in.d_dat[i].inst.r.rs2;
@@ -158,7 +164,7 @@ always_comb begin
         rob_out.tag[i]      = map_out.ts[i];
         rob_out.t_old[i]    = map_in.ts_old[i];
         //handling dest register
-        rob_out.dst[i]      = decode_in.d_dat[i].inst.r.rd;
+        rob_out.dst[i]      = decode_in.d_dat[i].dest_reg_idx;
 
         rob_out.halt[i]     = decode_in.d_dat[i].halt;
         rob_out.illegal[i]  = decode_in.d_dat[i].illegal;
@@ -170,14 +176,14 @@ end
 always_ff @(posedge clock) begin
 
     if (!reset) begin
-        $display("  %3d | >> Dispatch", $time);
+        $display("  %3d | >> Dispatch >>", $time);
         $display("rs_in.rs_rdy_scnt: %d",   rs_in.rs_rdy_scnt);
         $display("btq_in.btq_rdy_scnt: %d",   btq_in.btq_rdy_scnt);
         $display("rob_in.rob_rdy_scnt: %d",  rob_in.rob_rdy_scnt);
         $display("decode_in.d_vld_scnt: %d",  decode_in.d_vld_scnt);
         $display("free_in.free_rdy_scnt: %d",  free_in.free_rdy_scnt);
         $display("decode_in.prvw_has_dests: %b", decode_in.prvw_has_dests);
-        $display("  %3d | << Dispatch", $time);
+        $display("  %3d | << Dispatch <<", $time);
     end
 
 end

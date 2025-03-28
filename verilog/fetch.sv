@@ -138,10 +138,10 @@ module stage_if_p4 (
     `ifndef SYNTH
     always_ff @(posedge clock) begin
         if (!reset) begin
-            $display("  %3d | Fetch >>", $time);
+            $display("  %3d | >> Fetch >>", $time);
             $display("PC_reg:  %x", PC_reg);
             $display("Imem_data: %x", Imem_data);
-            $display("  %3d | Fetch <<", $time);
+            $display("  %3d | << Fetch <<", $time);
         end
     end
     `endif // SYNTH

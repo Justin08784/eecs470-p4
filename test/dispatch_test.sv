@@ -81,7 +81,7 @@ module dispatch_testbench;
         // Set up a valid dispatch line
 
         decode_in.d_dat[i]        = '0;
-        decode_in.d_dat[i].inst.r.rd  = rd;
+        decode_in.d_dat[i].dest_reg_idx = rd;
         decode_in.d_dat[i].inst.r.rs1 = rs1;
         decode_in.d_dat[i].inst.r.rs2 = rs2;
         decode_in.d_dat[i].opa_select = opa_select;

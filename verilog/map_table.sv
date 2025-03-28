@@ -70,8 +70,8 @@ module map_table #(parameter
             */
             d_out.t1s[i]    = entries_n[d_in.src1s[i]].t;
             d_out.t2s[i]    = entries_n[d_in.src2s[i]].t;
-            d_out.cpl1s[i]  = !d_in.is_rs1s[i] || entries_n[d_in.src1s[i]].cpl;
-            d_out.cpl2s[i]  = !d_in.is_rs2s[i] || entries_n[d_in.src2s[i]].cpl;
+            d_out.cpl1s[i]  = !d_in.rd_src1s[i] || entries_n[d_in.src1s[i]].cpl;
+            d_out.cpl2s[i]  = !d_in.rd_src2s[i] || entries_n[d_in.src2s[i]].cpl;
 
             if (d_in.dsts[i] != `ZERO_REG) begin
                 d_out.ts_old[i]             = entries_n[d_in.dsts[i]].t;
@@ -117,7 +117,7 @@ module map_table #(parameter
     // debugging
     always_ff @(posedge clock) begin
         if (!reset) begin
-            $display("  %3d | MT >>", $time);
+            $display("  %3d | >> MT >>", $time);
             $display("dis_in:   {en_cnt: %d, [(%0d->%0d, %d, %d), (%0d->%0d, %d, %d)]}",
                 d_in.en_cnt,
                 d_in.dsts[0],
@@ -143,7 +143,7 @@ module map_table #(parameter
                 d_out.t2s[1],
                 d_out.cpl2s[1]
             );
-            $display("  %3d | MT <<", $time);
+            $display("  %3d | << MT <<", $time);
         end
     end
     `endif

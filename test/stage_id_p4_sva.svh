@@ -148,7 +148,7 @@ module stage_id_p4_sva (
         property set_has_dest_correctly(i);
             logic has_dest;
             int  idx;
-            (f_in.f_en_cnt > i, has_dest=f_in.f_dat[i].inst.r.rd != `ZERO_REG, idx=(rd_count + used + i))
+            (f_in.f_en_cnt > i, has_dest=f_in.f_dat[i].dest_reg_idx != `ZERO_REG, idx=(rd_count + used + i))
             ##[0:$] (rd_count <= idx && idx < rd_count + d_in.dispatch_en_cnt)
             |-> (
                 d_out_delayed.prvw_has_dests[idx - rd_count] == has_dest
