@@ -350,7 +350,7 @@ module rs #(parameter
 
         `ifndef SYNTH
         if (!reset) begin
-            $display("  %3d | RS >>", $time);
+            $display("  %3d | >> RS >>", $time);
             print_id_result(d_in.d_dat[0]);
             print_id_result(d_in.d_dat[1]);
             for (int i = 0; i < RS_SZ; ++i) begin
@@ -378,7 +378,7 @@ module rs #(parameter
                     entries[i].dat.fu_idx,
                 );
             end
-            $display("  %3d | RS <<", $time);
+            $display("  %3d | << RS <<", $time);
         end
         `endif
     end

@@ -158,7 +158,7 @@ module rob #(
     `ifndef SYNTH
     always_ff @(posedge clock) begin
         if (!reset) begin
-            $display("  %3d | >> ROB", $time);
+            $display("  %3d | >> ROB >>", $time);
             $display("r_out: en_cnt: %d", r_out.r_en_cnt);
             for (int i = 0; i < `N; ++i) begin
                 $display("r_out[%d]: tag: %d, t_old: %d, dst: %d, halt: %d, illegal: %d, brch_vld: %d",
@@ -222,7 +222,7 @@ module rob #(
             //         state[i].NPC
             //     );
             // end
-            $display("  %3d | << ROB", $time);
+            $display("  %3d | << ROB <<", $time);
         end
     end
     `endif

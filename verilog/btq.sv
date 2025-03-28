@@ -123,7 +123,7 @@ module btq #(
     `ifndef SYNTH
     always_ff @(posedge clock) begin
         if (!reset) begin
-            $display("  %3d | BTQ >>", $time);
+            $display("  %3d | >> BTQ >>", $time);
             for (int i = 0; i < `BTQ_SZ; ++i) begin
                 $display("BTQ [%0d]: tgt: %x, NPC: %x, pred: %b, take: %b%s", 
                     i,
@@ -161,7 +161,7 @@ module btq #(
                     r_out.dat[i].take
                 );
             end
-            $display("  %3d | BTQ <<", $time);
+            $display("  %3d | << BTQ <<", $time);
         end
     end
     `endif // SYNTH

@@ -402,7 +402,7 @@ module stage_id_p4 (
 
         `ifndef SYNTH
         if (!reset) begin
-            $display("  %3d | ID >>", $time);
+            $display("  %3d | >> ID >>", $time);
             // $display("  %3d | FIFO: {used_scnt: %d, free_scnt: %d}",
             //     $time,
             //     used_scnt,
@@ -427,7 +427,7 @@ module stage_id_p4 (
             print_id_result(d_out.d_dat[1]);
             // $display("d_out.d_dat[0]: %b", d_out.d_dat[0]);
             // $display("d_out.d_dat[1]: %b", d_out.d_dat[1]);
-            $display("  %3d | ID <<", $time);
+            $display("  %3d | << ID <<", $time);
         end
         `endif
     end
