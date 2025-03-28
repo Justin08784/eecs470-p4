@@ -152,9 +152,33 @@ module rob #(
                     illegal : d_in.illegal[i]
                 };
             end
+        end
+    end
 
-            `ifndef SYNTH
+    `ifndef SYNTH
+    always_ff @(posedge clock) begin
+        if (!reset) begin
             $display("  %3d | >> ROB", $time);
+            for (int i = 0; i < `ROB_SZ; ++i) begin
+                $display("Rob[%2d]: cpl %b, t: %2d, t_old: %2d, dst: %2d, is_brch: %b, halt: %0b, illegal: %0b%s",
+                    i,
+                    state[i].cpl,
+                    state[i].tag,
+                    state[i].t_old,
+                    state[i].dst,
+                    state[i].is_brch,
+                    state[i].halt,
+                    state[i].illegal,
+                    (i == head && head == tail) 
+                        ? " << h/t"
+                        : (i == head) 
+                            ? " << h" 
+                            : (i == tail)
+                                ? " << t"
+                                : ""
+                );
+            end
+
             // $display("c_en: [%b %b] c_ts: [%d %d] c_data: [%h %h] c_rob_idxs: [%d %d]",
             //     c_in.c_en[0],
             //     c_in.c_en[1],
@@ -187,8 +211,8 @@ module rob #(
             //     );
             // end
             $display("  %3d | << ROB", $time);
-            `endif
         end
     end
+    `endif
 
 endmodule
