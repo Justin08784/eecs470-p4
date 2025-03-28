@@ -159,6 +159,18 @@ module rob #(
     always_ff @(posedge clock) begin
         if (!reset) begin
             $display("  %3d | >> ROB", $time);
+            $display("r_out: en_cnt: %d", r_out.r_en_cnt);
+            for (int i = 0; i < `N; ++i) begin
+                $display("r_out[%d]: tag: %d, t_old: %d, dst: %d, halt: %d, illegal: %d, brch_vld: %d",
+                    i,
+                    r_out.tag[i],
+                    r_out.t_old[i],
+                    r_out.dst[i],
+                    r_out.halt[i],
+                    r_out.illegal[i],
+                    r_out.brch_vld[i]
+                );
+            end
             for (int i = 0; i < `ROB_SZ; ++i) begin
                 $display("Rob[%2d]: cpl %b, t: %2d, t_old: %2d, dst: %2d, is_brch: %b, halt: %0b, illegal: %0b%s",
                     i,
