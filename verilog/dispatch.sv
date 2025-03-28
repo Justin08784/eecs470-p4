@@ -36,6 +36,7 @@ module dispatch #(parameter
 );
 
 logic [$clog2(N):0] dispatch_cnt;
+logic [N-1:0]       dispatch_en;
 
 // control logic
 always_comb begin
@@ -57,7 +58,9 @@ end
 
 // handle btq output
 always_comb begin
-    btq_out.en_cnt = dispatch_cnt;
+    foreach (dispatch_en[i])
+        dispatch_en[i] = i < dispatch_cnt;
+    btq_out.en_cnt = $countones(dispatch_en & decode_in.prvw_is_brch);
     for (int unsigned i = 0; i < `N; ++i)
         btq_out.NPC = decode_in.d_dat[i].NPC;
 end

@@ -18,7 +18,7 @@ module decoder_p4 (
     output ALU_OPB_SELECT opb_select,
     output logic          has_dest, // if there is a destination register
     output ALU_FUNC       alu_func,
-    output logic          mult, rd_mem, wr_mem, is_branch, cond_branch, uncond_branch,
+    output logic          mult, rd_mem, wr_mem, cond_branch, uncond_branch,
     output logic          csr_op, // used for CSR operations, we only use this as a cheap way to get the return code out
     output logic          halt,   // non-zero on a halt
     output logic          illegal // non-zero on an illegal instruction
@@ -37,7 +37,6 @@ module decoder_p4 (
         mult          = `FALSE;
         rd_mem        = `FALSE;
         wr_mem        = `FALSE;
-        is_branch     = cond_branch || uncond_branch;
         cond_branch   = `FALSE;
         uncond_branch = `FALSE;
         halt          = `FALSE;
@@ -262,7 +261,6 @@ module stage_id_p4 (
             .mult          (tmp[i].mult),
             .rd_mem        (tmp[i].rd_mem),
             .wr_mem        (tmp[i].wr_mem),
-            .is_branch     (tmp[i].is_branch),
             .cond_branch   (tmp[i].cond_branch),
             .uncond_branch (tmp[i].uncond_branch),
             .csr_op        (tmp[i].csr_op),
@@ -287,7 +285,7 @@ module stage_id_p4 (
                 fu_idx      : tmp[i].fu_idx,
                 rob_idx     : '0,
                 btq_idx     : '0,
-                is_branch   : tmp[i].is_branch,
+                is_branch   : tmp[i].cond_branch || tmp[i].uncond_branch,
 
                 inst        : f_in.f_dat[i].inst,
                 PC          : f_in.f_dat[i].PC,
