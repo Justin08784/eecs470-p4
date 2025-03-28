@@ -651,21 +651,29 @@ module stage_ex_p4 (
                 mul_ops.rs2[1],
                 mul_ops.dst[1].tag
             );
-            $display("rdy_alu: %b  rdy_mult: %b  rdy_store: %b  rdy_load: %b  |  c_en: [%b %b] c_ts: [%d %d] c_data: [%h %h] c_rob_idxs: [%d %d] cpl_gnt: %b",
+
+            $display("c_out: rdy_alu: %b  rdy_mult: %b  rdy_store: %b  rdy_load: %b  cpl_gnt: %b",
                 rs_out.fu_rdy_alu,
                 rs_out.fu_rdy_mult,
                 rs_out.fu_rdy_store,
                 rs_out.fu_rdy_load,
-                c_out.c_en[0],
-                c_out.c_en[1],
-                c_out.c_ts[0],
-                c_out.c_ts[1],
-                c_out.c_data[0],
-                c_out.c_data[1],
-                c_out.c_rob_idxs[0],
-                c_out.c_rob_idxs[1],
                 cpl_gnt
             );
+
+            for (int i = 0; i < `N; ++i) begin
+                $display("c_out[%0d]/cpl_gnt: %b: c_en: %b, is_branch: %b, c_ts: %2d, c_rob_idxs: %2d, c_data: %x, btq_idxs: %d, take: %b",
+                    i,
+                    c_out.c_en[i],
+                    c_out.is_branch[i],
+                    c_out.c_ts[i],
+                    c_out.c_rob_idxs[i],
+                    c_out.c_data[i],
+                    c_out.btq_idxs[i],
+                    c_out.take[i]
+                );
+            end
+
+
             // for (int i = 0; i < 4; ++i) begin
             //     $display("all_vld[%0d]: %b", i, all_vld[i]);
             // end
