@@ -629,30 +629,65 @@ module stage_ex_p4 (
     always_ff @(posedge clock) begin
         if (!reset) begin
             $display("  %3d | >> EXECUTE", $time);
-            $display("alu_ins: bsy[%b, %b], mul_ins: bsy[%b, %b]",
-                ins.rdy.alu[0],
-                ins.rdy.alu[1],
-                ins.rdy.mul[0],
-                ins.rdy.mul[1]
-            );
-            $display("alu_ops: [%b {opa: %x opb: %x}, %b {opa: %x opb: %x}]",
-                alu_ops.bsy[0],
-                alu_ops.opa[0],
-                alu_ops.opb[0],
-                alu_ops.bsy[1],
-                alu_ops.opa[1],
-                alu_ops.opb[1]
-            );
-            $display("mul_ops: [%b {rs1: %x rs2: %x dst: %0d}, %b {rs1: %x rs2: %x dst: %0d}]",
-                mul_ops.bsy[0],
-                mul_ops.rs1[0],
-                mul_ops.rs2[0],
-                mul_ops.dst[0].tag,
-                mul_ops.bsy[1],
-                mul_ops.rs1[1],
-                mul_ops.rs2[1],
-                mul_ops.dst[1].tag
-            );
+
+            for (int i = 0; i < `NUM_FU_ALU; ++i) begin
+                $display("alu_ins[%0d]: rdy: %b, vld: %b, t: %2d, t1: %2d, t2: %2d, rob_idx: %2d, btq_idx: %2d, inst: 0x%x, PC: 0x%x, NPC: 0x%x, cond_branch: %b, uncond_branch: %b",
+                    i,
+                    ins.rdy.alu[i],
+                    ins.vld.alu[i],
+                    ins.dat.alu[i].t,
+                    ins.dat.alu[i].t1,
+                    ins.dat.alu[i].t2,
+                    ins.dat.alu[i].rob_idx,
+                    ins.dat.alu[i].btq_idx,
+                    ins.dat.alu[i].inst,
+                    ins.dat.alu[i].PC,
+                    ins.dat.alu[i].NPC,
+                    ins.dat.alu[i].cond_branch,
+                    ins.dat.alu[i].uncond_branch
+                );
+            end
+
+            for (int i = 0; i < `NUM_FU_MULT; ++i) begin
+                $display("mul_ins[%0d]: rdy: %b, vld: %b, t: %2d, t1: %2d, t2: %2d, rob_idx: %2d, func: 0x%x",
+                    i,
+                    ins.rdy.mul[i],
+                    ins.vld.mul[i],
+                    ins.dat.mul[i].t,
+                    ins.dat.mul[i].t1,
+                    ins.dat.mul[i].t2,
+                    ins.dat.mul[i].rob_idx,
+                    ins.dat.mul[i].func
+                );
+            end
+
+            for (int i = 0; i < `NUM_FU_ALU; ++i) begin
+                $display("alu_ops[%0d]: bsy: %b, opa: 0x%x, opb: 0x%x, alu_func: %b, branch_func: %b, cond_branch: %b, uncond_branch: %b, t: %2d, rob_idx: %2d, btq_idx: %2d",
+                    i,
+                    alu_ops.bsy[i],
+                    alu_ops.opa[i],
+                    alu_ops.opb[i],
+                    alu_ops.alu_func[i],
+                    alu_ops.branch_func[i],
+                    alu_ops.cond_branch[i],
+                    alu_ops.uncond_branch[i],
+                    alu_ops.t[i],
+                    alu_ops.rob_idx[i],
+                    alu_ops.btq_idx[i]
+                );
+            end
+
+            for (int i = 0; i < `NUM_FU_MULT; ++i) begin
+                $display("mul_ops[%0d]: bsy: %b, rs1: 0x%x, rs2: 0x%x, func: %b, t: %2d, rob_idx: %2d",
+                    i,
+                    mul_ops.bsy[i],
+                    mul_ops.rs1[i],
+                    mul_ops.rs2[i],
+                    mul_ops.func[i],
+                    mul_ops.dst[i].tag,
+                    mul_ops.dst[i].rob_idx
+                );
+            end
 
             $display("c_out: rdy_alu: %b  rdy_mult: %b  rdy_store: %b  rdy_load: %b  cpl_gnt: %b",
                 rs_out.fu_rdy_alu,
