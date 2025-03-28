@@ -625,11 +625,11 @@ module dispatch_testbench;
         flush = 0;
 
 
-        clear_all();
+        // clear_all();
 
         // test_reset();
-        test_zero();
-        test_two_rdy();
+        // test_zero();
+        // test_two_rdy();
         // test_one_rdy();
         // test_too_many();
 

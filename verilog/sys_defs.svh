@@ -37,7 +37,7 @@
 
 // worry about these later
 `define BRANCH_PRED_SZ xx
-`define LSQ_SZ xx
+`define LSQ_SZ 16
 
 // functional units (you should decide if you want more or fewer types of FUs)
 `define NUM_FU_ALU 2
@@ -60,7 +60,7 @@
 ///////////////////////////////
 /* How can we implement this in the Makefile? */
 // comment out to enable synth only constructions
-`define SYNTH
+// `define SYNTH
 
 `ifndef SYNTH
 // comment out to disable DEBUG:
@@ -434,6 +434,15 @@ typedef struct packed {
     logic illegal;
 } ROB_ENTRY;
 
+typedef logic [$clog2(`LSQ_SZ)-1:0] LSQ_IDX;
+typedef struct packed {
+    LSQ_IDX sq_idx;
+    ROB_IDX rob_idx;
+    ADDR addr;
+    DATA data;
+    logic d_vld;
+} SQ_ENTRY;
+
 // BTQ stuff
 // typedef logic [$clog2(`BTQ_SZ)-1:0] BTQ_IDX;
 // typedef struct packed {
@@ -650,10 +659,11 @@ typedef struct packed {
 } dispatch2free_list;
 
 typedef struct packed {
-    logic     [$clog2(`N):0]  lsq_d_en_cnt;
+    logic   [$clog2(`N):0]  lsq_d_en_cnt;
         // To: LSQ
         // - number of enabled dispatch lines WHO NEED A LD/ST 
         //   (i.e. may only be a strict subset of dispatching insns!)
+    ROB_IDX [`N-1:0] rob_idx;
 } dispatch2lsq;
 
 typedef struct packed {
@@ -834,8 +844,32 @@ typedef struct packed{
 
 // By LSQ
 typedef struct packed {
-    logic    [$clog2(`N):0]    lsq_rdy_scnt;
+    logic   [$clog2(`N):0]      lsq_rdy_scnt;
+    logic   [$clog2(`LSQ_SZ):0] lsq_tail;
 } lsq2dispatch;
+
+typedef struct packed {
+    logic   [$clog2(`LSQ_SZ):0] lsq_d_complete_pos;
+} lsq2rs;
+
+typedef struct packed {
+    logic   [$clog2(`N):0] r_en;
+    ROB_IDX [`N-1:0] r_pos;
+} rob2lsq;
+
+typedef struct packed {
+    logic   [`N-1:0] ex_en;
+    ROB_IDX [`N-1:0] rob_idx;
+    ADDR    [`N-1:0] addr;
+    DATA    [`N-1:0] data;
+    logic   [`N-1:0] forward_req_en;
+    ADDR    [`N-1:0] forward_addr;
+} execute2lsq;
+
+typedef struct packed {
+    logic   [`N-1:0] forward_vld;
+    ADDR    [`N-1:0] forward_addr;
+} lsq2execute;
 
 typedef struct packed {
     ROB_IDX rob_idx;
