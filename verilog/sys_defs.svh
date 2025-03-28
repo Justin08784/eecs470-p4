@@ -849,7 +849,8 @@ typedef struct packed {
 } lsq2dispatch;
 
 typedef struct packed {
-    logic   [$clog2(`LSQ_SZ):0] lsq_d_complete_pos;
+    logic       [`NUM_FU_STORE-1:0] en;
+    LSQ_IDX     [`NUM_FU_STORE-1:0] lsq_cdb;
 } lsq2rs;
 
 typedef struct packed {
@@ -859,7 +860,7 @@ typedef struct packed {
 
 typedef struct packed {
     logic   [`N-1:0] ex_en;
-    ROB_IDX [`N-1:0] rob_idx;
+    LSQ_IDX [`N-1:0] sq_idx;
     ADDR    [`N-1:0] addr;
     DATA    [`N-1:0] data;
     logic   [`N-1:0] forward_req_en;
