@@ -877,11 +877,21 @@ typedef struct packed {
 } lsq2rob;
 
 typedef struct packed {
-    MEM_COMMAND   Dmem_command,   // The memory command
-    MEM_SIZE      Dmem_size,      // Size of data to read or write
-    ADDR          Dmem_addr,      // Address sent to Data memory
-    MEM_BLOCK     Dmem_store_data // Data sent to Data memory
+    MEM_COMMAND   Dmem_command;    // The memory command
+    MEM_SIZE      Dmem_size;       // Size of data to read or write
+    ADDR          Dmem_addr;       // Address sent to Data memory
+    MEM_BLOCK     Dmem_store_data; // Data sent to Data memory
 } lsq2mem;
+
+typedef struct packed {
+    logic [$clog2(`N):0] ret_cnt;
+    SQ_ENTRY [`N-1:0] ret_st;
+} lsq2stRET;
+
+typedef struct packed {
+    logic [$clog2(`N):0] free_out;
+    logic empty;
+} stRET2lsq;
 
 typedef struct packed {
     ROB_IDX rob_idx;

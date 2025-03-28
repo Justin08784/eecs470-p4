@@ -17,12 +17,13 @@ module lsq #(parameter
     input dispatch2lsq dis_2_lsq,
     input execute2lsq exec_2_lsq,
     input rob2lsq rob_2_lsq,
+    input stRET2lsq ret_2_lsq,
 
     output lsq2dispatch lsq_2_dis,
     output lsq2execute lsq_2_exec,
     output lsq2rs lsq_2_rs,
     output lsq2rob lsq_2_rob,
-    output lsq2mem lsq_2_mem
+    output lsq2stRET lsq_2_ret
 );
 
     localparam NUM_DPORTS = N; // dispatch ports (in-order)
@@ -82,7 +83,9 @@ module lsq #(parameter
         else                                                    lsq_2_rob.ret_rdy = 0;
 
         //handle retirement write to mem
-
+        lsq_2_ret.ret_cnt = rob_2_lsq.r_en;
+        lsq_2_ret.ret_st[0] = state[head];
+        lsq_2_ret.ret_st[1] = state[head_plus_one];
     end
 
 
@@ -171,10 +174,11 @@ module post_ret_buffer #(parameter
     input reset,
     input flush,
 
-    input SQ_ENTRY [N-1:0] ret_st,
+    input lsq2stRET lsq_2_ret,
 
-    output logic [$clog2(N):0] free,
-    output logic empty
+    output stRET2lsq ret_2_lsq,
+
+    output lsq2mem lsq_2_mem
 );
 
     localparam NUM_DPORTS = N; // dispatch ports (in-order)
@@ -202,11 +206,11 @@ module post_ret_buffer #(parameter
 
     // assign lsq_2_rs.en          = exec_2_lsq.ex_en;
     // assign lsq_2_rs.sq_idx_cdb  = exec_2_lsq.sq_idx;
-    LSQ_IDX head_plus_one;
+    // LSQ_IDX head_plus_one;
 
     always_comb begin
         // lsq2rs = '0;
-        lsq_2_exec = '0;
+        // lsq_2_exec = '0;
 
         for (int unsigned i = 0; i < NUM_RPORTS; ++i)
             r_idxs[i] = (head + i) % LSQ_SZ;
@@ -214,17 +218,19 @@ module post_ret_buffer #(parameter
             d_idxs[i] = (tail + i) % LSQ_SZ;
 
         // handle dispatch (outs)
-        lsq_2_dis <= '{
-            // rob_rdy_scnt : `MIN(free + r_out.r_en_cnt, NUM_DPORTS),
-            sq_rdy_scnt : `MIN(free, NUM_DPORTS),
-            sq_tail     : tail
-        };
+        // lsq_2_dis <= '{
+        //     // rob_rdy_scnt : `MIN(free + r_out.r_en_cnt, NUM_DPORTS),
+        //     sq_rdy_scnt : `MIN(free, NUM_DPORTS),
+        //     sq_tail     : tail
+        // };
+
+        ret_2_lsq.free_out = `MIN(free, NUM_DPORTS);
 
         //handle lsq to ROB for retirement
-        head_plus_one = (head + 1) % LSQ_SZ;
-        if (state[head].d_vld && state[head_plus_one].d_vld)    lsq_2_rob.ret_rdy = 2;
-        else if (state[head].d_vld)                             lsq_2_rob.ret_rdy = 1;
-        else                                                    lsq_2_rob.ret_rdy = 0;
+        // head_plus_one = (head + 1) % LSQ_SZ;
+        // if (state[head].d_vld && state[head_plus_one].d_vld)    lsq_2_rob.ret_rdy = 2;
+        // else if (state[head].d_vld)                             lsq_2_rob.ret_rdy = 1;
+        // else                                                    lsq_2_rob.ret_rdy = 0;
 
         //handle retirement write to mem
 
@@ -244,9 +250,9 @@ module post_ret_buffer #(parameter
             // if (r_out.r_en_cnt > used + d_in.d_en_cnt)
             //     $error("ROB underflow!");
             // `endif
-            used    <= used + dis_2_lsq.lsq_d_en_cnt - rob_2_lsq.r_en;
-            head    <= (head + rob_2_lsq.r_en) % LSQ_SZ;
-            tail    <= (tail + dis_2_lsq.lsq_d_en_cnt) % LSQ_SZ;
+            used    <= used + lsq_2_ret.ret_cnt;// - rob_2_lsq.r_en;
+            head    <= (head /*+ rob_2_lsq.r_en*/) % LSQ_SZ;
+            tail    <= (tail + lsq_2_ret.ret_cnt) % LSQ_SZ;
 
             // handle complete (ins)
             // for (int unsigned i = 0, int cur_idx = 0; i < NUM_ST_PORTS; ++i) begin
@@ -260,34 +266,35 @@ module post_ret_buffer #(parameter
             // end
 
             // handle execute updates
-            for (int unsigned i = 0, int cur_idx = 0; i < NUM_ST_PORTS; ++i) begin
-                cur_idx = exec_2_lsq.sq_idx[i];
+            // for (int unsigned i = 0, int cur_idx = 0; i < NUM_ST_PORTS; ++i) begin
+            //     cur_idx = exec_2_lsq.sq_idx[i];
 
-                if (exec_2_lsq.ex_en[i]) begin
-                    state[cur_idx].addr <= exec_2_lsq.addr[i];
-                    state[cur_idx].data <= exec_2_lsq.data[i];
-                    state[cur_idx].d_vld <= '1;
-                end
+            //     if (exec_2_lsq.ex_en[i]) begin
+            //         state[cur_idx].addr <= exec_2_lsq.addr[i];
+            //         state[cur_idx].data <= exec_2_lsq.data[i];
+            //         state[cur_idx].d_vld <= '1;
+            //     end
 
-            end
+            // end
 
             // handle dispatch (ins)
             // $display("d_en_cnt: %d", d_in.d_en_cnt);
             for (int unsigned i = 0, int cur_idx = 0; i < NUM_DPORTS; ++i) begin
-                if (i >= dis_2_lsq.lsq_d_en_cnt)
+                if (i >= lsq_2_ret.ret_cnt)
                     continue;
                 cur_idx = d_idxs[i];
-                state[cur_idx] <= '{
-                    sq_idx     : cur_idx,
-                    rob_idx : dis_2_lsq.rob_idx[i],
-                    addr     : '0,
-                    data   : '0,
-                    d_vld     : '0
-                };
+                // state[cur_idx] <= '{
+                //     sq_idx     : cur_idx,
+                //     rob_idx : dis_2_lsq.rob_idx[i],
+                //     addr     : '0,
+                //     data   : '0,
+                //     d_vld     : '0
+                // };
+                state[cur_idx] <= lsq_2_ret.ret_st[i];
             end
 
             `ifndef SYNTH
-            $display("  %3d | >> LSQ", $time);
+            $display("  %3d | >> RET buffer", $time);
             for (int i = 0; i < LSQ_SZ; i++) begin
                 $display("Entry [%0d]: id=%0d, rob_idx=%0d, addr=%0d, data=%0d, d_valid=%b",
                 i,
@@ -298,7 +305,7 @@ module post_ret_buffer #(parameter
                 state[i].d_vld
                 );
             end
-            $display("  %3d | << LSQ", $time);
+            $display("  %3d | << RET buffer", $time);
             `endif
         end
     end
