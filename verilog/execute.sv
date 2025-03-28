@@ -501,6 +501,8 @@ module stage_ex_p4 (
             alu_ops_n.t[i]           = ins.dat.alu[i].t;
             alu_ops_n.rob_idx[i]     = ins.dat.alu[i].rob_idx;
             alu_ops_n.btq_idx[i]     = ins.dat.alu[i].btq_idx;
+            alu_ops_n.cond_branch[i]        = ins.dat.alu[i].cond_branch;
+            alu_ops_n.uncond_branch[i]      = ins.dat.alu[i].uncond_branch;
         end
 
         mul_ops_n = '0;
