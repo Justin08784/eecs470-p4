@@ -844,13 +844,13 @@ typedef struct packed{
 
 // By LSQ
 typedef struct packed {
-    logic   [$clog2(`N):0]      lsq_rdy_scnt;
-    logic   [$clog2(`LSQ_SZ):0] lsq_tail;
+    logic   [$clog2(`N):0]      sq_rdy_scnt;
+    logic   [$clog2(`LSQ_SZ):0] sq_tail;
 } lsq2dispatch;
 
 typedef struct packed {
     logic       [`NUM_FU_STORE-1:0] en;
-    LSQ_IDX     [`NUM_FU_STORE-1:0] lsq_cdb;
+    LSQ_IDX     [`NUM_FU_STORE-1:0] sq_idx_cdb;
 } lsq2rs;
 
 typedef struct packed {
@@ -859,18 +859,29 @@ typedef struct packed {
 } rob2lsq;
 
 typedef struct packed {
-    logic   [`N-1:0] ex_en;
-    LSQ_IDX [`N-1:0] sq_idx;
-    ADDR    [`N-1:0] addr;
-    DATA    [`N-1:0] data;
-    logic   [`N-1:0] forward_req_en;
-    ADDR    [`N-1:0] forward_addr;
+    logic   [`NUM_FU_STORE-1:0] ex_en;
+    LSQ_IDX [`NUM_FU_STORE-1:0] sq_idx;
+    ADDR    [`NUM_FU_STORE-1:0] addr;
+    DATA    [`NUM_FU_STORE-1:0] data;
+    logic   [`NUM_FU_LOAD-1:0] forward_req_en;
+    ADDR    [`NUM_FU_LOAD-1:0] forward_addr;
 } execute2lsq;
 
 typedef struct packed {
     logic   [`N-1:0] forward_vld;
     ADDR    [`N-1:0] forward_addr;
 } lsq2execute;
+
+typedef struct packed {
+    logic [$clog2(`N):0] ret_rdy;
+} lsq2rob;
+
+typedef struct packed {
+    MEM_COMMAND   Dmem_command,   // The memory command
+    MEM_SIZE      Dmem_size,      // Size of data to read or write
+    ADDR          Dmem_addr,      // Address sent to Data memory
+    MEM_BLOCK     Dmem_store_data // Data sent to Data memory
+} lsq2mem;
 
 typedef struct packed {
     ROB_IDX rob_idx;
