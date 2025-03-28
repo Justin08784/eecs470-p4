@@ -97,7 +97,7 @@ always_comb begin
     for (int i = 0; i < dispatch_cnt; i++) begin
 
         //handling dest register
-        map_out.dsts[i]     = decode_in.d_dat[i].inst.r.rd;
+        map_out.dsts[i]      = decode_in.d_dat[i].dest_reg_idx;
         // actually need src tags?
         map_out.is_rs1s[i]  = decode_in.d_dat[i].opa_select == OPA_IS_RS1;
         map_out.is_rs2s[i]  = decode_in.d_dat[i].opb_select == OPB_IS_RS2;
@@ -158,7 +158,7 @@ always_comb begin
         rob_out.tag[i]      = map_out.ts[i];
         rob_out.t_old[i]    = map_in.ts_old[i];
         //handling dest register
-        rob_out.dst[i]      = decode_in.d_dat[i].inst.r.rd;
+        rob_out.dst[i]      = decode_in.d_dat[i].dest_reg_idx;
 
         rob_out.halt[i]     = decode_in.d_dat[i].halt;
         rob_out.illegal[i]  = decode_in.d_dat[i].illegal;
