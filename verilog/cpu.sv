@@ -504,19 +504,19 @@ module cpu (
             if (!rob_2_retire.brch_vld[i])
                 continue;
 
-            if (btq_2_retire.pred[btq_rd_cnt] != btq_2_retire.take[btq_rd_cnt]) begin
+            ++btq_rd_cnt;
+            if (btq_2_retire.dat[btq_rd_cnt].pred != btq_2_retire.dat[btq_rd_cnt].take) begin
                 mispred = 1;
-                mispred_target = btq_2_retire.tgt[btq_rd_cnt];
-                // don't increment btq_rd_cnt — we're going to flush
+                mispred_target = btq_2_retire.dat[btq_rd_cnt].tgt;
                 retire_2_f = '{
                     mispred : mispred,
-                    corrected_PC : btq_2_retire.pred[btq_rd_cnt]
-                        ? btq_2_retire.NPC[btq_rd_cnt]
-                        : btq_2_retire.tgt[btq_rd_cnt]
+                    corrected_PC : btq_2_retire.dat[btq_rd_cnt]
+                        ? btq_2_retire.dat[btq_rd_cnt].NPC
+                        : btq_2_retire.dat[btq_rd_cnt].tgt
                 };
                 break;
             end 
-            ++btq_rd_cnt;
+            // ++btq_rd_cnt;
         end
 
         retire_2_btq = '{

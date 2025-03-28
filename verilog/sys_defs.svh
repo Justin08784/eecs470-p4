@@ -461,10 +461,7 @@ typedef struct packed {
 
 typedef struct packed {
     logic   [$clog2(`N):0]  used_scnt;
-    ADDR    [`N-1:0]        tgt;
-    logic   [`N-1:0]        NPC;
-    logic   [`N-1:0]        pred;
-    logic   [`N-1:0]        take;
+    BTQ_ENTRY [`N-1:0]      dat;
 } btq2retire;
 
 typedef struct packed {

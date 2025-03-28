@@ -1,7 +1,7 @@
     addi x2, x0, 5      # x2 = 5 (loop counter)
 loop:
     addi x3, x2, 3      # x3 = x2 + 3 (just some operation)
-    mul x4, x2, x3      # x4 = x2 * x3
+    # mul x4, x2, x3      # x4 = x2 * x3
     add x5, x2, x3      # x5 = x2 + x3
     addi x2, x2, -1     # decrement counter
     bnez x2, loop       # if x2 != 0, jump back to loop
