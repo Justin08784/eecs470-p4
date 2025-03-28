@@ -260,8 +260,10 @@ module testbench;
                 output_cpi_file();
 
                 $display("\n---- Finished CPU Testbench ----\n");
-
-                #100 $finish;
+                
+                $finish;
+                // below: original. They put a #100 delay for some reason.
+                // #100 $finish;
             end
         end // if(reset)
     end
@@ -282,6 +284,9 @@ module testbench;
         (only *.out is graded after all), since hierarchical references
         do not work in synthesis
         */
+        `ifndef SYNTH
+        $display("  %3d | >> cpu_test >>", $time);
+        `endif // SYNTH
         for (int n = 0, int cur_idx = 0; n < `N; ++n) begin
             if (!committed_insts[n].valid)
                 continue;
@@ -310,6 +315,15 @@ module testbench;
                           data);
             end
             rob_debug.delete(cur_idx);
+            $display("commit[%0d]: (pc: 0x%x, inst: 0x%x) vld: %b, halt: %b, illegal: %b",
+                n,
+                pc,
+                inst,
+                committed_insts[n].valid,
+                committed_insts[n].halt,
+                committed_insts[n].illegal
+            );
+
             `endif // SYNTH
 
             // exit if we have an illegal instruction or a halt
@@ -321,6 +335,9 @@ module testbench;
                 break;
             end
         end
+        `ifndef SYNTH
+        $display("  %3d | << cpu_test <<", $time);
+        `endif // SYNTH
 
         // V1: original
         // for (int n = 0; n < `N; ++n) begin
