@@ -38,6 +38,7 @@
 // worry about these later
 `define BRANCH_PRED_SZ xx
 `define LSQ_SZ 16
+`define LSQ_SZ_DBL 32
 
 // functional units (you should decide if you want more or fewer types of FUs)
 `define NUM_FU_ALU 2
@@ -434,13 +435,14 @@ typedef struct packed {
     logic illegal;
 } ROB_ENTRY;
 
-typedef logic [$clog2(`LSQ_SZ)-1:0] LSQ_IDX;
+typedef logic [$clog2(`LSQ_SZ_DBL)-1:0] LSQ_IDX;
 typedef struct packed {
     LSQ_IDX sq_idx;
     ROB_IDX rob_idx;
     ADDR addr;
     DATA data;
     logic d_vld;
+    MEM_SIZE mem_size; //MEM_SIZE'(id_ex_reg.inst.r.funct3[1:0]); <-- HOW TO FIND THIS. DO THIS WHEN PUTTING ENTRY IN FROM DISPATCH OR FROM EXECUTE
 } SQ_ENTRY;
 
 // BTQ stuff
@@ -859,21 +861,26 @@ typedef struct packed {
 } rob2lsq;
 
 typedef struct packed {
-    logic   [`NUM_FU_STORE-1:0] ex_en;
-    LSQ_IDX [`NUM_FU_STORE-1:0] sq_idx;
-    ADDR    [`NUM_FU_STORE-1:0] addr;
-    DATA    [`NUM_FU_STORE-1:0] data;
-    logic   [`NUM_FU_LOAD-1:0] forward_req_en;
-    ADDR    [`NUM_FU_LOAD-1:0] forward_addr;
+    logic       [`NUM_FU_STORE-1:0] ex_en;
+    LSQ_IDX     [`NUM_FU_STORE-1:0] sq_idx;
+    ADDR        [`NUM_FU_STORE-1:0] addr;
+    DATA        [`NUM_FU_STORE-1:0] data;
+    MEM_SIZE    [`NUM_FU_STORE-1:0] st_mem_size; //MEM_SIZE'(id_ex_reg.inst.r.funct3[1:0]); <-- HOW TO FIND THIS. DO THIS WHEN PUTTING ENTRY IN FROM DISPATCH OR FROM EXECUTE
+    logic       [`NUM_FU_LOAD-1:0] forward_req_en;
+    ADDR        [`NUM_FU_LOAD-1:0] forward_addr;
+    MEM_SIZE    [`NUM_FU_LOAD-1:0] ld_mem_size; //MEM_SIZE'(id_ex_reg.inst.r.funct3[1:0]); <-- HOW TO FIND THIS. DO THIS WHEN PUTTING ENTRY IN FROM DISPATCH OR FROM EXECUTE
 } execute2lsq;
 
 typedef struct packed {
-    logic   [`N-1:0] forward_vld;
-    ADDR    [`N-1:0] forward_addr;
+    logic       [`NUM_FU_LOAD-1:0] forward_en;
+    ADDR        [`NUM_FU_LOAD-1:0] forward_addr;
+    DATA        [`NUM_FU_LOAD-1:0] froward_data;
+    MEM_SIZE    [`NUM_FU_LOAD-1:0] forward_mem_size;
 } lsq2execute;
 
 typedef struct packed {
-    logic [$clog2(`N):0] ret_rdy;
+    logic [$clog2(`N):0]    ret_rdy;
+    logic                   sq_ret_complete;
 } lsq2rob;
 
 typedef struct packed {
@@ -881,16 +888,24 @@ typedef struct packed {
     MEM_SIZE      Dmem_size;       // Size of data to read or write
     ADDR          Dmem_addr;       // Address sent to Data memory
     MEM_BLOCK     Dmem_store_data; // Data sent to Data memory
-} lsq2mem;
+} stRET2mem;
 
 typedef struct packed {
-    logic [$clog2(`N):0] ret_cnt;
-    SQ_ENTRY [`N-1:0] ret_st;
+    logic       [$clog2(`N):0] ret_cnt;
+    SQ_ENTRY    [`N-1:0] ret_st;
+    logic       [`NUM_FU_LOAD-1:0] forward_req_en;
+    LSQ_IDX     [`NUM_FU_LOAD-1:0] sq_idx;
+    ADDR        [`NUM_FU_LOAD-1:0] forward_addr;
+    MEM_SIZE    [`NUM_FU_LOAD-1:0] ld_mem_size;
 } lsq2stRET;
 
 typedef struct packed {
-    logic [$clog2(`N):0] free_out;
-    logic empty;
+    logic [$clog2(`N):0]    free_out;
+    logic                   empty;
+    logic       [`NUM_FU_LOAD-1:0] forward_en;
+    ADDR        [`NUM_FU_LOAD-1:0] forward_addr;
+    DATA        [`NUM_FU_LOAD-1:0] froward_data;
+    MEM_SIZE    [`NUM_FU_LOAD-1:0] forward_mem_size;
 } stRET2lsq;
 
 typedef struct packed {
