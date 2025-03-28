@@ -99,8 +99,11 @@ always_comb begin
         //handling dest register
         map_out.dsts[i]      = decode_in.d_dat[i].dest_reg_idx;
         // actually need src tags?
-        map_out.is_rs1s[i]  = decode_in.d_dat[i].opa_select == OPA_IS_RS1;
-        map_out.is_rs2s[i]  = decode_in.d_dat[i].opb_select == OPB_IS_RS2;
+        map_out.rd_src1s[i]  = decode_in.d_dat[i].opa_select == OPA_IS_RS1
+            || decode_in.d_dat[i].cond_branch;
+        map_out.rd_src2s[i]  = decode_in.d_dat[i].opb_select == OPB_IS_RS2
+            || decode_in.d_dat[i].cond_branch
+            || decode_in.d_dat[i].wr_mem;
         //handling src tags
         map_out.src1s[i]    = decode_in.d_dat[i].inst.r.rs1;
         map_out.src2s[i]    = decode_in.d_dat[i].inst.r.rs2;
