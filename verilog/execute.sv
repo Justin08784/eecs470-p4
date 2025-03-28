@@ -661,7 +661,7 @@ module stage_ex_p4 (
             );
 
             for (int i = 0; i < `N; ++i) begin
-                $display("c_out[%0d]/cpl_gnt: %b: c_en: %b, is_branch: %b, c_ts: %2d, c_rob_idxs: %2d, c_data: %x, btq_idxs: %d, take: %b",
+                $display("c_out[%0d]: c_en: %b, is_branch: %b, c_ts: %2d, c_rob_idxs: %2d, c_data: %x, btq_idxs: %d, take: %b",
                     i,
                     c_out.c_en[i],
                     c_out.is_branch[i],

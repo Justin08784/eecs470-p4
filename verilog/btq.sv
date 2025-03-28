@@ -146,6 +146,27 @@ module btq #(
                                 : ""
                 );
             end
+
+            for (int i = 0; i < `N; ++i) begin
+                $display("c_in[%0d]: c_en: %b, is_branch: %b, c_btq_idxs: %d, take: %b", 
+                    i,
+                    c_in.c_en[i],
+                    c_in.is_branch[i],
+                    c_in.btq_idxs[i],
+                    c_in.take[i]
+                );
+            end
+            $display("r_in: rd_cnt %d", r_in.rd_cnt);
+            $display("r_out: used_scnt: %0d r_idxs: %0d %0d", r_out.used_scnt, r_idxs[0], r_idxs[1]);
+            for (int i = 0; i < `N; ++i) begin
+                $display("r_out[%d]: tgt: %x, NPC: %x, pred: %b, take: %b", 
+                    i,
+                    r_out.dat[i].tgt,
+                    r_out.dat[i].NPC,
+                    r_out.dat[i].pred,
+                    r_out.dat[i].take
+                );
+            end
             $display("  %3d | BTQ <<", $time);
         end
     end
