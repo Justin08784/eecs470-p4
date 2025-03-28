@@ -64,14 +64,12 @@ module lsq #(parameter
 
         // handle dispatch (outs)
         lsq_2_dis <= '{
-            // rob_rdy_scnt : `MIN(free + r_out.r_en_cnt, NUM_DPORTS),
             sq_rdy_scnt : `MIN(free, NUM_DPORTS),
             sq_tail     : tail_dbl
         };
 
         //handle LSQ CDB to RS
         lsq_2_rs <= '{
-            // rob_rdy_scnt : `MIN(free + r_out.r_en_cnt, NUM_DPORTS),
             en : exec_2_lsq.ex_en,
             sq_idx_cdb     : exec_2_lsq.sq_idx
         };
@@ -260,28 +258,6 @@ module post_ret_buffer #(parameter
         //data forwarding
         forward_found = '0;
         forward_idx = '0;
-        // for (int unsigned i = 0; i < NUM_FU_STORE; i++) begin
-        //     if (!lsq_2_ret.forward_req_en[i]) continue;
-        //     // $display("here");
-        //     for (int unsigned j = state[head].sq_idx, int unsigned idx = head; (j != lsq_2_ret.sq_idx[i]) && (idx != tail); j = (j+1) % LSQ_SZ_DBL) begin
-        //         idx = j % LSQ_SZ;
-        //         // $display("here2");
-        //         if (state[idx].d_vld && (state[idx].addr == lsq_2_ret.forward_addr[i])) begin
-        //             // $display("here3");
-        //             forward_addr[i] = state[idx].addr; //don't want to break when found bc there could be a more recent store between here and the sq_idx
-        //             forward_idx[i] = idx;
-        //         end
-        //     end
-
-        //     if (forward_addr[i] != 0) begin
-        //         $display("here4");
-        //         ret_2_lsq.forward_en[i] = '1;
-        //         ret_2_lsq.forward_addr[i] = forward_addr[i];
-        //         ret_2_lsq.froward_data[i] = state[forward_idx].data;
-        //         ret_2_lsq.forward_mem_size[i] = state[forward_idx].mem_size;
-        //     end
-        // end
-
         for (int unsigned i = 0; i < NUM_FU_STORE; i++) begin
             for (int unsigned idx = head; (idx != tail); idx = (idx+1) % LSQ_SZ) begin
                 if (state[idx].d_vld && (state[idx].addr == lsq_2_ret.forward_addr[i])) begin
@@ -314,18 +290,6 @@ module post_ret_buffer #(parameter
             used    <= used + lsq_2_ret.ret_cnt - ret_success;
             head    <= (head + ret_success) % LSQ_SZ;
             tail    <= (tail + lsq_2_ret.ret_cnt) % LSQ_SZ;
-
-            // handle execute updates
-            // for (int unsigned i = 0, int cur_idx = 0; i < NUM_ST_PORTS; ++i) begin
-            //     cur_idx = exec_2_lsq.sq_idx[i];
-
-            //     if (exec_2_lsq.ex_en[i]) begin
-            //         state[cur_idx].addr <= exec_2_lsq.addr[i];
-            //         state[cur_idx].data <= exec_2_lsq.data[i];
-            //         state[cur_idx].d_vld <= '1;
-            //     end
-
-            // end
 
             // handle dispatch (ins)
             for (int unsigned i = 0, int cur_idx = 0; i < NUM_DPORTS; ++i) begin
