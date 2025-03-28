@@ -189,7 +189,7 @@ module alu_ex(
                 data    : tmp_res[i],
                 btq_idx : ops.btq_idx[i],
                 take    : tmp_take[i],
-                is_brch : ops.cond_branch || ops.uncond_branch
+                is_brch : ops.cond_branch[i] || ops.uncond_branch[i]
             };
 
             // <FU>_outs: where executed insns wait until completion
