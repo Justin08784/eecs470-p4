@@ -126,4 +126,29 @@ module btq #(
         end
     end
 
+    `ifndef SYNTH
+    always_ff @(posedge clock) begin
+        if (!reset) begin
+            $display("  %3d | BTQ >>", $time);
+            for (int i = 0; i < `BTQ_SZ; ++i) begin
+                $display("BTQ [%0d]: tgt: %x, NPC: %x, pred: %b, take: %b%s", 
+                    i,
+                    state[i].tgt,
+                    state[i].NPC,
+                    state[i].pred,
+                    state[i].take,
+                    (i == head && head == tail) 
+                        ? " << h/t"
+                        : (i == head) 
+                            ? " << h" 
+                            : (i == tail)
+                                ? " << t"
+                                : ""
+                );
+            end
+            $display("  %3d | BTQ <<", $time);
+        end
+    end
+    `endif // SYNTH
+
 endmodule

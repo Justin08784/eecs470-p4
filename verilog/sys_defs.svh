@@ -542,7 +542,7 @@ typedef struct packed {
 // TODO: remember to remove for synthesis? does this prevent synthesis?
 `ifndef SYNTH
 function print_id_result(input ID_RESULT x);
-    $display("ID_RESULT: id=%0d t=%0d t1=%0d t2=%0d t1_rdy=%b t2_rdy=%b fu_idx=%0d rob_idx=%0d inst=%h PC=%h NPC=%h opa_select=%0d opb_select=%0d dest_reg_idx=%0d alu_func=%0d mult=%b rd_mem=%b wr_mem=%b cond_branch=%b uncond_branch=%b halt=%b illegal=%b csr_op=%b",
+    $display("ID_RESULT: id=%0d t=%0d t1=%0d t2=%0d t1_rdy=%b t2_rdy=%b fu_idx=%0d rob_idx=%0d btq_idx=%0d is_branch:%b inst=%h PC=%h NPC=%h opa_select=%0d opb_select=%0d dest_reg_idx=%0d alu_func=%0d mult=%b rd_mem=%b wr_mem=%b cond_branch=%b uncond_branch=%b halt=%b illegal=%b csr_op=%b",
         x.id,
         x.t,
         x.t1,
@@ -551,6 +551,8 @@ function print_id_result(input ID_RESULT x);
         x.t2_rdy,
         x.fu_idx,
         x.rob_idx,
+        x.btq_idx,
+        x.is_branch,
         x.inst,
         x.PC,
         x.NPC,
