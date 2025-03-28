@@ -874,7 +874,7 @@ typedef struct packed {
 typedef struct packed {
     logic       [`NUM_FU_LOAD-1:0] forward_en;
     ADDR        [`NUM_FU_LOAD-1:0] forward_addr;
-    DATA        [`NUM_FU_LOAD-1:0] froward_data;
+    DATA        [`NUM_FU_LOAD-1:0] forward_data;
     MEM_SIZE    [`NUM_FU_LOAD-1:0] forward_mem_size;
 } lsq2execute;
 
@@ -904,7 +904,7 @@ typedef struct packed {
     logic                   empty;
     logic       [`NUM_FU_LOAD-1:0] forward_en;
     ADDR        [`NUM_FU_LOAD-1:0] forward_addr;
-    DATA        [`NUM_FU_LOAD-1:0] froward_data;
+    DATA        [`NUM_FU_LOAD-1:0] forward_data;
     MEM_SIZE    [`NUM_FU_LOAD-1:0] forward_mem_size;
 } stRET2lsq;
 
