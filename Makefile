@@ -268,7 +268,7 @@ build/btq.simv: $(BTB_FILES)
 build/btq.cov: $(BTB_FILES)
 build/btq.vg: $(BTB_FILES)
 
-LSQ_FILES = verilog/sys_defs.svh verilog/post_ret_buffer.sv
+LSQ_FILES = verilog/sys_defs.svh
 build/lsq.simv: $(LSQ_FILES)
 build/lsq.cov: $(LSQ_FILES)
 synth/lsq.vg: $(LSQ_FILES)
