@@ -492,13 +492,12 @@ module cpu (
     logic [$clog2(`N):0] btq_rd_cnt;
     logic [$clog2(`N):0] allowed_retire_cnt; // FUCK ME
     logic mispred;
-    logic mispred_target;
+    ADDR  mispred_target;
     always_comb begin
         mispred = 0;
         mispred_target = '0;
         btq_rd_cnt = 0;
         allowed_retire_cnt = 0;
-        retire_2_f = '{default:'0};
         for (int unsigned i = 0; i < rob_2_retire.r_en_cnt; ++i) begin
             if (!rob_2_retire.brch_vld[i]) begin
                 ++allowed_retire_cnt;
@@ -506,13 +505,9 @@ module cpu (
                 if (btq_2_retire.dat[btq_rd_cnt].pred != btq_2_retire.dat[btq_rd_cnt].take) begin
                     // is mispred?
                     mispred = 1;
-                    mispred_target = btq_2_retire.dat[btq_rd_cnt].tgt;
-                    retire_2_f = '{
-                        mispred : mispred,
-                        corrected_PC : btq_2_retire.dat[btq_rd_cnt]
-                            ? btq_2_retire.dat[btq_rd_cnt].NPC
-                            : btq_2_retire.dat[btq_rd_cnt].tgt
-                    };
+                    mispred_target = btq_2_retire.dat[btq_rd_cnt].take
+                        ? btq_2_retire.dat[btq_rd_cnt].tgt
+                        : btq_2_retire.dat[btq_rd_cnt].NPC;
                     break;
                 end 
                 ++allowed_retire_cnt;
@@ -540,13 +535,15 @@ module cpu (
 
     always_ff @(posedge clock) begin
         if (reset) begin
-            flush <= '0;
+            flush       <= '0;
+            retire_2_f  <= '0;
         end else begin
             `ifndef SYNTH
             $display("  %3d | retire_exec.r_en_cnt: %0d", $time, retire_exec.r_en_cnt);
             `endif // SYNTH
 /* ======================================== */
-        flush <= mispred;
+            flush       <= mispred;
+            retire_2_f  <= '{corrected_PC : mispred_target};
 /* ======================================== */
         end
     end

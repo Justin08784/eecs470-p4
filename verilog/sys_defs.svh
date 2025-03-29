@@ -480,7 +480,7 @@ typedef struct packed {
 } retire2btq;
 
 // same as rob2retire, but with r_en_cnt potentially adjusted to account for branch mispredicts
-typedef struct {
+typedef struct packed {
     logic [$clog2(`N):0]        r_en_cnt; // final final
     PHYS_REG_IDX [`N-1:0]       tag;
     PHYS_REG_IDX [`N-1:0]       t_old;
@@ -490,8 +490,7 @@ typedef struct {
     logic        [`N-1:0]       brch_vld;
 } retire_final;
 
-typedef struct {
-    logic   mispred;
+typedef struct packed {
     ADDR    corrected_PC;
 } retire2fetch;
 

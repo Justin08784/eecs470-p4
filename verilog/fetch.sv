@@ -125,9 +125,9 @@ module stage_if_p4 (
     );
 
     always_ff @(posedge clock) begin
-        if (reset || flush) begin
+        if (reset) begin
             PC_reg <= 0;                // initial PC value is 0 (the memory address where our program starts)
-        end else if (r_in.mispred) begin
+        end else if (flush) begin
             PC_reg <= r_in.corrected_PC;
         end else begin
             PC_reg <= PC_reg + 4*f_cnt; // ...or transition to next PC if valid
@@ -139,6 +139,7 @@ module stage_if_p4 (
     always_ff @(posedge clock) begin
         if (!reset) begin
             $display("  %3d | >> Fetch >>", $time);
+            $display("r_in: {flush: %b, corrected_PC: 0x%x}", flush, r_in.corrected_PC);
             $display("PC_reg:  %x", PC_reg);
             $display("Imem_data: %x", Imem_data);
             $display("  %3d | << Fetch <<", $time);
