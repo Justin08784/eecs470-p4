@@ -631,12 +631,14 @@ module cpu (
     //                                              //
     //////////////////////////////////////////////////  
 
+    arch_map2map_table am_2_mt;
     map_table #(
         .N(`N)
     ) map_table_0 (
         .clock(clock),
         .reset(reset),
         .flush(flush),
+        .am_in(am_2_mt),
         .c_in(ex_2_complete),
         .d_in(dispatch_2_map),
         .d_out(map_2_dispatch)
@@ -653,6 +655,7 @@ module cpu (
     ) arch_map_0 (
         .clock(clock),
         .reset(reset),
+        .mt_out(am_2_mt),
         .r_in(retire_exec)
     );
 
