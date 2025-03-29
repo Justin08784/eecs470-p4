@@ -78,6 +78,7 @@ typedef struct packed {
 typedef struct packed {
     logic       [`NUM_FU_ALU-1:0]       bsy; // unused; same as en
     DATA        [`NUM_FU_ALU-1:0]       opa, opb;
+    DATA        [`NUM_FU_ALU-1:0]       rs1, rs2;
     ALU_FUNC    [`NUM_FU_ALU-1:0]       alu_func;
     logic       [`NUM_FU_ALU-1:0][2:0]  branch_func; // Which branch condition to check
     logic       [`NUM_FU_ALU-1:0]       cond_branch;
@@ -100,6 +101,8 @@ typedef struct packed {
 module alu (
     input DATA      opa,
     input DATA      opb,
+    input DATA      rs1,
+    input DATA      rs2,
     input ALU_FUNC  alu_func,
     input [2:0]     branch_func, // Which branch condition to check
 
@@ -126,12 +129,12 @@ module alu (
 
     always_comb begin
         case (branch_func)
-            3'b000:  take = signed'(opa) == signed'(opb); // BEQ
-            3'b001:  take = signed'(opa) != signed'(opb); // BNE
-            3'b100:  take = signed'(opa) <  signed'(opb); // BLT
-            3'b101:  take = signed'(opa) >= signed'(opb); // BGE
-            3'b110:  take = opa < opb;                    // BLTU
-            3'b111:  take = opa >= opb;                   // BGEU
+            3'b000:  take = signed'(rs1) == signed'(rs2); // BEQ
+            3'b001:  take = signed'(rs1) != signed'(rs2); // BNE
+            3'b100:  take = signed'(rs1) <  signed'(rs2); // BLT
+            3'b101:  take = signed'(rs1) >= signed'(rs2); // BGE
+            3'b110:  take = rs1 <  rs2;                    // BLTU
+            3'b111:  take = rs1 >= rs2;                   // BGEU
             default: take = `FALSE;
         endcase
     end
@@ -176,6 +179,8 @@ module alu_ex(
                 // Inputs
                 .opa        (ops.opa[i]),
                 .opb        (ops.opb[i]),
+                .rs1        (ops.rs1[i]),
+                .rs2        (ops.rs2[i]),
                 .alu_func   (ops.alu_func[i]),
                 .branch_func(ops.branch_func[i]), // Which branch condition to check
 
@@ -443,13 +448,18 @@ module stage_ex_p4 (
     endgenerate
 
     // request operands from PRF (separate stage)
+    /*
+    TODO: A separate PRF + operand fetch/decode stage is UNACCEPTABLE for performance,
+    as it adds 1 cycle delay to waking dependent insns. We MUST move PRF read
+    forward to issue, and operand decode into <FU>_ex.
+    */
     always_comb begin
         prf_out = '0;
         foreach (alu_in2ops_en[i]) begin
             if (!alu_in2ops_en[i])
                 continue;
-            prf_out.s_en1s.alu[i]   = ins.dat.alu[i].opa_select == OPA_IS_RS1;
-            prf_out.s_en2s.alu[i]   = ins.dat.alu[i].opb_select == OPB_IS_RS2;
+            prf_out.s_en1s.alu[i]   = 1;
+            prf_out.s_en2s.alu[i]   = 1;
             prf_out.s_t1s.alu[i]    = ins.dat.alu[i].t1; 
             prf_out.s_t2s.alu[i]    = ins.dat.alu[i].t2; 
         end
@@ -474,6 +484,8 @@ module stage_ex_p4 (
         foreach(alu_in2ops_en[i]) begin
             if(!alu_in2ops_en[i]) 
                 continue;
+            alu_ops_n.rs1[i] = prf_in.s_v1s.alu[i];
+            alu_ops_n.rs2[i] = prf_in.s_v2s.alu[i];
 
             // ALU opA mux
             case (ins.dat.alu[i].opa_select)
