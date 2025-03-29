@@ -15,7 +15,18 @@ module cpu (
     input reset, // System reset
 
     //input MEM_TAG   mem2proc_transaction_tag, // Memory tag for current transaction
-    input MEM_BLOCK mem2proc_data,            // Data coming back from memory
+    input MEM_BLOCK [1:0] mem2proc_data,            // Data coming back from memory
+        /*
+        Q: Why 2 mem blocks when each mem block supplies a double word
+        i.e. 8 bytes i.e. 2 insns? Isn't this enough to support 2-size fetch?
+        A (Justin): No, it is not; fetch at a double-word misaligned PC will
+        straddle double word block boundaries.
+
+        An address is "double word-aligned" iff its lowest 3 bits are 000.
+        If PC_reg = 3'b100, the first instruction (PC) is in the *second half* of
+        mem2proc_data[0], but the next instruction (PC + 4) is in the *first half*
+        of mem2proc_data[1]. One memory block isn't enough to cover both.
+        */
     //input MEM_TAG   mem2proc_data_tag,        // Tag for which transaction data is for
 
     //output MEM_COMMAND proc2mem_command, // Command sent to memory
