@@ -60,9 +60,16 @@ end
 always_comb begin
     foreach (dispatch_en[i])
         dispatch_en[i] = i < dispatch_cnt;
+
+    // pack branch insns to lowest indices
+    for (int unsigned i = 0, int wr_idx = 0; i < `N; ++i) begin
+        if (!decode_in.prvw_is_brch[i])
+            continue;
+        btq_out.NPC[wr_idx] = decode_in.d_dat[i].NPC;
+        ++wr_idx;
+    end
+
     btq_out.en_cnt = $countones(dispatch_en & decode_in.prvw_is_brch);
-    for (int unsigned i = 0; i < `N; ++i)
-        btq_out.NPC = decode_in.d_dat[i].NPC;
 end
 
 //logic for free list
