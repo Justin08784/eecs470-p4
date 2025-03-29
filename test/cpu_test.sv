@@ -305,7 +305,7 @@ module testbench;
             inst    = block.word_level[pc[2]];
             reg_idx = verisimpleV.rob_0.r_out.dst[n];
             data    = verisimpleV.prf_0.phys_reg_file[
-                verisimpleV.arch_map_0.entries_n[reg_idx].t
+                verisimpleV.rob_2_retire.tag[n]
             ];
             // print the committed instructions to the writeback output file
             if (reg_idx == `ZERO_REG) begin
