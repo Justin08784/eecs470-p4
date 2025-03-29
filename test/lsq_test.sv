@@ -44,23 +44,25 @@ module lsq_testbench;
         .dis_2_lsq(dis_2_lsq),
         .exec_2_lsq(exec_2_lsq),
         .rob_2_lsq(rob_2_lsq),
-        .ret_2_lsq(ret_2_lsq),
+        // .ret_2_lsq(ret_2_lsq),
 
         .lsq_2_dis(lsq_2_dis),
         .lsq_2_exec(lsq_2_exec),
         .lsq_2_rs(lsq_2_rs),
-        .lsq_2_ret(lsq_2_ret)
-    );
-
-    post_ret_buffer buf_dut(
-        .clock(clock),
-        .reset(reset),
-        .flush(flush),
-        .lsq_2_ret(lsq_2_ret),
+        // .lsq_2_ret(lsq_2_ret),
         .mem2proc_transaction_tag(mem2proc_transaction_tag),
-        .ret_2_lsq(ret_2_lsq),
         .ret_2_mem(ret_2_mem)
     );
+
+    // post_ret_buffer buf_dut(
+    //     .clock(clock),
+    //     .reset(reset),
+    //     .flush(flush),
+    //     .lsq_2_ret(lsq_2_ret),
+    //     .mem2proc_transaction_tag(mem2proc_transaction_tag),
+    //     .ret_2_lsq(ret_2_lsq),
+    //     .ret_2_mem(ret_2_mem)
+    // );
 
     initial begin
         clock = 0;
