@@ -18,7 +18,6 @@ module lsq #(parameter
     input dispatch2lsq dis_2_lsq,
     input execute2lsq exec_2_lsq,
     input rob2lsq rob_2_lsq,
-    // input stRET2lsq ret_2_lsq,
 
     output lsq2dispatch lsq_2_dis,
     output lsq2execute lsq_2_exec,
@@ -47,8 +46,6 @@ module lsq #(parameter
 
     lsq2stRET lsq_2_ret;
     stRET2lsq ret_2_lsq;
-    // stRET2mem ret_2_mem;
-    // MEM_TAG mem2proc_transaction_tag;
 
     assign state_dbg            = state;
     assign free                 = LSQ_SZ - used;
@@ -68,8 +65,13 @@ module lsq #(parameter
 
 
     LSQ_IDX head_plus_one;
-    logic [NUM_FU_LOAD-1:0] forward_found;
-    LSQ_IDX [NUM_FU_LOAD-1:0] forward_idx;
+    logic [NUM_FU_LOAD-1:0] [$clog2(LSQ_SZ):0] forward_found;
+    LSQ_IDX [NUM_FU_LOAD-1:0] [LSQ_SZ-1:0] forward_idx;
+    struct packed {
+        ADDR        [NUM_FU_LOAD-1:0]   start;
+        ADDR        [NUM_FU_LOAD-1:0]   stop;
+        MEM_SIZE    [NUM_FU_LOAD-1:0]   start_sz_req;
+    } forward_range;
     logic [N-1:0] [$clog2(LSQ_SZ_DBL)-1:0] next_ids;
     always_comb begin
 
@@ -114,37 +116,61 @@ module lsq #(parameter
         forward_found = '0;
         forward_idx = '0;
         lsq_2_exec = '0;
+        //calculate ADDR ranges to search for forwarding
+        forward_range = '0;
+        for (int unsigned i = 0; i < NUM_FU_LOAD; i++) begin
+            forward_range.start[i] = exec_2_lsq.forward_addr[i] - (exec_2_lsq.forward_addr[i] % 8);
+            forward_range.stop[i] = forward_range.start[i] + 16;
+        end
+
+        //search for matches to forward
         for (int unsigned i = 0; i < NUM_FU_LOAD; i++) begin
             if (!exec_2_lsq.forward_req_en[i]) continue;
 
+            //find any addr's in the SQ that are within range
             for (int unsigned j = 0, int idx = 0; j < LSQ_SZ; j++) begin
                 idx = (head+j) % LSQ_SZ;
 
-                if (state[idx].d_vld && (state[idx].addr == exec_2_lsq.forward_addr[i])) begin
-                    forward_idx[i] = idx; //don't want to break when found bc there could be a more recent store between here and the sq_idx
-                    forward_found[i] = '1;
-                    // $display("forward_found: %0d", forward_idx[i]);
+                if (state[idx].d_vld && (forward_range.start[i] <= state[idx].addr) && (state[idx].addr < forward_range.stop[i])) begin
+                    forward_idx[i][forward_found] = idx;
+                    forward_found += 1;
                 end
-                // $display("Current[%0d]: %0d, %0d, %0d", i, state[idx].d_vld, state[idx].addr, exec_2_lsq.forward_addr[i]);
+
                 if (state[idx].sq_idx == exec_2_lsq.sq_idx[i]) break;
             end
-
-            if (forward_found[i]) begin
-                // $display("here6: %0d", forward_idx[i]);
-                lsq_2_exec.forward_en[i] = state[forward_idx[i]].d_vld;
-                lsq_2_exec.forward_addr[i] = state[forward_idx[i]].addr;
-                lsq_2_exec.forward_data[i] = state[forward_idx[i]].data;
-                lsq_2_exec.forward_mem_size[i] = state[forward_idx[i]].mem_size;
-            end
-            else if (ret_2_lsq.forward_en[i]) begin
-                // $display("here5: %0d",i);
-                lsq_2_exec.forward_en[i] |= '1;//ret_2_lsq.forward_en[i];
-                lsq_2_exec.forward_addr[i] |= ret_2_lsq.forward_addr[i];
-                lsq_2_exec.forward_data[i] |= ret_2_lsq.forward_data[i];
-                lsq_2_exec.forward_mem_size[i] = ret_2_lsq.forward_mem_size[i];
-            end
-
         end
+
+        // for (int unsigned i = 0; i < NUM_FU_LOAD; i++) begin
+        //     if (!exec_2_lsq.forward_req_en[i]) continue;
+
+        //     for (int unsigned j = 0, int idx = 0; j < LSQ_SZ; j++) begin
+        //         idx = (head+j) % LSQ_SZ;
+
+        //         if (state[idx].d_vld && (state[idx].addr == exec_2_lsq.forward_addr[i])) begin
+        //             forward_idx[i] = idx; //don't want to break when found bc there could be a more recent store between here and the sq_idx
+        //             forward_found[i] = '1;
+        //             // $display("forward_found: %0d", forward_idx[i]);
+        //         end
+        //         // $display("Current[%0d]: %0d, %0d, %0d", i, state[idx].d_vld, state[idx].addr, exec_2_lsq.forward_addr[i]);
+        //         if (state[idx].sq_idx == exec_2_lsq.sq_idx[i]) break;
+        //     end
+
+        //     if (forward_found[i]) begin
+        //         // $display("here6: %0d", forward_idx[i]);
+        //         lsq_2_exec.forward_en[i] = state[forward_idx[i]].d_vld;
+        //         lsq_2_exec.forward_addr[i] = state[forward_idx[i]].addr;
+        //         lsq_2_exec.forward_data[i] = state[forward_idx[i]].data;
+        //         lsq_2_exec.forward_mem_size[i] = state[forward_idx[i]].mem_size;
+        //     end
+        //     else if (ret_2_lsq.forward_en[i]) begin
+        //         // $display("here5: %0d",i);
+        //         lsq_2_exec.forward_en[i] |= '1;//ret_2_lsq.forward_en[i];
+        //         lsq_2_exec.forward_addr[i] |= ret_2_lsq.forward_addr[i];
+        //         lsq_2_exec.forward_data[i] |= ret_2_lsq.forward_data[i];
+        //         lsq_2_exec.forward_mem_size[i] = ret_2_lsq.forward_mem_size[i];
+        //     end
+
+        // end
     end
 
 
@@ -209,8 +235,6 @@ module lsq #(parameter
 
 endmodule
 
-
-`include "sys_defs.svh"
 
 module post_ret_buffer #(parameter 
     N=`N,
@@ -280,27 +304,27 @@ module post_ret_buffer #(parameter
         //data forwarding
         forward_found = '0;
         forward_idx = '0;
-        for (int unsigned i = 0; i < NUM_FU_STORE; i++) begin
-            for (int unsigned j = 0, int idx = 0; j < LSQ_SZ; j++) begin
-                idx = (head+j) % LSQ_SZ;
+        // for (int unsigned i = 0; i < NUM_FU_STORE; i++) begin
+        //     for (int unsigned j = 0, int idx = 0; j < LSQ_SZ; j++) begin
+        //         idx = (head+j) % LSQ_SZ;
 
-                if (state[idx].d_vld && (state[idx].addr == lsq_2_ret.forward_addr[i])) begin
-                    forward_idx[i] = idx; //don't want to break when found bc there could be a more recent store between here and the sq_idx
-                    forward_found[i] = '1;
-                    // $display("forward_found: %0d", forward_idx[i]);
-                end
-                // $display("Current[%0d]: %0d, %0d, %0d", i, state[idx].d_vld, state[idx].addr, lsq_2_ret.forward_addr[i]);
-                if (state[idx].sq_idx == lsq_2_ret.sq_idx[i]) break;
-            end
+        //         if (state[idx].d_vld && (state[idx].addr == lsq_2_ret.forward_addr[i])) begin
+        //             forward_idx[i] = idx; //don't want to break when found bc there could be a more recent store between here and the sq_idx
+        //             forward_found[i] = '1;
+        //             // $display("forward_found: %0d", forward_idx[i]);
+        //         end
+        //         // $display("Current[%0d]: %0d, %0d, %0d", i, state[idx].d_vld, state[idx].addr, lsq_2_ret.forward_addr[i]);
+        //         if (state[idx].sq_idx == lsq_2_ret.sq_idx[i]) break;
+        //     end
 
-            if (forward_found[i]) begin
-                // $display("here6: %0d", forward_idx[i]);
-                ret_2_lsq.forward_en[i] = state[forward_idx[i]].d_vld;
-                ret_2_lsq.forward_addr[i] = state[forward_idx[i]].addr;
-                ret_2_lsq.forward_data[i] = state[forward_idx[i]].data;
-                ret_2_lsq.forward_mem_size[i] = state[forward_idx[i]].mem_size;
-            end
-        end
+        //     if (forward_found[i]) begin
+        //         // $display("here6: %0d", forward_idx[i]);
+        //         ret_2_lsq.forward_en[i] = state[forward_idx[i]].d_vld;
+        //         ret_2_lsq.forward_addr[i] = state[forward_idx[i]].addr;
+        //         ret_2_lsq.forward_data[i] = state[forward_idx[i]].data;
+        //         ret_2_lsq.forward_mem_size[i] = state[forward_idx[i]].mem_size;
+        //     end
+        // end
     end
 
 

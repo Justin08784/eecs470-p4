@@ -54,15 +54,6 @@ module lsq_testbench;
         .ret_2_mem(ret_2_mem)
     );
 
-    // post_ret_buffer buf_dut(
-    //     .clock(clock),
-    //     .reset(reset),
-    //     .flush(flush),
-    //     .lsq_2_ret(lsq_2_ret),
-    //     .mem2proc_transaction_tag(mem2proc_transaction_tag),
-    //     .ret_2_lsq(ret_2_lsq),
-    //     .ret_2_mem(ret_2_mem)
-    // );
 
     initial begin
         clock = 0;
