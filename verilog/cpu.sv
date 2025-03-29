@@ -510,20 +510,33 @@ module cpu (
         btq_rd_cnt = 0;
         allowed_retire_cnt = 0;
         for (int unsigned i = 0; i < rob_2_retire.r_en_cnt; ++i) begin
-            if (!rob_2_retire.brch_vld[i]) begin
-                ++allowed_retire_cnt;
-            end else begin 
-                if (btq_2_retire.dat[btq_rd_cnt].pred != btq_2_retire.dat[btq_rd_cnt].take) begin
-                    // is mispred?
-                    mispred = 1;
-                    mispred_target = btq_2_retire.dat[btq_rd_cnt].take
-                        ? btq_2_retire.dat[btq_rd_cnt].tgt
-                        : btq_2_retire.dat[btq_rd_cnt].NPC;
-                    break;
-                end 
-                ++allowed_retire_cnt;
-                ++btq_rd_cnt;
-            end
+            ++allowed_retire_cnt;
+            if (!rob_2_retire.brch_vld[i])
+                continue;
+
+            // ++btq_rd_cnt; // TODO: why cant we just put this here instead of after the if???
+            if (btq_2_retire.dat[btq_rd_cnt].pred != btq_2_retire.dat[btq_rd_cnt].take) begin
+                // is mispred?
+                mispred = 1;
+                mispred_target = btq_2_retire.dat[btq_rd_cnt].take
+                    ? btq_2_retire.dat[btq_rd_cnt].tgt
+                    : btq_2_retire.dat[btq_rd_cnt].NPC;
+                break;
+            end 
+            ++btq_rd_cnt;
+
+            // if (!rob_2_retire.brch_vld[i]) begin
+            // end else begin 
+            //     if (btq_2_retire.dat[btq_rd_cnt].pred != btq_2_retire.dat[btq_rd_cnt].take) begin
+            //         // is mispred?
+            //         mispred = 1;
+            //         mispred_target = btq_2_retire.dat[btq_rd_cnt].take
+            //             ? btq_2_retire.dat[btq_rd_cnt].tgt
+            //             : btq_2_retire.dat[btq_rd_cnt].NPC;
+            //         break;
+            //     end 
+            //     ++btq_rd_cnt;
+            // end
         end
 
         retire_2_btq = '{
@@ -725,6 +738,8 @@ module cpu (
     always_comb begin
         committed_insts = '0;
         foreach(committed_insts[i]) begin
+            if (flush) // system is flushing; CANNOT COMMIT!
+                break;
             if (i >= retire_exec.r_en_cnt)
                 continue;
             committed_insts[i].valid      = 1;
