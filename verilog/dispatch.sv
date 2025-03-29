@@ -57,7 +57,7 @@ always_comb begin
 end
 
 // handle btq output
-logic [`N-1][`N-1:0] brch_packed_idx;
+logic [`N-1:0][`N-1:0] brch_packed_idx;
 always_comb begin
     foreach (dispatch_en[i])
         dispatch_en[i] = i < dispatch_cnt;
