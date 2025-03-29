@@ -600,6 +600,7 @@ module cpu (
         .reset      (reset),
         .flush      (flush),
         .r_out      (rob_2_retire),
+        .r_in       (retire_exec),
         .c_in       (ex_2_complete),
         .d_out      (rob_2_dispatch),
         .d_in       (dispatch_2_rob)
