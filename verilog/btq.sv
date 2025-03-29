@@ -139,6 +139,8 @@ module btq #(
                                 ? " << t"
                                 : ""
                 );
+                if (i == tail)
+                    break;
             end
 
             for (int i = 0; i < `N; ++i) begin

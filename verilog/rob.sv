@@ -190,6 +190,8 @@ module rob #(
                                 ? " << t"
                                 : ""
                 );
+                if (i == tail)
+                    break;
             end
 
             // $display("c_en: [%b %b] c_ts: [%d %d] c_data: [%h %h] c_rob_idxs: [%d %d]",
