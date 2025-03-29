@@ -57,14 +57,17 @@ always_comb begin
 end
 
 // handle btq output
+logic [`N-1][`N-1:0] brch_packed_idx;
 always_comb begin
     foreach (dispatch_en[i])
         dispatch_en[i] = i < dispatch_cnt;
 
     // pack branch insns to lowest indices
+    brch_packed_idx = '0;
     for (int unsigned i = 0, int wr_idx = 0; i < `N; ++i) begin
         if (!decode_in.prvw_is_brch[i])
             continue;
+        brch_packed_idx[i] = wr_idx;
         btq_out.NPC[wr_idx] = decode_in.d_dat[i].NPC;
         ++wr_idx;
     end
@@ -156,7 +159,9 @@ always_comb begin
         rs_out.d_dat[i].t2_rdy     = map_in.cpl2s[i];
 
         rs_out.d_dat[i].rob_idx    = rob_in.rob_idxs[i];
-        rs_out.d_dat[i].btq_idx    = decode_in.d_dat[i].is_branch ? btq_in.btq_idxs[i] : '0;
+        rs_out.d_dat[i].btq_idx    = decode_in.d_dat[i].is_branch
+            ? btq_in.btq_idxs[brch_packed_idx[i]]
+            : '0;
     end
 end
 
