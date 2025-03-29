@@ -189,7 +189,7 @@ GREP = grep -E --color=auto
 # ---- Modules to Test ---- #
 
 # TODO: add more modules here
-MODULES = cpu mult rob rs fifo free_list dispatch prf map_table stage_id_p4 execute fetch btb lsq
+MODULES = cpu mult rob rs fifo free_list dispatch prf map_table stage_id_p4 execute fetch btb lsq post_ret_buffer
 
 # TODO: update this if you add more header files
 ALL_HEADERS = $(CPU_HEADERS)
@@ -268,10 +268,15 @@ build/btq.simv: $(BTB_FILES)
 build/btq.cov: $(BTB_FILES)
 build/btq.vg: $(BTB_FILES)
 
-LSQ_FILES = verilog/sys_defs.svh 
+LSQ_FILES = verilog/sys_defs.svh verilog/post_ret_buffer.sv
 build/lsq.simv: $(LSQ_FILES)
 build/lsq.cov: $(LSQ_FILES)
 synth/lsq.vg: $(LSQ_FILES)
+
+POST_RET_BUFFER_FILES = verilog/sys_defs.svh
+build/post_ret_buffer.simv: $(POST_RET_BUFFER_FILES)
+build/post_ret_buffer.cov: $(POST_RET_BUFFER_FILES)
+synth/post_ret_buffer.vg: $(POST_RET_BUFFER_FILES)
 
 
 #################################
