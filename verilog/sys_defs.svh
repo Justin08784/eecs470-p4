@@ -480,7 +480,7 @@ typedef struct packed {
 } retire2btq;
 
 // same as rob2retire, but with r_en_cnt potentially adjusted to account for branch mispredicts
-typedef struct {
+typedef struct packed {
     logic [$clog2(`N):0]        r_en_cnt; // final final
     PHYS_REG_IDX [`N-1:0]       tag;
     PHYS_REG_IDX [`N-1:0]       t_old;
@@ -490,8 +490,7 @@ typedef struct {
     logic        [`N-1:0]       brch_vld;
 } retire_final;
 
-typedef struct {
-    logic   mispred;
+typedef struct packed {
     ADDR    corrected_PC;
 } retire2fetch;
 
@@ -550,7 +549,7 @@ typedef struct packed {
 // TODO: remember to remove for synthesis? does this prevent synthesis?
 `ifndef SYNTH
 function print_id_result(input ID_RESULT x);
-    $display("ID_RESULT: id=%0d t=%0d t1=%0d t2=%0d t1_rdy=%b t2_rdy=%b fu_idx=%0d rob_idx=%0d btq_idx=%0d is_branch:%b inst=%h PC=%h NPC=%h opa_select=%0d opb_select=%0d dest_reg_idx=%0d alu_func=%0d mult=%b rd_mem=%b wr_mem=%b cond_branch=%b uncond_branch=%b halt=%b illegal=%b csr_op=%b",
+    $display("ID_RESULT: id=%3d t=%2d t1=%2d t2=%2d t1_rdy=%b t2_rdy=%b fu_idx=%2d rob_idx=%2d btq_idx=%2d is_branch:%b inst=%h PC=%h NPC=%h opa_select=%1d opb_select=%1d dest_reg_idx=%2d alu_func=%1d mult=%b rd_mem=%b wr_mem=%b cond_branch=%b uncond_branch=%b halt=%b illegal=%b csr_op=%b",
         x.id,
         x.t,
         x.t1,

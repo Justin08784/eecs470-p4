@@ -358,12 +358,13 @@ module rs #(parameter
                 get_fu_name(entries[i].dat.fu_idx, fu_name);
 
                 if (!entries[i].busy) begin
-                    $display("Entry [%0d]:", i);
+                    $display("Entry [%2d]:", i);
                     continue;
                 end
 
-                $display("Entry [%0d]: id=%0d (%x), busy=%b, issued=%b, t=%0d, t1=%0d, t2=%0d, t1_rdy=%b, t2_rdy=%b, fu=%s(%0d)",
+                $display("Entry [%2d]: pc=0x%x, id=%3d (%x), busy=%b, issued=%b, t=%2d, t1=%2d, t2=%2d, t1_rdy=%b, t2_rdy=%b, fu=%s(%2d)",
                     i, 
+                    entries[i].dat.PC,
                     entries[i].dat.id, 
                     entries[i].dat.inst,
                     entries[i].busy, 

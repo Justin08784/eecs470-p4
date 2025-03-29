@@ -11,6 +11,7 @@ module rob #(
 
     // retire (read)
     output rob2retire r_out,
+    input  retire_final r_in,
 
     // complete (write)
     input  execute2complete c_in,
@@ -98,8 +99,8 @@ module rob #(
             if (r_out.r_en_cnt > used + d_in.d_en_cnt)
                 $error("ROB underflow!");
             `endif
-            used    <= used + d_in.d_en_cnt - r_out.r_en_cnt;
-            head    <= (head + r_out.r_en_cnt) % ROB_SZ;
+            used    <= used + d_in.d_en_cnt - r_in.r_en_cnt;
+            head    <= (head + r_in.r_en_cnt) % ROB_SZ;
             tail    <= (tail + d_in.d_en_cnt) % ROB_SZ;
 
             // handle complete (ins)
@@ -189,6 +190,8 @@ module rob #(
                                 ? " << t"
                                 : ""
                 );
+                if (i == tail)
+                    break;
             end
 
             // $display("c_en: [%b %b] c_ts: [%d %d] c_data: [%h %h] c_rob_idxs: [%d %d]",
