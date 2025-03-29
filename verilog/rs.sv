@@ -350,7 +350,7 @@ module rs #(parameter
 
         `ifndef SYNTH
         if (!reset) begin
-            $display("  %3d | RS >>", $time);
+            $display("  %3d | >> RS >>", $time);
             print_id_result(d_in.d_dat[0]);
             print_id_result(d_in.d_dat[1]);
             for (int i = 0; i < RS_SZ; ++i) begin
@@ -358,12 +358,13 @@ module rs #(parameter
                 get_fu_name(entries[i].dat.fu_idx, fu_name);
 
                 if (!entries[i].busy) begin
-                    $display("Entry [%0d]:", i);
+                    $display("Entry [%2d]:", i);
                     continue;
                 end
 
-                $display("Entry [%0d]: id=%0d (%x), busy=%b, issued=%b, t=%0d, t1=%0d, t2=%0d, t1_rdy=%b, t2_rdy=%b, fu=%s(%0d)",
+                $display("Entry [%2d]: pc=0x%x, id=%3d (%x), busy=%b, issued=%b, t=%2d, t1=%2d, t2=%2d, t1_rdy=%b, t2_rdy=%b, fu=%s(%2d)",
                     i, 
+                    entries[i].dat.PC,
                     entries[i].dat.id, 
                     entries[i].dat.inst,
                     entries[i].busy, 
@@ -378,7 +379,7 @@ module rs #(parameter
                     entries[i].dat.fu_idx,
                 );
             end
-            $display("  %3d | RS <<", $time);
+            $display("  %3d | << RS <<", $time);
         end
         `endif
     end

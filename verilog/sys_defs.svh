@@ -37,7 +37,8 @@
 
 // worry about these later
 `define BRANCH_PRED_SZ xx
-`define LSQ_SZ xx
+`define LSQ_SZ 16
+`define LSQ_SZ_DBL 32
 
 // functional units (you should decide if you want more or fewer types of FUs)
 `define NUM_FU_ALU 2
@@ -434,6 +435,16 @@ typedef struct packed {
     logic illegal;
 } ROB_ENTRY;
 
+typedef logic [$clog2(`LSQ_SZ_DBL)-1:0] LSQ_IDX;
+typedef struct packed {
+    LSQ_IDX sq_idx;
+    ROB_IDX rob_idx;
+    ADDR addr;
+    DATA data;
+    logic d_vld;
+    MEM_SIZE mem_size; //MEM_SIZE'(id_ex_reg.inst.r.funct3[1:0]); <-- HOW TO FIND THIS. DO THIS WHEN PUTTING ENTRY IN FROM DISPATCH OR FROM EXECUTE
+} SQ_ENTRY;
+
 // BTQ stuff
 // typedef logic [$clog2(`BTQ_SZ)-1:0] BTQ_IDX;
 // typedef struct packed {
@@ -461,10 +472,7 @@ typedef struct packed {
 
 typedef struct packed {
     logic   [$clog2(`N):0]  used_scnt;
-    ADDR    [`N-1:0]        tgt;
-    logic   [`N-1:0]        NPC;
-    logic   [`N-1:0]        pred;
-    logic   [`N-1:0]        take;
+    BTQ_ENTRY [`N-1:0]      dat;
 } btq2retire;
 
 typedef struct packed {
@@ -472,7 +480,7 @@ typedef struct packed {
 } retire2btq;
 
 // same as rob2retire, but with r_en_cnt potentially adjusted to account for branch mispredicts
-typedef struct {
+typedef struct packed {
     logic [$clog2(`N):0]        r_en_cnt; // final final
     PHYS_REG_IDX [`N-1:0]       tag;
     PHYS_REG_IDX [`N-1:0]       t_old;
@@ -482,8 +490,7 @@ typedef struct {
     logic        [`N-1:0]       brch_vld;
 } retire_final;
 
-typedef struct {
-    logic   mispred;
+typedef struct packed {
     ADDR    corrected_PC;
 } retire2fetch;
 
@@ -542,7 +549,7 @@ typedef struct packed {
 // TODO: remember to remove for synthesis? does this prevent synthesis?
 `ifndef SYNTH
 function print_id_result(input ID_RESULT x);
-    $display("ID_RESULT: id=%0d t=%0d t1=%0d t2=%0d t1_rdy=%b t2_rdy=%b fu_idx=%0d rob_idx=%0d inst=%h PC=%h NPC=%h opa_select=%0d opb_select=%0d dest_reg_idx=%0d alu_func=%0d mult=%b rd_mem=%b wr_mem=%b cond_branch=%b uncond_branch=%b halt=%b illegal=%b csr_op=%b",
+    $display("ID_RESULT: id=%3d t=%2d t1=%2d t2=%2d t1_rdy=%b t2_rdy=%b fu_idx=%2d rob_idx=%2d btq_idx=%2d is_branch:%b inst=%h PC=%h NPC=%h opa_select=%1d opb_select=%1d dest_reg_idx=%2d alu_func=%1d mult=%b rd_mem=%b wr_mem=%b cond_branch=%b uncond_branch=%b halt=%b illegal=%b csr_op=%b",
         x.id,
         x.t,
         x.t1,
@@ -551,6 +558,8 @@ function print_id_result(input ID_RESULT x);
         x.t2_rdy,
         x.fu_idx,
         x.rob_idx,
+        x.btq_idx,
+        x.is_branch,
         x.inst,
         x.PC,
         x.NPC,
@@ -650,10 +659,11 @@ typedef struct packed {
 } dispatch2free_list;
 
 typedef struct packed {
-    logic     [$clog2(`N):0]  lsq_d_en_cnt;
+    logic   [$clog2(`N):0]  lsq_d_en_cnt;
         // To: LSQ
         // - number of enabled dispatch lines WHO NEED A LD/ST 
         //   (i.e. may only be a strict subset of dispatching insns!)
+    ROB_IDX [`N-1:0] rob_idx;
 } dispatch2lsq;
 
 typedef struct packed {
@@ -661,8 +671,8 @@ typedef struct packed {
         // - Number of enabled dispatch lines?
         // - NOTE: For in-order stuff with serial deps (like dispatch), use c(ou)nts;
         // otherwise use en(able) buses.
-    logic         [`N-1:0] is_rs1s;
-    logic         [`N-1:0] is_rs2s;
+    logic         [`N-1:0] rd_src1s;
+    logic         [`N-1:0] rd_src2s;
     REG_IDX       [`N-1:0] src1s;
     REG_IDX       [`N-1:0] src2s;
     REG_IDX       [`N-1:0] dsts;
@@ -846,8 +856,67 @@ typedef struct packed{
 
 // By LSQ
 typedef struct packed {
-    logic    [$clog2(`N):0]    lsq_rdy_scnt;
+    logic   [$clog2(`N):0]      sq_rdy_scnt;
+    logic   [$clog2(`LSQ_SZ):0] sq_tail;
 } lsq2dispatch;
+
+typedef struct packed {
+    logic       [`NUM_FU_STORE-1:0] en;
+    LSQ_IDX     [`NUM_FU_STORE-1:0] sq_idx_cdb;
+} lsq2rs;
+
+typedef struct packed {
+    logic   [$clog2(`N):0] r_en;
+    ROB_IDX [`N-1:0] r_pos;
+} rob2lsq;
+
+typedef struct packed {
+    logic       [`NUM_FU_STORE-1:0] ex_en;
+    LSQ_IDX     [`NUM_FU_STORE-1:0] sq_idx;
+    ADDR        [`NUM_FU_STORE-1:0] addr;
+    DATA        [`NUM_FU_STORE-1:0] data;
+    MEM_SIZE    [`NUM_FU_STORE-1:0] st_mem_size; //MEM_SIZE'(id_ex_reg.inst.r.funct3[1:0]); <-- HOW TO FIND THIS. DO THIS WHEN PUTTING ENTRY IN FROM DISPATCH OR FROM EXECUTE
+    logic       [`NUM_FU_LOAD-1:0] forward_req_en;
+    ADDR        [`NUM_FU_LOAD-1:0] forward_addr;
+    MEM_SIZE    [`NUM_FU_LOAD-1:0] ld_mem_size; //MEM_SIZE'(id_ex_reg.inst.r.funct3[1:0]); <-- HOW TO FIND THIS. DO THIS WHEN PUTTING ENTRY IN FROM DISPATCH OR FROM EXECUTE
+} execute2lsq;
+
+typedef struct packed {
+    logic       [`NUM_FU_LOAD-1:0] forward_en;
+    ADDR        [`NUM_FU_LOAD-1:0] forward_addr;
+    DATA        [`NUM_FU_LOAD-1:0] forward_data;
+    MEM_SIZE    [`NUM_FU_LOAD-1:0] forward_mem_size;
+} lsq2execute;
+
+typedef struct packed {
+    logic [$clog2(`N):0]    ret_rdy;
+    logic                   sq_ret_complete;
+} lsq2rob;
+
+typedef struct packed {
+    MEM_COMMAND   Dmem_command;    // The memory command
+    MEM_SIZE      Dmem_size;       // Size of data to read or write
+    ADDR          Dmem_addr;       // Address sent to Data memory
+    MEM_BLOCK     Dmem_store_data; // Data sent to Data memory
+} stRET2mem;
+
+typedef struct packed {
+    logic       [$clog2(`N):0] ret_cnt;
+    SQ_ENTRY    [`N-1:0] ret_st;
+    logic       [`NUM_FU_LOAD-1:0] forward_req_en;
+    LSQ_IDX     [`NUM_FU_LOAD-1:0] sq_idx;
+    ADDR        [`NUM_FU_LOAD-1:0] forward_addr;
+    MEM_SIZE    [`NUM_FU_LOAD-1:0] ld_mem_size;
+} lsq2stRET;
+
+typedef struct packed {
+    logic [$clog2(`N):0]    free_out;
+    logic                   empty;
+    logic       [`NUM_FU_LOAD-1:0] forward_en;
+    ADDR        [`NUM_FU_LOAD-1:0] forward_addr;
+    DATA        [`NUM_FU_LOAD-1:0] forward_data;
+    MEM_SIZE    [`NUM_FU_LOAD-1:0] forward_mem_size;
+} stRET2lsq;
 
 typedef struct packed {
     ROB_IDX rob_idx;

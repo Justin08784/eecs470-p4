@@ -117,7 +117,7 @@ module free_list #(parameter
     // debugging
     // always_ff @(posedge clock) begin
     //     if (!reset) begin
-    //         $display("  %3d | >> Free list", $time);
+    //         $display("  %3d | >> Free list >>", $time);
     //         $display("rob2retire: {r_en_cnt: %d, [(t: %0d, told: %0d, dst: %0d), (t: %0d, told: %0d, dst: %0d)]}",
     //             r_in.r_en_cnt,
     //             r_in.tag[0],
@@ -135,7 +135,7 @@ module free_list #(parameter
     //             d_out.d_ts[0],
     //             d_out.d_ts[1]
     //         );
-    //         $display("  %3d | << Free list", $time);
+    //         $display("  %3d | << Free list <<", $time);
     //     end
     // end
 

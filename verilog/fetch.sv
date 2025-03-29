@@ -21,7 +21,7 @@ module stage_if_p4 (
     // input           take_branch,    // taken-branch signal
     // input ADDR      branch_target,  // target pc: use if take_branch is TRUE
     input retire2fetch r_in,
-    input MEM_BLOCK Imem_data,      // data coming back from Instruction memory
+    input MEM_BLOCK [1:0] Imem_data,      // data coming back from Instruction memory
 
     // tags from memory
     // input MEM_TAG  Imem2proc_transaction_tag, // Should be zero unless there is a response
@@ -90,14 +90,17 @@ module stage_if_p4 (
     logic [$clog2(`N):0]    free_scnt, used_scnt, f_cnt;
     IF_ID_PACKET [`N-1:0]   f_dat;
 
+    logic off; // 1 if PC is dw-misaligned (i.e. starts at 2nd word of double word)
     always_comb begin
         d_out.f_en_cnt = `MIN(used_scnt, d_in.d_rdy_cnt);
 
         f_cnt = free_scnt < `N ? 0 : `N; // no partial fetches (for simplicity)! 
+
+        off = PC_reg[2]; 
         for (int unsigned i = 0, logic vld = 0; i < `N; ++i) begin
             vld = i < f_cnt;
             f_dat[i] = '{
-                inst  : vld ? Imem_data.word_level[i] : `NOP,
+                inst  : vld ? Imem_data[(i + off) / 2].word_level[(i + off) % 2] : `NOP,
                 PC    : PC_reg + 4*i,
                 NPC   : PC_reg + 4*(i+1),
                 valid : vld
@@ -125,9 +128,9 @@ module stage_if_p4 (
     );
 
     always_ff @(posedge clock) begin
-        if (reset || flush) begin
+        if (reset) begin
             PC_reg <= 0;                // initial PC value is 0 (the memory address where our program starts)
-        end else if (r_in.mispred) begin
+        end else if (flush) begin
             PC_reg <= r_in.corrected_PC;
         end else begin
             PC_reg <= PC_reg + 4*f_cnt; // ...or transition to next PC if valid
@@ -138,10 +141,11 @@ module stage_if_p4 (
     `ifndef SYNTH
     always_ff @(posedge clock) begin
         if (!reset) begin
-            $display("  %3d | Fetch >>", $time);
+            $display("  %3d | >> Fetch >>", $time);
+            $display("r_in: {flush: %b, corrected_PC: 0x%x}", flush, r_in.corrected_PC);
             $display("PC_reg:  %x", PC_reg);
             $display("Imem_data: %x", Imem_data);
-            $display("  %3d | Fetch <<", $time);
+            $display("  %3d | << Fetch <<", $time);
         end
     end
     `endif // SYNTH

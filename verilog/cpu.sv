@@ -15,7 +15,18 @@ module cpu (
     input reset, // System reset
 
     //input MEM_TAG   mem2proc_transaction_tag, // Memory tag for current transaction
-    input MEM_BLOCK mem2proc_data,            // Data coming back from memory
+    input MEM_BLOCK [1:0] mem2proc_data,            // Data coming back from memory
+        /*
+        Q: Why 2 mem blocks when each mem block supplies a double word
+        i.e. 8 bytes i.e. 2 insns? Isn't this enough to support 2-size fetch?
+        A (Justin): No, it is not; fetch at a double-word misaligned PC will
+        straddle double word block boundaries.
+
+        An address is "double word-aligned" iff its lowest 3 bits are 000.
+        If PC_reg = 3'b100, the first instruction (PC) is in the *second half* of
+        mem2proc_data[0], but the next instruction (PC + 4) is in the *first half*
+        of mem2proc_data[1]. One memory block isn't enough to cover both.
+        */
     //input MEM_TAG   mem2proc_data_tag,        // Tag for which transaction data is for
 
     //output MEM_COMMAND proc2mem_command, // Command sent to memory
@@ -492,31 +503,27 @@ module cpu (
     logic [$clog2(`N):0] btq_rd_cnt;
     logic [$clog2(`N):0] allowed_retire_cnt; // FUCK ME
     logic mispred;
-    logic mispred_target;
+    ADDR  mispred_target;
     always_comb begin
         mispred = 0;
         mispred_target = '0;
         btq_rd_cnt = 0;
         allowed_retire_cnt = 0;
-        retire_2_f = '{default:'0};
         for (int unsigned i = 0; i < rob_2_retire.r_en_cnt; ++i) begin
-            ++allowed_retire_cnt;
-            if (!rob_2_retire.brch_vld[i])
-                continue;
-
-            if (btq_2_retire.pred[btq_rd_cnt] != btq_2_retire.take[btq_rd_cnt]) begin
-                mispred = 1;
-                mispred_target = btq_2_retire.tgt[btq_rd_cnt];
-                // don't increment btq_rd_cnt — we're going to flush
-                retire_2_f = '{
-                    mispred : mispred,
-                    corrected_PC : btq_2_retire.pred[btq_rd_cnt]
-                        ? btq_2_retire.NPC[btq_rd_cnt]
-                        : btq_2_retire.tgt[btq_rd_cnt]
-                };
-                break;
-            end 
-            ++btq_rd_cnt;
+            if (!rob_2_retire.brch_vld[i]) begin
+                ++allowed_retire_cnt;
+            end else begin 
+                if (btq_2_retire.dat[btq_rd_cnt].pred != btq_2_retire.dat[btq_rd_cnt].take) begin
+                    // is mispred?
+                    mispred = 1;
+                    mispred_target = btq_2_retire.dat[btq_rd_cnt].take
+                        ? btq_2_retire.dat[btq_rd_cnt].tgt
+                        : btq_2_retire.dat[btq_rd_cnt].NPC;
+                    break;
+                end 
+                ++allowed_retire_cnt;
+                ++btq_rd_cnt;
+            end
         end
 
         retire_2_btq = '{
@@ -538,9 +545,18 @@ module cpu (
     end
 
     always_ff @(posedge clock) begin
+        if (reset) begin
+            flush       <= '0;
+            retire_2_f  <= '0;
+        end else begin
+            `ifndef SYNTH
+            $display("  %3d | retire_exec.r_en_cnt: %0d", $time, retire_exec.r_en_cnt);
+            `endif // SYNTH
 /* ======================================== */
-        flush <= mispred;
+            flush       <= mispred;
+            retire_2_f  <= '{corrected_PC : mispred_target};
 /* ======================================== */
+        end
     end
 
 
@@ -600,6 +616,7 @@ module cpu (
         .reset      (reset),
         .flush      (flush),
         .r_out      (rob_2_retire),
+        .r_in       (retire_exec),
         .c_in       (ex_2_complete),
         .d_out      (rob_2_dispatch),
         .d_in       (dispatch_2_rob)
@@ -631,12 +648,14 @@ module cpu (
     //                                              //
     //////////////////////////////////////////////////  
 
+    arch_map2map_table am_2_mt;
     map_table #(
         .N(`N)
     ) map_table_0 (
         .clock(clock),
         .reset(reset),
         .flush(flush),
+        .am_in(am_2_mt),
         .c_in(ex_2_complete),
         .d_in(dispatch_2_map),
         .d_out(map_2_dispatch)
@@ -653,6 +672,7 @@ module cpu (
     ) arch_map_0 (
         .clock(clock),
         .reset(reset),
+        .mt_out(am_2_mt),
         .r_in(retire_exec)
     );
 

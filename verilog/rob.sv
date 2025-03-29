@@ -11,6 +11,7 @@ module rob #(
 
     // retire (read)
     output rob2retire r_out,
+    input  retire_final r_in,
 
     // complete (write)
     input  execute2complete c_in,
@@ -98,8 +99,8 @@ module rob #(
             if (r_out.r_en_cnt > used + d_in.d_en_cnt)
                 $error("ROB underflow!");
             `endif
-            used    <= used + d_in.d_en_cnt - r_out.r_en_cnt;
-            head    <= (head + r_out.r_en_cnt) % ROB_SZ;
+            used    <= used + d_in.d_en_cnt - r_in.r_en_cnt;
+            head    <= (head + r_in.r_en_cnt) % ROB_SZ;
             tail    <= (tail + d_in.d_en_cnt) % ROB_SZ;
 
             // handle complete (ins)
@@ -152,9 +153,47 @@ module rob #(
                     illegal : d_in.illegal[i]
                 };
             end
+        end
+    end
 
-            `ifndef SYNTH
-            $display("  %3d | >> ROB", $time);
+    `ifndef SYNTH
+    always_ff @(posedge clock) begin
+        if (!reset) begin
+            $display("  %3d | >> ROB >>", $time);
+            $display("r_out: en_cnt: %d", r_out.r_en_cnt);
+            for (int i = 0; i < `N; ++i) begin
+                $display("r_out[%d]: tag: %d, t_old: %d, dst: %d, halt: %d, illegal: %d, brch_vld: %d",
+                    i,
+                    r_out.tag[i],
+                    r_out.t_old[i],
+                    r_out.dst[i],
+                    r_out.halt[i],
+                    r_out.illegal[i],
+                    r_out.brch_vld[i]
+                );
+            end
+            for (int i = 0; i < `ROB_SZ; ++i) begin
+                $display("Rob[%2d]: cpl %b, t: %2d, t_old: %2d, dst: %2d, is_brch: %b, halt: %0b, illegal: %0b%s",
+                    i,
+                    state[i].cpl,
+                    state[i].tag,
+                    state[i].t_old,
+                    state[i].dst,
+                    state[i].is_brch,
+                    state[i].halt,
+                    state[i].illegal,
+                    (i == head && head == tail) 
+                        ? " << h/t"
+                        : (i == head) 
+                            ? " << h" 
+                            : (i == tail)
+                                ? " << t"
+                                : ""
+                );
+                if (i == tail)
+                    break;
+            end
+
             // $display("c_en: [%b %b] c_ts: [%d %d] c_data: [%h %h] c_rob_idxs: [%d %d]",
             //     c_in.c_en[0],
             //     c_in.c_en[1],
@@ -186,9 +225,9 @@ module rob #(
             //         state[i].NPC
             //     );
             // end
-            $display("  %3d | << ROB", $time);
-            `endif
+            $display("  %3d | << ROB <<", $time);
         end
     end
+    `endif
 
 endmodule

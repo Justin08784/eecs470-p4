@@ -49,7 +49,6 @@ module btq #(
 
     logic [NUM_RPORTS-1:0][$clog2(BTQ_SZ)-1:0] r_idxs;
     logic [NUM_DPORTS-1:0][$clog2(BTQ_SZ)-1:0] d_idxs;
-    BTQ_ENTRY cur_entry;
     always_comb begin
         for (int unsigned i = 0; i < NUM_RPORTS; ++i)
             r_idxs[i] = (head + i) % BTQ_SZ;
@@ -59,13 +58,8 @@ module btq #(
         // handle retire (outs)
         r_out = '0;
         r_out.used_scnt = `MIN(used, NUM_RPORTS);
-        for (int unsigned i = 0; i < NUM_RPORTS; ++i) begin
-            cur_entry       = state[r_idxs[i]];
-            r_out.tgt[i]    = cur_entry.tgt;
-            r_out.NPC[i]    = cur_entry.NPC;
-            r_out.pred[i]   = cur_entry.pred;
-            r_out.take[i]   = cur_entry.take;
-        end
+        for (int unsigned i = 0; i < NUM_RPORTS; ++i)
+            r_out.dat[i] = state[r_idxs[i]];
 
         // handle dispatch (outs)
         /*
@@ -125,5 +119,53 @@ module btq #(
             end
         end
     end
+
+    `ifndef SYNTH
+    always_ff @(posedge clock) begin
+        if (!reset) begin
+            $display("  %3d | >> BTQ >>", $time);
+            for (int i = 0; i < `BTQ_SZ; ++i) begin
+                $display("BTQ [%0d]: tgt: %x, NPC: %x, pred: %b, take: %b%s", 
+                    i,
+                    state[i].tgt,
+                    state[i].NPC,
+                    state[i].pred,
+                    state[i].take,
+                    (i == head && head == tail) 
+                        ? " << h/t"
+                        : (i == head) 
+                            ? " << h" 
+                            : (i == tail)
+                                ? " << t"
+                                : ""
+                );
+                if (i == tail)
+                    break;
+            end
+
+            for (int i = 0; i < `N; ++i) begin
+                $display("c_in[%0d]: c_en: %b, is_branch: %b, c_btq_idxs: %d, take: %b", 
+                    i,
+                    c_in.c_en[i],
+                    c_in.is_branch[i],
+                    c_in.btq_idxs[i],
+                    c_in.take[i]
+                );
+            end
+            $display("r_in: rd_cnt %d", r_in.rd_cnt);
+            $display("r_out: used_scnt: %0d r_idxs: %0d %0d", r_out.used_scnt, r_idxs[0], r_idxs[1]);
+            for (int i = 0; i < `N; ++i) begin
+                $display("r_out[%d]: tgt: %x, NPC: %x, pred: %b, take: %b", 
+                    i,
+                    r_out.dat[i].tgt,
+                    r_out.dat[i].NPC,
+                    r_out.dat[i].pred,
+                    r_out.dat[i].take
+                );
+            end
+            $display("  %3d | << BTQ <<", $time);
+        end
+    end
+    `endif // SYNTH
 
 endmodule

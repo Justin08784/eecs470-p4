@@ -78,6 +78,7 @@ typedef struct packed {
 typedef struct packed {
     logic       [`NUM_FU_ALU-1:0]       bsy; // unused; same as en
     DATA        [`NUM_FU_ALU-1:0]       opa, opb;
+    DATA        [`NUM_FU_ALU-1:0]       rs1, rs2;
     ALU_FUNC    [`NUM_FU_ALU-1:0]       alu_func;
     logic       [`NUM_FU_ALU-1:0][2:0]  branch_func; // Which branch condition to check
     logic       [`NUM_FU_ALU-1:0]       cond_branch;
@@ -100,6 +101,8 @@ typedef struct packed {
 module alu (
     input DATA      opa,
     input DATA      opb,
+    input DATA      rs1,
+    input DATA      rs2,
     input ALU_FUNC  alu_func,
     input [2:0]     branch_func, // Which branch condition to check
 
@@ -126,12 +129,12 @@ module alu (
 
     always_comb begin
         case (branch_func)
-            3'b000:  take = signed'(opa) == signed'(opb); // BEQ
-            3'b001:  take = signed'(opa) != signed'(opb); // BNE
-            3'b100:  take = signed'(opa) <  signed'(opb); // BLT
-            3'b101:  take = signed'(opa) >= signed'(opb); // BGE
-            3'b110:  take = opa < opb;                    // BLTU
-            3'b111:  take = opa >= opb;                   // BGEU
+            3'b000:  take = signed'(rs1) == signed'(rs2); // BEQ
+            3'b001:  take = signed'(rs1) != signed'(rs2); // BNE
+            3'b100:  take = signed'(rs1) <  signed'(rs2); // BLT
+            3'b101:  take = signed'(rs1) >= signed'(rs2); // BGE
+            3'b110:  take = rs1 <  rs2;                    // BLTU
+            3'b111:  take = rs1 >= rs2;                   // BGEU
             default: take = `FALSE;
         endcase
     end
@@ -176,6 +179,8 @@ module alu_ex(
                 // Inputs
                 .opa        (ops.opa[i]),
                 .opb        (ops.opb[i]),
+                .rs1        (ops.rs1[i]),
+                .rs2        (ops.rs2[i]),
                 .alu_func   (ops.alu_func[i]),
                 .branch_func(ops.branch_func[i]), // Which branch condition to check
 
@@ -189,7 +194,7 @@ module alu_ex(
                 data    : tmp_res[i],
                 btq_idx : ops.btq_idx[i],
                 take    : tmp_take[i],
-                is_brch : ops.cond_branch || ops.uncond_branch
+                is_brch : ops.cond_branch[i] || ops.uncond_branch[i]
             };
 
             // <FU>_outs: where executed insns wait until completion
@@ -443,13 +448,18 @@ module stage_ex_p4 (
     endgenerate
 
     // request operands from PRF (separate stage)
+    /*
+    TODO: A separate PRF + operand fetch/decode stage is UNACCEPTABLE for performance,
+    as it adds 1 cycle delay to waking dependent insns. We MUST move PRF read
+    forward to issue, and operand decode into <FU>_ex.
+    */
     always_comb begin
         prf_out = '0;
         foreach (alu_in2ops_en[i]) begin
             if (!alu_in2ops_en[i])
                 continue;
-            prf_out.s_en1s.alu[i]   = ins.dat.alu[i].opa_select == OPA_IS_RS1;
-            prf_out.s_en2s.alu[i]   = ins.dat.alu[i].opb_select == OPB_IS_RS2;
+            prf_out.s_en1s.alu[i]   = 1;
+            prf_out.s_en2s.alu[i]   = 1;
             prf_out.s_t1s.alu[i]    = ins.dat.alu[i].t1; 
             prf_out.s_t2s.alu[i]    = ins.dat.alu[i].t2; 
         end
@@ -474,6 +484,8 @@ module stage_ex_p4 (
         foreach(alu_in2ops_en[i]) begin
             if(!alu_in2ops_en[i]) 
                 continue;
+            alu_ops_n.rs1[i] = prf_in.s_v1s.alu[i];
+            alu_ops_n.rs2[i] = prf_in.s_v2s.alu[i];
 
             // ALU opA mux
             case (ins.dat.alu[i].opa_select)
@@ -501,6 +513,8 @@ module stage_ex_p4 (
             alu_ops_n.t[i]           = ins.dat.alu[i].t;
             alu_ops_n.rob_idx[i]     = ins.dat.alu[i].rob_idx;
             alu_ops_n.btq_idx[i]     = ins.dat.alu[i].btq_idx;
+            alu_ops_n.cond_branch[i]        = ins.dat.alu[i].cond_branch;
+            alu_ops_n.uncond_branch[i]      = ins.dat.alu[i].uncond_branch;
         end
 
         mul_ops_n = '0;
@@ -627,45 +641,88 @@ module stage_ex_p4 (
     always_ff @(posedge clock) begin
         if (!reset) begin
             $display("  %3d | >> EXECUTE", $time);
-            $display("alu_ins: bsy[%b, %b], mul_ins: bsy[%b, %b]",
-                ins.rdy.alu[0],
-                ins.rdy.alu[1],
-                ins.rdy.mul[0],
-                ins.rdy.mul[1]
-            );
-            $display("alu_ops: [%b {opa: %x opb: %x}, %b {opa: %x opb: %x}]",
-                alu_ops.bsy[0],
-                alu_ops.opa[0],
-                alu_ops.opb[0],
-                alu_ops.bsy[1],
-                alu_ops.opa[1],
-                alu_ops.opb[1]
-            );
-            $display("mul_ops: [%b {rs1: %x rs2: %x dst: %0d}, %b {rs1: %x rs2: %x dst: %0d}]",
-                mul_ops.bsy[0],
-                mul_ops.rs1[0],
-                mul_ops.rs2[0],
-                mul_ops.dst[0].tag,
-                mul_ops.bsy[1],
-                mul_ops.rs1[1],
-                mul_ops.rs2[1],
-                mul_ops.dst[1].tag
-            );
-            $display("rdy_alu: %b  rdy_mult: %b  rdy_store: %b  rdy_load: %b  |  c_en: [%b %b] c_ts: [%d %d] c_data: [%h %h] c_rob_idxs: [%d %d] cpl_gnt: %b",
+
+            for (int i = 0; i < `NUM_FU_ALU; ++i) begin
+                $display("alu_ins[%0d]: rdy: %b, vld: %b, t: %2d, t1: %2d, t2: %2d, rob_idx: %2d, btq_idx: %2d, inst: 0x%x, PC: 0x%x, NPC: 0x%x, cond_branch: %b, uncond_branch: %b",
+                    i,
+                    ins.rdy.alu[i],
+                    ins.vld.alu[i],
+                    ins.dat.alu[i].t,
+                    ins.dat.alu[i].t1,
+                    ins.dat.alu[i].t2,
+                    ins.dat.alu[i].rob_idx,
+                    ins.dat.alu[i].btq_idx,
+                    ins.dat.alu[i].inst,
+                    ins.dat.alu[i].PC,
+                    ins.dat.alu[i].NPC,
+                    ins.dat.alu[i].cond_branch,
+                    ins.dat.alu[i].uncond_branch
+                );
+            end
+
+            for (int i = 0; i < `NUM_FU_MULT; ++i) begin
+                $display("mul_ins[%0d]: rdy: %b, vld: %b, t: %2d, t1: %2d, t2: %2d, rob_idx: %2d, func: 0x%x",
+                    i,
+                    ins.rdy.mul[i],
+                    ins.vld.mul[i],
+                    ins.dat.mul[i].t,
+                    ins.dat.mul[i].t1,
+                    ins.dat.mul[i].t2,
+                    ins.dat.mul[i].rob_idx,
+                    ins.dat.mul[i].func
+                );
+            end
+
+            for (int i = 0; i < `NUM_FU_ALU; ++i) begin
+                $display("alu_ops[%0d]: bsy: %b, opa: 0x%x, opb: 0x%x, alu_func: %b, branch_func: %b, cond_branch: %b, uncond_branch: %b, t: %2d, rob_idx: %2d, btq_idx: %2d",
+                    i,
+                    alu_ops.bsy[i],
+                    alu_ops.opa[i],
+                    alu_ops.opb[i],
+                    alu_ops.alu_func[i],
+                    alu_ops.branch_func[i],
+                    alu_ops.cond_branch[i],
+                    alu_ops.uncond_branch[i],
+                    alu_ops.t[i],
+                    alu_ops.rob_idx[i],
+                    alu_ops.btq_idx[i]
+                );
+            end
+
+            for (int i = 0; i < `NUM_FU_MULT; ++i) begin
+                $display("mul_ops[%0d]: bsy: %b, rs1: 0x%x, rs2: 0x%x, func: %b, t: %2d, rob_idx: %2d",
+                    i,
+                    mul_ops.bsy[i],
+                    mul_ops.rs1[i],
+                    mul_ops.rs2[i],
+                    mul_ops.func[i],
+                    mul_ops.dst[i].tag,
+                    mul_ops.dst[i].rob_idx
+                );
+            end
+
+            $display("c_out: rdy_alu: %b  rdy_mult: %b  rdy_store: %b  rdy_load: %b  cpl_gnt: %b",
                 rs_out.fu_rdy_alu,
                 rs_out.fu_rdy_mult,
                 rs_out.fu_rdy_store,
                 rs_out.fu_rdy_load,
-                c_out.c_en[0],
-                c_out.c_en[1],
-                c_out.c_ts[0],
-                c_out.c_ts[1],
-                c_out.c_data[0],
-                c_out.c_data[1],
-                c_out.c_rob_idxs[0],
-                c_out.c_rob_idxs[1],
                 cpl_gnt
             );
+
+            for (int i = 0; i < `N; ++i) begin
+                $display("c_out[%0d]: c_en: %b, is_branch: %b, c_ts: %2d, c_rob_idxs: %2d, c_data: %x, btq_idxs: %d, take: %b",
+                    i,
+                    c_out.c_en[i],
+                    c_out.is_branch[i],
+                    c_out.c_ts[i],
+                    c_out.c_rob_idxs[i],
+                    c_out.c_data[i],
+                    c_out.btq_idxs[i],
+                    c_out.take[i]
+                );
+            end
+
+
             // for (int i = 0; i < 4; ++i) begin
             //     $display("all_vld[%0d]: %b", i, all_vld[i]);
             // end
