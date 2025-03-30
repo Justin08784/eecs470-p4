@@ -28,11 +28,6 @@ working set, but will break under realistic pressure.
 ===========================================
 */
 
-typedef struct packed {
-    PHYS_REG_IDX    t;
-    ID_RESULT       dat;
-} ALLOC_RENAME_PKT;
-
 module dispatch #(parameter 
     N=`N
 ) (
@@ -116,11 +111,11 @@ psel_gen #(
     .gnt_bus(gbus_preg2insn)
 );
 
-ALLOC_RENAME_PKT [`N-1:0] tmp_decode2alloc;
+ID_RESULT [`N-1:0] tmp_decode2alloc;
 always_comb begin
     tmp_decode2alloc = '0;
     for (int unsigned i = 0; i < `N; ++i)
-        tmp_decode2alloc[i].dat = decode_in.d_dat[i];
+        tmp_decode2alloc[i] = decode_in.d_dat[i];
 
     //handling dest tags
     foreach(gbus_preg2insn[i, j]) begin
@@ -129,14 +124,14 @@ always_comb begin
     end
 end
 
-ALLOC_RENAME_PKT [`N-1:0] rename_in;
+ID_RESULT [`N-1:0] rename_in;
 logic [$clog2(N):0]       rename_vld_scnt;
 logic [$clog2(N):0]       rename_en_cnt;
 logic [`N-1:0]            rename_en;
 fifo #(
     .INSTANCE_ID(39),
     .DEPTH(2*`N),
-    .WIDTH($bits(ALLOC_RENAME_PKT)),
+    .WIDTH($bits(ID_RESULT)),
     .NUM_RPORTS(`N),
     .NUM_WPORTS(`N),
     .ENABLE_INTR_FWD(`FALSE)
@@ -166,7 +161,7 @@ logic [`N-1:0] is_brch;
 logic [`N-1:0][`N-1:0] brch_packed_idx;
 always_comb begin
     foreach(is_brch[i])
-        is_brch[i] = rename_in[i].dat.is_branch;
+        is_brch[i] = rename_in[i].is_branch;
 
     // pack branch insns to lowest indices
     brch_packed_idx = '0;
@@ -174,7 +169,7 @@ always_comb begin
         if (!is_brch[i])
             continue;
         brch_packed_idx[i] = wr_idx;
-        btq_out.NPC[wr_idx] = rename_in[i].dat.NPC;
+        btq_out.NPC[wr_idx] = rename_in[i].NPC;
         ++wr_idx;
     end
 
@@ -189,16 +184,16 @@ always_comb begin
     for (int i = 0; i < rename_en_cnt; i++) begin
         //handling dest register
         map_out.ts[i]        = rename_in[i].t;
-        map_out.dsts[i]      = rename_in[i].dat.dest_reg_idx;
+        map_out.dsts[i]      = rename_in[i].dest_reg_idx;
         // actually need src tags?
-        map_out.rd_src1s[i]  = rename_in[i].dat.opa_select == OPA_IS_RS1
-            || rename_in[i].dat.cond_branch;
-        map_out.rd_src2s[i]  = rename_in[i].dat.opb_select == OPB_IS_RS2
-            || rename_in[i].dat.cond_branch
-            || rename_in[i].dat.wr_mem;
+        map_out.rd_src1s[i]  = rename_in[i].opa_select == OPA_IS_RS1
+            || rename_in[i].cond_branch;
+        map_out.rd_src2s[i]  = rename_in[i].opb_select == OPB_IS_RS2
+            || rename_in[i].cond_branch
+            || rename_in[i].wr_mem;
         //handling src tags
-        map_out.src1s[i]    = rename_in[i].dat.inst.r.rs1;
-        map_out.src2s[i]    = rename_in[i].dat.inst.r.rs2;
+        map_out.src1s[i]    = rename_in[i].inst.r.rs1;
+        map_out.src2s[i]    = rename_in[i].inst.r.rs2;
     end
 end
 
@@ -208,7 +203,7 @@ always_comb begin
     rs_out.d_dat = '0;
 
     for (int i = 0; i < rename_en_cnt; i++) begin
-        rs_out.d_dat[i]            = rename_in[i].dat;
+        rs_out.d_dat[i]            = rename_in[i];
 
         rs_out.d_dat[i].t          = map_out.ts[i];
         rs_out.d_dat[i].t1         = map_in.t1s[i];
@@ -217,7 +212,7 @@ always_comb begin
         rs_out.d_dat[i].t2_rdy     = map_in.cpl2s[i];
 
         rs_out.d_dat[i].rob_idx    = rob_in.rob_idxs[i];
-        rs_out.d_dat[i].btq_idx    = rename_in[i].dat.is_branch
+        rs_out.d_dat[i].btq_idx    = rename_in[i].is_branch
             ? btq_in.btq_idxs[brch_packed_idx[i]]
             : '0;
     end
@@ -229,14 +224,14 @@ always_comb begin
 
     for (int i = 0; i < rename_en_cnt; i++) begin
         //handling src tags
-        rob_out.is_brch[i]  = rename_in[i].dat.is_branch;
+        rob_out.is_brch[i]  = rename_in[i].is_branch;
         rob_out.tag[i]      = map_out.ts[i];
         rob_out.t_old[i]    = map_in.ts_old[i];
         //handling dest register
-        rob_out.dst[i]      = rename_in[i].dat.dest_reg_idx;
+        rob_out.dst[i]      = rename_in[i].dest_reg_idx;
 
-        rob_out.halt[i]     = rename_in[i].dat.halt;
-        rob_out.illegal[i]  = rename_in[i].dat.illegal;
+        rob_out.halt[i]     = rename_in[i].halt;
+        rob_out.illegal[i]  = rename_in[i].illegal;
     end
 end
 
