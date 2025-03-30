@@ -48,7 +48,7 @@ module ppln_skid #(
             if (o_rdy || !vld) begin
                 dat <= i_dat;
                 vld <= i_vld;
-            end else if (vld) begin
+            end else if (i_vld) begin
                 tmp <= i_dat;
                 rdy <= 0;
                 s   <= SKID;
