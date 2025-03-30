@@ -261,7 +261,7 @@ module mul_ex(
 
     // execute
     generate
-        logic       [`NUM_FU_MULT-1:0] tmp_done;
+        logic       [`NUM_FU_MULT-1:0] tmp_out_vld;
         DATA        [`NUM_FU_MULT-1:0] tmp_res;
         DST         [`NUM_FU_MULT-1:0] tmp_dst;
         CPL_CAND    [`NUM_FU_MULT-1:0] tmp_data;
@@ -270,7 +270,7 @@ module mul_ex(
                 .clock  (clock),
                 .reset  (reset),
                 .flush  (flush),
-                .start  (en[i]),
+                .in_vld (en[i]),
                 .dst_in (ops.dst[i]),
                 .rs1    (ops.rs1[i]),
                 .rs2    (ops.rs2[i]),
@@ -279,7 +279,7 @@ module mul_ex(
                 // Output
                 .dst_out(tmp_dst[i]),
                 .result (tmp_res[i]),
-                .done   (tmp_done[i])
+                .out_vld(tmp_out_vld[i])
             );
 
             assign tmp_data[i] = '{
@@ -303,7 +303,7 @@ module mul_ex(
                 .clock      (clock),
                 .reset      (reset),
                 .flush      (flush),
-                .wr_en_cnt  (tmp_done[i]),
+                .wr_en_cnt  (tmp_out_vld[i]),
                 .wr_data    (tmp_data[i]),
                 .rd_en_cnt  (cpl_gnt[i]),
                 .rd_data    (cands[i]),
