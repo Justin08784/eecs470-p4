@@ -817,10 +817,10 @@ typedef struct packed {
 } predictor2fetch;
 
 typedef struct packed {
-    logic update_enable;
-    logic taken;
-    ADDR PC;
-} execute2predictor;
+    logic [`N-1:0] update_enable;
+    logic [`N-1:0]taken;
+    ADDR [`N-1:0] PC;
+} retire2predictor;
 
 // By Arch Map
 `define NUM_ARCH_REG 32
