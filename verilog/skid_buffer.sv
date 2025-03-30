@@ -6,7 +6,7 @@ typedef enum logic {
 } STATUS;
 
 module ppln_skid #(
-    parameter int unsigned WIDTH=2,
+    parameter int unsigned WIDTH,
     type SKID_STATE = struct packed {
         logic s;
         logic vld, rdy;
