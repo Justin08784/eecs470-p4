@@ -48,6 +48,7 @@ module ppln_skid #(
             if (o_rdy || !vld) begin
                 dat <= i_dat;
                 vld <= i_vld;
+                rdy <= 1;
             end else if (i_vld) begin
                 tmp <= i_dat;
                 rdy <= 0;
@@ -57,6 +58,7 @@ module ppln_skid #(
             SKID: begin // tmp is full
             if (o_rdy) begin
                 dat <= tmp;
+                vld <= 1;
                 rdy <= 1;
                 s   <= PIPE;
             end
