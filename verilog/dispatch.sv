@@ -70,6 +70,7 @@ module dispatch #(parameter
 /* >> ==== 1. Alloc Stage ==== >> */
 logic [$clog2(N):0] alloc_en_cnt;
 logic [$clog2(N):0] alloc_rdy_scnt;
+logic [$clog2(N):0] alloc_vld_scnt;
 
 // control logic
 always_comb begin
@@ -130,6 +131,8 @@ end
 
 ALLOC_RENAME_PKT [`N-1:0] rename_in;
 logic [$clog2(N):0]       rename_vld_scnt;
+logic [$clog2(N):0]       rename_en_cnt;
+logic [`N-1:0]            rename_en;
 fifo #(
     .INSTANCE_ID(39),
     .DEPTH(2*`N),
@@ -143,19 +146,17 @@ fifo #(
     .flush      (flush),
     .wr_en_cnt  (alloc_en_cnt),
     .wr_data    (tmp_decode2alloc),
-    .rd_en_cnt  (rename_vld_scnt),
+    .rd_en_cnt  (rename_en_cnt),
     .rd_data    (rename_in),
 
     .free_scnt  (alloc_rdy_scnt),
-    .used_scnt  (rename_vld_scnt)
+    .used_scnt  (alloc_vld_scnt)
 );
 
 /* >> ==== 2. Rename Stage ==== >> */
 /* >> ==== 3. Commit Stage ==== >> */
-logic [`N-1:0]      rename_en;
-logic [$clog2(N):0] rename_en_cnt;
 always_comb begin
-    rename_en_cnt = rename_vld_scnt;
+    rename_en_cnt = alloc_vld_scnt;
     foreach(rename_en[i])
         rename_en[i] = i < rename_en_cnt;
 end
