@@ -184,7 +184,7 @@ always_comb begin
 end
 
 // debug
-`ifndef SYNTH
+`ifdef DEBUG
 always_ff @(posedge clock) begin
 
     if (!reset) begin

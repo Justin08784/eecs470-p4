@@ -113,7 +113,7 @@ module map_table #(parameter
         end
     end
 
-    `ifndef SYNTH
+    `ifdef DEBUG
     // debugging
     always_ff @(posedge clock) begin
         if (!reset) begin

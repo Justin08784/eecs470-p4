@@ -287,9 +287,9 @@ module testbench;
         (only *.out is graded after all), since hierarchical references
         do not work in synthesis
         */
-        `ifndef SYNTH
+        `ifdef DEBUG
         $display("  %3d | >> cpu_test >>", $time);
-        `endif // SYNTH
+        `endif // DEBUG
         for (int n = 0, int cur_idx = 0; n < `N; ++n) begin
             if (!committed_insts[n].valid)
                 continue;
@@ -305,7 +305,7 @@ module testbench;
             inst    = block.word_level[pc[2]];
             reg_idx = verisimpleV.rob_0.r_out.dst[n];
             data    = verisimpleV.prf_0.phys_reg_file[
-                verisimpleV.arch_map_0.entries_n[reg_idx].t
+                verisimpleV.rob_2_retire.tag[n]
             ];
             // print the committed instructions to the writeback output file
             if (reg_idx == `ZERO_REG) begin
@@ -318,6 +318,7 @@ module testbench;
                           data);
             end
             rob_debug.delete(cur_idx);
+            `ifdef DEBUG
             $display("commit[%0d]: (pc: 0x%x, inst: 0x%x) vld: %b, halt: %b, illegal: %b",
                 n,
                 pc,
@@ -326,6 +327,7 @@ module testbench;
                 committed_insts[n].halt,
                 committed_insts[n].illegal
             );
+            `endif // DEBUG
 
             `endif // SYNTH
 
@@ -338,7 +340,7 @@ module testbench;
                 break;
             end
         end
-        `ifndef SYNTH
+        `ifdef DEBUG
         $display("  %3d | << cpu_test <<", $time);
         `endif // SYNTH
 

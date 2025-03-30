@@ -166,7 +166,7 @@ module alu_ex(
     credit[i] = num available slots in fifo[i]
               = buf_sz - (num in-flight through FU[i] + num waiting in fifo[i])
     */
-    localparam buf_sz = 4;
+    localparam buf_sz = 2;
     logic [`NUM_FU_ALU-1:0][$clog2(buf_sz):0] credits;
 
     // execute
@@ -256,21 +256,23 @@ module mul_ex(
     input  logic [`NUM_FU_MULT-1:0]     cpl_gnt
         // completion grant
 );
-    localparam buf_sz = `MULT_STAGES;
-    logic [`NUM_FU_MULT-1:0][$clog2(buf_sz):0] credits;
+    localparam buf_sz = 2;
 
     // execute
     generate
-        logic       [`NUM_FU_MULT-1:0] tmp_done;
+        logic       [`NUM_FU_MULT-1:0] tmp_out_vld;
         DATA        [`NUM_FU_MULT-1:0] tmp_res;
         DST         [`NUM_FU_MULT-1:0] tmp_dst;
         CPL_CAND    [`NUM_FU_MULT-1:0] tmp_data;
+
+        logic       [`NUM_FU_MULT-1:0] cpl_buf_rdy;
         for (genvar i = 0; i < `NUM_FU_MULT; ++i) begin : gen_mults
             mult mult_0 ( 
                 .clock  (clock),
                 .reset  (reset),
                 .flush  (flush),
-                .start  (en[i]),
+                .in_vld (en[i]),
+                .out_rdy(cpl_buf_rdy[i]),
                 .dst_in (ops.dst[i]),
                 .rs1    (ops.rs1[i]),
                 .rs2    (ops.rs2[i]),
@@ -279,7 +281,8 @@ module mul_ex(
                 // Output
                 .dst_out(tmp_dst[i]),
                 .result (tmp_res[i]),
-                .done   (tmp_done[i])
+                .in_rdy (ex_rdy[i]),
+                .out_vld(tmp_out_vld[i])
             );
 
             assign tmp_data[i] = '{
@@ -303,32 +306,17 @@ module mul_ex(
                 .clock      (clock),
                 .reset      (reset),
                 .flush      (flush),
-                .wr_en_cnt  (tmp_done[i]),
+                .wr_en_cnt  (tmp_out_vld[i]),
                 .wr_data    (tmp_data[i]),
                 .rd_en_cnt  (cpl_gnt[i]),
                 .rd_data    (cands[i]),
 
-                .free_scnt  (),
+                .free_scnt  (cpl_buf_rdy[i]),
                 .used_scnt  (vld[i])
             );
            
         end
     endgenerate
-
-    always_comb begin
-        foreach (ex_rdy[i])
-            ex_rdy[i] = credits[i] > 0;
-    end
-
-    always_ff @(posedge clock) begin
-        if (reset || flush) begin
-            foreach(credits[i])
-                credits[i] <= buf_sz;
-        end else begin
-            foreach(credits[i])
-                credits[i] <= credits[i] - en[i] + cpl_gnt[i];
-        end
-    end
 endmodule
 
 module stage_ex_p4 (
@@ -637,7 +625,7 @@ module stage_ex_p4 (
         end
     end
 
-    `ifndef SYNTH
+    `ifdef DEBUG
     always_ff @(posedge clock) begin
         if (!reset) begin
             $display("  %3d | >> EXECUTE", $time);
@@ -776,6 +764,6 @@ module stage_ex_p4 (
             $display("  %3d | << EXECUTE", $time);
         end
     end
-    `endif // SYNTH
+    `endif // DEBUG
 
 endmodule // stage_ex

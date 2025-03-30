@@ -33,7 +33,7 @@ endmodule // correct_mult
 
 module testbench;
 
-    logic clock, start, reset, done, failed;
+    logic clock, in_vld, reset, out_vld, failed;
     DATA r1, r2, correct_r, mul_r;
     MULT_FUNC f;
 
@@ -42,12 +42,15 @@ module testbench;
     mult dut(
         .clock(clock),
         .reset(reset),
-        .start(start),
+        .flush('0),
+        .in_vld(in_vld),
+        .in_rdy(),
+        .out_rdy('1),
         .rs1(r1),
         .rs2(r2),
         .func(f),
         .result(mul_r),
-        .done(done)
+        .out_vld(out_vld)
     );
 
     correct_mult not_dut(
@@ -64,12 +67,12 @@ module testbench;
     end
 
 
-    task wait_until_done;
+    task wait_until_out_vld;
         forever begin : wait_loop
-            @(posedge done);
+            @(posedge out_vld);
             @(negedge clock);
-            if (done) begin
-                disable wait_until_done;
+            if (out_vld) begin
+                disable wait_until_out_vld;
             end
         end
     endtask
@@ -80,13 +83,13 @@ module testbench;
         input DATA reg_1, reg_2;
         begin
             @(negedge clock);
-            start = 1;
+            in_vld = 1;
             r1 = reg_1;
             r2 = reg_2;
             f = func;
             @(negedge clock);
-            start = 0;
-            wait_until_done();
+            in_vld = 0;
+            wait_until_out_vld();
             $display(fmt, f.name(), r1, r2, correct_r, mul_r);
             if (correct_r != mul_r) begin
                 $display("NOT EQUAL");

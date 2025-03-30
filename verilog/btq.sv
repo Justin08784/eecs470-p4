@@ -120,7 +120,7 @@ module btq #(
         end
     end
 
-    `ifndef SYNTH
+    `ifdef DEBUG
     always_ff @(posedge clock) begin
         if (!reset) begin
             $display("  %3d | >> BTQ >>", $time);
@@ -166,6 +166,6 @@ module btq #(
             $display("  %3d | << BTQ <<", $time);
         end
     end
-    `endif // SYNTH
+    `endif // DEBUG
 
 endmodule

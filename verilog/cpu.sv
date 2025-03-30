@@ -510,20 +510,20 @@ module cpu (
         btq_rd_cnt = 0;
         allowed_retire_cnt = 0;
         for (int unsigned i = 0; i < rob_2_retire.r_en_cnt; ++i) begin
-            if (!rob_2_retire.brch_vld[i]) begin
-                ++allowed_retire_cnt;
-            end else begin 
-                if (btq_2_retire.dat[btq_rd_cnt].pred != btq_2_retire.dat[btq_rd_cnt].take) begin
-                    // is mispred?
-                    mispred = 1;
-                    mispred_target = btq_2_retire.dat[btq_rd_cnt].take
-                        ? btq_2_retire.dat[btq_rd_cnt].tgt
-                        : btq_2_retire.dat[btq_rd_cnt].NPC;
-                    break;
-                end 
-                ++allowed_retire_cnt;
+            ++allowed_retire_cnt;
+            if (!rob_2_retire.brch_vld[i])
+                continue;
+
+            if (btq_2_retire.dat[btq_rd_cnt].pred != btq_2_retire.dat[btq_rd_cnt].take) begin
+                // is mispred?
+                mispred = 1;
+                mispred_target = btq_2_retire.dat[btq_rd_cnt].take
+                    ? btq_2_retire.dat[btq_rd_cnt].tgt
+                    : btq_2_retire.dat[btq_rd_cnt].NPC;
                 ++btq_rd_cnt;
-            end
+                break;
+            end 
+            ++btq_rd_cnt;
         end
 
         retire_2_btq = '{
@@ -549,9 +549,21 @@ module cpu (
             flush       <= '0;
             retire_2_f  <= '0;
         end else begin
-            `ifndef SYNTH
-            $display("  %3d | retire_exec.r_en_cnt: %0d", $time, retire_exec.r_en_cnt);
-            `endif // SYNTH
+            `ifdef DEBUG
+            $display("  %3d | >> retire >>", $time);
+            for (int i = 0; i < `N; ++i) begin
+                $display("btq_out [%0d]: tgt: %x, NPC: %x, pred: %b, take: %b", 
+                    i,
+                    btq_2_retire.dat[i].tgt,
+                    btq_2_retire.dat[i].NPC,
+                    btq_2_retire.dat[i].pred,
+                    btq_2_retire.dat[i].take
+                );
+            end
+            $display("btq_rd_cnt: %0d", btq_rd_cnt);
+            $display("retire_exec.r_en_cnt: %0d", retire_exec.r_en_cnt);
+            $display("  %3d | << retire <<", $time);
+            `endif // DEBUG
 /* ======================================== */
             flush       <= mispred;
             retire_2_f  <= '{corrected_PC : mispred_target};
@@ -725,6 +737,8 @@ module cpu (
     always_comb begin
         committed_insts = '0;
         foreach(committed_insts[i]) begin
+            if (flush) // system is flushing; CANNOT COMMIT!
+                break;
             if (i >= retire_exec.r_en_cnt)
                 continue;
             committed_insts[i].valid      = 1;

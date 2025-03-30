@@ -348,7 +348,7 @@ module rs #(parameter
             entries <= entries_n;
         end
 
-        `ifndef SYNTH
+        `ifdef DEBUG
         if (!reset) begin
             $display("  %3d | >> RS >>", $time);
             print_id_result(d_in.d_dat[0]);
