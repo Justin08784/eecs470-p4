@@ -61,7 +61,7 @@
 ///////////////////////////////
 /* How can we implement this in the Makefile? */
 // comment out to enable synth only constructions
-`define SYNTH
+//`define SYNTH
 
 `ifndef SYNTH
 // comment out to disable DEBUG:
@@ -808,7 +808,19 @@ typedef struct packed {
     logic [`N-1:0] [11:0] target;
 } execute2btb;
 
+typedef struct packed {
+    ADDR [`N-1:0] PC;
+} fetch2predictor;
 
+typedef struct packed {
+    logic [`N-1:0] prediction;
+} predictor2fetch;
+
+typedef struct packed {
+    logic [`N-1:0] update_enable;
+    logic [`N-1:0]taken;
+    ADDR [`N-1:0] PC;
+} retire2predictor;
 
 // By Arch Map
 `define NUM_ARCH_REG 32
