@@ -78,7 +78,7 @@ module skid_buffer_test();
     task print_skid_state(
         SKID_STATE s
     );
-        $display("SKID_STATE {s: %s, vld: %b, rdy: %b, dat: %x, tmp: %0d}",
+        $display("SKID_STATE {s: %s, vld: %b, rdy: %b, dat: %x, tmp: %x}",
             s.s == 0 ? "PIPE" : "SKID",
             s.vld,
             s.rdy,
@@ -105,6 +105,31 @@ module skid_buffer_test();
         end
     endtask
 
+    task setup_pipe_empty();
+        clr_all();
+        do_reset();
+    endtask
+
+    task setup_pipe_has1();
+        clr_all();
+        do_reset();
+
+        wr(1);
+        @(negedge clock);
+        clr_all();
+    endtask
+
+    task setup_skid_has2();
+        clr_all();
+        do_reset();
+
+        wr(1);
+        @(negedge clock);
+        wr(2);
+        @(negedge clock);
+        clr_all();
+    endtask
+
     initial begin
         $display("\nStart Testbench");
         clock = 0;
@@ -129,91 +154,114 @@ module skid_buffer_test();
 
         // ---------- Test 2 ---------- //
         $display("\nTest 2: from PIPE, empty");
-        clr_all();
-        do_reset();
-            o_rdy = 1;
-            @(negedge clock);
-            chk('{
-                s   : PIPE,
-                vld : 0,
-                rdy : 1,
-                dat : 'hdeadbeef,
-                tmp : '0
-            });
+        setup_pipe_empty();
+        o_rdy = 1;
+        @(negedge clock);
+        chk('{
+            s   : PIPE,
+            vld : 0,
+            rdy : 1,
+            dat : 'hdeadbeef,
+            tmp : '0
+        });
 
-        clr_all();
-        do_reset();
-            wr(1);
-            o_rdy = 1;
-            @(negedge clock);
-            chk('{
-                s   : PIPE,
-                vld : 1,
-                rdy : 1,
-                dat : 1,
-                tmp : '0
-            });
+        setup_pipe_empty();
+        wr(1);
+        o_rdy = 1;
+        @(negedge clock);
+        chk('{
+            s   : PIPE,
+            vld : 1,
+            rdy : 1,
+            dat : 1,
+            tmp : '0
+        });
 
-        clr_all();
-        do_reset();
-            wr(1);
-            @(negedge clock);
-            chk('{
-                s   : PIPE,
-                vld : 1,
-                rdy : 1,
-                dat : 1,
-                tmp : '0
-            });
+        setup_pipe_empty();
+        wr(1);
+        @(negedge clock);
+        chk('{
+            s   : PIPE,
+            vld : 1,
+            rdy : 1,
+            dat : 1,
+            tmp : '0
+        });
 
         // ---------- Test 3 ---------- //
         $display("\nTest 3: from PIPE, has 1");
 
-        clr_all();
-        do_reset();
-        wr(1);
+        setup_pipe_has1();
+        o_rdy = 1;
         @(negedge clock);
-        clr_all();
-            o_rdy = 1;
-            @(negedge clock);
-            chk('{
-                s   : PIPE,
-                vld : 0,
-                rdy : 1,
-                dat : 'hdeadbeef,
-                tmp : '0
-            });
+        chk('{
+            s   : PIPE,
+            vld : 0,
+            rdy : 1,
+            dat : 'hdeadbeef,
+            tmp : '0
+        });
 
-        clr_all();
-        do_reset();
-        wr(1);
+        setup_pipe_has1();
+        wr(2);
         @(negedge clock);
-        clr_all();
-            wr(2);
-            @(negedge clock);
-            chk('{
-                s   : SKID,
-                vld : 1,
-                rdy : 0,
-                dat : 1,
-                tmp : 2
-            });
+        chk('{
+            s   : SKID,
+            vld : 1,
+            rdy : 0,
+            dat : 1,
+            tmp : 2
+        });
+
+        setup_pipe_has1();
+        o_rdy = 1;
+        wr(2);
+        @(negedge clock);
+        chk('{
+            s   : PIPE,
+            vld : 1,
+            rdy : 1,
+            dat : 2,
+            tmp : '0
+        });
+
+        // ---------- Test 4 ---------- //
+        $display("\nTest 4: from SKID, has 2");
+
+        setup_skid_has2();
+        o_rdy = 1;
+        @(negedge clock);
+        chk('{
+            s   : PIPE,
+            vld : 1,
+            rdy : 1,
+            dat : 2,
+            tmp : 2
+        });
+
+        setup_skid_has2();
+        wr(3);
+        @(negedge clock);
+        chk('{
+            s   : SKID,
+            vld : 1,
+            rdy : 0,
+            dat : 1,
+            tmp : 2
+        });
+
+        setup_skid_has2();
+        o_rdy = 1;
+        wr(3);
+        @(negedge clock);
+        chk('{
+            s   : PIPE,
+            vld : 1,
+            rdy : 1,
+            dat : 2,
+            tmp : 2
+        });
         
-        // clr_all();
-        // do_reset();
-        // wr(1);
-        // @(negedge clock);
-        // clr_all();
-        //     o_rdy = 1;
-        //     wr(2);
-        //     @(negedge clock);
-        //     chk('{
-        //         s   : PIPE,
-        //         vld : 1,
-        //         rdy : 1,
-        //         dat : 2,
-        //         tmp : '0
-        //     });
         $finish;
     end
 
