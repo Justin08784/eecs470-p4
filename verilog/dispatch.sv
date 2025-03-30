@@ -93,27 +93,27 @@ always_comb begin
     
     //assigning output #'s
     decode_out.dispatch_en_cnt  = dispatch_cnt;
-    lsq_out.lsq_d_en_cnt        = dispatch_cnt; //this will likely need to be changed once memory operations are introduced
+    // lsq_out.lsq_d_en_cnt        = dispatch_cnt; //this will likely need to be changed once memory operations are introduced
 end
 
 //logic for free list
-logic [N-1:0]           bus_alloc_free;
-logic [$clog2(N):0]     num_alloc_free;
+logic [N-1:0]           bus_alloc_preg;
+logic [$clog2(N):0]     num_alloc_preg;
 logic [N-1:0][N-1:0]    gbus_preg2insn;
 always_comb begin
     //determining how many instructions have a dest reg
-    foreach (bus_alloc_free[i])
-        bus_alloc_free[i] = (i < dispatch_cnt) && decode_in.prvw_has_dests[i]; 
+    foreach (bus_alloc_preg[i])
+        bus_alloc_preg[i] = (i < dispatch_cnt) && decode_in.prvw_has_dests[i]; 
 
-    num_alloc_free = $countones(bus_alloc_free);
-    free_out.free_d_en_cnt = num_alloc_free;
+    num_alloc_preg = $countones(bus_alloc_preg);
+    free_out.free_d_en_cnt = num_alloc_preg;
 end
 
 psel_gen #(
     .WIDTH  (N),
     .REQS   (N)
 ) sel (
-    .req    (bus_alloc_free),
+    .req    (bus_alloc_preg),
     .gnt_bus(gbus_preg2insn)
 );
 
