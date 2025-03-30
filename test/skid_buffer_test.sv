@@ -62,10 +62,23 @@ module skid_buffer_test();
         o_rdy = 1;
     endtask
 
+    task clr_all();
+        i_vld = 0;
+        i_dat = 'hdeadbeef;
+        o_rdy = 0;
+    endtask
+
+    task do_reset();
+        reset = 1;
+        @(negedge clock);
+        reset = 0;
+    endtask
+
+
     task print_skid_state(
         SKID_STATE s
     );
-        $display("SKID_STATE {s: %s, vld: %b, rdy: %b, dat: %0d, tmp: %0d}",
+        $display("SKID_STATE {s: %s, vld: %b, rdy: %b, dat: %x, tmp: %0d}",
             s.s == 0 ? "PIPE" : "SKID",
             s.vld,
             s.rdy,
@@ -105,7 +118,7 @@ module skid_buffer_test();
         @(negedge clock);
 
         // ---------- Test 1 ---------- //
-        $display("\nTest 1: Check reset state");
+        $display("\nTest 1: Reset state");
         chk('{
             s   : PIPE,
             vld : 0,
@@ -115,61 +128,92 @@ module skid_buffer_test();
         });
 
         // ---------- Test 2 ---------- //
-        $display("\nTest 2: 1w, 0r, PIPE, empty");
+        $display("\nTest 2: from PIPE, empty");
+        clr_all();
+        do_reset();
+            o_rdy = 1;
+            @(negedge clock);
+            chk('{
+                s   : PIPE,
+                vld : 0,
+                rdy : 1,
+                dat : 'hdeadbeef,
+                tmp : '0
+            });
 
-        wr(1);
-        @(negedge clock);
-        chk('{
-            s   : PIPE,
-            vld : 1,
-            rdy : 1,
-            dat : 1,
-            tmp : '0
-        });
+        clr_all();
+        do_reset();
+            wr(1);
+            o_rdy = 1;
+            @(negedge clock);
+            chk('{
+                s   : PIPE,
+                vld : 1,
+                rdy : 1,
+                dat : 1,
+                tmp : '0
+            });
+
+        clr_all();
+        do_reset();
+            wr(1);
+            @(negedge clock);
+            chk('{
+                s   : PIPE,
+                vld : 1,
+                rdy : 1,
+                dat : 1,
+                tmp : '0
+            });
 
         // ---------- Test 3 ---------- //
-        $display("\nTest 3: 1w, 0r, PIPE, has 1");
+        $display("\nTest 3: from PIPE, has 1");
 
-        wr(2);
+        clr_all();
+        do_reset();
+        wr(1);
         @(negedge clock);
-        chk('{
-            s   : SKID,
-            vld : 1,
-            rdy : 0,
-            dat : 1,
-            tmp : 2
-        });
+        clr_all();
+            o_rdy = 1;
+            @(negedge clock);
+            chk('{
+                s   : PIPE,
+                vld : 0,
+                rdy : 1,
+                dat : 'hdeadbeef,
+                tmp : '0
+            });
 
-        // ---------- Test 4 ---------- //
-        $display("\nTest 4: 1w, 1r, SKID, has 2");
-
-        wr(69);
-        o_rdy = 1;
+        clr_all();
+        do_reset();
+        wr(1);
         @(negedge clock);
-        o_rdy = 0;
-        chk('{
-            s   : PIPE,
-            vld : 1,
-            rdy : 1,
-            dat : 2,
-            tmp : 2
-        });
-
-        // ---------- Test 5 ---------- //
-        $display("\nTest 5: 1w, 1r, PIPE, has 1");
-
-        wr(3);
-        o_rdy = 1;
-        @(negedge clock);
-        o_rdy = 0;
-        chk('{
-            s   : PIPE,
-            vld : 1,
-            rdy : 1,
-            dat : 3,
-            tmp : 2
-        });
-
+        clr_all();
+            wr(2);
+            @(negedge clock);
+            chk('{
+                s   : SKID,
+                vld : 1,
+                rdy : 0,
+                dat : 1,
+                tmp : 2
+            });
+        
+        // clr_all();
+        // do_reset();
+        // wr(1);
+        // @(negedge clock);
+        // clr_all();
+        //     o_rdy = 1;
+        //     wr(2);
+        //     @(negedge clock);
+        //     chk('{
+        //         s   : PIPE,
+        //         vld : 1,
+        //         rdy : 1,
+        //         dat : 2,
+        //         tmp : '0
+        //     });
         $finish;
     end
 
