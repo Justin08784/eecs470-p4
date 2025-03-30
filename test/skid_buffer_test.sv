@@ -155,6 +155,16 @@ module skid_buffer_test();
         // ---------- Test 2 ---------- //
         $display("\nTest 2: from PIPE, empty");
         setup_pipe_empty();
+        @(negedge clock);
+        chk('{
+            s   : PIPE,
+            vld : 0,
+            rdy : 1,
+            dat : 'hdeadbeef,
+            tmp : '0
+        });
+
+        setup_pipe_empty();
         o_rdy = 1;
         @(negedge clock);
         chk('{
@@ -190,6 +200,17 @@ module skid_buffer_test();
 
         // ---------- Test 3 ---------- //
         $display("\nTest 3: from PIPE, has 1");
+        setup_pipe_has1();
+        $display("just before:");
+        print_skid_state(state_dbg);
+        @(negedge clock);
+        chk('{
+            s   : PIPE,
+            vld : 1,
+            rdy : 1,
+            dat : 1,
+            tmp : '0
+        });
 
         setup_pipe_has1();
         o_rdy = 1;
@@ -227,6 +248,15 @@ module skid_buffer_test();
 
         // ---------- Test 4 ---------- //
         $display("\nTest 4: from SKID, has 2");
+        setup_skid_has2();
+        @(negedge clock);
+        chk('{
+            s   : SKID,
+            vld : 1,
+            rdy : 0,
+            dat : 1,
+            tmp : 2
+        });
 
         setup_skid_has2();
         o_rdy = 1;
