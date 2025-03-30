@@ -1,15 +1,41 @@
 `include "sys_defs.svh"
 // `include "psel_gen.sv"
 
+/*
+================= WARNING =================
+This version of dispatch lacks a real RS/ROB reservation system in the alloc stage.
+Currently relies on oversized RS/ROB to "absorb" long dependency chains in tests.
+
+e.g.
+With RS=16 and ROB=64, test2.s and branchy.s run correctly. But mult_no_lsq.s,
+a long-running program, gets stuck.
+
+With RS=128 and ROB=512, all three programs run correctly.
+
+Q: What is happening? A:
+Alloc stage overestimates available RS/ROB space because it does not
+track *reserved but not yet written* entries. When the pipeline is under
+heavy pressure (e.g. deep loop chains or high ILP), instructions can be 
+dispatched into supposedly "free" entries, overwriting in-flight ones in
+the ROB/BTQ. (I think this ovewriting is not an issue for RS because the
+dispatch->RS psel does its own independent selection.)
+
+This bug is masked when the structures are large enough to absorb the full
+working set, but will break under realistic pressure.
+
+[Initial commit of pipelined dispatch]
+===========================================
+*/
+
 typedef struct packed {
-    PHYS_REG_IDX    free_idx;
+    PHYS_REG_IDX    t;
     ID_RESULT       dat;
-} [`N-1:0] ALLOC_RENAME_PKT;
+} ALLOC_RENAME_PKT;
 
 module dispatch #(parameter 
     N=`N
 ) (
-    input clock, reset,
+    input clock, reset, flush,
     // DECODE
     input   decode2dispatch decode_in,
     output  dispatch2decode decode_out,
@@ -43,10 +69,13 @@ module dispatch #(parameter
 /* >> ==== 1. Alloc Stage ==== >> */
 logic [$clog2(N):0] dispatch_cnt;
 logic [N-1:0]       dispatch_en;
+logic [$clog2(N):0] alloc_free_scnt;
+logic [$clog2(N):0] alloc_used_scnt;
 
 // control logic
 always_comb begin
     //logic to find the minimum # of spots free across the 4 inputs
+    // TODO: Is syntheizer smart enough to transform this MIN compute into a tree?
     dispatch_cnt = `MIN(rs_in.rs_rdy_scnt, rob_in.rob_rdy_scnt);
     dispatch_cnt = `MIN(dispatch_cnt, decode_in.d_vld_scnt);
     // dispatch_cnt = `MIN(dispatch_cnt, lsq_in.lsq_rdy_scnt); // TODO: enable later
@@ -56,6 +85,7 @@ always_comb begin
     dispatch_cnt = btq_in.btq_rdy_scnt < $countones(decode_in.prvw_is_brch)
         ? `MIN(dispatch_cnt, btq_in.btq_rdy_scnt)
         : dispatch_cnt;
+    dispatch_cnt = `MIN(dispatch_cnt, alloc_free_scnt);
     
     //assigning output #'s
     decode_out.dispatch_en_cnt  = dispatch_cnt;
@@ -75,27 +105,6 @@ always_comb begin
     free_out.free_d_en_cnt = num_alloc_free;
 end
 
-/* >> ==== 2. Rename Stage ==== >> */
-/* >> ==== 3. Commit Stage ==== >> */
-// handle btq output
-logic [`N-1:0][`N-1:0] brch_packed_idx;
-always_comb begin
-    foreach (dispatch_en[i])
-        dispatch_en[i] = i < dispatch_cnt;
-
-    // pack branch insns to lowest indices
-    brch_packed_idx = '0;
-    for (int unsigned i = 0, int wr_idx = 0; i < `N; ++i) begin
-        if (!decode_in.prvw_is_brch[i])
-            continue;
-        brch_packed_idx[i] = wr_idx;
-        btq_out.NPC[wr_idx] = decode_in.d_dat[i].NPC;
-        ++wr_idx;
-    end
-
-    btq_out.en_cnt = $countones(dispatch_en & decode_in.prvw_is_brch);
-end
-
 psel_gen #(
     .WIDTH  (N),
     .REQS   (N)
@@ -104,61 +113,98 @@ psel_gen #(
     .gnt_bus(gbus_preg2insn)
 );
 
+ALLOC_RENAME_PKT [`N-1:0] tmp_decode2alloc;
+always_comb begin
+    tmp_decode2alloc = '0;
+    for (int unsigned i = 0; i < `N; ++i)
+        tmp_decode2alloc[i].dat = decode_in.d_dat[i];
+
+    //handling dest tags
+    foreach(gbus_preg2insn[i, j]) begin
+        if (gbus_preg2insn[i][j])
+            tmp_decode2alloc[j].t |= free_in.d_ts[i];
+    end
+end
+
+ALLOC_RENAME_PKT [`N-1:0] rename_in;
+fifo #(
+    .INSTANCE_ID(39),
+    .DEPTH(2*`N),
+    .WIDTH($bits(ALLOC_RENAME_PKT)),
+    .NUM_RPORTS(`N),
+    .NUM_WPORTS(`N),
+    .ENABLE_INTR_FWD(`FALSE)
+) alloc_buf (
+    .clock      (clock),
+    .reset      (reset),
+    .flush      (flush),
+    .wr_en_cnt  (dispatch_cnt),
+    .wr_data    (tmp_decode2alloc),
+    .rd_en_cnt  (alloc_used_scnt),
+    .rd_data    (rename_in),
+
+    .free_scnt  (alloc_free_scnt),
+    .used_scnt  (alloc_used_scnt)
+);
+
+/* >> ==== 2. Rename Stage ==== >> */
+/* >> ==== 3. Commit Stage ==== >> */
+logic [`N-1:0]      rename_en;
+logic [$clog2(N):0] rename_en_cnt;
+always_comb begin
+    rename_en_cnt = alloc_used_scnt;
+    foreach(rename_en[i])
+        rename_en[i] = i < rename_en_cnt;
+end
+
+// handle btq output
+logic [`N-1:0] is_brch;
+logic [`N-1:0][`N-1:0] brch_packed_idx;
+always_comb begin
+    foreach(is_brch[i])
+        is_brch[i] = rename_in[i].dat.is_branch;
+
+    // pack branch insns to lowest indices
+    brch_packed_idx = '0;
+    for (int unsigned i = 0, int wr_idx = 0; i < `N; ++i) begin
+        if (!is_brch[i])
+            continue;
+        brch_packed_idx[i] = wr_idx;
+        btq_out.NPC[wr_idx] = rename_in[i].dat.NPC;
+        ++wr_idx;
+    end
+
+    btq_out.en_cnt = $countones(rename_en & is_brch);
+end
+
 // handle map table output 
 always_comb begin
     map_out         = '0;
-    map_out.en_cnt  = dispatch_cnt;
+    map_out.en_cnt  = rename_en_cnt;
 
-    //handling dest tags
-    foreach (gbus_preg2insn[i, j]) begin
-        if (gbus_preg2insn[i][j])
-            map_out.ts[j] |= free_in.d_ts[i];
-    end
-
-    for (int i = 0; i < dispatch_cnt; i++) begin
-
+    for (int i = 0; i < rename_en_cnt; i++) begin
         //handling dest register
-        map_out.dsts[i]      = decode_in.d_dat[i].dest_reg_idx;
+        map_out.ts[i]        = rename_in[i].t;
+        map_out.dsts[i]      = rename_in[i].dat.dest_reg_idx;
         // actually need src tags?
-        map_out.rd_src1s[i]  = decode_in.d_dat[i].opa_select == OPA_IS_RS1
-            || decode_in.d_dat[i].cond_branch;
-        map_out.rd_src2s[i]  = decode_in.d_dat[i].opb_select == OPB_IS_RS2
-            || decode_in.d_dat[i].cond_branch
-            || decode_in.d_dat[i].wr_mem;
+        map_out.rd_src1s[i]  = rename_in[i].dat.opa_select == OPA_IS_RS1
+            || rename_in[i].dat.cond_branch;
+        map_out.rd_src2s[i]  = rename_in[i].dat.opb_select == OPB_IS_RS2
+            || rename_in[i].dat.cond_branch
+            || rename_in[i].dat.wr_mem;
         //handling src tags
-        map_out.src1s[i]    = decode_in.d_dat[i].inst.r.rs1;
-        map_out.src2s[i]    = decode_in.d_dat[i].inst.r.rs2;
-
-        // TODO: specifics of setting source registers need to be considered carefully!
-        // //handling src1s tags
-        // if (decode_in.d_dat[i].opa_select == OPA_IS_RS1) begin
-        //     map_out.src1s[i] = decode_in.d_dat[i].inst.r.rs1;
-        // //left these two separate in case we discover that they need to be handled differently
-        // end else if (decode_in.d_dat[i].cond_branch) begin
-        //     map_out.src1s[i] = decode_in.d_dat[i].inst.r.rs1;
-        // end else if (decode_in.d_dat[i].wr_mem) begin
-        //     map_out.src1s[i] = decode_in.d_dat[i].inst.r.rs1;
-        // end
-
-        // //handling src2s tags
-        // if (decode_in.d_dat[i].opb_select == OPB_IS_RS2) begin
-        //     map_out.src2s[i] = decode_in.d_dat[i].inst.r.rs2;
-        // //left these two separate in case we discover that they need to be handled differently
-        // end else if (decode_in.d_dat[i].cond_branch) begin
-        //     map_out.src2s[i] = decode_in.d_dat[i].inst.r.rs2;
-        // end else if (decode_in.d_dat[i].wr_mem) begin
-        //     map_out.src2s[i] = decode_in.d_dat[i].inst.r.rs2;
-        // end
+        map_out.src1s[i]    = rename_in[i].dat.inst.r.rs1;
+        map_out.src2s[i]    = rename_in[i].dat.inst.r.rs2;
     end
 end
 
 // handle rs output 
 always_comb begin
-    rs_out.d_en_cnt = dispatch_cnt;
+    rs_out.d_en_cnt = rename_en_cnt;
     rs_out.d_dat = '0;
 
-    for (int i = 0; i < dispatch_cnt; i++) begin
-        rs_out.d_dat[i]            = decode_in.d_dat[i];
+    for (int i = 0; i < rename_en_cnt; i++) begin
+        rs_out.d_dat[i]            = rename_in[i].dat;
 
         rs_out.d_dat[i].t          = map_out.ts[i];
         rs_out.d_dat[i].t1         = map_in.t1s[i];
@@ -167,7 +213,7 @@ always_comb begin
         rs_out.d_dat[i].t2_rdy     = map_in.cpl2s[i];
 
         rs_out.d_dat[i].rob_idx    = rob_in.rob_idxs[i];
-        rs_out.d_dat[i].btq_idx    = decode_in.d_dat[i].is_branch
+        rs_out.d_dat[i].btq_idx    = rename_in[i].dat.is_branch
             ? btq_in.btq_idxs[brch_packed_idx[i]]
             : '0;
     end
@@ -176,18 +222,18 @@ end
 // handle rob output 
 always_comb begin
     rob_out = '0;
-    rob_out.d_en_cnt = dispatch_cnt;
+    rob_out.d_en_cnt = rename_en_cnt;
 
-    for (int i = 0; i < dispatch_cnt; i++) begin
+    for (int i = 0; i < rename_en_cnt; i++) begin
         //handling src tags
-        rob_out.is_brch[i]  = decode_in.d_dat[i].is_branch;
+        rob_out.is_brch[i]  = rename_in[i].dat.is_branch;
         rob_out.tag[i]      = map_out.ts[i];
         rob_out.t_old[i]    = map_in.ts_old[i];
         //handling dest register
-        rob_out.dst[i]      = decode_in.d_dat[i].dest_reg_idx;
+        rob_out.dst[i]      = rename_in[i].dat.dest_reg_idx;
 
-        rob_out.halt[i]     = decode_in.d_dat[i].halt;
-        rob_out.illegal[i]  = decode_in.d_dat[i].illegal;
+        rob_out.halt[i]     = rename_in[i].dat.halt;
+        rob_out.illegal[i]  = rename_in[i].dat.illegal;
     end
 end
 
