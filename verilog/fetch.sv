@@ -138,7 +138,7 @@ module stage_if_p4 (
     end
 
     // debugging
-    `ifndef SYNTH
+    `ifdef DEBUG
     always_ff @(posedge clock) begin
         if (!reset) begin
             $display("  %3d | >> Fetch >>", $time);
@@ -148,7 +148,7 @@ module stage_if_p4 (
             $display("  %3d | << Fetch <<", $time);
         end
     end
-    `endif // SYNTH
+    `endif // DEBUG
 
     // //RE-EVALUATE
     // // assign valid_out = icache_valid ? (if_valid_q) : '0 && (if_valid_q[0] || if_valid_q[1]);

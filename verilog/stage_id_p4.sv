@@ -400,7 +400,7 @@ module stage_id_p4 (
         end
 
 
-        `ifndef SYNTH
+        `ifdef DEBUG
         if (!reset) begin
             $display("  %3d | >> ID >>", $time);
             // $display("  %3d | FIFO: {used_scnt: %d, free_scnt: %d}",

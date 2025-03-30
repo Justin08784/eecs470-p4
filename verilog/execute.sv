@@ -637,7 +637,7 @@ module stage_ex_p4 (
         end
     end
 
-    `ifndef SYNTH
+    `ifdef DEBUG
     always_ff @(posedge clock) begin
         if (!reset) begin
             $display("  %3d | >> EXECUTE", $time);
@@ -776,6 +776,6 @@ module stage_ex_p4 (
             $display("  %3d | << EXECUTE", $time);
         end
     end
-    `endif // SYNTH
+    `endif // DEBUG
 
 endmodule // stage_ex

@@ -216,7 +216,7 @@ module lsq #(parameter
                 };
             end
 
-            `ifndef SYNTH
+            `ifdef DEBUG
             $display("  %3d | >> LSQ", $time);
             for (int i = 0; i < LSQ_SZ; i++) begin
                 $display("Entry [%0d]: id=%0d, rob_idx=%0d, addr=%0d, data=%0d, d_valid=%b",
@@ -347,7 +347,7 @@ module post_ret_buffer #(parameter
                 state[cur_idx] <= lsq_2_ret.ret_st[i];
             end
 
-            `ifndef SYNTH
+            `ifdef DEBUG
             $display("  %3d | >> RET buffer", $time);
             for (int i = 0; i < LSQ_SZ; i++) begin
                 $display("Entry [%0d]: id=%0d, rob_idx=%0d, addr=%0d, data=%0d, d_valid=%b",
