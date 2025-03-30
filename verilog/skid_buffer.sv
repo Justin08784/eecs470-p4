@@ -5,7 +5,6 @@ typedef enum logic {
     SKID = 1
 } STATUS;
 
-
 module ppln_skid #(
     parameter int unsigned WIDTH=2,
     type SKID_STATE = struct packed {
@@ -34,13 +33,7 @@ module ppln_skid #(
         // rdy = can we accept data?
     logic [WIDTH-1:0] dat, tmp;
 
-    assign dbg = '{
-        s   :s,
-        vld :vld,
-        rdy :rdy,
-        dat :dat,
-        tmp :tmp
-    };
+    assign dbg = '{s, vld, rdy, dat, tmp};
 
     always_ff @(posedge clock) begin
         if (reset || flush) begin
@@ -55,7 +48,6 @@ module ppln_skid #(
             if (o_rdy || !vld) begin
                 dat <= i_dat;
                 vld <= i_vld;
-                // rdy <= 1; // necessary?
             end else if (vld) begin
                 tmp <= i_dat;
                 rdy <= 0;
@@ -65,7 +57,6 @@ module ppln_skid #(
             SKID: begin // tmp is full
             if (o_rdy) begin
                 dat <= tmp;
-                vld <= 1; // necessary?
                 rdy <= 1;
                 s   <= PIPE;
             end
