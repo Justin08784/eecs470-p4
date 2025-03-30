@@ -68,32 +68,30 @@ module dispatch #(parameter
 );
 
 /* >> ==== 1. Alloc Stage ==== >> */
-logic [$clog2(N):0] dispatch_cnt;
-logic [N-1:0]       dispatch_en;
-logic [$clog2(N):0] alloc_free_scnt;
-logic [$clog2(N):0] alloc_used_scnt;
+logic [$clog2(N):0] alloc_en_cnt;
+logic [$clog2(N):0] alloc_rdy_scnt;
 
 // control logic
 always_comb begin
     //logic to find the minimum # of spots free across the 4 inputs
     // TODO: Is syntheizer smart enough to transform this MIN compute into a tree?
-    dispatch_cnt = `MIN(rs_in.rs_rdy_scnt, rob_in.rob_rdy_scnt);
-    dispatch_cnt = `MIN(dispatch_cnt, decode_in.d_vld_scnt);
-    // dispatch_cnt = `MIN(dispatch_cnt, lsq_in.lsq_rdy_scnt); // TODO: enable later
-    dispatch_cnt = free_in.free_rdy_scnt < $countones(decode_in.prvw_has_dests)
-        ? `MIN(dispatch_cnt, free_in.free_rdy_scnt)
-        : dispatch_cnt;
-    dispatch_cnt = btq_in.btq_rdy_scnt < $countones(decode_in.prvw_is_brch)
-        ? `MIN(dispatch_cnt, btq_in.btq_rdy_scnt)
-        : dispatch_cnt;
-    dispatch_cnt = `MIN(dispatch_cnt, alloc_free_scnt);
-    rs_out.alloc_rsrv_cnt   = dispatch_cnt;
-    rob_out.alloc_rsrv_cnt  = dispatch_cnt;
-    btq_out.alloc_rsrv_cnt  = dispatch_cnt;
+    alloc_en_cnt = `MIN(rs_in.rs_rdy_scnt, rob_in.rob_rdy_scnt);
+    alloc_en_cnt = `MIN(alloc_en_cnt, decode_in.d_vld_scnt);
+    // alloc_en_cnt = `MIN(alloc_en_cnt, lsq_in.lsq_rdy_scnt); // TODO: enable later
+    alloc_en_cnt = free_in.free_rdy_scnt < $countones(decode_in.prvw_has_dests)
+        ? `MIN(alloc_en_cnt, free_in.free_rdy_scnt)
+        : alloc_en_cnt;
+    alloc_en_cnt = btq_in.btq_rdy_scnt < $countones(decode_in.prvw_is_brch)
+        ? `MIN(alloc_en_cnt, btq_in.btq_rdy_scnt)
+        : alloc_en_cnt;
+    alloc_en_cnt = `MIN(alloc_en_cnt, alloc_rdy_scnt);
+    rs_out.alloc_rsrv_cnt   = alloc_en_cnt;
+    rob_out.alloc_rsrv_cnt  = alloc_en_cnt;
+    btq_out.alloc_rsrv_cnt  = alloc_en_cnt;
     
     //assigning output #'s
-    decode_out.dispatch_en_cnt  = dispatch_cnt;
-    // lsq_out.lsq_d_en_cnt        = dispatch_cnt; //this will likely need to be changed once memory operations are introduced
+    decode_out.dispatch_en_cnt  = alloc_en_cnt;
+    // lsq_out.lsq_d_en_cnt        = alloc_en_cnt; //this will likely need to be changed once memory operations are introduced
 end
 
 //logic for free list
@@ -103,7 +101,7 @@ logic [N-1:0][N-1:0]    gbus_preg2insn;
 always_comb begin
     //determining how many instructions have a dest reg
     foreach (bus_alloc_preg[i])
-        bus_alloc_preg[i] = (i < dispatch_cnt) && decode_in.prvw_has_dests[i]; 
+        bus_alloc_preg[i] = (i < alloc_en_cnt) && decode_in.prvw_has_dests[i]; 
 
     num_alloc_preg = $countones(bus_alloc_preg);
     free_out.free_d_en_cnt = num_alloc_preg;
@@ -131,6 +129,7 @@ always_comb begin
 end
 
 ALLOC_RENAME_PKT [`N-1:0] rename_in;
+logic [$clog2(N):0]       rename_vld_scnt;
 fifo #(
     .INSTANCE_ID(39),
     .DEPTH(2*`N),
@@ -142,13 +141,13 @@ fifo #(
     .clock      (clock),
     .reset      (reset),
     .flush      (flush),
-    .wr_en_cnt  (dispatch_cnt),
+    .wr_en_cnt  (alloc_en_cnt),
     .wr_data    (tmp_decode2alloc),
-    .rd_en_cnt  (alloc_used_scnt),
+    .rd_en_cnt  (rename_vld_scnt),
     .rd_data    (rename_in),
 
-    .free_scnt  (alloc_free_scnt),
-    .used_scnt  (alloc_used_scnt)
+    .free_scnt  (alloc_rdy_scnt),
+    .used_scnt  (rename_vld_scnt)
 );
 
 /* >> ==== 2. Rename Stage ==== >> */
@@ -156,7 +155,7 @@ fifo #(
 logic [`N-1:0]      rename_en;
 logic [$clog2(N):0] rename_en_cnt;
 always_comb begin
-    rename_en_cnt = alloc_used_scnt;
+    rename_en_cnt = rename_vld_scnt;
     foreach(rename_en[i])
         rename_en[i] = i < rename_en_cnt;
 end
