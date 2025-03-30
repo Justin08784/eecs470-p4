@@ -29,6 +29,7 @@ module rob #(
 
     logic [$clog2(ROB_SZ)-1:0]   head;
     logic [$clog2(ROB_SZ)-1:0]   tail;
+    logic [$clog2(ROB_SZ)-1:0]   rsrv;
 
     ROB_ENTRY [ROB_SZ-1:0]       state;
     logic [$clog2(ROB_SZ):0]     used, free;
@@ -45,7 +46,7 @@ module rob #(
         for (int unsigned i = 0; i < NUM_RPORTS; ++i)
             r_idxs[i] = (head + i) % ROB_SZ;
         for (int unsigned i = 0; i < NUM_DPORTS; ++i)
-            d_idxs[i] = (tail + i) % ROB_SZ;
+            d_idxs[i] = (rsrv + i) % ROB_SZ;
 
         // handle retire (outs)
         r_out = '0;
@@ -91,6 +92,7 @@ module rob #(
             used    <= 0;
             head    <= 0;
             tail    <= 0;
+            rsrv    <= 0;
             state   <= '0;
         end else begin
             `ifndef SYNTH
@@ -101,7 +103,8 @@ module rob #(
             `endif
             used    <= used + d_in.d_en_cnt - r_in.r_en_cnt;
             head    <= (head + r_in.r_en_cnt) % ROB_SZ;
-            tail    <= (tail + d_in.d_en_cnt) % ROB_SZ;
+            tail    <= (tail + d_in.alloc_rsrv_cnt) % ROB_SZ;
+            rsrv    <= (rsrv + d_in.d_en_cnt) % ROB_SZ;
 
             // handle complete (ins)
             for (int unsigned i = 0, int cur_idx = 0; i < NUM_CPORTS; ++i) begin

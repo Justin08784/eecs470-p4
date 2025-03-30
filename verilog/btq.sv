@@ -36,8 +36,9 @@ module btq #(
     BTQ_ENTRY [BTQ_SZ-1:0]      state;
     logic [$clog2(BTQ_SZ)-1:0]  head;
     logic [$clog2(BTQ_SZ)-1:0]  tail;
-    logic [$clog2(BTQ_SZ):0]    used;
+    logic [$clog2(BTQ_SZ)-1:0]  rsrv;
 
+    logic [$clog2(BTQ_SZ):0]    used;
     logic [$clog2(BTQ_SZ):0]    free;
     assign free         = BTQ_SZ - used;
     assign state_dbg    = state;
@@ -53,7 +54,7 @@ module btq #(
         for (int unsigned i = 0; i < NUM_RPORTS; ++i)
             r_idxs[i] = (head + i) % BTQ_SZ;
         for (int unsigned i = 0; i < NUM_DPORTS; ++i)
-            d_idxs[i] = (tail + i) % BTQ_SZ;
+            d_idxs[i] = (rsrv + i) % BTQ_SZ;
 
         // handle retire (outs)
         r_out = '0;
@@ -84,6 +85,7 @@ module btq #(
             used    <= 0;
             head    <= 0;
             tail    <= 0;
+            rsrv    <= 0;
             state   <= '0;
         end else begin
             if (wr_cnt > free)
@@ -92,7 +94,8 @@ module btq #(
                 $error("BTQ underflow!");
             used    <= used + wr_cnt - rd_cnt;
             head    <= (head + rd_cnt) % BTQ_SZ;
-            tail    <= (tail + wr_cnt) % BTQ_SZ;
+            tail    <= (tail + d_in.alloc_rsrv_cnt) % BTQ_SZ;
+            rsrv    <= (rsrv + wr_cnt) % BTQ_SZ;
 
             // handle complete (ins)
             for (int unsigned i = 0, int cur_idx = 0; i < NUM_CPORTS; ++i) begin

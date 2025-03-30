@@ -2,6 +2,7 @@
 // `include "psel_gen.sv"
 
 /*
+[RESOLVED]
 ================= WARNING =================
 This version of dispatch lacks a real RS/ROB reservation system in the alloc stage.
 Currently relies on oversized RS/ROB to "absorb" long dependency chains in tests.
@@ -86,6 +87,9 @@ always_comb begin
         ? `MIN(dispatch_cnt, btq_in.btq_rdy_scnt)
         : dispatch_cnt;
     dispatch_cnt = `MIN(dispatch_cnt, alloc_free_scnt);
+    rs_out.alloc_rsrv_cnt   = dispatch_cnt;
+    rob_out.alloc_rsrv_cnt  = dispatch_cnt;
+    btq_out.alloc_rsrv_cnt  = dispatch_cnt;
     
     //assigning output #'s
     decode_out.dispatch_en_cnt  = dispatch_cnt;
@@ -221,7 +225,6 @@ end
 
 // handle rob output 
 always_comb begin
-    rob_out = '0;
     rob_out.d_en_cnt = rename_en_cnt;
 
     for (int i = 0; i < rename_en_cnt; i++) begin

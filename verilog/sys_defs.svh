@@ -61,7 +61,7 @@
 ///////////////////////////////
 /* How can we implement this in the Makefile? */
 // comment out to enable synth only constructions
-//`define SYNTH
+`define SYNTH
 
 `ifndef SYNTH
 // comment out to disable DEBUG:
@@ -495,6 +495,11 @@ typedef struct packed {
 } retire2fetch;
 
 typedef struct packed {
+    /* Alloc */
+    logic   [$clog2(`N):0] alloc_rsrv_cnt;
+
+    /* Rename */
+    /* Commit */
     logic   [$clog2(`N):0] en_cnt;
         // How many branch instructions dispatching?
         // Sender must ensure branch insns packed to lowest indices.
@@ -623,6 +628,11 @@ typedef struct packed {
 } dispatch2decode;
 
 typedef struct packed {
+    /* Alloc */
+    logic       [$clog2(`N):0] alloc_rsrv_cnt;
+
+    /* Rename */
+    /* Commit */
     logic       [$clog2(`N):0] d_en_cnt;
         // - To: RS
         // - Number of enabled dispatch lines? (replacement for d_vld)
@@ -635,6 +645,11 @@ typedef struct packed {
 } dispatch2rs;
 
 typedef struct packed {
+    /* Alloc */
+    logic       [$clog2(`N):0] alloc_rsrv_cnt;
+
+    /* Rename */
+    /* Commit */
     logic   [$clog2(`N):0]            d_en_cnt;
         // To: ROB
         // - Number of enabled dispatch lines?

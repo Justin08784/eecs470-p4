@@ -266,12 +266,17 @@ module rs #(parameter
     // SECTION: Dispatch
     // compute free entries
     logic [$clog2(RS_SZ):0] rs_cnt;
+    logic [$clog2(RS_SZ):0] rsrv_cnt;
     logic [RS_SZ-1:0] free_entries;
     assign free_entries = 
         ~busy_vec
         | issd_vec; // an issued insn will go to EX and free its entry
     assign rs_cnt = $countones(free_entries);
-    assign d_out.rs_rdy_scnt = rs_cnt > N ? N : rs_cnt;
+    always_ff @(posedge clock) begin
+        if (rsrv_cnt > rs_cnt)
+            $error("RS: more reservations than free rs entries");
+    end
+    assign d_out.rs_rdy_scnt = `MIN(rs_cnt - rsrv_cnt, `N);
 
 
     // select free entries
@@ -343,9 +348,15 @@ module rs #(parameter
 
     always_ff @(posedge clock) begin
         if (reset || flush) begin
-            entries <= '0;
+            entries  <= '0;
+            rsrv_cnt <= 0;
         end else begin
-            entries <= entries_n;
+            entries  <= entries_n;
+            if (d_in.alloc_rsrv_cnt > RS_SZ + d_in.d_en_cnt)
+                $error("RS overflow");
+            if (d_in.d_en_cnt > d_in.alloc_rsrv_cnt)
+                $error("RS underflow");
+            rsrv_cnt <= rsrv_cnt + d_in.alloc_rsrv_cnt - d_in.d_en_cnt;
         end
 
         `ifdef DEBUG
