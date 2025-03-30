@@ -189,7 +189,7 @@ GREP = grep -E --color=auto
 # ---- Modules to Test ---- #
 
 # TODO: add more modules here
-MODULES = cpu mult rob rs fifo free_list dispatch prf map_table stage_id_p4 execute fetch btb lsq post_ret_buffer
+MODULES = cpu mult rob rs fifo free_list dispatch prf map_table stage_id_p4 execute fetch btb lsq post_ret_buffer skid_buffer
 
 # TODO: update this if you add more header files
 ALL_HEADERS = $(CPU_HEADERS)
@@ -212,6 +212,11 @@ ROB_FILES = verilog/sys_defs.svh verilog/memDP.sv verilog/FIFO.sv
 build/rob.simv: $(ROB_FILES)
 build/rob.cov: $(ROB_FILES)
 synth/rob.vg: $(ROB_FILES)
+
+FIFO_FILES = verilog/sys_defs.svh
+build/fifo.simv: $(FIFO_FILES)
+build/fifo.cov: $(FIFO_FILES)
+synth/fifo.vg: $(FIFO_FILES)
 
 FIFO_FILES = verilog/sys_defs.svh
 build/fifo.simv: $(FIFO_FILES)
