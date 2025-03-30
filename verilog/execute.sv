@@ -166,7 +166,7 @@ module alu_ex(
     credit[i] = num available slots in fifo[i]
               = buf_sz - (num in-flight through FU[i] + num waiting in fifo[i])
     */
-    localparam buf_sz = 4;
+    localparam buf_sz = 2;
     logic [`NUM_FU_ALU-1:0][$clog2(buf_sz):0] credits;
 
     // execute
@@ -256,8 +256,7 @@ module mul_ex(
     input  logic [`NUM_FU_MULT-1:0]     cpl_gnt
         // completion grant
 );
-    localparam buf_sz = `MULT_STAGES;
-    logic [`NUM_FU_MULT-1:0][$clog2(buf_sz):0] credits;
+    localparam buf_sz = 2;
 
     // execute
     generate
@@ -282,6 +281,7 @@ module mul_ex(
                 // Output
                 .dst_out(tmp_dst[i]),
                 .result (tmp_res[i]),
+                .in_rdy (ex_rdy[i]),
                 .out_vld(tmp_out_vld[i])
             );
 
@@ -317,21 +317,6 @@ module mul_ex(
            
         end
     endgenerate
-
-    always_comb begin
-        foreach (ex_rdy[i])
-            ex_rdy[i] = credits[i] > 0;
-    end
-
-    always_ff @(posedge clock) begin
-        if (reset || flush) begin
-            foreach(credits[i])
-                credits[i] <= buf_sz;
-        end else begin
-            foreach(credits[i])
-                credits[i] <= credits[i] - en[i] + cpl_gnt[i];
-        end
-    end
 endmodule
 
 module stage_ex_p4 (
