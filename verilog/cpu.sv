@@ -514,29 +514,16 @@ module cpu (
             if (!rob_2_retire.brch_vld[i])
                 continue;
 
-            // ++btq_rd_cnt; // TODO: why cant we just put this here instead of after the if???
             if (btq_2_retire.dat[btq_rd_cnt].pred != btq_2_retire.dat[btq_rd_cnt].take) begin
                 // is mispred?
                 mispred = 1;
                 mispred_target = btq_2_retire.dat[btq_rd_cnt].take
                     ? btq_2_retire.dat[btq_rd_cnt].tgt
                     : btq_2_retire.dat[btq_rd_cnt].NPC;
+                ++btq_rd_cnt;
                 break;
             end 
             ++btq_rd_cnt;
-
-            // if (!rob_2_retire.brch_vld[i]) begin
-            // end else begin 
-            //     if (btq_2_retire.dat[btq_rd_cnt].pred != btq_2_retire.dat[btq_rd_cnt].take) begin
-            //         // is mispred?
-            //         mispred = 1;
-            //         mispred_target = btq_2_retire.dat[btq_rd_cnt].take
-            //             ? btq_2_retire.dat[btq_rd_cnt].tgt
-            //             : btq_2_retire.dat[btq_rd_cnt].NPC;
-            //         break;
-            //     end 
-            //     ++btq_rd_cnt;
-            // end
         end
 
         retire_2_btq = '{
