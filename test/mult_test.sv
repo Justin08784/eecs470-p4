@@ -44,6 +44,8 @@ module testbench;
         .reset(reset),
         .flush('0),
         .in_vld(in_vld),
+        .in_rdy(),
+        .out_rdy('1),
         .rs1(r1),
         .rs2(r2),
         .func(f),

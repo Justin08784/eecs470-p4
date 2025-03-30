@@ -26,6 +26,7 @@ module mult (
 
     logic [(64*(`MULT_STAGES-1))-1:0] internal_sums, internal_mcands, internal_mpliers;
     logic [`MULT_STAGES-2:0] internal_out_vlds;
+    logic [`MULT_STAGES-2:0] internal_out_rdys;
 
     logic [63:0] mcand, mplier, product;
     logic [63:0] mcand_out, mplier_out; // unused, just for wiring
@@ -39,7 +40,6 @@ module mult (
         .reset (reset),
         .flush (flush),
         .func        ({internal_funcs,   func}),
-        .in_vld      ({internal_out_vlds,in_vld}), // forward prev done as next start
         .prev_sum    ({internal_sums,    64'h0}), // start the sum at 0
         .mplier      ({internal_mpliers, mplier}),
         .mcand       ({internal_mcands,  mcand}),
@@ -49,6 +49,9 @@ module mult (
         .next_mcand  ({mcand_out,  internal_mcands}),
         .next_func   ({func_out,   internal_funcs}),
         .next_dst    ({dst_out,    internal_dsts}),
+        .in_rdy      ({internal_out_rdys,in_rdy}),
+        .in_vld      ({internal_out_vlds,in_vld}), // forward prev done as next start
+        .out_rdy     ({out_rdy,    internal_out_rdys}),
         .out_vld     ({out_vld,    internal_out_vlds}) // done when the final stage is done
     );
 
@@ -92,22 +95,24 @@ module mult_stage (
 
     assign partial_product = mplier[SHIFT-1:0] * mcand;
 
+    logic  out_vld_n;
     assign shifted_mplier = {SHIFT'('b0), mplier[63:SHIFT]};
     assign shifted_mcand = {mcand[63-SHIFT:0], SHIFT'('b0)};
-
-    always_ff @(posedge clock) begin
-        product_sum <= prev_sum + partial_product;
-        next_mplier <= shifted_mplier;
-        next_mcand  <= shifted_mcand;
-        next_func   <= func;
-        next_dst    <= dst;
-    end
+    assign in_rdy   = !out_vld || out_rdy;
+    assign out_vld_n= in_vld && out_rdy;
 
     always_ff @(posedge clock) begin
         if (reset || flush) begin
             out_vld <= 1'b0;
         end else begin
-            out_vld <= in_vld;
+            out_vld <= out_vld_n;
+            if (out_vld_n) begin
+                product_sum <= prev_sum + partial_product;
+                next_mplier <= shifted_mplier;
+                next_mcand  <= shifted_mcand;
+                next_func   <= func;
+                next_dst    <= dst;
+            end
         end
     end
 

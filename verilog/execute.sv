@@ -265,12 +265,15 @@ module mul_ex(
         DATA        [`NUM_FU_MULT-1:0] tmp_res;
         DST         [`NUM_FU_MULT-1:0] tmp_dst;
         CPL_CAND    [`NUM_FU_MULT-1:0] tmp_data;
+
+        logic       [`NUM_FU_MULT-1:0] cpl_buf_rdy;
         for (genvar i = 0; i < `NUM_FU_MULT; ++i) begin : gen_mults
             mult mult_0 ( 
                 .clock  (clock),
                 .reset  (reset),
                 .flush  (flush),
                 .in_vld (en[i]),
+                .out_rdy(cpl_buf_rdy[i]),
                 .dst_in (ops.dst[i]),
                 .rs1    (ops.rs1[i]),
                 .rs2    (ops.rs2[i]),
@@ -308,7 +311,7 @@ module mul_ex(
                 .rd_en_cnt  (cpl_gnt[i]),
                 .rd_data    (cands[i]),
 
-                .free_scnt  (),
+                .free_scnt  (cpl_buf_rdy[i]),
                 .used_scnt  (vld[i])
             );
            
