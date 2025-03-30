@@ -189,7 +189,7 @@ GREP = grep -E --color=auto
 # ---- Modules to Test ---- #
 
 # TODO: add more modules here
-MODULES = cpu mult rob rs fifo free_list dispatch prf map_table stage_id_p4 execute fetch btb lsq post_ret_buffer
+MODULES = cpu mult rob rs fifo free_list dispatch prf map_table stage_id_p4 execute fetch btb lsq post_ret_buffer gshare
 
 # TODO: update this if you add more header files
 ALL_HEADERS = $(CPU_HEADERS)
@@ -278,6 +278,11 @@ build/post_ret_buffer.simv: $(POST_RET_BUFFER_FILES)
 build/post_ret_buffer.cov: $(POST_RET_BUFFER_FILES)
 synth/post_ret_buffer.vg: $(POST_RET_BUFFER_FILES)
 
+GSHARE_FILES = verilog/sys_defs.svh verilog/gshare.sv verilog/prediction_buffer.sv verilog/global_history_register.sv verilog/pht.sv
+build/gshare.simv: $(GSHARE_FILES)
+build/gshare.cov: $(GSHARE_FILES)
+synth/gshare.vg: $(GSHARE_FILES)
+
 
 #################################
 # ---- Main CPU Definition ---- #
@@ -314,7 +319,12 @@ CPU_SOURCES = verilog/cpu.sv \
 			  verilog/fetch.sv \
 			  verilog/execute.sv \
 			  verilog/btq.sv \
-			  verilog/btb.sv
+			  verilog/btb.sv \
+			  verilog/gshare.sv \
+			  verilog/prediction_buffer.sv \
+			  verilog/global_history_register.sv \
+			  verilog/pht.sv 
+
 
 build/cpu.simv: $(CPU_SOURCES) $(CPU_HEADERS) $(CPU_TESTBENCH)
 synth/cpu.vg: $(CPU_SOURCES) $(CPU_HEADERS)
