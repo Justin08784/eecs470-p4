@@ -5,8 +5,14 @@ typedef enum logic {
     SKID = 1
 } STATUS;
 
+
 module ppln_skid #(
-    parameter int unsigned WIDTH=2
+    parameter int unsigned WIDTH=2,
+    type SKID_STATE = struct packed {
+        logic s;
+        logic vld, rdy;
+        logic [WIDTH-1:0] dat, tmp;
+    }
 ) (
     input   clock, 
     input   reset,
@@ -18,13 +24,23 @@ module ppln_skid #(
 
     output  logic   o_vld,
     input   logic   o_rdy,
-    output  logic   [WIDTH-1:0] o_dat
+    output  logic   [WIDTH-1:0] o_dat,
+
+    output  SKID_STATE dbg
 );
     STATUS s;
     logic vld, rdy; 
         // vld = is dat, i.e. pipeline reg, busy/occupied?
         // rdy = can we accept data?
     logic [WIDTH-1:0] dat, tmp;
+
+    assign dbg = '{
+        s   :s,
+        vld :vld,
+        rdy :rdy,
+        dat :dat,
+        tmp :tmp
+    };
 
     always_ff @(posedge clock) begin
         if (reset || flush) begin
