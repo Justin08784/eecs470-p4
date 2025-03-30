@@ -120,7 +120,7 @@ module lsq #(parameter
         forward_range = '0;
         for (int unsigned i = 0; i < NUM_FU_LOAD; i++) begin
             forward_range.start[i] = exec_2_lsq.forward_addr[i] - (exec_2_lsq.forward_addr[i] % 8);
-            forward_range.stop[i] = forward_range.start[i] + 16;
+            forward_range.stop[i] = forward_range.start[i] + 8;
         end
 
         //search for matches to forward
@@ -128,12 +128,57 @@ module lsq #(parameter
             if (!exec_2_lsq.forward_req_en[i]) continue;
 
             //find any addr's in the SQ that are within range
-            for (int unsigned j = 0, int idx = 0; j < LSQ_SZ; j++) begin
+            // for (int unsigned j = 0, int unsigned idx = 0, int start_diff = 0, int unsigned src_mod = 0, int unsigned sq_addr_mod = 0, int unsigned front = 0, int unsigned back = 0; j < LSQ_SZ; j++) begin
+            //     idx = (head+j) % LSQ_SZ;
+            //     src_mod = exec_2_lsq.forward_addr[i] % 8;
+            //     sq_addr_mod = state[idx].addr % 8;
+            //     start_diff = src_mod - sq_addr_mod;
+            //     front = 31 - (4 * sq_addr_mod);
+            //     back = 32 - (4 * sq_addr_mod) - (4*(2**state[idx].mem_size));
+
+            //     if (state[idx].d_vld && (forward_range.start[i] <= state[idx].addr) && (state[idx].addr < forward_range.stop[i])) begin
+            //         lsq_2_exec.forward_en[i] = '1;
+            //         if (start_diff == 0) begin
+            //             lsq_2_exec.forward_data[i] = insert_forward_data(front,back,sq_addr_mod,state[idx].mem_size,lsq_2_exec.forward_data[i],state[idx].data);
+            //         end
+            //         else if (start_diff > 0) begin
+                        
+            //         end
+            //         else if (start_diff > 1) begin
+                        
+            //         end
+            //         else if (start_diff > 3) begin
+            //             // forward_idx[i][forward_found] = idx;
+            //             // forward_found += 1;
+            //         end
+                    
+            //     end
+
+            //     if (state[idx].sq_idx == exec_2_lsq.sq_idx[i]) break;
+            // end
+
+            for (int unsigned j = 0, int unsigned idx = 0, int unsigned min = 0, int unsigned max = 0; j < LSQ_SZ; j++) begin
                 idx = (head+j) % LSQ_SZ;
+                // min = 0;
+                // max = 0;
 
                 if (state[idx].d_vld && (forward_range.start[i] <= state[idx].addr) && (state[idx].addr < forward_range.stop[i])) begin
-                    forward_idx[i][forward_found] = idx;
-                    forward_found += 1;
+                    lsq_2_exec.forward_en[i] = '1;
+
+                    if (state[idx].addr <= exec_2_lsq.forward_addr[i]) begin
+                        min = (8 * (exec_2_lsq.forward_addr[i] % 4)) - (8 * (state[idx].addr % 4));
+                        max = min + `MIN(state[idx].mem_size,exec_2_lsq.ld_mem_size[i]);
+                    end
+                    else begin
+                        min = 0;
+                        max = `MIN(state[idx].mem_size,exec_2_lsq.ld_mem_size[i]);
+                    end
+                    for (int k = 0, int unsigned adj_k = 0; k < 32; k++) begin
+                        adj_k = k-(8*(exec_2_lsq.forward_addr[i] % 4))+(8*(state[idx].addr % 4));
+                        if ((k >= min) && (k < max)) begin
+                            lsq_2_exec.forward_data[i][adj_k] = state[idx].data[k];
+                        end
+                    end
                 end
 
                 if (state[idx].sq_idx == exec_2_lsq.sq_idx[i]) break;
@@ -232,6 +277,47 @@ module lsq #(parameter
             `endif
         end
     end
+
+    function DATA insert_forward_data(
+        input int unsigned front,
+        input int unsigned back,
+        input int frd_mod,
+        input MEM_SIZE forward_mem_size,
+        input DATA forward_data,
+        input DATA forward_src
+    );
+        begin
+            if (front == 31) begin
+                if (back == 0) begin
+                    insert_forward_data = forward_src; //if double overwrite whole thing
+                end
+                else if (back == 16) begin
+                    insert_forward_data[31:16] = forward_src[15:0]; //if double overwrite whole thing
+                end
+                else if (back == 24) begin
+                    insert_forward_data[31:24] = forward_src[7:0];
+                end
+                else if (back == 28) begin
+                    insert_forward_data[31:28] = forward_src[3:0];
+                end
+            end
+            else if (front == 27) begin
+                if (back == 0) begin
+                    insert_forward_data = forward_src; //if double overwrite whole thing
+                end
+                else if (back == 16) begin
+                    insert_forward_data[31:16] = forward_src[15:0]; //if double overwrite whole thing
+                end
+                else if (back == 24) begin
+                    insert_forward_data[31:24] = forward_src[7:0];
+                end
+                else if (back == 28) begin
+                    insert_forward_data[31:28] = forward_src[3:0];
+                end
+            end
+        end
+
+    endfunction
 
 endmodule
 
@@ -365,3 +451,5 @@ module post_ret_buffer #(parameter
     end
 
 endmodule
+
+
