@@ -54,7 +54,7 @@
 
 
 `define BTB_ENTRIES 256
-`define BTB_TAG_WIDTH 10
+`define BTB_TAG_WIDTH 12
 
 ///////////////////////////////
 // --- Compil. Controls ---- //
