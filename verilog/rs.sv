@@ -271,6 +271,7 @@ module rs #(parameter
     assign free_entries = 
         ~busy_vec
         | issd_vec; // an issued insn will go to EX and free its entry
+    // Bradley: TODO: make this a sat count that stops at 2N (make it a dep for loop); 2N so you can fit reservations as well
     assign rs_cnt = $countones(free_entries);
     always_ff @(posedge clock) begin
         if (rsrv_cnt > rs_cnt && !reset)
