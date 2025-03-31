@@ -649,6 +649,8 @@ typedef struct packed {
     logic       [$clog2(`N):0] alloc_rsrv_cnt;
 
     /* Rename */
+    logic       [$clog2(`N):0] rename_collect_cnt;
+
     /* Commit */
     logic   [$clog2(`N):0]            d_en_cnt;
         // To: ROB

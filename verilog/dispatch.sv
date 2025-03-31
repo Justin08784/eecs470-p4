@@ -81,12 +81,8 @@ always_comb begin
     alloc_en_cnt = free_in.free_rdy_scnt < $countones(decode_in.prvw_has_dests)
         ? `MIN(alloc_en_cnt, free_in.free_rdy_scnt)
         : alloc_en_cnt;
-    alloc_en_cnt = btq_in.btq_rdy_scnt < $countones(decode_in.prvw_is_brch)
-        ? `MIN(alloc_en_cnt, btq_in.btq_rdy_scnt)
-        : alloc_en_cnt;
     alloc_en_cnt = `MIN(alloc_en_cnt, alloc_rdy_scnt);
     rob_out.alloc_rsrv_cnt  = alloc_en_cnt;
-    btq_out.alloc_rsrv_cnt  = alloc_en_cnt;
     
     //assigning output #'s
     decode_out.dispatch_en_cnt  = alloc_en_cnt;
@@ -153,22 +149,26 @@ fifo #(
 );
 
 /* >> ==== 2. Rename Stage ==== >> */
-/* >> ==== 3. Commit Stage ==== >> */
+logic [`N-1:0] is_brch;
+always_comb begin
+    foreach(is_brch[i])
+        is_brch[i] = rename_in[i].is_branch;
+end
+
 always_comb begin
     rename_en_cnt = `MIN(alloc_vld_scnt, rs_in.rs_rdy_scnt);
     rename_en_cnt = `MIN(rename_en_cnt,  rename_rdy_scnt);
+    rename_en_cnt = btq_in.btq_rdy_scnt < $countones(is_brch)
+        ? `MIN(rename_en_cnt, btq_in.btq_rdy_scnt)
+        : rename_en_cnt;
     rs_out.alloc_rsrv_cnt = rename_en_cnt;
     foreach(rename_en[i])
         rename_en[i] = i < rename_en_cnt;
 end
 
 // handle btq output
-logic [`N-1:0] is_brch;
 logic [`N-1:0][`N-1:0] brch_packed_idx;
 always_comb begin
-    foreach(is_brch[i])
-        is_brch[i] = rename_in[i].is_branch;
-
     // pack branch insns to lowest indices
     brch_packed_idx = '0;
     for (int unsigned i = 0, int wr_idx = 0; i < `N; ++i) begin
@@ -221,6 +221,7 @@ always_comb begin
             ? btq_in.btq_idxs[brch_packed_idx[i]]
             : '0;
     end
+    rob_out.rename_collect_cnt = rename_en_cnt;
 end
 
 RENAME_COMMIT_PKT [`N-1:0]  commit_in;
@@ -245,6 +246,8 @@ fifo #(
     .free_scnt  (rename_rdy_scnt),
     .used_scnt  (rename_vld_scnt)
 );
+
+/* >> ==== 3. Commit Stage ==== >> */
 
 // handle rs output 
 always_comb begin

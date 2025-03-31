@@ -273,7 +273,7 @@ module rs #(parameter
         | issd_vec; // an issued insn will go to EX and free its entry
     assign rs_cnt = $countones(free_entries);
     always_ff @(posedge clock) begin
-        if (rsrv_cnt > rs_cnt)
+        if (rsrv_cnt > rs_cnt && !reset)
             $error("RS: more reservations than free rs entries");
     end
     assign d_out.rs_rdy_scnt = `MIN(rs_cnt - rsrv_cnt, `N);
@@ -354,7 +354,7 @@ module rs #(parameter
             entries  <= entries_n;
             if (d_in.alloc_rsrv_cnt > RS_SZ + d_in.d_en_cnt)
                 $error("RS overflow");
-            if (d_in.d_en_cnt > d_in.alloc_rsrv_cnt)
+            if (d_in.d_en_cnt > rs_cnt + d_in.alloc_rsrv_cnt)
                 $error("RS underflow");
             rsrv_cnt <= rsrv_cnt + d_in.alloc_rsrv_cnt - d_in.d_en_cnt;
         end
