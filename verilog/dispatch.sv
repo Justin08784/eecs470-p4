@@ -27,6 +27,10 @@ working set, but will break under realistic pressure.
 [Initial commit of pipelined dispatch]
 ===========================================
 */
+typedef struct packed {
+    PHYS_REG_IDX    t_old;
+    ID_RESULT       dat;
+} RENAME_COMMIT_PKT;
 
 module dispatch #(parameter 
     N=`N
@@ -71,7 +75,7 @@ logic [$clog2(N):0] alloc_vld_scnt;
 always_comb begin
     //logic to find the minimum # of spots free across the 4 inputs
     // TODO: Is syntheizer smart enough to transform this MIN compute into a tree?
-    alloc_en_cnt = `MIN(rs_in.rs_rdy_scnt, rob_in.rob_rdy_scnt);
+    alloc_en_cnt = rob_in.rob_rdy_scnt;
     alloc_en_cnt = `MIN(alloc_en_cnt, decode_in.d_vld_scnt);
     // alloc_en_cnt = `MIN(alloc_en_cnt, lsq_in.lsq_rdy_scnt); // TODO: enable later
     alloc_en_cnt = free_in.free_rdy_scnt < $countones(decode_in.prvw_has_dests)
@@ -81,7 +85,6 @@ always_comb begin
         ? `MIN(alloc_en_cnt, btq_in.btq_rdy_scnt)
         : alloc_en_cnt;
     alloc_en_cnt = `MIN(alloc_en_cnt, alloc_rdy_scnt);
-    rs_out.alloc_rsrv_cnt   = alloc_en_cnt;
     rob_out.alloc_rsrv_cnt  = alloc_en_cnt;
     btq_out.alloc_rsrv_cnt  = alloc_en_cnt;
     
@@ -124,10 +127,11 @@ always_comb begin
     end
 end
 
-ID_RESULT [`N-1:0] rename_in;
-logic [$clog2(N):0]       rename_vld_scnt;
-logic [$clog2(N):0]       rename_en_cnt;
-logic [`N-1:0]            rename_en;
+ID_RESULT [`N-1:0]  rename_in;
+logic [$clog2(N):0] rename_vld_scnt;
+logic [$clog2(N):0] rename_rdy_scnt;
+logic [$clog2(N):0] rename_en_cnt;
+logic [`N-1:0]      rename_en;
 fifo #(
     .INSTANCE_ID(39),
     .DEPTH(2*`N),
@@ -151,7 +155,9 @@ fifo #(
 /* >> ==== 2. Rename Stage ==== >> */
 /* >> ==== 3. Commit Stage ==== >> */
 always_comb begin
-    rename_en_cnt = alloc_vld_scnt;
+    rename_en_cnt = `MIN(alloc_vld_scnt, rs_in.rs_rdy_scnt);
+    rename_en_cnt = `MIN(rename_en_cnt,  rename_rdy_scnt);
+    rs_out.alloc_rsrv_cnt = rename_en_cnt;
     foreach(rename_en[i])
         rename_en[i] = i < rename_en_cnt;
 end
@@ -197,41 +203,73 @@ always_comb begin
     end
 end
 
-// handle rs output 
+RENAME_COMMIT_PKT [`N-1:0] tmp_alloc2rename;
 always_comb begin
-    rs_out.d_en_cnt = rename_en_cnt;
-    rs_out.d_dat = '0;
-
+    tmp_alloc2rename = '0;
     for (int i = 0; i < rename_en_cnt; i++) begin
-        rs_out.d_dat[i]            = rename_in[i];
+        tmp_alloc2rename[i].dat         = rename_in[i];
 
-        rs_out.d_dat[i].t          = map_out.ts[i];
-        rs_out.d_dat[i].t1         = map_in.t1s[i];
-        rs_out.d_dat[i].t2         = map_in.t2s[i];
-        rs_out.d_dat[i].t1_rdy     = map_in.cpl1s[i];
-        rs_out.d_dat[i].t2_rdy     = map_in.cpl2s[i];
+        tmp_alloc2rename[i].dat.t       = map_out.ts[i];
+        tmp_alloc2rename[i].t_old       = map_in.ts_old[i];
+        tmp_alloc2rename[i].dat.t1      = map_in.t1s[i];
+        tmp_alloc2rename[i].dat.t2      = map_in.t2s[i];
+        tmp_alloc2rename[i].dat.t1_rdy  = map_in.cpl1s[i];
+        tmp_alloc2rename[i].dat.t2_rdy  = map_in.cpl2s[i];
 
-        rs_out.d_dat[i].rob_idx    = rob_in.rob_idxs[i];
-        rs_out.d_dat[i].btq_idx    = rename_in[i].is_branch
+        tmp_alloc2rename[i].dat.rob_idx = rob_in.rob_idxs[i];
+        tmp_alloc2rename[i].dat.btq_idx = rename_in[i].is_branch
             ? btq_in.btq_idxs[brch_packed_idx[i]]
             : '0;
     end
 end
 
+RENAME_COMMIT_PKT [`N-1:0]  commit_in;
+logic [$clog2(N):0] commit_en_cnt;
+logic [`N-1:0]      commit_en;
+fifo #(
+    .INSTANCE_ID(40),
+    .DEPTH(2*`N),
+    .WIDTH($bits(RENAME_COMMIT_PKT)),
+    .NUM_RPORTS(`N),
+    .NUM_WPORTS(`N),
+    .ENABLE_INTR_FWD(`FALSE)
+) rename_buf (
+    .clock      (clock),
+    .reset      (reset),
+    .flush      (flush),
+    .wr_en_cnt  (rename_en_cnt),
+    .wr_data    (tmp_alloc2rename),
+    .rd_en_cnt  (commit_en_cnt),
+    .rd_data    (commit_in),
+
+    .free_scnt  (rename_rdy_scnt),
+    .used_scnt  (rename_vld_scnt)
+);
+
+// handle rs output 
+always_comb begin
+    commit_en_cnt   = rename_vld_scnt;
+    rs_out.d_dat    = '0;
+    rs_out.d_en_cnt = commit_en_cnt;
+
+    for (int i = 0; i < commit_en_cnt; i++)
+        rs_out.d_dat[i] = commit_in[i].dat;
+end
+
 // handle rob output 
 always_comb begin
-    rob_out.d_en_cnt = rename_en_cnt;
+    rob_out.d_en_cnt = commit_en_cnt;
 
-    for (int i = 0; i < rename_en_cnt; i++) begin
+    for (int i = 0; i < commit_en_cnt; i++) begin
         //handling src tags
-        rob_out.is_brch[i]  = rename_in[i].is_branch;
-        rob_out.tag[i]      = map_out.ts[i];
-        rob_out.t_old[i]    = map_in.ts_old[i];
+        rob_out.is_brch[i]  = commit_in[i].dat.is_branch;
+        rob_out.tag[i]      = commit_in[i].dat.t;
+        rob_out.t_old[i]    = commit_in[i].t_old;
         //handling dest register
-        rob_out.dst[i]      = rename_in[i].dest_reg_idx;
+        rob_out.dst[i]      = commit_in[i].dat.dest_reg_idx;
 
-        rob_out.halt[i]     = rename_in[i].halt;
-        rob_out.illegal[i]  = rename_in[i].illegal;
+        rob_out.halt[i]     = commit_in[i].dat.halt;
+        rob_out.illegal[i]  = commit_in[i].dat.illegal;
     end
 end
 
