@@ -1,6 +1,11 @@
 `include "sys_defs.svh"
 // `include "psel_gen.sv"
 
+typedef struct packed {
+    PHYS_REG_IDX    free_idx;
+    ID_RESULT       dat;
+} [`N-1:0] ALLOC_RENAME_PKT;
+
 module dispatch #(parameter 
     N=`N
 ) (
@@ -35,6 +40,7 @@ module dispatch #(parameter
     
 );
 
+/* >> ==== 1. Alloc Stage ==== >> */
 logic [$clog2(N):0] dispatch_cnt;
 logic [N-1:0]       dispatch_en;
 
@@ -56,6 +62,21 @@ always_comb begin
     lsq_out.lsq_d_en_cnt        = dispatch_cnt; //this will likely need to be changed once memory operations are introduced
 end
 
+//logic for free list
+logic [N-1:0]           bus_alloc_free;
+logic [$clog2(N):0]     num_alloc_free;
+logic [N-1:0][N-1:0]    gbus_preg2insn;
+always_comb begin
+    //determining how many instructions have a dest reg
+    foreach (bus_alloc_free[i])
+        bus_alloc_free[i] = (i < dispatch_cnt) && decode_in.prvw_has_dests[i]; 
+
+    num_alloc_free = $countones(bus_alloc_free);
+    free_out.free_d_en_cnt = num_alloc_free;
+end
+
+/* >> ==== 2. Rename Stage ==== >> */
+/* >> ==== 3. Commit Stage ==== >> */
 // handle btq output
 logic [`N-1:0][`N-1:0] brch_packed_idx;
 always_comb begin
@@ -73,19 +94,6 @@ always_comb begin
     end
 
     btq_out.en_cnt = $countones(dispatch_en & decode_in.prvw_is_brch);
-end
-
-//logic for free list
-logic [N-1:0]           bus_alloc_free;
-logic [$clog2(N):0]     num_alloc_free;
-logic [N-1:0][N-1:0]    gbus_preg2insn;
-always_comb begin
-    //determining how many instructions have a dest reg
-    foreach (bus_alloc_free[i])
-        bus_alloc_free[i] = (i < dispatch_cnt) && decode_in.prvw_has_dests[i]; 
-
-    num_alloc_free = $countones(bus_alloc_free);
-    free_out.free_d_en_cnt = num_alloc_free;
 end
 
 psel_gen #(
