@@ -797,7 +797,7 @@ typedef struct packed {
 
 typedef struct packed {
    // ADDR [`N-1:0]  PC,
-    logic [`N-1:0] [11:0] target;
+    logic [`N-1:0] [15:0] target;
     logic [`N-1:0] hit;
 } btb2fetch;
 
@@ -805,7 +805,7 @@ typedef struct packed {
 typedef struct packed {
     logic [`N-1:0][31:0] PC;
     logic [`N-1:0] is_taken;
-    logic [`N-1:0] [11:0] target;
+    logic [`N-1:0] [15:0] target;
 } execute2btb;
 
 typedef struct packed {
