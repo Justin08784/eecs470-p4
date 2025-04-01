@@ -146,11 +146,13 @@ module sq #(parameter
                 // max = 0;
 
                 if (state[idx].d_vld && (forward_range.start[i] <= state[idx].addr) && (state[idx].addr < forward_range.stop[i])) begin
+                    //ensure that the found match and requested forward are big enough to overlap
                     if (!(((state[idx].addr + state[idx].mem_size) >= exec_2_lsq.forward_addr[i]) 
                         || ((exec_2_lsq.forward_addr[i] + exec_2_lsq.forward_mem_size[i]) >= state[idx].mem_size))) continue;
 
                     lsq_2_exec.forward_en[i] = '1;
 
+                    //ensure that the correct bytes are taken from the store that is being forwarded
                     if (state[idx].addr <= exec_2_lsq.forward_addr[i]) begin
                         min = (8 * (exec_2_lsq.forward_addr[i] % 4)) - (8 * (state[idx].addr % 4));
                         max = min + (8 * (2**`MIN(state[idx].mem_size,exec_2_lsq.forward_mem_size[i])));
@@ -161,6 +163,7 @@ module sq #(parameter
                     end
                     // $display("MIN: %0d, MAX: %0d", min, max);
                     for (int k = 0; k < 32; k++) begin
+                        //k and adj_k ensure correct data alignment between the data that needs to be forwarded and where it needs to be forwarded to
                         adj_k = k-(8*(exec_2_lsq.forward_addr[i] % 4))+(8*(state[idx].addr % 4));
                         if (((k >= min) && (k < max)) && ((adj_k >= 0) && (adj_k < 32))) begin
                             lsq_2_exec.forward_data[i][adj_k] = state[idx].data[k];
@@ -339,7 +342,7 @@ module post_ret_buffer #(parameter
 
     always_comb begin
         forward_ret_2_lsq = '0;
-        
+
         //calculate ADDR ranges to search for forwarding
         forward_range = '0;
         for (int unsigned i = 0; i < NUM_FU_LOAD; i++) begin
@@ -359,11 +362,13 @@ module post_ret_buffer #(parameter
                 if (state[idx].sq_idx == lsq_2_ret.forward_sq_idx[i]) forward_ret_2_lsq.sq_idx_found[i] = '1;
 
                 if (state[idx].d_vld && (forward_range.start[i] <= state[idx].addr) && (state[idx].addr < forward_range.stop[i])) begin
+                    //ensure that the found match and requested forward are big enough to overlap
                     if (!(((state[idx].addr + state[idx].mem_size) >= lsq_2_ret.forward_addr[i]) 
                         || ((lsq_2_ret.forward_addr[i] + lsq_2_ret.forward_mem_size[i]) >= state[idx].mem_size))) continue;
 
                     forward_ret_2_lsq.forward_en[i] = '1;
 
+                    //ensure that the correct bytes are taken from the store that is being forwarded
                     if (state[idx].addr <= lsq_2_ret.forward_addr[i]) begin
                         min = (8 * (lsq_2_ret.forward_addr[i] % 4)) - (8 * (state[idx].addr % 4));
                         max = min + (8 * (2**`MIN(state[idx].mem_size,lsq_2_ret.forward_mem_size[i])));
@@ -374,7 +379,8 @@ module post_ret_buffer #(parameter
                     end
                     // $display("MIN: %0d, MAX: %0d", min, max);
                     for (int k = 0; k < 32; k++) begin
-                        adj_k = k-(8*(lsq_2_ret.forward_addr[i] % 4))+(8*(state[idx].addr % 4));
+                        //k and adj_k ensure correct data alignment between the data that needs to be forwarded and where it needs to be forwarded to
+                        adj_k = k-(8*(lsq_2_ret.forward_addr[i] % 4))+(8*(state[idx].addr % 4)); 
                         if (((k >= min) && (k < max)) && ((adj_k >= 0) && (adj_k < 32))) begin
                             forward_ret_2_lsq.forward_data[i][adj_k] = state[idx].data[k];
                             if ((adj_k % 8) == 0) begin
