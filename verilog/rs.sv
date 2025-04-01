@@ -265,21 +265,10 @@ module rs #(parameter
 
     // SECTION: Dispatch
     // compute free entries
-    logic [$clog2(RS_SZ):0] rs_cnt;
-    logic [$clog2(RS_SZ):0] rsrv_cnt;
     logic [RS_SZ-1:0] free_entries;
     assign free_entries = 
         ~busy_vec
         | issd_vec; // an issued insn will go to EX and free its entry
-    // Bradley: TODO: make this a sat count that stops at 2N (make it a dep for loop); 2N so you can fit reservations as well
-    // So basically, you loop over 16 free_entries bits and stop incrementing when it reaches 2
-    assign rs_cnt = $countones(free_entries);
-    always_ff @(posedge clock) begin
-        if (rsrv_cnt > rs_cnt && !reset)
-            $error("RS: more reservations than free rs entries");
-    end
-    assign d_out.rs_rdy_scnt = `MIN(rs_cnt - rsrv_cnt, `N);
-
 
     // select free entries
     logic [N-1:0][RS_SZ-1:0] gbus_free;
@@ -299,6 +288,7 @@ module rs #(parameter
                 d2entry[i] |= gbus_free[i];
             end
         end
+        d_out.rs_rdy_scnt = $countones({|gbus_free[0], |gbus_free[1]});
     end
 
     // SECTION: Compute next state
@@ -351,14 +341,8 @@ module rs #(parameter
     always_ff @(posedge clock) begin
         if (reset || flush) begin
             entries  <= '0;
-            rsrv_cnt <= 0;
         end else begin
             entries  <= entries_n;
-            if (d_in.alloc_rsrv_cnt > RS_SZ + d_in.d_en_cnt)
-                $error("RS overflow");
-            if (d_in.d_en_cnt > rs_cnt + d_in.alloc_rsrv_cnt)
-                $error("RS underflow");
-            rsrv_cnt <= rsrv_cnt + d_in.alloc_rsrv_cnt - d_in.d_en_cnt;
         end
 
         `ifdef DEBUG

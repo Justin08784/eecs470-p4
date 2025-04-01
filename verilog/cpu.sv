@@ -463,6 +463,7 @@ module cpu (
     map_table2dispatch map_2_dispatch;
     dispatch2btq dispatch_2_btq;
     btq2dispatch btq_2_dispatch;
+    execute2complete ex_2_complete;
 
     dispatch dispatcher(
         .clock(clock),
@@ -477,6 +478,8 @@ module cpu (
 
         .rob_in(rob_2_dispatch),
         .rob_out(dispatch_2_rob),
+
+        .c_in(ex_2_complete),
 
         .free_in(fl_2_dispatch),
         .free_out(dispatch_2_fl),
@@ -578,7 +581,6 @@ module cpu (
     //           Branch target queue (BTQ)          //
     //                                              //
     //////////////////////////////////////////////////  
-    execute2complete ex_2_complete;
     btq btq_0(
         .clock(clock),
         .reset(reset),
