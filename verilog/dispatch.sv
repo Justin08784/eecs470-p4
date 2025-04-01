@@ -195,12 +195,6 @@ always_comb begin
         //handling dest register
         map_out.ts[i]        = rename_in[i].t;
         map_out.dsts[i]      = rename_in[i].dest_reg_idx;
-        // actually need src tags?
-        map_out.rd_src1s[i]  = rename_in[i].opa_select == OPA_IS_RS1
-            || rename_in[i].cond_branch;
-        map_out.rd_src2s[i]  = rename_in[i].opb_select == OPB_IS_RS2
-            || rename_in[i].cond_branch
-            || rename_in[i].wr_mem;
         //handling src tags
         map_out.src1s[i]    = rename_in[i].inst.r.rs1;
         map_out.src2s[i]    = rename_in[i].inst.r.rs2;
@@ -208,6 +202,8 @@ always_comb begin
 end
 
 RENAME_COMMIT_PKT [`N-1:0] tmp_alloc2rename;
+logic [`N-1:0] rd_src1s;
+logic [`N-1:0] rd_src2s;
 always_comb begin
     tmp_alloc2rename = '0;
     for (int i = 0; i < rename_en_cnt; i++) begin
@@ -217,8 +213,15 @@ always_comb begin
         tmp_alloc2rename[i].t_old       = map_in.ts_old[i];
         tmp_alloc2rename[i].dat.t1      = map_in.t1s[i];
         tmp_alloc2rename[i].dat.t2      = map_in.t2s[i];
-        tmp_alloc2rename[i].dat.t1_rdy  = map_in.cpl1s[i];
-        tmp_alloc2rename[i].dat.t2_rdy  = map_in.cpl2s[i];
+
+        // actually need src tags?
+        rd_src1s[i] = rename_in[i].opa_select == OPA_IS_RS1
+            || rename_in[i].cond_branch;
+        rd_src2s[i] = rename_in[i].opb_select == OPB_IS_RS2
+            || rename_in[i].cond_branch
+            || rename_in[i].wr_mem;
+        tmp_alloc2rename[i].dat.t1_rdy  = !rd_src1s[i];
+        tmp_alloc2rename[i].dat.t2_rdy  = !rd_src2s[i];
 
         tmp_alloc2rename[i].dat.rob_idx = rob_in.rob_idxs[i];
         tmp_alloc2rename[i].dat.btq_idx = rename_in[i].is_branch
@@ -262,8 +265,8 @@ always_comb begin
     for (int i = 0; i < `N; i++) begin
         rs_out.d_dat[i] = commit_in[i].dat;
         for (int c = 0; c < `N; ++c) begin
-            rs_out.d_dat[i].t1_rdy |= c_in.c_en[i] & (c_in.c_ts[c] == commit_in[i].dat.t1);
-            rs_out.d_dat[i].t2_rdy |= c_in.c_en[i] & (c_in.c_ts[c] == commit_in[i].dat.t2);
+            rs_out.d_dat[i].t1_rdy |= c_in.c_en[c] & (c_in.c_ts[c] == commit_in[i].dat.t1);
+            rs_out.d_dat[i].t2_rdy |= c_in.c_en[c] & (c_in.c_ts[c] == commit_in[i].dat.t2);
         end
         rs_out.d_dat[i].t1_rdy |= cpl_lst[commit_in[i].dat.t1];
         rs_out.d_dat[i].t2_rdy |= cpl_lst[commit_in[i].dat.t2];
@@ -309,12 +312,10 @@ always_ff @(posedge clock) begin
     if (reset || flush) begin
         cpl_lst <= '1;
     end else begin
-
         for (int i = 0; i < map_out.en_cnt; ++i) begin
             if (map_out.dsts[i] != `ZERO_REG)
-                cpl_lst[map_out.ts[i]] = 0;
+                cpl_lst[map_out.ts[i]] <= 0;
         end
-
         for (int c = 0; c < `N; ++c) begin
             if (c_in.c_en[c])
                 cpl_lst[c_in.c_ts[c]] <= 1;

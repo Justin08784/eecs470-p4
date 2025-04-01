@@ -688,8 +688,6 @@ typedef struct packed {
         // - Number of enabled dispatch lines?
         // - NOTE: For in-order stuff with serial deps (like dispatch), use c(ou)nts;
         // otherwise use en(able) buses.
-    logic         [`N-1:0] rd_src1s;
-    logic         [`N-1:0] rd_src2s;
     REG_IDX       [`N-1:0] src1s;
     REG_IDX       [`N-1:0] src2s;
     REG_IDX       [`N-1:0] dsts;

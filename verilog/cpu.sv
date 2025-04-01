@@ -671,7 +671,6 @@ module cpu (
         .reset(reset),
         .flush(flush),
         .am_in(am_2_mt),
-        .c_in(ex_2_complete),
         .d_in(dispatch_2_map),
         .d_out(map_2_dispatch)
     );
