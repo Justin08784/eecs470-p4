@@ -47,7 +47,7 @@ module rs #(parameter
     // complete (CDB)
     input execute2complete  c_in
 );
-    RS_ENTRY [RS_SZ-1:0]       entries, entries_n; // ms1 test: remove one RS entry (caught)
+    RS_ENTRY [RS_SZ-1:0]       entries; // ms1 test: remove one RS entry (caught)
     `ifdef DEBUG
     assign entries_dbg = entries;
     `endif 
@@ -291,40 +291,6 @@ module rs #(parameter
         d_out.rs_rdy_scnt = $countones({|gbus_free[0], |gbus_free[1]});
     end
 
-    // SECTION: Compute next state
-    always_comb begin
-        entries_n = entries;
-        for (int rs = 0; rs < RS_SZ; ++rs) begin
-            entries_n[rs].dat.t1_rdy |= to_t1_rdy[rs];
-            entries_n[rs].dat.t2_rdy |= to_t2_rdy[rs]; // [ADDRESSED] ms1 test: change |= to = (not caught)
-            /*
-            TODO: Ask Bradley! This change is not breaking because t2_rdy is 
-            ALREADY incorporated into the value of to_t2_rdy, which means an
-            assignment behaves identically to 'or' assignment here. i.e. logically redundant
-            This is because to_t2_rdy is initialized to t2_rdy, instead of 0;
-            if we did the latter, it would break as intended. So can we get
-            our points back here? */
-
-            if (to_issue[rs]) begin
-                // issuing
-                entries_n[rs].issued = 1;
-                continue;
-            end
-
-            if (entries[rs].issued) begin
-                // going to EX; clear entry
-                entries_n[rs] = '0; // optimize later: only clear busy bit
-            end
-
-            for (int n = 0; n < N; ++n) begin
-                if (!d2entry[n][rs])
-                    continue;
-                entries_n[rs].busy   = 1;
-                entries_n[rs].issued = 0;
-                entries_n[rs].dat    = d_in.d_dat[n];
-            end
-        end
-    end
 
     `ifndef SYNTH
     function get_fu_name(input FU_IDX fu_idx, output string name);
@@ -342,7 +308,35 @@ module rs #(parameter
         if (reset || flush) begin
             entries  <= '0;
         end else begin
-            entries  <= entries_n;
+            // SECTION: Compute next state
+            for (int rs = 0; rs < RS_SZ; ++rs) begin
+                entries[rs].dat.t1_rdy = entries[rs].dat.t1_rdy | to_t1_rdy[rs];
+                entries[rs].dat.t2_rdy = entries[rs].dat.t2_rdy | to_t2_rdy[rs]; // [ADDRESSED] ms1 test: change |= to = (not caught)
+                /*
+                TODO: Ask Bradley! This change is not breaking because t2_rdy is 
+                ALREADY incorporated into the value of to_t2_rdy, which means an
+                assignment behaves identically to 'or' assignment here. i.e. logically redundant
+                This is because to_t2_rdy is initialized to t2_rdy, instead of 0;
+                if we did the latter, it would break as intended. So can we get
+                our points back here? */
+
+                // issuing
+                if (to_issue[rs])
+                    entries[rs].issued <= 1;
+
+                // going to EX; clear entry
+                if (entries[rs].issued)
+                    entries[rs] <= '0; // optimize later: only clear busy bit
+
+                for (int n = 0; n < N; ++n) begin
+                    if (!d2entry[n][rs])
+                        continue;
+                    entries[rs].busy   <= 1;
+                    entries[rs].issued <= 0;
+                    entries[rs].dat    <= d_in.d_dat[n];
+                end
+            end
+
         end
 
         `ifdef DEBUG
