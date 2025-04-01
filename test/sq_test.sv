@@ -106,12 +106,14 @@ module lsq_testbench;
         @(negedge clock);
         exec_2_lsq.st_sq_idx[0] = 0;
         exec_2_lsq.st_ex_en[0] = '1;
-        exec_2_lsq.st_addr[0] = 24;
+        exec_2_lsq.st_addr[0] = 25;
         exec_2_lsq.st_data[0] = 48;
+        exec_2_lsq.st_mem_size[0] = BYTE;
         exec_2_lsq.st_sq_idx[1] = 1;
         exec_2_lsq.st_ex_en[1] = '1;
         exec_2_lsq.st_addr[1] = 72;
         exec_2_lsq.st_data[1] = 96;
+        exec_2_lsq.st_mem_size[1] = BYTE;
         assert (lsq_2_dis.sq_rdy_scnt == 0) 
         else   exit_on_error ("Free count not zero");
         @(negedge clock);
@@ -141,17 +143,18 @@ module lsq_testbench;
         @(negedge clock);
         exec_2_lsq.st_sq_idx[1] = 3;
         exec_2_lsq.st_ex_en[1] = '1;
-        exec_2_lsq.st_addr[1] = 108;
+        exec_2_lsq.st_addr[1] = 74;
         exec_2_lsq.st_data[1] = 120;
+        exec_2_lsq.st_mem_size[1] = HALF;
         @(negedge clock);
         exec_2_lsq = '0;
         @(negedge clock);
         exec_2_lsq.forward_req_en[0] = 1;
         exec_2_lsq.forward_addr[0] = 24;
         exec_2_lsq.forward_sq_idx[0] = 0;
-        exec_2_lsq.forward_mem_size[0] = BYTE;
+        exec_2_lsq.forward_mem_size[0] = HALF;
         exec_2_lsq.forward_req_en[1] = 1;
-        exec_2_lsq.forward_addr[1] = 108;
+        exec_2_lsq.forward_addr[1] = 72;
         exec_2_lsq.forward_sq_idx[1] = 3;
         exec_2_lsq.forward_mem_size[1] = BYTE;
         @(negedge clock);
@@ -161,11 +164,12 @@ module lsq_testbench;
         // $display(lsq_2_exec.forward_data[1]);
         assert (lsq_2_exec.forward_en[0] == '1)
         else exit_on_error ("Forward 0 en failed");
-        assert (lsq_2_exec.forward_data[0] == 48)
+        assert (lsq_2_exec.forward_data[0] == 12288)
         else exit_on_error ("Forward 0 data failed");
         assert (lsq_2_exec.forward_en[1] == '1)
         else exit_on_error ("Forward 1 en failed");
-        assert (lsq_2_exec.forward_data[1] == 120)
+        $display("Forward 1: %0d", lsq_2_exec.forward_data[1]);
+        assert (lsq_2_exec.forward_data[1] == 7864416) //7,864,416
         else exit_on_error ("Forward 1 data failed");
         @(negedge clock);
         exec_2_lsq = '0;
