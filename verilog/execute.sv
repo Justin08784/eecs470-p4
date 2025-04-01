@@ -162,13 +162,6 @@ module alu_ex(
     input  logic [`NUM_FU_ALU-1:0]      cpl_gnt
         // completion grant
 );
-    /*
-    credit[i] = num available slots in fifo[i]
-              = buf_sz - (num in-flight through FU[i] + num waiting in fifo[i])
-    */
-    localparam buf_sz = 2;
-    logic [`NUM_FU_ALU-1:0][$clog2(buf_sz):0] credits;
-
     // execute
     generate
         CPL_CAND    [`NUM_FU_ALU-1:0] tmp_data;
@@ -198,42 +191,23 @@ module alu_ex(
             };
 
             // <FU>_outs: where executed insns wait until completion
-            fifo #(
-                .INSTANCE_ID(10+i),
-                .DEPTH(buf_sz),
-                .WIDTH($bits(CPL_CAND)),
-                .NUM_RPORTS(1),
-                .NUM_WPORTS(1),
-                .ENABLE_INTR_FWD(`FALSE)
+            ppln_skid #(
+                .WIDTH($bits(CPL_CAND))
             ) cpl_buf (
-                .clock      (clock),
-                .reset      (reset),
-                .flush      (flush),
-                .wr_en_cnt  (en[i]),
-                .wr_data    (tmp_data[i]),
-                .rd_en_cnt  (cpl_gnt[i]),
-                .rd_data    (cands[i]),
+                .clock (clock),
+                .reset (reset),
+                .flush (flush),
 
-                .free_scnt  (),
-                .used_scnt  (vld[i])
+                .i_vld (en[i]),
+                .i_rdy (ex_rdy[i]),
+                .i_dat (tmp_data[i]),
+
+                .o_vld (vld[i]),
+                .o_rdy (cpl_gnt[i]),
+                .o_dat (cands[i])
             );
         end
     endgenerate
-
-    always_comb begin
-        foreach (ex_rdy[i])
-            ex_rdy[i] = credits[i] > 0;
-    end
-
-    always_ff @(posedge clock) begin
-        if (reset || flush) begin
-            foreach(credits[i])
-                credits[i] <= buf_sz;
-        end else begin
-            foreach(credits[i])
-                credits[i] <= credits[i] - en[i] + cpl_gnt[i];
-        end
-    end
 endmodule
 
 module mul_ex(
@@ -256,8 +230,6 @@ module mul_ex(
     input  logic [`NUM_FU_MULT-1:0]     cpl_gnt
         // completion grant
 );
-    localparam buf_sz = 2;
-
     // execute
     generate
         logic       [`NUM_FU_MULT-1:0] tmp_out_vld;
@@ -295,24 +267,21 @@ module mul_ex(
             };
 
             // <FU>_outs: where executed insns wait until completion
-            fifo #(
-                .INSTANCE_ID(20+i),
-                .DEPTH(buf_sz),
-                .WIDTH($bits(CPL_CAND)),
-                .NUM_RPORTS(1),
-                .NUM_WPORTS(1),
-                .ENABLE_INTR_FWD(`FALSE)
+            ppln_skid #(
+                .WIDTH($bits(CPL_CAND))
             ) cpl_buf (
-                .clock      (clock),
-                .reset      (reset),
-                .flush      (flush),
-                .wr_en_cnt  (tmp_out_vld[i]),
-                .wr_data    (tmp_data[i]),
-                .rd_en_cnt  (cpl_gnt[i]),
-                .rd_data    (cands[i]),
+                .clock (clock),
+                .reset (reset),
+                .flush (flush),
 
-                .free_scnt  (cpl_buf_rdy[i]),
-                .used_scnt  (vld[i])
+                .i_vld (tmp_out_vld[i]),
+                .i_dat (tmp_data[i]),
+                .i_rdy (cpl_buf_rdy[i]),
+
+                .o_vld (vld[i]),
+                .o_rdy (cpl_gnt[i]),
+                .o_dat (cands[i])
+
             );
            
         end
@@ -386,23 +355,21 @@ module stage_ex_p4 (
                 cond_branch : rs_in.fu_dat_alu[i].cond_branch,
                 uncond_branch : rs_in.fu_dat_alu[i].uncond_branch
             };
-            fifo #(
-                .DEPTH(2),
-                .WIDTH($bits(ID_ALU_VIEW)),
-                .NUM_RPORTS(1),
-                .NUM_WPORTS(1),
-                .ENABLE_INTR_FWD(`FALSE)
-            ) s_buf (
-                .clock      (clock),
-                .reset      (reset),
-                .flush      (flush),
-                .wr_en_cnt  (rs_in.fu_vld_alu[i]),
-                .wr_data    (tmp_alu_el[i]),
-                .rd_en_cnt  (alu_in2ops_en[i]),
-                .rd_data    (ins.dat.alu[i]),
 
-                .free_scnt  (ins.rdy.alu[i]),
-                .used_scnt  (ins.vld.alu[i])
+            ppln_skid #(
+                .WIDTH($bits(ID_ALU_VIEW))
+            ) cpl_buf (
+                .clock (clock),
+                .reset (reset),
+                .flush (flush),
+
+                .i_vld (rs_in.fu_vld_alu[i]),
+                .i_rdy (ins.rdy.alu[i]),
+                .i_dat (tmp_alu_el[i]),
+
+                .o_vld (ins.vld.alu[i]),
+                .o_rdy (alu_in2ops_en[i]),
+                .o_dat (ins.dat.alu[i])
             );
         end
         
@@ -414,24 +381,39 @@ module stage_ex_p4 (
                 rob_idx : rs_in.fu_dat_mult[i].rob_idx,
                 func    : rs_in.fu_dat_mult[i].inst.r.funct3
             };
-            fifo #(
-                .DEPTH(2),
-                .WIDTH($bits(ID_MUL_VIEW)),
-                .NUM_RPORTS(1),
-                .NUM_WPORTS(1),
-                .ENABLE_INTR_FWD(`FALSE)
-            ) s_buf (
-                .clock      (clock),
-                .reset      (reset),
-                .flush      (flush),
-                .wr_en_cnt  (rs_in.fu_vld_mult[i]),
-                .wr_data    (tmp_mul_el[i]),
-                .rd_en_cnt  (mul_in2ops_en[i]),
-                .rd_data    (ins.dat.mul[i]),
+            ppln_skid #(
+                .WIDTH($bits(ID_MUL_VIEW))
+            ) cpl_buf (
+                .clock (clock),
+                .reset (reset),
+                .flush (flush),
 
-                .free_scnt  (ins.rdy.mul[i]),
-                .used_scnt  (ins.vld.mul[i])
+                .i_vld (rs_in.fu_vld_mult[i]),
+                .i_rdy (ins.rdy.mul[i]),
+                .i_dat (tmp_mul_el[i]),
+
+                .o_vld (ins.vld.mul[i]),
+                .o_rdy (mul_in2ops_en[i]),
+                .o_dat (ins.dat.mul[i])
             );
+            // fifo #(
+            //     .DEPTH(2),
+            //     .WIDTH($bits(ID_MUL_VIEW)),
+            //     .NUM_RPORTS(1),
+            //     .NUM_WPORTS(1),
+            //     .ENABLE_INTR_FWD(`FALSE)
+            // ) s_buf (
+            //     .clock      (clock),
+            //     .reset      (reset),
+            //     .flush      (flush),
+            //     .wr_en_cnt  (rs_in.fu_vld_mult[i]),
+            //     .wr_data    (tmp_mul_el[i]),
+            //     .rd_en_cnt  (mul_in2ops_en[i]),
+            //     .rd_data    (ins.dat.mul[i]),
+
+            //     .free_scnt  (ins.rdy.mul[i]),
+            //     .used_scnt  (ins.vld.mul[i])
+            // );
         end
     endgenerate
 

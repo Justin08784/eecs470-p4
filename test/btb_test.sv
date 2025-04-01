@@ -39,7 +39,7 @@ module btb_tb;
     // Cycle 1: send taken branch
     execute_in.PC[0] = 32'h00000100;
     execute_in.is_taken[0] = 1;
-    execute_in.target[0] = 12'h0AA;
+    execute_in.target[0] = 16'h00AA;//12'h0AA;
 
     execute_in.PC[1] = 32'h00000104;
     execute_in.is_taken[1] = 0;
@@ -58,7 +58,7 @@ module btb_tb;
       $fatal("Missed hit!");
     end
 
-    if (fetch_out.target[0] !== 12'h0AA) begin
+    if (fetch_out.target[0] !==  16'h00AA/*12'h0AA*/) begin
       $display("fetch_out.target[0] = 0x%0h (expected 0x0AA)", fetch_out.target[0]);
       $fatal("Wrong target!");
     end
@@ -107,11 +107,11 @@ module btb_tb;
     // --------------------------
     execute_in.PC[0] = 32'h00000200;
     execute_in.is_taken[0] = 1;
-    execute_in.target[0] = 12'h123;
+    execute_in.target[0] = 16'h0123; //12'h123;
 
     execute_in.PC[1] = 32'h00000204;
     execute_in.is_taken[1] = 1;
-    execute_in.target[1] = 12'h456;
+    execute_in.target[1] = 16'h0456;//12'h456;
 
     @(negedge clock); // write to BTB
 
@@ -120,12 +120,12 @@ module btb_tb;
 
     @(negedge clock); // read back
 
-    if (!fetch_out.hit[0] || fetch_out.target[0] !== 12'h123) begin
+    if (!fetch_out.hit[0] || fetch_out.target[0] !== 16'h0123/*12'h123*/) begin
       $display("Mismatch for 0x200 → got target %h (hit = %b)", fetch_out.target[0], fetch_out.hit[0]);
       $fatal("Multiple entry check failed (0x200)");
     end
 
-    if (!fetch_out.hit[1] || fetch_out.target[1] !== 12'h456) begin
+    if (!fetch_out.hit[1] || fetch_out.target[1] !== 16'h0456/*12'h456*/) begin
       $display("Mismatch for 0x204 → got target %h (hit = %b)", fetch_out.target[1], fetch_out.hit[1]);
       $fatal("Multiple entry check failed (0x204)");
     end
@@ -135,7 +135,7 @@ module btb_tb;
     // --------------------------
     execute_in.PC[0] = 32'h00000100;
     execute_in.is_taken[0] = 1;
-    execute_in.target[0] = 12'h0BB; // different target now
+    execute_in.target[0] = 16'h00BB; //12'h0BB; // different target now
 
     execute_in.is_taken[1] = 0;
 
@@ -145,7 +145,7 @@ module btb_tb;
 
     @(negedge clock);
 
-    if (!fetch_out.hit[0] || fetch_out.target[0] !== 12'h0BB) begin
+    if (!fetch_out.hit[0] || fetch_out.target[0] !== 16'h00BB/*12'h0BB*/) begin
       $display("Target overwrite failed — got %h, expected 0x0BB", fetch_out.target[0]);
       $fatal("Overwrite test failed");
     end
