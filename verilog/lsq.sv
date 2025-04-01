@@ -165,7 +165,7 @@ module lsq #(parameter
                     for (int k = 0, logic [4:0] adj_k = 0, int unsigned byte_num = 0; k < 32; k++) begin
                         adj_k = k-(8*(exec_2_lsq.forward_addr[i] % 4))+(8*(state[idx].addr % 4));
                         if ((k >= min) && (k < max)) begin
-                            // initial_lsq_2_exec.forward_data[i][adj_k] = state[idx].data[k];
+                            initial_lsq_2_exec.forward_data[i][adj_k] = state[idx].data[k];
                             if ((k % 8) == 0) begin
                                 byte_num = k / 8;
                                 initial_lsq_2_exec.forward_byte_en[i][byte_num] = '1;
@@ -406,7 +406,7 @@ module post_ret_buffer #(parameter
                     for (int k = 0, logic [4:0] adj_k = 0, int unsigned byte_num = 0; k < 32; k++) begin
                         adj_k = k-(8*(lsq_2_ret.forward_addr[i] % 4))+(8*(state[idx].addr % 4));
                         if ((k >= min) && (k < max)) begin
-                            // next_forward_ret_2_lsq.forward_data[i][adj_k] = state[idx].data[k];
+                            next_forward_ret_2_lsq.forward_data[i][adj_k] = state[idx].data[k];
                             if ((k % 8) == 0) begin
                                 byte_num = k / 8;
                                 next_forward_ret_2_lsq.forward_byte_en[i][byte_num] = '1;
