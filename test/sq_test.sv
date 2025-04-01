@@ -157,8 +157,8 @@ module lsq_testbench;
         exec_2_lsq.forward_addr[1] = 72;
         exec_2_lsq.forward_sq_idx[1] = 3;
         exec_2_lsq.forward_mem_size[1] = BYTE;
-        @(negedge clock);
-        @(negedge clock);
+        // @(negedge clock);
+        // @(negedge clock);
         @(posedge clock);
         // $display(lsq_2_exec.forward_en[1]);
         // $display(lsq_2_exec.forward_data[1]);
@@ -168,9 +168,11 @@ module lsq_testbench;
         else exit_on_error ("Forward 0 data failed");
         assert (lsq_2_exec.forward_en[1] == '1)
         else exit_on_error ("Forward 1 en failed");
-        $display("Forward 1: %0d", lsq_2_exec.forward_data[1]);
+        // $display("Forward 1: %0d", lsq_2_exec.forward_data[1]);
         assert (lsq_2_exec.forward_data[1] == 7864416) //7,864,416
         else exit_on_error ("Forward 1 data failed");
+        // $display("Forward[0] map: %4b", lsq_2_exec.forward_byte_en[0]);
+        // $display("Forward[1] map: %4b", lsq_2_exec.forward_byte_en[1]);
         @(negedge clock);
         exec_2_lsq = '0;
         @(negedge clock);

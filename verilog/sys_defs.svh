@@ -61,7 +61,7 @@
 ///////////////////////////////
 /* How can we implement this in the Makefile? */
 // comment out to enable synth only constructions
-// `define SYNTH
+`define SYNTH
 
 `ifndef SYNTH
 // comment out to disable DEBUG:
@@ -444,6 +444,14 @@ typedef struct packed {
     logic d_vld;
     MEM_SIZE mem_size; //MEM_SIZE'(id_ex_reg.inst.r.funct3[1:0]); <-- HOW TO FIND THIS. DO THIS WHEN PUTTING ENTRY IN FROM DISPATCH OR FROM EXECUTE
 } SQ_ENTRY;
+
+typedef struct packed {
+    LSQ_IDX lq_idx;
+    ROB_IDX rob_idx;
+    ADDR addr;
+    logic d_vld;
+    MEM_SIZE mem_size;
+} LQ_ENTRY;
 
 // BTQ stuff
 // typedef logic [$clog2(`BTQ_SZ)-1:0] BTQ_IDX;
