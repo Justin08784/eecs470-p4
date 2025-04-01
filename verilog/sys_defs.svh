@@ -61,7 +61,7 @@
 ///////////////////////////////
 /* How can we implement this in the Makefile? */
 // comment out to enable synth only constructions
-//`define SYNTH
+`define SYNTH
 
 `ifndef SYNTH
 // comment out to disable DEBUG:
@@ -915,13 +915,16 @@ typedef struct packed {
 typedef struct packed {
     logic [$clog2(`N):0]    free_out;
     logic                   empty;
+} stRET2lsq;
+
+typedef struct packed {
     logic       [`NUM_FU_LOAD-1:0]          forward_en;
     ADDR        [`NUM_FU_LOAD-1:0]          forward_addr;
     DATA        [`NUM_FU_LOAD-1:0]          forward_data;
     MEM_SIZE    [`NUM_FU_LOAD-1:0]          forward_mem_size;
     logic       [`NUM_FU_LOAD-1:0] [3:0]    forward_byte_en;
-    logic       [`NUM_FU_LOAD-1:0]          sq_idx_found;
-} stRET2lsq;
+    logic       [`NUM_FU_LOAD-1:0]          sq_idx_found;    
+} forwardRET2lsq;
 
 typedef struct packed {
     ROB_IDX rob_idx;

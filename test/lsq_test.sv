@@ -154,6 +154,8 @@ module lsq_testbench;
         exec_2_lsq.forward_addr[1] = 108;
         exec_2_lsq.forward_sq_idx[1] = 3;
         exec_2_lsq.forward_mem_size[1] = BYTE;
+        @(negedge clock);
+        @(negedge clock);
         @(posedge clock);
         // $display(lsq_2_exec.forward_en[1]);
         // $display(lsq_2_exec.forward_data[1]);
