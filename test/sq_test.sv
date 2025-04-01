@@ -36,7 +36,7 @@ module lsq_testbench;
         end
     endtask
 
-    lsq lsq_dut(
+    sq sq_dut(
         .clock(clock),
         .reset(reset),
         .flush(flush),

@@ -1,7 +1,7 @@
 `include "sys_defs.svh"
 
 
-module lsq #(parameter 
+module sq #(parameter 
     N=`N,
     LSQ_SZ=`LSQ_SZ,
     LSQ_SZ_DBL=`LSQ_SZ_DBL,
@@ -178,23 +178,23 @@ module lsq #(parameter
             end
         end
 
-        for (int unsigned i = 0; i < NUM_FU_LOAD; i++) begin
-            if (forward_ret_2_lsq.sq_idx_found[i]) begin
-                initial_lsq_2_exec.forward_data[i] = forward_ret_2_lsq.forward_data[i];
-                initial_lsq_2_exec.forward_byte_en[i] = forward_ret_2_lsq.forward_byte_en[i];
-                initial_lsq_2_exec.forward_en[i] = forward_ret_2_lsq.forward_en[i];
-            end
-            else begin
-                for (int unsigned j = 0; j < 4; j++) begin
-                    if (!initial_lsq_2_exec.forward_byte_en[i][j]) begin
-                        initial_lsq_2_exec.forward_byte_en[i][j] = forward_ret_2_lsq.forward_byte_en[i][j];
-                        for (int unsigned k = 0; k < 32; k++) begin
-                            if (((8*(j+1)) > k) && ((8*j) <= k)) initial_lsq_2_exec.forward_data[i][k] = forward_ret_2_lsq.forward_data[i][k];
-                        end
-                    end
-                end
-            end
-        end        
+        // for (int unsigned i = 0; i < NUM_FU_LOAD; i++) begin
+        //     if (forward_ret_2_lsq.sq_idx_found[i]) begin
+        //         initial_lsq_2_exec.forward_data[i] = forward_ret_2_lsq.forward_data[i];
+        //         initial_lsq_2_exec.forward_byte_en[i] = forward_ret_2_lsq.forward_byte_en[i];
+        //         initial_lsq_2_exec.forward_en[i] = forward_ret_2_lsq.forward_en[i];
+        //     end
+        //     else begin
+        //         for (int unsigned j = 0; j < 4; j++) begin
+        //             if (!initial_lsq_2_exec.forward_byte_en[i][j]) begin
+        //                 initial_lsq_2_exec.forward_byte_en[i][j] = forward_ret_2_lsq.forward_byte_en[i][j];
+        //                 for (int unsigned k = 0; k < 32; k++) begin
+        //                     if (((8*(j+1)) > k) && ((8*j) <= k)) initial_lsq_2_exec.forward_data[i][k] = forward_ret_2_lsq.forward_data[i][k];
+        //                 end
+        //             end
+        //         end
+        //     end
+        // end        
 
         // initial_lsq_2_exec.forward_data = forward_ret_2_lsq.forward_data;
         // initial_lsq_2_exec.forward_byte_en = forward_ret_2_lsq.forward_byte_en;
