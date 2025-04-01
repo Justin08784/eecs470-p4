@@ -135,66 +135,14 @@ module sq #(parameter
             forward_range.stop[i] = forward_range.start[i] + 4;
         end
 
-        //search for matches to forward
-        // for (int unsigned i = 0; i < NUM_FU_LOAD; i++) begin
-        //     if (!exec_2_lsq.forward_req_en[i]) continue;
-
-        //     for (int unsigned j = 0, int unsigned idx = 0, int unsigned min = 0, int unsigned max = 0; j < used; ++j) begin
-        //         idx = (head+j) % LSQ_SZ;
-        //         // $display("Here[%0d,%0d]: %0d == %0d", idx, j, state[idx].sq_idx, exec_2_lsq.forward_sq_idx[i]);
-        //         // min = 0;
-        //         // max = 0;
-
-        //         if (state[idx].d_vld && (forward_range.start[i] <= state[idx].addr) && (state[idx].addr < forward_range.stop[i])) begin
-        //             //ensure that the found match and requested forward are big enough to overlap
-        //             if (!(((state[idx].addr + state[idx].mem_size) >= exec_2_lsq.forward_addr[i]) 
-        //                 || ((exec_2_lsq.forward_addr[i] + exec_2_lsq.forward_mem_size[i]) >= state[idx].mem_size))) continue;
-
-        //             lsq_2_exec.forward_en[i] = '1;
-
-        //             //ensure that the correct bytes are taken from the store that is being forwarded
-        //             if (state[idx].addr <= exec_2_lsq.forward_addr[i]) begin
-        //                 min = (8 * (exec_2_lsq.forward_addr[i] % 4)) - (8 * (state[idx].addr % 4));
-        //                 max = min + (8 * (2**`MIN(state[idx].mem_size,exec_2_lsq.forward_mem_size[i])));
-        //             end
-        //             else begin
-        //                 min = 0;
-        //                 max = 8 * (2**`MIN(state[idx].mem_size,exec_2_lsq.forward_mem_size[i]));
-        //             end
-        //             // $display("MIN: %0d, MAX: %0d", min, max);
-
-        //             adj_k = min-(8*(exec_2_lsq.forward_addr[i] % 4))+(8*(state[idx].addr % 4));
-        //             byte_num = adj_k / 8;
-        //             // $display("adj_k: %0d", adj_k);
-
-        //             if ((max - min) == 8) begin
-        //                 lsq_2_exec.forward_data[i][adj_k+:7] = state[idx].data[min+:7];
-        //                 lsq_2_exec.forward_byte_en[i][byte_num] = '1;
-        //             end
-        //             else if ((max - min) == 16) begin
-        //                 lsq_2_exec.forward_data[i][adj_k+:15] = state[idx].data[min+:15];
-        //                 lsq_2_exec.forward_byte_en[i][byte_num+:1] = '1;
-        //             end
-        //             else if ((max - min) == 32) begin
-        //                 lsq_2_exec.forward_data[i][adj_k+:31] = state[idx].data[min+:31];
-        //                 lsq_2_exec.forward_byte_en[i][byte_num+:3] = '1;
-        //             end
-
-        //             // $display("1. Forward_data[%0d]: %0d, %4b", i, lsq_2_exec.forward_data[i],lsq_2_exec.forward_byte_en[i]);
-
-        //         end
-        //         // $display("Return value: %0d", lsq_2_exec.forward_data[i]);
-        //         if (state[idx].sq_idx == exec_2_lsq.forward_sq_idx[i]) break;
-        //     end
-        // end
-
         for (int unsigned i = 0, ADDR start = 0; i < NUM_FU_LOAD; i++) begin
             if (!exec_2_lsq.forward_req_en[i]) continue;
 
             start = exec_2_lsq.forward_addr[i] - (exec_2_lsq.forward_addr[i] % 4);
-            for (int unsigned j = 0, int unsigned idx = 0, DATA shifted_data = 0, int unsigned offset = 0; j < used; ++j) begin
-                idx = (head+j) % LSQ_SZ;
-                offset = (4*(2**(state[idx].addr % 4)));
+            for (int unsigned j = 0, int unsigned idx = 0, DATA shifted_data = 0, int unsigned offset = 0, logic [1:0] modulo4 = 0; j < used; ++j) begin
+                idx = (head+j) % LSQ_SZ;modulo4 = state[idx].addr % 4;
+                offset = (modulo4 == 0) ? 0 : (modulo4 == 1) ? 8 : (modulo4 == 2) ? 16 : 32;
+                // offset = (8*(2**(state[idx].addr % 4))-8);
                 shifted_data = state[idx].data << offset;
                 if (state[idx].d_vld && (state[idx].bytewise_addr[0] == start)) begin
                     // $display("Mask: %4b", state[idx].bytewise_addr_mask);
@@ -212,6 +160,7 @@ module sq #(parameter
             lsq_2_exec.forward_en[i] = (lsq_2_exec.forward_byte_en[i] != 0) ? '1 : '0;
 
             lsq_2_exec.forward_data[i] = lsq_2_exec.forward_data[i] >> (8*(2**(exec_2_lsq.forward_addr[i] % 4))-8);
+            lsq_2_exec.forward_byte_en[i] = lsq_2_exec.forward_byte_en[i] >> (8*(2**(exec_2_lsq.forward_addr[i] % 4))-8);
             $display("Forward data[%0d]: %0d", i, lsq_2_exec.forward_data[i]);
         end
 
@@ -223,14 +172,18 @@ module sq #(parameter
                 // lsq_2_exec.forward_en[i] = forward_ret_2_lsq.forward_en[i];
             end
             else begin
-                for (int unsigned j = 0, logic [4:0] max = 0, logic [4:0] min = 0; j < 4; j++) begin
-                    if (!lsq_2_exec.forward_byte_en[i][j]) begin
-                        // lsq_2_exec.forward_byte_en[i][j] = forward_ret_2_lsq.forward_byte_en[i][j];
-                        min = 8*j;
-                        max = min + 7;
-                        lsq_2_exec.forward_data[i][min+:7] = forward_ret_2_lsq.forward_data[i][min+:7];
-                    end
-                end
+                // for (int unsigned j = 0, logic [4:0] max = 0, logic [4:0] min = 0; j < 4; j++) begin
+                //     if (!lsq_2_exec.forward_byte_en[i][j]) begin
+                //         // lsq_2_exec.forward_byte_en[i][j] = forward_ret_2_lsq.forward_byte_en[i][j];
+                //         min = 8*j;
+                //         max = min + 7;
+                //         lsq_2_exec.forward_data[i][min+:7] = forward_ret_2_lsq.forward_data[i][min+:7];
+                //     end
+                // end
+                lsq_2_exec.forward_data[i][7:0] = ~lsq_2_exec.forward_byte_en[i][0] ? forward_ret_2_lsq.forward_data[i][7:0] : lsq_2_exec.forward_data[i][7:0];
+                lsq_2_exec.forward_data[i][15:8] = ~lsq_2_exec.forward_byte_en[i][1] ? forward_ret_2_lsq.forward_data[i][15:8] : lsq_2_exec.forward_data[i][15:8];
+                lsq_2_exec.forward_data[i][23:16] = ~lsq_2_exec.forward_byte_en[i][2] ? forward_ret_2_lsq.forward_data[i][23:16] : lsq_2_exec.forward_data[i][23:16];
+                lsq_2_exec.forward_data[i][31:24] = ~lsq_2_exec.forward_byte_en[i][3] ? forward_ret_2_lsq.forward_data[i][31:24] : lsq_2_exec.forward_data[i][31:24];
             end
             lsq_2_exec.forward_byte_en[i] |= forward_ret_2_lsq.forward_byte_en[i];
 
@@ -476,10 +429,14 @@ module post_ret_buffer #(parameter
             if (!lsq_2_ret.forward_req_en[i]) continue;
 
             start = lsq_2_ret.forward_addr[i] - (lsq_2_ret.forward_addr[i] % 4);
-            for (int unsigned j = 0, int unsigned idx = 0, DATA shifted_data = 0, int unsigned offset = 0; j < used; ++j) begin
+            for (int unsigned j = 0, int unsigned idx = 0, DATA shifted_data = 0, int unsigned offset = 0, logic [1:0] modulo4 = 0; j < used; ++j) begin
                 idx = (head+j) % LSQ_SZ;
-                offset = (4*(2**(state[idx].addr % 4)));
+                modulo4 = state[idx].addr % 4;
+                offset = (modulo4 == 0) ? 0 : (modulo4 == 1) ? 8 : (modulo4 == 2) ? 16 : 32;
                 shifted_data = state[idx].data << offset;
+
+                if (state[idx].sq_idx == lsq_2_ret.forward_sq_idx[i]) forward_ret_2_lsq.sq_idx_found[i] = '1;
+
                 if (state[idx].d_vld && (state[idx].bytewise_addr[0] == start)) begin
                     $display("Mask: %4b", state[idx].bytewise_addr_mask);
                     $display("Addr: %0d, Data: %0d, Shifted: %0d, Offset: %0d", state[idx].addr, state[idx].data, shifted_data, offset);
@@ -496,6 +453,8 @@ module post_ret_buffer #(parameter
             forward_ret_2_lsq.forward_en[i] = (forward_ret_2_lsq.forward_byte_en[i] != 0) ? '1 : '0;
 
             forward_ret_2_lsq.forward_data[i] = forward_ret_2_lsq.forward_data[i] >> (8*(2**(lsq_2_ret.forward_addr[i] % 4))-8);
+            forward_ret_2_lsq.forward_byte_en[i] = forward_ret_2_lsq.forward_byte_en[i] >> (8*(2**(lsq_2_ret.forward_addr[i] % 4))-8);
+
             $display("RET Forward data[%0d]: %0d, Addr: %0d, Offset: %0d", i, forward_ret_2_lsq.forward_data[i], lsq_2_ret.forward_addr[i], (8*(2**(lsq_2_ret.forward_addr[i] % 4))-8));
         end
     end
