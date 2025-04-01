@@ -37,8 +37,8 @@
 
 // worry about these later
 `define BRANCH_PRED_SZ xx
-`define LSQ_SZ 4
-`define LSQ_SZ_DBL 8
+`define LSQ_SZ 16
+`define LSQ_SZ_DBL 32
 
 // functional units (you should decide if you want more or fewer types of FUs)
 `define NUM_FU_ALU 2
@@ -61,7 +61,7 @@
 ///////////////////////////////
 /* How can we implement this in the Makefile? */
 // comment out to enable synth only constructions
-// `define SYNTH
+`define SYNTH
 
 `ifndef SYNTH
 // comment out to disable DEBUG:

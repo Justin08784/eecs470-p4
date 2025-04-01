@@ -141,7 +141,7 @@ module sq #(parameter
             start = exec_2_lsq.forward_addr[i] - (exec_2_lsq.forward_addr[i] % 4);
             for (int unsigned j = 0, int unsigned idx = 0, DATA shifted_data = 0, int unsigned offset = 0, logic [1:0] modulo4 = 0; j < used; ++j) begin
                 idx = (head+j) % LSQ_SZ;modulo4 = state[idx].addr % 4;
-                offset = (modulo4 == 0) ? 0 : (modulo4 == 1) ? 8 : (modulo4 == 2) ? 16 : 32;
+                offset = (modulo4 == 0) ? 0 : (modulo4 == 1) ? 8 : (modulo4 == 2) ? 16 : 24;
                 // offset = (8*(2**(state[idx].addr % 4))-8);
                 shifted_data = state[idx].data << offset;
                 if (state[idx].d_vld && (state[idx].bytewise_addr[0] == start)) begin
@@ -159,9 +159,20 @@ module sq #(parameter
 
             lsq_2_exec.forward_en[i] = (lsq_2_exec.forward_byte_en[i] != 0) ? '1 : '0;
 
-            lsq_2_exec.forward_data[i] = lsq_2_exec.forward_data[i] >> (8*(2**(exec_2_lsq.forward_addr[i] % 4))-8);
-            lsq_2_exec.forward_byte_en[i] = lsq_2_exec.forward_byte_en[i] >> (8*(2**(exec_2_lsq.forward_addr[i] % 4))-8);
-            $display("Forward data[%0d]: %0d", i, lsq_2_exec.forward_data[i]);
+            if ((exec_2_lsq.forward_addr[i] % 4) == 1) begin
+                lsq_2_exec.forward_data[i] = lsq_2_exec.forward_data[i] >> 8;
+                lsq_2_exec.forward_byte_en[i] = lsq_2_exec.forward_byte_en[i] >> 8;
+            end
+            else if ((exec_2_lsq.forward_addr[i] % 4) == 2) begin
+                lsq_2_exec.forward_data[i] = lsq_2_exec.forward_data[i] >> 16;
+                lsq_2_exec.forward_byte_en[i] = lsq_2_exec.forward_byte_en[i] >> 16;
+            end
+            else if ((exec_2_lsq.forward_addr[i] % 4) == 3) begin
+                lsq_2_exec.forward_data[i] = lsq_2_exec.forward_data[i] >> 24;
+                lsq_2_exec.forward_byte_en[i] = lsq_2_exec.forward_byte_en[i] >> 24;
+            end
+            
+            // $display("Forward data[%0d]: %0d", i, lsq_2_exec.forward_data[i]);
         end
 
         for (int unsigned i = 0; i < NUM_FU_LOAD; i++) begin
@@ -187,7 +198,7 @@ module sq #(parameter
             end
             lsq_2_exec.forward_byte_en[i] |= forward_ret_2_lsq.forward_byte_en[i];
 
-            $display("2. Forward_data[%0d]: %0d, %4b", i, lsq_2_exec.forward_data[i],lsq_2_exec.forward_byte_en[i]);
+            // $display("2. Forward_data[%0d]: %0d, %4b", i, lsq_2_exec.forward_data[i],lsq_2_exec.forward_byte_en[i]);
         end
     end
 
@@ -201,7 +212,7 @@ module sq #(parameter
 
         for (int i = 0; i < `NUM_FU_STORE; i++) begin
             modulo4[i] = exec_2_lsq.st_addr[i] % 4;
-            $display("ADDR: %0d, MOD: %0d, SIZE: %0d", exec_2_lsq.st_addr[i], modulo4[i], exec_2_lsq.st_mem_size[i]);
+            // $display("ADDR: %0d, MOD: %0d, SIZE: %0d", exec_2_lsq.st_addr[i], modulo4[i], exec_2_lsq.st_mem_size[i]);
             for (int j = 0; j < 4; j++) begin
                 bytewise_addr[i][j] = exec_2_lsq.st_addr[i] - modulo4[i] + j;
             end
@@ -438,8 +449,8 @@ module post_ret_buffer #(parameter
                 if (state[idx].sq_idx == lsq_2_ret.forward_sq_idx[i]) forward_ret_2_lsq.sq_idx_found[i] = '1;
 
                 if (state[idx].d_vld && (state[idx].bytewise_addr[0] == start)) begin
-                    $display("Mask: %4b", state[idx].bytewise_addr_mask);
-                    $display("Addr: %0d, Data: %0d, Shifted: %0d, Offset: %0d", state[idx].addr, state[idx].data, shifted_data, offset);
+                    // $display("Mask: %4b", state[idx].bytewise_addr_mask);
+                    // $display("Addr: %0d, Data: %0d, Shifted: %0d, Offset: %0d", state[idx].addr, state[idx].data, shifted_data, offset);
                     forward_ret_2_lsq.forward_data[i][7:0] = state[idx].bytewise_addr_mask[0] ? shifted_data[7:0] : forward_ret_2_lsq.forward_data[i][7:0];
                     forward_ret_2_lsq.forward_data[i][15:8] = state[idx].bytewise_addr_mask[1] ? shifted_data[15:8] : forward_ret_2_lsq.forward_data[i][15:8];
                     forward_ret_2_lsq.forward_data[i][23:16] = state[idx].bytewise_addr_mask[2] ? shifted_data[23:16] : forward_ret_2_lsq.forward_data[i][23:16];
@@ -452,10 +463,23 @@ module post_ret_buffer #(parameter
 
             forward_ret_2_lsq.forward_en[i] = (forward_ret_2_lsq.forward_byte_en[i] != 0) ? '1 : '0;
 
-            forward_ret_2_lsq.forward_data[i] = forward_ret_2_lsq.forward_data[i] >> (8*(2**(lsq_2_ret.forward_addr[i] % 4))-8);
-            forward_ret_2_lsq.forward_byte_en[i] = forward_ret_2_lsq.forward_byte_en[i] >> (8*(2**(lsq_2_ret.forward_addr[i] % 4))-8);
+            // forward_ret_2_lsq.forward_data[i] = forward_ret_2_lsq.forward_data[i] >> (8*(2**(lsq_2_ret.forward_addr[i] % 4))-8);
+            // forward_ret_2_lsq.forward_byte_en[i] = forward_ret_2_lsq.forward_byte_en[i] >> (8*(2**(lsq_2_ret.forward_addr[i] % 4))-8);
 
-            $display("RET Forward data[%0d]: %0d, Addr: %0d, Offset: %0d", i, forward_ret_2_lsq.forward_data[i], lsq_2_ret.forward_addr[i], (8*(2**(lsq_2_ret.forward_addr[i] % 4))-8));
+            if ((lsq_2_ret.forward_addr[i] % 4) == 1) begin
+                forward_ret_2_lsq.forward_data[i] = forward_ret_2_lsq.forward_data[i] >> 8;
+                forward_ret_2_lsq.forward_byte_en[i] = forward_ret_2_lsq.forward_byte_en[i] >> 8;
+            end
+            else if ((lsq_2_ret.forward_addr[i] % 4) == 2) begin
+                forward_ret_2_lsq.forward_data[i] = forward_ret_2_lsq.forward_data[i] >> 16;
+                forward_ret_2_lsq.forward_byte_en[i] = forward_ret_2_lsq.forward_byte_en[i] >> 16;
+            end
+            else if ((lsq_2_ret.forward_addr[i] % 4) == 3) begin
+                forward_ret_2_lsq.forward_data[i] = forward_ret_2_lsq.forward_data[i] >> 24;
+                forward_ret_2_lsq.forward_byte_en[i] = forward_ret_2_lsq.forward_byte_en[i] >> 24;
+            end
+
+            // $display("RET Forward data[%0d]: %0d, Addr: %0d, Offset: %0d", i, forward_ret_2_lsq.forward_data[i], lsq_2_ret.forward_addr[i], (8*(2**(lsq_2_ret.forward_addr[i] % 4))-8));
         end
     end
 
