@@ -326,7 +326,7 @@ module rs #(parameter
 
                 // going to EX; clear entry
                 if (entries[rs].issued)
-                    entries[rs] <= '0; // optimize later: only clear busy bit
+                    entries[rs].busy <= 0; // only clear busy bit
 
                 for (int n = 0; n < N; ++n) begin
                     if (!d2entry[n][rs])
