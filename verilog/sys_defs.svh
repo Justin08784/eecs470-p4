@@ -871,14 +871,15 @@ typedef struct packed {
 } rob2lsq;
 
 typedef struct packed {
-    logic       [`NUM_FU_STORE-1:0] ex_en;
-    LSQ_IDX     [`NUM_FU_STORE-1:0] sq_idx;
-    ADDR        [`NUM_FU_STORE-1:0] addr;
-    DATA        [`NUM_FU_STORE-1:0] data;
+    logic       [`NUM_FU_STORE-1:0] st_ex_en;
+    LSQ_IDX     [`NUM_FU_STORE-1:0] st_sq_idx;
+    ADDR        [`NUM_FU_STORE-1:0] st_addr;
+    DATA        [`NUM_FU_STORE-1:0] st_data;
     MEM_SIZE    [`NUM_FU_STORE-1:0] st_mem_size; //MEM_SIZE'(id_ex_reg.inst.r.funct3[1:0]); <-- HOW TO FIND THIS. DO THIS WHEN PUTTING ENTRY IN FROM DISPATCH OR FROM EXECUTE
     logic       [`NUM_FU_LOAD-1:0] forward_req_en;
+    LSQ_IDX     [`NUM_FU_LOAD-1:0] forward_sq_idx;
     ADDR        [`NUM_FU_LOAD-1:0] forward_addr;
-    MEM_SIZE    [`NUM_FU_LOAD-1:0] ld_mem_size; //MEM_SIZE'(id_ex_reg.inst.r.funct3[1:0]); <-- HOW TO FIND THIS. DO THIS WHEN PUTTING ENTRY IN FROM DISPATCH OR FROM EXECUTE
+    MEM_SIZE    [`NUM_FU_LOAD-1:0] forward_mem_size; //MEM_SIZE'(id_ex_reg.inst.r.funct3[1:0]); <-- HOW TO FIND THIS. DO THIS WHEN PUTTING ENTRY IN FROM DISPATCH OR FROM EXECUTE
 } execute2lsq;
 
 typedef struct packed {
@@ -906,19 +907,24 @@ typedef struct packed {
     logic       [$clog2(`N):0] ret_cnt;
     SQ_ENTRY    [`N-1:0] ret_st;
     logic       [`NUM_FU_LOAD-1:0] forward_req_en;
-    LSQ_IDX     [`NUM_FU_LOAD-1:0] sq_idx;
+    LSQ_IDX     [`NUM_FU_LOAD-1:0] forward_sq_idx;
     ADDR        [`NUM_FU_LOAD-1:0] forward_addr;
-    MEM_SIZE    [`NUM_FU_LOAD-1:0] ld_mem_size;
+    MEM_SIZE    [`NUM_FU_LOAD-1:0] forward_mem_size;
 } lsq2stRET;
 
 typedef struct packed {
     logic [$clog2(`N):0]    free_out;
     logic                   empty;
-    logic       [`NUM_FU_LOAD-1:0] forward_en;
-    ADDR        [`NUM_FU_LOAD-1:0] forward_addr;
-    DATA        [`NUM_FU_LOAD-1:0] forward_data;
-    MEM_SIZE    [`NUM_FU_LOAD-1:0] forward_mem_size;
 } stRET2lsq;
+
+typedef struct packed {
+    logic       [`NUM_FU_LOAD-1:0]          forward_en;
+    ADDR        [`NUM_FU_LOAD-1:0]          forward_addr;
+    DATA        [`NUM_FU_LOAD-1:0]          forward_data;
+    MEM_SIZE    [`NUM_FU_LOAD-1:0]          forward_mem_size;
+    logic       [`NUM_FU_LOAD-1:0] [3:0]    forward_byte_en;
+    logic       [`NUM_FU_LOAD-1:0]          sq_idx_found;    
+} forwardRET2lsq;
 
 typedef struct packed {
     ROB_IDX rob_idx;
