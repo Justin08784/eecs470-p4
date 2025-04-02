@@ -76,17 +76,17 @@ typedef struct packed {
 
 /* Operand data needed for each FU type */
 typedef struct packed {
-    logic       [`NUM_FU_ALU-1:0]       bsy; // unused; same as en
-    DATA        [`NUM_FU_ALU-1:0]       opa, opb;
-    DATA        [`NUM_FU_ALU-1:0]       rs1, rs2;
-    ALU_FUNC    [`NUM_FU_ALU-1:0]       alu_func;
-    logic       [`NUM_FU_ALU-1:0][2:0]  branch_func; // Which branch condition to check
-    logic       [`NUM_FU_ALU-1:0]       cond_branch;
-    logic       [`NUM_FU_ALU-1:0]       uncond_branch;
+    logic           bsy; // unused; same as en
+    DATA            opa, opb;
+    DATA            rs1, rs2;
+    ALU_FUNC        alu_func;
+    logic   [2:0]   branch_func; // Which branch condition to check
+    logic           cond_branch;
+    logic           uncond_branch;
 
-    PHYS_REG_IDX    [`NUM_FU_ALU-1:0]   t;
-    ROB_IDX         [`NUM_FU_ALU-1:0]   rob_idx;
-    BTQ_IDX         [`NUM_FU_ALU-1:0]   btq_idx;
+    PHYS_REG_IDX    t;
+    ROB_IDX         rob_idx;
+    BTQ_IDX         btq_idx;
 } ALU_OPS;
 
 typedef struct packed {
@@ -152,7 +152,7 @@ module alu_ex(
         // ready to accept from alu_ins?
     input [`NUM_FU_ALU-1:0]                 en,
         // insns to accept from alu_ins
-    ALU_OPS ops,
+    ALU_OPS [`NUM_FU_ALU-1:0] ops,
         // insn metadata/operands
 
     /* BACKEND */
@@ -170,24 +170,24 @@ module alu_ex(
         for (genvar i = 0; i < `NUM_FU_ALU; ++i) begin : gen_alus
             alu alu_0 ( 
                 // Inputs
-                .opa        (ops.opa[i]),
-                .opb        (ops.opb[i]),
-                .rs1        (ops.rs1[i]),
-                .rs2        (ops.rs2[i]),
-                .alu_func   (ops.alu_func[i]),
-                .branch_func(ops.branch_func[i]), // Which branch condition to check
+                .opa        (ops[i].opa),
+                .opb        (ops[i].opb),
+                .rs1        (ops[i].rs1),
+                .rs2        (ops[i].rs2),
+                .alu_func   (ops[i].alu_func),
+                .branch_func(ops[i].branch_func), // Which branch condition to check
 
                 .take(tmp_take[i]), // True/False condition result (will return FALSE if branch is low)
                 .result(tmp_res[i]) // will return 32'hfacebeec if branch is high (Sentinel, hopefully none of our alu computations result in that value)
             );
 
             assign tmp_data[i] = '{
-                t       : ops.t[i],
-                rob_idx : ops.rob_idx[i],
+                t       : ops[i].t,
+                rob_idx : ops[i].rob_idx,
                 data    : tmp_res[i],
-                btq_idx : ops.btq_idx[i],
+                btq_idx : ops[i].btq_idx,
                 take    : tmp_take[i],
-                is_brch : ops.cond_branch[i] || ops.uncond_branch[i]
+                is_brch : ops[i].cond_branch || ops[i].uncond_branch
             };
 
             // <FU>_outs: where executed insns wait until completion
@@ -446,7 +446,8 @@ module stage_ex_p4 (
     } MUL_REGS_EX;
 
     // receive/decode operands from PRF
-    ALU_OPS alu_ops, alu_ops_n;
+    ALU_OPS [`NUM_FU_ALU-1:0] alu_ops;
+    ALU_OPS [`NUM_FU_ALU-1:0] alu_ops_n;
     MUL_OPS mul_ops, mul_ops_n;
 
     struct packed {
@@ -458,37 +459,37 @@ module stage_ex_p4 (
         foreach(iss2ops_en.alu[i]) begin
             if(!iss2ops_en.alu[i]) 
                 continue;
-            alu_ops_n.rs1[i] = prf_in.s_v1s.alu[i];
-            alu_ops_n.rs2[i] = prf_in.s_v2s.alu[i];
+            alu_ops_n[i].rs1 = prf_in.s_v1s.alu[i];
+            alu_ops_n[i].rs2 = prf_in.s_v2s.alu[i];
 
             // ALU opA mux
             case (iss.dat.alu[i].opa_select)
-                OPA_IS_RS1:  alu_ops_n.opa[i] = prf_in.s_v1s.alu[i];
-                OPA_IS_NPC:  alu_ops_n.opa[i] = iss.dat.alu[i].NPC;
-                OPA_IS_PC:   alu_ops_n.opa[i] = iss.dat.alu[i].PC;
-                OPA_IS_ZERO: alu_ops_n.opa[i] = 0;
-                default:     alu_ops_n.opa[i]= 32'hdeadface; // dead face
+                OPA_IS_RS1:  alu_ops_n[i].opa = prf_in.s_v1s.alu[i];
+                OPA_IS_NPC:  alu_ops_n[i].opa = iss.dat.alu[i].NPC;
+                OPA_IS_PC:   alu_ops_n[i].opa = iss.dat.alu[i].PC;
+                OPA_IS_ZERO: alu_ops_n[i].opa = 0;
+                default:     alu_ops_n[i].opa = 32'hdeadface; // dead face
             endcase
 
             // ALU opB mux
             case (iss.dat.alu[i].opb_select)
-                OPB_IS_RS2:   alu_ops_n.opb[i] =  prf_in.s_v2s.alu[i];
-                OPB_IS_I_IMM: alu_ops_n.opb[i] = `RV32_signext_Iimm(iss.dat.alu[i].inst);
-                OPB_IS_S_IMM: alu_ops_n.opb[i] = `RV32_signext_Simm(iss.dat.alu[i].inst);
-                OPB_IS_B_IMM: alu_ops_n.opb[i] = `RV32_signext_Bimm(iss.dat.alu[i].inst);
-                OPB_IS_U_IMM: alu_ops_n.opb[i] = `RV32_signext_Uimm(iss.dat.alu[i].inst);
-                OPB_IS_J_IMM: alu_ops_n.opb[i] = `RV32_signext_Jimm(iss.dat.alu[i].inst);
-                default:      alu_ops_n.opb[i] = 32'hfacefeed; // face feed
+                OPB_IS_RS2:   alu_ops_n[i].opb =  prf_in.s_v2s.alu[i];
+                OPB_IS_I_IMM: alu_ops_n[i].opb = `RV32_signext_Iimm(iss.dat.alu[i].inst);
+                OPB_IS_S_IMM: alu_ops_n[i].opb = `RV32_signext_Simm(iss.dat.alu[i].inst);
+                OPB_IS_B_IMM: alu_ops_n[i].opb = `RV32_signext_Bimm(iss.dat.alu[i].inst);
+                OPB_IS_U_IMM: alu_ops_n[i].opb = `RV32_signext_Uimm(iss.dat.alu[i].inst);
+                OPB_IS_J_IMM: alu_ops_n[i].opb = `RV32_signext_Jimm(iss.dat.alu[i].inst);
+                default:      alu_ops_n[i].opb = 32'hfacefeed; // face feed
             endcase
 
-            alu_ops_n.bsy[i]         = iss.o_vld.alu[i] | (ops.o_vld.alu & ~ex.i_rdy.alu);
-            alu_ops_n.alu_func[i]    = iss.dat.alu[i].alu_func;
-            alu_ops_n.branch_func[i] = iss.dat.alu[i].inst.b.funct3;
-            alu_ops_n.t[i]           = iss.dat.alu[i].t;
-            alu_ops_n.rob_idx[i]     = iss.dat.alu[i].rob_idx;
-            alu_ops_n.btq_idx[i]     = iss.dat.alu[i].btq_idx;
-            alu_ops_n.cond_branch[i]        = iss.dat.alu[i].cond_branch;
-            alu_ops_n.uncond_branch[i]      = iss.dat.alu[i].uncond_branch;
+            alu_ops_n[i].bsy         = iss.o_vld.alu[i] | (ops.o_vld.alu & ~ex.i_rdy.alu);
+            alu_ops_n[i].alu_func    = iss.dat.alu[i].alu_func;
+            alu_ops_n[i].branch_func = iss.dat.alu[i].inst.b.funct3;
+            alu_ops_n[i].t           = iss.dat.alu[i].t;
+            alu_ops_n[i].rob_idx     = iss.dat.alu[i].rob_idx;
+            alu_ops_n[i].btq_idx     = iss.dat.alu[i].btq_idx;
+            alu_ops_n[i].cond_branch        = iss.dat.alu[i].cond_branch;
+            alu_ops_n[i].uncond_branch      = iss.dat.alu[i].uncond_branch;
         end
 
         mul_ops_n = '0;
@@ -593,7 +594,8 @@ module stage_ex_p4 (
         end else begin
             alu_ops     <= alu_ops_n;
             mul_ops     <= mul_ops_n;
-            ops.o_vld.alu <= alu_ops_n.bsy;
+            foreach (alu_ops_n[i])
+                ops.o_vld.alu[i] <= alu_ops_n[i].bsy;
             ops.o_vld.mul <= mul_ops_n.bsy;
             /*
             We buffer c_out for 1 cycle to break the comb. chain...
@@ -652,15 +654,15 @@ module stage_ex_p4 (
                 $display("alu_ops[%0d]: bsy: %b, opa: 0x%x, opb: 0x%x, alu_func: %b, branch_func: %b, cond_branch: %b, uncond_branch: %b, t: %2d, rob_idx: %2d, btq_idx: %2d",
                     i,
                     ops.o_vld.alu[i],
-                    alu_ops.opa[i],
-                    alu_ops.opb[i],
-                    alu_ops.alu_func[i],
-                    alu_ops.branch_func[i],
-                    alu_ops.cond_branch[i],
-                    alu_ops.uncond_branch[i],
-                    alu_ops.t[i],
-                    alu_ops.rob_idx[i],
-                    alu_ops.btq_idx[i]
+                    alu_ops[i].opa,
+                    alu_ops[i].opb,
+                    alu_ops[i].alu_func,
+                    alu_ops[i].branch_func,
+                    alu_ops[i].cond_branch,
+                    alu_ops[i].uncond_branch,
+                    alu_ops[i].t,
+                    alu_ops[i].rob_idx,
+                    alu_ops[i].btq_idx
                 );
             end
 
