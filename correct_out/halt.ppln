@@ -1,6 +1,0 @@
-Cycle |     IF      |     ID      |     EX      |     MEM     |     WB      |    Reg WB    | MEM Bus
-    0 |   4:wfi     |   -:-       |   -:-       |   -:-       |   -:-       |              | LOAD  [0]
-    1 |   8:unknown |   4:wfi     |   -:-       |   -:-       |   -:-       |              | LOAD  [0]
-    2 |   C:unknown |   8:unknown |   4:wfi     |   -:-       |   -:-       |              | LOAD  [8]
-    3 |  10:unknown |   C:unknown |   8:unknown |   4:wfi     |   -:-       |              | LOAD  [8]
-    4 |  14:unknown |  10:unknown |   C:unknown |   8:unknown |   4:wfi     |              | LOAD  [10]
