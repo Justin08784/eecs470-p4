@@ -1,23 +1,23 @@
 `include "sys_defs.svh"
 
 
-module lsq_testbench;
+module sq_testbench;
 
     logic clock;
     logic reset;
     logic flush;
 
-    dispatch2lsq dis_2_lsq;
-    execute2lsq exec_2_lsq;
-    rob2lsq rob_2_lsq;
+    dispatch2sq dis_2_sq;
+    execute2sq exec_2_sq;
+    rob2sq rob_2_sq;
 
-    lsq2dispatch lsq_2_dis;
-    lsq2execute lsq_2_exec;
-    lsq2rs lsq_2_rs;
+    sq2dispatch sq_2_dis;
+    sq2execute sq_2_exec;
+    sq2rs sq_2_rs;
 
-    lsq2stRET lsq_2_ret;
+    sq2stRET sq_2_ret;
 
-    stRET2lsq ret_2_lsq;
+    stRET2sq ret_2_sq;
 
     stRET2mem ret_2_mem;
     MEM_TAG mem2proc_transaction_tag;
@@ -41,15 +41,15 @@ module lsq_testbench;
         .reset(reset),
         .flush(flush),
 
-        .dis_2_lsq(dis_2_lsq),
-        .exec_2_lsq(exec_2_lsq),
-        .rob_2_lsq(rob_2_lsq),
-        // .ret_2_lsq(ret_2_lsq),
+        .dis_2_sq(dis_2_sq),
+        .exec_2_sq(exec_2_sq),
+        .rob_2_sq(rob_2_sq),
+        // .ret_2_sq(ret_2_sq),
 
-        .lsq_2_dis(lsq_2_dis),
-        .lsq_2_exec(lsq_2_exec),
-        .lsq_2_rs(lsq_2_rs),
-        // .lsq_2_ret(lsq_2_ret),
+        .sq_2_dis(sq_2_dis),
+        .sq_2_exec(sq_2_exec),
+        .sq_2_rs(sq_2_rs),
+        // .sq_2_ret(sq_2_ret),
         .mem2proc_transaction_tag(mem2proc_transaction_tag),
         .ret_2_mem(ret_2_mem)
     );
@@ -60,9 +60,9 @@ module lsq_testbench;
         reset = 0;
         flush = 0;
 
-        dis_2_lsq = '0;
-        exec_2_lsq = '0;
-        rob_2_lsq = '0;
+        dis_2_sq = '0;
+        exec_2_sq = '0;
+        rob_2_sq = '0;
         mem2proc_transaction_tag = '0;
 
         @(negedge clock);
@@ -70,119 +70,119 @@ module lsq_testbench;
         @(negedge clock);
         reset = 0;
         @(negedge clock);
-        dis_2_lsq.lsq_d_en_cnt = 2;
-        dis_2_lsq.rob_idx[0] = 0;
-        dis_2_lsq.rob_idx[1] = 1;
+        dis_2_sq.sq_d_en_cnt = 2;
+        dis_2_sq.rob_idx[0] = 0;
+        dis_2_sq.rob_idx[1] = 1;
         @(negedge clock);
-        dis_2_lsq.lsq_d_en_cnt = 2;
-        dis_2_lsq.rob_idx[0] = 2;
-        dis_2_lsq.rob_idx[1] = 3;
+        dis_2_sq.sq_d_en_cnt = 2;
+        dis_2_sq.rob_idx[0] = 2;
+        dis_2_sq.rob_idx[1] = 3;
         @(negedge clock);
-        dis_2_lsq.lsq_d_en_cnt = 2;
-        dis_2_lsq.rob_idx[0] = 4;
-        dis_2_lsq.rob_idx[1] = 5;
+        dis_2_sq.sq_d_en_cnt = 2;
+        dis_2_sq.rob_idx[0] = 4;
+        dis_2_sq.rob_idx[1] = 5;
         @(negedge clock);
-        dis_2_lsq.lsq_d_en_cnt = 2;
-        dis_2_lsq.rob_idx[0] = 6;
-        dis_2_lsq.rob_idx[1] = 7;
+        dis_2_sq.sq_d_en_cnt = 2;
+        dis_2_sq.rob_idx[0] = 6;
+        dis_2_sq.rob_idx[1] = 7;
         @(negedge clock);
-        dis_2_lsq.lsq_d_en_cnt = 2;
-        dis_2_lsq.rob_idx[0] = 8;
-        dis_2_lsq.rob_idx[1] = 9;
+        dis_2_sq.sq_d_en_cnt = 2;
+        dis_2_sq.rob_idx[0] = 8;
+        dis_2_sq.rob_idx[1] = 9;
         @(negedge clock);
-        dis_2_lsq.lsq_d_en_cnt = 2;
-        dis_2_lsq.rob_idx[0] = 10;
-        dis_2_lsq.rob_idx[1] = 11;
+        dis_2_sq.sq_d_en_cnt = 2;
+        dis_2_sq.rob_idx[0] = 10;
+        dis_2_sq.rob_idx[1] = 11;
         @(negedge clock);
-        dis_2_lsq.lsq_d_en_cnt = 2;
-        dis_2_lsq.rob_idx[0] = 12;
-        dis_2_lsq.rob_idx[1] = 13;
+        dis_2_sq.sq_d_en_cnt = 2;
+        dis_2_sq.rob_idx[0] = 12;
+        dis_2_sq.rob_idx[1] = 13;
         @(negedge clock);
-        dis_2_lsq.lsq_d_en_cnt = 2;
-        dis_2_lsq.rob_idx[0] = 14;
-        dis_2_lsq.rob_idx[1] = 15;
+        dis_2_sq.sq_d_en_cnt = 2;
+        dis_2_sq.rob_idx[0] = 14;
+        dis_2_sq.rob_idx[1] = 15;
         @(negedge clock);
-        dis_2_lsq = '0;
+        dis_2_sq = '0;
         @(negedge clock);
-        exec_2_lsq.st_sq_idx[0] = 0;
-        exec_2_lsq.st_ex_en[0] = '1;
-        exec_2_lsq.st_addr[0] = 25;
-        exec_2_lsq.st_data[0] = 48;
-        exec_2_lsq.st_mem_size[0] = BYTE;
-        exec_2_lsq.st_sq_idx[1] = 1;
-        exec_2_lsq.st_ex_en[1] = '1;
-        exec_2_lsq.st_addr[1] = 74;
-        exec_2_lsq.st_data[1] = 96;
-        exec_2_lsq.st_mem_size[1] = BYTE;
-        assert (lsq_2_dis.sq_rdy_scnt == 0) 
+        exec_2_sq.st_sq_idx[0] = 0;
+        exec_2_sq.st_ex_en[0] = '1;
+        exec_2_sq.st_addr[0] = 25;
+        exec_2_sq.st_data[0] = 48;
+        exec_2_sq.st_mem_size[0] = BYTE;
+        exec_2_sq.st_sq_idx[1] = 1;
+        exec_2_sq.st_ex_en[1] = '1;
+        exec_2_sq.st_addr[1] = 74;
+        exec_2_sq.st_data[1] = 96;
+        exec_2_sq.st_mem_size[1] = BYTE;
+        assert (sq_2_dis.sq_rdy_scnt == 0) 
         else   exit_on_error ("Free count not zero");
         @(negedge clock);
-        exec_2_lsq = '0;
-        rob_2_lsq.r_en = 2;
-        assert (lsq_2_rs.en == 4'b0011) 
+        exec_2_sq = '0;
+        rob_2_sq.r_en = 2;
+        assert (sq_2_rs.en == 4'b0011) 
         else   exit_on_error ("CDB en not correct");
-        assert (lsq_2_rs.sq_idx_cdb[0] == 0) 
+        assert (sq_2_rs.sq_idx_cdb[0] == 0) 
         else   exit_on_error ("CDB [0] not correct");
-        assert (lsq_2_rs.sq_idx_cdb[1] == 1) 
+        assert (sq_2_rs.sq_idx_cdb[1] == 1) 
         else   exit_on_error ("CDB [1] not correct");
         @(negedge clock);
-        exec_2_lsq = '0;
-        rob_2_lsq = '0;
-        assert (lsq_2_dis.sq_rdy_scnt == 2) 
+        exec_2_sq = '0;
+        rob_2_sq = '0;
+        assert (sq_2_dis.sq_rdy_scnt == 2) 
         else   exit_on_error ("Free count not two");
         @(negedge clock);
-        rob_2_lsq.r_en = 1;
-        dis_2_lsq.lsq_d_en_cnt = 2;
-        dis_2_lsq.rob_idx[0] = 16;
-        dis_2_lsq.rob_idx[1] = 17;
+        rob_2_sq.r_en = 1;
+        dis_2_sq.sq_d_en_cnt = 2;
+        dis_2_sq.rob_idx[0] = 16;
+        dis_2_sq.rob_idx[1] = 17;
         @(negedge clock);
-        rob_2_lsq = '0;
-        dis_2_lsq = '0;
-        assert (lsq_2_dis.sq_rdy_scnt == 1) 
+        rob_2_sq = '0;
+        dis_2_sq = '0;
+        assert (sq_2_dis.sq_rdy_scnt == 1) 
         else   exit_on_error ("Free count not one");
         @(negedge clock);
-        exec_2_lsq.st_sq_idx[1] = 3;
-        exec_2_lsq.st_ex_en[1] = '1;
-        exec_2_lsq.st_addr[1] = 72;
-        exec_2_lsq.st_data[1] = 120;
-        exec_2_lsq.st_mem_size[1] = HALF;
+        exec_2_sq.st_sq_idx[1] = 3;
+        exec_2_sq.st_ex_en[1] = '1;
+        exec_2_sq.st_addr[1] = 72;
+        exec_2_sq.st_data[1] = 120;
+        exec_2_sq.st_mem_size[1] = HALF;
         @(negedge clock);
-        exec_2_lsq = '0;
+        exec_2_sq = '0;
         @(negedge clock);
-        exec_2_lsq.forward_req_en[0] = 1;
-        exec_2_lsq.forward_addr[0] = 24;
-        exec_2_lsq.forward_sq_idx[0] = 0;
-        exec_2_lsq.forward_mem_size[0] = HALF;
-        exec_2_lsq.forward_req_en[1] = 1;
-        exec_2_lsq.forward_addr[1] = 72;
-        exec_2_lsq.forward_sq_idx[1] = 3;
-        exec_2_lsq.forward_mem_size[1] = WORD;
-        exec_2_lsq.forward_req_en[2] = 1;
-        exec_2_lsq.forward_addr[2] = 74;
-        exec_2_lsq.forward_sq_idx[2] = 3;
-        exec_2_lsq.forward_mem_size[2] = HALF;
+        exec_2_sq.forward_req_en[0] = 1;
+        exec_2_sq.forward_addr[0] = 24;
+        exec_2_sq.forward_sq_idx[0] = 0;
+        exec_2_sq.forward_mem_size[0] = HALF;
+        exec_2_sq.forward_req_en[1] = 1;
+        exec_2_sq.forward_addr[1] = 72;
+        exec_2_sq.forward_sq_idx[1] = 3;
+        exec_2_sq.forward_mem_size[1] = WORD;
+        exec_2_sq.forward_req_en[2] = 1;
+        exec_2_sq.forward_addr[2] = 74;
+        exec_2_sq.forward_sq_idx[2] = 3;
+        exec_2_sq.forward_mem_size[2] = HALF;
         // @(negedge clock);
         // @(negedge clock);
         @(posedge clock);
-        // $display(lsq_2_exec.forward_en[1]);
-        // $display(lsq_2_exec.forward_data[1]);
-        assert (lsq_2_exec.forward_en[0] == '1)
+        // $display(sq_2_exec.forward_en[1]);
+        // $display(sq_2_exec.forward_data[1]);
+        assert (sq_2_exec.forward_en[0] == '1)
         else exit_on_error ("Forward 0 en failed");
-        assert (lsq_2_exec.forward_data[0] == 12288)
+        assert (sq_2_exec.forward_data[0] == 12288)
         else exit_on_error ("Forward 0 data failed");
-        assert (lsq_2_exec.forward_en[1] == '1)
+        assert (sq_2_exec.forward_en[1] == '1)
         else exit_on_error ("Forward 1 en failed");
-        // $display("Forward 1: %0d", lsq_2_exec.forward_data[1]);
-        assert (lsq_2_exec.forward_data[1] == 6291576) //7,864,416
+        // $display("Forward 1: %0d", sq_2_exec.forward_data[1]);
+        assert (sq_2_exec.forward_data[1] == 6291576) //7,864,416
         else exit_on_error ("Forward 1 data failed");
-        assert (lsq_2_exec.forward_en[2] == '1)
+        assert (sq_2_exec.forward_en[2] == '1)
         else exit_on_error ("Forward 2 en failed");
-        assert (lsq_2_exec.forward_data[2] == 96)
+        assert (sq_2_exec.forward_data[2] == 96)
         else exit_on_error ("Forward 2 data failed");
-        // $display("Forward[0] map: %4b", lsq_2_exec.forward_byte_en[0]);
-        // $display("Forward[1] map: %4b", lsq_2_exec.forward_byte_en[1]);
+        // $display("Forward[0] map: %4b", sq_2_exec.forward_byte_en[0]);
+        // $display("Forward[1] map: %4b", sq_2_exec.forward_byte_en[1]);
         @(negedge clock);
-        exec_2_lsq = '0;
+        exec_2_sq = '0;
         @(negedge clock);
         @(negedge clock);
         @(negedge clock);

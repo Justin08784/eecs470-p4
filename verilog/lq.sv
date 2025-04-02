@@ -15,15 +15,15 @@ module lq #(parameter
     input reset,
     input flush,
 
-    // input dispatch2lsq dis_2_lsq,
-    // input execute2lsq exec_2_lsq,
-    // input rob2lsq rob_2_lsq,
+    input dispatch2lq dis_2_lq,
+    // input execute2lq exec_2_lq,
+    input rob2lq rob_2_lq,
     // input MEM_TAG mem2proc_transaction_tag,
 
-    // output lsq2dispatch lsq_2_dis,
-    // output lsq2execute lsq_2_exec,
-    // output lsq2rs lsq_2_rs,
-    // output lsq2rob lsq_2_rob,
+    output lq2dispatch lq_2_dis,
+    // output lq2execute lq_2_exec,
+    // output lq2rs lq_2_rs,
+    output lq2rob lq_2_rob
     // output stRET2mem ret_2_mem
 );
 
@@ -44,14 +44,6 @@ module lq #(parameter
     logic [NUM_RPORTS-1:0][$clog2(LSQ_SZ)-1:0] r_idxs;
     logic [NUM_DPORTS-1:0][$clog2(LSQ_SZ)-1:0] d_idxs;
 
-    lsq2stRET lsq_2_ret;
-    stRET2lsq ret_2_lsq;
-    forwardRET2lsq forward_ret_2_lsq;
-
-    lsq2execute initial_lsq_2_exec; //local forwarding data
-    lsq2execute next_lsq_2_exec; //stores the local for a cycle
-    lsq2execute ready_lsq_2_exec; //combines the local with what is coming from the retirement buffer
-
     `ifdef DEBUG
     assign state_dbg            = state;
     `endif 
@@ -69,24 +61,23 @@ module lq #(parameter
             d_idxs[i] = (tail + i) % LSQ_SZ;
 
         // handle dispatch (outs)
-        lsq_2_dis <= '{
-            sq_rdy_scnt : `MIN(free, NUM_DPORTS),
-            sq_tail     : tail_dbl
+        lq_2_dis <= '{
+            lq_rdy_scnt : `MIN(free, NUM_DPORTS),
+            lq_tail     : tail_dbl
         };
 
         //handle LSQ CDB to RS
-        lsq_2_rs <= '{
-            en : exec_2_lsq.st_ex_en,
-            sq_idx_cdb     : exec_2_lsq.st_sq_idx
-        };
+        // lsq_2_rs <= '{
+        //     en : exec_2_lsq.st_ex_en,
+        //     sq_idx_cdb     : exec_2_lsq.st_sq_idx
+        // };
 
         //handle lsq to ROB for retirement
         head_plus_one = (head + 1) % LSQ_SZ;
-        if (state[head].d_vld && state[head_plus_one].d_vld)    lsq_2_rob.ret_rdy = 2;
-        else if (state[head].d_vld)                             lsq_2_rob.ret_rdy = 1;
-        else                                                    lsq_2_rob.ret_rdy = 0;
-        lsq_2_rob.ret_rdy = `MIN(lsq_2_rob.ret_rdy,ret_2_lsq.free_out);
-        lsq_2_rob.sq_ret_complete = (ret_2_lsq.empty && (used == 0)) ? '1 : '0;        
+        if (state[head].d_vld && state[head_plus_one].d_vld)    lq_2_rob.ret_rdy = 2;
+        else if (state[head].d_vld)                             lq_2_rob.ret_rdy = 1;
+        else                                                    lq_2_rob.ret_rdy = 0;
+        lq_2_rob.lq_ret_complete = (used == 0) ? '1 : '0;        
 
     end
 
@@ -99,33 +90,33 @@ module lq #(parameter
             tail_dbl <= 0;
             state   <= '0;
         end else begin
-            used    <= used + dis_2_lsq.lsq_d_en_cnt - rob_2_lsq.r_en;
-            head    <= (head + rob_2_lsq.r_en) % LSQ_SZ;
-            tail    <= (tail + dis_2_lsq.lsq_d_en_cnt) % LSQ_SZ;
-            tail_dbl <= (tail_dbl + dis_2_lsq.lsq_d_en_cnt) % LSQ_SZ_DBL;
+            used    <= used + dis_2_lq.lq_d_en_cnt - rob_2_lq.r_en;
+            head    <= (head + rob_2_lq.r_en) % LSQ_SZ;
+            tail    <= (tail + dis_2_lq.lq_d_en_cnt) % LSQ_SZ;
+            tail_dbl <= (tail_dbl + dis_2_lq.lq_d_en_cnt) % LSQ_SZ_DBL;
             
             // handle execute updates
-            for (int unsigned i = 0, int cur_idx = 0; i < NUM_ST_PORTS; ++i) begin
-                cur_idx = exec_2_lsq.st_sq_idx[i];
+            // for (int unsigned i = 0, int cur_idx = 0; i < NUM_ST_PORTS; ++i) begin
+            //     cur_idx = exec_2_lsq.st_sq_idx[i];
 
-                if (exec_2_lsq.st_ex_en[i]) begin
-                    state[cur_idx].addr <= exec_2_lsq.st_addr[i];
-                    state[cur_idx].data <= exec_2_lsq.st_data[i];
-                    state[cur_idx].mem_size <= exec_2_lsq.st_mem_size[i];
-                    state[cur_idx].d_vld <= '1;
-                end
+            //     if (exec_2_lsq.st_ex_en[i]) begin
+            //         state[cur_idx].addr <= exec_2_lsq.st_addr[i];
+            //         state[cur_idx].data <= exec_2_lsq.st_data[i];
+            //         state[cur_idx].mem_size <= exec_2_lsq.st_mem_size[i];
+            //         state[cur_idx].d_vld <= '1;
+            //     end
 
-            end
+            // end
 
             // handle dispatch (ins)
             // $display("d_en_cnt: %d", d_in.d_en_cnt);
             for (int unsigned i = 0, int cur_idx = 0; i < NUM_DPORTS; ++i) begin
-                if (i >= dis_2_lsq.lsq_d_en_cnt)
+                if (i >= dis_2_lq.lq_d_en_cnt)
                     continue;
                 cur_idx = d_idxs[i];
                 state[cur_idx] <= '{
                     lq_idx     : d_idxs[i],
-                    rob_idx : dis_2_lsq.rob_idx[i],
+                    rob_idx : dis_2_lq.rob_idx[i],
                     addr     : '0,
                     d_vld     : '0,
                     mem_size : '0

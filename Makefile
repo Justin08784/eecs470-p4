@@ -96,7 +96,7 @@
 # there should be no need to change anything for project 3
 
 # this is a global clock period variable used in the tcl script and referenced in testbenches
-export CLOCK_PERIOD = 5.0
+export CLOCK_PERIOD = 6.75
 
 # the Verilog Compiler command and arguments
 VCS =  vcs -sverilog -xprop=tmerge +vc -Mupdate -Mdir=build/csrc -line -full64 -kdb -lca -nc \
@@ -189,7 +189,7 @@ GREP = grep -E --color=auto
 # ---- Modules to Test ---- #
 
 # TODO: add more modules here
-MODULES = cpu mult rob rs fifo free_list dispatch prf map_table stage_id_p4 execute fetch btb sq post_ret_buffer gshare skid_buffer
+MODULES = cpu mult rob rs fifo free_list dispatch prf map_table stage_id_p4 execute fetch btb sq post_ret_buffer gshare skid_buffer lq
 
 # TODO: update this if you add more header files
 ALL_HEADERS = $(CPU_HEADERS)
@@ -277,6 +277,11 @@ SQ_FILES = verilog/sys_defs.svh
 build/sq.simv: $(SQ_FILES)
 build/sq.cov: $(SQ_FILES)
 synth/sq.vg: $(SQ_FILES)
+
+LQ_FILES = verilog/sys_defs.svh
+build/lq.simv: $(LQ_FILES)
+build/lq.cov: $(LQ_FILES)
+synth/lq.vg: $(LQ_FILES)
 
 POST_RET_BUFFER_FILES = verilog/sys_defs.svh
 build/post_ret_buffer.simv: $(POST_RET_BUFFER_FILES)
