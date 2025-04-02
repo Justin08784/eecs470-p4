@@ -55,7 +55,7 @@ module testbench;
     MEM_SIZE    proc2mem_size;
 
     COMMIT_PACKET [`N-1:0] committed_insts;
-    ADDR PC_reg;
+    ADDR [`N-1:0] PC_reg;
     EXCEPTION_CODE error_status = NO_ERROR;
 
     ADDR  if_NPC_dbg;
@@ -82,8 +82,8 @@ module testbench;
         .reset (reset),
         //.mem2proc_transaction_tag (mem2proc_transaction_tag),
         .mem2proc_data            ({
-            memory.unified_memory[PC_reg[15:3]+1],
-            memory.unified_memory[PC_reg[15:3]]
+            memory.unified_memory[PC_reg[1][15:3]],
+            memory.unified_memory[PC_reg[0][15:3]]
         }),
         //.mem2proc_data_tag        (mem2proc_data_tag),
 
