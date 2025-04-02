@@ -84,10 +84,10 @@ typedef struct packed {
 } ALU_OPS;
 
 typedef struct packed {
-    logic       [`NUM_FU_MULT-1:0]      bsy;
-    DATA        [`NUM_FU_MULT-1:0]      rs1, rs2;
-    MULT_FUNC   [`NUM_FU_MULT-1:0]      func;
-    DST         [`NUM_FU_MULT-1:0]      dst;
+    logic       bsy;
+    DATA        rs1, rs2;
+    MULT_FUNC   func;
+    DST         dst;
 } MUL_OPS;
 
 // ALU: computes the result of FUNC applied with operands A and B
@@ -214,7 +214,7 @@ module mul_ex(
         // ready to accept from mul_ins?
     input [`NUM_FU_MULT-1:0]            en,
         // insns to accept from mul_ins
-    MUL_OPS ops,
+    MUL_OPS [`NUM_FU_MULT-1:0] ops,
         // insn metadata/operands
 
     /* BACKEND */
@@ -239,10 +239,10 @@ module mul_ex(
                 .flush  (flush),
                 .in_vld (en[i]),
                 .out_rdy(cpl_buf_rdy[i]),
-                .dst_in (ops.dst[i]),
-                .rs1    (ops.rs1[i]),
-                .rs2    (ops.rs2[i]),
-                .func   (ops.func[i]),
+                .dst_in (ops[i].dst),
+                .rs1    (ops[i].rs1),
+                .rs2    (ops[i].rs2),
+                .func   (ops[i].func),
 
                 // Output
                 .dst_out(tmp_dst[i]),
@@ -440,9 +440,10 @@ module stage_ex_p4 (
     } MUL_REGS_EX;
 
     // receive/decode operands from PRF
-    ALU_OPS [`NUM_FU_ALU-1:0] alu_ops;
-    ALU_OPS [`NUM_FU_ALU-1:0] tmp_alu_ops;
-    MUL_OPS mul_ops, mul_ops_n;
+    ALU_OPS [`NUM_FU_ALU-1:0]   alu_ops;
+    ALU_OPS [`NUM_FU_ALU-1:0]   tmp_alu_ops;
+    MUL_OPS [`NUM_FU_MULT-1:0]  mul_ops;
+    MUL_OPS [`NUM_FU_MULT-1:0]  tmp_mul_ops;
 
     struct packed {
         LOGIC_BY_FU i_rdy;
@@ -485,15 +486,14 @@ module stage_ex_p4 (
             tmp_alu_ops[i].uncond_branch      = iss.dat.alu[i].uncond_branch;
         end
 
-        mul_ops_n = '0;
+        tmp_mul_ops = '0;
         foreach (iss2ops_en.mul[i]) begin
             if (!iss2ops_en.mul[i])
                 continue;
-            mul_ops_n.bsy[i] = iss.o_vld.mul[i] | (ops.o_vld.mul & ~ex.i_rdy.mul);
-            mul_ops_n.rs1[i] = prf_in.s_v1s.mul[i];
-            mul_ops_n.rs2[i] = prf_in.s_v2s.mul[i];
-            mul_ops_n.func[i] = iss.dat.mul[i].func;
-            mul_ops_n.dst[i] = '{
+            tmp_mul_ops[i].rs1 = prf_in.s_v1s.mul[i];
+            tmp_mul_ops[i].rs2 = prf_in.s_v2s.mul[i];
+            tmp_mul_ops[i].func = iss.dat.mul[i].func;
+            tmp_mul_ops[i].dst = '{
                 rob_idx : iss.dat.mul[i].rob_idx,
                 tag     : iss.dat.mul[i].t
             };
@@ -516,6 +516,24 @@ module stage_ex_p4 (
                 .o_vld (ops.o_vld.alu[i]),
                 .o_rdy (ex.i_rdy.alu[i]),
                 .o_dat (alu_ops[i])
+            );
+        end
+
+        for (genvar i = 0; i < `NUM_FU_MULT; ++i) begin : gen_mul_rbufs
+            ppln_skid #(
+                .WIDTH($bits(MUL_OPS))
+            ) rbuf (
+                .clock (clock),
+                .reset (reset),
+                .flush (flush),
+
+                .i_vld (iss.o_vld.mul[i]),
+                .i_rdy (ops.i_rdy.mul[i]),
+                .i_dat (tmp_mul_ops[i]),
+
+                .o_vld (ops.o_vld.mul[i]),
+                .o_rdy (ex.i_rdy.mul[i]),
+                .o_dat (mul_ops[i])
             );
         end
     endgenerate
@@ -571,8 +589,6 @@ module stage_ex_p4 (
 
     execute2complete c_out_n;
     always_comb begin
-        ops.i_rdy.mul = ~ops.o_vld.mul | ex.i_rdy.mul;
-
         rs_out = '{
             fu_rdy_alu      : iss.i_rdy.alu,
             fu_rdy_mult     : iss.i_rdy.mul,
@@ -598,12 +614,8 @@ module stage_ex_p4 (
 
     always_ff @(posedge clock) begin
         if (reset || flush) begin
-            mul_ops     <= '0;
-            ops.o_vld.mul <= '0;
             c_out       <= '0;
         end else begin
-            mul_ops     <= mul_ops_n;
-            ops.o_vld.mul <= mul_ops_n.bsy;
             /*
             We buffer c_out for 1 cycle to break the comb. chain...
             cpl_buf.used_scnt(vld) -> psel_gen(vld) -> cpl_buf.rd_en_cnt(cpl_gnt)
@@ -677,11 +689,11 @@ module stage_ex_p4 (
                 $display("mul_ops[%0d]: bsy: %b, rs1: 0x%x, rs2: 0x%x, func: %b, t: %2d, rob_idx: %2d",
                     i,
                     ops.o_vld.mul[i],
-                    mul_ops.rs1[i],
-                    mul_ops.rs2[i],
-                    mul_ops.func[i],
-                    mul_ops.dst[i].tag,
-                    mul_ops.dst[i].rob_idx
+                    mul_ops[i].rs1,
+                    mul_ops[i].rs2,
+                    mul_ops[i].func,
+                    mul_ops[i].dst.tag,
+                    mul_ops[i].dst.rob_idx
                 );
             end
 
