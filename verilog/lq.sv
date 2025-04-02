@@ -18,13 +18,10 @@ module lq #(parameter
     input dispatch2lq dis_2_lq,
     input execute2lq exec_2_lq,
     input rob2lq rob_2_lq,
-    // input MEM_TAG mem2proc_transaction_tag,
+    input sq2lq sq_2_lq,
 
     output lq2dispatch lq_2_dis,
-    // output lq2execute lq_2_exec,
-    // output lq2rs lq_2_rs,
     output lq2rob lq_2_rob
-    // output stRET2mem ret_2_mem
 );
 
     localparam NUM_DPORTS = N; // dispatch ports (in-order)
@@ -36,7 +33,6 @@ module lq #(parameter
 
     logic [$clog2(LSQ_SZ)-1:0]  head;
     logic [$clog2(LSQ_SZ)-1:0]  tail;
-    logic [$clog2(LSQ_SZ_DBL)-1:0]  tail_dbl;
 
     LQ_ENTRY [LSQ_SZ-1:0]       state;
     logic [$clog2(LSQ_SZ):0]    used, free;
@@ -63,21 +59,14 @@ module lq #(parameter
         // handle dispatch (outs)
         lq_2_dis <= '{
             lq_rdy_scnt : `MIN(free, NUM_DPORTS),
-            lq_tail     : tail_dbl
+            lq_tail     : tail
         };
-
-        //handle LSQ CDB to RS
-        // lsq_2_rs <= '{
-        //     en : exec_2_lq.st_ex_en,
-        //     sq_idx_cdb     : exec_2_lq.st_sq_idx
-        // };
 
         //handle lsq to ROB for retirement
         head_plus_one = (head + 1) % LSQ_SZ;
         if (state[head].d_vld && state[head_plus_one].d_vld)    lq_2_rob.ret_rdy = 2;
         else if (state[head].d_vld)                             lq_2_rob.ret_rdy = 1;
-        else                                                    lq_2_rob.ret_rdy = 0;
-        lq_2_rob.lq_ret_complete = (used == 0) ? '1 : '0;        
+        else                                                    lq_2_rob.ret_rdy = 0;      
 
     end
 
@@ -87,13 +76,11 @@ module lq #(parameter
             used    <= 0;
             head    <= 0;
             tail    <= 0;
-            tail_dbl <= 0;
             state   <= '0;
         end else begin
             used    <= used + dis_2_lq.lq_d_en_cnt - rob_2_lq.r_en;
             head    <= (head + rob_2_lq.r_en) % LSQ_SZ;
             tail    <= (tail + dis_2_lq.lq_d_en_cnt) % LSQ_SZ;
-            tail_dbl <= (tail_dbl + dis_2_lq.lq_d_en_cnt) % LSQ_SZ_DBL;
             
             // handle execute updates
             for (int unsigned i = 0, int cur_idx = 0; i < NUM_ST_PORTS; ++i) begin
