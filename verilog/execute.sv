@@ -84,7 +84,6 @@ typedef struct packed {
 } ALU_OPS;
 
 typedef struct packed {
-    logic       bsy;
     DATA        rs1, rs2;
     MULT_FUNC   func;
     DST         dst;
@@ -405,18 +404,14 @@ module stage_ex_p4 (
     always_comb begin
         prf_out = '0;
         foreach (iss.o_vld.alu[i]) begin
-            if (!iss.o_vld.alu[i])
-                continue;
-            prf_out.s_en1s.alu[i]   = 1;
-            prf_out.s_en2s.alu[i]   = 1;
+            prf_out.s_en1s.alu[i]   = iss.o_vld.alu[i];
+            prf_out.s_en2s.alu[i]   = iss.o_vld.alu[i];
             prf_out.s_t1s.alu[i]    = iss.dat.alu[i].t1; 
             prf_out.s_t2s.alu[i]    = iss.dat.alu[i].t2; 
         end
         foreach (iss.o_vld.mul[i]) begin
-            if (!iss.o_vld.mul[i])
-                continue;
-            prf_out.s_en1s.mul[i]   = 1;
-            prf_out.s_en2s.mul[i]   = 1;
+            prf_out.s_en1s.mul[i]   = iss.o_vld.mul[i];
+            prf_out.s_en2s.mul[i]   = iss.o_vld.mul[i];
             prf_out.s_t1s.mul[i]    = iss.dat.mul[i].t1; 
             prf_out.s_t2s.mul[i]    = iss.dat.mul[i].t2; 
         end
@@ -448,52 +443,51 @@ module stage_ex_p4 (
         LOGIC_BY_FU o_vld;
     } ex;
     always_comb begin
-        tmp_alu_ops = '0;
+        DATA opa, opb;
         foreach(iss.o_vld.alu[i]) begin
-            if(!iss.o_vld.alu[i]) 
-                continue;
-            tmp_alu_ops[i].rs1 = prf_in.s_v1s.alu[i];
-            tmp_alu_ops[i].rs2 = prf_in.s_v2s.alu[i];
-
             // ALU opA mux
             case (iss.dat.alu[i].opa_select)
-                OPA_IS_RS1:  tmp_alu_ops[i].opa = prf_in.s_v1s.alu[i];
-                OPA_IS_NPC:  tmp_alu_ops[i].opa = iss.dat.alu[i].NPC;
-                OPA_IS_PC:   tmp_alu_ops[i].opa = iss.dat.alu[i].PC;
-                OPA_IS_ZERO: tmp_alu_ops[i].opa = 0;
-                default:     tmp_alu_ops[i].opa = 32'hdeadface; // dead face
+                OPA_IS_RS1:  opa = prf_in.s_v1s.alu[i];
+                OPA_IS_NPC:  opa = iss.dat.alu[i].NPC;
+                OPA_IS_PC:   opa = iss.dat.alu[i].PC;
+                OPA_IS_ZERO: opa = 0;
+                default:     opa = 32'hdeadface; // dead face
             endcase
 
             // ALU opB mux
             case (iss.dat.alu[i].opb_select)
-                OPB_IS_RS2:   tmp_alu_ops[i].opb =  prf_in.s_v2s.alu[i];
-                OPB_IS_I_IMM: tmp_alu_ops[i].opb = `RV32_signext_Iimm(iss.dat.alu[i].inst);
-                OPB_IS_S_IMM: tmp_alu_ops[i].opb = `RV32_signext_Simm(iss.dat.alu[i].inst);
-                OPB_IS_B_IMM: tmp_alu_ops[i].opb = `RV32_signext_Bimm(iss.dat.alu[i].inst);
-                OPB_IS_U_IMM: tmp_alu_ops[i].opb = `RV32_signext_Uimm(iss.dat.alu[i].inst);
-                OPB_IS_J_IMM: tmp_alu_ops[i].opb = `RV32_signext_Jimm(iss.dat.alu[i].inst);
-                default:      tmp_alu_ops[i].opb = 32'hfacefeed; // face feed
+                OPB_IS_RS2:   opb =  prf_in.s_v2s.alu[i];
+                OPB_IS_I_IMM: opb = `RV32_signext_Iimm(iss.dat.alu[i].inst);
+                OPB_IS_S_IMM: opb = `RV32_signext_Simm(iss.dat.alu[i].inst);
+                OPB_IS_B_IMM: opb = `RV32_signext_Bimm(iss.dat.alu[i].inst);
+                OPB_IS_U_IMM: opb = `RV32_signext_Uimm(iss.dat.alu[i].inst);
+                OPB_IS_J_IMM: opb = `RV32_signext_Jimm(iss.dat.alu[i].inst);
+                default:      opb = 32'hfacefeed; // face feed
             endcase
-
-            tmp_alu_ops[i].alu_func    = iss.dat.alu[i].alu_func;
-            tmp_alu_ops[i].branch_func = iss.dat.alu[i].inst.b.funct3;
-            tmp_alu_ops[i].t           = iss.dat.alu[i].t;
-            tmp_alu_ops[i].rob_idx     = iss.dat.alu[i].rob_idx;
-            tmp_alu_ops[i].btq_idx     = iss.dat.alu[i].btq_idx;
-            tmp_alu_ops[i].cond_branch        = iss.dat.alu[i].cond_branch;
-            tmp_alu_ops[i].uncond_branch      = iss.dat.alu[i].uncond_branch;
+            tmp_alu_ops[i] = '{
+                rs1         : prf_in.s_v1s.alu[i],
+                rs2         : prf_in.s_v2s.alu[i],
+                opa         : opa,
+                opb         : opb,
+                alu_func    : iss.dat.alu[i].alu_func,
+                branch_func : iss.dat.alu[i].inst.b.funct3,
+                t           : iss.dat.alu[i].t,
+                rob_idx     : iss.dat.alu[i].rob_idx,
+                btq_idx     : iss.dat.alu[i].btq_idx,
+                cond_branch        : iss.dat.alu[i].cond_branch,
+                uncond_branch      : iss.dat.alu[i].uncond_branch
+            };
         end
 
-        tmp_mul_ops = '0;
         foreach (iss.o_vld.mul[i]) begin
-            if (!iss.o_vld.mul[i])
-                continue;
-            tmp_mul_ops[i].rs1 = prf_in.s_v1s.mul[i];
-            tmp_mul_ops[i].rs2 = prf_in.s_v2s.mul[i];
-            tmp_mul_ops[i].func = iss.dat.mul[i].func;
-            tmp_mul_ops[i].dst = '{
-                rob_idx : iss.dat.mul[i].rob_idx,
-                tag     : iss.dat.mul[i].t
+            tmp_mul_ops[i] = '{
+                rs1  : prf_in.s_v1s.mul[i],
+                rs2  : prf_in.s_v2s.mul[i],
+                func : iss.dat.mul[i].func,
+                dst  : '{
+                    rob_idx : iss.dat.mul[i].rob_idx,
+                    tag     : iss.dat.mul[i].t
+                }
             };
         end
     end
