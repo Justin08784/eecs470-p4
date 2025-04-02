@@ -674,31 +674,43 @@ module stage_ex_p4 (
             end
 
             for (int i = 0; i < `NUM_FU_ALU; ++i) begin
-                $display("alu_regs[%0d]: bsy: %b, opa: 0x%x, opb: 0x%x, alu_func: %b, branch_func: %b, cond_branch: %b, uncond_branch: %b, t: %2d, rob_idx: %2d, btq_idx: %2d",
+                $display("alu_regs[%0d]: bsy: %b, rs1: 0x%x, rs2: 0x%x",
                     i,
                     regs.o_vld.alu[i],
-                    alu_regs[i].opa,
-                    alu_regs[i].opb,
-                    alu_regs[i].alu_func,
-                    alu_regs[i].branch_func,
-                    alu_regs[i].cond_branch,
-                    alu_regs[i].uncond_branch,
-                    alu_regs[i].t,
-                    alu_regs[i].rob_idx,
-                    alu_regs[i].btq_idx
+                    alu_regs[i].rs1,
+                    alu_regs[i].rs2
                 );
+                // $display("alu_regs[%0d]: bsy: %b, opa: 0x%x, opb: 0x%x, alu_func: %b, branch_func: %b, cond_branch: %b, uncond_branch: %b, t: %2d, rob_idx: %2d, btq_idx: %2d",
+                //     i,
+                //     regs.o_vld.alu[i],
+                //     alu_regs[i].opa,
+                //     alu_regs[i].opb,
+                //     alu_regs[i].alu_func,
+                //     alu_regs[i].branch_func,
+                //     alu_regs[i].cond_branch,
+                //     alu_regs[i].uncond_branch,
+                //     alu_regs[i].t,
+                //     alu_regs[i].rob_idx,
+                //     alu_regs[i].btq_idx
+                // );
             end
 
             for (int i = 0; i < `NUM_FU_MULT; ++i) begin
-                $display("mul_regs[%0d]: bsy: %b, rs1: 0x%x, rs2: 0x%x, func: %b, t: %2d, rob_idx: %2d",
+                $display("mul_regs[%0d]: bsy: %b, rs1: 0x%x, rs2: 0x%x",
                     i,
                     regs.o_vld.mul[i],
                     mul_regs[i].rs1,
-                    mul_regs[i].rs2,
-                    mul_regs[i].func,
-                    mul_regs[i].dst.tag,
-                    mul_regs[i].dst.rob_idx
+                    mul_regs[i].rs2
                 );
+                // $display("mul_regs[%0d]: bsy: %b, rs1: 0x%x, rs2: 0x%x, func: %b, t: %2d, rob_idx: %2d",
+                //     i,
+                //     regs.o_vld.mul[i],
+                //     mul_regs[i].rs1,
+                //     mul_regs[i].rs2,
+                //     mul_regs[i].func,
+                //     mul_regs[i].dst.tag,
+                //     mul_regs[i].dst.rob_idx
+                // );
             end
 
             $display("c_out: rdy_alu: %b  rdy_mult: %b  rdy_store: %b  rdy_load: %b  cpl_gnt: %b",
