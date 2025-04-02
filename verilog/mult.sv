@@ -63,6 +63,7 @@ module mult (
         MODES modes;
         for (int i = 0; i < `MULT_STAGES; i++)
             modes[i] = O_SKID;
+        modes[`MULT_STAGES-1] = O_PSKID;
         return modes;
     endfunction
     localparam MODES modes = gen_modes();
@@ -84,7 +85,9 @@ module mult (
     end
 
     for (genvar i = 0; i < `MULT_STAGES; i++) begin : gen_stages
-        mult_stage mstage (
+        mult_stage #(
+            .MODE(modes[i])
+        ) mstage (
             .clock (clock),
             .reset (reset),
             .flush (flush),

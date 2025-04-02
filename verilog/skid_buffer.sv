@@ -38,11 +38,9 @@ module skid #(
         if (reset || flush) begin
             vld <= 0;
             dat <= '0;
-        end else begin
-            if (i_rdy) begin
-                dat <= i_dat;
-                vld <= i_vld;
-            end
+        end else if (i_rdy) begin
+            dat <= i_dat;
+            vld <= i_vld;
         end
     end
 endmodule
