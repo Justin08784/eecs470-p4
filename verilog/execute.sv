@@ -19,7 +19,7 @@ Flow chart
      ↓
 [Staging FIFO (s_buf)]  ← just buffers instruction for 1 cycle
      ↓
-[ops register (alu_ops, mul_ops)]  ← PRF values fetched here
+[regs register (alu_regs, mul_regs)]  ← PRF values fetched here
      ↓
 [Functional Unit (ALU or MUL)]
      ↓
@@ -41,11 +41,6 @@ typedef struct packed {
     CPL_CAND [`NUM_FU_ALU-1:0]  alu;
     CPL_CAND [`NUM_FU_MULT-1:0] mul;
 } CPL_CAND_BY_FU;
-
-typedef struct packed {
-    ID_RESULT [`NUM_FU_ALU-1:0]  alu;
-    ID_RESULT [`NUM_FU_MULT-1:0] mul;
-} ID_RESULT_BY_FU;
 
 /* Slices (or "views") of ID_RESULT needed for each FU type */
 typedef struct packed {
@@ -74,26 +69,35 @@ typedef struct packed {
     logic[2:0]      func;
 } ID_MUL_VIEW;
 
+typedef struct packed {
+    DATA rs1;
+    DATA rs2;
+    ID_ALU_VIEW dat;
+} ALU_REGS_EX;
+typedef struct packed {
+    DATA rs1;
+    DATA rs2;
+    ID_MUL_VIEW dat;
+} MUL_REGS_EX;
+
 /* Operand data needed for each FU type */
 typedef struct packed {
-    logic       [`NUM_FU_ALU-1:0]       bsy; // unused; same as en
-    DATA        [`NUM_FU_ALU-1:0]       opa, opb;
-    DATA        [`NUM_FU_ALU-1:0]       rs1, rs2;
-    ALU_FUNC    [`NUM_FU_ALU-1:0]       alu_func;
-    logic       [`NUM_FU_ALU-1:0][2:0]  branch_func; // Which branch condition to check
-    logic       [`NUM_FU_ALU-1:0]       cond_branch;
-    logic       [`NUM_FU_ALU-1:0]       uncond_branch;
+    DATA            opa, opb;
+    DATA            rs1, rs2;
+    ALU_FUNC        alu_func;
+    logic   [2:0]   branch_func; // Which branch condition to check
+    logic           cond_branch;
+    logic           uncond_branch;
 
-    PHYS_REG_IDX    [`NUM_FU_ALU-1:0]   t;
-    ROB_IDX         [`NUM_FU_ALU-1:0]   rob_idx;
-    BTQ_IDX         [`NUM_FU_ALU-1:0]   btq_idx;
+    PHYS_REG_IDX    t;
+    ROB_IDX         rob_idx;
+    BTQ_IDX         btq_idx;
 } ALU_OPS;
 
 typedef struct packed {
-    logic       [`NUM_FU_MULT-1:0]      bsy;
-    DATA        [`NUM_FU_MULT-1:0]      rs1, rs2;
-    MULT_FUNC   [`NUM_FU_MULT-1:0]      func;
-    DST         [`NUM_FU_MULT-1:0]      dst;
+    DATA        rs1, rs2;
+    MULT_FUNC   func;
+    DST         dst;
 } MUL_OPS;
 
 // ALU: computes the result of FUNC applied with operands A and B
@@ -148,20 +152,59 @@ module alu_ex(
     input flush,
 
     /* FRONTEND */
-    output logic [`NUM_FU_ALU-1:0]          ex_rdy,
+    output logic [`NUM_FU_ALU-1:0]          i_rdy,
         // ready to accept from alu_ins?
-    input [`NUM_FU_ALU-1:0]                 en,
+    input [`NUM_FU_ALU-1:0]                 i_vld,
         // insns to accept from alu_ins
-    ALU_OPS ops,
+    input ALU_REGS_EX [`NUM_FU_ALU-1:0]     i_regs,
         // insn metadata/operands
 
     /* BACKEND */
-    output logic [`NUM_FU_ALU-1:0]      vld,
-    output CPL_CAND [`NUM_FU_ALU-1:0]   cands,
+    output logic [`NUM_FU_ALU-1:0]      o_vld,
+    output CPL_CAND [`NUM_FU_ALU-1:0]   o_cands,
         // completion requests
-    input  logic [`NUM_FU_ALU-1:0]      cpl_gnt
+    input  logic [`NUM_FU_ALU-1:0]      o_rdy 
         // completion grant
 );
+    ALU_OPS [`NUM_FU_ALU-1:0] ops;
+    always_comb begin
+        DATA opa, opb;
+        foreach(ops[i]) begin
+            // ALU opA mux
+            case (i_regs[i].dat.opa_select)
+                OPA_IS_RS1:  opa = i_regs[i].rs1;
+                OPA_IS_NPC:  opa = i_regs[i].dat.NPC;
+                OPA_IS_PC:   opa = i_regs[i].dat.PC;
+                OPA_IS_ZERO: opa = 0;
+                default:     opa = 32'hdeadface; // dead face
+            endcase
+
+            // ALU opB mux
+            case (i_regs[i].dat.opb_select)
+                OPB_IS_RS2:   opb =  i_regs[i].rs2;
+                OPB_IS_I_IMM: opb = `RV32_signext_Iimm(i_regs[i].dat.inst);
+                OPB_IS_S_IMM: opb = `RV32_signext_Simm(i_regs[i].dat.inst);
+                OPB_IS_B_IMM: opb = `RV32_signext_Bimm(i_regs[i].dat.inst);
+                OPB_IS_U_IMM: opb = `RV32_signext_Uimm(i_regs[i].dat.inst);
+                OPB_IS_J_IMM: opb = `RV32_signext_Jimm(i_regs[i].dat.inst);
+                default:      opb = 32'hfacefeed; // face feed
+            endcase
+            ops[i] = '{
+                rs1         : i_regs[i].rs1,
+                rs2         : i_regs[i].rs2,
+                opa         : opa,
+                opb         : opb,
+                alu_func    : i_regs[i].dat.alu_func,
+                branch_func : i_regs[i].dat.inst.b.funct3,
+                t           : i_regs[i].dat.t,
+                rob_idx     : i_regs[i].dat.rob_idx,
+                btq_idx     : i_regs[i].dat.btq_idx,
+                cond_branch        : i_regs[i].dat.cond_branch,
+                uncond_branch      : i_regs[i].dat.uncond_branch
+            };
+        end
+    end
+
     // execute
     generate
         CPL_CAND    [`NUM_FU_ALU-1:0] tmp_data;
@@ -170,24 +213,24 @@ module alu_ex(
         for (genvar i = 0; i < `NUM_FU_ALU; ++i) begin : gen_alus
             alu alu_0 ( 
                 // Inputs
-                .opa        (ops.opa[i]),
-                .opb        (ops.opb[i]),
-                .rs1        (ops.rs1[i]),
-                .rs2        (ops.rs2[i]),
-                .alu_func   (ops.alu_func[i]),
-                .branch_func(ops.branch_func[i]), // Which branch condition to check
+                .opa        (ops[i].opa),
+                .opb        (ops[i].opb),
+                .rs1        (ops[i].rs1),
+                .rs2        (ops[i].rs2),
+                .alu_func   (ops[i].alu_func),
+                .branch_func(ops[i].branch_func), // Which branch condition to check
 
                 .take(tmp_take[i]), // True/False condition result (will return FALSE if branch is low)
                 .result(tmp_res[i]) // will return 32'hfacebeec if branch is high (Sentinel, hopefully none of our alu computations result in that value)
             );
 
             assign tmp_data[i] = '{
-                t       : ops.t[i],
-                rob_idx : ops.rob_idx[i],
+                t       : ops[i].t,
+                rob_idx : ops[i].rob_idx,
                 data    : tmp_res[i],
-                btq_idx : ops.btq_idx[i],
+                btq_idx : ops[i].btq_idx,
                 take    : tmp_take[i],
-                is_brch : ops.cond_branch[i] || ops.uncond_branch[i]
+                is_brch : ops[i].cond_branch || ops[i].uncond_branch
             };
 
             // <FU>_outs: where executed insns wait until completion
@@ -198,13 +241,13 @@ module alu_ex(
                 .reset (reset),
                 .flush (flush),
 
-                .i_vld (en[i]),
-                .i_rdy (ex_rdy[i]),
+                .i_vld (i_vld[i]),
+                .i_rdy (i_rdy[i]),
                 .i_dat (tmp_data[i]),
 
-                .o_vld (vld[i]),
-                .o_rdy (cpl_gnt[i]),
-                .o_dat (cands[i])
+                .o_vld (o_vld[i]),
+                .o_rdy (o_rdy[i]),
+                .o_dat (o_cands[i])
             );
         end
     endgenerate
@@ -216,20 +259,34 @@ module mul_ex(
     input flush,
 
     /* FRONTEND */
-    output logic [`NUM_FU_MULT-1:0]     ex_rdy,
+    output logic [`NUM_FU_MULT-1:0]     i_rdy,
         // ready to accept from mul_ins?
-    input [`NUM_FU_MULT-1:0]            en,
+    input [`NUM_FU_MULT-1:0]            i_vld,
         // insns to accept from mul_ins
-    MUL_OPS ops,
+    MUL_REGS_EX  [`NUM_FU_MULT-1:0]     i_regs,
         // insn metadata/operands
 
     /* BACKEND */
-    output logic [`NUM_FU_MULT-1:0]     vld,
-    output CPL_CAND [`NUM_FU_MULT-1:0]  cands,
+    output logic [`NUM_FU_MULT-1:0]     o_vld,
+    output CPL_CAND [`NUM_FU_MULT-1:0]  o_cands,
         // completion requests
-    input  logic [`NUM_FU_MULT-1:0]     cpl_gnt
+    input  logic [`NUM_FU_MULT-1:0]     o_rdy
         // completion grant
 );
+    MUL_OPS [`NUM_FU_MULT-1:0] ops;
+    always_comb begin
+        foreach (ops[i]) begin
+            ops[i] = '{
+                rs1  : i_regs[i].rs1,
+                rs2  : i_regs[i].rs2,
+                func : i_regs[i].dat.func,
+                dst  : '{
+                    rob_idx : i_regs[i].dat.rob_idx,
+                    tag     : i_regs[i].dat.t
+                }
+            };
+        end
+    end
     // execute
     generate
         logic       [`NUM_FU_MULT-1:0] tmp_out_vld;
@@ -243,17 +300,17 @@ module mul_ex(
                 .clock  (clock),
                 .reset  (reset),
                 .flush  (flush),
-                .in_vld (en[i]),
+                .in_vld (i_vld[i]),
                 .out_rdy(cpl_buf_rdy[i]),
-                .dst_in (ops.dst[i]),
-                .rs1    (ops.rs1[i]),
-                .rs2    (ops.rs2[i]),
-                .func   (ops.func[i]),
+                .dst_in (ops[i].dst),
+                .rs1    (ops[i].rs1),
+                .rs2    (ops[i].rs2),
+                .func   (ops[i].func),
 
                 // Output
                 .dst_out(tmp_dst[i]),
                 .result (tmp_res[i]),
-                .in_rdy (ex_rdy[i]),
+                .in_rdy (i_rdy[i]),
                 .out_vld(tmp_out_vld[i])
             );
 
@@ -278,9 +335,9 @@ module mul_ex(
                 .i_dat (tmp_data[i]),
                 .i_rdy (cpl_buf_rdy[i]),
 
-                .o_vld (vld[i]),
-                .o_rdy (cpl_gnt[i]),
-                .o_dat (cands[i])
+                .o_vld (o_vld[i]),
+                .o_rdy (o_rdy[i]),
+                .o_dat (o_cands[i])
 
             );
            
@@ -306,18 +363,23 @@ module stage_ex_p4 (
 
     // <FU>_ins: staging; where just-issued insns wait for 1 cycle to pull their operands
     struct packed {
-        LOGIC_BY_FU     rdy;
-        LOGIC_BY_FU     vld;
+        LOGIC_BY_FU     i_rdy;
+        LOGIC_BY_FU     o_vld;
         struct packed {
             ID_ALU_VIEW [`NUM_FU_ALU-1:0]   alu;
             ID_MUL_VIEW [`NUM_FU_MULT-1:0]  mul;
         } dat;
-    } ins;
+    } iss;
 
-    logic [`NUM_FU_ALU-1:0]     alu_ops_rdy;
-    logic [`NUM_FU_MULT-1:0]    mul_ops_rdy;
-    logic [`NUM_FU_ALU-1:0]     alu_in2ops_en;
-    logic [`NUM_FU_MULT-1:0]    mul_in2ops_en;
+    struct packed {
+        LOGIC_BY_FU i_rdy;
+        LOGIC_BY_FU o_vld;
+        struct packed {
+            ALU_OPS [`NUM_FU_ALU-1:0]   alu; // TODO: unused
+            MUL_OPS [`NUM_FU_MULT-1:0]  mul; // TODO: unused
+        } dat;
+    } regs;
+    
     generate
         /* Staging buffers (sbufs):
 
@@ -332,8 +394,6 @@ module stage_ex_p4 (
         */
         // TODO: Make these into FIFOs with only the subset of fields needed
         // for the ALU type. Conserve space.
-        assign alu_in2ops_en = ins.vld.alu & alu_ops_rdy;
-        assign mul_in2ops_en = ins.vld.mul & mul_ops_rdy;
         ID_ALU_VIEW tmp_alu_el[`NUM_FU_ALU-1:0];
         ID_MUL_VIEW tmp_mul_el[`NUM_FU_MULT-1:0];
 
@@ -364,12 +424,12 @@ module stage_ex_p4 (
                 .flush (flush),
 
                 .i_vld (rs_in.fu_vld_alu[i]),
-                .i_rdy (ins.rdy.alu[i]),
+                .i_rdy (iss.i_rdy.alu[i]),
                 .i_dat (tmp_alu_el[i]),
 
-                .o_vld (ins.vld.alu[i]),
-                .o_rdy (alu_in2ops_en[i]),
-                .o_dat (ins.dat.alu[i])
+                .o_vld (iss.o_vld.alu[i]),
+                .o_rdy (regs.i_rdy.alu[i]),
+                .o_dat (iss.dat.alu[i])
             );
         end
         
@@ -389,31 +449,13 @@ module stage_ex_p4 (
                 .flush (flush),
 
                 .i_vld (rs_in.fu_vld_mult[i]),
-                .i_rdy (ins.rdy.mul[i]),
+                .i_rdy (iss.i_rdy.mul[i]),
                 .i_dat (tmp_mul_el[i]),
 
-                .o_vld (ins.vld.mul[i]),
-                .o_rdy (mul_in2ops_en[i]),
-                .o_dat (ins.dat.mul[i])
+                .o_vld (iss.o_vld.mul[i]),
+                .o_rdy (regs.i_rdy.mul[i]),
+                .o_dat (iss.dat.mul[i])
             );
-            // fifo #(
-            //     .DEPTH(2),
-            //     .WIDTH($bits(ID_MUL_VIEW)),
-            //     .NUM_RPORTS(1),
-            //     .NUM_WPORTS(1),
-            //     .ENABLE_INTR_FWD(`FALSE)
-            // ) s_buf (
-            //     .clock      (clock),
-            //     .reset      (reset),
-            //     .flush      (flush),
-            //     .wr_en_cnt  (rs_in.fu_vld_mult[i]),
-            //     .wr_data    (tmp_mul_el[i]),
-            //     .rd_en_cnt  (mul_in2ops_en[i]),
-            //     .rd_data    (ins.dat.mul[i]),
-
-            //     .free_scnt  (ins.rdy.mul[i]),
-            //     .used_scnt  (ins.vld.mul[i])
-            // );
         end
     endgenerate
 
@@ -425,87 +467,86 @@ module stage_ex_p4 (
     */
     always_comb begin
         prf_out = '0;
-        foreach (alu_in2ops_en[i]) begin
-            if (!alu_in2ops_en[i])
-                continue;
-            prf_out.s_en1s.alu[i]   = 1;
-            prf_out.s_en2s.alu[i]   = 1;
-            prf_out.s_t1s.alu[i]    = ins.dat.alu[i].t1; 
-            prf_out.s_t2s.alu[i]    = ins.dat.alu[i].t2; 
+        foreach (iss.o_vld.alu[i]) begin
+            prf_out.s_en1s.alu[i]   = iss.o_vld.alu[i];
+            prf_out.s_en2s.alu[i]   = iss.o_vld.alu[i];
+            prf_out.s_t1s.alu[i]    = iss.dat.alu[i].t1; 
+            prf_out.s_t2s.alu[i]    = iss.dat.alu[i].t2; 
         end
-        foreach (mul_in2ops_en[i]) begin
-            if (!mul_in2ops_en[i])
-                continue;
-            prf_out.s_en1s.mul[i]   = 1;
-            prf_out.s_en2s.mul[i]   = 1;
-            prf_out.s_t1s.mul[i]    = ins.dat.mul[i].t1; 
-            prf_out.s_t2s.mul[i]    = ins.dat.mul[i].t2; 
+        foreach (iss.o_vld.mul[i]) begin
+            prf_out.s_en1s.mul[i]   = iss.o_vld.mul[i];
+            prf_out.s_en2s.mul[i]   = iss.o_vld.mul[i];
+            prf_out.s_t1s.mul[i]    = iss.dat.mul[i].t1; 
+            prf_out.s_t2s.mul[i]    = iss.dat.mul[i].t2; 
         end
     end
 
-    // receive/decode operands from PRF
-    ALU_OPS alu_ops, alu_ops_n;
-    MUL_OPS mul_ops, mul_ops_n;
+    ALU_REGS_EX [`NUM_FU_ALU-1:0]   alu_regs;
+    ALU_REGS_EX [`NUM_FU_ALU-1:0]   tmp_alu_regs;
+    MUL_REGS_EX [`NUM_FU_MULT-1:0]  mul_regs;
+    MUL_REGS_EX [`NUM_FU_MULT-1:0]  tmp_mul_regs;
 
-    logic [`NUM_FU_ALU-1:0]     alu_ex_rdy;
-    logic [`NUM_FU_MULT-1:0]    mul_ex_rdy;
+    struct packed {
+        LOGIC_BY_FU i_rdy;
+        LOGIC_BY_FU o_vld;
+    } ex;
     always_comb begin
-        alu_ops_n = '0;
-        foreach(alu_in2ops_en[i]) begin
-            if(!alu_in2ops_en[i]) 
-                continue;
-            alu_ops_n.rs1[i] = prf_in.s_v1s.alu[i];
-            alu_ops_n.rs2[i] = prf_in.s_v2s.alu[i];
-
-            // ALU opA mux
-            case (ins.dat.alu[i].opa_select)
-                OPA_IS_RS1:  alu_ops_n.opa[i] = prf_in.s_v1s.alu[i];
-                OPA_IS_NPC:  alu_ops_n.opa[i] = ins.dat.alu[i].NPC;
-                OPA_IS_PC:   alu_ops_n.opa[i] = ins.dat.alu[i].PC;
-                OPA_IS_ZERO: alu_ops_n.opa[i] = 0;
-                default:     alu_ops_n.opa[i]= 32'hdeadface; // dead face
-            endcase
-
-            // ALU opB mux
-            case (ins.dat.alu[i].opb_select)
-                OPB_IS_RS2:   alu_ops_n.opb[i] =  prf_in.s_v2s.alu[i];
-                OPB_IS_I_IMM: alu_ops_n.opb[i] = `RV32_signext_Iimm(ins.dat.alu[i].inst);
-                OPB_IS_S_IMM: alu_ops_n.opb[i] = `RV32_signext_Simm(ins.dat.alu[i].inst);
-                OPB_IS_B_IMM: alu_ops_n.opb[i] = `RV32_signext_Bimm(ins.dat.alu[i].inst);
-                OPB_IS_U_IMM: alu_ops_n.opb[i] = `RV32_signext_Uimm(ins.dat.alu[i].inst);
-                OPB_IS_J_IMM: alu_ops_n.opb[i] = `RV32_signext_Jimm(ins.dat.alu[i].inst);
-                default:      alu_ops_n.opb[i] = 32'hfacefeed; // face feed
-            endcase
-
-            alu_ops_n.bsy[i]         = ins.vld.alu[i] | (alu_ops.bsy & ~alu_ex_rdy);
-            alu_ops_n.alu_func[i]    = ins.dat.alu[i].alu_func;
-            alu_ops_n.branch_func[i] = ins.dat.alu[i].inst.b.funct3;
-            alu_ops_n.t[i]           = ins.dat.alu[i].t;
-            alu_ops_n.rob_idx[i]     = ins.dat.alu[i].rob_idx;
-            alu_ops_n.btq_idx[i]     = ins.dat.alu[i].btq_idx;
-            alu_ops_n.cond_branch[i]        = ins.dat.alu[i].cond_branch;
-            alu_ops_n.uncond_branch[i]      = ins.dat.alu[i].uncond_branch;
+        foreach (iss.o_vld.alu[i]) begin
+            tmp_alu_regs[i] = '{
+                rs1 : prf_in.s_v1s.alu[i],
+                rs2 : prf_in.s_v2s.alu[i],
+                dat : iss.dat.alu[i]
+            };
         end
-
-        mul_ops_n = '0;
-        foreach (mul_in2ops_en[i]) begin
-            if (!mul_in2ops_en[i])
-                continue;
-            mul_ops_n.bsy[i] = ins.vld.mul[i] | (mul_ops.bsy & ~mul_ex_rdy);
-            mul_ops_n.rs1[i] = prf_in.s_v1s.mul[i];
-            mul_ops_n.rs2[i] = prf_in.s_v2s.mul[i];
-            mul_ops_n.func[i] = ins.dat.mul[i].func;
-            mul_ops_n.dst[i] = '{
-                rob_idx : ins.dat.mul[i].rob_idx,
-                tag     : ins.dat.mul[i].t
+        foreach (iss.o_vld.mul[i]) begin
+            tmp_mul_regs[i] = '{
+                rs1 : prf_in.s_v1s.mul[i],
+                rs2 : prf_in.s_v2s.mul[i],
+                dat : iss.dat.mul[i]
             };
         end
     end
 
+    generate
+        for (genvar i = 0; i < `NUM_FU_ALU; ++i) begin : gen_alu_rbufs
+            ppln_skid #(
+                .WIDTH($bits(ALU_REGS_EX))
+            ) rbuf (
+                .clock (clock),
+                .reset (reset),
+                .flush (flush),
+
+                .i_vld (iss.o_vld.alu[i]),
+                .i_rdy (regs.i_rdy.alu[i]),
+                .i_dat (tmp_alu_regs[i]),
+
+                .o_vld (regs.o_vld.alu[i]),
+                .o_rdy (ex.i_rdy.alu[i]),
+                .o_dat (alu_regs[i])
+            );
+        end
+
+        for (genvar i = 0; i < `NUM_FU_MULT; ++i) begin : gen_mul_rbufs
+            ppln_skid #(
+                .WIDTH($bits(MUL_REGS_EX))
+            ) rbuf (
+                .clock (clock),
+                .reset (reset),
+                .flush (flush),
+
+                .i_vld (iss.o_vld.mul[i]),
+                .i_rdy (regs.i_rdy.mul[i]),
+                .i_dat (tmp_mul_regs[i]),
+
+                .o_vld (regs.o_vld.mul[i]),
+                .o_rdy (regs.i_rdy.mul[i]),
+                .o_dat (mul_regs[i])
+            );
+        end
+    endgenerate
+
 
     // structure results into generic cdb candidates array
-    LOGIC_BY_FU vld;
-
     CPL_CAND_BY_FU cands;
     CPL_CAND [`NUM_FU_TOTAL-1:0] cands_flat;
     assign cands_flat = cands;
@@ -513,55 +554,48 @@ module stage_ex_p4 (
     logic [`N-1:0][`NUM_FU_TOTAL-1:0] cdb2fu_gbus;
     LOGIC_BY_FU cpl_gnt;
 
-    logic [`NUM_FU_ALU-1:0] alu_ops2ex_en;
-    assign alu_ops2ex_en = alu_ops.bsy & alu_ex_rdy;
     alu_ex alu_ex0 (
         .clock  (clock),
         .reset  (reset),
         .flush  (flush),
 
-        .en     (alu_ops2ex_en),
-        .ops    (alu_ops),
-        .ex_rdy (alu_ex_rdy),
+        .i_vld  (regs.o_vld.alu),
+        .i_regs (alu_regs),
+        .i_rdy  (ex.i_rdy.alu),
 
-        .vld    (vld.alu),
-        .cands  (cands.alu),
-        .cpl_gnt(cpl_gnt.alu)
+        .o_vld  (ex.o_vld.alu),
+        .o_cands(cands.alu),
+        .o_rdy  (cpl_gnt.alu)
     );
 
-    logic [`NUM_FU_MULT-1:0] mul_ops2ex_en;
-    assign mul_ops2ex_en = mul_ops.bsy & mul_ex_rdy;
     mul_ex mul_ex0 (
         .clock  (clock),
         .reset  (reset),
         .flush  (flush),
 
-        .en     (mul_ops2ex_en),
-        .ops    (mul_ops),
-        .ex_rdy (mul_ex_rdy),
+        .i_vld  (regs.o_vld.mul),
+        .i_regs (mul_regs),
+        .i_rdy  (ex.i_rdy.mul),
 
-        .vld    (vld.mul),
-        .cands  (cands.mul),
-        .cpl_gnt(cpl_gnt.mul)
+        .o_vld  (ex.o_vld.mul),
+        .o_cands(cands.mul),
+        .o_rdy  (cpl_gnt.mul)
     );
 
     psel_gen #(
         .WIDTH(`NUM_FU_TOTAL),
         .REQS(`N)
     ) sel_cpl (
-        .req(vld),      // flatten (alu + mul bits) => single [NUM_FU_TOTAL-1:0] bus
+        .req(ex.o_vld), // flatten (alu + mul bits) => single [NUM_FU_TOTAL-1:0] bus
         .gnt(cpl_gnt),  // flatten => single bus
         .gnt_bus(cdb2fu_gbus)
     );
 
     execute2complete c_out_n;
     always_comb begin
-        alu_ops_rdy = ~alu_ops.bsy | alu_ex_rdy;
-        mul_ops_rdy = ~mul_ops.bsy | mul_ex_rdy;
-
         rs_out = '{
-            fu_rdy_alu      : ins.rdy.alu,
-            fu_rdy_mult     : ins.rdy.mul,
+            fu_rdy_alu      : iss.i_rdy.alu,
+            fu_rdy_mult     : iss.i_rdy.mul,
             fu_rdy_load     : '0,
             fu_rdy_store    : '0
         };
@@ -584,12 +618,8 @@ module stage_ex_p4 (
 
     always_ff @(posedge clock) begin
         if (reset || flush) begin
-            alu_ops     <= '0;
-            mul_ops     <= '0;
             c_out       <= '0;
         end else begin
-            alu_ops     <= alu_ops_n;
-            mul_ops     <= mul_ops_n;
             /*
             We buffer c_out for 1 cycle to break the comb. chain...
             cpl_buf.used_scnt(vld) -> psel_gen(vld) -> cpl_buf.rd_en_cnt(cpl_gnt)
@@ -615,60 +645,72 @@ module stage_ex_p4 (
             for (int i = 0; i < `NUM_FU_ALU; ++i) begin
                 $display("alu_ins[%0d]: rdy: %b, vld: %b, t: %2d, t1: %2d, t2: %2d, rob_idx: %2d, btq_idx: %2d, inst: 0x%x, PC: 0x%x, NPC: 0x%x, cond_branch: %b, uncond_branch: %b",
                     i,
-                    ins.rdy.alu[i],
-                    ins.vld.alu[i],
-                    ins.dat.alu[i].t,
-                    ins.dat.alu[i].t1,
-                    ins.dat.alu[i].t2,
-                    ins.dat.alu[i].rob_idx,
-                    ins.dat.alu[i].btq_idx,
-                    ins.dat.alu[i].inst,
-                    ins.dat.alu[i].PC,
-                    ins.dat.alu[i].NPC,
-                    ins.dat.alu[i].cond_branch,
-                    ins.dat.alu[i].uncond_branch
+                    iss.i_rdy.alu[i],
+                    iss.o_vld.alu[i],
+                    iss.dat.alu[i].t,
+                    iss.dat.alu[i].t1,
+                    iss.dat.alu[i].t2,
+                    iss.dat.alu[i].rob_idx,
+                    iss.dat.alu[i].btq_idx,
+                    iss.dat.alu[i].inst,
+                    iss.dat.alu[i].PC,
+                    iss.dat.alu[i].NPC,
+                    iss.dat.alu[i].cond_branch,
+                    iss.dat.alu[i].uncond_branch
                 );
             end
 
             for (int i = 0; i < `NUM_FU_MULT; ++i) begin
                 $display("mul_ins[%0d]: rdy: %b, vld: %b, t: %2d, t1: %2d, t2: %2d, rob_idx: %2d, func: 0x%x",
                     i,
-                    ins.rdy.mul[i],
-                    ins.vld.mul[i],
-                    ins.dat.mul[i].t,
-                    ins.dat.mul[i].t1,
-                    ins.dat.mul[i].t2,
-                    ins.dat.mul[i].rob_idx,
-                    ins.dat.mul[i].func
+                    iss.i_rdy.mul[i],
+                    iss.o_vld.mul[i],
+                    iss.dat.mul[i].t,
+                    iss.dat.mul[i].t1,
+                    iss.dat.mul[i].t2,
+                    iss.dat.mul[i].rob_idx,
+                    iss.dat.mul[i].func
                 );
             end
 
             for (int i = 0; i < `NUM_FU_ALU; ++i) begin
-                $display("alu_ops[%0d]: bsy: %b, opa: 0x%x, opb: 0x%x, alu_func: %b, branch_func: %b, cond_branch: %b, uncond_branch: %b, t: %2d, rob_idx: %2d, btq_idx: %2d",
+                $display("alu_regs[%0d]: bsy: %b, rs1: 0x%x, rs2: 0x%x",
                     i,
-                    alu_ops.bsy[i],
-                    alu_ops.opa[i],
-                    alu_ops.opb[i],
-                    alu_ops.alu_func[i],
-                    alu_ops.branch_func[i],
-                    alu_ops.cond_branch[i],
-                    alu_ops.uncond_branch[i],
-                    alu_ops.t[i],
-                    alu_ops.rob_idx[i],
-                    alu_ops.btq_idx[i]
+                    regs.o_vld.alu[i],
+                    alu_regs[i].rs1,
+                    alu_regs[i].rs2
                 );
+                // $display("alu_regs[%0d]: bsy: %b, opa: 0x%x, opb: 0x%x, alu_func: %b, branch_func: %b, cond_branch: %b, uncond_branch: %b, t: %2d, rob_idx: %2d, btq_idx: %2d",
+                //     i,
+                //     regs.o_vld.alu[i],
+                //     alu_regs[i].opa,
+                //     alu_regs[i].opb,
+                //     alu_regs[i].alu_func,
+                //     alu_regs[i].branch_func,
+                //     alu_regs[i].cond_branch,
+                //     alu_regs[i].uncond_branch,
+                //     alu_regs[i].t,
+                //     alu_regs[i].rob_idx,
+                //     alu_regs[i].btq_idx
+                // );
             end
 
             for (int i = 0; i < `NUM_FU_MULT; ++i) begin
-                $display("mul_ops[%0d]: bsy: %b, rs1: 0x%x, rs2: 0x%x, func: %b, t: %2d, rob_idx: %2d",
+                $display("mul_regs[%0d]: bsy: %b, rs1: 0x%x, rs2: 0x%x",
                     i,
-                    mul_ops.bsy[i],
-                    mul_ops.rs1[i],
-                    mul_ops.rs2[i],
-                    mul_ops.func[i],
-                    mul_ops.dst[i].tag,
-                    mul_ops.dst[i].rob_idx
+                    regs.o_vld.mul[i],
+                    mul_regs[i].rs1,
+                    mul_regs[i].rs2
                 );
+                // $display("mul_regs[%0d]: bsy: %b, rs1: 0x%x, rs2: 0x%x, func: %b, t: %2d, rob_idx: %2d",
+                //     i,
+                //     regs.o_vld.mul[i],
+                //     mul_regs[i].rs1,
+                //     mul_regs[i].rs2,
+                //     mul_regs[i].func,
+                //     mul_regs[i].dst.tag,
+                //     mul_regs[i].dst.rob_idx
+                // );
             end
 
             $display("c_out: rdy_alu: %b  rdy_mult: %b  rdy_store: %b  rdy_load: %b  cpl_gnt: %b",
