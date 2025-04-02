@@ -316,7 +316,11 @@ module stage_ex_p4 (
 
     struct packed {
         LOGIC_BY_FU i_rdy;
-        LOGIC_BY_FU o_vld; // TODO: unused
+        LOGIC_BY_FU o_vld;
+        struct packed {
+            ALU_OPS [`NUM_FU_ALU-1:0]   alu; // TODO: unused
+            MUL_OPS [`NUM_FU_MULT-1:0]  mul; // TODO: unused
+        } dat;
     } ops;
     
     LOGIC_BY_FU iss2ops_en;
@@ -477,7 +481,7 @@ module stage_ex_p4 (
                 default:      alu_ops_n.opb[i] = 32'hfacefeed; // face feed
             endcase
 
-            alu_ops_n.bsy[i]         = iss.o_vld.alu[i] | (alu_ops.bsy & ~ex.i_rdy.alu);
+            alu_ops_n.bsy[i]         = iss.o_vld.alu[i] | (ops.o_vld.alu & ~ex.i_rdy.alu);
             alu_ops_n.alu_func[i]    = iss.dat.alu[i].alu_func;
             alu_ops_n.branch_func[i] = iss.dat.alu[i].inst.b.funct3;
             alu_ops_n.t[i]           = iss.dat.alu[i].t;
@@ -491,7 +495,7 @@ module stage_ex_p4 (
         foreach (iss2ops_en.mul[i]) begin
             if (!iss2ops_en.mul[i])
                 continue;
-            mul_ops_n.bsy[i] = iss.o_vld.mul[i] | (mul_ops.bsy & ~ex.i_rdy.mul);
+            mul_ops_n.bsy[i] = iss.o_vld.mul[i] | (ops.o_vld.mul & ~ex.i_rdy.mul);
             mul_ops_n.rs1[i] = prf_in.s_v1s.mul[i];
             mul_ops_n.rs2[i] = prf_in.s_v2s.mul[i];
             mul_ops_n.func[i] = iss.dat.mul[i].func;
@@ -512,7 +516,7 @@ module stage_ex_p4 (
     LOGIC_BY_FU cpl_gnt;
 
     LOGIC_BY_FU ops2ex_en;
-    assign ops2ex_en.alu = alu_ops.bsy & ex.i_rdy.alu;
+    assign ops2ex_en.alu = ops.o_vld.alu & ex.i_rdy.alu;
     alu_ex alu_ex0 (
         .clock  (clock),
         .reset  (reset),
@@ -527,7 +531,7 @@ module stage_ex_p4 (
         .cpl_gnt(cpl_gnt.alu)
     );
 
-    assign ops2ex_en.mul = mul_ops.bsy & ex.i_rdy.mul;
+    assign ops2ex_en.mul = ops.o_vld.mul & ex.i_rdy.mul;
     mul_ex mul_ex0 (
         .clock  (clock),
         .reset  (reset),
@@ -553,8 +557,8 @@ module stage_ex_p4 (
 
     execute2complete c_out_n;
     always_comb begin
-        ops.i_rdy.alu = ~alu_ops.bsy | ex.i_rdy.alu;
-        ops.i_rdy.mul = ~mul_ops.bsy | ex.i_rdy.mul;
+        ops.i_rdy.alu = ~ops.o_vld.alu | ex.i_rdy.alu;
+        ops.i_rdy.mul = ~ops.o_vld.mul | ex.i_rdy.mul;
 
         rs_out = '{
             fu_rdy_alu      : iss.i_rdy.alu,
@@ -583,10 +587,14 @@ module stage_ex_p4 (
         if (reset || flush) begin
             alu_ops     <= '0;
             mul_ops     <= '0;
+            ops.o_vld.alu <= '0;
+            ops.o_vld.mul <= '0;
             c_out       <= '0;
         end else begin
             alu_ops     <= alu_ops_n;
             mul_ops     <= mul_ops_n;
+            ops.o_vld.alu <= alu_ops_n.bsy;
+            ops.o_vld.mul <= mul_ops_n.bsy;
             /*
             We buffer c_out for 1 cycle to break the comb. chain...
             cpl_buf.used_scnt(vld) -> psel_gen(vld) -> cpl_buf.rd_en_cnt(cpl_gnt)
@@ -643,7 +651,7 @@ module stage_ex_p4 (
             for (int i = 0; i < `NUM_FU_ALU; ++i) begin
                 $display("alu_ops[%0d]: bsy: %b, opa: 0x%x, opb: 0x%x, alu_func: %b, branch_func: %b, cond_branch: %b, uncond_branch: %b, t: %2d, rob_idx: %2d, btq_idx: %2d",
                     i,
-                    alu_ops.bsy[i],
+                    ops.o_vld.alu[i],
                     alu_ops.opa[i],
                     alu_ops.opb[i],
                     alu_ops.alu_func[i],
@@ -659,7 +667,7 @@ module stage_ex_p4 (
             for (int i = 0; i < `NUM_FU_MULT; ++i) begin
                 $display("mul_ops[%0d]: bsy: %b, rs1: 0x%x, rs2: 0x%x, func: %b, t: %2d, rob_idx: %2d",
                     i,
-                    mul_ops.bsy[i],
+                    ops.o_vld.mul[i],
                     mul_ops.rs1[i],
                     mul_ops.rs2[i],
                     mul_ops.func[i],
