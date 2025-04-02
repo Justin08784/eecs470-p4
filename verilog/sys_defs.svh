@@ -961,7 +961,7 @@ typedef struct packed {
 
 typedef struct packed {
     logic       [`NUM_FU_STORE-1:0] ld_ex_en;
-    LSQ_IDX     [`NUM_FU_STORE-1:0] ld_sq_idx;
+    LSQ_IDX     [`NUM_FU_STORE-1:0] ld_lq_idx;
     ADDR        [`NUM_FU_STORE-1:0] ld_addr;
     MEM_SIZE    [`NUM_FU_STORE-1:0] ld_mem_size; //MEM_SIZE'(id_ex_reg.inst.r.funct3[1:0]); <-- HOW TO FIND THIS. DO THIS WHEN PUTTING ENTRY IN FROM DISPATCH OR FROM EXECUTE
 } execute2lq;

@@ -16,7 +16,7 @@ module lq #(parameter
     input flush,
 
     input dispatch2lq dis_2_lq,
-    // input execute2lq exec_2_lq,
+    input execute2lq exec_2_lq,
     input rob2lq rob_2_lq,
     // input MEM_TAG mem2proc_transaction_tag,
 
@@ -68,8 +68,8 @@ module lq #(parameter
 
         //handle LSQ CDB to RS
         // lsq_2_rs <= '{
-        //     en : exec_2_lsq.st_ex_en,
-        //     sq_idx_cdb     : exec_2_lsq.st_sq_idx
+        //     en : exec_2_lq.st_ex_en,
+        //     sq_idx_cdb     : exec_2_lq.st_sq_idx
         // };
 
         //handle lsq to ROB for retirement
@@ -96,16 +96,16 @@ module lq #(parameter
             tail_dbl <= (tail_dbl + dis_2_lq.lq_d_en_cnt) % LSQ_SZ_DBL;
             
             // handle execute updates
-            // for (int unsigned i = 0, int cur_idx = 0; i < NUM_ST_PORTS; ++i) begin
-            //     cur_idx = exec_2_lsq.st_sq_idx[i];
+            for (int unsigned i = 0, int cur_idx = 0; i < NUM_ST_PORTS; ++i) begin
+                cur_idx = exec_2_lq.ld_lq_idx[i];
 
-            //     if (exec_2_lsq.st_ex_en[i]) begin
-            //         state[cur_idx].addr <= exec_2_lsq.st_addr[i];
-            //         state[cur_idx].mem_size <= exec_2_lsq.st_mem_size[i];
-            //         state[cur_idx].d_vld <= '1;
-            //     end
+                if (exec_2_lq.ld_ex_en[i]) begin
+                    state[cur_idx].addr <= exec_2_lq.ld_addr[i];
+                    state[cur_idx].mem_size <= exec_2_lq.ld_mem_size[i];
+                    state[cur_idx].d_vld <= '1;
+                end
 
-            // end
+            end
 
             // handle dispatch (ins)
             // $display("d_en_cnt: %d", d_in.d_en_cnt);
