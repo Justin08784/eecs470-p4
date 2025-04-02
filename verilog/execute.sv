@@ -306,8 +306,8 @@ module stage_ex_p4 (
 
     // <FU>_ins: staging; where just-issued insns wait for 1 cycle to pull their operands
     struct packed {
-        LOGIC_BY_FU     rdy;
-        LOGIC_BY_FU     vld;
+        LOGIC_BY_FU     i_rdy;
+        LOGIC_BY_FU     o_vld;
         struct packed {
             ID_ALU_VIEW [`NUM_FU_ALU-1:0]   alu;
             ID_MUL_VIEW [`NUM_FU_MULT-1:0]  mul;
@@ -315,10 +315,12 @@ module stage_ex_p4 (
     } iss;
 
     struct packed {
-        LOGIC_BY_FU rdy;
-        LOGIC_BY_FU vld;
+        LOGIC_BY_FU i_rdy;
+        LOGIC_BY_FU o_vld; // TODO: unused
     } ops;
+    
     LOGIC_BY_FU iss2ops_en;
+    assign iss2ops_en = iss.o_vld & ops.i_rdy;
     generate
         /* Staging buffers (sbufs):
 
@@ -333,8 +335,6 @@ module stage_ex_p4 (
         */
         // TODO: Make these into FIFOs with only the subset of fields needed
         // for the ALU type. Conserve space.
-        assign iss2ops_en.alu = iss.vld.alu & ops.rdy.alu;
-        assign iss2ops_en.mul = iss.vld.mul & ops.rdy.mul;
         ID_ALU_VIEW tmp_alu_el[`NUM_FU_ALU-1:0];
         ID_MUL_VIEW tmp_mul_el[`NUM_FU_MULT-1:0];
 
@@ -365,10 +365,10 @@ module stage_ex_p4 (
                 .flush (flush),
 
                 .i_vld (rs_in.fu_vld_alu[i]),
-                .i_rdy (iss.rdy.alu[i]),
+                .i_rdy (iss.i_rdy.alu[i]),
                 .i_dat (tmp_alu_el[i]),
 
-                .o_vld (iss.vld.alu[i]),
+                .o_vld (iss.o_vld.alu[i]),
                 .o_rdy (iss2ops_en.alu[i]),
                 .o_dat (iss.dat.alu[i])
             );
@@ -390,10 +390,10 @@ module stage_ex_p4 (
                 .flush (flush),
 
                 .i_vld (rs_in.fu_vld_mult[i]),
-                .i_rdy (iss.rdy.mul[i]),
+                .i_rdy (iss.i_rdy.mul[i]),
                 .i_dat (tmp_mul_el[i]),
 
-                .o_vld (iss.vld.mul[i]),
+                .o_vld (iss.o_vld.mul[i]),
                 .o_rdy (iss2ops_en.mul[i]),
                 .o_dat (iss.dat.mul[i])
             );
@@ -445,8 +445,10 @@ module stage_ex_p4 (
     ALU_OPS alu_ops, alu_ops_n;
     MUL_OPS mul_ops, mul_ops_n;
 
-    logic [`NUM_FU_ALU-1:0]     alu_ex_rdy;
-    logic [`NUM_FU_MULT-1:0]    mul_ex_rdy;
+    struct packed {
+        LOGIC_BY_FU i_rdy;
+        LOGIC_BY_FU o_vld;
+    } ex;
     always_comb begin
         alu_ops_n = '0;
         foreach(iss2ops_en.alu[i]) begin
@@ -475,7 +477,7 @@ module stage_ex_p4 (
                 default:      alu_ops_n.opb[i] = 32'hfacefeed; // face feed
             endcase
 
-            alu_ops_n.bsy[i]         = iss.vld.alu[i] | (alu_ops.bsy & ~alu_ex_rdy);
+            alu_ops_n.bsy[i]         = iss.o_vld.alu[i] | (alu_ops.bsy & ~ex.i_rdy.alu);
             alu_ops_n.alu_func[i]    = iss.dat.alu[i].alu_func;
             alu_ops_n.branch_func[i] = iss.dat.alu[i].inst.b.funct3;
             alu_ops_n.t[i]           = iss.dat.alu[i].t;
@@ -489,7 +491,7 @@ module stage_ex_p4 (
         foreach (iss2ops_en.mul[i]) begin
             if (!iss2ops_en.mul[i])
                 continue;
-            mul_ops_n.bsy[i] = iss.vld.mul[i] | (mul_ops.bsy & ~mul_ex_rdy);
+            mul_ops_n.bsy[i] = iss.o_vld.mul[i] | (mul_ops.bsy & ~ex.i_rdy.mul);
             mul_ops_n.rs1[i] = prf_in.s_v1s.mul[i];
             mul_ops_n.rs2[i] = prf_in.s_v2s.mul[i];
             mul_ops_n.func[i] = iss.dat.mul[i].func;
@@ -502,8 +504,6 @@ module stage_ex_p4 (
 
 
     // structure results into generic cdb candidates array
-    LOGIC_BY_FU vld;
-
     CPL_CAND_BY_FU cands;
     CPL_CAND [`NUM_FU_TOTAL-1:0] cands_flat;
     assign cands_flat = cands;
@@ -511,34 +511,33 @@ module stage_ex_p4 (
     logic [`N-1:0][`NUM_FU_TOTAL-1:0] cdb2fu_gbus;
     LOGIC_BY_FU cpl_gnt;
 
-    logic [`NUM_FU_ALU-1:0] alu_ops2ex_en;
-    assign alu_ops2ex_en = alu_ops.bsy & alu_ex_rdy;
+    LOGIC_BY_FU ops2ex_en;
+    assign ops2ex_en.alu = alu_ops.bsy & ex.i_rdy.alu;
     alu_ex alu_ex0 (
         .clock  (clock),
         .reset  (reset),
         .flush  (flush),
 
-        .en     (alu_ops2ex_en),
+        .en     (ops2ex_en.alu),
         .ops    (alu_ops),
-        .ex_rdy (alu_ex_rdy),
+        .ex_rdy (ex.i_rdy.alu),
 
-        .vld    (vld.alu),
+        .vld    (ex.o_vld.alu),
         .cands  (cands.alu),
         .cpl_gnt(cpl_gnt.alu)
     );
 
-    logic [`NUM_FU_MULT-1:0] mul_ops2ex_en;
-    assign mul_ops2ex_en = mul_ops.bsy & mul_ex_rdy;
+    assign ops2ex_en.mul = mul_ops.bsy & ex.i_rdy.mul;
     mul_ex mul_ex0 (
         .clock  (clock),
         .reset  (reset),
         .flush  (flush),
 
-        .en     (mul_ops2ex_en),
+        .en     (ops2ex_en.mul),
         .ops    (mul_ops),
-        .ex_rdy (mul_ex_rdy),
+        .ex_rdy (ex.i_rdy.mul),
 
-        .vld    (vld.mul),
+        .vld    (ex.o_vld.mul),
         .cands  (cands.mul),
         .cpl_gnt(cpl_gnt.mul)
     );
@@ -547,19 +546,19 @@ module stage_ex_p4 (
         .WIDTH(`NUM_FU_TOTAL),
         .REQS(`N)
     ) sel_cpl (
-        .req(vld),      // flatten (alu + mul bits) => single [NUM_FU_TOTAL-1:0] bus
+        .req(ex.o_vld), // flatten (alu + mul bits) => single [NUM_FU_TOTAL-1:0] bus
         .gnt(cpl_gnt),  // flatten => single bus
         .gnt_bus(cdb2fu_gbus)
     );
 
     execute2complete c_out_n;
     always_comb begin
-        ops.rdy.alu = ~alu_ops.bsy | alu_ex_rdy;
-        ops.rdy.mul = ~mul_ops.bsy | mul_ex_rdy;
+        ops.i_rdy.alu = ~alu_ops.bsy | ex.i_rdy.alu;
+        ops.i_rdy.mul = ~mul_ops.bsy | ex.i_rdy.mul;
 
         rs_out = '{
-            fu_rdy_alu      : iss.rdy.alu,
-            fu_rdy_mult     : iss.rdy.mul,
+            fu_rdy_alu      : iss.i_rdy.alu,
+            fu_rdy_mult     : iss.i_rdy.mul,
             fu_rdy_load     : '0,
             fu_rdy_store    : '0
         };
@@ -613,8 +612,8 @@ module stage_ex_p4 (
             for (int i = 0; i < `NUM_FU_ALU; ++i) begin
                 $display("alu_ins[%0d]: rdy: %b, vld: %b, t: %2d, t1: %2d, t2: %2d, rob_idx: %2d, btq_idx: %2d, inst: 0x%x, PC: 0x%x, NPC: 0x%x, cond_branch: %b, uncond_branch: %b",
                     i,
-                    iss.rdy.alu[i],
-                    iss.vld.alu[i],
+                    iss.i_rdy.alu[i],
+                    iss.o_vld.alu[i],
                     iss.dat.alu[i].t,
                     iss.dat.alu[i].t1,
                     iss.dat.alu[i].t2,
@@ -631,8 +630,8 @@ module stage_ex_p4 (
             for (int i = 0; i < `NUM_FU_MULT; ++i) begin
                 $display("mul_ins[%0d]: rdy: %b, vld: %b, t: %2d, t1: %2d, t2: %2d, rob_idx: %2d, func: 0x%x",
                     i,
-                    iss.rdy.mul[i],
-                    iss.vld.mul[i],
+                    iss.i_rdy.mul[i],
+                    iss.o_vld.mul[i],
                     iss.dat.mul[i].t,
                     iss.dat.mul[i].t1,
                     iss.dat.mul[i].t2,
