@@ -101,7 +101,6 @@ module lq #(parameter
 
             //     if (exec_2_lsq.st_ex_en[i]) begin
             //         state[cur_idx].addr <= exec_2_lsq.st_addr[i];
-            //         state[cur_idx].data <= exec_2_lsq.st_data[i];
             //         state[cur_idx].mem_size <= exec_2_lsq.st_mem_size[i];
             //         state[cur_idx].d_vld <= '1;
             //     end

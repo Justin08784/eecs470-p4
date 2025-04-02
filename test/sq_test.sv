@@ -15,12 +15,12 @@ module sq_testbench;
     sq2execute sq_2_exec;
     sq2rs sq_2_rs;
 
-    sq2stRET sq_2_ret;
-
-    stRET2sq ret_2_sq;
+    // sq2stRET sq_2_ret;
+    // stRET2sq ret_2_sq;
 
     stRET2mem ret_2_mem;
     MEM_TAG mem2proc_transaction_tag;
+    sq2rob sq_2_rob;
 
     always begin
         #(`CLOCK_PERIOD/2.0);
@@ -44,14 +44,13 @@ module sq_testbench;
         .dis_2_sq(dis_2_sq),
         .exec_2_sq(exec_2_sq),
         .rob_2_sq(rob_2_sq),
-        // .ret_2_sq(ret_2_sq),
+        .mem2proc_transaction_tag(mem2proc_transaction_tag),
 
         .sq_2_dis(sq_2_dis),
         .sq_2_exec(sq_2_exec),
         .sq_2_rs(sq_2_rs),
-        // .sq_2_ret(sq_2_ret),
-        .mem2proc_transaction_tag(mem2proc_transaction_tag),
-        .ret_2_mem(ret_2_mem)
+        .ret_2_mem(ret_2_mem),
+        .sq_2_rob(sq_2_rob)
     );
 
 
