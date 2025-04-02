@@ -9,6 +9,13 @@ typedef struct packed {
     DST             dst;
 } MUL_PKT;
 
+typedef enum logic[1:0] {
+    O_NONE    = 0,
+    O_SKID    = 1,
+    O_PSKID   = 2,
+    O_UNKNOWN = 3
+} OUT_MODE;
+
 // This is a pipelined multiplier that multiplies two 64-bit integers and
 // returns the low 64 bits of the result.
 // This is not an ideal multiplier but is sufficient to allow a faster clock
@@ -28,11 +35,6 @@ module mult (
     output DATA result,
     output DST dst_out
 );
-    MUL_PKT [`MULT_STAGES-2:0] internal_pkts;
-    logic   [`MULT_STAGES-2:0] internal_o_vlds;
-    logic   [`MULT_STAGES-2:0] internal_o_rdys;
-
-
     logic [63:0] i_mcand, i_mplier;
     MUL_PKT i_pkt, o_pkt;
     
@@ -56,14 +58,14 @@ module mult (
         };
     end
     
-    typedef logic [`MULT_STAGES-1:0][$clog2(`MULT_STAGES)-1:0] STAGE_IDXS;
-    function automatic STAGE_IDXS gen_stage_idxs;
-        logic [`MULT_STAGES-1:0][$clog2(`MULT_STAGES)-1:0] idxs;
+    typedef OUT_MODE [`MULT_STAGES-1:0] MODES;
+    function automatic MODES gen_modes;
+        MODES modes;
         for (int i = 0; i < `MULT_STAGES; i++)
-            idxs[i] = i;
-        return idxs;
+            modes[i] = O_SKID;
+        return modes;
     endfunction
-    localparam STAGE_IDXS stage_idxs = gen_stage_idxs();
+    localparam MODES modes = gen_modes();
 
     // instantiate an array of mult_stage modules
     // this uses concatenation syntax for internal wiring, see lab 2 slides
@@ -117,7 +119,7 @@ endmodule // mult
 
 
 module mult_stage #(
-    parameter int unsigned idx = 0
+    parameter MODE = O_SKID
 ) (
     input clock, reset, flush,
     input MUL_PKT   i_dat,
@@ -148,21 +150,57 @@ module mult_stage #(
         };
     end
 
-    skid #(
-        .WIDTH($bits(MUL_PKT))
-    ) skid_0 (
-        .clock(clock),
-        .reset(reset),
-        .flush(flush),
-        
-        .i_vld(i_vld),
-        .i_rdy(i_rdy),
-        .i_dat(tmp_dat),
+    generate
+        case (MODE)
+        O_NONE: begin
+            assign i_rdy = o_rdy;
+            assign o_vld = i_vld;
+            assign o_dat = i_dat;
+        end
 
-        .o_vld(o_vld),
-        .o_rdy(o_rdy),
-        .o_dat(o_dat)
-    );
+        O_SKID: begin
+            skid #(
+                .WIDTH($bits(MUL_PKT))
+            ) skid_0 (
+                .clock(clock),
+                .reset(reset),
+                .flush(flush),
+                
+                .i_vld(i_vld),
+                .i_rdy(i_rdy),
+                .i_dat(tmp_dat),
+
+                .o_vld(o_vld),
+                .o_rdy(o_rdy),
+                .o_dat(o_dat)
+            );
+        end
+
+        O_PSKID: begin
+            ppln_skid #(
+                .WIDTH($bits(MUL_PKT))
+            ) skid_0 (
+                .clock(clock),
+                .reset(reset),
+                .flush(flush),
+                
+                .i_vld(i_vld),
+                .i_rdy(i_rdy),
+                .i_dat(tmp_dat),
+
+                .o_vld(o_vld),
+                .o_rdy(o_rdy),
+                .o_dat(o_dat)
+            );
+        end
+
+        O_UNKNOWN: begin
+            assign i_rdy = 1'bx;
+            assign o_vld = 1'bx;
+            assign o_dat = 1'bx;
+        end
+        endcase
+    endgenerate
 
     `ifdef DEBUG
     always_ff @(posedge clock) begin
