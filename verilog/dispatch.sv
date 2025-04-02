@@ -27,8 +27,8 @@ module dispatch #(parameter
     output  dispatch2free_list free_out,
 
     // LSQ
-    input   lsq2dispatch lsq_in,
-    output  dispatch2lsq lsq_out,
+    input   lq2dispatch lq_in,
+    output  dispatch2lq lq_out,
     
     // BTQ
     input   btq2dispatch btq_in,
@@ -59,7 +59,7 @@ always_comb begin
     
     //assigning output #'s
     decode_out.dispatch_en_cnt  = dispatch_cnt;
-    lsq_out.lsq_d_en_cnt        = dispatch_cnt; //this will likely need to be changed once memory operations are introduced
+    lq_out.lq_d_en_cnt          = dispatch_cnt; //this will likely need to be changed once memory operations are introduced
 end
 
 //logic for free list

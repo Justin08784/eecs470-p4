@@ -480,8 +480,8 @@ module cpu (
         .free_in(fl_2_dispatch),
         .free_out(dispatch_2_fl),
 
-        .lsq_in('0),
-        .lsq_out(),
+        .lq_in('0),
+        .lq_out(),
 
         .btq_in(btq_2_dispatch),
         .btq_out(dispatch_2_btq),
