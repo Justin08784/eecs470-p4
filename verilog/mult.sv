@@ -55,29 +55,55 @@ module mult (
             dst     : dst_in
         };
     end
+    
+    typedef logic [`MULT_STAGES-1:0][$clog2(`MULT_STAGES)-1:0] STAGE_IDXS;
+    function automatic STAGE_IDXS gen_stage_idxs;
+        logic [`MULT_STAGES-1:0][$clog2(`MULT_STAGES)-1:0] idxs;
+        for (int i = 0; i < `MULT_STAGES; i++)
+            idxs[i] = i;
+        return idxs;
+    endfunction
+    localparam STAGE_IDXS stage_idxs = gen_stage_idxs();
 
     // instantiate an array of mult_stage modules
     // this uses concatenation syntax for internal wiring, see lab 2 slides
-    mult_stage mstage [`MULT_STAGES-1:0] (
-        .clock  (clock),
-        .reset  (reset),
-        .flush  (flush),
+    logic   [`MULT_STAGES:0] vlds;
+    logic   [`MULT_STAGES:0] rdys;
+    MUL_PKT [`MULT_STAGES:0] pkts;
 
-        .i_dat  ({internal_pkts, i_pkt}),
-        .o_dat  ({o_pkt, internal_pkts}),
+    always_comb begin
+        vlds[0] = i_vld;
+        i_rdy   = rdys[0];
+        pkts[0] = i_pkt;
 
-        .i_rdy  ({internal_o_rdys,i_rdy}),
-        .i_vld  ({internal_o_vlds,i_vld}), // forward prev done as next start
-        .o_rdy  ({o_rdy,internal_o_rdys}),
-        .o_vld  ({o_vld,internal_o_vlds}) // done when the final stage is done
-    );
+        o_vld               = vlds[`MULT_STAGES];
+        rdys[`MULT_STAGES]  = o_rdy;
+        o_pkt               = pkts[`MULT_STAGES];
+    end
+
+    for (genvar i = 0; i < `MULT_STAGES; i++) begin : gen_stages
+        mult_stage mstage (
+            .clock (clock),
+            .reset (reset),
+            .flush (flush),
+
+            .i_vld(vlds[i]),
+            .i_rdy(rdys[i]),
+            .i_dat(pkts[i]),
+            .o_vld(vlds[i+1]),
+            .o_rdy(rdys[i+1]),
+            .o_dat(pkts[i+1])
+        );
+    end
 
     // Use the high or low bits of the product based on the output func
-    assign result = (o_pkt.func == M_MUL)
-        ? o_pkt.sum[31:0]
-        : o_pkt.sum[63:32];
+    always_comb begin
+        result = (o_pkt.func == M_MUL)
+            ? o_pkt.sum[31:0]
+            : o_pkt.sum[63:32];
     
-    assign dst_out = o_pkt.dst;
+        dst_out = o_pkt.dst;
+    end
 
     `ifdef DEBUG
     always_ff @(posedge clock) begin
@@ -90,7 +116,9 @@ module mult (
 endmodule // mult
 
 
-module mult_stage (
+module mult_stage #(
+    parameter int unsigned idx = 0
+) (
     input clock, reset, flush,
     input MUL_PKT   i_dat,
 
