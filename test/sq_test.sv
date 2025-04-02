@@ -160,6 +160,10 @@ module sq_testbench;
         exec_2_sq.forward_addr[2] = 74;
         exec_2_sq.forward_sq_idx[2] = 3;
         exec_2_sq.forward_mem_size[2] = HALF;
+        exec_2_sq.forward_req_en[3] = 1;
+        exec_2_sq.forward_addr[3] = 73;
+        exec_2_sq.forward_sq_idx[3] = 3;
+        exec_2_sq.forward_mem_size[3] = BYTE;
         // @(negedge clock);
         // @(negedge clock);
         @(posedge clock);
@@ -178,6 +182,10 @@ module sq_testbench;
         else exit_on_error ("Forward 2 en failed");
         assert (sq_2_exec.forward_data[2] == 96)
         else exit_on_error ("Forward 2 data failed");
+        assert (sq_2_exec.forward_en[3] == '1)
+        else exit_on_error ("Forward 3 en failed");
+        assert (sq_2_exec.forward_data[3] == 0)
+        else exit_on_error ("Forward 3 data failed");
         // $display("Forward[0] map: %4b", sq_2_exec.forward_byte_en[0]);
         // $display("Forward[1] map: %4b", sq_2_exec.forward_byte_en[1]);
         @(negedge clock);

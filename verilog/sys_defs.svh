@@ -61,7 +61,7 @@
 ///////////////////////////////
 /* How can we implement this in the Makefile? */
 // comment out to enable synth only constructions
-`define SYNTH
+// `define SYNTH
 
 `ifndef SYNTH
 // comment out to disable DEBUG:
@@ -876,6 +876,7 @@ typedef struct packed{
 typedef struct packed {
     logic   [$clog2(`N):0]      sq_rdy_scnt;
     logic   [$clog2(`LSQ_SZ):0] sq_tail;
+    LSQ_IDX [`N-1:0] next_ids;
 } sq2dispatch;
 
 typedef struct packed {
@@ -947,7 +948,7 @@ typedef struct packed {
 typedef struct packed {
     logic [`NUM_FU_LOAD-1:0] en;
     LSQ_IDX [`NUM_FU_LOAD-1:0] sq_idx;
-} sq_2_lq;
+} sq2lq;
 
 typedef struct packed {
     logic   [$clog2(`N):0]      lq_rdy_scnt;
