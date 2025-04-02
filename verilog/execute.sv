@@ -289,10 +289,8 @@ module mul_ex(
     end
     // execute
     generate
-        logic       [`NUM_FU_MULT-1:0] tmp_out_vld;
         DATA        [`NUM_FU_MULT-1:0] tmp_res;
         DST         [`NUM_FU_MULT-1:0] tmp_dst;
-        CPL_CAND    [`NUM_FU_MULT-1:0] tmp_data;
 
         logic       [`NUM_FU_MULT-1:0] cpl_buf_rdy;
         for (genvar i = 0; i < `NUM_FU_MULT; ++i) begin : gen_mults
@@ -309,13 +307,13 @@ module mul_ex(
                 .func   (ops[i].func),
 
                 // Output
-                .o_vld  (tmp_out_vld[i]),
-                .o_rdy  (cpl_buf_rdy[i]),
+                .o_vld  (o_vld[i]),
+                .o_rdy  (o_rdy[i]),
                 .dst_out(tmp_dst[i]),
                 .result (tmp_res[i])
             );
 
-            assign tmp_data[i] = '{
+            assign o_cands[i] = '{
                 t       : tmp_dst[i].tag,
                 rob_idx : tmp_dst[i].rob_idx,
                 data    : tmp_res[i],
@@ -325,22 +323,7 @@ module mul_ex(
             };
 
             // <FU>_outs: where executed insns wait until completion
-            ppln_skid #(
-                .WIDTH($bits(CPL_CAND))
-            ) cpl_buf (
-                .clock (clock),
-                .reset (reset),
-                .flush (flush),
-
-                .i_vld (tmp_out_vld[i]),
-                .i_dat (tmp_data[i]),
-                .i_rdy (cpl_buf_rdy[i]),
-
-                .o_vld (o_vld[i]),
-                .o_rdy (o_rdy[i]),
-                .o_dat (o_cands[i])
-
-            );
+            // (buffering happens internally in mul)
            
         end
     endgenerate
