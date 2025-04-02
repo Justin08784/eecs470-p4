@@ -61,11 +61,11 @@
 ///////////////////////////////
 /* How can we implement this in the Makefile? */
 // comment out to enable synth only constructions
-//`define SYNTH
+`define SYNTH
 
 `ifndef SYNTH
 // comment out to disable DEBUG:
-`define DEBUG
+// `define DEBUG
 `endif
 
 ///////////////////////////////
@@ -440,10 +440,20 @@ typedef struct packed {
     LSQ_IDX sq_idx;
     ROB_IDX rob_idx;
     ADDR addr;
+    ADDR [3:0] bytewise_addr;
+    logic [3:0] bytewise_addr_mask;
     DATA data;
     logic d_vld;
     MEM_SIZE mem_size; //MEM_SIZE'(id_ex_reg.inst.r.funct3[1:0]); <-- HOW TO FIND THIS. DO THIS WHEN PUTTING ENTRY IN FROM DISPATCH OR FROM EXECUTE
 } SQ_ENTRY;
+
+typedef struct packed {
+    LSQ_IDX lq_idx;
+    ROB_IDX rob_idx;
+    ADDR addr;
+    logic d_vld;
+    MEM_SIZE mem_size;
+} LQ_ENTRY;
 
 // BTQ stuff
 // typedef logic [$clog2(`BTQ_SZ)-1:0] BTQ_IDX;
@@ -659,12 +669,20 @@ typedef struct packed {
 } dispatch2free_list;
 
 typedef struct packed {
-    logic   [$clog2(`N):0]  lsq_d_en_cnt;
+    logic   [$clog2(`N):0]  sq_d_en_cnt;
         // To: LSQ
         // - number of enabled dispatch lines WHO NEED A LD/ST 
         //   (i.e. may only be a strict subset of dispatching insns!)
     ROB_IDX [`N-1:0] rob_idx;
-} dispatch2lsq;
+} dispatch2sq;
+
+typedef struct packed {
+    logic   [$clog2(`N):0]  lq_d_en_cnt;
+        // To: LSQ
+        // - number of enabled dispatch lines WHO NEED A LD/ST 
+        //   (i.e. may only be a strict subset of dispatching insns!)
+    ROB_IDX [`N-1:0] rob_idx;
+} dispatch2lq;
 
 typedef struct packed {
     logic         [$clog2(`N):0] en_cnt;
@@ -854,32 +872,33 @@ typedef struct packed{
     DATA_BY_FU s_v2s;
 } prf2execute;
 
-// By LSQ
+// By SQ
 typedef struct packed {
     logic   [$clog2(`N):0]      sq_rdy_scnt;
     logic   [$clog2(`LSQ_SZ):0] sq_tail;
-} lsq2dispatch;
+} sq2dispatch;
 
 typedef struct packed {
     logic       [`NUM_FU_STORE-1:0] en;
     LSQ_IDX     [`NUM_FU_STORE-1:0] sq_idx_cdb;
-} lsq2rs;
+} sq2rs;
 
 typedef struct packed {
     logic   [$clog2(`N):0] r_en;
     ROB_IDX [`N-1:0] r_pos;
-} rob2lsq;
+} rob2sq;
 
 typedef struct packed {
-    logic       [`NUM_FU_STORE-1:0] ex_en;
-    LSQ_IDX     [`NUM_FU_STORE-1:0] sq_idx;
-    ADDR        [`NUM_FU_STORE-1:0] addr;
-    DATA        [`NUM_FU_STORE-1:0] data;
+    logic       [`NUM_FU_STORE-1:0] st_ex_en;
+    LSQ_IDX     [`NUM_FU_STORE-1:0] st_sq_idx;
+    ADDR        [`NUM_FU_STORE-1:0] st_addr;
+    DATA        [`NUM_FU_STORE-1:0] st_data;
     MEM_SIZE    [`NUM_FU_STORE-1:0] st_mem_size; //MEM_SIZE'(id_ex_reg.inst.r.funct3[1:0]); <-- HOW TO FIND THIS. DO THIS WHEN PUTTING ENTRY IN FROM DISPATCH OR FROM EXECUTE
     logic       [`NUM_FU_LOAD-1:0] forward_req_en;
+    LSQ_IDX     [`NUM_FU_LOAD-1:0] forward_sq_idx;
     ADDR        [`NUM_FU_LOAD-1:0] forward_addr;
-    MEM_SIZE    [`NUM_FU_LOAD-1:0] ld_mem_size; //MEM_SIZE'(id_ex_reg.inst.r.funct3[1:0]); <-- HOW TO FIND THIS. DO THIS WHEN PUTTING ENTRY IN FROM DISPATCH OR FROM EXECUTE
-} execute2lsq;
+    MEM_SIZE    [`NUM_FU_LOAD-1:0] forward_mem_size; //MEM_SIZE'(id_ex_reg.inst.r.funct3[1:0]); <-- HOW TO FIND THIS. DO THIS WHEN PUTTING ENTRY IN FROM DISPATCH OR FROM EXECUTE
+} execute2sq;
 
 typedef struct packed {
     logic       [`NUM_FU_LOAD-1:0]          forward_en;
@@ -888,12 +907,12 @@ typedef struct packed {
     DATA        [`NUM_FU_LOAD-1:0]          forward_data;
     MEM_SIZE    [`NUM_FU_LOAD-1:0]          forward_mem_size;
     logic       [`NUM_FU_LOAD-1:0] [3:0]    forward_byte_en;
-} lsq2execute;
+} sq2execute;
 
 typedef struct packed {
     logic [$clog2(`N):0]    ret_rdy;
     logic                   sq_ret_complete;
-} lsq2rob;
+} sq2rob;
 
 typedef struct packed {
     MEM_COMMAND   Dmem_command;    // The memory command
@@ -906,19 +925,52 @@ typedef struct packed {
     logic       [$clog2(`N):0] ret_cnt;
     SQ_ENTRY    [`N-1:0] ret_st;
     logic       [`NUM_FU_LOAD-1:0] forward_req_en;
-    LSQ_IDX     [`NUM_FU_LOAD-1:0] sq_idx;
+    LSQ_IDX     [`NUM_FU_LOAD-1:0] forward_sq_idx;
     ADDR        [`NUM_FU_LOAD-1:0] forward_addr;
-    MEM_SIZE    [`NUM_FU_LOAD-1:0] ld_mem_size;
-} lsq2stRET;
+    MEM_SIZE    [`NUM_FU_LOAD-1:0] forward_mem_size;
+} sq2stRET;
 
 typedef struct packed {
     logic [$clog2(`N):0]    free_out;
     logic                   empty;
-    logic       [`NUM_FU_LOAD-1:0] forward_en;
-    ADDR        [`NUM_FU_LOAD-1:0] forward_addr;
-    DATA        [`NUM_FU_LOAD-1:0] forward_data;
-    MEM_SIZE    [`NUM_FU_LOAD-1:0] forward_mem_size;
-} stRET2lsq;
+} stRET2sq;
+
+typedef struct packed {
+    logic       [`NUM_FU_LOAD-1:0]          forward_en;
+    ADDR        [`NUM_FU_LOAD-1:0]          forward_addr;
+    DATA        [`NUM_FU_LOAD-1:0]          forward_data;
+    MEM_SIZE    [`NUM_FU_LOAD-1:0]          forward_mem_size;
+    logic       [`NUM_FU_LOAD-1:0] [3:0]    forward_byte_en;
+    logic       [`NUM_FU_LOAD-1:0]          sq_idx_found;    
+} forwardRET2sq;
+
+typedef struct packed {
+    logic [`NUM_FU_LOAD-1:0] en;
+    LSQ_IDX [`NUM_FU_LOAD-1:0] sq_idx;
+} sq_2_lq;
+
+typedef struct packed {
+    logic   [$clog2(`N):0]      lq_rdy_scnt;
+    logic   [$clog2(`LSQ_SZ):0] lq_tail;
+} lq2dispatch;
+
+typedef struct packed {
+    logic [$clog2(`N):0]    ret_rdy;
+    logic [`NUM_FU_STORE-1:0] err_en;
+    ROB_IDX [`NUM_FU_LOAD-1:0] rob_idx;
+} lq2rob;
+
+typedef struct packed {
+    logic   [$clog2(`N):0] r_en;
+    ROB_IDX [`N-1:0] r_pos;
+} rob2lq;
+
+typedef struct packed {
+    logic       [`NUM_FU_STORE-1:0] ld_ex_en;
+    LSQ_IDX     [`NUM_FU_STORE-1:0] ld_lq_idx;
+    ADDR        [`NUM_FU_STORE-1:0] ld_addr;
+    MEM_SIZE    [`NUM_FU_STORE-1:0] ld_mem_size; //MEM_SIZE'(id_ex_reg.inst.r.funct3[1:0]); <-- HOW TO FIND THIS. DO THIS WHEN PUTTING ENTRY IN FROM DISPATCH OR FROM EXECUTE
+} execute2lq;
 
 typedef struct packed {
     ROB_IDX rob_idx;

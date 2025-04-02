@@ -36,7 +36,7 @@ module cpu (
 
     // Note: these are assigned at the very bottom of the module
     output COMMIT_PACKET [`N-1:0] committed_insts,
-    output ADDR PC_reg,
+    output ADDR [`N-1:0] PC_reg,
 
     // Debug outputs: these signals are solely used for debugging in testbenches
     // Do not change for project 3
@@ -480,8 +480,8 @@ module cpu (
         .free_in(fl_2_dispatch),
         .free_out(dispatch_2_fl),
 
-        .lsq_in('0),
-        .lsq_out(),
+        .lq_in('0),
+        .lq_out(),
 
         .btq_in(btq_2_dispatch),
         .btq_out(dispatch_2_btq),

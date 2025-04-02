@@ -96,7 +96,7 @@
 # there should be no need to change anything for project 3
 
 # this is a global clock period variable used in the tcl script and referenced in testbenches
-export CLOCK_PERIOD = 4.5
+export CLOCK_PERIOD = 30.0
 
 # the Verilog Compiler command and arguments
 VCS =  vcs -sverilog -xprop=tmerge +vc -Mupdate -Mdir=build/csrc -line -full64 -kdb -lca -nc \
@@ -189,7 +189,7 @@ GREP = grep -E --color=auto
 # ---- Modules to Test ---- #
 
 # TODO: add more modules here
-MODULES = cpu mult rob rs fifo free_list dispatch prf map_table stage_id_p4 execute fetch btb lsq post_ret_buffer gshare skid_buffer
+MODULES = cpu mult rob rs fifo free_list dispatch prf map_table stage_id_p4 execute fetch btb sq post_ret_buffer gshare skid_buffer lq
 
 # TODO: update this if you add more header files
 ALL_HEADERS = $(CPU_HEADERS)
@@ -273,10 +273,15 @@ build/btq.simv: $(BTB_FILES)
 build/btq.cov: $(BTB_FILES)
 build/btq.vg: $(BTB_FILES)
 
-LSQ_FILES = verilog/sys_defs.svh
-build/lsq.simv: $(LSQ_FILES)
-build/lsq.cov: $(LSQ_FILES)
-synth/lsq.vg: $(LSQ_FILES)
+SQ_FILES = verilog/sys_defs.svh
+build/sq.simv: $(SQ_FILES)
+build/sq.cov: $(SQ_FILES)
+synth/sq.vg: $(SQ_FILES)
+
+LQ_FILES = verilog/sys_defs.svh
+build/lq.simv: $(LQ_FILES)
+build/lq.cov: $(LQ_FILES)
+synth/lq.vg: $(LQ_FILES)
 
 POST_RET_BUFFER_FILES = verilog/sys_defs.svh
 build/post_ret_buffer.simv: $(POST_RET_BUFFER_FILES)
@@ -327,6 +332,7 @@ CPU_SOURCES = verilog/cpu.sv \
 			  verilog/btb.sv \
 			  verilog/gshare.sv \
 			  verilog/prediction_buffer.sv \
+			  verilog/skid_buffer.sv \
 			  verilog/global_history_register.sv \
 			  verilog/pht.sv 
 
