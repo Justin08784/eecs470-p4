@@ -443,6 +443,21 @@ module stage_ex_p4 (
         end
     end
 
+    struct packed {
+        LOGIC_BY_FU rdy;
+        LOGIC_BY_FU vld;
+    } regs;
+    typedef struct packed {
+        DATA src1;
+        DATA src2;
+        ID_ALU_VIEW dat;
+    } ALU_REGS_EX;
+    typedef struct packed {
+        DATA src1;
+        DATA src2;
+        ID_MUL_VIEW dat;
+    } MUL_REGS_EX;
+
     // receive/decode operands from PRF
     ALU_OPS alu_ops, alu_ops_n;
     MUL_OPS mul_ops, mul_ops_n;
