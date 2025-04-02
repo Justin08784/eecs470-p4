@@ -806,7 +806,7 @@ typedef struct packed {
     logic [`N-1:0][31:0] PC;
     logic [`N-1:0] is_taken;
     logic [`N-1:0] [15:0] target;
-} execute2btb;
+} retire2btb;
 
 typedef struct packed {
     ADDR [`N-1:0] PC;

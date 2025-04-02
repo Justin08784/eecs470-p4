@@ -4,7 +4,7 @@ module btb(
     input  logic        clock, reset,
     input  fetch2btb  fetch_in,
  
-    input  execute2btb execute_in,
+    input  retire2btb retire_in,
 
     output btb2fetch   fetch_out         
 
@@ -55,10 +55,10 @@ always_ff @(posedge clock) begin
         // $display("VALID ARRAY ON RESET", valid_array);
     end else begin
         for(int i = 0; i < `N; i++) begin
-            if(execute_in.is_taken[i]) begin
-                reg_index = execute_in.PC[i][9:2];
-                tag_array[reg_index] <= execute_in.PC[i][21:10];
-                target_array[reg_index] <= execute_in.target[i]; //[13:2]
+            if(retire_in.is_taken[i]) begin
+                reg_index = retire_in.PC[i][9:2];
+                tag_array[reg_index] <= retire_in.PC[i][21:10];
+                target_array[reg_index] <= retire_in.target[i]; //[13:2]
                 valid_array[reg_index] <= 1'b1;
             end
         end

@@ -21,7 +21,7 @@ generate
   for (genvar i = 0; i < `N; i++) begin
     property write_on_taken;
       @(posedge clock)
-        !reset && execute_in.is_taken[i] |=> valid_array[execute_in.PC[i][9:2]];
+        !reset && retire_in.is_taken[i] |=> valid_array[retire_in.PC[i][9:2]];
     endproperty
     assert property (write_on_taken);
   end
@@ -32,7 +32,7 @@ generate
   for (genvar i = 0; i < `N; i++) begin
     property index_in_range;
       @(posedge clock)
-        execute_in.is_taken[i] |-> (execute_in.PC[i][9:2] < `BTB_ENTRIES);
+        retire_in.is_taken[i] |-> (retire_in.PC[i][9:2] < `BTB_ENTRIES);
     endproperty
     assert property (index_in_range);
   end
