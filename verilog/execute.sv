@@ -19,7 +19,7 @@ Flow chart
      ↓
 [Staging FIFO (s_buf)]  ← just buffers instruction for 1 cycle
      ↓
-[ops register (alu_ops, mul_ops)]  ← PRF values fetched here
+[regs register (alu_regs, mul_regs)]  ← PRF values fetched here
      ↓
 [Functional Unit (ALU or MUL)]
      ↓
@@ -263,7 +263,7 @@ module mul_ex(
         // ready to accept from mul_ins?
     input [`NUM_FU_MULT-1:0]            i_vld,
         // insns to accept from mul_ins
-    MUL_OPS [`NUM_FU_MULT-1:0] i_ops,
+    MUL_REGS_EX  [`NUM_FU_MULT-1:0]     i_regs,
         // insn metadata/operands
 
     /* BACKEND */
@@ -273,6 +273,20 @@ module mul_ex(
     input  logic [`NUM_FU_MULT-1:0]     o_rdy
         // completion grant
 );
+    MUL_OPS [`NUM_FU_MULT-1:0] ops;
+    always_comb begin
+        foreach (ops[i]) begin
+            ops[i] = '{
+                rs1  : i_regs[i].rs1,
+                rs2  : i_regs[i].rs2,
+                func : i_regs[i].dat.func,
+                dst  : '{
+                    rob_idx : i_regs[i].dat.rob_idx,
+                    tag     : i_regs[i].dat.t
+                }
+            };
+        end
+    end
     // execute
     generate
         logic       [`NUM_FU_MULT-1:0] tmp_out_vld;
@@ -288,10 +302,10 @@ module mul_ex(
                 .flush  (flush),
                 .in_vld (i_vld[i]),
                 .out_rdy(cpl_buf_rdy[i]),
-                .dst_in (i_ops[i].dst),
-                .rs1    (i_ops[i].rs1),
-                .rs2    (i_ops[i].rs2),
-                .func   (i_ops[i].func),
+                .dst_in (ops[i].dst),
+                .rs1    (ops[i].rs1),
+                .rs2    (ops[i].rs2),
+                .func   (ops[i].func),
 
                 // Output
                 .dst_out(tmp_dst[i]),
@@ -467,12 +481,10 @@ module stage_ex_p4 (
         end
     end
 
-
-    // receive/decode operands from PRF
-    ALU_REGS_EX [`NUM_FU_ALU-1:0]  alu_regs;
-    ALU_REGS_EX [`NUM_FU_ALU-1:0]  tmp_alu_regs;
-    MUL_OPS [`NUM_FU_MULT-1:0]  mul_ops;
-    MUL_OPS [`NUM_FU_MULT-1:0]  tmp_mul_ops;
+    ALU_REGS_EX [`NUM_FU_ALU-1:0]   alu_regs;
+    ALU_REGS_EX [`NUM_FU_ALU-1:0]   tmp_alu_regs;
+    MUL_REGS_EX [`NUM_FU_MULT-1:0]  mul_regs;
+    MUL_REGS_EX [`NUM_FU_MULT-1:0]  tmp_mul_regs;
 
     struct packed {
         LOGIC_BY_FU i_rdy;
@@ -486,16 +498,11 @@ module stage_ex_p4 (
                 dat : iss.dat.alu[i]
             };
         end
-
         foreach (iss.o_vld.mul[i]) begin
-            tmp_mul_ops[i] = '{
-                rs1  : prf_in.s_v1s.mul[i],
-                rs2  : prf_in.s_v2s.mul[i],
-                func : iss.dat.mul[i].func,
-                dst  : '{
-                    rob_idx : iss.dat.mul[i].rob_idx,
-                    tag     : iss.dat.mul[i].t
-                }
+            tmp_mul_regs[i] = '{
+                rs1 : prf_in.s_v1s.mul[i],
+                rs2 : prf_in.s_v2s.mul[i],
+                dat : iss.dat.mul[i]
             };
         end
     end
@@ -521,7 +528,7 @@ module stage_ex_p4 (
 
         for (genvar i = 0; i < `NUM_FU_MULT; ++i) begin : gen_mul_rbufs
             ppln_skid #(
-                .WIDTH($bits(MUL_OPS))
+                .WIDTH($bits(MUL_REGS_EX))
             ) rbuf (
                 .clock (clock),
                 .reset (reset),
@@ -529,11 +536,11 @@ module stage_ex_p4 (
 
                 .i_vld (iss.o_vld.mul[i]),
                 .i_rdy (regs.i_rdy.mul[i]),
-                .i_dat (tmp_mul_ops[i]),
+                .i_dat (tmp_mul_regs[i]),
 
                 .o_vld (regs.o_vld.mul[i]),
                 .o_rdy (regs.i_rdy.mul[i]),
-                .o_dat (mul_ops[i])
+                .o_dat (mul_regs[i])
             );
         end
     endgenerate
@@ -567,7 +574,7 @@ module stage_ex_p4 (
         .flush  (flush),
 
         .i_vld  (regs.o_vld.mul),
-        .i_ops  (mul_ops),
+        .i_regs (mul_regs),
         .i_rdy  (ex.i_rdy.mul),
 
         .o_vld  (ex.o_vld.mul),
@@ -683,14 +690,14 @@ module stage_ex_p4 (
             end
 
             for (int i = 0; i < `NUM_FU_MULT; ++i) begin
-                $display("mul_ops[%0d]: bsy: %b, rs1: 0x%x, rs2: 0x%x, func: %b, t: %2d, rob_idx: %2d",
+                $display("mul_regs[%0d]: bsy: %b, rs1: 0x%x, rs2: 0x%x, func: %b, t: %2d, rob_idx: %2d",
                     i,
                     regs.o_vld.mul[i],
-                    mul_ops[i].rs1,
-                    mul_ops[i].rs2,
-                    mul_ops[i].func,
-                    mul_ops[i].dst.tag,
-                    mul_ops[i].dst.rob_idx
+                    mul_regs[i].rs1,
+                    mul_regs[i].rs2,
+                    mul_regs[i].func,
+                    mul_regs[i].dst.tag,
+                    mul_regs[i].dst.rob_idx
                 );
             end
 
