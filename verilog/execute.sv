@@ -360,6 +360,14 @@ module stage_ex_p4 (
     output  execute2complete c_out
 
 );
+    /*
+    Dummy instantiation to stop compiler from complaining about param override.
+    Compiler always be complaining.
+    */
+    skid #(
+        .WIDTH(1)
+    ) dut_skid (
+    );
 
     // <FU>_ins: staging; where just-issued insns wait for 1 cycle to pull their operands
     struct packed {
