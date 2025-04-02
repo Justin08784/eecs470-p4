@@ -300,18 +300,19 @@ module mul_ex(
                 .clock  (clock),
                 .reset  (reset),
                 .flush  (flush),
-                .in_vld (i_vld[i]),
-                .out_rdy(cpl_buf_rdy[i]),
+
+                .i_vld  (i_vld[i]),
+                .i_rdy  (i_rdy[i]),
                 .dst_in (ops[i].dst),
                 .rs1    (ops[i].rs1),
                 .rs2    (ops[i].rs2),
                 .func   (ops[i].func),
 
                 // Output
+                .o_vld  (tmp_out_vld[i]),
+                .o_rdy  (cpl_buf_rdy[i]),
                 .dst_out(tmp_dst[i]),
-                .result (tmp_res[i]),
-                .in_rdy (i_rdy[i]),
-                .out_vld(tmp_out_vld[i])
+                .result (tmp_res[i])
             );
 
             assign tmp_data[i] = '{

@@ -1,6 +1,14 @@
 
 `include "sys_defs.svh"
 
+typedef struct packed {
+    logic [63:0]    sum;
+    logic [63:0]    mplier;
+    logic [63:0]    mcand;
+    MULT_FUNC       func;
+    DST             dst;
+} MUL_PKT;
+
 // This is a pipelined multiplier that multiplies two 64-bit integers and
 // returns the low 64 bits of the result.
 // This is not an ideal multiplier but is sufficient to allow a faster clock
@@ -12,108 +20,135 @@ module mult (
     input MULT_FUNC func,
     input DST dst_in,
 
-    input  logic in_vld,  // replacement for start
-    output logic in_rdy,  // TODO: set
-    input  logic out_rdy, // TODO: set
-    output logic out_vld, // replacement for done
+    input  logic i_vld,  // replacement for start
+    output logic i_rdy,  // TODO: set
+    input  logic o_rdy, // TODO: set
+    output logic o_vld, // replacement for done
 
     output DATA result,
     output DST dst_out
 );
+    MUL_PKT [`MULT_STAGES-2:0] internal_pkts;
+    logic   [`MULT_STAGES-2:0] internal_o_vlds;
+    logic   [`MULT_STAGES-2:0] internal_o_rdys;
 
-    MULT_FUNC [`MULT_STAGES-2:0] internal_funcs;
-    MULT_FUNC func_out;
 
-    logic [(64*(`MULT_STAGES-1))-1:0] internal_sums, internal_mcands, internal_mpliers;
-    logic [`MULT_STAGES-2:0] internal_out_vlds;
-    logic [`MULT_STAGES-2:0] internal_out_rdys;
+    logic [63:0] i_mcand, i_mplier;
+    MUL_PKT i_pkt, o_pkt;
+    
+    // Sign-extend the multiplier inputs based on the operation
+    always_comb begin
+        case (func)
+            M_MUL, M_MULH, M_MULHSU: i_mcand = {{(32){rs1[31]}}, rs1};
+            default:                 i_mcand = {32'b0, rs1};
+        endcase
+        case (func)
+            M_MUL, M_MULH: i_mplier = {{(32){rs2[31]}}, rs2};
+            default:       i_mplier = {32'b0, rs2};
+        endcase
 
-    logic [63:0] mcand, mplier, product;
-    logic [63:0] mcand_out, mplier_out; // unused, just for wiring
-
-    DST [`MULT_STAGES-2:0] internal_dsts;
+        i_pkt = '{
+            sum     : 64'h0,
+            mplier  : i_mplier,
+            mcand   : i_mcand,
+            func    : func,
+            dst     : dst_in
+        };
+    end
 
     // instantiate an array of mult_stage modules
     // this uses concatenation syntax for internal wiring, see lab 2 slides
     mult_stage mstage [`MULT_STAGES-1:0] (
-        .clock (clock),
-        .reset (reset),
-        .flush (flush),
-        .func        ({internal_funcs,   func}),
-        .prev_sum    ({internal_sums,    64'h0}), // start the sum at 0
-        .mplier      ({internal_mpliers, mplier}),
-        .mcand       ({internal_mcands,  mcand}),
-        .dst         ({internal_dsts,    dst_in}),
-        .product_sum ({product,    internal_sums}),
-        .next_mplier ({mplier_out, internal_mpliers}),
-        .next_mcand  ({mcand_out,  internal_mcands}),
-        .next_func   ({func_out,   internal_funcs}),
-        .next_dst    ({dst_out,    internal_dsts}),
-        .in_rdy      ({internal_out_rdys,in_rdy}),
-        .in_vld      ({internal_out_vlds,in_vld}), // forward prev done as next start
-        .out_rdy     ({out_rdy,    internal_out_rdys}),
-        .out_vld     ({out_vld,    internal_out_vlds}) // done when the final stage is done
+        .clock  (clock),
+        .reset  (reset),
+        .flush  (flush),
+
+        .i_dat  ({internal_pkts, i_pkt}),
+        .o_dat  ({o_pkt, internal_pkts}),
+
+        .i_rdy  ({internal_o_rdys,i_rdy}),
+        .i_vld  ({internal_o_vlds,i_vld}), // forward prev done as next start
+        .o_rdy  ({o_rdy,internal_o_rdys}),
+        .o_vld  ({o_vld,internal_o_vlds}) // done when the final stage is done
     );
 
-    // Sign-extend the multiplier inputs based on the operation
-    always_comb begin
-        case (func)
-            M_MUL, M_MULH, M_MULHSU: mcand = {{(32){rs1[31]}}, rs1};
-            default:                 mcand = {32'b0, rs1};
-        endcase
-        case (func)
-            M_MUL, M_MULH: mplier = {{(32){rs2[31]}}, rs2};
-            default:       mplier = {32'b0, rs2};
-        endcase
-    end
-
     // Use the high or low bits of the product based on the output func
-    assign result = (func_out == M_MUL) ? product[31:0] : product[63:32];
+    assign result = (o_pkt.func == M_MUL)
+        ? o_pkt.sum[31:0]
+        : o_pkt.sum[63:32];
+    
+    assign dst_out = o_pkt.dst;
+
+    `ifdef DEBUG
+    always_ff @(posedge clock) begin
+        if (!reset) begin
+            $display("");
+        end
+    end
+    `endif // DEBUG
 
 endmodule // mult
 
 
 module mult_stage (
     input clock, reset, flush,
-    input [63:0] prev_sum, mplier, mcand,
-    input DST dst,
-    input MULT_FUNC func,
+    input MUL_PKT   i_dat,
 
-    input  logic in_vld,  // replacement for start
-    output logic in_rdy,  // TODO: set
-    input  logic out_rdy, // TODO: set
-    output logic out_vld, // replacement for done
+    input  logic    i_vld,  // replacement for start
+    output logic    i_rdy,  // TODO: set
+    input  logic    o_rdy,  // TODO: set
+    output logic    o_vld,  // replacement for done
 
-    output logic [63:0] product_sum, next_mplier, next_mcand,
-    output MULT_FUNC next_func,
-    output DST next_dst
+    output MUL_PKT  o_dat
 );
 
     parameter SHIFT = 64/`MULT_STAGES;
 
     logic [63:0] partial_product, shifted_mplier, shifted_mcand;
+    MUL_PKT tmp_dat;
+    always_comb begin
+        partial_product = i_dat.mplier[SHIFT-1:0] * i_dat.mcand;
+        shifted_mplier  = {SHIFT'('b0), i_dat.mplier[63:SHIFT]};
+        shifted_mcand   = {i_dat.mcand[63-SHIFT:0], SHIFT'('b0)};
 
-    assign partial_product = mplier[SHIFT-1:0] * mcand;
+        tmp_dat = '{
+            sum     : i_dat.sum + partial_product,
+            mplier  : shifted_mplier,
+            mcand   : shifted_mcand,
+            func    : i_dat.func,
+            dst     : i_dat.dst
+        };
+    end
 
-    logic  out_vld_n;
-    assign shifted_mplier = {SHIFT'('b0), mplier[63:SHIFT]};
-    assign shifted_mcand = {mcand[63-SHIFT:0], SHIFT'('b0)};
-    assign in_rdy   = !out_vld || out_rdy;
-    assign out_vld_n= in_vld && out_rdy;
+    skid #(
+        .WIDTH($bits(MUL_PKT))
+    ) skid_0 (
+        .clock(clock),
+        .reset(reset),
+        .flush(flush),
+        
+        .i_vld(i_vld),
+        .i_rdy(i_rdy),
+        .i_dat(tmp_dat),
 
+        .o_vld(o_vld),
+        .o_rdy(o_rdy),
+        .o_dat(o_dat)
+    );
+
+    `ifdef DEBUG
     always_ff @(posedge clock) begin
-        if (reset || flush) begin
-            out_vld <= 1'b0;
-        end else begin
-            out_vld <= out_vld_n;
-            if (out_vld_n) begin
-                product_sum <= prev_sum + partial_product;
-                next_mplier <= shifted_mplier;
-                next_mcand  <= shifted_mcand;
-                next_func   <= func;
-                next_dst    <= dst;
-            end
+        if (!reset) begin
+            $display("– sum: %x, mplier: %x, mcand: %x, func: %0d, tag: %x, rob_idx: %x",
+                tmp_dat.sum,
+                tmp_dat.mplier,
+                tmp_dat.mcand,
+                tmp_dat.func,
+                tmp_dat.dst.tag,
+                tmp_dat.dst.rob_idx
+            );
         end
     end
+    `endif // DEBUG
 
 endmodule // mult_stage
