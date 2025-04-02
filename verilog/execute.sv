@@ -369,7 +369,7 @@ module stage_ex_p4 (
                 .i_dat (tmp_alu_el[i]),
 
                 .o_vld (iss.o_vld.alu[i]),
-                .o_rdy (iss2ops_en.alu[i]),
+                .o_rdy (ops.i_rdy.alu[i]),
                 .o_dat (iss.dat.alu[i])
             );
         end
@@ -394,7 +394,7 @@ module stage_ex_p4 (
                 .i_dat (tmp_mul_el[i]),
 
                 .o_vld (iss.o_vld.mul[i]),
-                .o_rdy (iss2ops_en.mul[i]),
+                .o_rdy (ops.i_rdy.mul[i]),
                 .o_dat (iss.dat.mul[i])
             );
         end
