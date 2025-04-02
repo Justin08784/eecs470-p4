@@ -18,7 +18,6 @@ module lq #(parameter
     input dispatch2lq dis_2_lq,
     input execute2lq exec_2_lq,
     input rob2lq rob_2_lq,
-    input sq2lq sq_2_lq,
 
     output lq2dispatch lq_2_dis,
     output lq2rob lq_2_rob
@@ -50,6 +49,7 @@ module lq #(parameter
 
     LSQ_IDX head_plus_one;
     always_comb begin
+        lq_2_rob = '0;
 
         for (int unsigned i = 0; i < NUM_RPORTS; ++i)
             r_idxs[i] = (head + i) % LSQ_SZ;
@@ -68,6 +68,18 @@ module lq #(parameter
         else if (state[head].d_vld)                             lq_2_rob.ret_rdy = 1;
         else                                                    lq_2_rob.ret_rdy = 0;      
 
+        //handle checking if LQ got ahead of SQ and needs to flag it in ROB
+        for (int i = 0; i < NUM_FU_STORE; i++) begin
+            if (!exec_2_lq.st_en[i]) continue;
+
+            for (int j = 0, int idx = 0; j < used; j++) begin
+                idx = (head + j) % LSQ_SZ;
+                if (state[idx].sq_idx == exec_2_lq.st_sq_idx[i]) begin
+                    lq_2_rob.err_en[i] = '1;
+                    lq_2_rob.rob_idx[i] = state[idx].rob_idx;
+                end
+            end
+        end
     end
 
 
@@ -102,6 +114,7 @@ module lq #(parameter
                 cur_idx = d_idxs[i];
                 state[cur_idx] <= '{
                     lq_idx     : d_idxs[i],
+                    sq_idx : dis_2_lq.sq_idx[i],
                     rob_idx : dis_2_lq.rob_idx[i],
                     addr     : '0,
                     d_vld     : '0,

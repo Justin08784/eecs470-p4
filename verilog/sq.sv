@@ -105,8 +105,6 @@ module sq #(parameter
         sq_2_ret.ret_st[0] = state[head];
         sq_2_ret.ret_st[1] = state[head_plus_one];
 
-        
-
     end
 
 
