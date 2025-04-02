@@ -312,12 +312,13 @@ module stage_ex_p4 (
             ID_ALU_VIEW [`NUM_FU_ALU-1:0]   alu;
             ID_MUL_VIEW [`NUM_FU_MULT-1:0]  mul;
         } dat;
-    } ins;
+    } iss;
 
-    logic [`NUM_FU_ALU-1:0]     alu_ops_rdy;
-    logic [`NUM_FU_MULT-1:0]    mul_ops_rdy;
-    logic [`NUM_FU_ALU-1:0]     alu_in2ops_en;
-    logic [`NUM_FU_MULT-1:0]    mul_in2ops_en;
+    struct packed {
+        LOGIC_BY_FU rdy;
+        LOGIC_BY_FU vld;
+    } ops;
+    LOGIC_BY_FU iss2ops_en;
     generate
         /* Staging buffers (sbufs):
 
@@ -332,8 +333,8 @@ module stage_ex_p4 (
         */
         // TODO: Make these into FIFOs with only the subset of fields needed
         // for the ALU type. Conserve space.
-        assign alu_in2ops_en = ins.vld.alu & alu_ops_rdy;
-        assign mul_in2ops_en = ins.vld.mul & mul_ops_rdy;
+        assign iss2ops_en.alu = iss.vld.alu & ops.rdy.alu;
+        assign iss2ops_en.mul = iss.vld.mul & ops.rdy.mul;
         ID_ALU_VIEW tmp_alu_el[`NUM_FU_ALU-1:0];
         ID_MUL_VIEW tmp_mul_el[`NUM_FU_MULT-1:0];
 
@@ -364,12 +365,12 @@ module stage_ex_p4 (
                 .flush (flush),
 
                 .i_vld (rs_in.fu_vld_alu[i]),
-                .i_rdy (ins.rdy.alu[i]),
+                .i_rdy (iss.rdy.alu[i]),
                 .i_dat (tmp_alu_el[i]),
 
-                .o_vld (ins.vld.alu[i]),
-                .o_rdy (alu_in2ops_en[i]),
-                .o_dat (ins.dat.alu[i])
+                .o_vld (iss.vld.alu[i]),
+                .o_rdy (iss2ops_en.alu[i]),
+                .o_dat (iss.dat.alu[i])
             );
         end
         
@@ -389,31 +390,13 @@ module stage_ex_p4 (
                 .flush (flush),
 
                 .i_vld (rs_in.fu_vld_mult[i]),
-                .i_rdy (ins.rdy.mul[i]),
+                .i_rdy (iss.rdy.mul[i]),
                 .i_dat (tmp_mul_el[i]),
 
-                .o_vld (ins.vld.mul[i]),
-                .o_rdy (mul_in2ops_en[i]),
-                .o_dat (ins.dat.mul[i])
+                .o_vld (iss.vld.mul[i]),
+                .o_rdy (iss2ops_en.mul[i]),
+                .o_dat (iss.dat.mul[i])
             );
-            // fifo #(
-            //     .DEPTH(2),
-            //     .WIDTH($bits(ID_MUL_VIEW)),
-            //     .NUM_RPORTS(1),
-            //     .NUM_WPORTS(1),
-            //     .ENABLE_INTR_FWD(`FALSE)
-            // ) s_buf (
-            //     .clock      (clock),
-            //     .reset      (reset),
-            //     .flush      (flush),
-            //     .wr_en_cnt  (rs_in.fu_vld_mult[i]),
-            //     .wr_data    (tmp_mul_el[i]),
-            //     .rd_en_cnt  (mul_in2ops_en[i]),
-            //     .rd_data    (ins.dat.mul[i]),
-
-            //     .free_scnt  (ins.rdy.mul[i]),
-            //     .used_scnt  (ins.vld.mul[i])
-            // );
         end
     endgenerate
 
@@ -425,21 +408,21 @@ module stage_ex_p4 (
     */
     always_comb begin
         prf_out = '0;
-        foreach (alu_in2ops_en[i]) begin
-            if (!alu_in2ops_en[i])
+        foreach (iss2ops_en.alu[i]) begin
+            if (!iss2ops_en.alu[i])
                 continue;
             prf_out.s_en1s.alu[i]   = 1;
             prf_out.s_en2s.alu[i]   = 1;
-            prf_out.s_t1s.alu[i]    = ins.dat.alu[i].t1; 
-            prf_out.s_t2s.alu[i]    = ins.dat.alu[i].t2; 
+            prf_out.s_t1s.alu[i]    = iss.dat.alu[i].t1; 
+            prf_out.s_t2s.alu[i]    = iss.dat.alu[i].t2; 
         end
-        foreach (mul_in2ops_en[i]) begin
-            if (!mul_in2ops_en[i])
+        foreach (iss2ops_en.mul[i]) begin
+            if (!iss2ops_en.mul[i])
                 continue;
             prf_out.s_en1s.mul[i]   = 1;
             prf_out.s_en2s.mul[i]   = 1;
-            prf_out.s_t1s.mul[i]    = ins.dat.mul[i].t1; 
-            prf_out.s_t2s.mul[i]    = ins.dat.mul[i].t2; 
+            prf_out.s_t1s.mul[i]    = iss.dat.mul[i].t1; 
+            prf_out.s_t2s.mul[i]    = iss.dat.mul[i].t2; 
         end
     end
 
@@ -466,53 +449,53 @@ module stage_ex_p4 (
     logic [`NUM_FU_MULT-1:0]    mul_ex_rdy;
     always_comb begin
         alu_ops_n = '0;
-        foreach(alu_in2ops_en[i]) begin
-            if(!alu_in2ops_en[i]) 
+        foreach(iss2ops_en.alu[i]) begin
+            if(!iss2ops_en.alu[i]) 
                 continue;
             alu_ops_n.rs1[i] = prf_in.s_v1s.alu[i];
             alu_ops_n.rs2[i] = prf_in.s_v2s.alu[i];
 
             // ALU opA mux
-            case (ins.dat.alu[i].opa_select)
+            case (iss.dat.alu[i].opa_select)
                 OPA_IS_RS1:  alu_ops_n.opa[i] = prf_in.s_v1s.alu[i];
-                OPA_IS_NPC:  alu_ops_n.opa[i] = ins.dat.alu[i].NPC;
-                OPA_IS_PC:   alu_ops_n.opa[i] = ins.dat.alu[i].PC;
+                OPA_IS_NPC:  alu_ops_n.opa[i] = iss.dat.alu[i].NPC;
+                OPA_IS_PC:   alu_ops_n.opa[i] = iss.dat.alu[i].PC;
                 OPA_IS_ZERO: alu_ops_n.opa[i] = 0;
                 default:     alu_ops_n.opa[i]= 32'hdeadface; // dead face
             endcase
 
             // ALU opB mux
-            case (ins.dat.alu[i].opb_select)
+            case (iss.dat.alu[i].opb_select)
                 OPB_IS_RS2:   alu_ops_n.opb[i] =  prf_in.s_v2s.alu[i];
-                OPB_IS_I_IMM: alu_ops_n.opb[i] = `RV32_signext_Iimm(ins.dat.alu[i].inst);
-                OPB_IS_S_IMM: alu_ops_n.opb[i] = `RV32_signext_Simm(ins.dat.alu[i].inst);
-                OPB_IS_B_IMM: alu_ops_n.opb[i] = `RV32_signext_Bimm(ins.dat.alu[i].inst);
-                OPB_IS_U_IMM: alu_ops_n.opb[i] = `RV32_signext_Uimm(ins.dat.alu[i].inst);
-                OPB_IS_J_IMM: alu_ops_n.opb[i] = `RV32_signext_Jimm(ins.dat.alu[i].inst);
+                OPB_IS_I_IMM: alu_ops_n.opb[i] = `RV32_signext_Iimm(iss.dat.alu[i].inst);
+                OPB_IS_S_IMM: alu_ops_n.opb[i] = `RV32_signext_Simm(iss.dat.alu[i].inst);
+                OPB_IS_B_IMM: alu_ops_n.opb[i] = `RV32_signext_Bimm(iss.dat.alu[i].inst);
+                OPB_IS_U_IMM: alu_ops_n.opb[i] = `RV32_signext_Uimm(iss.dat.alu[i].inst);
+                OPB_IS_J_IMM: alu_ops_n.opb[i] = `RV32_signext_Jimm(iss.dat.alu[i].inst);
                 default:      alu_ops_n.opb[i] = 32'hfacefeed; // face feed
             endcase
 
-            alu_ops_n.bsy[i]         = ins.vld.alu[i] | (alu_ops.bsy & ~alu_ex_rdy);
-            alu_ops_n.alu_func[i]    = ins.dat.alu[i].alu_func;
-            alu_ops_n.branch_func[i] = ins.dat.alu[i].inst.b.funct3;
-            alu_ops_n.t[i]           = ins.dat.alu[i].t;
-            alu_ops_n.rob_idx[i]     = ins.dat.alu[i].rob_idx;
-            alu_ops_n.btq_idx[i]     = ins.dat.alu[i].btq_idx;
-            alu_ops_n.cond_branch[i]        = ins.dat.alu[i].cond_branch;
-            alu_ops_n.uncond_branch[i]      = ins.dat.alu[i].uncond_branch;
+            alu_ops_n.bsy[i]         = iss.vld.alu[i] | (alu_ops.bsy & ~alu_ex_rdy);
+            alu_ops_n.alu_func[i]    = iss.dat.alu[i].alu_func;
+            alu_ops_n.branch_func[i] = iss.dat.alu[i].inst.b.funct3;
+            alu_ops_n.t[i]           = iss.dat.alu[i].t;
+            alu_ops_n.rob_idx[i]     = iss.dat.alu[i].rob_idx;
+            alu_ops_n.btq_idx[i]     = iss.dat.alu[i].btq_idx;
+            alu_ops_n.cond_branch[i]        = iss.dat.alu[i].cond_branch;
+            alu_ops_n.uncond_branch[i]      = iss.dat.alu[i].uncond_branch;
         end
 
         mul_ops_n = '0;
-        foreach (mul_in2ops_en[i]) begin
-            if (!mul_in2ops_en[i])
+        foreach (iss2ops_en.mul[i]) begin
+            if (!iss2ops_en.mul[i])
                 continue;
-            mul_ops_n.bsy[i] = ins.vld.mul[i] | (mul_ops.bsy & ~mul_ex_rdy);
+            mul_ops_n.bsy[i] = iss.vld.mul[i] | (mul_ops.bsy & ~mul_ex_rdy);
             mul_ops_n.rs1[i] = prf_in.s_v1s.mul[i];
             mul_ops_n.rs2[i] = prf_in.s_v2s.mul[i];
-            mul_ops_n.func[i] = ins.dat.mul[i].func;
+            mul_ops_n.func[i] = iss.dat.mul[i].func;
             mul_ops_n.dst[i] = '{
-                rob_idx : ins.dat.mul[i].rob_idx,
-                tag     : ins.dat.mul[i].t
+                rob_idx : iss.dat.mul[i].rob_idx,
+                tag     : iss.dat.mul[i].t
             };
         end
     end
@@ -571,12 +554,12 @@ module stage_ex_p4 (
 
     execute2complete c_out_n;
     always_comb begin
-        alu_ops_rdy = ~alu_ops.bsy | alu_ex_rdy;
-        mul_ops_rdy = ~mul_ops.bsy | mul_ex_rdy;
+        ops.rdy.alu = ~alu_ops.bsy | alu_ex_rdy;
+        ops.rdy.mul = ~mul_ops.bsy | mul_ex_rdy;
 
         rs_out = '{
-            fu_rdy_alu      : ins.rdy.alu,
-            fu_rdy_mult     : ins.rdy.mul,
+            fu_rdy_alu      : iss.rdy.alu,
+            fu_rdy_mult     : iss.rdy.mul,
             fu_rdy_load     : '0,
             fu_rdy_store    : '0
         };
@@ -630,31 +613,31 @@ module stage_ex_p4 (
             for (int i = 0; i < `NUM_FU_ALU; ++i) begin
                 $display("alu_ins[%0d]: rdy: %b, vld: %b, t: %2d, t1: %2d, t2: %2d, rob_idx: %2d, btq_idx: %2d, inst: 0x%x, PC: 0x%x, NPC: 0x%x, cond_branch: %b, uncond_branch: %b",
                     i,
-                    ins.rdy.alu[i],
-                    ins.vld.alu[i],
-                    ins.dat.alu[i].t,
-                    ins.dat.alu[i].t1,
-                    ins.dat.alu[i].t2,
-                    ins.dat.alu[i].rob_idx,
-                    ins.dat.alu[i].btq_idx,
-                    ins.dat.alu[i].inst,
-                    ins.dat.alu[i].PC,
-                    ins.dat.alu[i].NPC,
-                    ins.dat.alu[i].cond_branch,
-                    ins.dat.alu[i].uncond_branch
+                    iss.rdy.alu[i],
+                    iss.vld.alu[i],
+                    iss.dat.alu[i].t,
+                    iss.dat.alu[i].t1,
+                    iss.dat.alu[i].t2,
+                    iss.dat.alu[i].rob_idx,
+                    iss.dat.alu[i].btq_idx,
+                    iss.dat.alu[i].inst,
+                    iss.dat.alu[i].PC,
+                    iss.dat.alu[i].NPC,
+                    iss.dat.alu[i].cond_branch,
+                    iss.dat.alu[i].uncond_branch
                 );
             end
 
             for (int i = 0; i < `NUM_FU_MULT; ++i) begin
                 $display("mul_ins[%0d]: rdy: %b, vld: %b, t: %2d, t1: %2d, t2: %2d, rob_idx: %2d, func: 0x%x",
                     i,
-                    ins.rdy.mul[i],
-                    ins.vld.mul[i],
-                    ins.dat.mul[i].t,
-                    ins.dat.mul[i].t1,
-                    ins.dat.mul[i].t2,
-                    ins.dat.mul[i].rob_idx,
-                    ins.dat.mul[i].func
+                    iss.rdy.mul[i],
+                    iss.vld.mul[i],
+                    iss.dat.mul[i].t,
+                    iss.dat.mul[i].t1,
+                    iss.dat.mul[i].t2,
+                    iss.dat.mul[i].rob_idx,
+                    iss.dat.mul[i].func
                 );
             end
 
