@@ -42,11 +42,6 @@ typedef struct packed {
     CPL_CAND [`NUM_FU_MULT-1:0] mul;
 } CPL_CAND_BY_FU;
 
-typedef struct packed {
-    ID_RESULT [`NUM_FU_ALU-1:0]  alu;
-    ID_RESULT [`NUM_FU_MULT-1:0] mul;
-} ID_RESULT_BY_FU;
-
 /* Slices (or "views") of ID_RESULT needed for each FU type */
 typedef struct packed {
     PHYS_REG_IDX    t;
@@ -76,7 +71,6 @@ typedef struct packed {
 
 /* Operand data needed for each FU type */
 typedef struct packed {
-    logic           bsy; // unused; same as en
     DATA            opa, opb;
     DATA            rs1, rs2;
     ALU_FUNC        alu_func;
@@ -447,7 +441,7 @@ module stage_ex_p4 (
 
     // receive/decode operands from PRF
     ALU_OPS [`NUM_FU_ALU-1:0] alu_ops;
-    ALU_OPS [`NUM_FU_ALU-1:0] alu_ops_n;
+    ALU_OPS [`NUM_FU_ALU-1:0] tmp_alu_ops;
     MUL_OPS mul_ops, mul_ops_n;
 
     struct packed {
@@ -455,41 +449,40 @@ module stage_ex_p4 (
         LOGIC_BY_FU o_vld;
     } ex;
     always_comb begin
-        alu_ops_n = '0;
+        tmp_alu_ops = '0;
         foreach(iss2ops_en.alu[i]) begin
             if(!iss2ops_en.alu[i]) 
                 continue;
-            alu_ops_n[i].rs1 = prf_in.s_v1s.alu[i];
-            alu_ops_n[i].rs2 = prf_in.s_v2s.alu[i];
+            tmp_alu_ops[i].rs1 = prf_in.s_v1s.alu[i];
+            tmp_alu_ops[i].rs2 = prf_in.s_v2s.alu[i];
 
             // ALU opA mux
             case (iss.dat.alu[i].opa_select)
-                OPA_IS_RS1:  alu_ops_n[i].opa = prf_in.s_v1s.alu[i];
-                OPA_IS_NPC:  alu_ops_n[i].opa = iss.dat.alu[i].NPC;
-                OPA_IS_PC:   alu_ops_n[i].opa = iss.dat.alu[i].PC;
-                OPA_IS_ZERO: alu_ops_n[i].opa = 0;
-                default:     alu_ops_n[i].opa = 32'hdeadface; // dead face
+                OPA_IS_RS1:  tmp_alu_ops[i].opa = prf_in.s_v1s.alu[i];
+                OPA_IS_NPC:  tmp_alu_ops[i].opa = iss.dat.alu[i].NPC;
+                OPA_IS_PC:   tmp_alu_ops[i].opa = iss.dat.alu[i].PC;
+                OPA_IS_ZERO: tmp_alu_ops[i].opa = 0;
+                default:     tmp_alu_ops[i].opa = 32'hdeadface; // dead face
             endcase
 
             // ALU opB mux
             case (iss.dat.alu[i].opb_select)
-                OPB_IS_RS2:   alu_ops_n[i].opb =  prf_in.s_v2s.alu[i];
-                OPB_IS_I_IMM: alu_ops_n[i].opb = `RV32_signext_Iimm(iss.dat.alu[i].inst);
-                OPB_IS_S_IMM: alu_ops_n[i].opb = `RV32_signext_Simm(iss.dat.alu[i].inst);
-                OPB_IS_B_IMM: alu_ops_n[i].opb = `RV32_signext_Bimm(iss.dat.alu[i].inst);
-                OPB_IS_U_IMM: alu_ops_n[i].opb = `RV32_signext_Uimm(iss.dat.alu[i].inst);
-                OPB_IS_J_IMM: alu_ops_n[i].opb = `RV32_signext_Jimm(iss.dat.alu[i].inst);
-                default:      alu_ops_n[i].opb = 32'hfacefeed; // face feed
+                OPB_IS_RS2:   tmp_alu_ops[i].opb =  prf_in.s_v2s.alu[i];
+                OPB_IS_I_IMM: tmp_alu_ops[i].opb = `RV32_signext_Iimm(iss.dat.alu[i].inst);
+                OPB_IS_S_IMM: tmp_alu_ops[i].opb = `RV32_signext_Simm(iss.dat.alu[i].inst);
+                OPB_IS_B_IMM: tmp_alu_ops[i].opb = `RV32_signext_Bimm(iss.dat.alu[i].inst);
+                OPB_IS_U_IMM: tmp_alu_ops[i].opb = `RV32_signext_Uimm(iss.dat.alu[i].inst);
+                OPB_IS_J_IMM: tmp_alu_ops[i].opb = `RV32_signext_Jimm(iss.dat.alu[i].inst);
+                default:      tmp_alu_ops[i].opb = 32'hfacefeed; // face feed
             endcase
 
-            alu_ops_n[i].bsy         = iss.o_vld.alu[i] | (ops.o_vld.alu & ~ex.i_rdy.alu);
-            alu_ops_n[i].alu_func    = iss.dat.alu[i].alu_func;
-            alu_ops_n[i].branch_func = iss.dat.alu[i].inst.b.funct3;
-            alu_ops_n[i].t           = iss.dat.alu[i].t;
-            alu_ops_n[i].rob_idx     = iss.dat.alu[i].rob_idx;
-            alu_ops_n[i].btq_idx     = iss.dat.alu[i].btq_idx;
-            alu_ops_n[i].cond_branch        = iss.dat.alu[i].cond_branch;
-            alu_ops_n[i].uncond_branch      = iss.dat.alu[i].uncond_branch;
+            tmp_alu_ops[i].alu_func    = iss.dat.alu[i].alu_func;
+            tmp_alu_ops[i].branch_func = iss.dat.alu[i].inst.b.funct3;
+            tmp_alu_ops[i].t           = iss.dat.alu[i].t;
+            tmp_alu_ops[i].rob_idx     = iss.dat.alu[i].rob_idx;
+            tmp_alu_ops[i].btq_idx     = iss.dat.alu[i].btq_idx;
+            tmp_alu_ops[i].cond_branch        = iss.dat.alu[i].cond_branch;
+            tmp_alu_ops[i].uncond_branch      = iss.dat.alu[i].uncond_branch;
         end
 
         mul_ops_n = '0;
@@ -506,6 +499,26 @@ module stage_ex_p4 (
             };
         end
     end
+
+    generate
+        for (genvar i = 0; i < `NUM_FU_ALU; ++i) begin : gen_alu_rbufs
+            ppln_skid #(
+                .WIDTH($bits(ALU_OPS))
+            ) rbuf (
+                .clock (clock),
+                .reset (reset),
+                .flush (flush),
+
+                .i_vld (iss.o_vld.alu[i]),
+                .i_rdy (ops.i_rdy.alu[i]),
+                .i_dat (tmp_alu_ops[i]),
+
+                .o_vld (ops.o_vld.alu[i]),
+                .o_rdy (ex.i_rdy.alu[i]),
+                .o_dat (alu_ops[i])
+            );
+        end
+    endgenerate
 
 
     // structure results into generic cdb candidates array
@@ -558,7 +571,6 @@ module stage_ex_p4 (
 
     execute2complete c_out_n;
     always_comb begin
-        ops.i_rdy.alu = ~ops.o_vld.alu | ex.i_rdy.alu;
         ops.i_rdy.mul = ~ops.o_vld.mul | ex.i_rdy.mul;
 
         rs_out = '{
@@ -586,16 +598,11 @@ module stage_ex_p4 (
 
     always_ff @(posedge clock) begin
         if (reset || flush) begin
-            alu_ops     <= '0;
             mul_ops     <= '0;
-            ops.o_vld.alu <= '0;
             ops.o_vld.mul <= '0;
             c_out       <= '0;
         end else begin
-            alu_ops     <= alu_ops_n;
             mul_ops     <= mul_ops_n;
-            foreach (alu_ops_n[i])
-                ops.o_vld.alu[i] <= alu_ops_n[i].bsy;
             ops.o_vld.mul <= mul_ops_n.bsy;
             /*
             We buffer c_out for 1 cycle to break the comb. chain...
