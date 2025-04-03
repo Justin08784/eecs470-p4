@@ -239,7 +239,7 @@ module testbench;
             for (int i = 0, int cur_idx = 0; i < `N; ++i) begin
                 if (i >= verisimpleV.rob_0.d_in.d_en_cnt)
                     break;
-                cur_idx = verisimpleV.rob_0.d_idxs[i];
+                cur_idx = verisimpleV.rob_0.comm_idxs[i];
                 rob_debug[cur_idx] = '{
                     halt    : verisimpleV.rob_0.d_in.halt[i],
                     illegal : verisimpleV.rob_0.d_in.illegal[i],
@@ -299,7 +299,7 @@ module testbench;
             illegal = committed_insts[n].illegal;
 
             `ifndef SYNTH
-            cur_idx = verisimpleV.rob_0.r_idxs[n];
+            cur_idx = verisimpleV.rob_0.rtre_idxs[n];
             pc      = rob_debug[cur_idx].NPC - 4;
             block   = memory.unified_memory[pc[31:3]];
             inst    = block.word_level[pc[2]];

@@ -506,6 +506,9 @@ typedef struct packed {
 } retire2fetch;
 
 typedef struct packed {
+    /* Alloc */
+    /* Rename */
+    /* Commit */
     logic   [$clog2(`N):0] en_cnt;
         // How many branch instructions dispatching?
         // Sender must ensure branch insns packed to lowest indices.
@@ -634,6 +637,9 @@ typedef struct packed {
 } dispatch2decode;
 
 typedef struct packed {
+    /* Alloc */
+    /* Rename */
+    /* Commit */
     logic       [$clog2(`N):0] d_en_cnt;
         // - To: RS
         // - Number of enabled dispatch lines? (replacement for d_vld)
@@ -646,6 +652,11 @@ typedef struct packed {
 } dispatch2rs;
 
 typedef struct packed {
+    /* Alloc */
+    /* Rename */
+    logic       [$clog2(`N):0] rename_collect_cnt;
+
+    /* Commit */
     logic   [$clog2(`N):0]            d_en_cnt;
         // To: ROB
         // - Number of enabled dispatch lines?
@@ -691,8 +702,6 @@ typedef struct packed {
         // - Number of enabled dispatch lines?
         // - NOTE: For in-order stuff with serial deps (like dispatch), use c(ou)nts;
         // otherwise use en(able) buses.
-    logic         [`N-1:0] rd_src1s;
-    logic         [`N-1:0] rd_src2s;
     REG_IDX       [`N-1:0] src1s;
     REG_IDX       [`N-1:0] src2s;
     REG_IDX       [`N-1:0] dsts;

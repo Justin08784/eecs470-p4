@@ -28,13 +28,15 @@ module rob #(
     logic [$clog2(NUM_RPORTS):0]    used_scnt;
 
     logic [$clog2(ROB_SZ)-1:0]   head;
+    logic [$clog2(ROB_SZ)-1:0]   rsrv;
     logic [$clog2(ROB_SZ)-1:0]   tail;
 
     ROB_ENTRY [ROB_SZ-1:0]       state;
     logic [$clog2(ROB_SZ):0]     used, free;
 
-    logic [NUM_RPORTS-1:0][$clog2(ROB_SZ)-1:0] r_idxs;
-    logic [NUM_DPORTS-1:0][$clog2(ROB_SZ)-1:0] d_idxs;
+    logic [NUM_RPORTS-1:0][$clog2(ROB_SZ)-1:0] rtre_idxs;
+    logic [NUM_DPORTS-1:0][$clog2(ROB_SZ)-1:0] rsrv_idxs;
+    logic [NUM_DPORTS-1:0][$clog2(ROB_SZ)-1:0] comm_idxs;
 
     assign state_dbg    = state;
     assign free         = ROB_SZ - used;
@@ -43,14 +45,16 @@ module rob #(
 
     always_comb begin
         for (int unsigned i = 0; i < NUM_RPORTS; ++i)
-            r_idxs[i] = (head + i) % ROB_SZ;
+            rtre_idxs[i] = (head + i) % ROB_SZ;
         for (int unsigned i = 0; i < NUM_DPORTS; ++i)
-            d_idxs[i] = (tail + i) % ROB_SZ;
+            comm_idxs[i] = (tail + i) % ROB_SZ;
+        for (int unsigned i = 0; i < NUM_DPORTS; ++i)
+            rsrv_idxs[i] = (rsrv + i) % ROB_SZ;
 
         // handle retire (outs)
         r_out = '0;
         for (int unsigned i = 0; i < used_scnt; ++i) begin
-            if (!state[r_idxs[i]].cpl)
+            if (!state[rtre_idxs[i]].cpl)
                 break;
             ++r_out.r_en_cnt;
         end
@@ -58,12 +62,12 @@ module rob #(
         for (int unsigned i = 0; i < used_scnt; ++i) begin
             /* preview mode–– just display all valid entries in read window even
             if not all will get retired this cycle */
-            r_out.tag[i]    = state[r_idxs[i]].tag;
-            r_out.t_old[i]  = state[r_idxs[i]].t_old;
-            r_out.dst[i]    = state[r_idxs[i]].dst;
-            r_out.halt[i]   = state[r_idxs[i]].halt;
-            r_out.illegal[i]= state[r_idxs[i]].illegal;
-            r_out.brch_vld[i]= state[r_idxs[i]].is_brch;
+            r_out.tag[i]    = state[rtre_idxs[i]].tag;
+            r_out.t_old[i]  = state[rtre_idxs[i]].t_old;
+            r_out.dst[i]    = state[rtre_idxs[i]].dst;
+            r_out.halt[i]   = state[rtre_idxs[i]].halt;
+            r_out.illegal[i]= state[rtre_idxs[i]].illegal;
+            r_out.brch_vld[i]= state[rtre_idxs[i]].is_brch;
         end
 
         // handle dispatch (outs)
@@ -82,7 +86,7 @@ module rob #(
         d_out <= '{
             // rob_rdy_scnt : `MIN(free + r_out.r_en_cnt, NUM_DPORTS),
             rob_rdy_scnt : `MIN(free, NUM_DPORTS),
-            rob_idxs     : d_idxs
+            rob_idxs     : rsrv_idxs
         };
     end
 
@@ -90,6 +94,7 @@ module rob #(
         if (reset || flush) begin
             used    <= 0;
             head    <= 0;
+            rsrv    <= 0;
             tail    <= 0;
             state   <= '0;
         end else begin
@@ -101,6 +106,7 @@ module rob #(
             `endif
             used    <= used + d_in.d_en_cnt - r_in.r_en_cnt;
             head    <= (head + r_in.r_en_cnt) % ROB_SZ;
+            rsrv    <= (rsrv + d_in.rename_collect_cnt) % ROB_SZ;
             tail    <= (tail + d_in.d_en_cnt) % ROB_SZ;
 
             // handle complete (ins)
@@ -142,7 +148,7 @@ module rob #(
                 // $display("d[%d]: (tag: %d, t_old: %d, idx: %d)", i, d_idxs[i], d_in.tag[i], d_in.t_old[i]);
                 if (i >= d_in.d_en_cnt)
                     continue;
-                cur_idx = d_idxs[i];
+                cur_idx = comm_idxs[i];
                 state[cur_idx] <= '{
                     cpl     : 0,
                     is_brch : d_in.is_brch[i],
