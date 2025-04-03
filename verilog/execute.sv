@@ -549,19 +549,13 @@ module stage_ex_p4 (
     CPL_CAND_BY_FU cands;
     CPL_CAND [`NUM_FU_TOTAL-1:0] cands_flat;
     assign cands_flat = cands;
-
-    logic [`N-1:0][`NUM_FU_TOTAL-1:0] cdb2fu_gbus;
-    LOGIC_BY_FU cpl_gnt;
-
+    
     /*
     Complete grant bus shift register
     */
-    typedef struct packed {
-        logic [`NUM_FU_ALU-1:0][`N-1:0]     alu;
-        logic [`NUM_FU_MULT-1:0][`N-1:0]    mul;
-    } CPL_SLICE;
-    CPL_SLICE [2:0] cpl_gbus_shr;
-    CPL_SLICE tmp_cpl_gbus;
+    logic [2:0][`N-1:0][`NUM_FU_TOTAL-1:0]  cdb2fu_gbus_shr;
+    logic [`N-1:0][`NUM_FU_TOTAL-1:0]       cdb2fu_gbus;
+    LOGIC_BY_FU [2:0]   cdb_gnt_shr;
 
     LOGIC_BY_FU cdb_req;
     LOGIC_BY_FU cdb_gnt;
@@ -571,18 +565,22 @@ module stage_ex_p4 (
         .WIDTH(`NUM_FU_TOTAL),
         .REQS(`N)
     ) cdb_arb (
-        .req(cdb_req),
-        .gnt(cdb_gnt),
-        .gnt_bus(tmp_cpl_gbus)
+        .req    (cdb_req),  // flatten (alu + mul bits) => single [NUM_FU_TOTAL-1:0] bus
+        .gnt    (cdb_gnt),  // flatten => single bus
+        .gnt_bus(cdb2fu_gbus)
     );
 
     always_ff @(posedge clock) begin
         if (reset || flush) begin
-            cpl_gbus_shr <= '0;
+            cdb2fu_gbus_shr <= '0;
+            cdb_gnt_shr     <= '0;
         end else begin
-            cpl_gbus_shr[0] <= tmp_cpl_gbus;
-            for (int unsigned i = 0; i < 2; ++i)
-                cpl_gbus_shr[i+1] <= cpl_gbus_shr[i];
+            cdb2fu_gbus_shr[0]  <= cdb2fu_gbus;
+            cdb_gnt_shr[0]      <= cdb_gnt;
+            for (int unsigned i = 0; i < 2; ++i) begin
+                cdb2fu_gbus_shr[i+1] <= cdb2fu_gbus_shr[i];
+                cdb_gnt_shr[i+1]     <= cdb_gnt_shr[i];
+            end
         end
     end
 
@@ -597,7 +595,7 @@ module stage_ex_p4 (
 
         .o_vld  (ex.o_vld.alu),
         .o_cands(cands.alu),
-        .o_rdy  (cpl_gnt.alu)
+        .o_rdy  (cdb_gnt_shr[2].alu)
     );
 
     mul_ex mul_ex0 (
@@ -614,16 +612,7 @@ module stage_ex_p4 (
 
         .o_vld  (ex.o_vld.mul),
         .o_cands(cands.mul),
-        .o_rdy  (cpl_gnt.mul)
-    );
-
-    psel_gen #(
-        .WIDTH(`NUM_FU_TOTAL),
-        .REQS(`N)
-    ) sel_cpl (
-        .req(ex.o_vld), // flatten (alu + mul bits) => single [NUM_FU_TOTAL-1:0] bus
-        .gnt(cpl_gnt),  // flatten => single bus
-        .gnt_bus(cdb2fu_gbus)
+        .o_rdy  (cdb_gnt_shr[2].mul)
     );
 
     execute2complete c_out_n;
@@ -636,8 +625,8 @@ module stage_ex_p4 (
         };
 
         c_out_n = '0;
-        foreach (cdb2fu_gbus[c, f]) begin
-            if (cdb2fu_gbus[c][f]) begin
+        foreach(cdb2fu_gbus_shr[_, c, f]) begin
+            if (cdb2fu_gbus_shr[2][c][f]) begin
                 c_out_n.c_en[c]       |= 1;
                 c_out_n.c_ts[c]       |= cands_flat[f].t;
                 c_out_n.c_rob_idxs[c] |= cands_flat[f].rob_idx;
