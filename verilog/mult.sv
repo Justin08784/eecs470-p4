@@ -34,6 +34,7 @@ module mult (
 
     // lines for early CDB arbitration
     output logic cdb_req,
+    output PHYS_REG_IDX ctag_t,
     input  logic cdb_gnt,
 
     output DATA result,
@@ -120,6 +121,7 @@ module mult (
                 .o_rdy(cdb_gnt),
                 .o_dat(pkts[i+1])
             );
+            assign ctag_t = pkts[i+1].dst.tag;
 
         end else if (i == `MULT_STAGES-3) begin
             mult_stage #(

@@ -272,6 +272,7 @@ module mul_ex(
 
     /* Early CDB arbitration */
     output logic [`NUM_FU_MULT-1:0]     cdb_req,
+    output PHYS_REG_IDX [`NUM_FU_MULT-1:0] ctag_ts,
     input  logic [`NUM_FU_MULT-1:0]     cdb_gnt,
 
     /* BACKEND */
@@ -315,6 +316,7 @@ module mul_ex(
                 .func   (ops[i].func),
 
                 .cdb_req(cdb_req[i]),
+                .ctag_t (ctag_ts[i]),
                 .cdb_gnt(cdb_gnt[i]),
 
                 // Output
@@ -593,6 +595,12 @@ module stage_ex_p4 (
         .o_rdy  (cdb_gnt_shr[2].alu)
     );
 
+    struct packed {
+        PHYS_REG_IDX [`NUM_FU_ALU-1:0] alu;
+        PHYS_REG_IDX [`NUM_FU_ALU-1:0] mul; // TODO: set. need to pull from mul_ex again
+    } ctag_ts;
+    PHYS_REG_IDX [`NUM_FU_TOTAL-1:0] ctag_ts_flat;
+    
     mul_ex mul_ex0 (
         .clock  (clock),
         .reset  (reset),
@@ -603,6 +611,7 @@ module stage_ex_p4 (
         .i_rdy  (ex.i_rdy.mul),
 
         .cdb_req(cdb_req.mul),
+        .ctag_ts(ctag_ts.mul),
         .cdb_gnt(cdb_gnt.mul),
 
         .o_vld  (ex.o_vld.mul),
@@ -612,11 +621,6 @@ module stage_ex_p4 (
 
     execute2complete_tag ctag_out_n;
     execute2complete_dat cdat_out_n;
-    struct packed {
-        PHYS_REG_IDX [`NUM_FU_ALU-1:0] alu;
-        PHYS_REG_IDX [`NUM_FU_ALU-1:0] mul; // TODO: set. need to pull from mul_ex again
-    } ctag_ts;
-    PHYS_REG_IDX [`NUM_FU_TOTAL-1:0] ctag_ts_flat;
     always_comb begin
         rs_out = '{
             fu_cdb_gnt_alu  : cdb_gnt.alu,
@@ -627,7 +631,6 @@ module stage_ex_p4 (
             fu_rdy_store    : '0
         };
 
-        ctag_ts = '0;
         foreach (rs_in.fu_dat_alu[i])
             ctag_ts.alu[i] = rs_in.fu_dat_alu[i].t;
         ctag_ts_flat = ctag_ts;
