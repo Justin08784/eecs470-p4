@@ -888,7 +888,7 @@ typedef struct packed {
 
 typedef struct packed {
     logic   [$clog2(`N):0] r_en;
-    ROB_IDX [`N-1:0] r_pos;
+    // ROB_IDX [`N-1:0] r_pos;
 } rob2sq;
 
 typedef struct packed {

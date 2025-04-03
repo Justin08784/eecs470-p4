@@ -13,7 +13,7 @@ module sq_testbench;
 
     sq2dispatch sq_2_dis;
     sq2execute sq_2_exec;
-    sq2rs sq_2_rs;
+    // sq2rs sq_2_rs;
 
     // sq2stRET sq_2_ret;
     // stRET2sq ret_2_sq;
@@ -48,7 +48,7 @@ module sq_testbench;
 
         .sq_2_dis(sq_2_dis),
         .sq_2_exec(sq_2_exec),
-        .sq_2_rs(sq_2_rs),
+        // .sq_2_rs(sq_2_rs),
         .ret_2_mem(ret_2_mem),
         .sq_2_rob(sq_2_rob)
     );
@@ -118,12 +118,12 @@ module sq_testbench;
         @(negedge clock);
         exec_2_sq = '0;
         rob_2_sq.r_en = 2;
-        assert (sq_2_rs.en == 4'b0011) 
-        else   exit_on_error ("CDB en not correct");
-        assert (sq_2_rs.sq_idx_cdb[0] == 0) 
-        else   exit_on_error ("CDB [0] not correct");
-        assert (sq_2_rs.sq_idx_cdb[1] == 1) 
-        else   exit_on_error ("CDB [1] not correct");
+        // assert (sq_2_rs.en == 4'b0011) 
+        // else   exit_on_error ("CDB en not correct");
+        // assert (sq_2_rs.sq_idx_cdb[0] == 0) 
+        // else   exit_on_error ("CDB [0] not correct");
+        // assert (sq_2_rs.sq_idx_cdb[1] == 1) 
+        // else   exit_on_error ("CDB [1] not correct");
         @(negedge clock);
         exec_2_sq = '0;
         rob_2_sq = '0;
