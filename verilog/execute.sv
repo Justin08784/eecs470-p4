@@ -653,7 +653,7 @@ module stage_ex_p4 (
 
     always_ff @(posedge clock) begin
         if (reset || flush) begin
-            c_out       <= '0;
+            c_out <= '0;
         end else begin
             /*
             We buffer c_out for 1 cycle to break the comb. chain...
@@ -667,7 +667,12 @@ module stage_ex_p4 (
             they have INTR_FWD disabled? Can you simply reenable INTR_FWD for
             them with minimal latency cost?
             */
-            c_out       <= c_out_n;
+            c_out <= c_out_n;
+            if (c_out.c_en[0] && c_out.c_en[1]
+                && c_out.c_ts[0] == c_out.c_ts[1]
+                && c_out.c_ts[0] != '0) begin
+                $error("💥 DUPLICATE CDB TAG: slot %0d and %0d both write tag %0d", 0, 1, c_out.c_ts[1]);
+            end
 
         end
     end

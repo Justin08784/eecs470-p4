@@ -66,30 +66,25 @@ module rs #(parameter
     endgenerate
 
     // SECTION: cdb completion
+    logic [`N-1:0][RS_SZ-1:0] to_t1_rdy_per_cpl;
+    logic [`N-1:0][RS_SZ-1:0] to_t2_rdy_per_cpl;
     logic [RS_SZ-1:0] to_t1_rdy;
     logic [RS_SZ-1:0] to_t2_rdy;
     always_comb begin
+        to_t1_rdy_per_cpl = '0;
+        to_t2_rdy_per_cpl = '0;
+        foreach(to_t1_rdy_per_cpl[n, rs]) begin
+            if (!c_in.c_en[n])
+                continue;
+            to_t1_rdy_per_cpl[n][rs] = entries[rs].dat.t1 == c_in.c_ts[n];
+            to_t2_rdy_per_cpl[n][rs] = entries[rs].dat.t2 == c_in.c_ts[n];
+        end
+
         to_t1_rdy = '0;
         to_t2_rdy = '0;
-        for (int rs = 0; rs < RS_SZ; ++rs) begin
-            logic match_t1;
-            logic match_t2;
-            // in milestone 1:
-            // match_t1 = t1_rdy_vec[rs];
-            // match_t2 = t2_rdy_vec[rs];
-            match_t1 = 0;
-            match_t2 = 0;
-
-            // match any tag in CDB?
-            for (int n = 0; n < N; ++n) begin
-                if (c_in.c_en[n]) begin
-                    match_t1 |= entries[rs].dat.t1 == c_in.c_ts[n];
-                    match_t2 |= entries[rs].dat.t2 == c_in.c_ts[n];
-                end
-            end
-
-            to_t1_rdy[rs] = match_t1;
-            to_t2_rdy[rs] = match_t2;
+        foreach(to_t1_rdy_per_cpl[n, rs]) begin
+            to_t1_rdy[rs] |= to_t1_rdy_per_cpl[n][rs];
+            to_t2_rdy[rs] |= to_t2_rdy_per_cpl[n][rs];
         end
     end
 
@@ -236,6 +231,23 @@ module rs #(parameter
         end
     end
 
+    function automatic BYPASS_TAG get_bytag (
+        input int rs
+    );
+        BYPASS_TAG tag = '0;
+        for (int n = 0; n < N; ++n) begin
+            if (to_t1_rdy_per_cpl[n][rs]) begin
+                tag.bypass1     |= 1; // TODO: What about zero reg? A matching zero reg should not count as a valid wakeup!
+                tag.cdb_idx1    |= n; // This should be okay. Two insns cannot have the same destination tag! There is a $fatal check for this in execute.sv
+            end
+            if (to_t2_rdy_per_cpl[n][rs]) begin
+                tag.bypass2     |= 1;
+                tag.cdb_idx2    |= n;
+            end
+        end
+        return tag;
+    endfunction
+
     always_comb begin
         ex_out.fu_dat_alu   = '0;
         ex_out.fu_dat_mult  = '0;
@@ -248,21 +260,25 @@ module rs #(parameter
         foreach (fu2issuer_alu[fu, rs]) begin
             if (fu2issuer_alu[fu][rs]) begin // [MISSING] ms1 test: Remove "!" from if condition (not caught)
                 ex_out.fu_dat_alu[fu] |= entries[rs].dat;
+                ex_out.bytag_alu[fu]  |= get_bytag(rs);
             end
         end
         foreach (fu2issuer_mult[fu, rs]) begin
             if (fu2issuer_mult[fu][rs]) begin
                 ex_out.fu_dat_mult[fu] |= entries[rs].dat;
+                ex_out.bytag_mul[fu]   |= get_bytag(rs);
             end
         end
         foreach (fu2issuer_load[fu, rs]) begin
             if (fu2issuer_load[fu][rs]) begin
                 ex_out.fu_dat_load[fu] |= entries[rs].dat;
+                ex_out.bytag_ldr[fu]   |= get_bytag(rs);
             end
         end
         foreach (fu2issuer_store[fu, rs]) begin
             if (fu2issuer_store[fu][rs]) begin
                 ex_out.fu_dat_store[fu] |= entries[rs].dat;
+                ex_out.bytag_str[fu]    |= get_bytag(rs);
             end
         end
     end

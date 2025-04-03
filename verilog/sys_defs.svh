@@ -603,8 +603,8 @@ typedef struct packed {
         is needed. */
     logic bypass2;
 
-    logic [`N-1:0]  cdb_idx1;   // which cdb slot to bypass for src1 (valid iff bypass1 set)
-    logic [`N-1:0]  cdb_idx2;
+    logic [$clog2(`N)-1:0]  cdb_idx1;   // which cdb slot to bypass for src1 (valid iff bypass1 set)
+    logic [$clog2(`N)-1:0]  cdb_idx2;
 } BYPASS_TAG;
 
 typedef struct packed {
