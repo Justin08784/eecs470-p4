@@ -237,10 +237,14 @@ module rs #(parameter
     end
 
     always_comb begin
-        ex_out.fu_dat_alu      = '0;
-        ex_out.fu_dat_mult     = '0;
-        ex_out.fu_dat_store    = '0;
-        ex_out.fu_dat_load     = '0;
+        ex_out.fu_dat_alu   = '0;
+        ex_out.fu_dat_mult  = '0;
+        ex_out.fu_dat_store = '0;
+        ex_out.fu_dat_load  = '0;
+        ex_out.bytag_alu    = '0; // TODO: set
+        ex_out.bytag_mul    = '0; // TODO: set
+        ex_out.bytag_ldr    = '0; // TODO: set
+        ex_out.bytag_str    = '0; // TODO: set
         foreach (fu2issuer_alu[fu, rs]) begin
             if (fu2issuer_alu[fu][rs]) begin // [MISSING] ms1 test: Remove "!" from if condition (not caught)
                 ex_out.fu_dat_alu[fu] |= entries[rs].dat;

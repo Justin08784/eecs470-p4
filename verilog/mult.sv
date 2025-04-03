@@ -32,6 +32,10 @@ module mult (
     input  logic o_rdy, // TODO: set
     output logic o_vld, // replacement for done
 
+    // lines for early CDB arbitration
+    output logic cdb_req,
+    input  logic cdb_gnt,
+
     output DATA result,
     output DST dst_out
 );
@@ -84,21 +88,68 @@ module mult (
         o_pkt               = pkts[`MULT_STAGES];
     end
 
-    for (genvar i = 0; i < `MULT_STAGES; i++) begin : gen_stages
-        mult_stage #(
-            .MODE(modes[i])
-        ) mstage (
-            .clock (clock),
-            .reset (reset),
-            .flush (flush),
+    for (genvar i = 0; i < `MULT_STAGES; ++i) begin : gen_stages
+        if (i < `MULT_STAGES-4) begin
+            mult_stage #(
+                .MODE(O_SKID)
+            ) mstage (
+                .clock (clock),
+                .reset (reset),
+                .flush (flush),
 
-            .i_vld(vlds[i]),
-            .i_rdy(rdys[i]),
-            .i_dat(pkts[i]),
-            .o_vld(vlds[i+1]),
-            .o_rdy(rdys[i+1]),
-            .o_dat(pkts[i+1])
-        );
+                .i_vld(vlds[i]),
+                .i_rdy(rdys[i]),
+                .i_dat(pkts[i]),
+                .o_vld(vlds[i+1]),
+                .o_rdy(rdys[i+1]),
+                .o_dat(pkts[i+1])
+            );
+
+        end else if (i == `MULT_STAGES-4) begin
+            mult_stage #(
+                .MODE(O_PSKID)
+            ) mstage (
+                .clock (clock),
+                .reset (reset),
+                .flush (flush),
+
+                .i_vld(vlds[i]),
+                .i_rdy(rdys[i]),
+                .i_dat(pkts[i]),
+                .o_vld(cdb_req),
+                .o_rdy(cdb_gnt),
+                .o_dat(pkts[i+1])
+            );
+
+        end else if (i == `MULT_STAGES-3) begin
+            mult_stage #(
+                .MODE(O_FLOP)
+            ) mstage (
+                .clock (clock),
+                .reset (reset),
+                .flush (flush),
+
+                .i_vld(cdb_gnt),
+                .i_dat(pkts[i]),
+                .o_vld(vlds[i+1]),
+                .o_dat(pkts[i+1])
+            );
+
+        end else begin
+            mult_stage #(
+                .MODE(O_FLOP)
+            ) mstage (
+                .clock (clock),
+                .reset (reset),
+                .flush (flush),
+
+                .i_vld(vlds[i]),
+                .i_dat(pkts[i]),
+                .o_vld(vlds[i+1]),
+                .o_dat(pkts[i+1])
+            );
+
+        end
     end
 
     // Use the high or low bits of the product based on the output func

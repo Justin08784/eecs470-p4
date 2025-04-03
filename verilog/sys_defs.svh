@@ -594,22 +594,24 @@ endfunction
 `endif
 
 typedef struct packed {
+    /* ETB bypass control */
+    logic bypass1;  // set iff 1) awaken by a complete to its src1 AND 2) issued same cycle
+        /* Q: How to implement?
+        A: Set if a complete readies our src1. Clear if we do not issue same cycle.
+        If an insn issues 1 or more cycles *after* all of its source operands
+        have been readied, then they will be ready in the PRF, and thus bypass
+        is needed. */
+    logic bypass2;
+
+    logic [`N-1:0]  cdb_idx1;   // which cdb slot to bypass for src1 (valid iff bypass1 set)
+    logic [`N-1:0]  cdb_idx2;
+} BYPASS_TAG;
+
+typedef struct packed {
     logic           busy;
     logic           issued;
     ID_RESULT       dat;
 } RS_ENTRY;
-
-typedef struct packed {
-    logic       busy;
-
-    /*
-    NOTE: This is a generic struct which could hold the execute-necessary data
-    for ANY operation type, but a lot of the fields may go wasted. Might be
-    better to define FU-specific structs to hold only the data necessary for
-    that specific FU group. (Jonah says not to; dont overcomplicate things)
-    */
-    ID_RESULT   dat;
-} FU_ENTRY;
 
 // By Fetch
 typedef struct packed {
@@ -737,6 +739,11 @@ typedef struct packed {
     logic       [`NUM_FU_MULT-1:0]   fu_vld_mult;
     logic       [`NUM_FU_STORE-1:0]  fu_vld_store;
     logic       [`NUM_FU_LOAD-1:0]   fu_vld_load;
+    BYPASS_TAG  [`NUM_FU_ALU-1:0]    bytag_alu;
+    BYPASS_TAG  [`NUM_FU_MULT-1:0]   bytag_mul;
+    BYPASS_TAG  [`NUM_FU_LOAD-1:0]   bytag_ldr;
+    BYPASS_TAG  [`NUM_FU_STORE-1:0]  bytag_str;
+
     ID_RESULT   [`NUM_FU_ALU-1:0]    fu_dat_alu;
     ID_RESULT   [`NUM_FU_MULT-1:0]   fu_dat_mult;
     ID_RESULT   [`NUM_FU_STORE-1:0]  fu_dat_store;

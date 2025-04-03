@@ -266,6 +266,10 @@ module mul_ex(
     MUL_REGS_EX  [`NUM_FU_MULT-1:0]     i_regs,
         // insn metadata/operands
 
+    /* Early CDB arbitration */
+    output logic [`NUM_FU_MULT-1:0]     cdb_req,
+    input  logic [`NUM_FU_MULT-1:0]     cdb_gnt,
+
     /* BACKEND */
     output logic [`NUM_FU_MULT-1:0]     o_vld,
     output CPL_CAND [`NUM_FU_MULT-1:0]  o_cands,
@@ -305,6 +309,9 @@ module mul_ex(
                 .rs1    (ops[i].rs1),
                 .rs2    (ops[i].rs2),
                 .func   (ops[i].func),
+
+                .cdb_req(cdb_req[i]),
+                .cdb_gnt(cdb_gnt[i]),
 
                 // Output
                 .o_vld  (o_vld[i]),
@@ -546,6 +553,39 @@ module stage_ex_p4 (
     logic [`N-1:0][`NUM_FU_TOTAL-1:0] cdb2fu_gbus;
     LOGIC_BY_FU cpl_gnt;
 
+    /*
+    Complete grant bus shift register
+    */
+    typedef struct packed {
+        logic [`NUM_FU_ALU-1:0][`N-1:0]     alu;
+        logic [`NUM_FU_MULT-1:0][`N-1:0]    mul;
+    } CPL_SLICE;
+    CPL_SLICE [2:0] cpl_gbus_shr;
+    CPL_SLICE tmp_cpl_gbus;
+
+    LOGIC_BY_FU cdb_req;
+    LOGIC_BY_FU cdb_gnt;
+    assign cdb_req.alu = rs_in.fu_vld_alu;
+
+    psel_gen #(
+        .WIDTH(`NUM_FU_TOTAL),
+        .REQS(`N)
+    ) cdb_arb (
+        .req(cdb_req),
+        .gnt(cdb_gnt),
+        .gnt_bus(tmp_cpl_gbus)
+    );
+
+    always_ff @(posedge clock) begin
+        if (reset || flush) begin
+            cpl_gbus_shr <= '0;
+        end else begin
+            cpl_gbus_shr[0] <= tmp_cpl_gbus;
+            for (int unsigned i = 0; i < 2; ++i)
+                cpl_gbus_shr[i+1] <= cpl_gbus_shr[i];
+        end
+    end
+
     alu_ex alu_ex0 (
         .clock  (clock),
         .reset  (reset),
@@ -568,6 +608,9 @@ module stage_ex_p4 (
         .i_vld  (regs.o_vld.mul),
         .i_regs (mul_regs),
         .i_rdy  (ex.i_rdy.mul),
+
+        .cdb_req(cdb_req.mul),
+        .cdb_gnt(cdb_gnt.mul),
 
         .o_vld  (ex.o_vld.mul),
         .o_cands(cands.mul),
