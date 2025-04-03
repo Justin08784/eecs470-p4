@@ -36,8 +36,8 @@ module btq #(
     BTQ_ENTRY [BTQ_SZ-1:0]      state;
     logic [$clog2(BTQ_SZ)-1:0]  head;
     logic [$clog2(BTQ_SZ)-1:0]  tail;
-
     logic [$clog2(BTQ_SZ):0]    used;
+
     logic [$clog2(BTQ_SZ):0]    free;
     assign free         = BTQ_SZ - used;
     assign state_dbg    = state;

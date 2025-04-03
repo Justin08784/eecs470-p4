@@ -87,7 +87,6 @@ always_comb begin
         ? `MIN(alloc_en_cnt, free_in.free_rdy_scnt)
         : alloc_en_cnt;
     alloc_en_cnt = `MIN(alloc_en_cnt, alloc_rdy_scnt);
-    rob_out.alloc_rsrv_cnt  = alloc_en_cnt;
     
     //assigning output #'s
     decode_out.dispatch_en_cnt  = alloc_en_cnt;
