@@ -44,6 +44,8 @@ typedef struct packed {
 
 /* Slices (or "views") of ID_RESULT needed for each FU type */
 typedef struct packed {
+    BYPASS_TAG      bytag;
+
     PHYS_REG_IDX    t;
     PHYS_REG_IDX    t1;
     PHYS_REG_IDX    t2;
@@ -62,6 +64,8 @@ typedef struct packed {
 } ID_ALU_VIEW;
 
 typedef struct packed {
+    BYPASS_TAG      bytag;
+
     PHYS_REG_IDX    t;
     PHYS_REG_IDX    t1;
     PHYS_REG_IDX    t2;
@@ -399,6 +403,8 @@ module stage_ex_p4 (
 
         for (genvar i = 0; i < `NUM_FU_ALU; ++i) begin : gen_alu_sbufs
             assign tmp_alu_el[i] = '{
+                bytag   : rs_in.bytag_alu[i],
+
                 t       : rs_in.fu_dat_alu[i].t,
                 t1      : rs_in.fu_dat_alu[i].t1,
                 t2      : rs_in.fu_dat_alu[i].t2,
@@ -435,6 +441,8 @@ module stage_ex_p4 (
         
         for (genvar i = 0; i < `NUM_FU_MULT; ++i) begin : gen_mul_sbufs
             assign tmp_mul_el[i] = '{
+                bytag   : rs_in.bytag_mul[i],
+
                 t       : rs_in.fu_dat_mult[i].t,
                 t1      : rs_in.fu_dat_mult[i].t1,
                 t2      : rs_in.fu_dat_mult[i].t2,
@@ -571,31 +579,6 @@ module stage_ex_p4 (
         .gnt_bus(cdb2fu_gbus)
     );
 
-    always_ff @(posedge clock) begin
-        if (reset || flush) begin
-            cdb2fu_gbus_shr <= '0;
-            cdb_gnt_shr     <= '0;
-        end else begin
-            cdb2fu_gbus_shr[0]  <= cdb2fu_gbus;
-            cdb_gnt_shr[0]      <= cdb_gnt;
-            for (int unsigned i = 0; i < 2; ++i) begin
-                cdb2fu_gbus_shr[i+1] <= cdb2fu_gbus_shr[i];
-                cdb_gnt_shr[i+1]     <= cdb_gnt_shr[i];
-            end
-
-            if (ctag_out.en[0] && ctag_out.en[1]
-                && ctag_out.ts[0] == ctag_out.ts[1]
-                && ctag_out.ts[0] != '0) begin
-                $error("💥 DUPLICATE CDB_TAG TAG: slot %0d and %0d both write tag %0d", 0, 1, ctag_out.ts[1]);
-            end
-            if (cdat_out.en[0] && cdat_out.en[1]
-                && cdat_out.ts[0] == cdat_out.ts[1]
-                && cdat_out.ts[0] != '0) begin
-                $error("💥 DUPLICATE CDB_DAT tag: slot %0d and %0d both write tag %0d", 0, 1, cdat_out.ts[1]);
-            end
-        end
-    end
-
     alu_ex alu_ex0 (
         .clock  (clock),
         .reset  (reset),
@@ -641,20 +624,50 @@ module stage_ex_p4 (
 
         foreach(cdb2fu_gbus_shr[_, c, f]) begin
             if (cdb2fu_gbus_shr[0][c][f]) begin
-                ctag_out.en[c]  |= 1;
-                ctag_out.ts[c]  |= cands_flat[f].t; // TODO: correct these tags
-            end
-            if (cdb2fu_gbus_shr[2][c][f]) begin
-                cdat_out.en[c]          |= 1;
-                cdat_out.ts[c]          |= cands_flat[f].t;
-                cdat_out.rob_idxs[c]    |= cands_flat[f].rob_idx;
-                cdat_out.data[c]        |= cands_flat[f].data;
-                // TODO: fill these
-                cdat_out.btq_idxs[c]    |= cands_flat[f].btq_idx;
-                cdat_out.is_branch[c]   |= cands_flat[f].is_brch;
-                cdat_out.take[c]        |= cands_flat[f].take;
+                ctag_out_n.en[c]  |= 1;
+                ctag_out_n.ts[c]  |= cands_flat[f].t; // TODO: correct these tags
             end
 
+            if (cdb2fu_gbus_shr[2][c][f]) begin
+                cdat_out_n.en[c]          |= 1;
+                cdat_out_n.ts[c]          |= cands_flat[f].t;
+                cdat_out_n.rob_idxs[c]    |= cands_flat[f].rob_idx;
+                cdat_out_n.data[c]        |= cands_flat[f].data;
+                // TODO: fill these
+                cdat_out_n.btq_idxs[c]    |= cands_flat[f].btq_idx;
+                cdat_out_n.is_branch[c]   |= cands_flat[f].is_brch;
+                cdat_out_n.take[c]        |= cands_flat[f].take;
+            end
+
+        end
+    end
+
+    always_ff @(posedge clock) begin
+        if (reset || flush) begin
+            cdb2fu_gbus_shr <= '0;
+            cdb_gnt_shr     <= '0;
+            ctag_out <= '0;
+            cdat_out <= '0;
+        end else begin
+            cdb2fu_gbus_shr[0]  <= cdb2fu_gbus;
+            cdb_gnt_shr[0]      <= cdb_gnt;
+            for (int unsigned i = 0; i < 2; ++i) begin
+                cdb2fu_gbus_shr[i+1] <= cdb2fu_gbus_shr[i];
+                cdb_gnt_shr[i+1]     <= cdb_gnt_shr[i];
+            end
+            ctag_out <= ctag_out_n;
+            cdat_out <= cdat_out_n;
+
+            if (ctag_out.en[0] && ctag_out.en[1]
+                && ctag_out.ts[0] == ctag_out.ts[1]
+                && ctag_out.ts[0] != '0) begin
+                $error("💥 DUPLICATE CDB_TAG TAG: slot %0d and %0d both write tag %0d", 0, 1, ctag_out.ts[1]);
+            end
+            if (cdat_out.en[0] && cdat_out.en[1]
+                && cdat_out.ts[0] == cdat_out.ts[1]
+                && cdat_out.ts[0] != '0) begin
+                $error("💥 DUPLICATE CDB_DAT tag: slot %0d and %0d both write tag %0d", 0, 1, cdat_out.ts[1]);
+            end
         end
     end
 
