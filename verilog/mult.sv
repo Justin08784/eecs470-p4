@@ -11,9 +11,9 @@ typedef struct packed {
 
 typedef enum logic[1:0] {
     O_NONE    = 0,
-    O_SKID    = 1,
-    O_PSKID   = 2,
-    O_UNKNOWN = 3
+    O_SKID    = 1, // combinational backpressure, registered forward pressure
+    O_PSKID   = 2, // registered back AND forward pressure (but needs 2 regs)
+    O_FLOP    = 3  // no handshake; advance unconditionally (i.e. simple flop)
 } OUT_MODE;
 
 // This is a pipelined multiplier that multiplies two 64-bit integers and
@@ -197,10 +197,22 @@ module mult_stage #(
             );
         end
 
-        O_UNKNOWN: begin
-            assign i_rdy = 1'bx;
-            assign o_vld = 1'bx;
-            assign o_dat = 1'bx;
+        O_FLOP: begin
+            assign i_rdy = 1'b1;
+
+            flop #(
+                .WIDTH($bits(MUL_PKT))
+            ) flop_0 (
+                .clock(clock),
+                .reset(reset),
+                .flush(flush),
+                
+                .i_vld(i_vld),
+                .i_dat(tmp_dat),
+
+                .o_vld(o_vld),
+                .o_dat(o_dat)
+            );
         end
         endcase
     endgenerate

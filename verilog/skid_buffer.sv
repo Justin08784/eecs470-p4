@@ -1,5 +1,34 @@
 `include "sys_defs.svh"
 
+module flop #(
+    parameter int unsigned WIDTH
+) (
+    input   clock, 
+    input   reset,
+    input   flush,
+
+    input   logic   i_vld,
+    input   logic   [WIDTH-1:0] i_dat,
+
+    output  logic   o_vld,
+    output  logic   [WIDTH-1:0] o_dat
+);
+    logic vld;
+    logic [WIDTH-1:0] dat;
+    always_ff @(posedge clock) begin
+        if (reset || flush) begin
+            vld <= 0;
+            dat <= '0;
+        end else begin
+            vld <= i_vld;
+            dat <= i_dat;
+        end
+    end
+
+    assign o_vld = vld;
+    assign o_dat = dat;
+endmodule
+
 module skid #(
     parameter int unsigned WIDTH,
     type SKID_STATE = struct packed {
