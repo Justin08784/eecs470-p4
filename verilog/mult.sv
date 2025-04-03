@@ -10,7 +10,7 @@ typedef struct packed {
 } MUL_PKT;
 
 typedef enum logic[1:0] {
-    O_NONE    = 0,
+    O_NONE    = 0, // passthrough
     O_SKID    = 1, // combinational backpressure, registered forward pressure
     O_PSKID   = 2, // registered back AND forward pressure (but needs 2 regs)
     O_FLOP    = 3  // no handshake; advance unconditionally (i.e. simple flop)
@@ -28,8 +28,8 @@ module mult (
     input DST dst_in,
 
     input  logic i_vld,  // replacement for start
-    output logic i_rdy,  // TODO: set
-    input  logic o_rdy, // TODO: set
+    output logic i_rdy,
+    input  logic o_rdy,
     output logic o_vld, // replacement for done
 
     // lines for early CDB arbitration
