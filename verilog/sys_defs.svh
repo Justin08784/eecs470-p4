@@ -805,21 +805,28 @@ typedef struct packed {
 typedef struct packed {
     /* TODO: Better to make this a union, with shared c_en and is_branch
     at the top, and union over non-branch and branch-specific stuff? */
-    logic           [`N-1:0] c_en;
+    logic           [`N-1:0] en;
+    PHYS_REG_IDX    [`N-1:0] ts;
+} execute2complete_tag;
+
+typedef struct packed {
+    /* TODO: Better to make this a union, with shared c_en and is_branch
+    at the top, and union over non-branch and branch-specific stuff? */
+    logic           [`N-1:0] en;
     logic           [`N-1:0] is_branch;
         // - From: EX
-    PHYS_REG_IDX    [`N-1:0] c_ts;
+    PHYS_REG_IDX    [`N-1:0] ts;
         // - From: EX
-    ROB_IDX         [`N-1:0] c_rob_idxs;
+    ROB_IDX         [`N-1:0] rob_idxs;
         // - From: EX
-    DATA            [`N-1:0] c_data;
+    DATA            [`N-1:0] data;
         // doubles as branch target if is_branch true
 
     // BTQ-specific completion stuff
     BTQ_IDX [`N-1:0] btq_idxs; 
         // Entries to which we are completing
     logic   [`N-1:0] take;
-} execute2complete;
+} execute2complete_dat;
 
 // By Free List
 typedef struct packed {

@@ -348,7 +348,8 @@ module stage_ex_p4 (
     output  execute2prf prf_out,
 
     // TODO: wrap this stuff into execute2complete. Wrap crap here in general.
-    output  execute2complete c_out
+    output  execute2complete_tag ctag_out,
+    output  execute2complete_dat cdat_out
 
 );
     /*
@@ -581,6 +582,17 @@ module stage_ex_p4 (
                 cdb2fu_gbus_shr[i+1] <= cdb2fu_gbus_shr[i];
                 cdb_gnt_shr[i+1]     <= cdb_gnt_shr[i];
             end
+
+            if (ctag_out.en[0] && ctag_out.en[1]
+                && ctag_out.ts[0] == ctag_out.ts[1]
+                && ctag_out.ts[0] != '0) begin
+                $error("💥 DUPLICATE CDB_TAG TAG: slot %0d and %0d both write tag %0d", 0, 1, ctag_out.ts[1]);
+            end
+            if (cdat_out.en[0] && cdat_out.en[1]
+                && cdat_out.ts[0] == cdat_out.ts[1]
+                && cdat_out.ts[0] != '0) begin
+                $error("💥 DUPLICATE CDB_DAT tag: slot %0d and %0d both write tag %0d", 0, 1, cdat_out.ts[1]);
+            end
         end
     end
 
@@ -615,7 +627,8 @@ module stage_ex_p4 (
         .o_rdy  (cdb_gnt_shr[2].mul)
     );
 
-    execute2complete c_out_n;
+    execute2complete_tag ctag_out_n;
+    execute2complete_dat cdat_out_n;
     always_comb begin
         rs_out = '{
             fu_cdb_gnt_alu  : cdb_gnt.alu,
@@ -626,47 +639,46 @@ module stage_ex_p4 (
             fu_rdy_store    : '0
         };
 
-        c_out_n = '0;
         foreach(cdb2fu_gbus_shr[_, c, f]) begin
+            if (cdb2fu_gbus_shr[0][c][f]) begin
+                ctag_out.en[c]  |= 1;
+                ctag_out.ts[c]  |= cands_flat[f].t; // TODO: correct these tags
+            end
             if (cdb2fu_gbus_shr[2][c][f]) begin
-                c_out_n.c_en[c]       |= 1;
-                c_out_n.c_ts[c]       |= cands_flat[f].t;
-                c_out_n.c_rob_idxs[c] |= cands_flat[f].rob_idx;
-                c_out_n.c_data[c]     |= cands_flat[f].data;
+                cdat_out.en[c]          |= 1;
+                cdat_out.ts[c]          |= cands_flat[f].t;
+                cdat_out.rob_idxs[c]    |= cands_flat[f].rob_idx;
+                cdat_out.data[c]        |= cands_flat[f].data;
                 // TODO: fill these
-                c_out_n.btq_idxs[c]   |= cands_flat[f].btq_idx;
-                c_out_n.is_branch[c]  |= cands_flat[f].is_brch;
-                c_out_n.take[c]       |= cands_flat[f].take;
-            end
-        end
-    end
-
-
-    always_ff @(posedge clock) begin
-        if (reset || flush) begin
-            c_out <= '0;
-        end else begin
-            /*
-            We buffer c_out for 1 cycle to break the comb. chain...
-            cpl_buf.used_scnt(vld) -> psel_gen(vld) -> cpl_buf.rd_en_cnt(cpl_gnt)
-            -> cpl_buf.rd_data(cands) -> c_out $#BREAK HERE#$ -> RS issue
-            -> FU sbuf.wr_data()
-
-            TODO: Buffering c_out for 1 cycle feels a little questionable.
-            Are you sure you're not adding an unnecessary cycle of latency for
-            free_list and rob who practically already wait for 1 cycle because
-            they have INTR_FWD disabled? Can you simply reenable INTR_FWD for
-            them with minimal latency cost?
-            */
-            c_out <= c_out_n;
-            if (c_out.c_en[0] && c_out.c_en[1]
-                && c_out.c_ts[0] == c_out.c_ts[1]
-                && c_out.c_ts[0] != '0) begin
-                $error("💥 DUPLICATE CDB TAG: slot %0d and %0d both write tag %0d", 0, 1, c_out.c_ts[1]);
+                cdat_out.btq_idxs[c]    |= cands_flat[f].btq_idx;
+                cdat_out.is_branch[c]   |= cands_flat[f].is_brch;
+                cdat_out.take[c]        |= cands_flat[f].take;
             end
 
         end
     end
+
+
+    // always_ff @(posedge clock) begin
+    //     if (reset || flush) begin
+    //         c_out <= '0;
+    //     end else begin
+    //         /*
+    //         We buffer c_out for 1 cycle to break the comb. chain...
+    //         cpl_buf.used_scnt(vld) -> psel_gen(vld) -> cpl_buf.rd_en_cnt(cpl_gnt)
+    //         -> cpl_buf.rd_data(cands) -> c_out $#BREAK HERE#$ -> RS issue
+    //         -> FU sbuf.wr_data()
+
+    //         TODO: Buffering c_out for 1 cycle feels a little questionable.
+    //         Are you sure you're not adding an unnecessary cycle of latency for
+    //         free_list and rob who practically already wait for 1 cycle because
+    //         they have INTR_FWD disabled? Can you simply reenable INTR_FWD for
+    //         them with minimal latency cost?
+    //         */
+    //         c_out <= c_out_n;
+
+    //     end
+    // end
 
     `ifdef DEBUG
     always_ff @(posedge clock) begin

@@ -45,7 +45,7 @@ module rs #(parameter
     `endif 
 
     // complete (CDB)
-    input execute2complete  c_in
+    input execute2complete_tag  ctag_in
 );
     RS_ENTRY [RS_SZ-1:0]       entries; // ms1 test: remove one RS entry (caught)
     `ifdef DEBUG
@@ -74,10 +74,10 @@ module rs #(parameter
         to_t1_rdy_per_cpl = '0;
         to_t2_rdy_per_cpl = '0;
         foreach(to_t1_rdy_per_cpl[n, rs]) begin
-            if (!c_in.c_en[n])
+            if (!ctag_in.en[n])
                 continue;
-            to_t1_rdy_per_cpl[n][rs] = entries[rs].dat.t1 == c_in.c_ts[n];
-            to_t2_rdy_per_cpl[n][rs] = entries[rs].dat.t2 == c_in.c_ts[n];
+            to_t1_rdy_per_cpl[n][rs] = entries[rs].dat.t1 == ctag_in.ts[n];
+            to_t2_rdy_per_cpl[n][rs] = entries[rs].dat.t2 == ctag_in.ts[n];
         end
 
         to_t1_rdy = '0;
