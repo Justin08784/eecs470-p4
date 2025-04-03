@@ -163,6 +163,8 @@ module alu_ex(
     input ALU_REGS_EX [`NUM_FU_ALU-1:0]     i_regs,
         // insn metadata/operands
 
+    input  execute2complete_dat         cdat,
+
     /* BACKEND */
     output logic [`NUM_FU_ALU-1:0]      o_vld,
     output CPL_CAND [`NUM_FU_ALU-1:0]   o_cands,
@@ -173,10 +175,17 @@ module alu_ex(
     ALU_OPS [`NUM_FU_ALU-1:0] ops;
     always_comb begin
         DATA opa, opb;
+        DATA rs1, rs2;
         foreach(ops[i]) begin
+            rs1 = i_regs[i].dat.bytag.bypass1
+                ? cdat.data[i_regs[i].dat.bytag.cdb_idx1]
+                : i_regs[i].rs1;
+            rs2 = i_regs[i].dat.bytag.bypass2
+                ? cdat.data[i_regs[i].dat.bytag.cdb_idx2]
+                : i_regs[i].rs2;
             // ALU opA mux
             case (i_regs[i].dat.opa_select)
-                OPA_IS_RS1:  opa = i_regs[i].rs1;
+                OPA_IS_RS1:  opa = rs1;
                 OPA_IS_NPC:  opa = i_regs[i].dat.NPC;
                 OPA_IS_PC:   opa = i_regs[i].dat.PC;
                 OPA_IS_ZERO: opa = 0;
@@ -185,7 +194,7 @@ module alu_ex(
 
             // ALU opB mux
             case (i_regs[i].dat.opb_select)
-                OPB_IS_RS2:   opb =  i_regs[i].rs2;
+                OPB_IS_RS2:   opb =  rs2;
                 OPB_IS_I_IMM: opb = `RV32_signext_Iimm(i_regs[i].dat.inst);
                 OPB_IS_S_IMM: opb = `RV32_signext_Simm(i_regs[i].dat.inst);
                 OPB_IS_B_IMM: opb = `RV32_signext_Bimm(i_regs[i].dat.inst);
@@ -194,8 +203,8 @@ module alu_ex(
                 default:      opb = 32'hfacefeed; // face feed
             endcase
             ops[i] = '{
-                rs1         : i_regs[i].rs1,
-                rs2         : i_regs[i].rs2,
+                rs1         : rs1,
+                rs2         : rs2,
                 opa         : opa,
                 opb         : opb,
                 alu_func    : i_regs[i].dat.alu_func,
@@ -275,6 +284,8 @@ module mul_ex(
     output PHYS_REG_IDX [`NUM_FU_MULT-1:0] ctag_ts,
     input  logic [`NUM_FU_MULT-1:0]     cdb_gnt,
 
+    input  execute2complete_dat         cdat,
+
     /* BACKEND */
     output logic [`NUM_FU_MULT-1:0]     o_vld,
     output CPL_CAND [`NUM_FU_MULT-1:0]  o_cands,
@@ -284,10 +295,18 @@ module mul_ex(
 );
     MUL_OPS [`NUM_FU_MULT-1:0] ops;
     always_comb begin
+        DATA rs1, rs2;
         foreach (ops[i]) begin
+            rs1 = i_regs[i].dat.bytag.bypass1
+                ? cdat.data[i_regs[i].dat.bytag.cdb_idx1]
+                : i_regs[i].rs1;
+            rs2 = i_regs[i].dat.bytag.bypass2
+                ? cdat.data[i_regs[i].dat.bytag.cdb_idx2]
+                : i_regs[i].rs2;
+
             ops[i] = '{
-                rs1  : i_regs[i].rs1,
-                rs2  : i_regs[i].rs2,
+                rs1  : rs1,
+                rs2  : rs2,
                 func : i_regs[i].dat.func,
                 dst  : '{
                     rob_idx : i_regs[i].dat.rob_idx,
@@ -592,7 +611,10 @@ module stage_ex_p4 (
 
         .o_vld  (ex.o_vld.alu),
         .o_cands(cands.alu),
-        .o_rdy  (cdb_gnt_shr[2].alu)
+        .o_rdy  (cdb_gnt_shr[2].alu),
+
+        /* CDB bypass */
+        .cdat   (cdat_out)
     );
 
     struct packed {
@@ -616,7 +638,10 @@ module stage_ex_p4 (
 
         .o_vld  (ex.o_vld.mul),
         .o_cands(cands.mul),
-        .o_rdy  (cdb_gnt_shr[2].mul)
+        .o_rdy  (cdb_gnt_shr[2].mul),
+
+        /* CDB bypass */
+        .cdat   (cdat_out)
     );
 
     execute2complete_tag ctag_out_n;
