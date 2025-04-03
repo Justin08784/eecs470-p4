@@ -22,7 +22,7 @@ module sq #(parameter
 
     output sq2dispatch sq_2_dis,
     output sq2execute sq_2_exec,
-    output sq2rs sq_2_rs,
+    // output sq2rs sq_2_rs,
     output sq2rob sq_2_rob,
     output stRET2mem ret_2_mem
 );
@@ -87,10 +87,10 @@ module sq #(parameter
         };
 
         //handle LSQ CDB to RS
-        sq_2_rs <= '{
-            en : exec_2_sq.st_ex_en,
-            sq_idx_cdb     : exec_2_sq.st_sq_idx
-        };
+        // sq_2_rs <= '{
+        //     en : exec_2_sq.st_ex_en,
+        //     sq_idx_cdb     : exec_2_sq.st_sq_idx
+        // };
 
         //handle sq to ROB for retirement
         head_plus_one = (head + 1) % LSQ_SZ;
@@ -131,6 +131,7 @@ module sq #(parameter
                     sq_2_exec.forward_data[i][15:8]     = state[idx].bytewise_addr_mask[1] ? state[idx].data[15:8]     : sq_2_exec.forward_data[i][15:8];
                     sq_2_exec.forward_data[i][23:16]    = state[idx].bytewise_addr_mask[2] ? state[idx].data[23:16]    : sq_2_exec.forward_data[i][23:16];
                     sq_2_exec.forward_data[i][31:24]    = state[idx].bytewise_addr_mask[3] ? state[idx].data[31:24]    : sq_2_exec.forward_data[i][31:24];
+
                     sq_2_exec.forward_byte_en[i] |= state[idx].bytewise_addr_mask;
                 end
 
@@ -170,11 +171,11 @@ module sq #(parameter
 
             //ensure don't accidentally give more data than it wants
             if (exec_2_sq.forward_mem_size[i] == BYTE) begin
-                sq_2_exec.forward_data[i] &= 8'b11111111;
+                sq_2_exec.forward_data[i] &= 8'hFF;
                 sq_2_exec.forward_byte_en[i] &= 1'b1;
             end
             else if (exec_2_sq.forward_mem_size[i] == HALF) begin
-                sq_2_exec.forward_data[i] &= 16'b1111111111111111;
+                sq_2_exec.forward_data[i] &= 16'hFFFF;
                 sq_2_exec.forward_byte_en[i] &= 2'b11;
             end
 
@@ -383,6 +384,8 @@ module post_ret_buffer #(parameter
                     forward_ret_2_sq.forward_data[i][15:8]  = state[idx].bytewise_addr_mask[1] ? state[idx].data[15:8]     : forward_ret_2_sq.forward_data[i][15:8];
                     forward_ret_2_sq.forward_data[i][23:16] = state[idx].bytewise_addr_mask[2] ? state[idx].data[23:16]    : forward_ret_2_sq.forward_data[i][23:16];
                     forward_ret_2_sq.forward_data[i][31:24] = state[idx].bytewise_addr_mask[3] ? state[idx].data[31:24]    : forward_ret_2_sq.forward_data[i][31:24];
+
+
                     forward_ret_2_sq.forward_byte_en[i] |= state[idx].bytewise_addr_mask;
                 end
 
