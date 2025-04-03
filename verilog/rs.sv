@@ -181,6 +181,23 @@ module rs #(parameter
     logic [NUM_FU_LOAD-1:0] [RS_SZ-1:0] fu2issuer_load;
     logic [NUM_FU_STORE-1:0][RS_SZ-1:0] fu2issuer_store;
 
+    function automatic BYPASS_TAG get_bytag (
+        input int rs
+    );
+        BYPASS_TAG tag = '0;
+        for (int n = 0; n < N; ++n) begin
+            if (to_t1_rdy_per_cpl[n][rs]) begin
+                tag.bypass1     |= 1; // TODO: What about zero reg? A matching zero reg should not count as a valid wakeup!
+                tag.cdb_idx1    |= n; // This should be okay. Two insns cannot have the same destination tag! There is a $fatal check for this in execute.sv
+            end
+            if (to_t2_rdy_per_cpl[n][rs]) begin
+                tag.bypass2     |= 1;
+                tag.cdb_idx2    |= n;
+            end
+        end
+        return tag;
+    endfunction
+
     always_comb begin
         to_issue        = '0;
         fu2issuer_alu   = '0;
@@ -229,26 +246,7 @@ module rs #(parameter
                 to_issue            |= gbus_can_issue_store[i];
             end
         end
-    end
 
-    function automatic BYPASS_TAG get_bytag (
-        input int rs
-    );
-        BYPASS_TAG tag = '0;
-        for (int n = 0; n < N; ++n) begin
-            if (to_t1_rdy_per_cpl[n][rs]) begin
-                tag.bypass1     |= 1; // TODO: What about zero reg? A matching zero reg should not count as a valid wakeup!
-                tag.cdb_idx1    |= n; // This should be okay. Two insns cannot have the same destination tag! There is a $fatal check for this in execute.sv
-            end
-            if (to_t2_rdy_per_cpl[n][rs]) begin
-                tag.bypass2     |= 1;
-                tag.cdb_idx2    |= n;
-            end
-        end
-        return tag;
-    endfunction
-
-    always_comb begin
         ex_out.fu_dat_alu   = '0;
         ex_out.fu_dat_mult  = '0;
         ex_out.fu_dat_store = '0;
@@ -261,6 +259,8 @@ module rs #(parameter
             if (fu2issuer_alu[fu][rs]) begin // [MISSING] ms1 test: Remove "!" from if condition (not caught)
                 ex_out.fu_dat_alu[fu] |= entries[rs].dat;
                 ex_out.bytag_alu[fu]  |= get_bytag(rs);
+                /* ALU insns can only issue if they ALSO win CDB tag arbitration! */
+                to_issue[rs] &= ex_in.fu_cdb_gnt_alu[fu];
             end
         end
         foreach (fu2issuer_mult[fu, rs]) begin

@@ -791,6 +791,8 @@ typedef struct packed {
     logic       [`NUM_FU_MULT-1:0]   fu_rdy_mult;
     logic       [`NUM_FU_STORE-1:0]  fu_rdy_store;
     logic       [`NUM_FU_LOAD-1:0]   fu_rdy_load;
+
+    logic       [`NUM_FU_ALU-1:0]    fu_cdb_gnt_alu; // 1-cycle insns need to win CDB arb. to issue
 } execute2rs;
 
 typedef struct packed {

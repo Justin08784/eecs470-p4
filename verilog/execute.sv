@@ -422,7 +422,7 @@ module stage_ex_p4 (
                 .reset (reset),
                 .flush (flush),
 
-                .i_vld (rs_in.fu_vld_alu[i]),
+                .i_vld (rs_in.fu_vld_alu[i] & cdb_gnt.alu[i]),
                 .i_rdy (iss.i_rdy.alu[i]),
                 .i_dat (tmp_alu_el[i]),
 
@@ -618,6 +618,8 @@ module stage_ex_p4 (
     execute2complete c_out_n;
     always_comb begin
         rs_out = '{
+            fu_cdb_gnt_alu  : cdb_gnt.alu,
+
             fu_rdy_alu      : iss.i_rdy.alu,
             fu_rdy_mult     : iss.i_rdy.mul,
             fu_rdy_load     : '0,
