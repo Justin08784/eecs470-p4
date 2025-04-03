@@ -246,22 +246,9 @@ module alu_ex(
                 is_brch : ops[i].cond_branch || ops[i].uncond_branch
             };
 
-            // <FU>_outs: where executed insns wait until completion
-            ppln_skid #(
-                .WIDTH($bits(CPL_CAND))
-            ) cpl_buf (
-                .clock (clock),
-                .reset (reset),
-                .flush (flush),
-
-                .i_vld (i_vld[i]),
-                .i_rdy (i_rdy[i]),
-                .i_dat (tmp_data[i]),
-
-                .o_vld (o_vld[i]),
-                .o_rdy (o_rdy[i]),
-                .o_dat (o_cands[i])
-            );
+            assign o_vld[i] = i_vld[i];
+            assign i_rdy[i] = o_rdy[i];
+            assign o_cands[i] = tmp_data[i];
         end
     endgenerate
 endmodule
@@ -739,7 +726,7 @@ module stage_ex_p4 (
             $display("  %3d | >> EXECUTE", $time);
 
             for (int i = 0; i < `NUM_FU_ALU; ++i) begin
-                $display("alu_ins[%0d]: rdy: %b, vld: %b, t: %2d, t1: %2d, t2: %2d, rob_idx: %2d, btq_idx: %2d, inst: 0x%x, PC: 0x%x, NPC: 0x%x, cond_branch: %b, uncond_branch: %b",
+                $display("alu_iss[%0d]: rdy: %b, vld: %b, t: %2d, t1: %2d, t2: %2d, rob_idx: %2d, btq_idx: %2d, inst: 0x%x, PC: 0x%x, NPC: 0x%x, cond_branch: %b, uncond_branch: %b",
                     i,
                     iss.i_rdy.alu[i],
                     iss.o_vld.alu[i],
@@ -754,10 +741,16 @@ module stage_ex_p4 (
                     iss.dat.alu[i].cond_branch,
                     iss.dat.alu[i].uncond_branch
                 );
+                $display("  bytag: (b1:%b, idx1: %b) (b2: %b, idx2: %b)",
+                    iss.dat.alu[i].bytag.bypass1,
+                    iss.dat.alu[i].bytag.cdb_idx1,
+                    iss.dat.alu[i].bytag.bypass2,
+                    iss.dat.alu[i].bytag.cdb_idx2,
+                );
             end
 
             for (int i = 0; i < `NUM_FU_MULT; ++i) begin
-                $display("mul_ins[%0d]: rdy: %b, vld: %b, t: %2d, t1: %2d, t2: %2d, rob_idx: %2d, func: 0x%x",
+                $display("mul_iss[%0d]: rdy: %b, vld: %b, t: %2d, t1: %2d, t2: %2d, rob_idx: %2d, func: 0x%x",
                     i,
                     iss.i_rdy.mul[i],
                     iss.o_vld.mul[i],
@@ -766,6 +759,12 @@ module stage_ex_p4 (
                     iss.dat.mul[i].t2,
                     iss.dat.mul[i].rob_idx,
                     iss.dat.mul[i].func
+                );
+                $display("  bytag: (b1: %b, idx1: %b) (b2: %b, idx2: %b)",
+                    iss.dat.mul[i].bytag.bypass1,
+                    iss.dat.mul[i].bytag.cdb_idx1,
+                    iss.dat.mul[i].bytag.bypass2,
+                    iss.dat.mul[i].bytag.cdb_idx2,
                 );
             end
 
