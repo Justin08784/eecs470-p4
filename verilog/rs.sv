@@ -204,10 +204,10 @@ module rs #(parameter
         fu2issuer_mult  = '0;
         fu2issuer_load  = '0;
         fu2issuer_store = '0;
-        ex_out.fu_vld_alu      = '0;
-        ex_out.fu_vld_mult     = '0;
-        ex_out.fu_vld_store    = '0;
-        ex_out.fu_vld_load     = '0;
+        ex_out.fu_vld_alu   = '0;
+        ex_out.fu_en_mult   = '0;
+        ex_out.fu_en_store  = '0;
+        ex_out.fu_en_load   = '0;
 
         foreach (gbus_fu_rdy_alu[i, j]) begin
             if (gbus_fu_rdy_alu[i][j]) begin
@@ -217,24 +217,24 @@ module rs #(parameter
                 if a gnt_bus row is actually used?
                 \/ \/ \/ \/
                 */
-                ex_out.fu_vld_alu[j]       = |gbus_can_issue_alu[i];
-                // for (int rs = 0; rs < RS_SZ; ++rs) begin
-                //     ex_out.fu_dat_alu[j]   |= entries[i];
-                // end
-                to_issue            |= gbus_can_issue_alu[i];
+                ex_out.fu_vld_alu[j]    = |gbus_can_issue_alu[i];
+                /* WARNING: There is an entire CDB arbitration between these two lines...
+                ALU insns can only issue if they ALSO win (early) CDB arbitration! */
+                ex_out.fu_en_alu[j]     = ex_out.fu_vld_alu[j] && ex_in.fu_cdb_gnt_alu[j];
+                to_issue            |= ex_in.fu_cdb_gnt_alu[j] ? gbus_can_issue_alu[i] : '0;
             end
         end
         foreach (gbus_fu_rdy_mult[i, j]) begin
             if (gbus_fu_rdy_mult[i][j]) begin
                 fu2issuer_mult[j]   |= gbus_can_issue_mult[i];
-                ex_out.fu_vld_mult[j]      = |gbus_can_issue_mult[i]; // [MISSING] ms1 test: change i to j (not caught)
+                ex_out.fu_en_mult[j]    = |gbus_can_issue_mult[i]; // [MISSING] ms1 test: change i to j (not caught)
                 to_issue            |= gbus_can_issue_mult[i];
             end
         end
         foreach (gbus_fu_rdy_load[i, j]) begin
             if (gbus_fu_rdy_load[i][j]) begin
                 fu2issuer_load[j]   |= gbus_can_issue_load[i];
-                ex_out.fu_vld_load[j]      = |gbus_can_issue_load[i];
+                ex_out.fu_en_load[j]    = |gbus_can_issue_load[i];
                 to_issue            |= gbus_can_issue_load[i];
 
             end
@@ -242,11 +242,13 @@ module rs #(parameter
         foreach (gbus_fu_rdy_store[i, j]) begin
             if (gbus_fu_rdy_store[i][j]) begin
                 fu2issuer_store[j]  |= gbus_can_issue_store[i];
-                ex_out.fu_vld_store[j]     = |gbus_can_issue_store[i];
+                ex_out.fu_en_store[j]   = |gbus_can_issue_store[i];
                 to_issue            |= gbus_can_issue_store[i];
             end
         end
+    end
 
+    always_comb begin
         ex_out.fu_dat_alu   = '0;
         ex_out.fu_dat_mult  = '0;
         ex_out.fu_dat_store = '0;
@@ -259,8 +261,6 @@ module rs #(parameter
             if (fu2issuer_alu[fu][rs]) begin // [MISSING] ms1 test: Remove "!" from if condition (not caught)
                 ex_out.fu_dat_alu[fu] |= entries[rs].dat;
                 ex_out.bytag_alu[fu]  |= get_bytag(rs);
-                /* ALU insns can only issue if they ALSO win CDB tag arbitration! */
-                to_issue[rs] &= ex_in.fu_cdb_gnt_alu[fu];
             end
         end
         foreach (fu2issuer_mult[fu, rs]) begin

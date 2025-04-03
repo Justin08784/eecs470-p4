@@ -422,7 +422,7 @@ module stage_ex_p4 (
                 .reset (reset),
                 .flush (flush),
 
-                .i_vld (rs_in.fu_vld_alu[i] & cdb_gnt.alu[i]),
+                .i_vld (rs_in.fu_en_alu[i]),
                 .i_rdy (iss.i_rdy.alu[i]),
                 .i_dat (tmp_alu_el[i]),
 
@@ -447,7 +447,7 @@ module stage_ex_p4 (
                 .reset (reset),
                 .flush (flush),
 
-                .i_vld (rs_in.fu_vld_mult[i]),
+                .i_vld (rs_in.fu_en_mult[i]),
                 .i_rdy (iss.i_rdy.mul[i]),
                 .i_dat (tmp_mul_el[i]),
 

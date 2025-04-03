@@ -603,6 +603,7 @@ typedef struct packed {
         is needed. */
     logic bypass2;
 
+    /* This is a ridiculous optimization. Try impl a simple CAM first. */
     logic [$clog2(`N)-1:0]  cdb_idx1;   // which cdb slot to bypass for src1 (valid iff bypass1 set)
     logic [$clog2(`N)-1:0]  cdb_idx2;
 } BYPASS_TAG;
@@ -735,10 +736,16 @@ typedef struct packed {
 } rs2dispatch;
 
 typedef struct packed {
+    /* Requested by issue arbiter 
+    (only ALU needs gnt by CDB arbiter to 'en')*/
     logic       [`NUM_FU_ALU-1:0]    fu_vld_alu;
-    logic       [`NUM_FU_MULT-1:0]   fu_vld_mult;
-    logic       [`NUM_FU_STORE-1:0]  fu_vld_store;
-    logic       [`NUM_FU_LOAD-1:0]   fu_vld_load;
+
+    /* Selected for issue */
+    logic       [`NUM_FU_ALU-1:0]    fu_en_alu;
+    logic       [`NUM_FU_MULT-1:0]   fu_en_mult;
+    logic       [`NUM_FU_STORE-1:0]  fu_en_store;
+    logic       [`NUM_FU_LOAD-1:0]   fu_en_load;
+
     BYPASS_TAG  [`NUM_FU_ALU-1:0]    bytag_alu;
     BYPASS_TAG  [`NUM_FU_MULT-1:0]   bytag_mul;
     BYPASS_TAG  [`NUM_FU_LOAD-1:0]   bytag_ldr;
