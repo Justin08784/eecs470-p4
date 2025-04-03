@@ -69,7 +69,7 @@ module sq #(parameter
 
 
     LSQ_IDX head_plus_one;
-    logic [N-1:0] [$clog2(LSQ_SZ_DBL)-1:0] next_ids;
+    LSQ_IDX [N-1:0] next_ids;
     always_comb begin
 
         for (int unsigned i = 0; i < NUM_RPORTS; ++i)
@@ -82,7 +82,8 @@ module sq #(parameter
         // handle dispatch (outs)
         sq_2_dis <= '{
             sq_rdy_scnt : `MIN(free, NUM_DPORTS),
-            sq_tail     : tail_dbl
+            sq_tail     : tail_dbl,
+            next_ids    : next_ids
         };
 
         //handle LSQ CDB to RS
@@ -104,8 +105,6 @@ module sq #(parameter
         sq_2_ret.ret_st[0] = state[head];
         sq_2_ret.ret_st[1] = state[head_plus_one];
 
-        
-
     end
 
 
@@ -122,11 +121,8 @@ module sq #(parameter
             if (!exec_2_sq.forward_req_en[i]) continue;
 
             start = exec_2_sq.forward_addr[i] - (exec_2_sq.forward_addr[i] % 4);
-            for (int unsigned j = 0, int unsigned idx = 0, DATA shifted_data = 0, int unsigned offset = 0, logic [1:0] modulo4 = 0; j < used; ++j) begin
+            for (int unsigned j = 0, int unsigned idx = 0; j < used; ++j) begin
                 idx = (head+j) % LSQ_SZ;
-                // modulo4 = state[idx].addr % 4;
-                // offset = (modulo4 == 0) ? 0 : (modulo4 == 1) ? 8 : (modulo4 == 2) ? 16 : 24;
-                // shifted_data = state[idx].data << offset;
 
                 if (state[idx].d_vld && (state[idx].bytewise_addr[0] == start)) begin
                     // $display("Mask: %4b", state[idx].bytewise_addr_mask);
@@ -150,8 +146,6 @@ module sq #(parameter
             sq_2_exec.forward_en[i] |= forward_ret_2_sq.forward_en[i];
             if (forward_ret_2_sq.sq_idx_found[i]) begin
                 sq_2_exec.forward_data[i] = forward_ret_2_sq.forward_data[i];
-                // sq_2_exec.forward_byte_en[i] = forward_ret_2_sq.forward_byte_en[i];
-                // sq_2_exec.forward_en[i] = forward_ret_2_sq.forward_en[i];
             end
             else begin
                 sq_2_exec.forward_data[i][7:0]      = ~sq_2_exec.forward_byte_en[i][0] ? forward_ret_2_sq.forward_data[i][7:0]      : sq_2_exec.forward_data[i][7:0];
@@ -172,6 +166,16 @@ module sq #(parameter
             else if ((exec_2_sq.forward_addr[i] % 4) == 3) begin
                 sq_2_exec.forward_data[i]       = sq_2_exec.forward_data[i] >> 24;
                 sq_2_exec.forward_byte_en[i]    = sq_2_exec.forward_byte_en[i] >> 24;
+            end
+
+            //ensure don't accidentally give more data than it wants
+            if (exec_2_sq.forward_mem_size[i] == BYTE) begin
+                sq_2_exec.forward_data[i] &= 8'b11111111;
+                sq_2_exec.forward_byte_en[i] &= 1'b1;
+            end
+            else if (exec_2_sq.forward_mem_size[i] == HALF) begin
+                sq_2_exec.forward_data[i] &= 16'b1111111111111111;
+                sq_2_exec.forward_byte_en[i] &= 2'b11;
             end
 
             // $display("2. Forward_data[%0d]: %0d, %4b", i, sq_2_exec.forward_data[i],sq_2_exec.forward_byte_en[i]);
@@ -367,11 +371,8 @@ module post_ret_buffer #(parameter
             if (!sq_2_ret.forward_req_en[i]) continue;
 
             start = sq_2_ret.forward_addr[i] - (sq_2_ret.forward_addr[i] % 4);
-            for (int unsigned j = 0, int unsigned idx = 0, DATA shifted_data = 0, int unsigned offset = 0, logic [1:0] modulo4 = 0; j < used; ++j) begin
+            for (int unsigned j = 0, int unsigned idx = 0; j < used; ++j) begin
                 idx = (head+j) % LSQ_SZ;
-                // modulo4 = state[idx].addr % 4;
-                // offset = (modulo4 == 0) ? 0 : (modulo4 == 1) ? 8 : (modulo4 == 2) ? 16 : 24;
-                // shifted_data = state[idx].data << offset;
 
                 if (state[idx].sq_idx == sq_2_ret.forward_sq_idx[i]) forward_ret_2_sq.sq_idx_found[i] = '1;
 
