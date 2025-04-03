@@ -14,7 +14,7 @@ module cpu (
     input clock, // System clock
     input reset, // System reset
 
-    //input MEM_TAG   mem2proc_transaction_tag, // Memory tag for current transaction
+    input MEM_TAG   mem2proc_transaction_tag, // Memory tag for current transaction
     input MEM_BLOCK [1:0] mem2proc_data,            // Data coming back from memory
         /*
         Q: Why 2 mem blocks when each mem block supplies a double word
@@ -464,6 +464,8 @@ module cpu (
     dispatch2btq dispatch_2_btq;
     btq2dispatch btq_2_dispatch;
     execute2complete ex_2_complete;
+    dispatch2sq dispatch_2_sq;
+    sq2dispatch sq_2_dispatch;
 
     dispatch dispatcher(
         .clock(clock),
@@ -484,8 +486,8 @@ module cpu (
         .free_in(fl_2_dispatch),
         .free_out(dispatch_2_fl),
 
-        .lq_in('0),
-        .lq_out(),
+        .sq_in(sq_2_dispatch),
+        .sq_out(dispatch_2_sq),
 
         .btq_in(btq_2_dispatch),
         .btq_out(dispatch_2_btq),
@@ -623,6 +625,9 @@ module cpu (
     //                                              //
     //////////////////////////////////////////////////  
 
+    rob2sq rob_2_sq;
+    sq2rob sq_2_rob;
+
     rob #(
         .ROB_SZ(`ROB_SZ),
         .N(`N)
@@ -636,6 +641,40 @@ module cpu (
         .d_out      (rob_2_dispatch),
         .d_in       (dispatch_2_rob)
     );
+
+    //////////////////////////////////////////////////
+    //                                              //
+    //                      SQ                      //
+    //                                              //
+    ////////////////////////////////////////////////// 
+
+    execute2sq exec_2_sq;
+    // MEM_TAG mem2proc_transaction_tag;
+
+    sq2execute sq_2_exec;
+    stRET2mem ret_2_mem;
+
+    sq #(
+        .N(`N),
+        .LSQ_SZ(`LSQ_SZ),
+        .LSQ_SZ_DBL(`LSQ_SZ_DBL),
+        .NUM_FU_STORE(`NUM_FU_STORE),
+        .NUM_FU_LOAD(`NUM_FU_LOAD)
+    ) sq_0 (
+        .clock(clock),
+        .reset(reset),
+        .flush(flush),
+
+        .dis_2_sq(dispatch_2_sq),
+        .exec_2_sq(exec_2_sq),
+        .rob_2_sq('0),
+        .mem2proc_transaction_tag(mem2proc_transaction_tag),
+
+        .sq_2_dis(sq_2_dispatch),
+        .sq_2_exec(sq_2_exec),
+        .sq_2_rob(sq_2_rob),
+        .ret_2_mem(ret_2_mem)
+);
 
     //////////////////////////////////////////////////
     //                                              //

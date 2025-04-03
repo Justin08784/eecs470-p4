@@ -53,8 +53,8 @@ module dispatch #(parameter
     output  dispatch2free_list free_out,
 
     // LSQ
-    input   lq2dispatch lq_in,
-    output  dispatch2lq lq_out,
+    input   sq2dispatch sq_in,
+    output  dispatch2sq sq_out,
     
     // BTQ
     input   btq2dispatch btq_in,
@@ -78,11 +78,12 @@ logic [$clog2(N):0] alloc_vld_scnt;
 
 // control logic
 always_comb begin
+    sq_out = '0;
     //logic to find the minimum # of spots free across the 4 inputs
     // TODO: Is syntheizer smart enough to transform this MIN compute into a tree?
     alloc_en_cnt = rob_in.rob_rdy_scnt;
     alloc_en_cnt = `MIN(alloc_en_cnt, decode_in.d_vld_scnt);
-    // alloc_en_cnt = `MIN(alloc_en_cnt, lsq_in.lsq_rdy_scnt); // TODO: enable later
+    // alloc_en_cnt = `MIN(alloc_en_cnt, sq_in.sq_rdy_scnt); // TODO: enable later
     alloc_en_cnt = free_in.free_rdy_scnt < $countones(decode_in.prvw_has_dests)
         ? `MIN(alloc_en_cnt, free_in.free_rdy_scnt)
         : alloc_en_cnt;
@@ -308,6 +309,7 @@ end
 `endif
 
 always_ff @(posedge clock) begin
+    
     if (reset || flush) begin
         cpl_lst <= '1;
     end else begin

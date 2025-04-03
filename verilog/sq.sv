@@ -222,6 +222,7 @@ module sq #(parameter
 
 
     always_ff @(posedge clock) begin
+        
         if (reset || flush) begin
             used    <= 0;
             head    <= 0;

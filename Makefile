@@ -334,7 +334,8 @@ CPU_SOURCES = verilog/cpu.sv \
 			  verilog/prediction_buffer.sv \
 			  verilog/skid_buffer.sv \
 			  verilog/global_history_register.sv \
-			  verilog/pht.sv 
+			  verilog/pht.sv \
+			  verilog/sq.sv
 
 
 build/cpu.simv: $(CPU_SOURCES) $(CPU_HEADERS) $(CPU_TESTBENCH)
