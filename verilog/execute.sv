@@ -612,6 +612,11 @@ module stage_ex_p4 (
 
     execute2complete_tag ctag_out_n;
     execute2complete_dat cdat_out_n;
+    struct packed {
+        PHYS_REG_IDX [`NUM_FU_ALU-1:0] alu;
+        PHYS_REG_IDX [`NUM_FU_ALU-1:0] mul; // TODO: set. need to pull from mul_ex again
+    } ctag_ts;
+    PHYS_REG_IDX [`NUM_FU_TOTAL-1:0] ctag_ts_flat;
     always_comb begin
         rs_out = '{
             fu_cdb_gnt_alu  : cdb_gnt.alu,
@@ -622,10 +627,17 @@ module stage_ex_p4 (
             fu_rdy_store    : '0
         };
 
+        ctag_ts = '0;
+        foreach (rs_in.fu_dat_alu[i])
+            ctag_ts.alu[i] = rs_in.fu_dat_alu[i].t;
+        ctag_ts_flat = ctag_ts;
+
+        ctag_out_n = '0;
+        cdat_out_n = '0;
         foreach(cdb2fu_gbus_shr[_, c, f]) begin
-            if (cdb2fu_gbus_shr[0][c][f]) begin
+            if (cdb2fu_gbus[c][f]) begin
                 ctag_out_n.en[c]  |= 1;
-                ctag_out_n.ts[c]  |= cands_flat[f].t; // TODO: correct these tags
+                ctag_out_n.ts[c]  |= ctag_ts_flat[f];
             end
 
             if (cdb2fu_gbus_shr[2][c][f]) begin
@@ -769,24 +781,55 @@ module stage_ex_p4 (
                 // );
             end
 
-            $display("c_out: rdy_alu: %b  rdy_mult: %b  rdy_store: %b  rdy_load: %b  cpl_gnt: %b",
+            $display("c_out: rdy_alu:{%b} rdy_mult:{%b} rdy_store:{%b} rdy_load:{%b}",
                 rs_out.fu_rdy_alu,
                 rs_out.fu_rdy_mult,
                 rs_out.fu_rdy_store,
                 rs_out.fu_rdy_load,
-                cpl_gnt
             );
 
+            $display("\ncdb_req: alu:{%b} mul:{%b}", cdb_req.alu, cdb_req.mul);
+            $display("ctag_ts: alu:{%b} mul:{%b}", ctag_ts.alu, ctag_ts.mul);
+            $display("cdb_gnt: alu:{%b} mul:{%b}", cdb_gnt.alu, cdb_gnt.mul);
+            for (int i = 0; i < 3; ++i) begin
+                $display("cdb_gnt[%0d]: alu:{%b} mul:{%b}", i, cdb_gnt_shr[i].alu, cdb_gnt_shr[i].mul);
+            end
+
+            $display("");
+            for (int n = 0; n < `N; ++n) begin
+                $display("cdb2fu_gbus[%0d]: %b", n, cdb2fu_gbus[n]);
+            end
+            for (int s = 0; s < 3; ++s) begin
+                for (int n = 0; n < `N; ++n) begin
+                    $display("cdb2fu_gbus[%0d][%0d]: %b", s, n, cdb2fu_gbus_shr[s][n]);
+                end
+            end
+
+
             for (int i = 0; i < `N; ++i) begin
-                $display("c_out[%0d]: c_en: %b, is_branch: %b, c_ts: %2d, c_rob_idxs: %2d, c_data: %x, btq_idxs: %d, take: %b",
+                $display("ctag_out_n[%0d]: en: %b, ts: %2d",
                     i,
-                    c_out.c_en[i],
-                    c_out.is_branch[i],
-                    c_out.c_ts[i],
-                    c_out.c_rob_idxs[i],
-                    c_out.c_data[i],
-                    c_out.btq_idxs[i],
-                    c_out.take[i]
+                    ctag_out_n.en[i],
+                    ctag_out_n.ts[i],
+                );
+            end
+            for (int i = 0; i < `N; ++i) begin
+                $display("ctag_out[%0d]: en: %b, ts: %2d",
+                    i,
+                    ctag_out.en[i],
+                    ctag_out.ts[i],
+                );
+            end
+            for (int i = 0; i < `N; ++i) begin
+                $display("cdat_out[%0d]: en: %b, is_branch: %b, ts: %2d, rob_idxs: %2d, data: %x, btq_idxs: %d, take: %b",
+                    i,
+                    cdat_out.en[i],
+                    cdat_out.is_branch[i],
+                    cdat_out.ts[i],
+                    cdat_out.rob_idxs[i],
+                    cdat_out.data[i],
+                    cdat_out.btq_idxs[i],
+                    cdat_out.take[i]
                 );
             end
 
