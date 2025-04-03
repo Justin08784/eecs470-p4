@@ -61,7 +61,7 @@
 ///////////////////////////////
 /* How can we implement this in the Makefile? */
 // comment out to enable synth only constructions
-`define SYNTH
+// `define SYNTH
 
 `ifndef SYNTH
 // comment out to disable DEBUG:
@@ -496,8 +496,6 @@ typedef struct packed {
 
 typedef struct packed {
     /* Alloc */
-    logic   [$clog2(`N):0] alloc_rsrv_cnt;
-
     /* Rename */
     /* Commit */
     logic   [$clog2(`N):0] en_cnt;
@@ -629,8 +627,6 @@ typedef struct packed {
 
 typedef struct packed {
     /* Alloc */
-    logic       [$clog2(`N):0] alloc_rsrv_cnt;
-
     /* Rename */
     /* Commit */
     logic       [$clog2(`N):0] d_en_cnt;
@@ -646,8 +642,6 @@ typedef struct packed {
 
 typedef struct packed {
     /* Alloc */
-    logic       [$clog2(`N):0] alloc_rsrv_cnt;
-
     /* Rename */
     logic       [$clog2(`N):0] rename_collect_cnt;
 
