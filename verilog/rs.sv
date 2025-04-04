@@ -45,7 +45,7 @@ module rs #(parameter
     `endif 
 
     // complete (CDB)
-    input execute2complete  c_in
+    input execute2complete_tag  ctag_in
 );
     RS_ENTRY [RS_SZ-1:0]       entries; // ms1 test: remove one RS entry (caught)
     `ifdef DEBUG
@@ -66,30 +66,25 @@ module rs #(parameter
     endgenerate
 
     // SECTION: cdb completion
+    logic [`N-1:0][RS_SZ-1:0] to_t1_rdy_per_cpl;
+    logic [`N-1:0][RS_SZ-1:0] to_t2_rdy_per_cpl;
     logic [RS_SZ-1:0] to_t1_rdy;
     logic [RS_SZ-1:0] to_t2_rdy;
     always_comb begin
+        to_t1_rdy_per_cpl = '0;
+        to_t2_rdy_per_cpl = '0;
+        foreach(to_t1_rdy_per_cpl[n, rs]) begin
+            if (!ctag_in.en[n])
+                continue;
+            to_t1_rdy_per_cpl[n][rs] = entries[rs].dat.t1 == ctag_in.ts[n];
+            to_t2_rdy_per_cpl[n][rs] = entries[rs].dat.t2 == ctag_in.ts[n];
+        end
+
         to_t1_rdy = '0;
         to_t2_rdy = '0;
-        for (int rs = 0; rs < RS_SZ; ++rs) begin
-            logic match_t1;
-            logic match_t2;
-            // in milestone 1:
-            // match_t1 = t1_rdy_vec[rs];
-            // match_t2 = t2_rdy_vec[rs];
-            match_t1 = 0;
-            match_t2 = 0;
-
-            // match any tag in CDB?
-            for (int n = 0; n < N; ++n) begin
-                if (c_in.c_en[n]) begin
-                    match_t1 |= entries[rs].dat.t1 == c_in.c_ts[n];
-                    match_t2 |= entries[rs].dat.t2 == c_in.c_ts[n];
-                end
-            end
-
-            to_t1_rdy[rs] = match_t1;
-            to_t2_rdy[rs] = match_t2;
+        foreach(to_t1_rdy_per_cpl[n, rs]) begin
+            to_t1_rdy[rs] |= to_t1_rdy_per_cpl[n][rs];
+            to_t2_rdy[rs] |= to_t2_rdy_per_cpl[n][rs];
         end
     end
 
@@ -186,16 +181,33 @@ module rs #(parameter
     logic [NUM_FU_LOAD-1:0] [RS_SZ-1:0] fu2issuer_load;
     logic [NUM_FU_STORE-1:0][RS_SZ-1:0] fu2issuer_store;
 
+    function automatic BYPASS_TAG get_bytag (
+        input int rs
+    );
+        BYPASS_TAG tag = '0;
+        for (int n = 0; n < N; ++n) begin
+            if (to_t1_rdy_per_cpl[n][rs]) begin
+                tag.bypass1     |= 1; // TODO: What about zero reg? A matching zero reg should not count as a valid wakeup!
+                tag.cdb_idx1    |= n; // This should be okay. Two insns cannot have the same destination tag! There is a $fatal check for this in execute.sv
+            end
+            if (to_t2_rdy_per_cpl[n][rs]) begin
+                tag.bypass2     |= 1;
+                tag.cdb_idx2    |= n;
+            end
+        end
+        return tag;
+    endfunction
+
     always_comb begin
         to_issue        = '0;
         fu2issuer_alu   = '0;
         fu2issuer_mult  = '0;
         fu2issuer_load  = '0;
         fu2issuer_store = '0;
-        ex_out.fu_vld_alu      = '0;
-        ex_out.fu_vld_mult     = '0;
-        ex_out.fu_vld_store    = '0;
-        ex_out.fu_vld_load     = '0;
+        ex_out.fu_vld_alu   = '0;
+        ex_out.fu_en_mult   = '0;
+        ex_out.fu_en_store  = '0;
+        ex_out.fu_en_load   = '0;
 
         foreach (gbus_fu_rdy_alu[i, j]) begin
             if (gbus_fu_rdy_alu[i][j]) begin
@@ -205,24 +217,24 @@ module rs #(parameter
                 if a gnt_bus row is actually used?
                 \/ \/ \/ \/
                 */
-                ex_out.fu_vld_alu[j]       = |gbus_can_issue_alu[i];
-                // for (int rs = 0; rs < RS_SZ; ++rs) begin
-                //     ex_out.fu_dat_alu[j]   |= entries[i];
-                // end
-                to_issue            |= gbus_can_issue_alu[i];
+                ex_out.fu_vld_alu[j]    = |gbus_can_issue_alu[i];
+                /* WARNING: There is an entire CDB arbitration between these two lines...
+                ALU insns can only issue if they ALSO win (early) CDB arbitration! */
+                ex_out.fu_en_alu[j]     = ex_out.fu_vld_alu[j] && ex_in.fu_cdb_gnt_alu[j];
+                to_issue            |= ex_in.fu_cdb_gnt_alu[j] ? gbus_can_issue_alu[i] : '0;
             end
         end
         foreach (gbus_fu_rdy_mult[i, j]) begin
             if (gbus_fu_rdy_mult[i][j]) begin
                 fu2issuer_mult[j]   |= gbus_can_issue_mult[i];
-                ex_out.fu_vld_mult[j]      = |gbus_can_issue_mult[i]; // [MISSING] ms1 test: change i to j (not caught)
+                ex_out.fu_en_mult[j]    = |gbus_can_issue_mult[i]; // [MISSING] ms1 test: change i to j (not caught)
                 to_issue            |= gbus_can_issue_mult[i];
             end
         end
         foreach (gbus_fu_rdy_load[i, j]) begin
             if (gbus_fu_rdy_load[i][j]) begin
                 fu2issuer_load[j]   |= gbus_can_issue_load[i];
-                ex_out.fu_vld_load[j]      = |gbus_can_issue_load[i];
+                ex_out.fu_en_load[j]    = |gbus_can_issue_load[i];
                 to_issue            |= gbus_can_issue_load[i];
 
             end
@@ -230,35 +242,43 @@ module rs #(parameter
         foreach (gbus_fu_rdy_store[i, j]) begin
             if (gbus_fu_rdy_store[i][j]) begin
                 fu2issuer_store[j]  |= gbus_can_issue_store[i];
-                ex_out.fu_vld_store[j]     = |gbus_can_issue_store[i];
+                ex_out.fu_en_store[j]   = |gbus_can_issue_store[i];
                 to_issue            |= gbus_can_issue_store[i];
             end
         end
     end
 
     always_comb begin
-        ex_out.fu_dat_alu      = '0;
-        ex_out.fu_dat_mult     = '0;
-        ex_out.fu_dat_store    = '0;
-        ex_out.fu_dat_load     = '0;
+        ex_out.fu_dat_alu   = '0;
+        ex_out.fu_dat_mult  = '0;
+        ex_out.fu_dat_store = '0;
+        ex_out.fu_dat_load  = '0;
+        ex_out.bytag_alu    = '0; // TODO: set
+        ex_out.bytag_mul    = '0; // TODO: set
+        ex_out.bytag_ldr    = '0; // TODO: set
+        ex_out.bytag_str    = '0; // TODO: set
         foreach (fu2issuer_alu[fu, rs]) begin
             if (fu2issuer_alu[fu][rs]) begin // [MISSING] ms1 test: Remove "!" from if condition (not caught)
                 ex_out.fu_dat_alu[fu] |= entries[rs].dat;
+                ex_out.bytag_alu[fu]  |= get_bytag(rs);
             end
         end
         foreach (fu2issuer_mult[fu, rs]) begin
             if (fu2issuer_mult[fu][rs]) begin
                 ex_out.fu_dat_mult[fu] |= entries[rs].dat;
+                ex_out.bytag_mul[fu]   |= get_bytag(rs);
             end
         end
         foreach (fu2issuer_load[fu, rs]) begin
             if (fu2issuer_load[fu][rs]) begin
                 ex_out.fu_dat_load[fu] |= entries[rs].dat;
+                ex_out.bytag_ldr[fu]   |= get_bytag(rs);
             end
         end
         foreach (fu2issuer_store[fu, rs]) begin
             if (fu2issuer_store[fu][rs]) begin
                 ex_out.fu_dat_store[fu] |= entries[rs].dat;
+                ex_out.bytag_str[fu]    |= get_bytag(rs);
             end
         end
     end

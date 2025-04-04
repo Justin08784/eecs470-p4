@@ -14,7 +14,7 @@ module rob #(
     input  retire_final r_in,
 
     // complete (write)
-    input  execute2complete c_in,
+    input  execute2complete_dat cdat_in,
 
     // dispatch (write)
     output rob2dispatch d_out,
@@ -111,21 +111,21 @@ module rob #(
 
             // handle complete (ins)
             for (int unsigned i = 0, int cur_idx = 0; i < NUM_CPORTS; ++i) begin
-                cur_idx = c_in.c_rob_idxs[i];
-                // $display("c[%d]: (en: %b, idx: %d), state[%d].cpl: %b, c_in.c_en[i]: %b, or: %b...",
+                cur_idx = cdat_in.rob_idxs[i];
+                // $display("c[%d]: (en: %b, idx: %d), state[%d].cpl: %b, cdat_in.en[i]: %b, or: %b...",
                 //     i,
-                //     c_in.c_en[i],
-                //     c_in.c_rob_idxs[i],
+                //     cdat_in.en[i],
+                //     cdat_in.rob_idxs[i],
                 //     cur_idx,
                 //     state[cur_idx].cpl,
-                //     c_in.c_en[i],
-                //     state[cur_idx].cpl | c_in.c_en[i]
+                //     cdat_in.en[i],
+                //     state[cur_idx].cpl | cdat_in.en[i]
                 // );
 
                 /* V1: This doesn't actually update the cpl bit... */
-                // state[cur_idx].cpl <= state[cur_idx].cpl || c_in.c_en[i];
+                // state[cur_idx].cpl <= state[cur_idx].cpl || cdat_in.en[i];
                 /* V2: ...but this one does???! Make this make sense? */
-                if (c_in.c_en[i])
+                if (cdat_in.en[i])
                     state[cur_idx].cpl <= 1;
                 /*
                 V1 is incorrect due to the following edge case:
@@ -201,14 +201,14 @@ module rob #(
             end
 
             // $display("c_en: [%b %b] c_ts: [%d %d] c_data: [%h %h] c_rob_idxs: [%d %d]",
-            //     c_in.c_en[0],
-            //     c_in.c_en[1],
-            //     c_in.c_ts[0],
-            //     c_in.c_ts[1],
-            //     c_in.c_data[0],
-            //     c_in.c_data[1],
-            //     c_in.c_rob_idxs[0],
-            //     c_in.c_rob_idxs[1]
+            //     cdat_in.en[0],
+            //     cdat_in.en[1],
+            //     cdat_in.ts[0],
+            //     cdat_in.ts[1],
+            //     cdat_in.data[0],
+            //     cdat_in.data[1],
+            //     cdat_in.rob_idxs[0],
+            //     cdat_in.rob_idxs[1]
             // );
             // $display("{r_free_cnt: %d, [(t: %0d, told: %0d, dst: %0d), (t: %0d, told: %0d, dst: %0d)]}",
             //     r_out.r_free_cnt,

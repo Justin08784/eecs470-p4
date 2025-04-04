@@ -61,7 +61,7 @@ module dispatch #(parameter
     output  dispatch2btq btq_out,
 
     // Map table
-    input   execute2complete c_in,
+    input   execute2complete_tag ctag_in,
 
     // Map table
     input   map_table2dispatch map_in,
@@ -265,8 +265,8 @@ always_comb begin
     for (int i = 0; i < `N; i++) begin
         rs_out.d_dat[i] = commit_in[i].dat;
         for (int c = 0; c < `N; ++c) begin
-            rs_out.d_dat[i].t1_rdy |= c_in.c_en[c] & (c_in.c_ts[c] == commit_in[i].dat.t1);
-            rs_out.d_dat[i].t2_rdy |= c_in.c_en[c] & (c_in.c_ts[c] == commit_in[i].dat.t2);
+            rs_out.d_dat[i].t1_rdy |= ctag_in.en[c] & (ctag_in.ts[c] == commit_in[i].dat.t1);
+            rs_out.d_dat[i].t2_rdy |= ctag_in.en[c] & (ctag_in.ts[c] == commit_in[i].dat.t2);
         end
         rs_out.d_dat[i].t1_rdy |= cpl_lst[commit_in[i].dat.t1];
         rs_out.d_dat[i].t2_rdy |= cpl_lst[commit_in[i].dat.t2];
@@ -318,8 +318,8 @@ always_ff @(posedge clock) begin
                 cpl_lst[map_out.ts[i]] <= 0;
         end
         for (int c = 0; c < `N; ++c) begin
-            if (c_in.c_en[c])
-                cpl_lst[c_in.c_ts[c]] <= 1;
+            if (ctag_in.en[c])
+                cpl_lst[ctag_in.ts[c]] <= 1;
         end
     end
 end

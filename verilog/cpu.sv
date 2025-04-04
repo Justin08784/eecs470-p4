@@ -463,7 +463,8 @@ module cpu (
     map_table2dispatch map_2_dispatch;
     dispatch2btq dispatch_2_btq;
     btq2dispatch btq_2_dispatch;
-    execute2complete ex_2_complete;
+    execute2complete_tag ex_2_ctag;
+    execute2complete_dat ex_2_cdat;
     dispatch2sq dispatch_2_sq;
     sq2dispatch sq_2_dispatch;
 
@@ -481,7 +482,7 @@ module cpu (
         .rob_in(rob_2_dispatch),
         .rob_out(dispatch_2_rob),
 
-        .c_in(ex_2_complete),
+        .ctag_in(ex_2_ctag),
 
         .free_in(fl_2_dispatch),
         .free_out(dispatch_2_fl),
@@ -589,7 +590,7 @@ module cpu (
         .flush(flush),
         .r_in (retire_2_btq),
         .r_out(btq_2_retire),
-        .c_in(ex_2_complete),
+        .cdat_in(ex_2_cdat),
         .d_in(dispatch_2_btq),
         .d_out(btq_2_dispatch)
     );
@@ -616,7 +617,7 @@ module cpu (
         .ex_in(ex_2_rs),
         .ex_out(rs_2_ex),
 
-        .c_in(ex_2_complete)
+        .ctag_in(ex_2_ctag)
     );
     
     //////////////////////////////////////////////////
@@ -637,7 +638,7 @@ module cpu (
         .flush      (flush),
         .r_out      (rob_2_retire),
         .r_in       (retire_exec),
-        .c_in       (ex_2_complete),
+        .cdat_in    (ex_2_cdat),
         .d_out      (rob_2_dispatch),
         .d_in       (dispatch_2_rob)
     );
@@ -689,7 +690,8 @@ module cpu (
         .flush(flush),
         .rs_in(rs_2_ex),
         .rs_out(ex_2_rs),
-        .c_out(ex_2_complete),
+        .ctag_out(ex_2_ctag),
+        .cdat_out(ex_2_cdat),
         .prf_out(prf_out),
         .prf_in(prf_in)
     );
@@ -761,10 +763,10 @@ module cpu (
         .clock(clock),
         //.reset(reset),
         //.flush(),
-        .c_en   (ex_2_complete.c_en),
-        .c_is_branch (ex_2_complete.is_branch),
-        .c_ts   (ex_2_complete.c_ts),
-        .c_vs   (ex_2_complete.c_data),
+        .c_en   (ex_2_cdat.en),
+        .c_is_branch (ex_2_cdat.is_branch),
+        .c_ts   (ex_2_cdat.ts),
+        .c_vs   (ex_2_cdat.data),
 
         // NOTE: Here each X_BY_FU type is coerced into a flat X array type
         .s_en1s (prf_out.s_en1s),

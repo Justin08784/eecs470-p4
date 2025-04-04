@@ -10,7 +10,7 @@ typedef struct packed {
 } MUL_PKT;
 
 typedef enum logic[1:0] {
-    O_NONE    = 0,
+    O_NONE    = 0, // passthrough
     O_SKID    = 1, // combinational backpressure, registered forward pressure
     O_PSKID   = 2, // registered back AND forward pressure (but needs 2 regs)
     O_FLOP    = 3  // no handshake; advance unconditionally (i.e. simple flop)
@@ -21,16 +21,23 @@ typedef enum logic[1:0] {
 // This is not an ideal multiplier but is sufficient to allow a faster clock
 // period than straight multiplication.
 
-module mult (
+module mult #(
+    parameter int unsigned ID
+) (
     input clock, reset, flush,
     input DATA rs1, rs2,
     input MULT_FUNC func,
     input DST dst_in,
 
     input  logic i_vld,  // replacement for start
-    output logic i_rdy,  // TODO: set
-    input  logic o_rdy, // TODO: set
+    output logic i_rdy,
+    input  logic o_rdy,
     output logic o_vld, // replacement for done
+
+    // lines for early CDB arbitration
+    output logic cdb_req,
+    output PHYS_REG_IDX ctag_t,
+    input  logic cdb_gnt,
 
     output DATA result,
     output DST dst_out
@@ -58,16 +65,6 @@ module mult (
         };
     end
     
-    typedef OUT_MODE [`MULT_STAGES-1:0] MODES;
-    function automatic MODES gen_modes;
-        MODES modes;
-        for (int i = 0; i < `MULT_STAGES; i++)
-            modes[i] = O_SKID;
-        modes[`MULT_STAGES-1] = O_PSKID;
-        return modes;
-    endfunction
-    localparam MODES modes = gen_modes();
-
     // instantiate an array of mult_stage modules
     // this uses concatenation syntax for internal wiring, see lab 2 slides
     logic   [`MULT_STAGES:0] vlds;
@@ -84,21 +81,89 @@ module mult (
         o_pkt               = pkts[`MULT_STAGES];
     end
 
-    for (genvar i = 0; i < `MULT_STAGES; i++) begin : gen_stages
-        mult_stage #(
-            .MODE(modes[i])
-        ) mstage (
-            .clock (clock),
-            .reset (reset),
-            .flush (flush),
+    for (genvar i = 0; i < `MULT_STAGES; ++i) begin : gen_stages
+        if (i < `MULT_STAGES-4) begin
+            mult_stage #(
+                .MODE(O_SKID)
+            ) mstage (
+                .clock (clock),
+                .reset (reset),
+                .flush (flush),
 
-            .i_vld(vlds[i]),
-            .i_rdy(rdys[i]),
-            .i_dat(pkts[i]),
-            .o_vld(vlds[i+1]),
-            .o_rdy(rdys[i+1]),
-            .o_dat(pkts[i+1])
-        );
+                .i_vld(vlds[i]),
+                .i_rdy(rdys[i]),
+                .i_dat(pkts[i]),
+                .o_vld(vlds[i+1]),
+                .o_rdy(rdys[i+1]),
+                .o_dat(pkts[i+1])
+            );
+
+        end else if (i == `MULT_STAGES-4) begin
+            // stage just before CDB arbiter; guard upstream with ppln_skid
+            mult_stage #(
+                .MODE(O_PSKID)
+            ) mstage (
+                .clock (clock),
+                .reset (reset),
+                .flush (flush),
+
+                .i_vld(vlds[i]),
+                .i_rdy(rdys[i]),
+                .i_dat(pkts[i]),
+                .o_vld(cdb_req),
+                .o_rdy(cdb_gnt),
+                .o_dat(pkts[i+1])
+            );
+            assign ctag_t = pkts[i+1].dst.tag;
+
+        end else if (i == `MULT_STAGES-3) begin
+            // stage just after CDB arbiter; since arb. is done, may advance unconditionally
+            mult_stage #(
+                .MODE(O_FLOP)
+            ) mstage (
+                .clock (clock),
+                .reset (reset),
+                .flush (flush),
+
+                .i_vld(cdb_gnt),
+                .i_dat(pkts[i]),
+                .o_vld(vlds[i+1]),
+                .o_dat(pkts[i+1])
+            );
+
+        end else if (i < `MULT_STAGES-1) begin
+            mult_stage #(
+                .MODE(O_FLOP)
+            ) mstage (
+                .clock (clock),
+                .reset (reset),
+                .flush (flush),
+
+                .i_vld(vlds[i]),
+                .i_dat(pkts[i]),
+                .o_vld(vlds[i+1]),
+                .o_dat(pkts[i+1])
+            );
+
+        end else if (i == `MULT_STAGES-1) begin
+            // do not buffer here; latch result directly into CDB data bus (cdat_out)
+
+            mult_stage #(
+                .MODE(O_NONE)
+            ) mstage (
+                .clock (clock),
+                .reset (reset),
+                .flush (flush),
+
+                .i_vld(vlds[i]),
+                .i_dat(pkts[i]),
+                .o_vld(vlds[i+1]),
+                .o_dat(pkts[i+1])
+            );
+
+        end else begin
+            $fatal("mult OUT_MODE config: This case should be impossible.");
+        end
     end
 
     // Use the high or low bits of the product based on the output func
@@ -112,8 +177,19 @@ module mult (
 
     `ifdef DEBUG
     always_ff @(posedge clock) begin
-        if (!reset) begin
-            $display("");
+        if (!reset && ID == 1) begin
+            $display("  %3d | >> mul%0d >>", $time, ID);
+            for (int unsigned i = 0; i < `MULT_STAGES+1; ++i) begin
+                $display("– sum: %x, mplier: %x, mcand: %x, func: %0d, tag: %2d, rob_idx: %2d",
+                    pkts[i].sum,
+                    pkts[i].mplier,
+                    pkts[i].mcand,
+                    pkts[i].func,
+                    pkts[i].dst.tag,
+                    pkts[i].dst.rob_idx
+                );
+            end
+            $display("  %3d | << mul%0d <<", $time, ID);
         end
     end
     `endif // DEBUG
@@ -128,8 +204,8 @@ module mult_stage #(
     input MUL_PKT   i_dat,
 
     input  logic    i_vld,  // replacement for start
-    output logic    i_rdy,  // TODO: set
-    input  logic    o_rdy,  // TODO: set
+    output logic    i_rdy,
+    input  logic    o_rdy,
     output logic    o_vld,  // replacement for done
 
     output MUL_PKT  o_dat
@@ -216,20 +292,5 @@ module mult_stage #(
         end
         endcase
     endgenerate
-
-    `ifdef DEBUG
-    always_ff @(posedge clock) begin
-        if (!reset) begin
-            $display("– sum: %x, mplier: %x, mcand: %x, func: %0d, tag: %x, rob_idx: %x",
-                tmp_dat.sum,
-                tmp_dat.mplier,
-                tmp_dat.mcand,
-                tmp_dat.func,
-                tmp_dat.dst.tag,
-                tmp_dat.dst.rob_idx
-            );
-        end
-    end
-    `endif // DEBUG
 
 endmodule // mult_stage
