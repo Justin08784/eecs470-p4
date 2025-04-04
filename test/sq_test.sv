@@ -54,6 +54,7 @@ module sq_testbench;
     );
 
 
+
     initial begin
         clock = 0;
         reset = 0;

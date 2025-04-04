@@ -435,7 +435,11 @@ typedef struct packed {
     logic illegal;
 } ROB_ENTRY;
 
-typedef logic [$clog2(`LSQ_SZ_DBL)-1:0] LSQ_IDX;
+//allowing one bit greater than strictly necessary 
+//so that we can use values above what we will see 
+//in the LSQ as the initial value for SQ_IDX in 
+//dispatch if a load comes before the first store
+typedef logic [$clog2(`LSQ_SZ_DBL):0] LSQ_IDX; 
 typedef struct packed {
     LSQ_IDX sq_idx;
     ROB_IDX rob_idx;
@@ -535,6 +539,8 @@ typedef struct packed {
     FU_IDX          fu_idx;
     ROB_IDX         rob_idx;
     BTQ_IDX         btq_idx;
+    LSQ_IDX         sq_idx;
+    LSQ_IDX         lq_idx;
     logic           is_branch; // Is inst a branch?
     
 
@@ -908,9 +914,9 @@ typedef struct packed{
 
 // By SQ
 typedef struct packed {
-    logic   [$clog2(`N):0]      sq_rdy_scnt;
-    logic   [$clog2(`LSQ_SZ):0] sq_tail;
-    LSQ_IDX [`N-1:0] next_ids;
+    logic   [$clog2(`N):0]  sq_rdy_scnt;
+    LSQ_IDX                 last_used_sq_idx;
+    LSQ_IDX [`N-1:0]        next_ids;
 } sq2dispatch;
 
 typedef struct packed {

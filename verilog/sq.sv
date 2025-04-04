@@ -34,12 +34,13 @@ module sq #(parameter
     logic [$clog2(NUM_DPORTS):0]    free_scnt;
     logic [$clog2(NUM_RPORTS):0]    used_scnt;
 
-    logic [$clog2(LSQ_SZ)-1:0]  head;
-    logic [$clog2(LSQ_SZ)-1:0]  tail;
+    logic [$clog2(LSQ_SZ)-1:0]      head;
+    logic [$clog2(LSQ_SZ)-1:0]      tail;
     logic [$clog2(LSQ_SZ_DBL)-1:0]  tail_dbl;
+    LSQ_IDX                         last_used_sq_idx;
 
-    SQ_ENTRY [LSQ_SZ-1:0]       state;
-    logic [$clog2(LSQ_SZ):0]    used, free;
+    SQ_ENTRY [LSQ_SZ-1:0]           state;
+    logic [$clog2(LSQ_SZ):0]        used, free;
 
     logic [NUM_RPORTS-1:0][$clog2(LSQ_SZ)-1:0] r_idxs;
     logic [NUM_DPORTS-1:0][$clog2(LSQ_SZ)-1:0] d_idxs;
@@ -49,11 +50,11 @@ module sq #(parameter
     forwardRET2sq forward_ret_2_sq;
 
     `ifdef DEBUG
-    assign state_dbg            = state;
+    assign state_dbg    = state;
     `endif 
-    assign free                 = LSQ_SZ - used;
-    assign free_scnt            = `MIN(free, NUM_DPORTS);
-    assign used_scnt            = `MIN(used, NUM_RPORTS);
+    assign free         = LSQ_SZ - used;
+    assign free_scnt    = `MIN(free, NUM_DPORTS);
+    assign used_scnt    = `MIN(used, NUM_RPORTS);
 
 
     post_ret_buffer buf_dut(
@@ -81,9 +82,9 @@ module sq #(parameter
 
         // handle dispatch (outs)
         sq_2_dis <= '{
-            sq_rdy_scnt : `MIN(free, NUM_DPORTS),
-            sq_tail     : tail_dbl,
-            next_ids    : next_ids
+            sq_rdy_scnt         : `MIN(free, NUM_DPORTS),
+            last_used_sq_idx    : last_used_sq_idx,
+            next_ids            : next_ids
         };
 
         //handle LSQ CDB to RS
@@ -229,11 +230,13 @@ module sq #(parameter
             tail    <= 0;
             tail_dbl <= 0;
             state   <= '0;
+            last_used_sq_idx <= LSQ_SZ_DBL + 1; //outside of SQ range so that if a load occurs before the first store we don't flag it falsely
         end else begin
             used    <= used + dis_2_sq.sq_d_en_cnt - rob_2_sq.r_en;
             head    <= (head + rob_2_sq.r_en) % LSQ_SZ;
             tail    <= (tail + dis_2_sq.sq_d_en_cnt) % LSQ_SZ;
             tail_dbl <= (tail_dbl + dis_2_sq.sq_d_en_cnt) % LSQ_SZ_DBL;
+            last_used_sq_idx <= (last_used_sq_idx + dis_2_sq.sq_d_en_cnt) % LSQ_SZ_DBL;
             
             // handle execute updates
             for (int unsigned i = 0, int cur_idx = 0; i < NUM_ST_PORTS; ++i) begin
@@ -268,8 +271,8 @@ module sq #(parameter
                 };
             end
 
-            `ifdef DEBUG
-            $display("  %3d | >> LSQ", $time);
+            // `ifdef DEBUG
+            $display("  %3d | >> SQ", $time);
             for (int i = 0; i < LSQ_SZ; i++) begin
                 $display("Entry [%0d]: id=%0d, rob_idx=%0d, addr=%0d, data=%0d, d_valid=%b, addr mask=%4b",
                 i,
@@ -282,8 +285,8 @@ module sq #(parameter
                 state[i].bytewise_addr_mask
                 );
             end
-            $display("  %3d | << LSQ", $time);
-            `endif
+            $display("  %3d | << SQ", $time);
+            // `endif
         end
     end
 

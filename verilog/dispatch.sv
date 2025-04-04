@@ -78,7 +78,6 @@ logic [$clog2(N):0] alloc_vld_scnt;
 
 // control logic
 always_comb begin
-    sq_out = '0;
     //logic to find the minimum # of spots free across the 4 inputs
     // TODO: Is syntheizer smart enough to transform this MIN compute into a tree?
     alloc_en_cnt = rob_in.rob_rdy_scnt;
@@ -87,6 +86,18 @@ always_comb begin
     alloc_en_cnt = free_in.free_rdy_scnt < $countones(decode_in.prvw_has_dests)
         ? `MIN(alloc_en_cnt, free_in.free_rdy_scnt)
         : alloc_en_cnt;
+
+    //check if enough room in SQ
+    if (decode_in.d_dat[0].wr_mem && decode_in.d_dat[1].wr_mem) begin
+        alloc_en_cnt = `MIN(alloc_en_cnt, sq_in.sq_rdy_scnt);
+    end
+    else if (decode_in.d_dat[0].wr_mem) begin
+        alloc_en_cnt = (sq_in.sq_rdy_scnt >= 1) ? alloc_en_cnt : 0;
+    end
+    else if (decode_in.d_dat[1].wr_mem) begin
+        alloc_en_cnt = (sq_in.sq_rdy_scnt >= 1) ? alloc_en_cnt : `MIN(alloc_en_cnt, 1);
+    end
+
     alloc_en_cnt = `MIN(alloc_en_cnt, alloc_rdy_scnt);
     
     //assigning output #'s
@@ -204,8 +215,12 @@ end
 RENAME_COMMIT_PKT [`N-1:0] tmp_alloc2rename;
 logic [`N-1:0] rd_src1s;
 logic [`N-1:0] rd_src2s;
+logic [$clog2(`N):0] sq_placed;
 always_comb begin
     tmp_alloc2rename = '0;
+    sq_placed = '0;
+    sq_out = '0;
+
     for (int i = 0; i < rename_en_cnt; i++) begin
         tmp_alloc2rename[i].dat         = rename_in[i];
 
@@ -227,6 +242,14 @@ always_comb begin
         tmp_alloc2rename[i].dat.btq_idx = rename_in[i].is_branch
             ? btq_in.btq_idxs[brch_packed_idx[i]]
             : '0;
+
+        if (tmp_alloc2rename[i].dat.wr_mem) begin
+            $display("WR_MEM ENABLED");
+            tmp_alloc2rename[i].dat.sq_idx = sq_in.next_ids[sq_placed];
+            sq_placed += 1;
+            sq_out.sq_d_en_cnt += 1;
+            sq_out.rob_idx = rob_in.rob_idxs[i];
+        end
     end
     rob_out.rename_collect_cnt = rename_en_cnt;
 end
