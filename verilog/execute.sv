@@ -624,7 +624,7 @@ module stage_ex_p4 (
         .gnt_bus(cdb2fu_gbus)
     );
     
-    /* >> ======== STAGE 4: Execution ======== >> */
+    /* >> ======== STAGE 3: Execution ======== >> */
     // Includes operand decode/CDB bypass just before 1st cycle of execution.
 
     alu_ex alu_ex0 (
@@ -671,7 +671,7 @@ module stage_ex_p4 (
         .cdat   (cdat_out)
     );
 
-    /* >> ======== STAGE 5/?: CDB data/tag broadcast ======== >> */
+    /* >> ======== STAGE 4/?: CDB data/tag broadcast ======== >> */
     // Tag broadcast occurs with CDB arbitration
     // Data broadcast is the final stage of the execute pipeline.
     execute2complete_tag ctag_out_n;
