@@ -217,6 +217,8 @@ module alu_ex(
             };
         end
     end
+
+    `ifdef DEBUG
     always_ff @(posedge clock) begin
         if (!reset) begin
             $display("alu_ex: cdb <%b>[%2d -> %2d], <%b>[%2d -> %2d]",
@@ -239,6 +241,7 @@ module alu_ex(
             end
         end
     end
+    `endif // DEBUG
 
     // execute
     generate
@@ -325,6 +328,7 @@ module mul_ex(
         end
     end
 
+    `ifdef DEBUG
     always_ff @(posedge clock) begin
         if (!reset) begin
             $display("mul_ex: cdb <%b>[%2d -> %2d], <%b>[%2d -> %2d]",
@@ -347,6 +351,8 @@ module mul_ex(
             end
         end
     end
+    `endif // DEBUG
+
     // execute
     generate
         DATA        [`NUM_FU_MULT-1:0] tmp_res;
