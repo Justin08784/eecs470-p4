@@ -479,7 +479,7 @@ module stage_ex_p4 (
 
             ppln_skid #(
                 .WIDTH($bits(ID_ALU_VIEW))
-            ) cpl_buf (
+            ) sbuf_alu (
                 .clock (clock),
                 .reset (reset),
                 .flush (flush),
@@ -506,7 +506,7 @@ module stage_ex_p4 (
             };
             ppln_skid #(
                 .WIDTH($bits(ID_MUL_VIEW))
-            ) cpl_buf (
+            ) sbuf_mul (
                 .clock (clock),
                 .reset (reset),
                 .flush (flush),
@@ -571,28 +571,27 @@ module stage_ex_p4 (
     end
 
     generate
+        assign regs.i_rdy.alu = '1;
         for (genvar i = 0; i < `NUM_FU_ALU; ++i) begin : gen_alu_rbufs
-            ppln_skid #(
+            flop #(
                 .WIDTH($bits(ALU_REGS_EX))
-            ) rbuf (
+            ) rbuf_alu (
                 .clock (clock),
                 .reset (reset),
                 .flush (flush),
 
                 .i_vld (iss.o_vld.alu[i]),
-                .i_rdy (regs.i_rdy.alu[i]),
                 .i_dat (tmp_alu_regs[i]),
 
                 .o_vld (regs.o_vld.alu[i]),
-                .o_rdy (ex.i_rdy.alu[i]),
                 .o_dat (alu_regs[i])
             );
         end
 
         for (genvar i = 0; i < `NUM_FU_MULT; ++i) begin : gen_mul_rbufs
-            ppln_skid #(
+            skid #(
                 .WIDTH($bits(MUL_REGS_EX))
-            ) rbuf (
+            ) rbuf_mul (
                 .clock (clock),
                 .reset (reset),
                 .flush (flush),
