@@ -162,7 +162,8 @@ module mult #(
             );
 
         end else begin
-            $fatal("mult OUT_MODE config: This case should be impossible.");
+            $error("mult OUT_MODE config: This case should be impossible.");
+            $fatal;
         end
     end
 
