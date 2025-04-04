@@ -273,7 +273,7 @@ module mult_stage #(
     `ifdef DEBUG
     always_ff @(posedge clock) begin
         if (!reset) begin
-            $display("– sum: %x, mplier: %x, mcand: %x, func: %0d, tag: %x, rob_idx: %x",
+            $display("– sum: %x, mplier: %x, mcand: %x, func: %0d, tag: %2d, rob_idx: %2d",
                 tmp_dat.sum,
                 tmp_dat.mplier,
                 tmp_dat.mcand,
