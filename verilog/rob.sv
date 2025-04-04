@@ -19,7 +19,11 @@ module rob #(
     // dispatch (write)
     output rob2dispatch d_out,
 
-    input  dispatch2rob d_in
+    input  dispatch2rob d_in,
+
+    //SQ
+    input sq2rob sq_2_rob,
+    output rob2sq rob_2_sq
 );
     localparam NUM_DPORTS = N; // dispatch ports (in-order)
     localparam NUM_RPORTS = N; // retire ports (in-order)
@@ -152,6 +156,8 @@ module rob #(
                 state[cur_idx] <= '{
                     cpl     : 0,
                     is_brch : d_in.is_brch[i],
+                    wr_mem  : d_in.wr_mem[i],
+                    rd_mem  : d_in.rd_mem[i],
                     tag     : d_in.tag[i],
                     t_old   : d_in.t_old[i],
                     dst     : d_in.dst[i],

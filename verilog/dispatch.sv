@@ -303,6 +303,8 @@ always_comb begin
     for (int i = 0; i < `N; i++) begin
         //handling src tags
         rob_out.is_brch[i]  = commit_in[i].dat.is_branch;
+        rob_out.wr_mem[i]   = commit_in[i].dat.wr_mem;
+        rob_out.rd_mem[i]   = commit_in[i].dat.rd_mem;
         rob_out.tag[i]      = commit_in[i].dat.t;
         rob_out.t_old[i]    = commit_in[i].t_old;
         //handling dest register

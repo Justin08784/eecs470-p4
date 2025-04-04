@@ -431,6 +431,8 @@ typedef struct packed {
     REG_IDX dst;
     
     logic is_brch;
+    logic wr_mem;
+    logic rd_mem;
     logic halt;
     logic illegal;
 } ROB_ENTRY;
@@ -677,6 +679,8 @@ typedef struct packed {
     //(ONLY HERE FOR CURRENT ROB TESTBENCH)
     REG_IDX [`N-1:0] dst;
     logic [`N-1:0] is_brch;
+    logic [`N-1:0] wr_mem;
+    logic [`N-1:0] rd_mem;
     logic [`N-1:0] halt;
     logic [`N-1:0] illegal;
 } dispatch2rob;
