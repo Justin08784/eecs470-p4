@@ -23,9 +23,13 @@ Flow chart
      ↓
 [Functional Unit (ALU or MUL)]
      ↓
-[Completion FIFO (cpl_buf)] ← waits for CDB slot
-     ↓
-[ CDB Output Reg (c_out) ] ← selected for writeback this cycle
+[CDB Output Reg (c_out)] ← selected for writeback this cycle
+
+CDB arbitration:
+- For 1-cycle op, arbitration occurs in [RS] -> [s_buf]
+- For ≥ 4 cycle ops, it occurs in [FU]
+- For < 4 cycle ops, it occurs *before* [FU] (but we dont support any
+ops in this category, so we wouldn't know)
 */
 
 typedef struct packed {
