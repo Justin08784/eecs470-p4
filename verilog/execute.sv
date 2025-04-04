@@ -77,12 +77,12 @@ typedef struct packed {
     DATA rs1;
     DATA rs2;
     ID_ALU_VIEW dat;
-} ALU_REGS_EX;
+} ALU_REGS;
 typedef struct packed {
     DATA rs1;
     DATA rs2;
     ID_MUL_VIEW dat;
-} MUL_REGS_EX;
+} MUL_REGS;
 
 /* Operand data needed for each FU type */
 typedef struct packed {
@@ -156,20 +156,19 @@ module alu_ex(
     input flush,
 
     /* FRONTEND */
-    output logic [`NUM_FU_ALU-1:0]          i_rdy,
-        // ready to accept from alu_ins?
-    input [`NUM_FU_ALU-1:0]                 i_vld,
-        // insns to accept from alu_ins
-    input ALU_REGS_EX [`NUM_FU_ALU-1:0]     i_regs,
+    output logic    [`NUM_FU_ALU-1:0]   i_rdy,
+        // ready to accept from alu_regs?
+    input  logic    [`NUM_FU_ALU-1:0]   i_vld,
+        // insns to accept from alu_regs
+    input  ALU_REGS [`NUM_FU_ALU-1:0]   i_regs,
         // insn metadata/operands
 
     input  execute2complete_dat         cdat,
 
     /* BACKEND */
-    output logic [`NUM_FU_ALU-1:0]      o_vld,
+    output logic    [`NUM_FU_ALU-1:0]   o_vld,
     output CPL_CAND [`NUM_FU_ALU-1:0]   o_cands,
-        // completion requests
-    input  logic [`NUM_FU_ALU-1:0]      o_rdy 
+    input  logic    [`NUM_FU_ALU-1:0]   o_rdy 
         // completion grant
 );
     ALU_OPS [`NUM_FU_ALU-1:0] ops;
@@ -258,8 +257,9 @@ module alu_ex(
                 .alu_func   (ops[i].alu_func),
                 .branch_func(ops[i].branch_func), // Which branch condition to check
 
+                // Output (directly to cdat_out)
                 .take(tmp_take[i]), // True/False condition result (will return FALSE if branch is low)
-                .result(tmp_res[i]) // will return 32'hfacebeec if branch is high (Sentinel, hopefully none of our alu computations result in that value)
+                .result(tmp_res[i]) // will return 32'hfacebeec if branch is high
             );
 
             assign tmp_data[i] = '{
@@ -284,11 +284,11 @@ module mul_ex(
     input flush,
 
     /* FRONTEND */
-    output logic [`NUM_FU_MULT-1:0]     i_rdy,
-        // ready to accept from mul_ins?
-    input [`NUM_FU_MULT-1:0]            i_vld,
-        // insns to accept from mul_ins
-    MUL_REGS_EX  [`NUM_FU_MULT-1:0]     i_regs,
+    output logic    [`NUM_FU_MULT-1:0]  i_rdy,
+        // ready to accept from mul_regs?
+    input  logic    [`NUM_FU_MULT-1:0]  i_vld,
+        // insns to accept from mul_regs
+    input  MUL_REGS [`NUM_FU_MULT-1:0]  i_regs,
         // insn metadata/operands
 
     /* Early CDB arbitration */
@@ -299,10 +299,10 @@ module mul_ex(
     input  execute2complete_dat         cdat,
 
     /* BACKEND */
-    output logic [`NUM_FU_MULT-1:0]     o_vld,
+    output logic    [`NUM_FU_MULT-1:0]  o_vld,
     output CPL_CAND [`NUM_FU_MULT-1:0]  o_cands,
         // completion requests
-    input  logic [`NUM_FU_MULT-1:0]     o_rdy
+    input  logic    [`NUM_FU_MULT-1:0]  o_rdy
         // completion grant
 );
     MUL_OPS [`NUM_FU_MULT-1:0] ops;
@@ -378,7 +378,7 @@ module mul_ex(
                 .ctag_t (ctag_ts[i]),
                 .cdb_gnt(cdb_gnt[i]),
 
-                // Output
+                // Output (directly to cdat_out)
                 .o_vld  (o_vld[i]),
                 .o_rdy  (o_rdy[i]),
                 .dst_out(tmp_dst[i]),
@@ -393,10 +393,6 @@ module mul_ex(
                 take    : '0,
                 is_brch : '0
             };
-
-            // <FU>_outs: where executed insns wait until completion
-            // (buffering happens internally in mul)
-           
         end
     endgenerate
 endmodule
@@ -412,21 +408,12 @@ module stage_ex_p4 (
     input   prf2execute prf_in,
     output  execute2prf prf_out,
 
-    // TODO: wrap this stuff into execute2complete. Wrap crap here in general.
     output  execute2complete_tag ctag_out,
     output  execute2complete_dat cdat_out
 
 );
-    /*
-    Dummy instantiation to stop compiler from complaining about param override.
-    Compiler always be complaining.
-    */
-    skid #(
-        .WIDTH(1)
-    ) dut_skid (
-    );
-
-    // <FU>_ins: staging; where just-issued insns wait for 1 cycle to pull their operands
+    /* >> ======== STAGE 1: Issue Staging ======== >> */
+    // (where just-issued insns wait for 1 cycle)
     struct packed {
         LOGIC_BY_FU     i_rdy;
         LOGIC_BY_FU     o_vld;
@@ -439,10 +426,6 @@ module stage_ex_p4 (
     struct packed {
         LOGIC_BY_FU i_rdy;
         LOGIC_BY_FU o_vld;
-        struct packed {
-            ALU_OPS [`NUM_FU_ALU-1:0]   alu; // TODO: unused
-            MUL_OPS [`NUM_FU_MULT-1:0]  mul; // TODO: unused
-        } dat;
     } regs;
     
     generate
@@ -457,8 +440,6 @@ module stage_ex_p4 (
             2) issue selection logic in RS
         Adding internal forwarding would defeat its entire purpose.
         */
-        // TODO: Make these into FIFOs with only the subset of fields needed
-        // for the ALU type. Conserve space.
         ID_ALU_VIEW tmp_alu_el[`NUM_FU_ALU-1:0];
         ID_MUL_VIEW tmp_mul_el[`NUM_FU_MULT-1:0];
 
@@ -510,6 +491,7 @@ module stage_ex_p4 (
                 rob_idx : rs_in.fu_dat_mult[i].rob_idx,
                 func    : rs_in.fu_dat_mult[i].inst.r.funct3
             };
+
             ppln_skid #(
                 .WIDTH($bits(ID_MUL_VIEW))
             ) sbuf_mul (
@@ -528,12 +510,8 @@ module stage_ex_p4 (
         end
     endgenerate
 
-    // request operands from PRF (separate stage)
-    /*
-    TODO: A separate PRF + operand fetch/decode stage is UNACCEPTABLE for performance,
-    as it adds 1 cycle delay to waking dependent insns. We MUST move PRF read
-    forward to issue, and operand decode into <FU>_ex.
-    */
+    /* >> ======== STAGE 2: PRF Read ======== >> */
+    // fetch rs1, rs2 from PRF **IF NOT BYPASSING**
     always_comb begin
         prf_out = '0;
         foreach (iss.o_vld.alu[i]) begin
@@ -550,10 +528,10 @@ module stage_ex_p4 (
         end
     end
 
-    ALU_REGS_EX [`NUM_FU_ALU-1:0]   alu_regs;
-    ALU_REGS_EX [`NUM_FU_ALU-1:0]   tmp_alu_regs;
-    MUL_REGS_EX [`NUM_FU_MULT-1:0]  mul_regs;
-    MUL_REGS_EX [`NUM_FU_MULT-1:0]  tmp_mul_regs;
+    ALU_REGS [`NUM_FU_ALU-1:0]   alu_regs;
+    ALU_REGS [`NUM_FU_ALU-1:0]   tmp_alu_regs;
+    MUL_REGS [`NUM_FU_MULT-1:0]  mul_regs;
+    MUL_REGS [`NUM_FU_MULT-1:0]  tmp_mul_regs;
 
     struct packed {
         LOGIC_BY_FU i_rdy;
@@ -580,7 +558,7 @@ module stage_ex_p4 (
         assign regs.i_rdy.alu = '1;
         for (genvar i = 0; i < `NUM_FU_ALU; ++i) begin : gen_alu_rbufs
             flop #(
-                .WIDTH($bits(ALU_REGS_EX))
+                .WIDTH($bits(ALU_REGS))
             ) rbuf_alu (
                 .clock (clock),
                 .reset (reset),
@@ -596,7 +574,7 @@ module stage_ex_p4 (
 
         for (genvar i = 0; i < `NUM_FU_MULT; ++i) begin : gen_mul_rbufs
             skid #(
-                .WIDTH($bits(MUL_REGS_EX))
+                .WIDTH($bits(MUL_REGS))
             ) rbuf_mul (
                 .clock (clock),
                 .reset (reset),
@@ -613,8 +591,10 @@ module stage_ex_p4 (
         end
     endgenerate
 
+    /* >> ======== STAGE ?: (early) CDB arbitration ======== >> */
+    // If 1-cycle operation (e.g. ALU), this is before issue staging.
+    // Else if a longer-latency insn, this is in the middle of execution.
 
-    // structure results into generic cdb candidates array
     CPL_CAND_BY_FU cands;
     CPL_CAND [`NUM_FU_TOTAL-1:0] cands_flat;
     assign cands_flat = cands;
@@ -629,6 +609,7 @@ module stage_ex_p4 (
     LOGIC_BY_FU cdb_req;
     LOGIC_BY_FU cdb_gnt;
     assign cdb_req.alu = rs_in.fu_vld_alu;
+    // cdb_req.mul set by mul_ex
 
     psel_gen #(
         .WIDTH(`NUM_FU_TOTAL),
@@ -638,6 +619,9 @@ module stage_ex_p4 (
         .gnt    (cdb_gnt),  // flatten => single bus
         .gnt_bus(cdb2fu_gbus)
     );
+    
+    /* >> ======== STAGE 4: Execution ======== >> */
+    // Includes operand decode/CDB bypass just before 1st cycle of execution.
 
     alu_ex alu_ex0 (
         .clock  (clock),
@@ -658,7 +642,7 @@ module stage_ex_p4 (
 
     struct packed {
         PHYS_REG_IDX [`NUM_FU_ALU-1:0] alu;
-        PHYS_REG_IDX [`NUM_FU_ALU-1:0] mul; // TODO: set. need to pull from mul_ex again
+        PHYS_REG_IDX [`NUM_FU_ALU-1:0] mul;
     } ctag_ts;
     PHYS_REG_IDX [`NUM_FU_TOTAL-1:0] ctag_ts_flat;
     
@@ -683,6 +667,9 @@ module stage_ex_p4 (
         .cdat   (cdat_out)
     );
 
+    /* >> ======== STAGE 5/?: CDB data/tag broadcast ======== >> */
+    // Tag broadcast occurs with CDB arbitration
+    // Data broadcast is the final stage of the execute pipeline.
     execute2complete_tag ctag_out_n;
     execute2complete_dat cdat_out_n;
     always_comb begin
@@ -712,7 +699,6 @@ module stage_ex_p4 (
                 cdat_out_n.ts[c]          |= cands_flat[f].t;
                 cdat_out_n.rob_idxs[c]    |= cands_flat[f].rob_idx;
                 cdat_out_n.data[c]        |= cands_flat[f].data;
-                // TODO: fill these
                 cdat_out_n.btq_idxs[c]    |= cands_flat[f].btq_idx;
                 cdat_out_n.is_branch[c]   |= cands_flat[f].is_brch;
                 cdat_out_n.take[c]        |= cands_flat[f].take;
@@ -749,28 +735,6 @@ module stage_ex_p4 (
             end
         end
     end
-
-
-    // always_ff @(posedge clock) begin
-    //     if (reset || flush) begin
-    //         c_out <= '0;
-    //     end else begin
-    //         /*
-    //         We buffer c_out for 1 cycle to break the comb. chain...
-    //         cpl_buf.used_scnt(vld) -> psel_gen(vld) -> cpl_buf.rd_en_cnt(cpl_gnt)
-    //         -> cpl_buf.rd_data(cands) -> c_out $#BREAK HERE#$ -> RS issue
-    //         -> FU sbuf.wr_data()
-
-    //         TODO: Buffering c_out for 1 cycle feels a little questionable.
-    //         Are you sure you're not adding an unnecessary cycle of latency for
-    //         free_list and rob who practically already wait for 1 cycle because
-    //         they have INTR_FWD disabled? Can you simply reenable INTR_FWD for
-    //         them with minimal latency cost?
-    //         */
-    //         c_out <= c_out_n;
-
-    //     end
-    // end
 
     `ifdef DEBUG
     always_ff @(posedge clock) begin
@@ -925,47 +889,6 @@ module stage_ex_p4 (
                 );
             end
 
-
-            // for (int i = 0; i < 4; ++i) begin
-            //     $display("all_vld[%0d]: %b", i, all_vld[i]);
-            // end
-            // $display("all_vld: %b", all_vld);
-            // $display("");
-            // for (int i = 0; i < 4; ++i) begin
-            //     $display("cpl_gnt[%0d]: %b", i, cpl_gnt[i]);
-            // end
-            // $display("cpl_gnt: %b", cpl_gnt);
-            // $display("");
-            // for (int c = 0; c < 2; ++c) begin
-            //     for (int f = 0; f < 4; ++f) begin
-            //         $display("cdb2fu_gbus[%0d][%0d]: %b", c, f, cdb2fu_gbus[c][f]);
-            //     end
-            // end
-            // $display("");
-            // for (int i = 0; i < 4; ++i) begin
-            //     $display("cand[%0d]: t: %0d rob_idx: %0d data: %x", i, all_cands[i].t, all_cands[i].rob_idx, all_cands[i].data);
-            // end
-            // $display("<prf_out> en: %b s_t1s: [%0d, %0d, %0d, %0d] s_t2s: [%0d, %0d, %0d, %0d]",
-            //     prf_out.prf_en,
-            //     prf_out.s_t1s[0],
-            //     prf_out.s_t1s[1],
-            //     prf_out.s_t1s[2],
-            //     prf_out.s_t1s[3],
-            //     prf_out.s_t2s[0],
-            //     prf_out.s_t2s[1],
-            //     prf_out.s_t2s[2],
-            //     prf_out.s_t2s[3]
-            // );
-            // $display("alu: (rdy: %b, res: %x), (rdy: %b, res: %x), mul: (rdy: %b, res: %x), (rdy: %b, res: %x)",
-            //     alu_outs.rdy[0],
-            //     alu_outs.res[0],
-            //     alu_outs.rdy[1],
-            //     alu_outs.res[1],
-            //     mul_outs.rdy[0],
-            //     mul_outs.res[0],
-            //     mul_outs.rdy[1],
-            //     mul_outs.res[1]
-            // );
             $display("<prf_in >        s_v1s: [%0d, %0d, %0d, %0d] s_v2s: [%0d, %0d, %0d, %0d]",
                 prf_in.s_v1s[0],
                 prf_in.s_v1s[1],
