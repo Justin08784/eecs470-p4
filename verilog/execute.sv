@@ -309,7 +309,9 @@ module mul_ex(
 
         logic       [`NUM_FU_MULT-1:0] cpl_buf_rdy;
         for (genvar i = 0; i < `NUM_FU_MULT; ++i) begin : gen_mults
-            mult mult_0 ( 
+            mult #(
+                .ID(i)
+            ) mult_0 ( 
                 .clock  (clock),
                 .reset  (reset),
                 .flush  (flush),

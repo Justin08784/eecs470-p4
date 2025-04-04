@@ -21,7 +21,9 @@ typedef enum logic[1:0] {
 // This is not an ideal multiplier but is sufficient to allow a faster clock
 // period than straight multiplication.
 
-module mult (
+module mult #(
+    parameter int unsigned ID
+) (
     input clock, reset, flush,
     input DATA rs1, rs2,
     input MULT_FUNC func,
@@ -166,7 +168,18 @@ module mult (
     `ifdef DEBUG
     always_ff @(posedge clock) begin
         if (!reset) begin
-            $display("");
+            $display("  %3d | >> mul%0d >>", $time, ID);
+            for (int unsigned i = 0; i < `MULT_STAGES+1; ++i) begin
+                $display("– sum: %x, mplier: %x, mcand: %x, func: %0d, tag: %2d, rob_idx: %2d",
+                    pkts[i].sum,
+                    pkts[i].mplier,
+                    pkts[i].mcand,
+                    pkts[i].func,
+                    pkts[i].dst.tag,
+                    pkts[i].dst.rob_idx
+                );
+            end
+            $display("  %3d | << mul%0d <<", $time, ID);
         end
     end
     `endif // DEBUG
@@ -269,20 +282,5 @@ module mult_stage #(
         end
         endcase
     endgenerate
-
-    `ifdef DEBUG
-    always_ff @(posedge clock) begin
-        if (!reset) begin
-            $display("– sum: %x, mplier: %x, mcand: %x, func: %0d, tag: %2d, rob_idx: %2d",
-                tmp_dat.sum,
-                tmp_dat.mplier,
-                tmp_dat.mcand,
-                tmp_dat.func,
-                tmp_dat.dst.tag,
-                tmp_dat.dst.rob_idx
-            );
-        end
-    end
-    `endif // DEBUG
 
 endmodule // mult_stage
