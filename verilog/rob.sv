@@ -48,6 +48,8 @@ module rob #(
     assign used_scnt    = `MIN(used, NUM_RPORTS);
 
     always_comb begin
+        rob_2_sq = '0;
+
         for (int unsigned i = 0; i < NUM_RPORTS; ++i)
             rtre_idxs[i] = (head + i) % ROB_SZ;
         for (int unsigned i = 0; i < NUM_DPORTS; ++i)
@@ -59,6 +61,8 @@ module rob #(
         r_out = '0;
         for (int unsigned i = 0; i < used_scnt; ++i) begin
             if (!state[rtre_idxs[i]].cpl)
+                break;
+            if (state[rtre_idxs[i]].halt && (!sq_2_rob.sq_ret_complete)) //ensures that the SQ and SQ retirement buffer are empty before halting
                 break;
             ++r_out.r_en_cnt;
         end
@@ -72,6 +76,9 @@ module rob #(
             r_out.halt[i]   = state[rtre_idxs[i]].halt;
             r_out.illegal[i]= state[rtre_idxs[i]].illegal;
             r_out.brch_vld[i]= state[rtre_idxs[i]].is_brch;
+
+            //tell SQ to retire entries
+            if (state[rtre_idxs[i]].wr_mem) rob_2_sq.r_en += 1;
         end
 
         // handle dispatch (outs)
@@ -185,13 +192,15 @@ module rob #(
                 );
             end
             for (int i = 0; i < `ROB_SZ; ++i) begin
-                $display("Rob[%2d]: cpl %b, t: %2d, t_old: %2d, dst: %2d, is_brch: %b, halt: %0b, illegal: %0b%s",
+                $display("Rob[%2d]: cpl %b, t: %2d, t_old: %2d, dst: %2d, is_brch: %b, wr_mem: %b, rd_mem: %b, halt: %0b, illegal: %0b%s",
                     i,
                     state[i].cpl,
                     state[i].tag,
                     state[i].t_old,
                     state[i].dst,
                     state[i].is_brch,
+                    state[i].wr_mem,
+                    state[i].rd_mem,
                     state[i].halt,
                     state[i].illegal,
                     (i == head && head == tail) 

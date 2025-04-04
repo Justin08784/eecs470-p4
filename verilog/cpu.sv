@@ -668,7 +668,7 @@ module cpu (
 
         .dis_2_sq(dispatch_2_sq),
         .exec_2_sq(exec_2_sq),
-        .rob_2_sq('0),
+        .rob_2_sq(rob_2_sq),
         .mem2proc_transaction_tag(mem2proc_transaction_tag),
 
         .sq_2_dis(sq_2_dispatch),
