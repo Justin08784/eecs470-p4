@@ -65,16 +65,6 @@ module mult #(
         };
     end
     
-    typedef OUT_MODE [`MULT_STAGES-1:0] MODES;
-    function automatic MODES gen_modes;
-        MODES modes;
-        for (int i = 0; i < `MULT_STAGES; i++)
-            modes[i] = O_SKID;
-        modes[`MULT_STAGES-1] = O_PSKID;
-        return modes;
-    endfunction
-    localparam MODES modes = gen_modes();
-
     // instantiate an array of mult_stage modules
     // this uses concatenation syntax for internal wiring, see lab 2 slides
     logic   [`MULT_STAGES:0] vlds;
@@ -109,6 +99,7 @@ module mult #(
             );
 
         end else if (i == `MULT_STAGES-4) begin
+            // stage just before CDB arbiter; guard upstream with ppln_skid
             mult_stage #(
                 .MODE(O_PSKID)
             ) mstage (
@@ -126,6 +117,7 @@ module mult #(
             assign ctag_t = pkts[i+1].dst.tag;
 
         end else if (i == `MULT_STAGES-3) begin
+            // stage just after CDB arbiter; since arb. is done, may advance unconditionally
             mult_stage #(
                 .MODE(O_FLOP)
             ) mstage (
@@ -153,7 +145,9 @@ module mult #(
                 .o_dat(pkts[i+1])
             );
 
-        end else begin
+        end else if (i == `MULT_STAGES-1) begin
+            // do not buffer here; latch result directly into CDB data bus (cdat_out)
+
             mult_stage #(
                 .MODE(O_NONE)
             ) mstage (
@@ -167,6 +161,8 @@ module mult #(
                 .o_dat(pkts[i+1])
             );
 
+        end else begin
+            $fatal("mult OUT_MODE config: This case should be impossible.");
         end
     end
 
@@ -208,8 +204,8 @@ module mult_stage #(
     input MUL_PKT   i_dat,
 
     input  logic    i_vld,  // replacement for start
-    output logic    i_rdy,  // TODO: set
-    input  logic    o_rdy,  // TODO: set
+    output logic    i_rdy,
+    input  logic    o_rdy,
     output logic    o_vld,  // replacement for done
 
     output MUL_PKT  o_dat
