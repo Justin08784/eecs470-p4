@@ -139,9 +139,23 @@ module mult #(
                 .o_dat(pkts[i+1])
             );
 
-        end else begin
+        end else if (i < `MULT_STAGES-1) begin
             mult_stage #(
                 .MODE(O_FLOP)
+            ) mstage (
+                .clock (clock),
+                .reset (reset),
+                .flush (flush),
+
+                .i_vld(vlds[i]),
+                .i_dat(pkts[i]),
+                .o_vld(vlds[i+1]),
+                .o_dat(pkts[i+1])
+            );
+
+        end else begin
+            mult_stage #(
+                .MODE(O_NONE)
             ) mstage (
                 .clock (clock),
                 .reset (reset),
@@ -167,7 +181,7 @@ module mult #(
 
     `ifdef DEBUG
     always_ff @(posedge clock) begin
-        if (!reset) begin
+        if (!reset && ID == 1) begin
             $display("  %3d | >> mul%0d >>", $time, ID);
             for (int unsigned i = 0; i < `MULT_STAGES+1; ++i) begin
                 $display("– sum: %x, mplier: %x, mcand: %x, func: %0d, tag: %2d, rob_idx: %2d",

@@ -217,6 +217,28 @@ module alu_ex(
             };
         end
     end
+    always_ff @(posedge clock) begin
+        if (!reset) begin
+            $display("alu_ex: cdb <%b>[%2d -> %2d], <%b>[%2d -> %2d]",
+                cdat.en[0],
+                cdat.ts[0],
+                cdat.data[0],
+                cdat.en[1],
+                cdat.ts[1],
+                cdat.data[1]
+            );
+
+            for (int unsigned i = 0; i < `NUM_FU_ALU; ++i) begin
+                $display("%2d bytag: (b1:%b, idx1:%b) (b2:%b, idx2:%b)",
+                    i,
+                    i_regs[i].dat.bytag.bypass1,
+                    i_regs[i].dat.bytag.cdb_idx1,
+                    i_regs[i].dat.bytag.bypass2,
+                    i_regs[i].dat.bytag.cdb_idx2,
+                );
+            end
+        end
+    end
 
     // execute
     generate
@@ -300,6 +322,29 @@ module mul_ex(
                     tag     : i_regs[i].dat.t
                 }
             };
+        end
+    end
+
+    always_ff @(posedge clock) begin
+        if (!reset) begin
+            $display("mul_ex: cdb <%b>[%2d -> %2d], <%b>[%2d -> %2d]",
+                cdat.en[0],
+                cdat.ts[0],
+                cdat.data[0],
+                cdat.en[1],
+                cdat.ts[1],
+                cdat.data[1]
+            );
+
+            for (int unsigned i = 0; i < `NUM_FU_MULT; ++i) begin
+                $display("%2d bytag: (b1:%b, idx1:%b) (b2:%b, idx2:%b)",
+                    i,
+                    i_regs[i].dat.bytag.bypass1,
+                    i_regs[i].dat.bytag.cdb_idx1,
+                    i_regs[i].dat.bytag.bypass2,
+                    i_regs[i].dat.bytag.cdb_idx2,
+                );
+            end
         end
     end
     // execute
@@ -572,9 +617,9 @@ module stage_ex_p4 (
     /*
     Complete grant bus shift register
     */
-    logic [2:0][`N-1:0][`NUM_FU_TOTAL-1:0]  cdb2fu_gbus_shr;
+    logic [1:0][`N-1:0][`NUM_FU_TOTAL-1:0]  cdb2fu_gbus_shr;
     logic [`N-1:0][`NUM_FU_TOTAL-1:0]       cdb2fu_gbus;
-    LOGIC_BY_FU [2:0]   cdb_gnt_shr;
+    LOGIC_BY_FU [1:0]   cdb_gnt_shr;
 
     LOGIC_BY_FU cdb_req;
     LOGIC_BY_FU cdb_gnt;
@@ -600,7 +645,7 @@ module stage_ex_p4 (
 
         .o_vld  (ex.o_vld.alu),
         .o_cands(cands.alu),
-        .o_rdy  (cdb_gnt_shr[2].alu),
+        .o_rdy  (cdb_gnt_shr[1].alu),
 
         /* CDB bypass */
         .cdat   (cdat_out)
@@ -627,7 +672,7 @@ module stage_ex_p4 (
 
         .o_vld  (ex.o_vld.mul),
         .o_cands(cands.mul),
-        .o_rdy  (cdb_gnt_shr[2].mul),
+        .o_rdy  (cdb_gnt_shr[1].mul),
 
         /* CDB bypass */
         .cdat   (cdat_out)
@@ -657,7 +702,7 @@ module stage_ex_p4 (
                 ctag_out_n.ts[c]  |= ctag_ts_flat[f];
             end
 
-            if (cdb2fu_gbus_shr[2][c][f]) begin
+            if (cdb2fu_gbus_shr[1][c][f]) begin
                 cdat_out_n.en[c]          |= 1;
                 cdat_out_n.ts[c]          |= cands_flat[f].t;
                 cdat_out_n.rob_idxs[c]    |= cands_flat[f].rob_idx;
@@ -680,7 +725,7 @@ module stage_ex_p4 (
         end else begin
             cdb2fu_gbus_shr[0]  <= cdb2fu_gbus;
             cdb_gnt_shr[0]      <= cdb_gnt;
-            for (int unsigned i = 0; i < 2; ++i) begin
+            for (int unsigned i = 0; i < 1; ++i) begin
                 cdb2fu_gbus_shr[i+1] <= cdb2fu_gbus_shr[i];
                 cdb_gnt_shr[i+1]     <= cdb_gnt_shr[i];
             end
@@ -743,7 +788,7 @@ module stage_ex_p4 (
                     iss.dat.alu[i].cond_branch,
                     iss.dat.alu[i].uncond_branch
                 );
-                $display("  bytag: (b1:%b, idx1: %b) (b2: %b, idx2: %b)",
+                $display("  bytag: (b1:%b, idx1:%b) (b2:%b, idx2:%b)",
                     iss.dat.alu[i].bytag.bypass1,
                     iss.dat.alu[i].bytag.cdb_idx1,
                     iss.dat.alu[i].bytag.bypass2,
@@ -762,7 +807,7 @@ module stage_ex_p4 (
                     iss.dat.mul[i].rob_idx,
                     iss.dat.mul[i].func
                 );
-                $display("  bytag: (b1: %b, idx1: %b) (b2: %b, idx2: %b)",
+                $display("  bytag: (b1:%b, idx1: %b) (b2: %b, idx2:%b)",
                     iss.dat.mul[i].bytag.bypass1,
                     iss.dat.mul[i].bytag.cdb_idx1,
                     iss.dat.mul[i].bytag.bypass2,
@@ -776,6 +821,12 @@ module stage_ex_p4 (
                     regs.o_vld.alu[i],
                     alu_regs[i].rs1,
                     alu_regs[i].rs2
+                );
+                $display("  bytag: (b1:%b, idx1:%b) (b2:%b, idx2:%b)",
+                    alu_regs[i].dat.bytag.bypass1,
+                    alu_regs[i].dat.bytag.cdb_idx1,
+                    alu_regs[i].dat.bytag.bypass2,
+                    alu_regs[i].dat.bytag.cdb_idx2,
                 );
                 // $display("alu_regs[%0d]: bsy: %b, opa: 0x%x, opb: 0x%x, alu_func: %b, branch_func: %b, cond_branch: %b, uncond_branch: %b, t: %2d, rob_idx: %2d, btq_idx: %2d",
                 //     i,
@@ -799,6 +850,12 @@ module stage_ex_p4 (
                     mul_regs[i].rs1,
                     mul_regs[i].rs2
                 );
+                $display("  bytag: (b1:%b, idx1:%b) (b2:%b, idx2:%b)",
+                    mul_regs[i].dat.bytag.bypass1,
+                    mul_regs[i].dat.bytag.cdb_idx1,
+                    mul_regs[i].dat.bytag.bypass2,
+                    mul_regs[i].dat.bytag.cdb_idx2,
+                );
                 // $display("mul_regs[%0d]: bsy: %b, rs1: 0x%x, rs2: 0x%x, func: %b, t: %2d, rob_idx: %2d",
                 //     i,
                 //     regs.o_vld.mul[i],
@@ -818,9 +875,10 @@ module stage_ex_p4 (
             );
 
             $display("\ncdb_req: alu:{%b} mul:{%b}", cdb_req.alu, cdb_req.mul);
-            $display("ctag_ts: alu:{%b} mul:{%b}", ctag_ts.alu, ctag_ts.mul);
+            $display("ctag_ts: alu:{%2d, %2d} mul:{%2d, %2d}",
+                ctag_ts.alu[1], ctag_ts.alu[0], ctag_ts.mul[1], ctag_ts.mul[0]);
             $display("cdb_gnt: alu:{%b} mul:{%b}", cdb_gnt.alu, cdb_gnt.mul);
-            for (int i = 0; i < 3; ++i) begin
+            for (int i = 0; i < 2; ++i) begin
                 $display("cdb_gnt[%0d]: alu:{%b} mul:{%b}", i, cdb_gnt_shr[i].alu, cdb_gnt_shr[i].mul);
             end
 
@@ -828,7 +886,7 @@ module stage_ex_p4 (
             for (int n = 0; n < `N; ++n) begin
                 $display("cdb2fu_gbus[%0d]: %b", n, cdb2fu_gbus[n]);
             end
-            for (int s = 0; s < 3; ++s) begin
+            for (int s = 0; s < 2; ++s) begin
                 for (int n = 0; n < `N; ++n) begin
                     $display("cdb2fu_gbus[%0d][%0d]: %b", s, n, cdb2fu_gbus_shr[s][n]);
                 end
