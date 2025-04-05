@@ -162,7 +162,6 @@ fifo #(
 logic [$clog2(`N):0] lim_cnt_btq;
 always_comb begin
     rename_en_cnt = alloc_vld_scnt;
-    rename_en_cnt = `MIN(rename_rdy_scnt, rename_en_cnt);
 
     lim_cnt_btq = 0;
     for (int unsigned i = 0, int used_cnt = 0; i < `N; ++i) begin
@@ -181,19 +180,21 @@ always_comb begin
         ++lim_cnt_sq;
     end
     rename_en_cnt = `MIN(lim_cnt_sq, rename_en_cnt);
+
+    rename_en_cnt = `MIN(rename_rdy_scnt, rename_en_cnt);
 end
 
 // handle btq output
 logic [`N-1:0] is_brch;
 logic [`N-1:0] wr_mem;
 always_comb begin
+    foreach(rename_en[i])
+        rename_en[i] = i < rename_en_cnt;
+
     foreach(is_brch[i])
         is_brch[i]  = rename_in[i].is_branch;
     foreach(wr_mem[i])
         wr_mem[i]   = rename_in[i].wr_mem;
-
-    foreach(rename_en[i])
-        rename_en[i] = i < rename_en_cnt;
 
     btq_out.en_cnt      = $countones(rename_en & is_brch);
     sq_out.sq_d_en_cnt  = $countones(rename_en & wr_mem);
@@ -219,11 +220,13 @@ logic [`N-1:0] rd_src2s;
 logic [$clog2(`N):0] sq_wr_idx;
 logic [$clog2(`N):0] btq_wr_idx;
 always_comb begin
+    rob_out.rename_collect_cnt = rename_en_cnt;
+
     tmp_alloc2rename = '0;
     sq_wr_idx   = 0;
     btq_wr_idx  = 0;
 
-    for (int i = 0; i < rename_en_cnt; i++) begin
+    for (int i = 0; i < `N; ++i) begin
         tmp_alloc2rename[i].dat         = rename_in[i];
 
         tmp_alloc2rename[i].dat.t       = map_out.ts[i];
@@ -253,7 +256,6 @@ always_comb begin
             ++sq_wr_idx;
         end
     end
-    rob_out.rename_collect_cnt = rename_en_cnt;
 end
 
 RENAME_COMMIT_PKT [`N-1:0]  commit_in;
