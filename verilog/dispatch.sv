@@ -76,33 +76,37 @@ logic [$clog2(N):0] alloc_en_cnt;
 logic [$clog2(N):0] alloc_rdy_scnt;
 logic [$clog2(N):0] alloc_vld_scnt;
 
-// control logic
+logic [$clog2(N):0] lim_cnt_free;
+logic [$clog2(N):0] lim_cnt_sq;
+logic [`N-1:0] prvw_wr_mem;
+
+// Gate by availability
 always_comb begin
-    //logic to find the minimum # of spots free across the 4 inputs
     // TODO: Is syntheizer smart enough to transform this MIN compute into a tree?
-    alloc_en_cnt = rob_in.rob_rdy_scnt;
-    alloc_en_cnt = `MIN(alloc_en_cnt, decode_in.d_vld_scnt);
-    // alloc_en_cnt = `MIN(alloc_en_cnt, sq_in.sq_rdy_scnt); // TODO: enable later
-    alloc_en_cnt = free_in.free_rdy_scnt < $countones(decode_in.prvw_has_dests)
-        ? `MIN(alloc_en_cnt, free_in.free_rdy_scnt)
-        : alloc_en_cnt;
+    alloc_en_cnt = decode_in.d_vld_scnt;
+    alloc_en_cnt = `MIN(rob_in.rob_rdy_scnt, alloc_en_cnt);
 
-    //check if enough room in SQ
-    if (decode_in.d_dat[0].wr_mem && decode_in.d_dat[1].wr_mem) begin
-        alloc_en_cnt = `MIN(alloc_en_cnt, sq_in.sq_rdy_scnt);
+    lim_cnt_free = 0;
+    for (int unsigned i = 0, int used_cnt = 0; i < `N; ++i) begin
+        if (used_cnt + decode_in.prvw_has_dests[i] > free_in.free_rdy_scnt)
+            break;
+        used_cnt += decode_in.prvw_has_dests[i];
+        ++lim_cnt_free;
     end
-    else if (decode_in.d_dat[0].wr_mem) begin
-        alloc_en_cnt = (sq_in.sq_rdy_scnt >= 1) ? alloc_en_cnt : 0;
-    end
-    else if (decode_in.d_dat[1].wr_mem) begin
-        alloc_en_cnt = (sq_in.sq_rdy_scnt >= 1) ? alloc_en_cnt : `MIN(alloc_en_cnt, 1);
-    end
+    alloc_en_cnt = `MIN(lim_cnt_free, alloc_en_cnt);
 
-    alloc_en_cnt = `MIN(alloc_en_cnt, alloc_rdy_scnt);
+    lim_cnt_sq = 0;
+    for (int unsigned i = 0, int used_cnt = 0; i < `N; ++i) begin
+        if (used_cnt + decode_in.d_dat[i].wr_mem > sq_in.sq_rdy_scnt)
+            break;
+        used_cnt += decode_in.d_dat[i].wr_mem;
+        ++lim_cnt_sq;
+    end
+    alloc_en_cnt = `MIN(lim_cnt_sq, alloc_en_cnt);
+
+    alloc_en_cnt = `MIN(alloc_rdy_scnt, alloc_en_cnt);
     
-    //assigning output #'s
     decode_out.dispatch_en_cnt  = alloc_en_cnt;
-    // lsq_out.lsq_d_en_cnt        = alloc_en_cnt; //this will likely need to be changed once memory operations are introduced
 end
 
 //logic for free list
