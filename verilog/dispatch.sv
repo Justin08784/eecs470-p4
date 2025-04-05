@@ -1,32 +1,5 @@
 `include "sys_defs.svh"
-// `include "psel_gen.sv"
 
-/*
-[RESOLVED]
-================= WARNING =================
-This version of dispatch lacks a real RS/ROB reservation system in the alloc stage.
-Currently relies on oversized RS/ROB to "absorb" long dependency chains in tests.
-
-e.g.
-With RS=16 and ROB=64, test2.s and branchy.s run correctly. But mult_no_lsq.s,
-a long-running program, gets stuck.
-
-With RS=128 and ROB=512, all three programs run correctly.
-
-Q: What is happening? A:
-Alloc stage overestimates available RS/ROB space because it does not
-track *reserved but not yet written* entries. When the pipeline is under
-heavy pressure (e.g. deep loop chains or high ILP), instructions can be 
-dispatched into supposedly "free" entries, overwriting in-flight ones in
-the ROB/BTQ. (I think this ovewriting is not an issue for RS because the
-dispatch->RS psel does its own independent selection.)
-
-This bug is masked when the structures are large enough to absorb the full
-working set, but will break under realistic pressure.
-
-[Initial commit of pipelined dispatch]
-===========================================
-*/
 typedef struct packed {
     PHYS_REG_IDX    t_old;
     ID_RESULT       dat;
@@ -96,6 +69,7 @@ always_comb begin
     alloc_en_cnt = `MIN(alloc_rdy_scnt, alloc_en_cnt);
     
     decode_out.dispatch_en_cnt  = alloc_en_cnt;
+    rob_out.alloc_en_cnt        = alloc_en_cnt;
 end
 
 //logic for free list
@@ -220,8 +194,6 @@ logic [`N-1:0] rd_src2s;
 logic [$clog2(`N):0] sq_wr_idx;
 logic [$clog2(`N):0] btq_wr_idx;
 always_comb begin
-    rob_out.rename_collect_cnt = rename_en_cnt;
-
     tmp_alloc2rename = '0;
     sq_wr_idx   = 0;
     btq_wr_idx  = 0;
@@ -243,7 +215,6 @@ always_comb begin
         tmp_alloc2rename[i].dat.t1_rdy  = !rd_src1s[i];
         tmp_alloc2rename[i].dat.t2_rdy  = !rd_src2s[i];
 
-        tmp_alloc2rename[i].dat.rob_idx = rob_in.rob_idxs[i];
         if (rename_in[i].is_branch) begin
             tmp_alloc2rename[i].dat.btq_idx = btq_in.btq_idxs[btq_wr_idx];
             btq_out.NPC[btq_wr_idx] = rename_in[i].NPC;
@@ -291,6 +262,7 @@ always_comb begin
 
     for (int i = 0; i < `N; i++) begin
         rs_out.d_dat[i] = commit_in[i].dat;
+        rs_out.d_dat[i].rob_idx = rob_in.rob_idxs[i];
         for (int c = 0; c < `N; ++c) begin
             rs_out.d_dat[i].t1_rdy |= ctag_in.en[c] & (ctag_in.ts[c] == commit_in[i].dat.t1);
             rs_out.d_dat[i].t2_rdy |= ctag_in.en[c] & (ctag_in.ts[c] == commit_in[i].dat.t2);

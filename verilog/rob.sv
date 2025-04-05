@@ -18,11 +18,10 @@ module rob #(
 
     // dispatch (write)
     output rob2dispatch d_out,
-
     input  dispatch2rob d_in,
 
     //SQ
-    input sq2rob sq_2_rob,
+    input  sq2rob sq_2_rob,
     output rob2sq rob_2_sq
 );
     localparam NUM_DPORTS = N; // dispatch ports (in-order)
@@ -31,20 +30,23 @@ module rob #(
     logic [$clog2(NUM_DPORTS):0]    free_scnt;
     logic [$clog2(NUM_RPORTS):0]    used_scnt;
 
-    logic [$clog2(ROB_SZ)-1:0]   head;
-    logic [$clog2(ROB_SZ)-1:0]   rsrv;
-    logic [$clog2(ROB_SZ)-1:0]   tail;
+    logic [$clog2(ROB_SZ)-1:0]  head;
+    logic [$clog2(ROB_SZ)-1:0]  tail;
 
-    ROB_ENTRY [ROB_SZ-1:0]       state;
-    logic [$clog2(ROB_SZ):0]     used, free;
+    ROB_ENTRY [ROB_SZ-1:0]      state;
+    logic [$clog2(ROB_SZ):0]    used, free;
+    logic [$clog2(4*`N):0]      rsvd;
+    /*
+    FIXME: can just make rsvd [$clog2(ROB_SZ):0] to be safe but I'm trying to
+    match it exactly with the max number of insns that can have reservations:
+    sz(alloc_buf) + sz(rename_buf) = 4*`N.
+    */
 
     logic [NUM_RPORTS-1:0][$clog2(ROB_SZ)-1:0] rtre_idxs;
-    logic [NUM_DPORTS-1:0][$clog2(ROB_SZ)-1:0] rsrv_idxs;
     logic [NUM_DPORTS-1:0][$clog2(ROB_SZ)-1:0] comm_idxs;
 
     assign state_dbg    = state;
-    assign free         = ROB_SZ - used;
-    assign free_scnt    = `MIN(free, NUM_DPORTS);
+    assign free_scnt    = `MIN(free - rsvd, NUM_DPORTS);
     assign used_scnt    = `MIN(used, NUM_RPORTS);
 
     always_comb begin
@@ -54,8 +56,6 @@ module rob #(
             rtre_idxs[i] = (head + i) % ROB_SZ;
         for (int unsigned i = 0; i < NUM_DPORTS; ++i)
             comm_idxs[i] = (tail + i) % ROB_SZ;
-        for (int unsigned i = 0; i < NUM_DPORTS; ++i)
-            rsrv_idxs[i] = (rsrv + i) % ROB_SZ;
 
         // handle retire (outs)
         r_out = '0;
@@ -78,9 +78,8 @@ module rob #(
             r_out.brch_vld[i]= state[rtre_idxs[i]].is_brch;
 
             //tell SQ to retire entries
-            if (state[rtre_idxs[i]].wr_mem) begin
-                rob_2_sq.r_en += 1;
-            end
+            if (state[rtre_idxs[i]].wr_mem)
+                ++rob_2_sq.r_en;
         end
 
         // handle dispatch (outs)
@@ -96,18 +95,20 @@ module rob #(
         (opposite of above points)
         */
         // The true number of same-cycle free slots is free + r_en_cnt
-        d_out <= '{
+        d_out = '{
             // rob_rdy_scnt : `MIN(free + r_out.r_en_cnt, NUM_DPORTS),
-            rob_rdy_scnt : `MIN(free, NUM_DPORTS),
-            rob_idxs     : rsrv_idxs
+            rob_rdy_scnt : free_scnt,
+            rob_idxs     : comm_idxs
         };
     end
 
     always_ff @(posedge clock) begin
         if (reset || flush) begin
             used    <= 0;
+            free    <= ROB_SZ;
+            rsvd    <= 0;
+
             head    <= 0;
-            rsrv    <= 0;
             tail    <= 0;
             state   <= '0;
         end else begin
@@ -118,22 +119,14 @@ module rob #(
                 $error("ROB underflow!");
             `endif
             used    <= used + d_in.d_en_cnt - r_in.r_en_cnt;
+            free    <= free - d_in.d_en_cnt + r_in.r_en_cnt;
+            rsvd    <= rsvd - d_in.d_en_cnt + d_in.alloc_en_cnt;
             head    <= (head + r_in.r_en_cnt) % ROB_SZ;
-            rsrv    <= (rsrv + d_in.rename_collect_cnt) % ROB_SZ;
             tail    <= (tail + d_in.d_en_cnt) % ROB_SZ;
 
             // handle complete (ins)
             for (int unsigned i = 0, int cur_idx = 0; i < NUM_CPORTS; ++i) begin
                 cur_idx = cdat_in.rob_idxs[i];
-                // $display("c[%d]: (en: %b, idx: %d), state[%d].cpl: %b, cdat_in.en[i]: %b, or: %b...",
-                //     i,
-                //     cdat_in.en[i],
-                //     cdat_in.rob_idxs[i],
-                //     cur_idx,
-                //     state[cur_idx].cpl,
-                //     cdat_in.en[i],
-                //     state[cur_idx].cpl | cdat_in.en[i]
-                // );
 
                 /* V1: This doesn't actually update the cpl bit... */
                 // state[cur_idx].cpl <= state[cur_idx].cpl || cdat_in.en[i];
@@ -156,9 +149,7 @@ module rob #(
             end
 
             // handle dispatch (ins)
-            // $display("d_en_cnt: %d", d_in.d_en_cnt);
             for (int unsigned i = 0, int cur_idx = 0; i < NUM_DPORTS; ++i) begin
-                // $display("d[%d]: (tag: %d, t_old: %d, idx: %d)", i, d_idxs[i], d_in.tag[i], d_in.t_old[i]);
                 if (i >= d_in.d_en_cnt)
                     continue;
                 cur_idx = comm_idxs[i];
@@ -193,6 +184,7 @@ module rob #(
                     r_out.brch_vld[i]
                 );
             end
+
             for (int i = 0; i < `ROB_SZ; ++i) begin
                 $display("Rob[%2d]: cpl %b, t: %2d, t_old: %2d, dst: %2d, is_brch: %b, wr_mem: %b, rd_mem: %b, halt: %0b, illegal: %0b%s",
                     i,
@@ -213,42 +205,12 @@ module rob #(
                                 ? " << t"
                                 : ""
                 );
+
                 if (i == tail)
                     break;
             end
-
-            // $display("c_en: [%b %b] c_ts: [%d %d] c_data: [%h %h] c_rob_idxs: [%d %d]",
-            //     cdat_in.en[0],
-            //     cdat_in.en[1],
-            //     cdat_in.ts[0],
-            //     cdat_in.ts[1],
-            //     cdat_in.data[0],
-            //     cdat_in.data[1],
-            //     cdat_in.rob_idxs[0],
-            //     cdat_in.rob_idxs[1]
-            // );
-            // $display("{r_free_cnt: %d, [(t: %0d, told: %0d, dst: %0d), (t: %0d, told: %0d, dst: %0d)]}",
-            //     r_out.r_free_cnt,
-            //     r_out.tag[0],
-            //     r_out.t_old[0],
-            //     r_out.dst[0],
-            //     r_out.tag[1],
-            //     r_out.t_old[1],
-            //     r_out.dst[1]
-            // );
-            // for (int i = head; i < 10; ++i) begin
-            //     $display("Rob[%0d]: cpl %b, t: %0d, t_old: %0d, dst: %0d, halt: %0b, illegal: %0b, NPC: %h",
-            //         i,
-            //         state[i].cpl,
-            //         state[i].tag,
-            //         state[i].t_old,
-            //         state[i].dst,
-            //         state[i].halt,
-            //         state[i].illegal,
-            //         state[i].NPC
-            //     );
-            // end
             $display("  %3d | << ROB <<", $time);
+
         end
     end
     `endif
