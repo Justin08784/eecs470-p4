@@ -67,7 +67,7 @@
 
 `ifndef SYNTH
 // comment out to disable DEBUG:
-// `define DEBUG
+`define DEBUG
 `endif
 
 ///////////////////////////////
@@ -666,11 +666,10 @@ typedef struct packed {
 
 typedef struct packed {
     /* Alloc */
+    logic   [$clog2(`N):0]  alloc_en_cnt;
     /* Rename */
-    logic       [$clog2(`N):0] rename_collect_cnt;
-
     /* Commit */
-    logic   [$clog2(`N):0]            d_en_cnt;
+    logic   [$clog2(`N):0]  d_en_cnt;
         // To: ROB
         // - Number of enabled dispatch lines?
     logic [`N-1:0][$clog2(`PHYS_REG_SZ_R10K)-1:0] tag;
