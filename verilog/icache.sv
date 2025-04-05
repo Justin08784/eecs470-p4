@@ -145,7 +145,7 @@ module icache (
                                         //miss_outstanding && (Imem2proc_transaction_tag == 0);
 
     // Keep sending memory requests until we receive a response tag or change addresses
-    assign proc2Imem_command = reset ? MEM_LOAD : (((PC_prefetch - proc2Icache_addr) >= 24) ? MEM_NONE : MEM_LOAD);
+    assign proc2Imem_command = reset ? MEM_LOAD : (((PC_prefetch - proc2Icache_addr) >= `PREFETCH_CAP) ? MEM_NONE : MEM_LOAD);
     assign proc2Imem_addr    = reset ? {proc2Icache_addr[31:3],3'b0} : {PC_prefetch[31:3],3'b0};
 
     // ---- Cache state registers ---- //
@@ -181,7 +181,7 @@ module icache (
                 icache_tags[write_index].tags  <= write_tag;
                 icache_tags[write_index].valid <= 1'b1;
             end
-            PC_prefetch      <= (!Icache_valid_out && flush) ? proc2Icache_addr : (PC_prefetch - proc2Icache_addr == 24 ? PC_prefetch : PC_prefetch + 8);
+            PC_prefetch      <= (!Icache_valid_out && flush) ? proc2Icache_addr : (PC_prefetch - proc2Icache_addr == `PREFETCH_CAP ? PC_prefetch : PC_prefetch + 8);
             if(Imem2proc_transaction_tag != 0) begin
                 MSHR[Imem2proc_transaction_tag].addr    <= proc2Imem_addr;
                 MSHR[Imem2proc_transaction_tag].valid   <= 1;
