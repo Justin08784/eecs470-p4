@@ -78,7 +78,6 @@ logic [$clog2(N):0] alloc_vld_scnt;
 
 logic [$clog2(N):0] lim_cnt_free;
 logic [$clog2(N):0] lim_cnt_sq;
-logic [`N-1:0] prvw_wr_mem;
 
 // Gate by availability
 always_comb begin
@@ -175,12 +174,20 @@ always_comb begin
         is_brch[i] = rename_in[i].is_branch;
 end
 
+logic [$clog2(`N):0] lim_cnt_btq;
 always_comb begin
     rename_en_cnt = alloc_vld_scnt;
-    rename_en_cnt = `MIN(rename_en_cnt,  rename_rdy_scnt);
-    rename_en_cnt = btq_in.btq_rdy_scnt < $countones(is_brch)
-        ? `MIN(rename_en_cnt, btq_in.btq_rdy_scnt)
-        : rename_en_cnt;
+    rename_en_cnt = `MIN(rename_rdy_scnt, rename_en_cnt);
+
+    lim_cnt_btq = 0;
+    for (int unsigned i = 0, int used_cnt = 0; i < `N; ++i) begin
+        if (used_cnt + is_brch[i] > btq_in.btq_rdy_scnt)
+            break;
+        used_cnt += is_brch[i];
+        ++lim_cnt_btq;
+    end
+    rename_en_cnt = `MIN(lim_cnt_btq, rename_en_cnt);
+
     foreach(rename_en[i])
         rename_en[i] = i < rename_en_cnt;
 end
@@ -203,13 +210,12 @@ end
 
 // handle map table output 
 always_comb begin
-    // map_out         = '0;
     map_out.en_cnt  = rename_en_cnt;
 
     for (int i = 0; i < rename_en_cnt; i++) begin
         //handling dest register
-        map_out.ts[i]        = rename_in[i].t;
-        map_out.dsts[i]      = rename_in[i].dest_reg_idx;
+        map_out.ts[i]       = rename_in[i].t;
+        map_out.dsts[i]     = rename_in[i].dest_reg_idx;
         //handling src tags
         map_out.src1s[i]    = rename_in[i].inst.r.rs1;
         map_out.src2s[i]    = rename_in[i].inst.r.rs2;
@@ -248,7 +254,6 @@ always_comb begin
             : '0;
 
         if (tmp_alloc2rename[i].dat.wr_mem) begin
-            $display("WR_MEM ENABLED");
             tmp_alloc2rename[i].dat.sq_idx = sq_in.next_ids[sq_placed];
             sq_placed += 1;
             sq_out.sq_d_en_cnt += 1;
