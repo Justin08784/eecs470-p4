@@ -178,14 +178,29 @@ module alu_ex(
     ALU_OPS [`NUM_FU_ALU-1:0] ops;
     always_comb begin
         DATA opa, opb;
+        logic bypass1, bypass2;
+        DATA  tmp_rs1, tmp_rs2;
         DATA rs1, rs2;
         foreach(ops[i]) begin
-            rs1 = i_regs[i].dat.bytag.bypass1
-                ? cdat.data[i_regs[i].dat.bytag.cdb_idx1]
-                : i_regs[i].rs1;
-            rs2 = i_regs[i].dat.bytag.bypass2
-                ? cdat.data[i_regs[i].dat.bytag.cdb_idx2]
-                : i_regs[i].rs2;
+            tmp_rs1 = '0;
+            tmp_rs2 = '0;
+            bypass1 = 0;
+            bypass2 = 0;
+            foreach(cdat.en[n]) begin
+                if (!cdat.en[n] || cdat.ts[n] == '0)
+                    continue;
+                if (i_regs[i].dat.t1 == cdat.ts[n]) begin
+                    bypass1 |= 1;
+                    tmp_rs1 |= cdat.data[n];
+                end
+                if (i_regs[i].dat.t2 == cdat.ts[n]) begin
+                    bypass2 |= 1;
+                    tmp_rs2 |= cdat.data[n];
+                end
+            end
+            rs1 = bypass1 ? tmp_rs1 : i_regs[i].rs1;
+            rs2 = bypass2 ? tmp_rs2 : i_regs[i].rs2;
+
             // ALU opA mux
             case (i_regs[i].dat.opa_select)
                 OPA_IS_RS1:  opa = rs1;
@@ -311,15 +326,29 @@ module mul_ex(
 );
     MUL_OPS [`NUM_FU_MULT-1:0] ops;
     always_comb begin
+        logic bypass1, bypass2;
+        DATA  tmp_rs1, tmp_rs2;
         DATA rs1, rs2;
         foreach (ops[i]) begin
-            rs1 = i_regs[i].dat.bytag.bypass1
-                ? cdat.data[i_regs[i].dat.bytag.cdb_idx1]
-                : i_regs[i].rs1;
-            rs2 = i_regs[i].dat.bytag.bypass2
-                ? cdat.data[i_regs[i].dat.bytag.cdb_idx2]
-                : i_regs[i].rs2;
-
+            tmp_rs1 = '0;
+            tmp_rs2 = '0;
+            bypass1 = 0;
+            bypass2 = 0;
+            foreach(cdat.en[n]) begin
+                if (!cdat.en[n] || cdat.ts[n] == '0)
+                    continue;
+                if (i_regs[i].dat.t1 == cdat.ts[n]) begin
+                    bypass1 |= 1;
+                    tmp_rs1 |= cdat.data[n];
+                end
+                if (i_regs[i].dat.t2 == cdat.ts[n]) begin
+                    bypass2 |= 1;
+                    tmp_rs2 |= cdat.data[n];
+                end
+            end
+            rs1 = bypass1 ? tmp_rs1 : i_regs[i].rs1;
+            rs2 = bypass2 ? tmp_rs2 : i_regs[i].rs2;
+            
             ops[i] = '{
                 rs1  : rs1,
                 rs2  : rs2,
