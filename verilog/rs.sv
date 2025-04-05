@@ -76,8 +76,10 @@ module rs #(parameter
         foreach(to_t1_rdy_per_cpl[n, rs]) begin
             if (!ctag_in.en[n])
                 continue;
-            to_t1_rdy_per_cpl[n][rs] = entries[rs].dat.t1 == ctag_in.ts[n];
-            to_t2_rdy_per_cpl[n][rs] = entries[rs].dat.t2 == ctag_in.ts[n];
+            to_t1_rdy_per_cpl[n][rs] = entries[rs].dat.t1 == ctag_in.ts[n]
+                && ctag_in.ts[n] != '0;
+            to_t2_rdy_per_cpl[n][rs] = entries[rs].dat.t2 == ctag_in.ts[n]
+                && ctag_in.ts[n] != '0;
         end
 
         to_t1_rdy = '0;
