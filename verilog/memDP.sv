@@ -27,6 +27,8 @@ module memDP
     input        [READ_PORTS-1:0][$clog2(DEPTH)-1:0] raddr,  // Read address
     output logic [READ_PORTS-1:0][WIDTH        -1:0] rdata,  // Read data
 
+    input ICACHE_TAG [`ICACHE_LINES-1:0] tags,
+
     // ------------------------------------------------------------ //
     //                      Write interface                         //
     // ------------------------------------------------------------ //
@@ -113,5 +115,15 @@ end
         end
     endgenerate
 `endif
+
+always_ff @(posedge clock) begin
+    if (!reset) begin
+        $display("  %3d | >> memDP", $time);
+        for (int unsigned i = 0; i < DEPTH; ++i) begin
+            $display("<%x> memDP[%2x]: %x", tags[i], i, memData[i]);
+        end
+        $display("  %3d | << memDP", $time);
+    end
+end
 
 endmodule

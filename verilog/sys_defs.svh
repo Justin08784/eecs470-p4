@@ -1032,4 +1032,9 @@ typedef struct packed {
     PHYS_REG_IDX tag;
 } DST;
 
+typedef struct packed {
+    ADDR  addr;
+    logic valid;
+} MSHR_entry;
+
 `endif // __SYS_DEFS_SVH__
