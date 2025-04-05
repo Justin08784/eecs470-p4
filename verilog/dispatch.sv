@@ -76,33 +76,26 @@ logic [$clog2(N):0] alloc_en_cnt;
 logic [$clog2(N):0] alloc_rdy_scnt;
 logic [$clog2(N):0] alloc_vld_scnt;
 
-// control logic
+logic [$clog2(N):0] lim_cnt_free;
+logic [$clog2(N):0] lim_cnt_sq;
+
+// Gate by availability
 always_comb begin
-    //logic to find the minimum # of spots free across the 4 inputs
     // TODO: Is syntheizer smart enough to transform this MIN compute into a tree?
-    alloc_en_cnt = rob_in.rob_rdy_scnt;
-    alloc_en_cnt = `MIN(alloc_en_cnt, decode_in.d_vld_scnt);
-    // alloc_en_cnt = `MIN(alloc_en_cnt, sq_in.sq_rdy_scnt); // TODO: enable later
-    alloc_en_cnt = free_in.free_rdy_scnt < $countones(decode_in.prvw_has_dests)
-        ? `MIN(alloc_en_cnt, free_in.free_rdy_scnt)
-        : alloc_en_cnt;
+    alloc_en_cnt = decode_in.d_vld_scnt;
+    alloc_en_cnt = `MIN(rob_in.rob_rdy_scnt, alloc_en_cnt);
 
-    //check if enough room in SQ
-    if (decode_in.d_dat[0].wr_mem && decode_in.d_dat[1].wr_mem) begin
-        alloc_en_cnt = `MIN(alloc_en_cnt, sq_in.sq_rdy_scnt);
+    lim_cnt_free = 0;
+    for (int unsigned i = 0, int used_cnt = 0; i < `N; ++i) begin
+        if (used_cnt + decode_in.prvw_has_dests[i] > free_in.free_rdy_scnt)
+            break;
+        used_cnt += decode_in.prvw_has_dests[i];
+        ++lim_cnt_free;
     end
-    else if (decode_in.d_dat[0].wr_mem) begin
-        alloc_en_cnt = (sq_in.sq_rdy_scnt >= 1) ? alloc_en_cnt : 0;
-    end
-    else if (decode_in.d_dat[1].wr_mem) begin
-        alloc_en_cnt = (sq_in.sq_rdy_scnt >= 1) ? alloc_en_cnt : `MIN(alloc_en_cnt, 1);
-    end
-
-    alloc_en_cnt = `MIN(alloc_en_cnt, alloc_rdy_scnt);
+    alloc_en_cnt = `MIN(lim_cnt_free, alloc_en_cnt);
+    alloc_en_cnt = `MIN(alloc_rdy_scnt, alloc_en_cnt);
     
-    //assigning output #'s
     decode_out.dispatch_en_cnt  = alloc_en_cnt;
-    // lsq_out.lsq_d_en_cnt        = alloc_en_cnt; //this will likely need to be changed once memory operations are introduced
 end
 
 //logic for free list
@@ -165,47 +158,56 @@ fifo #(
 );
 
 /* >> ==== 2. Rename Stage ==== >> */
-logic [`N-1:0] is_brch;
-always_comb begin
-    foreach(is_brch[i])
-        is_brch[i] = rename_in[i].is_branch;
-end
 
+logic [$clog2(`N):0] lim_cnt_btq;
 always_comb begin
     rename_en_cnt = alloc_vld_scnt;
-    rename_en_cnt = `MIN(rename_en_cnt,  rename_rdy_scnt);
-    rename_en_cnt = btq_in.btq_rdy_scnt < $countones(is_brch)
-        ? `MIN(rename_en_cnt, btq_in.btq_rdy_scnt)
-        : rename_en_cnt;
-    foreach(rename_en[i])
-        rename_en[i] = i < rename_en_cnt;
+
+    lim_cnt_btq = 0;
+    for (int unsigned i = 0, int used_cnt = 0; i < `N; ++i) begin
+        if (used_cnt + rename_in[i].is_branch > btq_in.btq_rdy_scnt)
+            break;
+        used_cnt += rename_in[i].is_branch;
+        ++lim_cnt_btq;
+    end
+    rename_en_cnt = `MIN(lim_cnt_btq, rename_en_cnt);
+
+    lim_cnt_sq = 0;
+    for (int unsigned i = 0, int used_cnt = 0; i < `N; ++i) begin
+        if (used_cnt + rename_in[i].wr_mem > sq_in.sq_rdy_scnt)
+            break;
+        used_cnt += rename_in[i].wr_mem;
+        ++lim_cnt_sq;
+    end
+    rename_en_cnt = `MIN(lim_cnt_sq, rename_en_cnt);
+
+    rename_en_cnt = `MIN(rename_rdy_scnt, rename_en_cnt);
 end
 
 // handle btq output
-logic [`N-1:0][`N-1:0] brch_packed_idx;
+logic [`N-1:0] is_brch;
+logic [`N-1:0] wr_mem;
 always_comb begin
-    // pack branch insns to lowest indices
-    brch_packed_idx = '0;
-    for (int unsigned i = 0, int wr_idx = 0; i < `N; ++i) begin
-        if (!is_brch[i])
-            continue;
-        brch_packed_idx[i] = wr_idx;
-        btq_out.NPC[wr_idx] = rename_in[i].NPC;
-        ++wr_idx;
-    end
+    foreach(rename_en[i])
+        rename_en[i] = i < rename_en_cnt;
 
-    btq_out.en_cnt = $countones(rename_en & is_brch);
+    foreach(is_brch[i])
+        is_brch[i]  = rename_in[i].is_branch;
+    foreach(wr_mem[i])
+        wr_mem[i]   = rename_in[i].wr_mem;
+
+    btq_out.en_cnt      = $countones(rename_en & is_brch);
+    sq_out.sq_d_en_cnt  = $countones(rename_en & wr_mem);
 end
 
 // handle map table output 
 always_comb begin
-    // map_out         = '0;
     map_out.en_cnt  = rename_en_cnt;
 
     for (int i = 0; i < rename_en_cnt; i++) begin
         //handling dest register
-        map_out.ts[i]        = rename_in[i].t;
-        map_out.dsts[i]      = rename_in[i].dest_reg_idx;
+        map_out.ts[i]       = rename_in[i].t;
+        map_out.dsts[i]     = rename_in[i].dest_reg_idx;
         //handling src tags
         map_out.src1s[i]    = rename_in[i].inst.r.rs1;
         map_out.src2s[i]    = rename_in[i].inst.r.rs2;
@@ -215,13 +217,16 @@ end
 RENAME_COMMIT_PKT [`N-1:0] tmp_alloc2rename;
 logic [`N-1:0] rd_src1s;
 logic [`N-1:0] rd_src2s;
-logic [$clog2(`N):0] sq_placed;
+logic [$clog2(`N):0] sq_wr_idx;
+logic [$clog2(`N):0] btq_wr_idx;
 always_comb begin
-    tmp_alloc2rename = '0;
-    sq_placed = '0;
-    sq_out = '0;
+    rob_out.rename_collect_cnt = rename_en_cnt;
 
-    for (int i = 0; i < rename_en_cnt; i++) begin
+    tmp_alloc2rename = '0;
+    sq_wr_idx   = 0;
+    btq_wr_idx  = 0;
+
+    for (int i = 0; i < `N; ++i) begin
         tmp_alloc2rename[i].dat         = rename_in[i];
 
         tmp_alloc2rename[i].dat.t       = map_out.ts[i];
@@ -239,19 +244,18 @@ always_comb begin
         tmp_alloc2rename[i].dat.t2_rdy  = !rd_src2s[i];
 
         tmp_alloc2rename[i].dat.rob_idx = rob_in.rob_idxs[i];
-        tmp_alloc2rename[i].dat.btq_idx = rename_in[i].is_branch
-            ? btq_in.btq_idxs[brch_packed_idx[i]]
-            : '0;
+        if (rename_in[i].is_branch) begin
+            tmp_alloc2rename[i].dat.btq_idx = btq_in.btq_idxs[btq_wr_idx];
+            btq_out.NPC[btq_wr_idx] = rename_in[i].NPC;
+            ++btq_wr_idx;
+        end
 
-        if (tmp_alloc2rename[i].dat.wr_mem) begin
-            $display("WR_MEM ENABLED");
-            tmp_alloc2rename[i].dat.sq_idx = sq_in.next_ids[sq_placed];
-            sq_placed += 1;
-            sq_out.sq_d_en_cnt += 1;
+        if (rename_in[i].wr_mem) begin
+            tmp_alloc2rename[i].dat.sq_idx = sq_in.next_ids[sq_wr_idx];
             sq_out.rob_idx = rob_in.rob_idxs[i];
+            ++sq_wr_idx;
         end
     end
-    rob_out.rename_collect_cnt = rename_en_cnt;
 end
 
 RENAME_COMMIT_PKT [`N-1:0]  commit_in;
