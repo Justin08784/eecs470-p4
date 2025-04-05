@@ -668,7 +668,9 @@ module cpu (
 
         .dis_2_sq(dispatch_2_sq),
         .exec_2_sq(exec_2_sq),
-        .rob_2_sq(rob_2_sq),
+        .rob_2_sq('0), //using the rob_2_sq packet here seems to be causing false retirements from the SQ. Will investigate Sunday 4/6. 
+        //As is, can still see packets entering the SQ, and should be able to retire the top 2 entries "properly", they just won't actually write to memory.
+        //But this will still work if you just want to make sure that you can actually make it through a program to the wfi
         .mem2proc_transaction_tag(mem2proc_transaction_tag),
 
         .sq_2_dis(sq_2_dispatch),

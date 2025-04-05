@@ -78,7 +78,9 @@ module rob #(
             r_out.brch_vld[i]= state[rtre_idxs[i]].is_brch;
 
             //tell SQ to retire entries
-            if (state[rtre_idxs[i]].wr_mem) rob_2_sq.r_en += 1;
+            if (state[rtre_idxs[i]].wr_mem) begin
+                rob_2_sq.r_en += 1;
+            end
         end
 
         // handle dispatch (outs)

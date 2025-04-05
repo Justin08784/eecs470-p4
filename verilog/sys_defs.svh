@@ -934,24 +934,31 @@ typedef struct packed {
 } rob2sq;
 
 typedef struct packed {
-    logic       [`NUM_FU_STORE-1:0] st_ex_en;
-    LSQ_IDX     [`NUM_FU_STORE-1:0] st_sq_idx;
-    ADDR        [`NUM_FU_STORE-1:0] st_addr;
-    DATA        [`NUM_FU_STORE-1:0] st_data;
-    MEM_SIZE    [`NUM_FU_STORE-1:0] st_mem_size; //MEM_SIZE'(id_ex_reg.inst.r.funct3[1:0]); <-- HOW TO FIND THIS. DO THIS WHEN PUTTING ENTRY IN FROM DISPATCH OR FROM EXECUTE
-    logic       [`NUM_FU_LOAD-1:0] forward_req_en;
-    LSQ_IDX     [`NUM_FU_LOAD-1:0] forward_sq_idx;
-    ADDR        [`NUM_FU_LOAD-1:0] forward_addr;
-    MEM_SIZE    [`NUM_FU_LOAD-1:0] forward_mem_size; //MEM_SIZE'(id_ex_reg.inst.r.funct3[1:0]); <-- HOW TO FIND THIS. DO THIS WHEN PUTTING ENTRY IN FROM DISPATCH OR FROM EXECUTE
+    logic       [`NUM_FU_STORE-1:0] st_ex_en; //tells SQ that a valid store is coming in on that line (bus, not count)
+    LSQ_IDX     [`NUM_FU_STORE-1:0] st_sq_idx; //the SQ IDXs of the incoming stores, found in the ID_RESULT packet
+    ADDR        [`NUM_FU_STORE-1:0] st_addr; //address that the stores are pointing to
+    DATA        [`NUM_FU_STORE-1:0] st_data; //the data to be stored
+    MEM_SIZE    [`NUM_FU_STORE-1:0] st_mem_size; //MEM_SIZE'(id_ex_reg.inst.r.funct3[1:0]); <-- HOW TO FIND THIS. the size of the data to store. Will be BYTE, HALF, or WORD
+    logic       [`NUM_FU_LOAD-1:0] forward_req_en; //tells the SQ that a store-load forwarding request is coming in on that line (bus, not count)
+    LSQ_IDX     [`NUM_FU_LOAD-1:0] forward_sq_idx; //the SQ IDXs of the loads that are requesting a forward (all loads are assigned the SQ_IDX of the store that most recently was dispatched in the ID_RESULT packet)
+    ADDR        [`NUM_FU_LOAD-1:0] forward_addr; //the address of the forwarding request
+    MEM_SIZE    [`NUM_FU_LOAD-1:0] forward_mem_size; //MEM_SIZE'(id_ex_reg.inst.r.funct3[1:0]); <-- HOW TO FIND THIS. the size of teh data forward requested. Will be BYTE, HALF, or WORD
+
+    //NOTE:the "st_" items should be sent to SQ as soon as the address to store to is resolved and the process begins. Once the data is sent to the SQ, the store FU's job is complete.
+    //In addition, we still want to set their complete flags in the rob after execution is complete so that we can retire them.
 } execute2sq;
 
 typedef struct packed {
-    logic       [`NUM_FU_LOAD-1:0]          forward_en;
-    logic       [`NUM_FU_LOAD-1:0] [7:0]    forward_matches;
-    ADDR        [`NUM_FU_LOAD-1:0]          forward_addr;
-    DATA        [`NUM_FU_LOAD-1:0]          forward_data;
-    MEM_SIZE    [`NUM_FU_LOAD-1:0]          forward_mem_size;
-    logic       [`NUM_FU_LOAD-1:0] [3:0]    forward_byte_en;
+    logic       [`NUM_FU_LOAD-1:0]          forward_en; //tells the load FU if valid data to be forwarded was found (will be ready by the posedge of the next clock cycle)
+    DATA        [`NUM_FU_LOAD-1:0]          forward_data; //the data being forwarded
+    MEM_SIZE    [`NUM_FU_LOAD-1:0]          forward_mem_size; //the size of the data being forwarded. Will always match the size of the request
+    logic       [`NUM_FU_LOAD-1:0] [3:0]    forward_byte_en; //a 4-wide mask telling which of the bytes are valid data being forwarded. This allows cases where you request 4000-4003, and SQ returns a match on 400-4001 and 4003 but not 4002 (and similar cases)
+    //example for byte mask:
+    //request addr 4000 size WORD
+    //SQ match 4000-4001 (HALF)
+    //SQ match 4003 (BYTE)
+    //Return data 32'b: 4003 4002 4001 4000
+    //byte mask:   4'b   1    0    1    1
 } sq2execute;
 
 typedef struct packed {
@@ -1006,12 +1013,18 @@ typedef struct packed {
 } rob2lq;
 
 typedef struct packed {
-    logic       [`NUM_FU_STORE-1:0] ld_ex_en;
-    LSQ_IDX     [`NUM_FU_STORE-1:0] ld_lq_idx;
-    ADDR        [`NUM_FU_STORE-1:0] ld_addr;
-    MEM_SIZE    [`NUM_FU_STORE-1:0] ld_mem_size; //MEM_SIZE'(id_ex_reg.inst.r.funct3[1:0]); <-- HOW TO FIND THIS. DO THIS WHEN PUTTING ENTRY IN FROM DISPATCH OR FROM EXECUTE
-    logic [`NUM_FU_STORE-1:0] st_en;
-    LSQ_IDX [`NUM_FU_STORE-1:0] st_sq_idx;
+    logic       [`NUM_FU_STORE-1:0] ld_ex_en; //tells LQ that a valid load is coming in on that line (bus, not count)
+    LSQ_IDX     [`NUM_FU_STORE-1:0] ld_lq_idx; //LQ IDX for the incoming loads (found in ID_RESULT packet).
+    ADDR        [`NUM_FU_STORE-1:0] ld_addr; //address that the load is loading from
+    MEM_SIZE    [`NUM_FU_STORE-1:0] ld_mem_size; //MEM_SIZE'(id_ex_reg.inst.r.funct3[1:0]); <-- HOW TO FIND THIS. size being loaded (BYTE, HALF, WORD)
+    logic [`NUM_FU_STORE-1:0] st_en; //this comes from the STORE FUs, and tells teh LQ if a valid SQ IDX is coming in on that line (bus, not count)
+    LSQ_IDX [`NUM_FU_STORE-1:0] st_sq_idx; //SQ_IDX associated with st_en. These two items are used to check if any loads and stores have happened out-of-order to flag in the ROB
+    //LQ doesn't need to talk back to execute
+
+    //NOTE: the "ld_" items should be sent to LQ as soon as the address to load from is resolved and the query begins. In addition, we still want to set their complete flags in the
+    //rob after execution is complete so that we can retire them.
+
+    //NOTE: the "st_" items should be sent to LQ as soon as the address to store to is resolved and the data is being sent to the SQ.
 } execute2lq;
 
 typedef struct packed {
