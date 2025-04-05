@@ -674,8 +674,8 @@ module stage_ex_p4 (
     );
 
     struct packed {
-        PHYS_REG_IDX [`NUM_FU_ALU-1:0] alu;
-        PHYS_REG_IDX [`NUM_FU_ALU-1:0] mul;
+        PHYS_REG_IDX [`NUM_FU_ALU-1:0]  alu;
+        PHYS_REG_IDX [`NUM_FU_MULT-1:0] mul;
     } ctag_ts;
     PHYS_REG_IDX [`NUM_FU_TOTAL-1:0] ctag_ts_flat;
     
