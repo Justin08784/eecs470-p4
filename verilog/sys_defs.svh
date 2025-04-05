@@ -56,6 +56,8 @@
 `define BTB_ENTRIES 256
 `define BTB_TAG_WIDTH 12
 
+`define PREFETCH_CAP 48 // <- how far ahead we can prefetch
+
 ///////////////////////////////
 // --- Compil. Controls ---- //
 ///////////////////////////////
