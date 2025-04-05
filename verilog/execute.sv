@@ -618,7 +618,7 @@ module stage_ex_p4 (
                 .i_dat (tmp_mul_regs[i]),
 
                 .o_vld (regs.o_vld.mul[i]),
-                .o_rdy (regs.i_rdy.mul[i]),
+                .o_rdy (ex.i_rdy.mul[i]),
                 .o_dat (mul_regs[i])
             );
         end
