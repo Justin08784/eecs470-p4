@@ -19,9 +19,9 @@ Flow chart
      ↓
 [Staging FIFO (s_buf)]  ← just buffers instruction for 1 cycle
      ↓
-[regs register (alu_regs, mul_regs)]  ← PRF values fetched here
+[regs register (r_buf)]  ← PRF values fetched here
      ↓
-[Functional Unit (ALU or MUL)]
+[Functional Unit (ALU, MUL, LOD, or STR)]
      ↓
 [CDB Output Reg (c_out)] ← selected for writeback this cycle
 
@@ -164,9 +164,9 @@ module alu_ex(
 
     /* FRONTEND */
     output logic    [`NUM_FU_ALU-1:0]   i_rdy,
-        // ready to accept from alu_regs?
+        // ready to accept from regs.o_dat.alu?
     input  logic    [`NUM_FU_ALU-1:0]   i_vld,
-        // insns to accept from alu_regs
+        // insns to accept from regs.o_dat.alu
     input  ALU_REGS [`NUM_FU_ALU-1:0]   i_regs,
         // insn metadata/operands
 
@@ -307,9 +307,9 @@ module mul_ex(
 
     /* FRONTEND */
     output logic    [`NUM_FU_MULT-1:0]  i_rdy,
-        // ready to accept from mul_regs?
+        // ready to accept from regs.o_dat.mul?
     input  logic    [`NUM_FU_MULT-1:0]  i_vld,
-        // insns to accept from mul_regs
+        // insns to accept from regs.o_dat.mul
     input  MUL_REGS [`NUM_FU_MULT-1:0]  i_regs,
         // insn metadata/operands
 
@@ -458,7 +458,7 @@ module stage_ex_p4 (
             ID_MUL_VIEW [`NUM_FU_MULT-1:0]  mul;
             ID_LOD_VIEW [`NUM_FU_LOAD-1:0]  lod;
             ID_STR_VIEW [`NUM_FU_STORE-1:0] str;
-        } dat;
+        } i_dat, o_dat;
     } iss;
     assign iss.i_rdy.lod = '0;
     assign iss.i_rdy.str = '0;
@@ -468,6 +468,11 @@ module stage_ex_p4 (
     struct packed {
         `BY_FU(logic) i_rdy;
         `BY_FU(logic) o_vld;
+        struct packed {
+            ALU_REGS [`NUM_FU_ALU-1:0]  alu;
+            MUL_REGS [`NUM_FU_MULT-1:0] mul;
+            // TODO: add LOD_REGS, STR_REGS
+        } i_dat, o_dat;
     } regs;
     assign regs.i_rdy.lod = '0;
     assign regs.i_rdy.str = '0;
@@ -486,11 +491,8 @@ module stage_ex_p4 (
             2) issue selection logic in RS
         Adding internal forwarding would defeat its entire purpose.
         */
-        ID_ALU_VIEW tmp_alu_el[`NUM_FU_ALU-1:0];
-        ID_MUL_VIEW tmp_mul_el[`NUM_FU_MULT-1:0];
-
         for (genvar i = 0; i < `NUM_FU_ALU; ++i) begin : gen_alu_sbufs
-            assign tmp_alu_el[i] = '{
+            assign iss.i_dat.alu[i] = '{
                 bytag   : rs_in.bytag_alu[i],
 
                 t       : rs_in.fu_dat_alu[i].t,
@@ -519,16 +521,16 @@ module stage_ex_p4 (
 
                 .i_vld (rs_in.fu_en_alu[i]),
                 .i_rdy (iss.i_rdy.alu[i]),
-                .i_dat (tmp_alu_el[i]),
+                .i_dat (iss.i_dat.alu[i]),
 
                 .o_vld (iss.o_vld.alu[i]),
                 .o_rdy (regs.i_rdy.alu[i]),
-                .o_dat (iss.dat.alu[i])
+                .o_dat (iss.o_dat.alu[i])
             );
         end
         
         for (genvar i = 0; i < `NUM_FU_MULT; ++i) begin : gen_mul_sbufs
-            assign tmp_mul_el[i] = '{
+            assign iss.i_dat.mul[i] = '{
                 bytag   : rs_in.bytag_mul[i],
 
                 t       : rs_in.fu_dat_mult[i].t,
@@ -547,11 +549,11 @@ module stage_ex_p4 (
 
                 .i_vld (rs_in.fu_en_mult[i]),
                 .i_rdy (iss.i_rdy.mul[i]),
-                .i_dat (tmp_mul_el[i]),
+                .i_dat (iss.i_dat.mul[i]),
 
                 .o_vld (iss.o_vld.mul[i]),
                 .o_rdy (regs.i_rdy.mul[i]),
-                .o_dat (iss.dat.mul[i])
+                .o_dat (iss.o_dat.mul[i])
             );
         end
     endgenerate
@@ -563,21 +565,16 @@ module stage_ex_p4 (
         foreach (iss.o_vld.alu[i]) begin
             prf_out.s_en1s.alu[i]   = iss.o_vld.alu[i];
             prf_out.s_en2s.alu[i]   = iss.o_vld.alu[i];
-            prf_out.s_t1s.alu[i]    = iss.dat.alu[i].t1; 
-            prf_out.s_t2s.alu[i]    = iss.dat.alu[i].t2; 
+            prf_out.s_t1s.alu[i]    = iss.o_dat.alu[i].t1; 
+            prf_out.s_t2s.alu[i]    = iss.o_dat.alu[i].t2; 
         end
         foreach (iss.o_vld.mul[i]) begin
             prf_out.s_en1s.mul[i]   = iss.o_vld.mul[i];
             prf_out.s_en2s.mul[i]   = iss.o_vld.mul[i];
-            prf_out.s_t1s.mul[i]    = iss.dat.mul[i].t1; 
-            prf_out.s_t2s.mul[i]    = iss.dat.mul[i].t2; 
+            prf_out.s_t1s.mul[i]    = iss.o_dat.mul[i].t1; 
+            prf_out.s_t2s.mul[i]    = iss.o_dat.mul[i].t2; 
         end
     end
-
-    ALU_REGS [`NUM_FU_ALU-1:0]   alu_regs;
-    ALU_REGS [`NUM_FU_ALU-1:0]   tmp_alu_regs;
-    MUL_REGS [`NUM_FU_MULT-1:0]  mul_regs;
-    MUL_REGS [`NUM_FU_MULT-1:0]  tmp_mul_regs;
 
     struct packed {
         `BY_FU(logic) i_rdy;
@@ -589,17 +586,17 @@ module stage_ex_p4 (
     assign ex.o_vld.str = '0;
     always_comb begin
         foreach (iss.o_vld.alu[i]) begin
-            tmp_alu_regs[i] = '{
+            regs.i_dat.alu[i] = '{
                 rs1 : prf_in.s_v1s.alu[i],
                 rs2 : prf_in.s_v2s.alu[i],
-                dat : iss.dat.alu[i]
+                dat : iss.o_dat.alu[i]
             };
         end
         foreach (iss.o_vld.mul[i]) begin
-            tmp_mul_regs[i] = '{
+            regs.i_dat.mul[i] = '{
                 rs1 : prf_in.s_v1s.mul[i],
                 rs2 : prf_in.s_v2s.mul[i],
-                dat : iss.dat.mul[i]
+                dat : iss.o_dat.mul[i]
             };
         end
     end
@@ -615,10 +612,10 @@ module stage_ex_p4 (
                 .flush (flush),
 
                 .i_vld (iss.o_vld.alu[i]),
-                .i_dat (tmp_alu_regs[i]),
+                .i_dat (regs.i_dat.alu[i]),
 
                 .o_vld (regs.o_vld.alu[i]),
-                .o_dat (alu_regs[i])
+                .o_dat (regs.o_dat.alu[i])
             );
         end
 
@@ -632,11 +629,11 @@ module stage_ex_p4 (
 
                 .i_vld (iss.o_vld.mul[i]),
                 .i_rdy (regs.i_rdy.mul[i]),
-                .i_dat (tmp_mul_regs[i]),
+                .i_dat (regs.i_dat.mul[i]),
 
                 .o_vld (regs.o_vld.mul[i]),
                 .o_rdy (ex.i_rdy.mul[i]),
-                .o_dat (mul_regs[i])
+                .o_dat (regs.o_dat.mul[i])
             );
         end
     endgenerate
@@ -681,7 +678,7 @@ module stage_ex_p4 (
         .flush  (flush),
 
         .i_vld  (regs.o_vld.alu),
-        .i_regs (alu_regs),
+        .i_regs (regs.o_dat.alu),
         .i_rdy  (ex.i_rdy.alu),
 
         .o_vld  (ex.o_vld.alu),
@@ -701,7 +698,7 @@ module stage_ex_p4 (
         .flush  (flush),
 
         .i_vld  (regs.o_vld.mul),
-        .i_regs (mul_regs),
+        .i_regs (regs.o_dat.mul),
         .i_rdy  (ex.i_rdy.mul),
 
         .cdb_req(cdb_req.mul),
@@ -795,22 +792,22 @@ module stage_ex_p4 (
                     i,
                     iss.i_rdy.alu[i],
                     iss.o_vld.alu[i],
-                    iss.dat.alu[i].t,
-                    iss.dat.alu[i].t1,
-                    iss.dat.alu[i].t2,
-                    iss.dat.alu[i].rob_idx,
-                    iss.dat.alu[i].btq_idx,
-                    iss.dat.alu[i].inst,
-                    iss.dat.alu[i].PC,
-                    iss.dat.alu[i].NPC,
-                    iss.dat.alu[i].cond_branch,
-                    iss.dat.alu[i].uncond_branch
+                    iss.o_dat.alu[i].t,
+                    iss.o_dat.alu[i].t1,
+                    iss.o_dat.alu[i].t2,
+                    iss.o_dat.alu[i].rob_idx,
+                    iss.o_dat.alu[i].btq_idx,
+                    iss.o_dat.alu[i].inst,
+                    iss.o_dat.alu[i].PC,
+                    iss.o_dat.alu[i].NPC,
+                    iss.o_dat.alu[i].cond_branch,
+                    iss.o_dat.alu[i].uncond_branch
                 );
                 $display("  bytag: (b1:%b, idx1:%b) (b2:%b, idx2:%b)",
-                    iss.dat.alu[i].bytag.bypass1,
-                    iss.dat.alu[i].bytag.cdb_idx1,
-                    iss.dat.alu[i].bytag.bypass2,
-                    iss.dat.alu[i].bytag.cdb_idx2,
+                    iss.o_dat.alu[i].bytag.bypass1,
+                    iss.o_dat.alu[i].bytag.cdb_idx1,
+                    iss.o_dat.alu[i].bytag.bypass2,
+                    iss.o_dat.alu[i].bytag.cdb_idx2,
                 );
             end
 
@@ -819,69 +816,69 @@ module stage_ex_p4 (
                     i,
                     iss.i_rdy.mul[i],
                     iss.o_vld.mul[i],
-                    iss.dat.mul[i].t,
-                    iss.dat.mul[i].t1,
-                    iss.dat.mul[i].t2,
-                    iss.dat.mul[i].rob_idx,
-                    iss.dat.mul[i].func
+                    iss.o_dat.mul[i].t,
+                    iss.o_dat.mul[i].t1,
+                    iss.o_dat.mul[i].t2,
+                    iss.o_dat.mul[i].rob_idx,
+                    iss.o_dat.mul[i].func
                 );
                 $display("  bytag: (b1:%b, idx1: %b) (b2: %b, idx2:%b)",
-                    iss.dat.mul[i].bytag.bypass1,
-                    iss.dat.mul[i].bytag.cdb_idx1,
-                    iss.dat.mul[i].bytag.bypass2,
-                    iss.dat.mul[i].bytag.cdb_idx2,
+                    iss.o_dat.mul[i].bytag.bypass1,
+                    iss.o_dat.mul[i].bytag.cdb_idx1,
+                    iss.o_dat.mul[i].bytag.bypass2,
+                    iss.o_dat.mul[i].bytag.cdb_idx2,
                 );
             end
 
             for (int i = 0; i < `NUM_FU_ALU; ++i) begin
-                $display("alu_regs[%0d]: bsy: %b, rs1: 0x%x, rs2: 0x%x",
+                $display("regs.o_dat.alu[%0d]: bsy: %b, rs1: 0x%x, rs2: 0x%x",
                     i,
                     regs.o_vld.alu[i],
-                    alu_regs[i].rs1,
-                    alu_regs[i].rs2
+                    regs.o_dat.alu[i].rs1,
+                    regs.o_dat.alu[i].rs2
                 );
                 $display("  bytag: (b1:%b, idx1:%b) (b2:%b, idx2:%b)",
-                    alu_regs[i].dat.bytag.bypass1,
-                    alu_regs[i].dat.bytag.cdb_idx1,
-                    alu_regs[i].dat.bytag.bypass2,
-                    alu_regs[i].dat.bytag.cdb_idx2,
+                    regs.o_dat.alu[i].dat.bytag.bypass1,
+                    regs.o_dat.alu[i].dat.bytag.cdb_idx1,
+                    regs.o_dat.alu[i].dat.bytag.bypass2,
+                    regs.o_dat.alu[i].dat.bytag.cdb_idx2,
                 );
-                // $display("alu_regs[%0d]: bsy: %b, opa: 0x%x, opb: 0x%x, alu_func: %b, branch_func: %b, cond_branch: %b, uncond_branch: %b, t: %2d, rob_idx: %2d, btq_idx: %2d",
+                // $display("regs.o_dat.alu[%0d]: bsy: %b, opa: 0x%x, opb: 0x%x, alu_func: %b, branch_func: %b, cond_branch: %b, uncond_branch: %b, t: %2d, rob_idx: %2d, btq_idx: %2d",
                 //     i,
                 //     regs.o_vld.alu[i],
-                //     alu_regs[i].opa,
-                //     alu_regs[i].opb,
-                //     alu_regs[i].alu_func,
-                //     alu_regs[i].branch_func,
-                //     alu_regs[i].cond_branch,
-                //     alu_regs[i].uncond_branch,
-                //     alu_regs[i].t,
-                //     alu_regs[i].rob_idx,
-                //     alu_regs[i].btq_idx
+                //     regs.o_dat.alu[i].opa,
+                //     regs.o_dat.alu[i].opb,
+                //     regs.o_dat.alu[i].alu_func,
+                //     regs.o_dat.alu[i].branch_func,
+                //     regs.o_dat.alu[i].cond_branch,
+                //     regs.o_dat.alu[i].uncond_branch,
+                //     regs.o_dat.alu[i].t,
+                //     regs.o_dat.alu[i].rob_idx,
+                //     regs.o_dat.alu[i].btq_idx
                 // );
             end
 
             for (int i = 0; i < `NUM_FU_MULT; ++i) begin
-                $display("mul_regs[%0d]: bsy: %b, rs1: 0x%x, rs2: 0x%x",
+                $display("regs.o_dat.mul[%0d]: bsy: %b, rs1: 0x%x, rs2: 0x%x",
                     i,
                     regs.o_vld.mul[i],
-                    mul_regs[i].rs1,
-                    mul_regs[i].rs2
+                    regs.o_dat.mul[i].rs1,
+                    regs.o_dat.mul[i].rs2
                 );
                 $display("  bytag: (b1:%b, idx1:%b) (b2:%b, idx2:%b)",
-                    mul_regs[i].dat.bytag.bypass1,
-                    mul_regs[i].dat.bytag.cdb_idx1,
-                    mul_regs[i].dat.bytag.bypass2,
-                    mul_regs[i].dat.bytag.cdb_idx2,
+                    regs.o_dat.mul[i].dat.bytag.bypass1,
+                    regs.o_dat.mul[i].dat.bytag.cdb_idx1,
+                    regs.o_dat.mul[i].dat.bytag.bypass2,
+                    regs.o_dat.mul[i].dat.bytag.cdb_idx2,
                 );
-                // $display("mul_regs[%0d]: bsy: %b, rs1: 0x%x, rs2: 0x%x, func: %b, t: %2d, rob_idx: %2d",
+                // $display("regs.o_dat.mul[%0d]: bsy: %b, rs1: 0x%x, rs2: 0x%x, func: %b, t: %2d, rob_idx: %2d",
                 //     i,
                 //     regs.o_vld.mul[i],
-                //     mul_regs[i].rs1,
-                //     mul_regs[i].rs2,
-                //     mul_regs[i].func,
-                //     mul_regs[i].dst.tag,
-                //     mul_regs[i].dst.rob_idx
+                //     regs.o_dat.mul[i].rs1,
+                //     regs.o_dat.mul[i].rs2,
+                //     regs.o_dat.mul[i].func,
+                //     regs.o_dat.mul[i].dst.tag,
+                //     regs.o_dat.mul[i].dst.rob_idx
                 // );
             end
 
