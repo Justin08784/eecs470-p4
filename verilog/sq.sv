@@ -71,6 +71,7 @@ module sq #(parameter
 
     LSQ_IDX head_plus_one;
     LSQ_IDX [N-1:0] next_ids;
+    logic sq_ret_complete;
     always_comb begin
 
         for (int unsigned i = 0; i < NUM_RPORTS; ++i)
@@ -94,12 +95,15 @@ module sq #(parameter
         // };
 
         //handle sq to ROB for retirement
+        sq_ret_complete = (ret_2_sq.empty && (used == 0)) ? '1 : '0;
         head_plus_one = (head + 1) % LSQ_SZ;
-        if (state[head].d_vld && state[head_plus_one].d_vld)    sq_2_rob.ret_rdy = 2;
-        else if (state[head].d_vld)                             sq_2_rob.ret_rdy = 1;
-        else                                                    sq_2_rob.ret_rdy = 0;
-        sq_2_rob.ret_rdy = `MIN(sq_2_rob.ret_rdy,ret_2_sq.free_out);
-        sq_2_rob.sq_ret_complete = (ret_2_sq.empty && (used == 0)) ? '1 : '0;
+        // if (state[head].d_vld && state[head_plus_one].d_vld)    sq_2_rob.ret_rdy = 2;
+        // else if (state[head].d_vld)                             sq_2_rob.ret_rdy = 1;
+        // else                                                    sq_2_rob.ret_rdy = 0;
+        // // sq_2_rob.ret_rdy = `MIN(sq_2_rob.ret_rdy,ret_2_sq.free_out);
+        // sq_2_rob.sq_ret_complete = (ret_2_sq.empty && (used == 0)) ? '1 : '0;
+
+        // $display("SQ_RET_RDY: %0d", sq_2_rob.ret_rdy);
 
         //handle retirement write to mem
         sq_2_ret.ret_cnt   = rob_2_sq.r_en;
@@ -223,6 +227,8 @@ module sq #(parameter
 
 
     always_ff @(posedge clock) begin
+
+        // $display("SQ_RET_RDY: %0d, head: %0d, valid: %b", sq_2_rob.ret_rdy, head, state[head].d_vld);
         
         if (reset || flush) begin
             used    <= 0;
@@ -231,17 +237,25 @@ module sq #(parameter
             tail_dbl <= 0;
             state   <= '0;
             last_used_sq_idx <= LSQ_SZ_DBL + 1; //outside of SQ range so that if a load occurs before the first store we don't flag it falsely
+            sq_2_rob <= '0;
         end else begin
             used    <= used + dis_2_sq.sq_d_en_cnt - rob_2_sq.r_en;
             head    <= (head + rob_2_sq.r_en) % LSQ_SZ;
             tail    <= (tail + dis_2_sq.sq_d_en_cnt) % LSQ_SZ;
             tail_dbl <= (tail_dbl + dis_2_sq.sq_d_en_cnt) % LSQ_SZ_DBL;
             last_used_sq_idx <= (last_used_sq_idx + dis_2_sq.sq_d_en_cnt) % LSQ_SZ_DBL;
+
+            //to ROB
+            if (state[head].d_vld && state[head_plus_one].d_vld)    sq_2_rob.ret_rdy <= 2;
+            else if (state[head].d_vld)                             sq_2_rob.ret_rdy <= 1;
+            else                                                    sq_2_rob.ret_rdy <= 0;
+            // sq_2_rob.ret_rdy = `MIN(sq_2_rob.ret_rdy,ret_2_sq.free_out);
+            sq_2_rob.sq_ret_complete <= sq_ret_complete;
             
             // handle execute updates
             for (int unsigned i = 0, int cur_idx = 0; i < NUM_ST_PORTS; ++i) begin
                 cur_idx = exec_2_sq.st_sq_idx[i];
-
+                // $display("EX IN [%0d]: en: %b, sq_idx: %0d, addr: %0d, data: %0d, mem_size: %0d", i, exec_2_sq.st_ex_en[i], exec_2_sq.st_sq_idx[i], exec_2_sq.st_addr[i], exec_2_sq.st_data[i], exec_2_sq.st_mem_size[i]);
                 if (exec_2_sq.st_ex_en[i]) begin
                     state[cur_idx].addr                 <= exec_2_sq.st_addr[i];
                     state[cur_idx].bytewise_addr        <= bytewise_addr[i];

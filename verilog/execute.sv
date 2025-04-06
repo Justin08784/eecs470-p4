@@ -408,7 +408,7 @@ module str_ex(
 
     input   sq2execute sq_in,
     output  execute2sq sq_out,
-    // FIXME: Isn't an lq2execute needed?
+    // FIXME: Isn't an lq2execute needed? <-- Answer: No, if an issue is found when forwarding the SQ_IDX to LQ, it is flagged in the ROB to restart from that PC
     output  execute2lq lq_out,
 
     /* BACKEND */
@@ -458,6 +458,7 @@ module str_ex(
             sq_out.st_mem_size[i]   = i_regs[i].dat.mem_size;
             /* FIXME: What about rd_unsigned? We are not using this
             in lq???? */
+            // $display("EX OUT [%0d]: en: %b, sq_idx: %0d, addr: %0d, data: %0d, mem_size: %0d", i, sq_out.st_ex_en[i], sq_out.st_sq_idx[i], sq_out.st_addr[i], sq_out.st_data[i], sq_out.st_mem_size[i]);
         end
     end
 
@@ -1023,6 +1024,9 @@ module stage_ex_p4 (
         /* FIXME: How exactly do we do CDB arbitration for loads/stores?
         And how does it fit in our ETB system? */
         .o_rdy  (cdb_gnt_shr[0].str),
+
+        .sq_in(sq_in),
+        .sq_out(sq_out),
 
         /* CDB bypass */
         .cdat   (cdat_out)

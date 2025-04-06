@@ -21,8 +21,8 @@ module rob #(
     input  dispatch2rob d_in,
 
     //SQ
-    input  sq2rob sq_2_rob,
-    output rob2sq rob_2_sq
+    input  sq2rob sq_in,
+    output rob2sq sq_out
 );
     localparam NUM_DPORTS = N; // dispatch ports (in-order)
     localparam NUM_RPORTS = N; // retire ports (in-order)
@@ -50,7 +50,7 @@ module rob #(
     assign used_scnt    = `MIN(used, NUM_RPORTS);
 
     always_comb begin
-        rob_2_sq = '0;
+        sq_out = '0;
 
         for (int unsigned i = 0; i < NUM_RPORTS; ++i)
             rtre_idxs[i] = (head + i) % ROB_SZ;
@@ -60,11 +60,16 @@ module rob #(
         // handle retire (outs)
         r_out = '0;
         for (int unsigned i = 0; i < used_scnt; ++i) begin
-            if (!state[rtre_idxs[i]].cpl)
+            // $display("Entry[%0d]: wr_mem: %0d, mem_ret_rdy: %0d", rtre_idxs[i], state[rtre_idxs[i]].wr_mem, sq_in.ret_rdy);
+            if (state[rtre_idxs[i]].halt && (!sq_in.sq_ret_complete)) //ensures that the SQ and SQ retirement buffer are empty before halting
                 break;
-            if (state[rtre_idxs[i]].halt && (!sq_2_rob.sq_ret_complete)) //ensures that the SQ and SQ retirement buffer are empty before halting
+            if (state[rtre_idxs[i]].wr_mem && (sq_in.ret_rdy > i)) begin
+                ++r_out.r_en_cnt;
+                ++sq_out.r_en;
+            end
+            else if (!state[rtre_idxs[i]].cpl)
                 break;
-            ++r_out.r_en_cnt;
+            else ++r_out.r_en_cnt;
         end
 
         for (int unsigned i = 0; i < used_scnt; ++i) begin
@@ -78,8 +83,8 @@ module rob #(
             r_out.brch_vld[i]= state[rtre_idxs[i]].is_brch;
 
             //tell SQ to retire entries
-            if (state[rtre_idxs[i]].wr_mem)
-                ++rob_2_sq.r_en;
+            // if (state[rtre_idxs[i]].wr_mem)
+            //     ++sq_out.r_en;
         end
 
         // handle dispatch (outs)
@@ -168,7 +173,7 @@ module rob #(
         end
     end
 
-    `ifdef DEBUG
+    // `ifdef DEBUG
     always_ff @(posedge clock) begin
         if (!reset) begin
             $display("  %3d | >> ROB >>", $time);
@@ -213,6 +218,6 @@ module rob #(
 
         end
     end
-    `endif
+    // `endif
 
 endmodule

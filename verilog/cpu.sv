@@ -307,7 +307,9 @@ module cpu (
         .r_in       (retire_exec),
         .cdat_in    (ex_2_cdat),
         .d_out      (rob_2_dispatch),
-        .d_in       (dispatch_2_rob)
+        .d_in       (dispatch_2_rob),
+        .sq_in      (sq_2_rob),
+        .sq_out     (rob_2_sq)
     );
 
     //////////////////////////////////////////////////
@@ -335,7 +337,7 @@ module cpu (
 
         .dis_2_sq(dispatch_2_sq),
         .exec_2_sq(exec_2_sq),
-        .rob_2_sq('0), //using the rob_2_sq packet here seems to be causing false retirements from the SQ. Will investigate Sunday 4/6. 
+        .rob_2_sq(rob_2_sq), //using the rob_2_sq packet here seems to be causing false retirements from the SQ. Will investigate Sunday 4/6. 
         //As is, can still see packets entering the SQ, and should be able to retire the top 2 entries "properly", they just won't actually write to memory.
         //But this will still work if you just want to make sure that you can actually make it through a program to the wfi
         .mem2proc_transaction_tag(mem2proc_transaction_tag),
@@ -354,8 +356,6 @@ module cpu (
 
     
     execute2lq ex_2_lq;
-    execute2sq ex_2_sq;
-    sq2execute sq_2_ex;
     stage_ex_p4 ex_0 (
         .clock(clock),
         .reset(reset),
@@ -363,8 +363,8 @@ module cpu (
         .rs_in(rs_2_ex),
         .rs_out(ex_2_rs),
 
-        .sq_in('0),
-        .sq_out(ex_2_sq), // TODO: hook up to sq
+        .sq_in(sq_2_exec),
+        .sq_out(exec_2_sq), // TODO: hook up to sq
         .lq_out(ex_2_lq), // TODO: hook up to lq
 
         .ctag_out(ex_2_ctag),

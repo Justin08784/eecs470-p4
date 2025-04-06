@@ -67,7 +67,7 @@
 
 `ifndef SYNTH
 // comment out to disable DEBUG:
-`define DEBUG
+// `define DEBUG
 `endif
 
 ///////////////////////////////
