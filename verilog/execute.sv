@@ -41,11 +41,6 @@ typedef struct packed {
     logic is_brch;
 } CPL_CAND;
 
-typedef struct packed {
-    CPL_CAND [`NUM_FU_ALU-1:0]  alu;
-    CPL_CAND [`NUM_FU_MULT-1:0] mul;
-} CPL_CAND_BY_FU;
-
 /* Slices (or "views") of ID_RESULT needed for each FU type */
 typedef struct packed {
     BYPASS_TAG      bytag;
@@ -76,6 +71,14 @@ typedef struct packed {
     ROB_IDX         rob_idx;
     logic[2:0]      func;
 } ID_MUL_VIEW;
+
+typedef struct packed {
+    logic todo;
+} ID_LOD_VIEW;
+
+typedef struct packed {
+    logic todo;
+} ID_STR_VIEW;
 
 typedef struct packed {
     DATA rs1;
@@ -448,18 +451,28 @@ module stage_ex_p4 (
     /* >> ======== STAGE 1: Issue Staging ======== >> */
     // (where just-issued insns wait for 1 cycle)
     struct packed {
-        LOGIC_BY_FU     i_rdy;
-        LOGIC_BY_FU     o_vld;
+        `BY_FU(logic)   i_rdy;
+        `BY_FU(logic)   o_vld;
         struct packed {
             ID_ALU_VIEW [`NUM_FU_ALU-1:0]   alu;
             ID_MUL_VIEW [`NUM_FU_MULT-1:0]  mul;
+            ID_LOD_VIEW [`NUM_FU_LOAD-1:0]  lod;
+            ID_STR_VIEW [`NUM_FU_STORE-1:0] str;
         } dat;
     } iss;
+    assign iss.i_rdy.lod = '0;
+    assign iss.i_rdy.str = '0;
+    assign iss.o_vld.lod = '0;
+    assign iss.o_vld.str = '0;
 
     struct packed {
-        LOGIC_BY_FU i_rdy;
-        LOGIC_BY_FU o_vld;
+        `BY_FU(logic) i_rdy;
+        `BY_FU(logic) o_vld;
     } regs;
+    assign regs.i_rdy.lod = '0;
+    assign regs.i_rdy.str = '0;
+    assign regs.o_vld.lod = '0;
+    assign regs.o_vld.str = '0;
     
     generate
         /* Staging buffers (sbufs):
@@ -567,9 +580,13 @@ module stage_ex_p4 (
     MUL_REGS [`NUM_FU_MULT-1:0]  tmp_mul_regs;
 
     struct packed {
-        LOGIC_BY_FU i_rdy;
-        LOGIC_BY_FU o_vld;
+        `BY_FU(logic) i_rdy;
+        `BY_FU(logic) o_vld;
     } ex;
+    assign ex.i_rdy.lod = '0;
+    assign ex.i_rdy.str = '0;
+    assign ex.o_vld.lod = '0;
+    assign ex.o_vld.str = '0;
     always_comb begin
         foreach (iss.o_vld.alu[i]) begin
             tmp_alu_regs[i] = '{
@@ -628,7 +645,7 @@ module stage_ex_p4 (
     // If 1-cycle operation (e.g. ALU), this is before issue staging.
     // Else if a longer-latency insn, this is in the middle of execution.
 
-    CPL_CAND_BY_FU cands;
+    `BY_FU(CPL_CAND) cands;
     CPL_CAND [`NUM_FU_TOTAL-1:0] cands_flat;
     assign cands_flat = cands;
     
@@ -637,10 +654,12 @@ module stage_ex_p4 (
     */
     logic [1:0][`N-1:0][`NUM_FU_TOTAL-1:0]  cdb2fu_gbus_shr;
     logic [`N-1:0][`NUM_FU_TOTAL-1:0]       cdb2fu_gbus;
-    LOGIC_BY_FU [1:0]   cdb_gnt_shr;
+    `BY_FU(logic) [1:0] cdb_gnt_shr;
 
-    LOGIC_BY_FU cdb_req;
-    LOGIC_BY_FU cdb_gnt;
+    `BY_FU(logic) cdb_req;
+    assign cdb_req.lod = '0;
+    assign cdb_req.str = '0;
+    `BY_FU(logic) cdb_gnt;
     assign cdb_req.alu = rs_in.fu_vld_alu;
     // cdb_req.mul set by mul_ex
 
@@ -673,10 +692,7 @@ module stage_ex_p4 (
         .cdat   (cdat_out)
     );
 
-    struct packed {
-        PHYS_REG_IDX [`NUM_FU_ALU-1:0]  alu;
-        PHYS_REG_IDX [`NUM_FU_MULT-1:0] mul;
-    } ctag_ts;
+    `BY_FU(PHYS_REG_IDX) ctag_ts;
     PHYS_REG_IDX [`NUM_FU_TOTAL-1:0] ctag_ts_flat;
     
     mul_ex mul_ex0 (

@@ -43,10 +43,10 @@
 // functional units (you should decide if you want more or fewer types of FUs)
 `define NUM_FU_ALU 2
 `define NUM_FU_MULT 2
-`define NUM_FU_LOAD 4
-`define NUM_FU_STORE 4
+`define NUM_FU_LOAD 1
+`define NUM_FU_STORE 1
 // `define NUM_FU_TOTAL `NUM_FU_ALU + `NUM_FU_MULT + `NUM_FU_LOAD + `NUM_FU_STORE
-`define NUM_FU_TOTAL `NUM_FU_ALU + `NUM_FU_MULT
+`define NUM_FU_TOTAL `NUM_FU_ALU + `NUM_FU_MULT + `NUM_FU_LOAD + `NUM_FU_STORE
 
 // number of mult stages (2, 4) (you likely don't need 8)
 `define MULT_STAGES 16
@@ -893,28 +893,24 @@ typedef struct packed {
     } [`NUM_ARCH_REG-1:0] state; 
 } arch_map2map_table;
 
-typedef struct packed {
-    logic   [`NUM_FU_ALU-1:0]   alu;
-    logic   [`NUM_FU_MULT-1:0]  mul;
-} LOGIC_BY_FU;
-typedef struct packed {
-    PHYS_REG_IDX [`NUM_FU_ALU-1:0]   alu;
-    PHYS_REG_IDX [`NUM_FU_MULT-1:0]  mul;
-} PRI_BY_FU;
-typedef struct packed {
-    LOGIC_BY_FU s_en1s;
-    LOGIC_BY_FU s_en2s;
-    PRI_BY_FU   s_t1s;
-    PRI_BY_FU   s_t2s;
-} execute2prf;
+`define BY_FU(type) \
+struct packed { \
+    type [`NUM_FU_ALU-1:0]   alu; \
+    type [`NUM_FU_MULT-1:0]  mul; \
+    type [`NUM_FU_LOAD-1:0]  lod; \
+    type [`NUM_FU_STORE-1:0] str; \
+}
 
 typedef struct packed {
-    DATA    [`NUM_FU_ALU-1:0]   alu;
-    DATA    [`NUM_FU_MULT-1:0]  mul;
-} DATA_BY_FU;
+    `BY_FU(logic)           s_en1s;
+    `BY_FU(logic)           s_en2s;
+    `BY_FU(PHYS_REG_IDX)    s_t1s;
+    `BY_FU(PHYS_REG_IDX)    s_t2s;
+} execute2prf;
+
 typedef struct packed{
-    DATA_BY_FU s_v1s;
-    DATA_BY_FU s_v2s;
+    `BY_FU(DATA)    s_v1s;
+    `BY_FU(DATA)    s_v2s;
 } prf2execute;
 
 // By SQ
