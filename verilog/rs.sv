@@ -361,7 +361,7 @@ module rs #(parameter
 
         end
 
-        // `ifdef DEBUG
+        `ifdef DEBUG
         if (!reset) begin
             $display("  %3d | >> RS >>", $time);
             print_id_result(d_in.d_dat[0]);
@@ -395,7 +395,7 @@ module rs #(parameter
             end
             $display("  %3d | << RS <<", $time);
         end
-        // `endif
+        `endif
     end
 
 
