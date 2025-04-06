@@ -199,6 +199,7 @@ always_comb begin
     btq_wr_idx  = 0;
 
     for (int i = 0; i < `N; ++i) begin
+        $display("I: %0d, ROB_IDX[i]: %0d", i, rob_in.rob_idxs[i]);
         tmp_alloc2rename[i].dat         = rename_in[i];
 
         tmp_alloc2rename[i].dat.t       = map_out.ts[i];
@@ -222,9 +223,10 @@ always_comb begin
         end
 
         if (rename_in[i].wr_mem) begin
-            tmp_alloc2rename[i].dat.lsq_idx = sq_in.next_ids[sq_wr_idx];
-            sq_out.rob_idx = rob_in.rob_idxs[i];
+            tmp_alloc2rename[i].dat.sq_idx = sq_in.next_ids[sq_wr_idx];
+            sq_out.rob_idx[sq_wr_idx] = rob_in.rob_idxs[i];
             ++sq_wr_idx;
+            $display("ASSIGNING IDX: i: %0d, idx: %0d", i, rob_in.rob_idxs[i]);
         end
     end
 end

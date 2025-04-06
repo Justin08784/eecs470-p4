@@ -543,8 +543,8 @@ typedef struct packed {
     FU_IDX          fu_idx;
     ROB_IDX         rob_idx;
     BTQ_IDX         btq_idx;
-    // FIXME: This was originally separate (sq_idx and lq_idx). Was that necessary?
-    LSQ_IDX         lsq_idx;
+    LSQ_IDX         sq_idx;
+    LSQ_IDX         lq_idx; //THESE ARE TWO DIFFERENT THINGS, BOTH REQUIRED. DO *NOT* COMBINE THEM
     logic           is_branch; // Is inst a branch?
     
 
@@ -959,7 +959,8 @@ typedef struct packed {
 } sq2execute;
 
 typedef struct packed {
-    logic [$clog2(`N):0]    ret_rdy;
+    logic   [$clog2(`N):0]  complete_en;
+    ROB_IDX [`N-1:0]        complete_rob_idxs;
     logic                   sq_ret_complete;
 } sq2rob;
 

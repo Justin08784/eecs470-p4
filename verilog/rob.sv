@@ -63,21 +63,22 @@ module rob #(
             // $display("SQ_RET_COMPLETE: %b",sq_in.sq_ret_complete);
             // $display("Entry[%0d]: wr_mem: %0d, mem_ret_rdy: %0d", rtre_idxs[i], state[rtre_idxs[i]].wr_mem, sq_in.ret_rdy);
             if (state[rtre_idxs[i]].halt && (~sq_in.sq_ret_complete)) begin
-                $display("stopping halt %0d, %0d", i, rtre_idxs[i]); //ensures that the SQ and SQ retirement buffer are empty before halting
+                // $display("stopping halt %0d, %0d", i, rtre_idxs[i]); //ensures that the SQ and SQ retirement buffer are empty before halting
                 break;
             end
-            else if (state[rtre_idxs[i]].wr_mem && (sq_in.ret_rdy > i)) begin
-                ++r_out.r_en_cnt;
-                ++sq_out.r_en;
-                $display("retire store %0d, %0d", i, rtre_idxs[i]);
-            end
+            // else if (state[rtre_idxs[i]].wr_mem && (sq_in.ret_rdy > i)) begin
+            //     ++r_out.r_en_cnt;
+            //     ++sq_out.r_en;
+            //     // $display("retire store %0d, %0d", i, rtre_idxs[i]);
+            // end
             else if (!state[rtre_idxs[i]].cpl) begin
-                $display("incomplete %0d, %0d", i, rtre_idxs[i]);
+                // $display("incomplete %0d, %0d", i, rtre_idxs[i]);
                 break;
             end
             else begin
-                $display("incrementing %0d, %0d", i, rtre_idxs[i]);
+                // $display("incrementing %0d, %0d", i, rtre_idxs[i]);
                 ++r_out.r_en_cnt;
+                if (state[rtre_idxs[i]].wr_mem) ++sq_out.r_en;
             end
         end
 
@@ -114,10 +115,12 @@ module rob #(
             rob_rdy_scnt : free_scnt,
             rob_idxs     : comm_idxs
         };
+
+        $display("NEXT ROB_IDXS: %0d, %0d", comm_idxs[0], comm_idxs[1]);
     end
 
     always_ff @(posedge clock) begin
-            $display("SQ_RET_COMPLETE: %b",sq_in.sq_ret_complete);
+            // $display("SQ_RET_COMPLETE: %b",sq_in.sq_ret_complete);
         if (reset || flush) begin
             used    <= 0;
             free    <= ROB_SZ;
@@ -161,6 +164,11 @@ module rob #(
                 This edge case seems only possible (as far as we can tell) for rob_idx 0,
                 since the CDB defaults to 0 at the start of each cycle.
                 */
+            end
+
+            //handle SQ completes
+            for (int unsigned i = 0; i < `NUM_FU_STORE; ++i) begin
+                if (sq_in.complete_en[i]) state[sq_in.complete_rob_idxs[i]].cpl <= 1;
             end
 
             // handle dispatch (ins)

@@ -727,7 +727,7 @@ module stage_ex_p4 (
                 t1      : rs_in.fu_dat_load[i].t1,
                 opb     : `RV32_signext_Iimm(rs_in.fu_dat_load[i].inst),
 
-                lq_idx  : rs_in.fu_dat_load[i].lsq_idx,
+                lq_idx  : rs_in.fu_dat_load[i].lq_idx,
                 rob_idx : rs_in.fu_dat_load[i].rob_idx,
                 mem_size: MEM_SIZE'(rs_in.fu_dat_load[i].inst.r.funct3[1:0]),
                 rd_unsigned : rs_in.fu_dat_load[i].inst.r.funct3[2]
@@ -758,7 +758,7 @@ module stage_ex_p4 (
                 t2      : rs_in.fu_dat_store[i].t2,
                 opb     : `RV32_signext_Simm(rs_in.fu_dat_store[i].inst),
 
-                sq_idx  : rs_in.fu_dat_store[i].lsq_idx,
+                sq_idx  : rs_in.fu_dat_store[i].sq_idx,
                 rob_idx : rs_in.fu_dat_store[i].rob_idx,
                 mem_size: MEM_SIZE'(rs_in.fu_dat_store[i].inst.r.funct3[1:0])
             };

@@ -71,7 +71,7 @@ module sq #(parameter
 
     LSQ_IDX head_plus_one;
     LSQ_IDX [N-1:0] next_ids;
-    logic sq_ret_complete;
+    execute2sq next_complete;
     always_comb begin
 
         for (int unsigned i = 0; i < NUM_RPORTS; ++i)
@@ -95,11 +95,17 @@ module sq #(parameter
         // };
 
         //handle sq to ROB for retirement
-        sq_ret_complete = (ret_2_sq.empty && (used == 0)) ? '1 : '0;
         head_plus_one = (head + 1) % LSQ_SZ;
-        if (state[head].d_vld && state[head_plus_one].d_vld)    sq_2_rob.ret_rdy = 2;
-        else if (state[head].d_vld)                             sq_2_rob.ret_rdy = 1;
-        else                                                    sq_2_rob.ret_rdy = 0;
+        // if (state[head].d_vld && state[head_plus_one].d_vld)    sq_2_rob.ret_rdy = 2;
+        // else if (state[head].d_vld)                             sq_2_rob.ret_rdy = 1;
+        // else                                                    sq_2_rob.ret_rdy = 0;
+
+        sq_2_rob.complete_en = next_complete.st_ex_en;
+        for (int i = 0; i < NUM_FU_STORE; i++) begin
+            if (i >= next_complete.st_ex_en) continue;
+
+            sq_2_rob.complete_rob_idxs[i] = state[next_complete.st_sq_idx[i]].rob_idx;
+        end
         // sq_2_rob.ret_rdy = `MIN(sq_2_rob.ret_rdy,ret_2_sq.free_out);
         sq_2_rob.sq_ret_complete = (ret_2_sq.empty && (used_scnt == 0)) ? '1 : '0;
 
@@ -237,13 +243,15 @@ module sq #(parameter
             tail_dbl <= 0;
             state   <= '0;
             last_used_sq_idx <= LSQ_SZ_DBL + 1; //outside of SQ range so that if a load occurs before the first store we don't flag it falsely
-            // sq_2_rob <= '0;
+            next_complete <= '0;
         end else begin
             used    <= used + dis_2_sq.sq_d_en_cnt - rob_2_sq.r_en;
             head    <= (head + rob_2_sq.r_en) % LSQ_SZ;
             tail    <= (tail + dis_2_sq.sq_d_en_cnt) % LSQ_SZ;
             tail_dbl <= (tail_dbl + dis_2_sq.sq_d_en_cnt) % LSQ_SZ_DBL;
             last_used_sq_idx <= (last_used_sq_idx + dis_2_sq.sq_d_en_cnt) % LSQ_SZ_DBL;
+
+            next_complete <= exec_2_sq;
 
             //to ROB
             // if (state[head].d_vld && state[head_plus_one].d_vld)    sq_2_rob.ret_rdy <= 2;
@@ -443,7 +451,7 @@ module post_ret_buffer #(parameter
                 state[cur_idx] <= sq_2_ret.ret_st[i];
             end
 
-            // `ifdef DEBUG
+            `ifdef DEBUG
             $display("  %3d | >> RET buffer", $time);
             for (int i = 0; i < LSQ_SZ; i++) begin
                 $display("Entry [%0d]: id=%0d, rob_idx=%0d, addr=%0d, data=%0d, d_valid=%b%s",
@@ -463,7 +471,7 @@ module post_ret_buffer #(parameter
                 );
             end
             $display("  %3d | << RET buffer", $time);
-            // `endif
+            `endif
         end
     end
 

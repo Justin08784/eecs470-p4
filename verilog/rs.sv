@@ -361,7 +361,7 @@ module rs #(parameter
 
         end
 
-        `ifdef DEBUG
+        // `ifdef DEBUG
         if (!reset) begin
             $display("  %3d | >> RS >>", $time);
             print_id_result(d_in.d_dat[0]);
@@ -375,12 +375,13 @@ module rs #(parameter
                     continue;
                 end
 
-                $display("Entry [%2d]: pc=0x%x, id=%3d (%x), busy=%b, issued=%b, t=%2d, t1=%2d, t2=%2d, t1_rdy=%b, t2_rdy=%b, fu=%s(%2d)",
+                $display("Entry [%2d]: pc=0x%x, id=%3d (%x), busy=%b, rob_idx=%0d, issued=%b, t=%2d, t1=%2d, t2=%2d, t1_rdy=%b, t2_rdy=%b, fu=%s(%2d)",
                     i, 
                     entries[i].dat.PC,
                     entries[i].dat.id, 
                     entries[i].dat.inst,
                     entries[i].busy, 
+                    entries[i].dat.rob_idx, 
                     entries[i].issued, 
                     entries[i].dat.t, 
                     entries[i].dat.t1, 
@@ -394,7 +395,7 @@ module rs #(parameter
             end
             $display("  %3d | << RS <<", $time);
         end
-        `endif
+        // `endif
     end
 
 
