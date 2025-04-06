@@ -222,7 +222,7 @@ always_comb begin
         end
 
         if (rename_in[i].wr_mem) begin
-            tmp_alloc2rename[i].dat.sq_idx = sq_in.next_ids[sq_wr_idx];
+            tmp_alloc2rename[i].dat.lsq_idx = sq_in.next_ids[sq_wr_idx];
             sq_out.rob_idx = rob_in.rob_idxs[i];
             ++sq_wr_idx;
         end

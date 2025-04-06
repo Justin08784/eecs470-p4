@@ -285,8 +285,7 @@ module stage_id_p4 (
                 fu_idx      : tmp[i].fu_idx,
                 rob_idx     : '0,
                 btq_idx     : '0,
-                sq_idx      : '0,
-                lq_idx      : '0,
+                lsq_idx     : '0,
                 is_branch   : tmp[i].cond_branch || tmp[i].uncond_branch,
 
                 inst        : f_in.f_dat[i].inst,

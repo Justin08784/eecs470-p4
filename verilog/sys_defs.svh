@@ -543,8 +543,8 @@ typedef struct packed {
     FU_IDX          fu_idx;
     ROB_IDX         rob_idx;
     BTQ_IDX         btq_idx;
-    LSQ_IDX         sq_idx;
-    LSQ_IDX         lq_idx;
+    // FIXME: This was originally separate (sq_idx and lq_idx). Was that necessary?
+    LSQ_IDX         lsq_idx;
     logic           is_branch; // Is inst a branch?
     
 
@@ -999,9 +999,9 @@ typedef struct packed {
 } lq2dispatch;
 
 typedef struct packed {
-    logic [$clog2(`N):0]    ret_rdy;
-    logic [`NUM_FU_STORE-1:0] err_en;
-    ROB_IDX [`NUM_FU_STORE-1:0] rob_idx;
+    logic   [$clog2(`N):0]      ret_rdy;
+    logic   [`NUM_FU_LOAD-1:0]  err_en;
+    ROB_IDX [`NUM_FU_LOAD-1:0]  rob_idx;
 } lq2rob;
 
 typedef struct packed {

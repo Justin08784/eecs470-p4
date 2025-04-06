@@ -74,6 +74,9 @@ typedef struct packed {
 
 typedef struct packed {
     BYPASS_TAG      bytag;
+    // alu_func   = ALU_ADD;
+    // opa_select = OPA_IS_RS1
+    // opb_select = OPB_IS_I_IMM
 
     PHYS_REG_IDX    t;
     PHYS_REG_IDX    t1;
@@ -86,7 +89,18 @@ typedef struct packed {
 } ID_LOD_VIEW;
 
 typedef struct packed {
-    logic todo;
+    BYPASS_TAG      bytag;
+    // alu_func   = ALU_ADD;
+    // opa_select = OPA_IS_RS1
+    // opb_select = OPB_IS_S_IMM
+
+    PHYS_REG_IDX    t1;
+    PHYS_REG_IDX    t2;
+    DATA            opb;
+
+    LSQ_IDX         sq_idx;
+    ROB_IDX         rob_idx;
+    MEM_SIZE        mem_size;
 } ID_STR_VIEW;
 
 typedef struct packed {
@@ -103,6 +117,11 @@ typedef struct packed {
     DATA rs1;
     ID_LOD_VIEW dat;
 } LOD_REGS;
+typedef struct packed {
+    DATA rs1;
+    DATA rs2;
+    ID_STR_VIEW dat;
+} STR_REGS;
 
 /* Operand data needed for each FU type */
 typedef struct packed {
@@ -375,6 +394,76 @@ module lod_ex(
     a load result is ready without an lq2execute line? */
 endmodule
 
+module str_ex(
+    input clock,
+    input reset,
+    input flush,
+
+    /* FRONTEND */
+    output logic    [`NUM_FU_STORE-1:0]  i_rdy,
+    input  logic    [`NUM_FU_STORE-1:0]  i_vld,
+    input  STR_REGS [`NUM_FU_STORE-1:0]  i_regs,
+    
+    input  execute2complete_dat         cdat,
+
+    input   sq2execute sq_in,
+    output  execute2sq sq_out,
+    // FIXME: Isn't an lq2execute needed?
+    output  execute2lq lq_out,
+
+    /* BACKEND */
+    output logic    [`NUM_FU_STORE-1:0]  o_vld,
+    output CPL_CAND [`NUM_FU_STORE-1:0]  o_cands,
+    input  logic    [`NUM_FU_STORE-1:0]  o_rdy 
+        // completion grant
+);
+    // FIXME: Is this right? 
+    assign i_rdy = '1;
+    // FIXME: hardcoded
+    assign o_vld    = '0;
+    assign o_cands  = '0;
+
+    always_comb begin
+        logic bypass1, bypass2;
+        DATA  rs1, tmp_rs1;
+        DATA  rs2, tmp_rs2;
+        ADDR  addr;
+        foreach(i_vld[i]) begin
+            tmp_rs1 = '0;
+            tmp_rs2 = '0;
+            bypass1 = 0;
+            bypass2 = 0;
+            foreach(cdat.en[n]) begin
+                if (!cdat.en[n] || cdat.ts[n] == '0)
+                    continue;
+                if (i_regs[i].dat.t1 == cdat.ts[n]) begin
+                    bypass1 |= 1;
+                    tmp_rs1 |= cdat.data[n];
+                end
+                if (i_regs[i].dat.t2 == cdat.ts[n]) begin
+                    bypass2 |= 1;
+                    tmp_rs2 |= cdat.data[n];
+                end
+            end
+            rs1 = bypass1 ? tmp_rs1 : i_regs[i].rs1;
+            rs2 = bypass2 ? tmp_rs2 : i_regs[i].rs2;
+            
+            // store address computation
+            addr = rs1 + i_regs[i].dat.opb;
+
+            sq_out.st_ex_en[i]      = i_vld[i];
+            sq_out.st_sq_idx[i]     = i_regs[i].dat.sq_idx;
+            sq_out.st_addr[i]       = addr;
+            sq_out.st_data[i]       = rs2;
+            sq_out.st_mem_size[i]   = i_regs[i].dat.mem_size;
+            /* FIXME: What about rd_unsigned? We are not using this
+            in lq???? */
+        end
+    end
+
+    /* TODO: CAND generation logic. */
+endmodule
+
 module mul_ex(
     input clock,
     input reset,
@@ -540,21 +629,17 @@ module stage_ex_p4 (
             ID_STR_VIEW [`NUM_FU_STORE-1:0] str;
         } i_dat, o_dat;
     } iss;
-    assign iss.i_rdy.str = '0;
-    assign iss.o_vld.str = '0;
 
     struct packed {
         `BY_FU(logic) i_rdy;
         `BY_FU(logic) o_vld;
         struct packed {
-            ALU_REGS [`NUM_FU_ALU-1:0]  alu;
-            MUL_REGS [`NUM_FU_MULT-1:0] mul;
-            // TODO: add LOD_REGS, STR_REGS
-            LOD_REGS [`NUM_FU_LOAD-1:0] lod;
+            ALU_REGS [`NUM_FU_ALU-1:0]   alu;
+            MUL_REGS [`NUM_FU_MULT-1:0]  mul;
+            LOD_REGS [`NUM_FU_LOAD-1:0]  lod;
+            STR_REGS [`NUM_FU_STORE-1:0] str;
         } i_dat, o_dat;
     } regs;
-    assign regs.i_rdy.str = '0;
-    assign regs.o_vld.str = '0;
     
     generate
         /* Staging buffers (sbufs):
@@ -642,7 +727,7 @@ module stage_ex_p4 (
                 t1      : rs_in.fu_dat_load[i].t1,
                 opb     : `RV32_signext_Iimm(rs_in.fu_dat_load[i].inst),
 
-                lq_idx  : rs_in.fu_dat_load[i].lq_idx,
+                lq_idx  : rs_in.fu_dat_load[i].lsq_idx,
                 rob_idx : rs_in.fu_dat_load[i].rob_idx,
                 mem_size: MEM_SIZE'(rs_in.fu_dat_load[i].inst.r.funct3[1:0]),
                 rd_unsigned : rs_in.fu_dat_load[i].inst.r.funct3[2]
@@ -662,6 +747,36 @@ module stage_ex_p4 (
                 .o_vld (iss.o_vld.lod[i]),
                 .o_rdy (regs.i_rdy.lod[i]),
                 .o_dat (iss.o_dat.lod[i])
+            );
+        end
+
+        for (genvar i = 0; i < `NUM_FU_STORE; ++i) begin : gen_str_sbufs
+            assign iss.i_dat.str[i] = '{
+                bytag   : rs_in.bytag_str[i],
+
+                t1      : rs_in.fu_dat_store[i].t1,
+                t2      : rs_in.fu_dat_store[i].t2,
+                opb     : `RV32_signext_Simm(rs_in.fu_dat_store[i].inst),
+
+                sq_idx  : rs_in.fu_dat_store[i].lsq_idx,
+                rob_idx : rs_in.fu_dat_store[i].rob_idx,
+                mem_size: MEM_SIZE'(rs_in.fu_dat_store[i].inst.r.funct3[1:0])
+            };
+
+            ppln_skid #(
+                .WIDTH($bits(ID_STR_VIEW))
+            ) sbuf_str (
+                .clock (clock),
+                .reset (reset),
+                .flush (flush),
+
+                .i_vld (rs_in.fu_en_store[i]),
+                .i_rdy (iss.i_rdy.str[i]),
+                .i_dat (iss.i_dat.str[i]),
+
+                .o_vld (iss.o_vld.str[i]),
+                .o_rdy (regs.i_rdy.str[i]),
+                .o_dat (iss.o_dat.str[i])
             );
         end
     endgenerate
@@ -686,14 +801,18 @@ module stage_ex_p4 (
             prf_out.s_en1s.lod[i]   = iss.o_vld.lod[i];
             prf_out.s_t1s.lod[i]    = iss.o_dat.lod[i].t1; 
         end
+        foreach (iss.o_vld.str[i]) begin
+            prf_out.s_en1s.str[i]   = iss.o_vld.str[i];
+            prf_out.s_en2s.str[i]   = iss.o_vld.str[i];
+            prf_out.s_t1s.str[i]    = iss.o_dat.str[i].t1; 
+            prf_out.s_t2s.str[i]    = iss.o_dat.str[i].t2; 
+        end
     end
 
     struct packed {
         `BY_FU(logic) i_rdy;
         `BY_FU(logic) o_vld;
     } ex;
-    assign ex.i_rdy.str = '0;
-    assign ex.o_vld.str = '0;
     always_comb begin
         foreach (iss.o_vld.alu[i]) begin
             regs.i_dat.alu[i] = '{
@@ -713,6 +832,13 @@ module stage_ex_p4 (
             regs.i_dat.lod[i] = '{
                 rs1 : prf_in.s_v1s.lod[i],
                 dat : iss.o_dat.lod[i]
+            };
+        end
+        foreach (iss.o_vld.str[i]) begin
+            regs.i_dat.str[i] = '{
+                rs1 : prf_in.s_v1s.str[i],
+                rs2 : prf_in.s_v2s.str[i],
+                dat : iss.o_dat.str[i]
             };
         end
     end
@@ -768,6 +894,24 @@ module stage_ex_p4 (
                 .o_vld (regs.o_vld.lod[i]),
                 .o_rdy (ex.i_rdy.lod[i]),
                 .o_dat (regs.o_dat.lod[i])
+            );
+        end
+
+        for (genvar i = 0; i < `NUM_FU_STORE; ++i) begin : gen_str_rbufs
+            skid #(
+                .WIDTH($bits(STR_REGS))
+            ) rbuf_str (
+                .clock (clock),
+                .reset (reset),
+                .flush (flush),
+
+                .i_vld (iss.o_vld.str[i]),
+                .i_rdy (regs.i_rdy.str[i]),
+                .i_dat (regs.i_dat.str[i]),
+
+                .o_vld (regs.o_vld.str[i]),
+                .o_rdy (ex.i_rdy.str[i]),
+                .o_dat (regs.o_dat.str[i])
             );
         end
     endgenerate
@@ -866,6 +1010,25 @@ module stage_ex_p4 (
         .cdat   (cdat_out)
     );
 
+    str_ex str_ex0 (
+        .clock  (clock),
+        .reset  (reset),
+        .flush  (flush),
+
+        .i_vld  (regs.o_vld.str),
+        .i_regs (regs.o_dat.str),
+        .i_rdy  (ex.i_rdy.str),
+
+        .o_vld  (ex.o_vld.str),
+        .o_cands(cands.str),
+        /* FIXME: How exactly do we do CDB arbitration for loads/stores?
+        And how does it fit in our ETB system? */
+        .o_rdy  (cdb_gnt_shr[0].str),
+
+        /* CDB bypass */
+        .cdat   (cdat_out)
+    );
+
     /* >> ======== STAGE 4/?: CDB data/tag broadcast ======== >> */
     // Tag broadcast occurs with CDB arbitration
     // Data broadcast is the final stage of the execute pipeline.
@@ -877,8 +1040,8 @@ module stage_ex_p4 (
 
             fu_rdy_alu      : iss.i_rdy.alu,
             fu_rdy_mult     : iss.i_rdy.mul,
-            fu_rdy_load     : '0,
-            fu_rdy_store    : '0
+            fu_rdy_load     : iss.i_rdy.lod,
+            fu_rdy_store    : iss.i_rdy.str
         };
 
         foreach (rs_in.fu_dat_alu[i])
