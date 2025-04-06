@@ -97,11 +97,11 @@ module sq #(parameter
         //handle sq to ROB for retirement
         sq_ret_complete = (ret_2_sq.empty && (used == 0)) ? '1 : '0;
         head_plus_one = (head + 1) % LSQ_SZ;
-        // if (state[head].d_vld && state[head_plus_one].d_vld)    sq_2_rob.ret_rdy = 2;
-        // else if (state[head].d_vld)                             sq_2_rob.ret_rdy = 1;
-        // else                                                    sq_2_rob.ret_rdy = 0;
-        // // sq_2_rob.ret_rdy = `MIN(sq_2_rob.ret_rdy,ret_2_sq.free_out);
-        // sq_2_rob.sq_ret_complete = (ret_2_sq.empty && (used == 0)) ? '1 : '0;
+        if (state[head].d_vld && state[head_plus_one].d_vld)    sq_2_rob.ret_rdy = 2;
+        else if (state[head].d_vld)                             sq_2_rob.ret_rdy = 1;
+        else                                                    sq_2_rob.ret_rdy = 0;
+        // sq_2_rob.ret_rdy = `MIN(sq_2_rob.ret_rdy,ret_2_sq.free_out);
+        sq_2_rob.sq_ret_complete = (ret_2_sq.empty && (used_scnt == 0)) ? '1 : '0;
 
         // $display("SQ_RET_RDY: %0d", sq_2_rob.ret_rdy);
 
@@ -237,7 +237,7 @@ module sq #(parameter
             tail_dbl <= 0;
             state   <= '0;
             last_used_sq_idx <= LSQ_SZ_DBL + 1; //outside of SQ range so that if a load occurs before the first store we don't flag it falsely
-            sq_2_rob <= '0;
+            // sq_2_rob <= '0;
         end else begin
             used    <= used + dis_2_sq.sq_d_en_cnt - rob_2_sq.r_en;
             head    <= (head + rob_2_sq.r_en) % LSQ_SZ;
@@ -246,11 +246,11 @@ module sq #(parameter
             last_used_sq_idx <= (last_used_sq_idx + dis_2_sq.sq_d_en_cnt) % LSQ_SZ_DBL;
 
             //to ROB
-            if (state[head].d_vld && state[head_plus_one].d_vld)    sq_2_rob.ret_rdy <= 2;
-            else if (state[head].d_vld)                             sq_2_rob.ret_rdy <= 1;
-            else                                                    sq_2_rob.ret_rdy <= 0;
-            // sq_2_rob.ret_rdy = `MIN(sq_2_rob.ret_rdy,ret_2_sq.free_out);
-            sq_2_rob.sq_ret_complete <= sq_ret_complete;
+            // if (state[head].d_vld && state[head_plus_one].d_vld)    sq_2_rob.ret_rdy <= 2;
+            // else if (state[head].d_vld)                             sq_2_rob.ret_rdy <= 1;
+            // else                                                    sq_2_rob.ret_rdy <= 0;
+            // // sq_2_rob.ret_rdy = `MIN(sq_2_rob.ret_rdy,ret_2_sq.free_out);
+            // sq_2_rob.sq_ret_complete <= sq_ret_complete;
             
             // handle execute updates
             for (int unsigned i = 0, int cur_idx = 0; i < NUM_ST_PORTS; ++i) begin
@@ -288,7 +288,7 @@ module sq #(parameter
             // `ifdef DEBUG
             $display("  %3d | >> SQ", $time);
             for (int i = 0; i < LSQ_SZ; i++) begin
-                $display("Entry [%0d]: id=%0d, rob_idx=%0d, addr=%0d, data=%0d, d_valid=%b, addr mask=%4b",
+                $display("Entry [%0d]: id=%0d, rob_idx=%0d, addr=%0d, data=%0d, d_valid=%b, addr mask=%4b%s",
                 i,
                 state[i].sq_idx,
                 state[i].rob_idx,
@@ -296,7 +296,14 @@ module sq #(parameter
                 state[i].data,
                 state[i].d_vld,
                 // state[i].bytewise_addr,
-                state[i].bytewise_addr_mask
+                state[i].bytewise_addr_mask,
+                    (i == head && head == tail) 
+                        ? " << h/t"
+                        : (i == head) 
+                            ? " << h" 
+                            : (i == tail)
+                                ? " << t"
+                                : ""
                 );
             end
             $display("  %3d | << SQ", $time);
@@ -364,8 +371,8 @@ module post_ret_buffer #(parameter
             d_idxs[i] = (tail + i) % LSQ_SZ;
 
         // handle ret_2_sq
-        ret_2_sq.free_out = `MIN(free, NUM_DPORTS);
-        ret_2_sq.empty = (used == 0) ? '1 : '0;
+        ret_2_sq.free_out = free_scnt;//`MIN(free, NUM_DPORTS);
+        ret_2_sq.empty = (used_scnt == 0) ? '1 : '0;
 
         //handle retirement write to mem
         ret_2_mem = '0;
@@ -436,20 +443,27 @@ module post_ret_buffer #(parameter
                 state[cur_idx] <= sq_2_ret.ret_st[i];
             end
 
-            `ifdef DEBUG
+            // `ifdef DEBUG
             $display("  %3d | >> RET buffer", $time);
             for (int i = 0; i < LSQ_SZ; i++) begin
-                $display("Entry [%0d]: id=%0d, rob_idx=%0d, addr=%0d, data=%0d, d_valid=%b",
+                $display("Entry [%0d]: id=%0d, rob_idx=%0d, addr=%0d, data=%0d, d_valid=%b%s",
                 i,
                 state[i].sq_idx,
                 state[i].rob_idx,
                 state[i].addr,
                 state[i].data,
-                state[i].d_vld
+                state[i].d_vld,
+                    (i == head && head == tail) 
+                        ? " << h/t"
+                        : (i == head) 
+                            ? " << h" 
+                            : (i == tail)
+                                ? " << t"
+                                : ""
                 );
             end
             $display("  %3d | << RET buffer", $time);
-            `endif
+            // `endif
         end
     end
 

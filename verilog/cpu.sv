@@ -184,6 +184,7 @@ module cpu (
         btq_rd_cnt = 0;
         allowed_retire_cnt = 0;
         for (int unsigned i = 0; i < rob_2_retire.r_en_cnt; ++i) begin
+            $display("RETIRE COUNT: %0d, idx[0]: %0d, idx[1]: %0d", rob_2_retire.r_en_cnt, rob_2_retire.halt[0], rob_2_retire.halt[1]);
             ++allowed_retire_cnt;
             if (!rob_2_retire.brch_vld[i])
                 continue;
@@ -320,9 +321,11 @@ module cpu (
 
     execute2sq exec_2_sq;
     // MEM_TAG mem2proc_transaction_tag;
+    MEM_TAG temp_tag;
 
     sq2execute sq_2_exec;
     stRET2mem ret_2_mem;
+    assign temp_tag = (ret_2_mem.Dmem_command == MEM_STORE) ? 1 : 0;
 
     sq #(
         .N(`N),
@@ -340,13 +343,14 @@ module cpu (
         .rob_2_sq(rob_2_sq), //using the rob_2_sq packet here seems to be causing false retirements from the SQ. Will investigate Sunday 4/6. 
         //As is, can still see packets entering the SQ, and should be able to retire the top 2 entries "properly", they just won't actually write to memory.
         //But this will still work if you just want to make sure that you can actually make it through a program to the wfi
-        .mem2proc_transaction_tag(mem2proc_transaction_tag),
+        .mem2proc_transaction_tag(temp_tag),
 
         .sq_2_dis(sq_2_dispatch),
         .sq_2_exec(sq_2_exec),
         .sq_2_rob(sq_2_rob),
         .ret_2_mem(ret_2_mem)
 );
+
 
     //////////////////////////////////////////////////
     //                                              //

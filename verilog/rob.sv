@@ -60,16 +60,25 @@ module rob #(
         // handle retire (outs)
         r_out = '0;
         for (int unsigned i = 0; i < used_scnt; ++i) begin
+            // $display("SQ_RET_COMPLETE: %b",sq_in.sq_ret_complete);
             // $display("Entry[%0d]: wr_mem: %0d, mem_ret_rdy: %0d", rtre_idxs[i], state[rtre_idxs[i]].wr_mem, sq_in.ret_rdy);
-            if (state[rtre_idxs[i]].halt && (!sq_in.sq_ret_complete)) //ensures that the SQ and SQ retirement buffer are empty before halting
+            if (state[rtre_idxs[i]].halt && (~sq_in.sq_ret_complete)) begin
+                $display("stopping halt %0d, %0d", i, rtre_idxs[i]); //ensures that the SQ and SQ retirement buffer are empty before halting
                 break;
-            if (state[rtre_idxs[i]].wr_mem && (sq_in.ret_rdy > i)) begin
+            end
+            else if (state[rtre_idxs[i]].wr_mem && (sq_in.ret_rdy > i)) begin
                 ++r_out.r_en_cnt;
                 ++sq_out.r_en;
+                $display("retire store %0d, %0d", i, rtre_idxs[i]);
             end
-            else if (!state[rtre_idxs[i]].cpl)
+            else if (!state[rtre_idxs[i]].cpl) begin
+                $display("incomplete %0d, %0d", i, rtre_idxs[i]);
                 break;
-            else ++r_out.r_en_cnt;
+            end
+            else begin
+                $display("incrementing %0d, %0d", i, rtre_idxs[i]);
+                ++r_out.r_en_cnt;
+            end
         end
 
         for (int unsigned i = 0; i < used_scnt; ++i) begin
@@ -108,6 +117,7 @@ module rob #(
     end
 
     always_ff @(posedge clock) begin
+            $display("SQ_RET_COMPLETE: %b",sq_in.sq_ret_complete);
         if (reset || flush) begin
             used    <= 0;
             free    <= ROB_SZ;
