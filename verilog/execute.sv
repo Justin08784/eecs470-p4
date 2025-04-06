@@ -82,6 +82,7 @@ typedef struct packed {
     LSQ_IDX         lq_idx;
     ROB_IDX         rob_idx;
     MEM_SIZE        mem_size;
+    logic           rd_unsigned;
 } ID_LOD_VIEW;
 
 typedef struct packed {
@@ -365,6 +366,8 @@ module lod_ex(
             lq_out.ld_lq_idx[i]     = i_regs[i].dat.lq_idx;
             lq_out.ld_addr[i]       = addr;
             lq_out.ld_mem_size[i]   = i_regs[i].dat.mem_size;
+            /* FIXME: What about rd_unsigned? We are not using this
+            in lq???? */
         end
     end
 
@@ -641,7 +644,8 @@ module stage_ex_p4 (
 
                 lq_idx  : rs_in.fu_dat_load[i].lq_idx,
                 rob_idx : rs_in.fu_dat_load[i].rob_idx,
-                mem_size: MEM_SIZE'(rs_in.fu_dat_load[i].inst.r.funct3[1:0])
+                mem_size: MEM_SIZE'(rs_in.fu_dat_load[i].inst.r.funct3[1:0]),
+                rd_unsigned : rs_in.fu_dat_load[i].inst.r.funct3[2]
             };
 
             ppln_skid #(
