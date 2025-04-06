@@ -353,12 +353,20 @@ module cpu (
     ////////////////////////////////////////////////// 
 
     
+    execute2lq ex_2_lq;
+    execute2sq ex_2_sq;
+    sq2execute sq_2_ex;
     stage_ex_p4 ex_0 (
         .clock(clock),
         .reset(reset),
         .flush(flush),
         .rs_in(rs_2_ex),
         .rs_out(ex_2_rs),
+
+        .sq_in('0),
+        .sq_out(ex_2_sq), // TODO: hook up to sq
+        .lq_out(ex_2_lq), // TODO: hook up to lq
+
         .ctag_out(ex_2_ctag),
         .cdat_out(ex_2_cdat),
         .prf_out(prf_out),

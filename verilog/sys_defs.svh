@@ -1010,12 +1010,12 @@ typedef struct packed {
 } rob2lq;
 
 typedef struct packed {
-    logic       [`NUM_FU_STORE-1:0] ld_ex_en; //tells LQ that a valid load is coming in on that line (bus, not count)
-    LSQ_IDX     [`NUM_FU_STORE-1:0] ld_lq_idx; //LQ IDX for the incoming loads (found in ID_RESULT packet).
-    ADDR        [`NUM_FU_STORE-1:0] ld_addr; //address that the load is loading from
-    MEM_SIZE    [`NUM_FU_STORE-1:0] ld_mem_size; //MEM_SIZE'(id_ex_reg.inst.r.funct3[1:0]); <-- HOW TO FIND THIS. size being loaded (BYTE, HALF, WORD)
-    logic [`NUM_FU_STORE-1:0] st_en; //this comes from the STORE FUs, and tells teh LQ if a valid SQ IDX is coming in on that line (bus, not count)
-    LSQ_IDX [`NUM_FU_STORE-1:0] st_sq_idx; //SQ_IDX associated with st_en. These two items are used to check if any loads and stores have happened out-of-order to flag in the ROB
+    logic       [`NUM_FU_LOAD-1:0]  ld_ex_en; //tells LQ that a valid load is coming in on that line (bus, not count)
+    LSQ_IDX     [`NUM_FU_LOAD-1:0]  ld_lq_idx; //LQ IDX for the incoming loads (found in ID_RESULT packet).
+    ADDR        [`NUM_FU_LOAD-1:0]  ld_addr; //address that the load is loading from
+    MEM_SIZE    [`NUM_FU_LOAD-1:0]  ld_mem_size; //MEM_SIZE'(id_ex_reg.inst.r.funct3[1:0]); <-- HOW TO FIND THIS. size being loaded (BYTE, HALF, WORD)
+    logic       [`NUM_FU_STORE-1:0] st_en; //this comes from the STORE FUs, and tells teh LQ if a valid SQ IDX is coming in on that line (bus, not count)
+    LSQ_IDX     [`NUM_FU_STORE-1:0] st_sq_idx; //SQ_IDX associated with st_en. These two items are used to check if any loads and stores have happened out-of-order to flag in the ROB
     //LQ doesn't need to talk back to execute
 
     //NOTE: the "ld_" items should be sent to LQ as soon as the address to load from is resolved and the query begins. In addition, we still want to set their complete flags in the
