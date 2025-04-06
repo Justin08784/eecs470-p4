@@ -674,7 +674,8 @@ module stage_ex_p4 (
                 uncond_branch : rs_in.fu_dat_alu[i].uncond_branch
             };
 
-            ppln_skid #(
+            assign iss.i_rdy.alu[i] = 1;
+            flop #(
                 .WIDTH($bits(ID_ALU_VIEW))
             ) sbuf_alu (
                 .clock (clock),
@@ -682,11 +683,9 @@ module stage_ex_p4 (
                 .flush (flush),
 
                 .i_vld (rs_in.fu_en_alu[i]),
-                .i_rdy (iss.i_rdy.alu[i]),
                 .i_dat (iss.i_dat.alu[i]),
 
                 .o_vld (iss.o_vld.alu[i]),
-                .o_rdy (regs.i_rdy.alu[i]),
                 .o_dat (iss.o_dat.alu[i])
             );
         end
