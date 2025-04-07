@@ -74,6 +74,11 @@ module testbench;
     DATA  mem_wb_inst_dbg;
     logic mem_wb_valid_dbg;
 
+    rob2retire dbg_rob2retire;
+    btq2retire dbg_btq2retire;
+    retire2btq dbg_retire2btq;
+    sq2retire  dbg_sq2retire;
+
 
     // Instantiate the Pipeline
     cpu verisimpleV (
@@ -98,6 +103,10 @@ module testbench;
         .committed_insts (committed_insts),
         .PC_reg(PC_reg),
 
+        .dbg_rob2retire (dbg_rob2retire),
+        .dbg_btq2retire (dbg_btq2retire),
+        .dbg_retire2btq (dbg_retire2btq),
+        .dbg_sq2retire  (dbg_sq2retire),
         .if_NPC_dbg       (if_NPC_dbg),
         .if_inst_dbg      (if_inst_dbg),
         .if_valid_dbg     (if_valid_dbg),

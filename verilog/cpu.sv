@@ -41,6 +41,10 @@ module cpu (
     // Debug outputs: these signals are solely used for debugging in testbenches
     // Do not change for project 3
     // You should definitely change these for project 4
+    output rob2retire dbg_rob2retire,
+    output btq2retire dbg_btq2retire,
+    output retire2btq dbg_retire2btq,
+    output sq2retire  dbg_sq2retire,
     output ADDR  if_NPC_dbg,
     output DATA  if_inst_dbg,
     output logic if_valid_dbg,
@@ -170,13 +174,17 @@ module cpu (
     //                                              //
     //////////////////////////////////////////////////  
     rob2retire rob_2_retire;
+    assign dbg_rob2retire = rob_2_retire;
     // TODO: collects from both rob2retire and btq2retire
     btq2retire btq_2_retire;
+    assign dbg_btq2retire = btq_2_retire;
     retire2btq retire_2_btq;
+    assign dbg_retire2btq = retire_2_btq;
     retire_final retire_exec;
     logic mispred;
     ADDR  mispred_target;
     sq2retire sq_2_retire;
+    assign dbg_sq2retire = sq_2_retire;
 
     sq2retire HARDCODED_sq2retire;
     assign HARDCODED_sq2retire = '{
@@ -194,6 +202,8 @@ module cpu (
         FIXME: hardcoded sq_in
         If connected to true sq_2_retire, it stalls in `*.syn.out` (i.e.
         reaches max cycle limit), even if it doesn't stall in `*.out`.
+
+        Actually I don't think this actually fixes the stalling problem.
         */
         .sq_in(HARDCODED_sq2retire),
         // .sq_out(),

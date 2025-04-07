@@ -58,6 +58,7 @@ module rob #(
             comm_idxs[i] = (tail + i) % ROB_SZ;
 
         // handle retire (outs)
+        r_out = '0;
         r_out.r_vld_cnt = used_scnt;
         for (int unsigned i = 0; i < used_scnt; ++i) begin
             /* preview mode–– just display all valid entries in read window even
