@@ -285,7 +285,12 @@ module sq #(parameter
                 };
             end
 
-            // `ifdef DEBUG
+        end
+    end
+
+    `ifdef DEBUG
+    always_ff @(posedge clock) begin
+        if (!reset) begin
             $display("  %3d | >> SQ", $time);
             for (int i = 0; i < LSQ_SZ; i++) begin
                 $display("Entry [%0d]: id=%0d, rob_idx=%0d, addr=%0d, data=%0d, d_valid=%b, addr mask=%4b%s",
@@ -307,10 +312,9 @@ module sq #(parameter
                 );
             end
             $display("  %3d | << SQ", $time);
-            // `endif
         end
     end
-
+    `endif // DEBUG
 
 endmodule
 
@@ -443,7 +447,12 @@ module post_ret_buffer #(parameter
                 state[cur_idx] <= sq_2_ret.ret_st[i];
             end
 
-            // `ifdef DEBUG
+        end
+    end
+
+    `ifdef DEBUG
+    always_ff @(posedge clock) begin
+        if (!reset) begin
             $display("  %3d | >> RET buffer", $time);
             for (int i = 0; i < LSQ_SZ; i++) begin
                 $display("Entry [%0d]: id=%0d, rob_idx=%0d, addr=%0d, data=%0d, d_valid=%b%s",
@@ -463,9 +472,9 @@ module post_ret_buffer #(parameter
                 );
             end
             $display("  %3d | << RET buffer", $time);
-            // `endif
         end
     end
+    `endif // DEBUG
 
 endmodule
 

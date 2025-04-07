@@ -63,20 +63,16 @@ module rob #(
             // $display("SQ_RET_COMPLETE: %b",sq_in.sq_ret_complete);
             // $display("Entry[%0d]: wr_mem: %0d, mem_ret_rdy: %0d", rtre_idxs[i], state[rtre_idxs[i]].wr_mem, sq_in.ret_rdy);
             if (state[rtre_idxs[i]].halt && (~sq_in.sq_ret_complete)) begin
-                $display("stopping halt %0d, %0d", i, rtre_idxs[i]); //ensures that the SQ and SQ retirement buffer are empty before halting
                 break;
             end
             else if (state[rtre_idxs[i]].wr_mem && (sq_in.ret_rdy > i)) begin
                 ++r_out.r_en_cnt;
                 ++sq_out.r_en;
-                $display("retire store %0d, %0d", i, rtre_idxs[i]);
             end
             else if (!state[rtre_idxs[i]].cpl) begin
-                $display("incomplete %0d, %0d", i, rtre_idxs[i]);
                 break;
             end
             else begin
-                $display("incrementing %0d, %0d", i, rtre_idxs[i]);
                 ++r_out.r_en_cnt;
             end
         end
@@ -117,7 +113,6 @@ module rob #(
     end
 
     always_ff @(posedge clock) begin
-            $display("SQ_RET_COMPLETE: %b",sq_in.sq_ret_complete);
         if (reset || flush) begin
             used    <= 0;
             free    <= ROB_SZ;
@@ -183,7 +178,7 @@ module rob #(
         end
     end
 
-    // `ifdef DEBUG
+    `ifdef DEBUG
     always_ff @(posedge clock) begin
         if (!reset) begin
             $display("  %3d | >> ROB >>", $time);
@@ -228,6 +223,6 @@ module rob #(
 
         end
     end
-    // `endif
+    `endif
 
 endmodule
