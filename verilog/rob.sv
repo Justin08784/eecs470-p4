@@ -60,21 +60,23 @@ module rob #(
         // handle retire (outs)
         r_out = '0;
         for (int unsigned i = 0; i < used_scnt; ++i) begin
-            // $display("SQ_RET_COMPLETE: %b",sq_in.sq_ret_complete);
-            // $display("Entry[%0d]: wr_mem: %0d, mem_ret_rdy: %0d", rtre_idxs[i], state[rtre_idxs[i]].wr_mem, sq_in.ret_rdy);
-            if (state[rtre_idxs[i]].halt && (~sq_in.sq_ret_complete)) begin
+            if (!state[rtre_idxs[i]].cpl)
                 break;
-            end
-            else if (state[rtre_idxs[i]].wr_mem && (sq_in.ret_rdy > i)) begin
-                ++r_out.r_en_cnt;
+            if (state[rtre_idxs[i]].halt && !sq_in.sq_ret_complete)
+                break;
+
+            /* FIXME: ROB should NOT be handling this. All the counts
+            should be forwarded to the retire module inlined in cpu.sv (who
+            aggregates signals from ROB and BTQ to make the final retire decision).
+
+            There should be NO sq2rob interaction.
+
+            Also the logic below has a bug because i does not necessarily correspond
+            to count of allocated so far if non-contiguous allocation. See how
+            I implemented lim_cnt_free in dispatch.sv */
+            ++r_out.r_en_cnt;
+            if (state[rtre_idxs[i]].wr_mem && (i < sq_in.ret_rdy))
                 ++sq_out.r_en;
-            end
-            else if (!state[rtre_idxs[i]].cpl) begin
-                break;
-            end
-            else begin
-                ++r_out.r_en_cnt;
-            end
         end
 
         for (int unsigned i = 0; i < used_scnt; ++i) begin
