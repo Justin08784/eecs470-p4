@@ -173,50 +173,23 @@ module cpu (
     // TODO: collects from both rob2retire and btq2retire
     btq2retire btq_2_retire;
     retire2btq retire_2_btq;
-    retire_final        retire_exec;
-    logic [$clog2(`N):0] btq_rd_cnt;
-    logic [$clog2(`N):0] allowed_retire_cnt; // FUCK ME
+    retire_final retire_exec;
     logic mispred;
     ADDR  mispred_target;
-    always_comb begin
-        mispred = 0;
-        mispred_target = '0;
-        btq_rd_cnt = 0;
-        allowed_retire_cnt = 0;
-        for (int unsigned i = 0; i < rob_2_retire.r_en_cnt; ++i) begin
-            ++allowed_retire_cnt;
-            if (!rob_2_retire.is_brch[i])
-                continue;
+    retire retire0 (
+        .clock(clock),
+        .reset(reset),
+        .rob_in(rob_2_retire),
+        .btq_in(btq_2_retire),
+        .btq_out(retire_2_btq),
 
-            if (btq_2_retire.dat[btq_rd_cnt].pred != btq_2_retire.dat[btq_rd_cnt].take) begin
-                // is mispred?
-                mispred = 1;
-                mispred_target = btq_2_retire.dat[btq_rd_cnt].take
-                    ? btq_2_retire.dat[btq_rd_cnt].tgt
-                    : btq_2_retire.dat[btq_rd_cnt].NPC;
-                ++btq_rd_cnt;
-                break;
-            end 
-            ++btq_rd_cnt;
-        end
+        // .sq_in(),
+        // .sq_out(),
 
-        retire_2_btq = '{
-            rd_cnt : btq_rd_cnt
-        };
-
-        retire_exec = '{
-            // only the count *may* be adjusted
-            r_en_cnt    : allowed_retire_cnt,
-
-            // the rest of the fields stay the same
-            tag         : rob_2_retire.tag,
-            t_old       : rob_2_retire.t_old,
-            dst         : rob_2_retire.dst,
-            halt        : rob_2_retire.halt,
-            illegal     : rob_2_retire.illegal,
-            is_brch    : rob_2_retire.is_brch
-        };
-    end
+        .mispred(mispred),
+        .mispred_target(mispred_target),
+        .retire_exec(retire_exec)
+    );
 
     always_ff @(posedge clock) begin
         if (reset) begin
