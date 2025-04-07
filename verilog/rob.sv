@@ -163,12 +163,12 @@ module rob #(
             for (int i = 0; i < `N; ++i) begin
                 $display("r_out[%d]: tag: %d, t_old: %d, dst: %d, halt: %d, illegal: %d, is_brch: %d",
                     i,
-                    r_out.tag[i],
-                    r_out.t_old[i],
-                    r_out.dst[i],
-                    r_out.halt[i],
-                    r_out.illegal[i],
-                    r_out.is_brch[i]
+                    r_out.entries[i].tag,
+                    r_out.entries[i].t_old,
+                    r_out.entries[i].dst,
+                    r_out.entries[i].halt,
+                    r_out.entries[i].illegal,
+                    r_out.entries[i].is_brch
                 );
             end
 

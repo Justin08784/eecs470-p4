@@ -208,21 +208,6 @@ module cpu (
             flush       <= '0;
             retire_2_f  <= '0;
         end else begin
-            `ifdef DEBUG
-            $display("  %3d | >> retire >>", $time);
-            for (int i = 0; i < `N; ++i) begin
-                $display("btq_out [%0d]: tgt: %x, NPC: %x, pred: %b, take: %b", 
-                    i,
-                    btq_2_retire.dat[i].tgt,
-                    btq_2_retire.dat[i].NPC,
-                    btq_2_retire.dat[i].pred,
-                    btq_2_retire.dat[i].take
-                );
-            end
-            $display("btq_rd_cnt: %0d", btq_rd_cnt);
-            $display("retire_exec.r_en_cnt: %0d", retire_exec.r_en_cnt);
-            $display("  %3d | << retire <<", $time);
-            `endif // DEBUG
 /* ======================================== */
             flush       <= mispred;
             retire_2_f  <= '{corrected_PC : mispred_target};
