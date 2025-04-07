@@ -782,9 +782,9 @@ typedef struct packed {
 } rob2dispatch;
 
 typedef struct packed {
-    logic           [$clog2(`N):0]      r_en_cnt;
+    logic           [$clog2(`N):0]      r_vld_cnt;
         // From: retire (ROB)
-        // - number of enabled retire lines
+        // - number of valid retire lines
     PHYS_REG_IDX    [`N-1:0]            tag;
         // From: retire (ROB)
         // - IMPORTANT: Set from lowest indices in program-order. NO GAPS!!!

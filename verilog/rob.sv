@@ -74,7 +74,7 @@ module rob #(
             Also the logic below has a bug because i does not necessarily correspond
             to count of allocated so far if non-contiguous allocation. See how
             I implemented lim_cnt_free in dispatch.sv */
-            ++r_out.r_en_cnt;
+            ++r_out.r_vld_cnt;
             if (state[rtre_idxs[i]].wr_mem && (i < sq_in.ret_rdy))
                 ++sq_out.r_en;
         end
@@ -98,7 +98,7 @@ module rob #(
         /*
         TODO: This tradeoff needs consideration for performance
         Option 1: 
-        d_out.rob_rdy_scnt = `MIN(free + r_out.r_en_cnt, NUM_DPORTS);
+        d_out.rob_rdy_scnt = `MIN(free + r_out.r_vld_cnt, NUM_DPORTS);
         + avoids dispatch stalls when ROB is full if N branches retire per cycle
         - longer combinational delay due to dependency on r_en_cnt
 
@@ -108,7 +108,7 @@ module rob #(
         */
         // The true number of same-cycle free slots is free + r_en_cnt
         d_out = '{
-            // rob_rdy_scnt : `MIN(free + r_out.r_en_cnt, NUM_DPORTS),
+            // rob_rdy_scnt : `MIN(free + r_out.r_vld_cnt, NUM_DPORTS),
             rob_rdy_scnt : free_scnt,
             rob_idxs     : comm_idxs
         };
@@ -125,9 +125,9 @@ module rob #(
             state   <= '0;
         end else begin
             `ifndef SYNTH
-            if (d_in.d_en_cnt > free + r_out.r_en_cnt)
+            if (d_in.d_en_cnt > free + r_out.r_vld_cnt)
                 $error("ROB overflow!");
-            if (r_out.r_en_cnt > used + d_in.d_en_cnt)
+            if (r_out.r_vld_cnt > used + d_in.d_en_cnt)
                 $error("ROB underflow!");
             `endif
             used    <= used + d_in.d_en_cnt - r_in.r_en_cnt;
@@ -184,7 +184,7 @@ module rob #(
     always_ff @(posedge clock) begin
         if (!reset) begin
             $display("  %3d | >> ROB >>", $time);
-            $display("r_out: en_cnt: %d", r_out.r_en_cnt);
+            $display("r_out: en_cnt: %d", r_out.r_vld_cnt);
             for (int i = 0; i < `N; ++i) begin
                 $display("r_out[%d]: tag: %d, t_old: %d, dst: %d, halt: %d, illegal: %d, is_brch: %d",
                     i,

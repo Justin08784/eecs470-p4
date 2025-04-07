@@ -29,7 +29,7 @@ module retire (
         mispred_target = '0;
         btq_rd_cnt = 0;
         allowed_retire_cnt = 0;
-        for (int unsigned i = 0; i < rob_in.r_en_cnt; ++i) begin
+        for (int unsigned i = 0; i < rob_in.r_vld_cnt; ++i) begin
             ++allowed_retire_cnt;
             if (!rob_in.is_brch[i])
                 continue;
