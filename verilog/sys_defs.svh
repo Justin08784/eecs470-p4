@@ -506,7 +506,7 @@ typedef struct packed {
     REG_IDX      [`N-1:0]       dst;
     logic        [`N-1:0]       halt;
     logic        [`N-1:0]       illegal;
-    logic        [`N-1:0]       brch_vld;
+    logic        [`N-1:0]       is_brch;
 } retire_final;
 
 typedef struct packed {
@@ -545,7 +545,7 @@ typedef struct packed {
     BTQ_IDX         btq_idx;
     // FIXME: This was originally separate (sq_idx and lq_idx). Was that necessary?
     LSQ_IDX         lsq_idx;
-    logic           is_branch; // Is inst a branch?
+    logic           is_brch; // Is inst a branch?
     
 
     /* from ID_EX_PACKET */
@@ -573,7 +573,7 @@ typedef struct packed {
 // TODO: remember to remove for synthesis? does this prevent synthesis?
 `ifndef SYNTH
 function print_id_result(input ID_RESULT x);
-    $display("ID_RESULT: id=%3d t=%2d t1=%2d t2=%2d t1_rdy=%b t2_rdy=%b fu_idx=%2d rob_idx=%2d btq_idx=%2d is_branch:%b inst=%h PC=%h NPC=%h opa_select=%1d opb_select=%1d dest_reg_idx=%2d alu_func=%1d mult=%b rd_mem=%b wr_mem=%b cond_branch=%b uncond_branch=%b halt=%b illegal=%b csr_op=%b",
+    $display("ID_RESULT: id=%3d t=%2d t1=%2d t2=%2d t1_rdy=%b t2_rdy=%b fu_idx=%2d rob_idx=%2d btq_idx=%2d is_brch:%b inst=%h PC=%h NPC=%h opa_select=%1d opb_select=%1d dest_reg_idx=%2d alu_func=%1d mult=%b rd_mem=%b wr_mem=%b cond_branch=%b uncond_branch=%b halt=%b illegal=%b csr_op=%b",
         x.id,
         x.t,
         x.t1,
@@ -583,7 +583,7 @@ function print_id_result(input ID_RESULT x);
         x.fu_idx,
         x.rob_idx,
         x.btq_idx,
-        x.is_branch,
+        x.is_brch,
         x.inst,
         x.PC,
         x.NPC,
@@ -798,7 +798,7 @@ typedef struct packed {
     logic           [`N-1:0]            illegal;
 
     // BTQ-specific retirement stuff
-    logic           [`N-1:0]            brch_vld;
+    logic           [`N-1:0]            is_brch;
         // Bus: which of the insns are 1) retiring AND 2) branches?
 } rob2retire;
 
@@ -814,24 +814,24 @@ typedef struct packed {
 } execute2rs;
 
 typedef struct packed {
-    /* TODO: Better to make this a union, with shared c_en and is_branch
+    /* TODO: Better to make this a union, with shared c_en and is_brch
     at the top, and union over non-branch and branch-specific stuff? */
     logic           [`N-1:0] en;
     PHYS_REG_IDX    [`N-1:0] ts;
 } execute2complete_tag;
 
 typedef struct packed {
-    /* TODO: Better to make this a union, with shared c_en and is_branch
+    /* TODO: Better to make this a union, with shared c_en and is_brch
     at the top, and union over non-branch and branch-specific stuff? */
     logic           [`N-1:0] en;
-    logic           [`N-1:0] is_branch;
+    logic           [`N-1:0] is_brch;
         // - From: EX
     PHYS_REG_IDX    [`N-1:0] ts;
         // - From: EX
     ROB_IDX         [`N-1:0] rob_idxs;
         // - From: EX
     DATA            [`N-1:0] data;
-        // doubles as branch target if is_branch true
+        // doubles as branch target if is_brch true
 
     // BTQ-specific completion stuff
     BTQ_IDX [`N-1:0] btq_idxs; 

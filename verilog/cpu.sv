@@ -185,7 +185,7 @@ module cpu (
         allowed_retire_cnt = 0;
         for (int unsigned i = 0; i < rob_2_retire.r_en_cnt; ++i) begin
             ++allowed_retire_cnt;
-            if (!rob_2_retire.brch_vld[i])
+            if (!rob_2_retire.is_brch[i])
                 continue;
 
             if (btq_2_retire.dat[btq_rd_cnt].pred != btq_2_retire.dat[btq_rd_cnt].take) begin
@@ -214,7 +214,7 @@ module cpu (
             dst         : rob_2_retire.dst,
             halt        : rob_2_retire.halt,
             illegal     : rob_2_retire.illegal,
-            brch_vld    : rob_2_retire.brch_vld
+            is_brch    : rob_2_retire.is_brch
         };
     end
 
@@ -444,7 +444,7 @@ module cpu (
         //.reset(reset),
         //.flush(),
         .c_en   (ex_2_cdat.en),
-        .c_is_branch (ex_2_cdat.is_branch),
+        .c_is_brch (ex_2_cdat.is_brch),
         .c_ts   (ex_2_cdat.ts),
         .c_vs   (ex_2_cdat.data),
 

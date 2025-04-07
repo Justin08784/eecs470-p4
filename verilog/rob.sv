@@ -87,7 +87,7 @@ module rob #(
             r_out.dst[i]    = state[rtre_idxs[i]].dst;
             r_out.halt[i]   = state[rtre_idxs[i]].halt;
             r_out.illegal[i]= state[rtre_idxs[i]].illegal;
-            r_out.brch_vld[i]= state[rtre_idxs[i]].is_brch;
+            r_out.is_brch[i]= state[rtre_idxs[i]].is_brch;
 
             //tell SQ to retire entries
             // if (state[rtre_idxs[i]].wr_mem)
@@ -186,14 +186,14 @@ module rob #(
             $display("  %3d | >> ROB >>", $time);
             $display("r_out: en_cnt: %d", r_out.r_en_cnt);
             for (int i = 0; i < `N; ++i) begin
-                $display("r_out[%d]: tag: %d, t_old: %d, dst: %d, halt: %d, illegal: %d, brch_vld: %d",
+                $display("r_out[%d]: tag: %d, t_old: %d, dst: %d, halt: %d, illegal: %d, is_brch: %d",
                     i,
                     r_out.tag[i],
                     r_out.t_old[i],
                     r_out.dst[i],
                     r_out.halt[i],
                     r_out.illegal[i],
-                    r_out.brch_vld[i]
+                    r_out.is_brch[i]
                 );
             end
 

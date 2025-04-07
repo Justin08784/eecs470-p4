@@ -286,7 +286,7 @@ module stage_id_p4 (
                 rob_idx     : '0,
                 btq_idx     : '0,
                 lsq_idx     : '0,
-                is_branch   : tmp[i].cond_branch || tmp[i].uncond_branch,
+                is_brch   : tmp[i].cond_branch || tmp[i].uncond_branch,
 
                 inst        : f_in.f_dat[i].inst,
                 PC          : f_in.f_dat[i].PC,
@@ -389,7 +389,7 @@ module stage_id_p4 (
             need to check && (i < prvw_vld_cnt) for either condition!
             */
             d_out.prvw_has_dests[i] = d_out.d_dat[i].dest_reg_idx != `ZERO_REG;
-            d_out.prvw_is_brch[i]   = d_out.d_dat[i].is_branch;
+            d_out.prvw_is_brch[i]   = d_out.d_dat[i].is_brch;
         end
     end
 

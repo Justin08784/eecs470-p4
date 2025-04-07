@@ -1065,7 +1065,7 @@ module stage_ex_p4 (
                 cdat_out_n.rob_idxs[c]    |= cands_flat[f].rob_idx;
                 cdat_out_n.data[c]        |= cands_flat[f].data;
                 cdat_out_n.btq_idxs[c]    |= cands_flat[f].btq_idx;
-                cdat_out_n.is_branch[c]   |= cands_flat[f].is_brch;
+                cdat_out_n.is_brch[c]   |= cands_flat[f].is_brch;
                 cdat_out_n.take[c]        |= cands_flat[f].take;
             end
 
@@ -1242,10 +1242,10 @@ module stage_ex_p4 (
                 );
             end
             for (int i = 0; i < `N; ++i) begin
-                $display("cdat_out[%0d]: en: %b, is_branch: %b, ts: %2d, rob_idxs: %2d, data: %x, btq_idxs: %d, take: %b",
+                $display("cdat_out[%0d]: en: %b, is_brch: %b, ts: %2d, rob_idxs: %2d, data: %x, btq_idxs: %d, take: %b",
                     i,
                     cdat_out.en[i],
-                    cdat_out.is_branch[i],
+                    cdat_out.is_brch[i],
                     cdat_out.ts[i],
                     cdat_out.rob_idxs[i],
                     cdat_out.data[i],

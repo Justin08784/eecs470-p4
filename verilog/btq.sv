@@ -96,7 +96,7 @@ module btq #(
 
             // handle complete (ins)
             for (int unsigned i = 0, int cur_idx = 0; i < NUM_CPORTS; ++i) begin
-                if (!cdat_in.en[i] || !cdat_in.is_branch[i])
+                if (!cdat_in.en[i] || !cdat_in.is_brch[i])
                     continue;
                 cur_idx = cdat_in.btq_idxs[i];
 
@@ -144,10 +144,10 @@ module btq #(
             end
 
             for (int i = 0; i < `N; ++i) begin
-                $display("cdat_in[%0d]: c_en: %b, is_branch: %b, c_btq_idxs: %d, take: %b", 
+                $display("cdat_in[%0d]: c_en: %b, is_brch: %b, c_btq_idxs: %d, take: %b", 
                     i,
                     cdat_in.en[i],
-                    cdat_in.is_branch[i],
+                    cdat_in.is_brch[i],
                     cdat_in.btq_idxs[i],
                     cdat_in.take[i]
                 );
