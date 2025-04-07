@@ -335,6 +335,7 @@ CPU_SOURCES = verilog/cpu.sv \
 			  verilog/skid_buffer.sv \
 			  verilog/global_history_register.sv \
 			  verilog/pht.sv \
+			  verilog/retire.sv \
 			  verilog/sq.sv
 
 
