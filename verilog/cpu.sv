@@ -184,7 +184,6 @@ module cpu (
         btq_rd_cnt = 0;
         allowed_retire_cnt = 0;
         for (int unsigned i = 0; i < rob_2_retire.r_en_cnt; ++i) begin
-            $display("RETIRE COUNT: %0d, idx[0]: %0d, idx[1]: %0d", rob_2_retire.r_en_cnt, rob_2_retire.halt[0], rob_2_retire.halt[1]);
             ++allowed_retire_cnt;
             if (!rob_2_retire.brch_vld[i])
                 continue;
