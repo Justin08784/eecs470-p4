@@ -21,7 +21,7 @@ module rob #(
     input  dispatch2rob d_in,
 
     //SQ
-    input  sq2rob sq_in,
+    input  sq2retire sq_in,
     output rob2sq sq_out
 );
     localparam NUM_DPORTS = N; // dispatch ports (in-order)
@@ -58,36 +58,11 @@ module rob #(
             comm_idxs[i] = (tail + i) % ROB_SZ;
 
         // handle retire (outs)
-        r_out = '0;
-        for (int unsigned i = 0; i < used_scnt; ++i) begin
-            if (!state[rtre_idxs[i]].cpl)
-                break;
-            if (state[rtre_idxs[i]].halt && !sq_in.sq_ret_complete)
-                break;
-
-            /* FIXME: ROB should NOT be handling this. All the counts
-            should be forwarded to the retire module inlined in cpu.sv (who
-            aggregates signals from ROB and BTQ to make the final retire decision).
-
-            There should be NO sq2rob interaction.
-
-            Also the logic below has a bug because i does not necessarily correspond
-            to count of allocated so far if non-contiguous allocation. See how
-            I implemented lim_cnt_free in dispatch.sv */
-            ++r_out.r_vld_cnt;
-            if (state[rtre_idxs[i]].wr_mem && (i < sq_in.ret_rdy))
-                ++sq_out.r_en;
-        end
-
+        r_out.r_vld_cnt = used_scnt;
         for (int unsigned i = 0; i < used_scnt; ++i) begin
             /* preview mode–– just display all valid entries in read window even
             if not all will get retired this cycle */
-            r_out.tag[i]    = state[rtre_idxs[i]].tag;
-            r_out.t_old[i]  = state[rtre_idxs[i]].t_old;
-            r_out.dst[i]    = state[rtre_idxs[i]].dst;
-            r_out.halt[i]   = state[rtre_idxs[i]].halt;
-            r_out.illegal[i]= state[rtre_idxs[i]].illegal;
-            r_out.is_brch[i]= state[rtre_idxs[i]].is_brch;
+            r_out.entries[i] = state[rtre_idxs[i]];
 
             //tell SQ to retire entries
             // if (state[rtre_idxs[i]].wr_mem)

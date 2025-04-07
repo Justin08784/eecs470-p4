@@ -303,9 +303,9 @@ module testbench;
             pc      = rob_debug[cur_idx].NPC - 4;
             block   = memory.unified_memory[pc[31:3]];
             inst    = block.word_level[pc[2]];
-            reg_idx = verisimpleV.rob_0.r_out.dst[n];
+            reg_idx = verisimpleV.rob_0.r_out.entries[n].dst;
             data    = verisimpleV.prf_0.phys_reg_file[
-                verisimpleV.rob_2_retire.tag[n]
+                verisimpleV.rob_0.r_out.entries[n].tag
             ];
             // print the committed instructions to the writeback output file
             if (reg_idx == `ZERO_REG) begin

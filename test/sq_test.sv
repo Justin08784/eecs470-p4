@@ -20,7 +20,7 @@ module sq_testbench;
 
     stRET2mem ret_2_mem;
     MEM_TAG mem2proc_transaction_tag;
-    sq2rob sq_2_rob;
+    sq2retire sq_2_rob;
 
     always begin
         #(`CLOCK_PERIOD/2.0);

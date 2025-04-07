@@ -498,7 +498,6 @@ typedef struct packed {
     logic   [$clog2(`N):0]  rd_cnt;
 } retire2btq;
 
-// same as rob2retire, but with r_en_cnt potentially adjusted to account for branch mispredicts
 typedef struct packed {
     logic [$clog2(`N):0]        r_en_cnt; // final final
     PHYS_REG_IDX [`N-1:0]       tag;
@@ -782,24 +781,27 @@ typedef struct packed {
 } rob2dispatch;
 
 typedef struct packed {
-    logic           [$clog2(`N):0]      r_vld_cnt;
+    logic       [$clog2(`N):0]  r_vld_cnt;
         // From: retire (ROB)
         // - number of valid retire lines
-    PHYS_REG_IDX    [`N-1:0]            tag;
-        // From: retire (ROB)
+    ROB_ENTRY   [`N-1:0]        entries; 
         // - IMPORTANT: Set from lowest indices in program-order. NO GAPS!!!
-    PHYS_REG_IDX    [`N-1:0]            t_old;
-        // From: retire (ROB)
-        // - pregs being returned to free list
-    REG_IDX         [`N-1:0]            dst;
 
-    // control signals for cpu.sv
-    logic           [`N-1:0]            halt;
-    logic           [`N-1:0]            illegal;
+    // PHYS_REG_IDX    [`N-1:0]            tag;
+    //     // From: retire (ROB)
+    //     // - IMPORTANT: Set from lowest indices in program-order. NO GAPS!!!
+    // PHYS_REG_IDX    [`N-1:0]            t_old;
+    //     // From: retire (ROB)
+    //     // - pregs being returned to free list
+    // REG_IDX         [`N-1:0]            dst;
 
-    // BTQ-specific retirement stuff
-    logic           [`N-1:0]            is_brch;
-        // Bus: which of the insns are 1) retiring AND 2) branches?
+    // // control signals for cpu.sv
+    // logic           [`N-1:0]            halt;
+    // logic           [`N-1:0]            illegal;
+
+    // // BTQ-specific retirement stuff
+    // logic           [`N-1:0]            is_brch;
+    //     // Bus: which of the insns are 1) retiring AND 2) branches?
 } rob2retire;
 
 
@@ -961,7 +963,7 @@ typedef struct packed {
 typedef struct packed {
     logic [$clog2(`N):0]    ret_rdy;
     logic                   sq_ret_complete;
-} sq2rob;
+} sq2retire;
 
 typedef struct packed {
     MEM_COMMAND   Dmem_command;    // The memory command

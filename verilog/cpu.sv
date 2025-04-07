@@ -176,6 +176,7 @@ module cpu (
     retire_final retire_exec;
     logic mispred;
     ADDR  mispred_target;
+    sq2retire sq_2_retire;
     retire retire0 (
         .clock(clock),
         .reset(reset),
@@ -183,7 +184,7 @@ module cpu (
         .btq_in(btq_2_retire),
         .btq_out(retire_2_btq),
 
-        // .sq_in(),
+        .sq_in(sq_2_retire),
         // .sq_out(),
 
         .mispred(mispred),
@@ -267,7 +268,6 @@ module cpu (
     //////////////////////////////////////////////////  
 
     rob2sq rob_2_sq;
-    sq2rob sq_2_rob;
 
     rob #(
         .ROB_SZ(`ROB_SZ),
@@ -281,7 +281,7 @@ module cpu (
         .cdat_in    (ex_2_cdat),
         .d_out      (rob_2_dispatch),
         .d_in       (dispatch_2_rob),
-        .sq_in      (sq_2_rob),
+        .sq_in      (sq_2_retire),
         .sq_out     (rob_2_sq)
     );
 
@@ -319,7 +319,7 @@ module cpu (
 
         .sq_2_dis(sq_2_dispatch),
         .sq_2_exec(sq_2_exec),
-        .sq_2_rob(sq_2_rob),
+        .sq_2_retire(sq_2_retire),
         .ret_2_mem(ret_2_mem)
 );
 
