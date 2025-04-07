@@ -15,7 +15,7 @@ module retire (
     output retire2btq btq_out,
 
     input  sq2retire sq_in,
-    output retire2sq sq_out,
+    // output retire2sq sq_out,
 
     output logic mispred,
     output ADDR  mispred_target,
