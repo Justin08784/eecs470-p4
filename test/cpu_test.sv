@@ -31,6 +31,10 @@ import "DPI-C" function string decode_inst(int inst);
 `define TB_MAX_CYCLES 50000000
 
 
+// Debug cycle limits, both inclusive
+localparam DBG_CYCLE_MIN = 0;
+localparam DBG_CYCLE_MAX = `TB_MAX_CYCLES;
+
 module testbench;
     // string inputs for loading memory and output files
     // run like: cd build && ./simv +MEMORY=../programs/mem/<my_program>.mem +OUTPUT=../output/<my_program>
@@ -989,6 +993,14 @@ module testbench;
 
 
     task print_custom_data;
+        int cycle_no;
+        cycle_no = clock_count - 1;
+
+        if (cycle_no < DBG_CYCLE_MIN)
+            return;
+        if (cycle_no > DBG_CYCLE_MAX)
+            return;
+
         $display("  | >> CYCLE: %3d (t: %3d)", clock_count-1, $time);
         print_btq();
         print_fetch();
