@@ -22,7 +22,7 @@ module lq #(parameter
 
     output lq2dispatch lq_2_dis,
     output lq2rob lq_2_rob,
-    output lq2fetch fetch_out
+    output lq2retire retire_out
 );
 
     localparam NUM_DPORTS = N; // dispatch ports (in-order)
@@ -81,8 +81,8 @@ module lq #(parameter
         end
 
         //handle telling fetch the top 2 PC's
-        fetch_out.PC[0] = state[head].inst_pc;
-        fetch_out.PC[1] = state[head_plus_one].inst_pc;
+        retire_out.PC[0] = state[head].inst_pc;
+        retire_out.PC[1] = state[head_plus_one].inst_pc;
     end
 
 

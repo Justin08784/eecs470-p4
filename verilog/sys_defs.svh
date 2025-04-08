@@ -961,7 +961,7 @@ typedef struct packed {
 
 typedef struct packed {
     ADDR [`N-1:0] PC;
-} lq2fetch;
+} lq2retire;
 
 typedef struct packed {
     logic   [$clog2(`N):0]      ret_rdy;

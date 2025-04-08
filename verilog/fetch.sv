@@ -23,8 +23,6 @@ module stage_if_p4 (
     input   decode2fetch d_in,
     output  fetch2decode d_out,
 
-    input   lq2fetch    lq_in,
-
     // input           take_branch,    // taken-branch signal
     // input ADDR      branch_target,  // target pc: use if take_branch is TRUE
     input retire2fetch r_in,

@@ -20,6 +20,8 @@ module retire (
     input  sq2retire sq_in,
     output retire2sq sq_out,
 
+    input lq2retire lq_in,
+
     output retire2lq lq_out,
 
     output logic mispred,
