@@ -102,7 +102,7 @@ module testbench;
         .dbg_fetch      (dbg_fetch),
         .dbg_decode     (dbg_decode),
         .dbg_dispatch   (dbg_dispatch),
-        // .dbg_lq         (dbg_lq),
+        .dbg_lq         (dbg_lq),
         .dbg_mt         (dbg_mt),
         .dbg_prf        (dbg_prf),
         .dbg_rob        (dbg_rob),
@@ -912,6 +912,55 @@ module testbench;
         $display("  | << SQ");
     endtask
 
+    task print_lq;
+        // internal state
+        LQ_ENTRY [`LSQ_SZ-1:0]      state;
+        logic [$clog2(`LSQ_SZ)-1:0] head;
+        logic [$clog2(`LSQ_SZ)-1:0] tail;
+        logic [$clog2(`LSQ_SZ):0]   used;
+        // I/O
+
+        dispatch2lq   dis_2_lq;
+        execute2lq    exec_2_lq;
+        retire2lq     retire_2_lq;
+
+        lq2dispatch  lq_2_dis;
+        // sq2rs sq_2_rs,
+        lq2rob    lq_2_rob;
+
+        state   = dbg_lq.state;
+        head    = dbg_lq.head;
+        tail    = dbg_lq.tail;
+        used    = dbg_lq.used;
+
+        dis_2_lq    = dbg_lq.dis_2_lq;
+        exec_2_lq   = dbg_lq.exec_2_lq;
+        retire_2_lq = dbg_lq.retire_2_lq;
+
+        lq_2_dis    = dbg_lq.lq_2_dis;
+        lq_2_rob   = dbg_lq.lq_2_rob;
+
+        $display("  | >> LQ");
+        for (int i = 0; i < `LSQ_SZ; i++) begin
+            $display("Entry [%0d]: id=%0d, sq_idx=%0d, rob_idx=%0d, addr=%0d, d_valid=%b%s",
+            i,
+            state[i].lq_idx,
+            state[i].sq_idx,
+            state[i].rob_idx,
+            state[i].addr,
+            state[i].d_vld,
+                (i == head && head == tail) 
+                    ? " << h/t"
+                    : (i == head) 
+                        ? " << h" 
+                        : (i == tail)
+                            ? " << t"
+                            : ""
+            );
+        end
+        $display("  | << LQ");
+    endtask
+
     task print_retbuf;
         DBG_retbuf dbg_retbuf;
         // internal state
@@ -1015,6 +1064,7 @@ module testbench;
         print_rob();
         print_rs();
         print_sq();
+        print_lq();
         print_retbuf();
         print_retire();
         $display("  | << CYCLE: %3d (t: %3d)", clock_count-1, $time);
