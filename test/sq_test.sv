@@ -1,6 +1,16 @@
 `include "sys_defs.svh"
 
 
+/*
+>>>> ==== >>>> ==== >>>> ==== >>>>
+FIXME:
+`make sq.out` fails as of commit...
+sq: moved all sq<->rob interaction to sq<->retire (sha: 03c332d1c2729aaf3d037821dae054233cdf8c77)
+
+...BECAUSE we reduced the number of load and store functional units from 4 each to 1 each.
+<<<< ==== <<<< ==== <<<< ==== <<<<
+*/
+
 module sq_testbench;
 
     logic clock;
