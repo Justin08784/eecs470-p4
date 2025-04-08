@@ -66,6 +66,7 @@ module cpu (
     fetch2decode f_2_decode;
     decode2fetch decode_2_f;
     retire2fetch retire_2_f;
+    lq2fetch lq_2_fetch;
 
     stage_if_p4 fetch_0(
         `ifdef DEBUG
@@ -79,6 +80,7 @@ module cpu (
         .d_in   (decode_2_f),
         .d_out  (f_2_decode),
         .r_in   (retire_2_f),
+        .lq_in  (lq_2_fetch),
 
         .Imem_data  (mem2proc_data),      // data coming back from Instruction memory
         .PC_reg     (PC_reg)
@@ -350,7 +352,8 @@ module cpu (
         .exec_2_lq(exec_2_lq),
 
         .lq_2_dis(lq_2_dis),
-        .lq_2_rob(lq_2_rob)
+        .lq_2_rob(lq_2_rob),
+        .fetch_out(lq_2_fetch)
     );
 
     //////////////////////////////////////////////////

@@ -960,6 +960,10 @@ typedef struct packed {
 } lq2dispatch;
 
 typedef struct packed {
+    ADDR [`N-1:0] PC;
+} lq2fetch;
+
+typedef struct packed {
     logic   [$clog2(`N):0]      ret_rdy;
     logic   [`NUM_FU_LOAD-1:0]  err_en;
     ROB_IDX [`NUM_FU_LOAD-1:0]  rob_idx;
