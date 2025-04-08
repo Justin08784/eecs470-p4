@@ -49,9 +49,6 @@ module sq #(parameter
     stRET2sq ret_2_sq;
     forwardRET2sq forward_ret_2_sq;
 
-    `ifdef DEBUG
-    assign state_dbg    = state;
-    `endif 
     assign free         = LSQ_SZ - used;
     assign free_scnt    = `MIN(free, NUM_DPORTS);
     assign used_scnt    = `MIN(used, NUM_RPORTS);
@@ -366,9 +363,6 @@ module post_ret_buffer #(parameter
     logic [NUM_RPORTS-1:0][$clog2(LSQ_SZ)-1:0] r_idxs;
     logic [NUM_DPORTS-1:0][$clog2(LSQ_SZ)-1:0] d_idxs;
 
-    `ifdef DEBUG
-    assign state_dbg            = state;
-    `endif 
     assign free                 = LSQ_SZ - used;
     assign free_scnt            = `MIN(free, NUM_DPORTS);
     assign used_scnt            = `MIN(used, NUM_RPORTS);
