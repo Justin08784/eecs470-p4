@@ -131,7 +131,8 @@ module rob #(
 
             //handle SQ completes
             for (int unsigned i = 0; i < `NUM_FU_STORE; ++i) begin
-                if (sq_in.complete_en[i]) state[sq_in.complete_rob_idxs[i]].cpl <= 1;
+                if (sq_in.complete_en[i])
+                    state[sq_in.complete_rob_idxs[i]].cpl <= 1;
             end
 
             //handle LQ errors
