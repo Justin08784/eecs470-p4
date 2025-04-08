@@ -559,39 +559,6 @@ typedef struct packed {
     // logic    valid;
 } ID_RESULT;
 
-// TODO: remember to remove for synthesis? does this prevent synthesis?
-`ifndef SYNTH
-function print_id_result(input ID_RESULT x);
-    $display("ID_RESULT: id=%3d t=%2d t1=%2d t2=%2d t1_rdy=%b t2_rdy=%b fu_idx=%2d rob_idx=%2d btq_idx=%2d is_brch:%b inst=%h PC=%h NPC=%h opa_select=%1d opb_select=%1d dest_reg_idx=%2d alu_func=%1d mult=%b rd_mem=%b wr_mem=%b cond_branch=%b uncond_branch=%b halt=%b illegal=%b csr_op=%b",
-        x.id,
-        x.t,
-        x.t1,
-        x.t2,
-        x.t1_rdy,
-        x.t2_rdy,
-        x.fu_idx,
-        x.rob_idx,
-        x.btq_idx,
-        x.is_brch,
-        x.inst,
-        x.PC,
-        x.NPC,
-        x.opa_select,
-        x.opb_select,
-        x.dest_reg_idx,
-        x.alu_func,
-        x.mult,
-        x.rd_mem,
-        x.wr_mem,
-        x.cond_branch,
-        x.uncond_branch,
-        x.halt,
-        x.illegal,
-        x.csr_op
-    );
-endfunction
-`endif
-
 typedef struct packed {
     /* ETB bypass control */
     logic bypass1;  // set iff 1) awaken by a complete to its src1 AND 2) issued same cycle
