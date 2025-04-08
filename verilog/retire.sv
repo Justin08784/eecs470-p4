@@ -29,6 +29,7 @@ module retire (
     logic [$clog2(`N):0] r_en_cnt;
     logic [$clog2(`N):0] btq_rd_cnt;
     logic [$clog2(`N):0] sq_rd_cnt;
+    logic [$clog2(`N):0] lq_rd_cnt;
 
     PHYS_REG_IDX [`N-1:0] tmp_tag;
     PHYS_REG_IDX [`N-1:0] tmp_t_old;
@@ -52,6 +53,7 @@ module retire (
         r_en_cnt = 0;
         btq_rd_cnt = 0;
         sq_rd_cnt  = 0;
+        lq_rd_cnt = 0;
         for (int i = 0; i < rob_in.r_vld_cnt; ++i) begin
             if (!rob_in.entries[i].cpl)
                 break;
@@ -60,8 +62,10 @@ module retire (
 
             ++r_en_cnt;
             if (rob_in.entries[i].wr_mem)
-                ++sq_rd_cnt; // TODO: assign to sq_out.r_en
-            // FIXME: Is checking sq_in.ret_rdy even necessary?
+                ++sq_rd_cnt; 
+                
+            if (rob_in.entries[i].rd_mem)
+                ++lq_rd_cnt; 
 
             if (!rob_in.entries[i].is_brch)
                 continue;
@@ -104,6 +108,7 @@ module retire (
         };
 
         sq_out.r_en = sq_rd_cnt;
+        lq_out.r_en = lq_rd_cnt;
     end
 
     `ifdef DEBUG
