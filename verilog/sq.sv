@@ -41,6 +41,7 @@ module sq #(parameter
 
     SQ_ENTRY [LSQ_SZ-1:0]           state;
     logic [$clog2(LSQ_SZ):0]        used, free;
+    logic [$clog2(2*`N):0]          rsvd; // sz(rename_buf) = 2*`N
 
     logic [NUM_RPORTS-1:0][$clog2(LSQ_SZ)-1:0] r_idxs;
     logic [NUM_DPORTS-1:0][$clog2(LSQ_SZ)-1:0] d_idxs;
@@ -49,8 +50,7 @@ module sq #(parameter
     stRET2sq ret_2_sq;
     forwardRET2sq forward_ret_2_sq;
 
-    assign free         = LSQ_SZ - used;
-    assign free_scnt    = `MIN(free, NUM_DPORTS);
+    assign free_scnt    = `MIN(free - rsvd, NUM_DPORTS);
     assign used_scnt    = `MIN(used, NUM_RPORTS);
 
 
@@ -239,6 +239,9 @@ module sq #(parameter
         
         if (reset || flush) begin
             used    <= 0;
+            free    <= LSQ_SZ;
+            rsvd    <= 0;
+
             head    <= 0;
             tail    <= 0;
             tail_dbl <= 0;
@@ -247,6 +250,9 @@ module sq #(parameter
             next_complete <= '0;
         end else begin
             used    <= used + dis_2_sq.sq_d_en_cnt - retire_2_sq.r_en;
+            free    <= free - dis_2_sq.sq_d_en_cnt + retire_2_sq.r_en;
+            rsvd    <= rsvd - dis_2_sq.sq_d_en_cnt + dis_2_sq.rename_en_cnt;
+
             head    <= (head + retire_2_sq.r_en) % LSQ_SZ;
             tail    <= (tail + dis_2_sq.sq_d_en_cnt) % LSQ_SZ;
             tail_dbl <= (tail_dbl + dis_2_sq.sq_d_en_cnt) % LSQ_SZ_DBL;

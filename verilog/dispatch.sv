@@ -186,6 +186,7 @@ always_comb begin
     foreach(wr_mem[i])
         wr_mem[i]   = rename_in[i].wr_mem;
 
+    sq_out.rename_en_cnt= $countones(rename_en & wr_mem);
     btq_out.en_cnt      = $countones(rename_en & is_brch);
 end
 
@@ -272,7 +273,6 @@ always_comb begin
     rs_out.d_dat    = '0;
     sq_wr_idx = 0;
     lq_wr_idx = 0;
-    sq_out = '0;
     lq_out = '0;
 
     for (int i = 0; i < `N; i++) begin
@@ -287,7 +287,6 @@ always_comb begin
 
         if (commit_in[i].dat.wr_mem) begin
             rs_out.d_dat[i].sq_idx = sq_in.next_ids[sq_wr_idx];
-            sq_out.sq_d_en_cnt++;
             sq_out.rob_idx[sq_wr_idx] = rob_in.rob_idxs[i];
             ++sq_wr_idx;
         end
@@ -300,6 +299,8 @@ always_comb begin
             ++lq_wr_idx;
         end
     end
+
+    sq_out.sq_d_en_cnt = sq_wr_idx;
 end
 
 // handle rob output 
