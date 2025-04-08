@@ -1,6 +1,16 @@
 `include "sys_defs.svh"
 
 
+/*
+>>>> ==== >>>> ==== >>>> ==== >>>>
+FIXME:
+`make sq.out` fails as of commit...
+sq: moved all sq<->rob interaction to sq<->retire (sha: 03c332d1c2729aaf3d037821dae054233cdf8c77)
+
+...BECAUSE we reduced the number of load and store functional units from 4 each to 1 each.
+<<<< ==== <<<< ==== <<<< ==== <<<<
+*/
+
 module sq_testbench;
 
     logic clock;
@@ -9,7 +19,7 @@ module sq_testbench;
 
     dispatch2sq dis_2_sq;
     execute2sq exec_2_sq;
-    rob2sq rob_2_sq;
+    retire2sq retire_2_sq;
 
     sq2dispatch sq_2_dis;
     sq2execute sq_2_exec;
@@ -20,7 +30,7 @@ module sq_testbench;
 
     stRET2mem ret_2_mem;
     MEM_TAG mem2proc_transaction_tag;
-    sq2retire sq_2_rob;
+    sq2retire sq_2_retire;
 
     always begin
         #(`CLOCK_PERIOD/2.0);
@@ -43,14 +53,14 @@ module sq_testbench;
 
         .dis_2_sq(dis_2_sq),
         .exec_2_sq(exec_2_sq),
-        .rob_2_sq(rob_2_sq),
+        .retire_2_sq(retire_2_sq),
         .mem2proc_transaction_tag(mem2proc_transaction_tag),
 
         .sq_2_dis(sq_2_dis),
         .sq_2_exec(sq_2_exec),
         // .sq_2_rs(sq_2_rs),
         .ret_2_mem(ret_2_mem),
-        .sq_2_rob(sq_2_rob)
+        .sq_2_retire(sq_2_retire)
     );
 
 
@@ -62,7 +72,7 @@ module sq_testbench;
 
         dis_2_sq = '0;
         exec_2_sq = '0;
-        rob_2_sq = '0;
+        retire_2_sq = '0;
         mem2proc_transaction_tag = '0;
 
         @(negedge clock);
@@ -118,7 +128,7 @@ module sq_testbench;
         else   exit_on_error ("Free count not zero");
         @(negedge clock);
         exec_2_sq = '0;
-        rob_2_sq.r_en = 2;
+        retire_2_sq.r_en = 2;
         // assert (sq_2_rs.en == 4'b0011) 
         // else   exit_on_error ("CDB en not correct");
         // assert (sq_2_rs.sq_idx_cdb[0] == 0) 
@@ -127,16 +137,16 @@ module sq_testbench;
         // else   exit_on_error ("CDB [1] not correct");
         @(negedge clock);
         exec_2_sq = '0;
-        rob_2_sq = '0;
+        retire_2_sq = '0;
         assert (sq_2_dis.sq_rdy_scnt == 2) 
         else   exit_on_error ("Free count not two");
         @(negedge clock);
-        rob_2_sq.r_en = 1;
+        retire_2_sq.r_en = 1;
         dis_2_sq.sq_d_en_cnt = 2;
         dis_2_sq.rob_idx[0] = 16;
         dis_2_sq.rob_idx[1] = 17;
         @(negedge clock);
-        rob_2_sq = '0;
+        retire_2_sq = '0;
         dis_2_sq = '0;
         assert (sq_2_dis.sq_rdy_scnt == 1) 
         else   exit_on_error ("Free count not one");

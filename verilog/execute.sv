@@ -140,7 +140,9 @@ typedef struct packed {
 typedef struct packed {
     DATA        rs1, rs2;
     MULT_FUNC   func;
-    DST         dst;
+
+    PHYS_REG_IDX    t;
+    ROB_IDX         rob_idx;
 } MUL_OPS;
 
 // ALU: computes the result of FUNC applied with operands A and B
@@ -521,10 +523,8 @@ module mul_ex(
                 rs1  : rs1,
                 rs2  : rs2,
                 func : i_regs[i].dat.func,
-                dst  : '{
-                    rob_idx : i_regs[i].dat.rob_idx,
-                    tag     : i_regs[i].dat.t
-                }
+                t       : i_regs[i].dat.t,
+                rob_idx : i_regs[i].dat.rob_idx
             };
         end
     end
@@ -557,7 +557,8 @@ module mul_ex(
     // execute
     generate
         DATA        [`NUM_FU_MULT-1:0] tmp_res;
-        DST         [`NUM_FU_MULT-1:0] tmp_dst;
+        PHYS_REG_IDX[`NUM_FU_MULT-1:0] tmp_t;
+        ROB_IDX     [`NUM_FU_MULT-1:0] tmp_rob_idx;
 
         logic       [`NUM_FU_MULT-1:0] cpl_buf_rdy;
         for (genvar i = 0; i < `NUM_FU_MULT; ++i) begin : gen_mults
@@ -570,10 +571,11 @@ module mul_ex(
 
                 .i_vld  (i_vld[i]),
                 .i_rdy  (i_rdy[i]),
-                .dst_in (ops[i].dst),
                 .rs1    (ops[i].rs1),
                 .rs2    (ops[i].rs2),
                 .func   (ops[i].func),
+                .i_t    (ops[i].t),
+                .i_rob_idx(ops[i].rob_idx),
 
                 .cdb_req(cdb_req[i]),
                 .ctag_t (ctag_ts[i]),
@@ -582,13 +584,14 @@ module mul_ex(
                 // Output (directly to cdat_out)
                 .o_vld  (o_vld[i]),
                 .o_rdy  (o_rdy[i]),
-                .dst_out(tmp_dst[i]),
+                .o_t    (tmp_t[i]),
+                .o_rob_idx(tmp_rob_idx[i]),
                 .result (tmp_res[i])
             );
 
             assign o_cands[i] = '{
-                t       : tmp_dst[i].tag,
-                rob_idx : tmp_dst[i].rob_idx,
+                t       : tmp_t[i],
+                rob_idx : tmp_rob_idx[i],
                 data    : tmp_res[i],
                 btq_idx : '0,
                 take    : '0,
@@ -786,26 +789,26 @@ module stage_ex_p4 (
     always_comb begin
         prf_out = '0;
         foreach (iss.o_vld.alu[i]) begin
-            prf_out.s_en1s.alu[i]   = iss.o_vld.alu[i];
-            prf_out.s_en2s.alu[i]   = iss.o_vld.alu[i];
-            prf_out.s_t1s.alu[i]    = iss.o_dat.alu[i].t1; 
-            prf_out.s_t2s.alu[i]    = iss.o_dat.alu[i].t2; 
+            prf_out.en1s.alu[i]   = iss.o_vld.alu[i];
+            prf_out.en2s.alu[i]   = iss.o_vld.alu[i];
+            prf_out.t1s.alu[i]    = iss.o_dat.alu[i].t1; 
+            prf_out.t2s.alu[i]    = iss.o_dat.alu[i].t2; 
         end
         foreach (iss.o_vld.mul[i]) begin
-            prf_out.s_en1s.mul[i]   = iss.o_vld.mul[i];
-            prf_out.s_en2s.mul[i]   = iss.o_vld.mul[i];
-            prf_out.s_t1s.mul[i]    = iss.o_dat.mul[i].t1; 
-            prf_out.s_t2s.mul[i]    = iss.o_dat.mul[i].t2; 
+            prf_out.en1s.mul[i]   = iss.o_vld.mul[i];
+            prf_out.en2s.mul[i]   = iss.o_vld.mul[i];
+            prf_out.t1s.mul[i]    = iss.o_dat.mul[i].t1; 
+            prf_out.t2s.mul[i]    = iss.o_dat.mul[i].t2; 
         end
         foreach (iss.o_vld.lod[i]) begin
-            prf_out.s_en1s.lod[i]   = iss.o_vld.lod[i];
-            prf_out.s_t1s.lod[i]    = iss.o_dat.lod[i].t1; 
+            prf_out.en1s.lod[i]   = iss.o_vld.lod[i];
+            prf_out.t1s.lod[i]    = iss.o_dat.lod[i].t1; 
         end
         foreach (iss.o_vld.str[i]) begin
-            prf_out.s_en1s.str[i]   = iss.o_vld.str[i];
-            prf_out.s_en2s.str[i]   = iss.o_vld.str[i];
-            prf_out.s_t1s.str[i]    = iss.o_dat.str[i].t1; 
-            prf_out.s_t2s.str[i]    = iss.o_dat.str[i].t2; 
+            prf_out.en1s.str[i]   = iss.o_vld.str[i];
+            prf_out.en2s.str[i]   = iss.o_vld.str[i];
+            prf_out.t1s.str[i]    = iss.o_dat.str[i].t1; 
+            prf_out.t2s.str[i]    = iss.o_dat.str[i].t2; 
         end
     end
 
@@ -816,28 +819,28 @@ module stage_ex_p4 (
     always_comb begin
         foreach (iss.o_vld.alu[i]) begin
             regs.i_dat.alu[i] = '{
-                rs1 : prf_in.s_v1s.alu[i],
-                rs2 : prf_in.s_v2s.alu[i],
+                rs1 : prf_in.v1s.alu[i],
+                rs2 : prf_in.v2s.alu[i],
                 dat : iss.o_dat.alu[i]
             };
         end
         foreach (iss.o_vld.mul[i]) begin
             regs.i_dat.mul[i] = '{
-                rs1 : prf_in.s_v1s.mul[i],
-                rs2 : prf_in.s_v2s.mul[i],
+                rs1 : prf_in.v1s.mul[i],
+                rs2 : prf_in.v2s.mul[i],
                 dat : iss.o_dat.mul[i]
             };
         end
         foreach (iss.o_vld.lod[i]) begin
             regs.i_dat.lod[i] = '{
-                rs1 : prf_in.s_v1s.lod[i],
+                rs1 : prf_in.v1s.lod[i],
                 dat : iss.o_dat.lod[i]
             };
         end
         foreach (iss.o_vld.str[i]) begin
             regs.i_dat.str[i] = '{
-                rs1 : prf_in.s_v1s.str[i],
-                rs2 : prf_in.s_v2s.str[i],
+                rs1 : prf_in.v1s.str[i],
+                rs2 : prf_in.v2s.str[i],
                 dat : iss.o_dat.str[i]
             };
         end
@@ -1254,15 +1257,15 @@ module stage_ex_p4 (
                 );
             end
 
-            $display("<prf_in >        s_v1s: [%0d, %0d, %0d, %0d] s_v2s: [%0d, %0d, %0d, %0d]",
-                prf_in.s_v1s[0],
-                prf_in.s_v1s[1],
-                prf_in.s_v1s[2],
-                prf_in.s_v1s[3],
-                prf_in.s_v2s[0],
-                prf_in.s_v2s[1],
-                prf_in.s_v2s[2],
-                prf_in.s_v2s[3]
+            $display("<prf_in >        v1s: [%0d, %0d, %0d, %0d] v2s: [%0d, %0d, %0d, %0d]",
+                prf_in.v1s[0],
+                prf_in.v1s[1],
+                prf_in.v1s[2],
+                prf_in.v1s[3],
+                prf_in.v2s[0],
+                prf_in.v2s[1],
+                prf_in.v2s[2],
+                prf_in.v2s[3]
             );
             $display("  %3d | << EXECUTE", $time);
         end

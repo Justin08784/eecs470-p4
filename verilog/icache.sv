@@ -60,6 +60,10 @@ craft some hacky custom fix that handles branch resolution.
 */
 
 module icache (
+    `ifdef DEBUG
+    output DBG_icache dbg,
+    `endif 
+
     input clock,
     input reset,
     input flush,
@@ -165,13 +169,6 @@ module icache (
             last_index       <= current_index;
             last_tag         <= current_tag;
 
-            $display("  %2d | >> ICACHE >>", $time);
-            $display("tags: {cur: %x, last: %x, wr: %x}", current_tag, last_tag, write_tag);
-            $display("read: {en %b, addr: %x, data: %x}", 1'b1, current_index, Icache_data_out);
-            $display("writ: {en %b, addr: %x, data: %x}", got_mem_data, write_index, Imem2proc_data);
-            $display("changed_addr: %b, proc2Imem_command: %1d, proc2Imem_addr: %x", changed_addr, proc2Imem_command, proc2Imem_addr);
-            $display("  %2d | << ICACHE <<", $time);
-
 
             // miss_outstanding <= unanswered_miss;
             // if (update_mem_tag) begin
@@ -194,12 +191,24 @@ module icache (
             MSHR_addr        <= (proc2Imem_command == MEM_LOAD) ? proc2Imem_addr : '1;
         end
     end 
-    always_ff @(posedge clock) begin
-        if (!reset) begin
-            $display("  %3d | >> icache >>", $time);
-            $display("last: {tag: %x, idx: %x} -> curr {tag: %x, idx: %x} <changed: %b>", last_tag, last_index, current_tag, current_index, changed_addr);
-            $display("  %3d | << icache <<", $time);
-        end
-    end
+
+    `ifdef DEBUG
+    assign dbg = '{
+        changed_addr,
+        current_tag,   last_tag,   write_tag,
+        current_index, last_index, write_index,
+        got_mem_data,
+        MSHR,
+        icache_tags,
+        Imem2proc_transaction_tag,
+        Imem2proc_data,
+        Imem2proc_data_tag,
+        proc2Icache_addr,
+        proc2Imem_command,
+        proc2Imem_addr,
+        Icache_data_out,
+        Icache_valid_out
+    };
+    `endif
  
 endmodule // icache

@@ -6,6 +6,9 @@ Retire (Manager)
 ================================================
 */
 module retire (
+    `ifdef DEBUG
+    output DBG_retire dbg,
+    `endif
     input clock, reset,
 
     input  rob2retire rob_in,
@@ -15,7 +18,7 @@ module retire (
     output retire2btq btq_out,
 
     input  sq2retire sq_in,
-    // output retire2sq sq_out,
+    output retire2sq sq_out,
 
     output logic mispred,
     output ADDR  mispred_target,
@@ -33,6 +36,14 @@ module retire (
     logic        [`N-1:0] tmp_is_brch;
 
     always_comb begin
+        // FIXME: >>
+        // sq_out logic migrated from rob (when it still had rob2sq)
+        sq_out = '0;
+        //tell SQ to retire entries
+        // if (state[rtre_idxs[i]].wr_mem)
+        //     ++sq_out.r_en;
+        // FIXME: <<
+
         mispred = 0;
         mispred_target = '0;
 
@@ -90,24 +101,17 @@ module retire (
             is_brch  : tmp_is_brch
         };
     end
-    
+
     `ifdef DEBUG
-    always_ff @(posedge clock) begin
-        if (!reset) begin
-            $display("  %3d | >> retire >>", $time);
-            for (int i = 0; i < `N; ++i) begin
-                $display("btq_out [%0d]: tgt: %x, NPC: %x, pred: %b, take: %b", 
-                    i,
-                    btq_in.dat[i].tgt,
-                    btq_in.dat[i].NPC,
-                    btq_in.dat[i].pred,
-                    btq_in.dat[i].take
-                );
-            end
-            $display("btq_rd_cnt: %0d", btq_rd_cnt);
-            $display("retire_exec.r_en_cnt: %0d", retire_exec.r_en_cnt);
-            $display("  %3d | << retire <<", $time);
-        end
-    end
-    `endif // DEBUG
+    assign dbg = '{
+        rob_in,
+        btq_in,
+        btq_out,
+        sq_in,
+        sq_out,
+        mispred,
+        mispred_target,
+        retire_exec
+    };
+    `endif
 endmodule

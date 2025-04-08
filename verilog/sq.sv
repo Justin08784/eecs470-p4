@@ -9,22 +9,22 @@ module sq #(parameter
     NUM_FU_LOAD=`NUM_FU_LOAD
 ) (
     `ifdef DEBUG
-    output  SQ_ENTRY   [LSQ_SZ-1:0]    state_dbg,
+    output DBG_sq dbg,
     `endif 
     input clock,
     input reset,
     input flush,
 
-    input dispatch2sq dis_2_sq,
-    input execute2sq exec_2_sq,
-    input rob2sq rob_2_sq,
-    input MEM_TAG mem2proc_transaction_tag,
+    input dispatch2sq   dis_2_sq,
+    input execute2sq    exec_2_sq,
+    input retire2sq     retire_2_sq,
+    input MEM_TAG       mem2proc_transaction_tag,
 
-    output sq2dispatch sq_2_dis,
-    output sq2execute sq_2_exec,
+    output sq2dispatch  sq_2_dis,
+    output sq2execute   sq_2_exec,
     // output sq2rs sq_2_rs,
-    output sq2retire sq_2_retire,
-    output stRET2mem ret_2_mem
+    output sq2retire    sq_2_retire,
+    output stRET2mem    ret_2_mem
 );
 
     localparam NUM_DPORTS = N; // dispatch ports (in-order)
@@ -57,7 +57,11 @@ module sq #(parameter
     assign used_scnt    = `MIN(used, NUM_RPORTS);
 
 
+    DBG_retbuf dbg_retbuf;
     post_ret_buffer buf_dut(
+        `ifdef DEBUG
+        .dbg(dbg_retbuf),
+        `endif
         .clock(clock),
         .reset(reset),
         .flush(flush),
@@ -106,7 +110,7 @@ module sq #(parameter
         // $display("SQ_RET_RDY: %0d", sq_2_retire.ret_rdy);
 
         //handle retirement write to mem
-        sq_2_ret.ret_cnt   = rob_2_sq.r_en;
+        sq_2_ret.ret_cnt   = retire_2_sq.r_en;
         sq_2_ret.ret_st[0] = state[head];
         sq_2_ret.ret_st[1] = state[head_plus_one];
 
@@ -239,8 +243,8 @@ module sq #(parameter
             last_used_sq_idx <= LSQ_SZ_DBL + 1; //outside of SQ range so that if a load occurs before the first store we don't flag it falsely
             // sq_2_retire <= '0;
         end else begin
-            used    <= used + dis_2_sq.sq_d_en_cnt - rob_2_sq.r_en;
-            head    <= (head + rob_2_sq.r_en) % LSQ_SZ;
+            used    <= used + dis_2_sq.sq_d_en_cnt - retire_2_sq.r_en;
+            head    <= (head + retire_2_sq.r_en) % LSQ_SZ;
             tail    <= (tail + dis_2_sq.sq_d_en_cnt) % LSQ_SZ;
             tail_dbl <= (tail_dbl + dis_2_sq.sq_d_en_cnt) % LSQ_SZ_DBL;
             last_used_sq_idx <= (last_used_sq_idx + dis_2_sq.sq_d_en_cnt) % LSQ_SZ_DBL;
@@ -288,33 +292,30 @@ module sq #(parameter
         end
     end
 
+
     `ifdef DEBUG
-    always_ff @(posedge clock) begin
-        if (!reset) begin
-            $display("  %3d | >> SQ", $time);
-            for (int i = 0; i < LSQ_SZ; i++) begin
-                $display("Entry [%0d]: id=%0d, rob_idx=%0d, addr=%0d, data=%0d, d_valid=%b, addr mask=%4b%s",
-                i,
-                state[i].sq_idx,
-                state[i].rob_idx,
-                state[i].addr,
-                state[i].data,
-                state[i].d_vld,
-                // state[i].bytewise_addr,
-                state[i].bytewise_addr_mask,
-                    (i == head && head == tail) 
-                        ? " << h/t"
-                        : (i == head) 
-                            ? " << h" 
-                            : (i == tail)
-                                ? " << t"
-                                : ""
-                );
-            end
-            $display("  %3d | << SQ", $time);
-        end
-    end
-    `endif // DEBUG
+    assign dbg = '{
+        // internal state
+        state,
+        head,
+        tail,
+        used,
+        // I/O
+        dis_2_sq,
+        exec_2_sq,
+        retire_2_sq,
+        mem2proc_transaction_tag,
+
+        sq_2_dis,
+        sq_2_exec,
+        // sq2rs sq_2_rs,
+        sq_2_retire,
+        ret_2_mem,
+
+        dbg_retbuf
+    };
+    `endif
+
 
 endmodule
 
@@ -326,6 +327,9 @@ module post_ret_buffer #(parameter
     NUM_FU_STORE=`NUM_FU_STORE,
     NUM_FU_LOAD=`NUM_FU_LOAD
 ) (
+    `ifdef DEBUG
+    output DBG_retbuf dbg,
+    `endif
     input clock,
     input reset,
     input flush,
@@ -451,30 +455,21 @@ module post_ret_buffer #(parameter
     end
 
     `ifdef DEBUG
-    always_ff @(posedge clock) begin
-        if (!reset) begin
-            $display("  %3d | >> RET buffer", $time);
-            for (int i = 0; i < LSQ_SZ; i++) begin
-                $display("Entry [%0d]: id=%0d, rob_idx=%0d, addr=%0d, data=%0d, d_valid=%b%s",
-                i,
-                state[i].sq_idx,
-                state[i].rob_idx,
-                state[i].addr,
-                state[i].data,
-                state[i].d_vld,
-                    (i == head && head == tail) 
-                        ? " << h/t"
-                        : (i == head) 
-                            ? " << h" 
-                            : (i == tail)
-                                ? " << t"
-                                : ""
-                );
-            end
-            $display("  %3d | << RET buffer", $time);
-        end
-    end
-    `endif // DEBUG
+    assign dbg = '{ 
+        // internal state
+        state,
+        head,
+        tail,
+        used,
+        // I/O
+        sq_2_ret,
+        mem2proc_transaction_tag,
+
+        ret_2_sq,
+        forward_ret_2_sq,
+        ret_2_mem
+    };
+    `endif
 
 endmodule
 

@@ -5,9 +5,10 @@ module rob #(
     parameter N=`N
 ) (
     `ifdef DEBUG
-    output  ROB_ENTRY   [ROB_SZ-1:0]    state_dbg,
+    output  DBG_rob dbg,
     `endif 
-    input                       clock, reset, flush,
+
+    input clock, reset, flush,
 
     // retire (read)
     output rob2retire r_out,
@@ -18,11 +19,7 @@ module rob #(
 
     // dispatch (write)
     output rob2dispatch d_out,
-    input  dispatch2rob d_in,
-
-    //SQ
-    input  sq2retire sq_in,
-    output rob2sq sq_out
+    input  dispatch2rob d_in
 );
     localparam NUM_DPORTS = N; // dispatch ports (in-order)
     localparam NUM_RPORTS = N; // retire ports (in-order)
@@ -45,13 +42,10 @@ module rob #(
     logic [NUM_RPORTS-1:0][$clog2(ROB_SZ)-1:0] rtre_idxs;
     logic [NUM_DPORTS-1:0][$clog2(ROB_SZ)-1:0] comm_idxs;
 
-    assign state_dbg    = state;
     assign free_scnt    = `MIN(free - rsvd, NUM_DPORTS);
     assign used_scnt    = `MIN(used, NUM_RPORTS);
 
     always_comb begin
-        sq_out = '0;
-
         for (int unsigned i = 0; i < NUM_RPORTS; ++i)
             rtre_idxs[i] = (head + i) % ROB_SZ;
         for (int unsigned i = 0; i < NUM_DPORTS; ++i)
@@ -64,10 +58,6 @@ module rob #(
             /* preview mode–– just display all valid entries in read window even
             if not all will get retired this cycle */
             r_out.entries[i] = state[rtre_idxs[i]];
-
-            //tell SQ to retire entries
-            // if (state[rtre_idxs[i]].wr_mem)
-            //     ++sq_out.r_en;
         end
 
         // handle dispatch (outs)
@@ -155,52 +145,23 @@ module rob #(
             end
         end
     end
-
+    
     `ifdef DEBUG
-    always_ff @(posedge clock) begin
-        if (!reset) begin
-            $display("  %3d | >> ROB >>", $time);
-            $display("r_out: en_cnt: %d", r_out.r_vld_cnt);
-            for (int i = 0; i < `N; ++i) begin
-                $display("r_out[%d]: tag: %d, t_old: %d, dst: %d, halt: %d, illegal: %d, is_brch: %d",
-                    i,
-                    r_out.entries[i].tag,
-                    r_out.entries[i].t_old,
-                    r_out.entries[i].dst,
-                    r_out.entries[i].halt,
-                    r_out.entries[i].illegal,
-                    r_out.entries[i].is_brch
-                );
-            end
-
-            for (int i = 0; i < `ROB_SZ; ++i) begin
-                $display("Rob[%2d]: cpl %b, t: %2d, t_old: %2d, dst: %2d, is_brch: %b, wr_mem: %b, rd_mem: %b, halt: %0b, illegal: %0b%s",
-                    i,
-                    state[i].cpl,
-                    state[i].tag,
-                    state[i].t_old,
-                    state[i].dst,
-                    state[i].is_brch,
-                    state[i].wr_mem,
-                    state[i].rd_mem,
-                    state[i].halt,
-                    state[i].illegal,
-                    (i == head && head == tail) 
-                        ? " << h/t"
-                        : (i == head) 
-                            ? " << h" 
-                            : (i == tail)
-                                ? " << t"
-                                : ""
-                );
-
-                if (i == tail)
-                    break;
-            end
-            $display("  %3d | << ROB <<", $time);
-
-        end
-    end
+    assign dbg = '{
+        // internal state
+        state,
+        head,
+        tail,
+        used,
+        free,
+        rsvd,
+        // I/O
+        r_out,
+        r_in,
+        cdat_in,
+        d_out,
+        d_in
+    };
     `endif
 
 endmodule

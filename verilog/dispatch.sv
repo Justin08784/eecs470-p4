@@ -8,6 +8,10 @@ typedef struct packed {
 module dispatch #(parameter 
     N=`N
 ) (
+    `ifdef DEBUG
+    output DBG_dispatch dbg,
+    `endif
+
     input clock, reset, flush,
     // DECODE
     input   decode2dispatch decode_in,
@@ -291,24 +295,6 @@ always_comb begin
     end
 end
 
-// debug
-`ifdef DEBUG
-always_ff @(posedge clock) begin
-
-    if (!reset) begin
-        $display("  %3d | >> Dispatch >>", $time);
-        $display("r_in.btq_rdy_scnt: %d",   btq_in.btq_rdy_scnt);
-        $display("btq_in.btq_rdy_scnt: %d",   btq_in.btq_rdy_scnt);
-        $display("rob_in.rob_rdy_scnt: %d",  rob_in.rob_rdy_scnt);
-        $display("decode_in.d_vld_scnt: %d",  decode_in.d_vld_scnt);
-        $display("free_in.free_rdy_scnt: %d",  free_in.free_rdy_scnt);
-        $display("decode_in.prvw_has_dests: %b", decode_in.prvw_has_dests);
-        $display("  %3d | << Dispatch <<", $time);
-    end
-
-end
-`endif
-
 always_ff @(posedge clock) begin
     
     if (reset || flush) begin
@@ -324,6 +310,26 @@ always_ff @(posedge clock) begin
         end
     end
 end
+
+`ifdef DEBUG
+assign dbg = '{
+    decode_in,
+    decode_out,
+    rs_in,
+    rs_out,
+    rob_in,
+    rob_out,
+    free_in,
+    free_out,
+    sq_in,
+    sq_out,
+    btq_in,
+    btq_out,
+    ctag_in,
+    map_in,
+    map_out
+};
+`endif
 
 endmodule
 
