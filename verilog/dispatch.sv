@@ -175,7 +175,6 @@ always_comb begin
         wr_mem[i]   = rename_in[i].wr_mem;
 
     btq_out.en_cnt      = $countones(rename_en & is_brch);
-    sq_out.sq_d_en_cnt  = $countones(rename_en & wr_mem);
 end
 
 // handle map table output 
@@ -199,7 +198,7 @@ logic [$clog2(`N):0] sq_wr_idx;
 logic [$clog2(`N):0] btq_wr_idx;
 always_comb begin
     tmp_alloc2rename = '0;
-    sq_wr_idx   = 0;
+    // sq_wr_idx   = 0;
     btq_wr_idx  = 0;
 
     for (int i = 0; i < `N; ++i) begin
@@ -224,13 +223,6 @@ always_comb begin
             tmp_alloc2rename[i].dat.btq_idx = btq_in.btq_idxs[btq_wr_idx];
             btq_out.NPC[btq_wr_idx] = rename_in[i].NPC;
             ++btq_wr_idx;
-        end
-
-        if (rename_in[i].wr_mem) begin
-            tmp_alloc2rename[i].dat.sq_idx = sq_in.next_ids[sq_wr_idx];
-            sq_out.rob_idx[sq_wr_idx] = rob_in.rob_idxs[i];
-            ++sq_wr_idx;
-            $display("ASSIGNING IDX: i: %0d, idx: %0d", i, rob_in.rob_idxs[i]);
         end
     end
 end
@@ -265,16 +257,25 @@ always_comb begin
     commit_en_cnt   = `MIN(rename_vld_scnt, rs_in.rs_rdy_scnt);
     rs_out.d_en_cnt = commit_en_cnt;
     rs_out.d_dat    = '0;
+    sq_wr_idx = 0;
+    sq_out = '0;
 
     for (int i = 0; i < `N; i++) begin
         rs_out.d_dat[i] = commit_in[i].dat;
         rs_out.d_dat[i].rob_idx = rob_in.rob_idxs[i];
+        rs_out.d_dat[i].sq_idx = sq_in.next_ids[sq_wr_idx];
         for (int c = 0; c < `N; ++c) begin
             rs_out.d_dat[i].t1_rdy |= ctag_in.en[c] & (ctag_in.ts[c] == commit_in[i].dat.t1);
             rs_out.d_dat[i].t2_rdy |= ctag_in.en[c] & (ctag_in.ts[c] == commit_in[i].dat.t2);
         end
         rs_out.d_dat[i].t1_rdy |= cpl_lst[commit_in[i].dat.t1];
         rs_out.d_dat[i].t2_rdy |= cpl_lst[commit_in[i].dat.t2];
+
+        if (commit_in[i].dat.wr_mem) begin
+            sq_out.sq_d_en_cnt++;
+            sq_out.rob_idx[sq_wr_idx] = rob_in.rob_idxs[i];
+            ++sq_wr_idx;
+        end
     end
 end
 
