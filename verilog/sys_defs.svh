@@ -465,16 +465,6 @@ typedef struct packed {
 } LQ_ENTRY;
 
 // BTQ stuff
-// typedef logic [$clog2(`BTQ_SZ)-1:0] BTQ_IDX;
-// typedef struct packed {
-//     logic   cpl;
-//     ADDR    addr;
-//     REG_IDX dst;
-//     
-//     logic halt;
-//     logic illegal;
-// } ROB_ENTRY;
-
 // By btq
 typedef logic [$clog2(`BTQ_SZ)-1:0] BTQ_IDX;
 typedef struct packed {
@@ -786,22 +776,6 @@ typedef struct packed {
         // - number of valid retire lines
     ROB_ENTRY   [`N-1:0]        entries; 
         // - IMPORTANT: Set from lowest indices in program-order. NO GAPS!!!
-
-    // PHYS_REG_IDX    [`N-1:0]            tag;
-    //     // From: retire (ROB)
-    //     // - IMPORTANT: Set from lowest indices in program-order. NO GAPS!!!
-    // PHYS_REG_IDX    [`N-1:0]            t_old;
-    //     // From: retire (ROB)
-    //     // - pregs being returned to free list
-    // REG_IDX         [`N-1:0]            dst;
-
-    // // control signals for cpu.sv
-    // logic           [`N-1:0]            halt;
-    // logic           [`N-1:0]            illegal;
-
-    // // BTQ-specific retirement stuff
-    // logic           [`N-1:0]            is_brch;
-    //     // Bus: which of the insns are 1) retiring AND 2) branches?
 } rob2retire;
 
 

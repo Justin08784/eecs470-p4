@@ -140,7 +140,9 @@ typedef struct packed {
 typedef struct packed {
     DATA        rs1, rs2;
     MULT_FUNC   func;
-    DST         dst;
+
+    PHYS_REG_IDX    t;
+    ROB_IDX         rob_idx;
 } MUL_OPS;
 
 // ALU: computes the result of FUNC applied with operands A and B
@@ -521,10 +523,8 @@ module mul_ex(
                 rs1  : rs1,
                 rs2  : rs2,
                 func : i_regs[i].dat.func,
-                dst  : '{
-                    rob_idx : i_regs[i].dat.rob_idx,
-                    tag     : i_regs[i].dat.t
-                }
+                t       : i_regs[i].dat.t,
+                rob_idx : i_regs[i].dat.rob_idx
             };
         end
     end
@@ -557,7 +557,8 @@ module mul_ex(
     // execute
     generate
         DATA        [`NUM_FU_MULT-1:0] tmp_res;
-        DST         [`NUM_FU_MULT-1:0] tmp_dst;
+        PHYS_REG_IDX[`NUM_FU_MULT-1:0] tmp_t;
+        ROB_IDX     [`NUM_FU_MULT-1:0] tmp_rob_idx;
 
         logic       [`NUM_FU_MULT-1:0] cpl_buf_rdy;
         for (genvar i = 0; i < `NUM_FU_MULT; ++i) begin : gen_mults
@@ -570,10 +571,11 @@ module mul_ex(
 
                 .i_vld  (i_vld[i]),
                 .i_rdy  (i_rdy[i]),
-                .dst_in (ops[i].dst),
                 .rs1    (ops[i].rs1),
                 .rs2    (ops[i].rs2),
                 .func   (ops[i].func),
+                .i_t    (ops[i].t),
+                .i_rob_idx(ops[i].rob_idx),
 
                 .cdb_req(cdb_req[i]),
                 .ctag_t (ctag_ts[i]),
@@ -582,13 +584,14 @@ module mul_ex(
                 // Output (directly to cdat_out)
                 .o_vld  (o_vld[i]),
                 .o_rdy  (o_rdy[i]),
-                .dst_out(tmp_dst[i]),
+                .o_t    (tmp_t[i]),
+                .o_rob_idx(tmp_rob_idx[i]),
                 .result (tmp_res[i])
             );
 
             assign o_cands[i] = '{
-                t       : tmp_dst[i].tag,
-                rob_idx : tmp_dst[i].rob_idx,
+                t       : tmp_t[i],
+                rob_idx : tmp_rob_idx[i],
                 data    : tmp_res[i],
                 btq_idx : '0,
                 take    : '0,

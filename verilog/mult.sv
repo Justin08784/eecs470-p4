@@ -6,7 +6,8 @@ typedef struct packed {
     logic [63:0]    mplier;
     logic [63:0]    mcand;
     MULT_FUNC       func;
-    DST             dst;
+    PHYS_REG_IDX    t;
+    ROB_IDX         rob_idx;
 } MUL_PKT;
 
 typedef enum logic[1:0] {
@@ -27,7 +28,8 @@ module mult #(
     input clock, reset, flush,
     input DATA rs1, rs2,
     input MULT_FUNC func,
-    input DST dst_in,
+    input PHYS_REG_IDX  i_t,
+    input ROB_IDX       i_rob_idx,
 
     input  logic i_vld,  // replacement for start
     output logic i_rdy,
@@ -40,7 +42,8 @@ module mult #(
     input  logic cdb_gnt,
 
     output DATA result,
-    output DST dst_out
+    output PHYS_REG_IDX  o_t,
+    output ROB_IDX       o_rob_idx
 );
     logic [63:0] i_mcand, i_mplier;
     MUL_PKT i_pkt, o_pkt;
@@ -61,7 +64,8 @@ module mult #(
             mplier  : i_mplier,
             mcand   : i_mcand,
             func    : func,
-            dst     : dst_in
+            t       : i_t,
+            rob_idx : i_rob_idx
         };
     end
     
@@ -114,7 +118,7 @@ module mult #(
                 .o_rdy(cdb_gnt),
                 .o_dat(pkts[i+1])
             );
-            assign ctag_t = pkts[i+1].dst.tag;
+            assign ctag_t = pkts[i+1].t;
 
         end else if (i == `MULT_STAGES-3) begin
             // stage just after CDB arbiter; since arb. is done, may advance unconditionally
@@ -173,7 +177,8 @@ module mult #(
             ? o_pkt.sum[31:0]
             : o_pkt.sum[63:32];
     
-        dst_out = o_pkt.dst;
+        o_t         = o_pkt.t;
+        o_rob_idx   = o_pkt.rob_idx;
     end
 
     `ifdef DEBUG
@@ -186,8 +191,8 @@ module mult #(
                     pkts[i].mplier,
                     pkts[i].mcand,
                     pkts[i].func,
-                    pkts[i].dst.tag,
-                    pkts[i].dst.rob_idx
+                    pkts[i].t,
+                    pkts[i].rob_idx
                 );
             end
             $display("  %3d | << mul%0d <<", $time, ID);
@@ -226,7 +231,8 @@ module mult_stage #(
             mplier  : shifted_mplier,
             mcand   : shifted_mcand,
             func    : i_dat.func,
-            dst     : i_dat.dst
+            t       : i_dat.t,
+            rob_idx : i_dat.rob_idx
         };
     end
 
