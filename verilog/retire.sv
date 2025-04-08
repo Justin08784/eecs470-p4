@@ -20,6 +20,8 @@ module retire (
     input  sq2retire sq_in,
     output retire2sq sq_out,
 
+    output retire2lq lq_out,
+
     output logic mispred,
     output ADDR  mispred_target,
     output retire_final retire_exec

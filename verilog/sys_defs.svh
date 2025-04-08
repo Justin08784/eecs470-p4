@@ -67,7 +67,7 @@
 
 `ifndef SYNTH
 // comment out to disable DEBUG:
-// `define DEBUG
+`define DEBUG
 `endif
 
 ///////////////////////////////
@@ -957,7 +957,7 @@ typedef struct packed {
 typedef struct packed {
     logic   [$clog2(`N):0] r_en;
     ROB_IDX [`N-1:0] r_pos;
-} rob2lq;
+} retire2lq;
 
 typedef struct packed {
     logic       [`NUM_FU_LOAD-1:0]  ld_ex_en; //tells LQ that a valid load is coming in on that line (bus, not count)
@@ -1064,7 +1064,7 @@ typedef struct packed {
     // I/O
     dispatch2lq dis_2_lq;
     execute2lq exec_2_lq;
-    rob2lq rob_2_lq;
+    retire2lq rob_2_lq;
 
     lq2dispatch lq_2_dis;
     lq2rob lq_2_rob;

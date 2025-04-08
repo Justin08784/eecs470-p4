@@ -18,7 +18,7 @@ module lq #(parameter
 
     input dispatch2lq dis_2_lq,
     input execute2lq exec_2_lq,
-    input rob2lq rob_2_lq,
+    input retire2lq retire_2_lq,
 
     output lq2dispatch lq_2_dis,
     output lq2rob lq_2_rob
@@ -91,8 +91,8 @@ module lq #(parameter
             tail    <= 0;
             state   <= '0;
         end else begin
-            used    <= used + dis_2_lq.lq_d_en_cnt - rob_2_lq.r_en;
-            head    <= (head + rob_2_lq.r_en) % LSQ_SZ;
+            used    <= used + dis_2_lq.lq_d_en_cnt - retire_2_lq.r_en;
+            head    <= (head + retire_2_lq.r_en) % LSQ_SZ;
             tail    <= (tail + dis_2_lq.lq_d_en_cnt) % LSQ_SZ;
             
             // handle execute updates
@@ -150,11 +150,11 @@ module lq #(parameter
         // I/O
         dis_2_lq,
         exec_2_lq,
-        rob_2_lq,
+        retire_2_lq,
 
         lq_2_dis,
         lq_2_rob
-    } DBG_lq;
+    };
     `endif 
 
 

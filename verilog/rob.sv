@@ -18,6 +18,8 @@ module rob #(
     input  execute2complete_dat cdat_in,
     input sq2rob sq_in,
 
+    input lq2rob lq_in,
+
     // dispatch (write)
     output rob2dispatch d_out,
     input  dispatch2rob d_in

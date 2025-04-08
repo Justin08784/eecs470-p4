@@ -128,6 +128,8 @@ module cpu (
     execute2complete_dat ex_2_cdat;
     dispatch2sq dispatch_2_sq;
     sq2dispatch sq_2_dispatch;
+    dispatch2lq dis_2_lq;
+    lq2dispatch lq_2_dis;
 
     dispatch dispatcher(
         `ifdef DEBUG
@@ -152,6 +154,8 @@ module cpu (
         .btq_out    (dispatch_2_btq),
         .map_in     (map_2_dispatch),
         .map_out    (dispatch_2_map),
+        .lq_in      (lq_2_dis),
+        .lq_out     (dis_2_lq),
 
         .ctag_in    (ex_2_ctag)
     );
@@ -166,6 +170,7 @@ module cpu (
     retire2btq retire_2_btq;
     sq2retire sq_2_retire;
     retire2sq retire_2_sq;
+    retire2lq retire_2_lq;
 
     retire_final    retire_exec;
     logic           mispred;
@@ -183,6 +188,7 @@ module cpu (
         .btq_out(retire_2_btq),
         .sq_in  (sq_2_retire),
         .sq_out (retire_2_sq),
+        .lq_out (retire_2_lq),
 
         .mispred        (mispred),
         .mispred_target (mispred_target),
@@ -257,6 +263,7 @@ module cpu (
     //////////////////////////////////////////////////  
 
     sq2rob sq_2_rob;
+    lq2rob lq_2_rob;
 
     rob #(
         .ROB_SZ(`ROB_SZ),
@@ -273,7 +280,8 @@ module cpu (
         .cdat_in    (ex_2_cdat),
         .sq_in      (sq_2_rob),
         .d_out      (rob_2_dispatch),
-        .d_in       (dispatch_2_rob)
+        .d_in       (dispatch_2_rob),
+        .lq_in      (lq_2_rob)
     );
 
     //////////////////////////////////////////////////
@@ -323,12 +331,31 @@ module cpu (
 
     //////////////////////////////////////////////////
     //                                              //
+    //                      LQ                      //
+    //                                              //
+    //////////////////////////////////////////////////
+
+    execute2lq exec_2_lq;
+
+    lq lq_0(
+        .clock(clock),
+        .reset(reset),
+        .flush(flush),
+
+        .dis_2_lq(dis_2_lq),
+        .retire_2_lq(retire_2_lq),
+        .exec_2_lq(exec_2_lq),
+
+        .lq_2_dis(lq_2_dis),
+        .lq_2_rob(lq_2_rob)
+    );
+
+    //////////////////////////////////////////////////
+    //                                              //
     //                  Execute                     //
     //                                              //
     ////////////////////////////////////////////////// 
 
-    
-    execute2lq ex_2_lq;
     stage_ex_p4 ex_0 (
         .clock  (clock),
         .reset  (reset),
@@ -340,7 +367,7 @@ module cpu (
         .sq_in  (sq_2_exec),
         .sq_out (exec_2_sq),
 
-        .lq_out (ex_2_lq),
+        .lq_out (exec_2_lq),
 
         .prf_in (prf_2_ex),
         .prf_out(ex_2_prf),

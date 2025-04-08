@@ -32,6 +32,8 @@ module dispatch #(parameter
     // LSQ
     input   sq2dispatch sq_in,
     output  dispatch2sq sq_out,
+    input   lq2dispatch lq_in,
+    output  dispatch2lq lq_out,
     
     // BTQ
     input   btq2dispatch btq_in,
@@ -263,7 +265,6 @@ always_comb begin
     for (int i = 0; i < `N; i++) begin
         rs_out.d_dat[i] = commit_in[i].dat;
         rs_out.d_dat[i].rob_idx = rob_in.rob_idxs[i];
-        rs_out.d_dat[i].sq_idx = sq_in.next_ids[sq_wr_idx];
         for (int c = 0; c < `N; ++c) begin
             rs_out.d_dat[i].t1_rdy |= ctag_in.en[c] & (ctag_in.ts[c] == commit_in[i].dat.t1);
             rs_out.d_dat[i].t2_rdy |= ctag_in.en[c] & (ctag_in.ts[c] == commit_in[i].dat.t2);
@@ -272,6 +273,7 @@ always_comb begin
         rs_out.d_dat[i].t2_rdy |= cpl_lst[commit_in[i].dat.t2];
 
         if (commit_in[i].dat.wr_mem) begin
+            rs_out.d_dat[i].sq_idx = sq_in.next_ids[sq_wr_idx];
             sq_out.sq_d_en_cnt++;
             sq_out.rob_idx[sq_wr_idx] = rob_in.rob_idxs[i];
             ++sq_wr_idx;
