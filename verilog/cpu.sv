@@ -174,8 +174,8 @@ module cpu (
     retire2lq retire_2_lq;
 
     retire_final    retire_exec;
-    logic           mispred;
-    ADDR            mispred_target;
+    logic           flush_n;
+    ADDR            corrected_PC_n;
 
     retire retire0 (
         `ifdef DEBUG
@@ -192,8 +192,8 @@ module cpu (
         .lq_in  (lq_2_retire),
         .lq_out (retire_2_lq),
 
-        .mispred        (mispred),
-        .mispred_target (mispred_target),
+        .flush          (flush_n),
+        .corrected_PC   (corrected_PC_n),
         .retire_exec    (retire_exec)
     );
 
@@ -203,8 +203,10 @@ module cpu (
             retire_2_f  <= '0;
         end else begin
 /* ======================================== */
-            flush       <= mispred;
-            retire_2_f  <= '{corrected_PC : mispred_target};
+            flush       <= flush_n;
+            retire_2_f  <= '{
+                corrected_PC : corrected_PC_n
+            };
 /* ======================================== */
         end
     end
