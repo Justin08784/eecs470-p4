@@ -534,7 +534,7 @@ typedef struct packed {
     BTQ_IDX         btq_idx;
     LSQ_IDX         sq_idx;
     LSQ_IDX         lq_idx; //THESE ARE TWO DIFFERENT THINGS, BOTH REQUIRED. DO *NOT* COMBINE THEM
-    logic           is_branch; // Is inst a branch?
+    logic           is_brch; // Is inst a branch?
     
 
     /* from ID_EX_PACKET */

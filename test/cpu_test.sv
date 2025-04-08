@@ -433,7 +433,7 @@ module testbench;
             x.fu_idx,
             x.rob_idx,
             x.btq_idx,
-            x.is_branch,
+            x.is_brch,
             x.inst,
             x.PC,
             x.NPC,
