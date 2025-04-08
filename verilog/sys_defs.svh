@@ -1001,13 +1001,24 @@ typedef struct packed {
 } execute2lq;
 
 typedef struct packed {
-    ROB_IDX rob_idx;
-    PHYS_REG_IDX tag;
-} DST;
-
-typedef struct packed {
     ADDR  addr;
     logic valid;
 } MSHR_entry;
+
+/* DEBUG STRUCTS */
+typedef struct packed {
+    // internal state
+    BTQ_ENTRY [`BTQ_SZ-1:0]      state;
+    logic [$clog2(`BTQ_SZ)-1:0]  head;
+    logic [$clog2(`BTQ_SZ)-1:0]  tail;
+    logic [$clog2(`BTQ_SZ):0]    used;
+    // I/O
+    retire2btq           r_in;
+    btq2retire           r_out;
+    execute2complete_dat cdat_in;
+    dispatch2btq         d_in;
+    btq2dispatch         d_out;
+} DBG_btq;
+
 
 `endif // __SYS_DEFS_SVH__

@@ -58,27 +58,12 @@ module testbench;
     ADDR [`N-1:0] PC_reg;
     EXCEPTION_CODE error_status = NO_ERROR;
 
-    ADDR  if_NPC_dbg;
-    DATA  if_inst_dbg;
-    logic if_valid_dbg;
-    ADDR  if_id_NPC_dbg;
-    DATA  if_id_inst_dbg;
-    logic if_id_valid_dbg;
-    ADDR  id_ex_NPC_dbg;
-    DATA  id_ex_inst_dbg;
-    logic id_ex_valid_dbg;
-    ADDR  ex_mem_NPC_dbg;
-    DATA  ex_mem_inst_dbg;
-    logic ex_mem_valid_dbg;
-    ADDR  mem_wb_NPC_dbg;
-    DATA  mem_wb_inst_dbg;
-    logic mem_wb_valid_dbg;
-
     rob2retire dbg_rob2retire;
     btq2retire dbg_btq2retire;
     retire2btq dbg_retire2btq;
     sq2retire  dbg_sq2retire;
 
+    DBG_btq     dbg_btq;
 
     // Instantiate the Pipeline
     cpu verisimpleV (
@@ -103,25 +88,11 @@ module testbench;
         .committed_insts (committed_insts),
         .PC_reg(PC_reg),
 
+        .dbg_btq        (dbg_btq),
         .dbg_rob2retire (dbg_rob2retire),
         .dbg_btq2retire (dbg_btq2retire),
         .dbg_retire2btq (dbg_retire2btq),
-        .dbg_sq2retire  (dbg_sq2retire),
-        .if_NPC_dbg       (if_NPC_dbg),
-        .if_inst_dbg      (if_inst_dbg),
-        .if_valid_dbg     (if_valid_dbg),
-        .if_id_NPC_dbg    (if_id_NPC_dbg),
-        .if_id_inst_dbg   (if_id_inst_dbg),
-        .if_id_valid_dbg  (if_id_valid_dbg),
-        .id_ex_NPC_dbg    (id_ex_NPC_dbg),
-        .id_ex_inst_dbg   (id_ex_inst_dbg),
-        .id_ex_valid_dbg  (id_ex_valid_dbg),
-        .ex_mem_NPC_dbg   (ex_mem_NPC_dbg),
-        .ex_mem_inst_dbg  (ex_mem_inst_dbg),
-        .ex_mem_valid_dbg (ex_mem_valid_dbg),
-        .mem_wb_NPC_dbg   (mem_wb_NPC_dbg),
-        .mem_wb_inst_dbg  (mem_wb_inst_dbg),
-        .mem_wb_valid_dbg (mem_wb_valid_dbg)
+        .dbg_sq2retire  (dbg_sq2retire)
     );
 
 
@@ -438,10 +409,73 @@ module testbench;
 
     // OPTIONAL: Print our your data here
     // It will go to the $program.log file
+    task print_btq;
+        // internal state
+        BTQ_ENTRY [`BTQ_SZ-1:0]      state;
+        logic [$clog2(`BTQ_SZ)-1:0]  head;
+        logic [$clog2(`BTQ_SZ)-1:0]  tail;
+        logic [$clog2(`BTQ_SZ):0]    used;
+        // I/O
+        retire2btq           r_in;
+        btq2retire           r_out;
+        execute2complete_dat cdat_in;
+        dispatch2btq         d_in;
+        btq2dispatch         d_out;
+
+        state   = dbg_btq.state;
+        head    = dbg_btq.head;
+        tail    = dbg_btq.tail;
+        used    = dbg_btq.used;
+        r_in    = dbg_btq.r_in;
+        r_out   = dbg_btq.r_out;
+        cdat_in = dbg_btq.cdat_in;
+        d_in    = dbg_btq.d_in;
+        d_out   = dbg_btq.d_out;
+
+        for (int i = 0; i < `BTQ_SZ; ++i) begin
+            $display("BTQ [%0d]: tgt: %x, NPC: %x, pred: %b, take: %b%s", 
+                i,
+                state[i].tgt,
+                state[i].NPC,
+                state[i].pred,
+                state[i].take,
+                (i == head && head == tail) 
+                    ? " << h/t"
+                    : (i == head) 
+                        ? " << h" 
+                        : (i == tail)
+                            ? " << t"
+                            : ""
+            );
+            if (i == tail)
+                break;
+        end
+
+        for (int i = 0; i < `N; ++i) begin
+            $display("cdat_in[%0d]: c_en: %b, is_brch: %b, c_btq_idxs: %d, take: %b", 
+                i,
+                cdat_in.en[i],
+                cdat_in.is_brch[i],
+                cdat_in.btq_idxs[i],
+                cdat_in.take[i]
+            );
+        end
+        $display("r_in: rd_cnt %d", r_in.rd_cnt);
+        $display("r_out: used_scnt: %0d", r_out.used_scnt);
+        for (int i = 0; i < `N; ++i) begin
+            $display("r_out[%d]: tgt: %x, NPC: %x, pred: %b, take: %b", 
+                i,
+                r_out.dat[i].tgt,
+                r_out.dat[i].NPC,
+                r_out.dat[i].pred,
+                r_out.dat[i].take
+            );
+        end
+    endtask
     task print_custom_data;
-        //$display("%3d: YOUR DATA HERE", 
-        //    clock_count-1
-        //);
+        $display("  | >> CYCLE: %3d (t: %3d)", clock_count-1, $time);
+        print_btq();
+        $display("  | << CYCLE: %3d (t: %3d)", clock_count-1, $time);
     endtask
 
 

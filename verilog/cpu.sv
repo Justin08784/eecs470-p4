@@ -41,6 +41,7 @@ module cpu (
     // Debug outputs: these signals are solely used for debugging in testbenches
     // Do not change for project 3
     // You should definitely change these for project 4
+    output DBG_btq dbg_btq,
     output rob2retire dbg_rob2retire,
     output btq2retire dbg_btq2retire,
     output retire2btq dbg_retire2btq,
@@ -206,6 +207,10 @@ module cpu (
     //                                              //
     //////////////////////////////////////////////////  
     btq btq_0(
+        `ifdef DEBUG
+        .dbg    (dbg_btq),
+        `endif
+
         .clock  (clock),
         .reset  (reset),
         .flush  (flush),
