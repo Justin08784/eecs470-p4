@@ -48,11 +48,7 @@ module cpu (
     // output DBG_lq       dbg_lq,
     // output DBG_icache   dbg_icache, // icache is submodule of fetch; dont need separate line
     output DBG_mt       dbg_mt,
-    output DBG_prf      dbg_prf,
-    output rob2retire dbg_rob2retire,
-    output btq2retire dbg_btq2retire,
-    output retire2btq dbg_retire2btq,
-    output sq2retire  dbg_sq2retire
+    output DBG_prf      dbg_prf
 );
     /* Global controls*/
     logic flush;
@@ -170,11 +166,6 @@ module cpu (
     retire_final    retire_exec;
     logic           mispred;
     ADDR            mispred_target;
-
-    assign dbg_rob2retire   = rob_2_retire;
-    assign dbg_btq2retire   = btq_2_retire;
-    assign dbg_retire2btq   = retire_2_btq;
-    assign dbg_sq2retire    = sq_2_retire;
 
     retire retire0 (
         .clock  (clock),

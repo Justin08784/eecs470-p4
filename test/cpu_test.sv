@@ -58,11 +58,6 @@ module testbench;
     ADDR [`N-1:0] PC_reg;
     EXCEPTION_CODE error_status = NO_ERROR;
 
-    rob2retire dbg_rob2retire;
-    btq2retire dbg_btq2retire;
-    retire2btq dbg_retire2btq;
-    sq2retire  dbg_sq2retire;
-
     DBG_btq         dbg_btq;
     DBG_fetch       dbg_fetch;
     DBG_decode      dbg_decode;
@@ -100,11 +95,7 @@ module testbench;
         .dbg_dispatch   (dbg_dispatch),
         // .dbg_lq         (dbg_lq),
         .dbg_mt         (dbg_mt),
-        .dbg_prf        (dbg_prf),
-        .dbg_rob2retire (dbg_rob2retire),
-        .dbg_btq2retire (dbg_btq2retire),
-        .dbg_retire2btq (dbg_retire2btq),
-        .dbg_sq2retire  (dbg_sq2retire)
+        .dbg_prf        (dbg_prf)
     );
 
 
