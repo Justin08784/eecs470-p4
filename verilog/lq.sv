@@ -123,20 +123,20 @@ module lq #(parameter
                 };
             end
 
-            `ifdef DEBUG
-            $display("  %3d | >> LQ", $time);
-            for (int i = 0; i < LSQ_SZ; i++) begin
-                $display("Entry [%0d]: id=%0d, rob_idx=%0d, addr=%0d, d_valid=%b, mem_size=%0d",
-                i,
-                state[i].lq_idx,
-                state[i].rob_idx,
-                state[i].addr,
-                state[i].d_vld,
-                state[i].mem_size
-                );
-            end
-            $display("  %3d | << LQ", $time);
-            `endif
+            // `ifdef DEBUG
+            // $display("  %3d | >> LQ", $time);
+            // for (int i = 0; i < LSQ_SZ; i++) begin
+            //     $display("Entry [%0d]: id=%0d, rob_idx=%0d, addr=%0d, d_valid=%b, mem_size=%0d",
+            //     i,
+            //     state[i].lq_idx,
+            //     state[i].rob_idx,
+            //     state[i].addr,
+            //     state[i].d_vld,
+            //     state[i].mem_size
+            //     );
+            // end
+            // $display("  %3d | << LQ", $time);
+            // `endif
         end
     end
 

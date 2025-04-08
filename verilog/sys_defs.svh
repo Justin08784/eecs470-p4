@@ -1064,7 +1064,7 @@ typedef struct packed {
     // I/O
     dispatch2lq dis_2_lq;
     execute2lq exec_2_lq;
-    retire2lq rob_2_lq;
+    retire2lq retire_2_lq;
 
     lq2dispatch lq_2_dis;
     lq2rob lq_2_rob;

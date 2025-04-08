@@ -57,6 +57,7 @@ logic [$clog2(N):0] alloc_vld_scnt;
 
 logic [$clog2(N):0] lim_cnt_free;
 logic [$clog2(N):0] lim_cnt_sq;
+logic [$clog2(N):0] lim_cnt_lq;
 
 // Gate by availability
 always_comb begin
@@ -161,6 +162,15 @@ always_comb begin
     end
     rename_en_cnt = `MIN(lim_cnt_sq, rename_en_cnt);
 
+    lim_cnt_lq = 0;
+    for (int unsigned i = 0, int used_cnt = 0; i < `N; ++i) begin
+        if (used_cnt + rename_in[i].rd_mem > lq_in.lq_rdy_scnt)
+            break;
+        used_cnt += rename_in[i].rd_mem;
+        ++lim_cnt_lq;
+    end
+    rename_en_cnt = `MIN(lim_cnt_lq, rename_en_cnt);
+
     rename_en_cnt = `MIN(rename_rdy_scnt, rename_en_cnt);
 end
 
@@ -197,6 +207,7 @@ RENAME_COMMIT_PKT [`N-1:0] tmp_alloc2rename;
 logic [`N-1:0] rd_src1s;
 logic [`N-1:0] rd_src2s;
 logic [$clog2(`N):0] sq_wr_idx;
+logic [$clog2(`N):0] lq_wr_idx;
 logic [$clog2(`N):0] btq_wr_idx;
 always_comb begin
     tmp_alloc2rename = '0;
@@ -260,7 +271,9 @@ always_comb begin
     rs_out.d_en_cnt = commit_en_cnt;
     rs_out.d_dat    = '0;
     sq_wr_idx = 0;
+    lq_wr_idx = 0;
     sq_out = '0;
+    lq_out = '0;
 
     for (int i = 0; i < `N; i++) begin
         rs_out.d_dat[i] = commit_in[i].dat;
@@ -277,6 +290,14 @@ always_comb begin
             sq_out.sq_d_en_cnt++;
             sq_out.rob_idx[sq_wr_idx] = rob_in.rob_idxs[i];
             ++sq_wr_idx;
+        end
+
+        if (commit_in[i].dat.rd_mem) begin
+            rs_out.d_dat[i].sq_idx = sq_in.next_ids[lq_wr_idx];
+            lq_out.lq_d_en_cnt++;
+            lq_out.rob_idx[lq_wr_idx] = rob_in.rob_idxs[i];
+            lq_out.sq_idx[lq_wr_idx] = (sq_in.last_used_sq_idx + sq_wr_idx) % `LSQ_SZ_DBL;
+            ++lq_wr_idx;
         end
     end
 end

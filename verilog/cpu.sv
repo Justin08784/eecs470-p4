@@ -45,7 +45,7 @@ module cpu (
     output DBG_fetch    dbg_fetch,
     output DBG_decode   dbg_decode,
     output DBG_dispatch dbg_dispatch,
-    // output DBG_lq       dbg_lq,
+    output DBG_lq       dbg_lq,
     // output DBG_icache   dbg_icache, // icache is submodule of fetch; dont need separate line
     output DBG_mt       dbg_mt,
     output DBG_prf      dbg_prf,
@@ -338,6 +338,9 @@ module cpu (
     execute2lq exec_2_lq;
 
     lq lq_0(
+        `ifdef DEBUG
+        .dbg        (dbg_lq),
+        `endif
         .clock(clock),
         .reset(reset),
         .flush(flush),
