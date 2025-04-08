@@ -223,7 +223,9 @@ module testbench;
             // print_membus({30'b0,proc2mem_command}, proc2mem_addr[31:0],
             //              proc2mem_data[63:32], proc2mem_data[31:0]);
 
+            `ifdef DEBUG
             print_custom_data();
+            `endif
 
             output_reg_writeback_and_maybe_halt();
 

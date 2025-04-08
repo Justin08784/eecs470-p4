@@ -131,12 +131,14 @@ module rob #(
 
             //handle SQ completes
             for (int unsigned i = 0; i < `NUM_FU_STORE; ++i) begin
-                if (sq_in.complete_en[i]) state[sq_in.complete_rob_idxs[i]].cpl <= 1;
+                if (sq_in.complete_en[i])
+                    state[sq_in.complete_rob_idxs[i]].cpl <= 1;
             end
 
             //handle LQ errors
             for (int unsigned i = 0; i < `NUM_FU_LOAD; ++i) begin
-                if (lq_in.err_en[i]) state[lq_in.rob_idx[i]].err_ld_ooo <= 1;
+                if (lq_in.err_en[i])
+                    state[lq_in.rob_idx[i]].err_ld_ooo <= 1;
             end
 
             // handle dispatch (ins)
