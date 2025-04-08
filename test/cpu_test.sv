@@ -778,7 +778,7 @@ module testbench;
         end
 
         for (int i = 0; i < `ROB_SZ; ++i) begin
-            $display("Rob[%2d]: cpl %b, t: %2d, t_old: %2d, dst: %2d, is_brch: %b, wr_mem: %b, rd_mem: %b, halt: %0b, illegal: %0b%s",
+            $display("Rob[%2d]: cpl %b, t: %2d, t_old: %2d, dst: %2d, is_brch: %b, wr_mem: %b, rd_mem: %b, halt: %0b, illegal: %0b, err_ld_ooo:%b%s",
                 i,
                 state[i].cpl,
                 state[i].tag,
@@ -789,6 +789,7 @@ module testbench;
                 state[i].rd_mem,
                 state[i].halt,
                 state[i].illegal,
+                state[i].err_ld_ooo,
                 (i == head && head == tail) 
                     ? " << h/t"
                     : (i == head) 
