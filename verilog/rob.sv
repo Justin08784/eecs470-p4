@@ -137,7 +137,8 @@ module rob #(
 
             //handle LQ errors
             for (int unsigned i = 0; i < `NUM_FU_LOAD; ++i) begin
-                if (lq_in.err_en[i]) state[lq_in.rob_idx[i]].err_ld_ooo <= 1;
+                if (lq_in.err_en[i])
+                    state[lq_in.rob_idx[i]].err_ld_ooo <= 1;
             end
 
             // handle dispatch (ins)
