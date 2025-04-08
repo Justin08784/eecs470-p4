@@ -942,11 +942,12 @@ module testbench;
 
         $display("  | >> LQ");
         for (int i = 0; i < `LSQ_SZ; i++) begin
-            $display("Entry [%0d]: id=%0d, sq_idx=%0d, rob_idx=%0d, addr=%0d, d_valid=%b%s",
+            $display("Entry [%0d]: id=%0d, sq_idx=%0d, rob_idx=%0d, PC=%0d, addr=%0d, d_valid=%b%s",
             i,
             state[i].lq_idx,
             state[i].sq_idx,
             state[i].rob_idx,
+            state[i].inst_pc,
             state[i].addr,
             state[i].d_vld,
                 (i == head && head == tail) 
