@@ -1109,4 +1109,13 @@ typedef struct packed {
     map_table2dispatch d_out;
 } DBG_mt;
 
+typedef struct packed {
+    // internal state
+    logic [`PHYS_REG_SZ_R10K-1:0][$bits(DATA)-1:0] file;
+    // I/O
+    execute2complete_dat cdat_in;
+    execute2prf ex_in;
+    prf2execute ex_out;
+} DBG_prf;
+
 `endif // __SYS_DEFS_SVH__

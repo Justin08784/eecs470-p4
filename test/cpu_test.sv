@@ -69,6 +69,7 @@ module testbench;
     DBG_dispatch    dbg_dispatch;
     DBG_lq          dbg_lq;
     DBG_mt          dbg_mt;
+    DBG_prf         dbg_prf;
 
     // Instantiate the Pipeline
     cpu verisimpleV (
@@ -99,6 +100,7 @@ module testbench;
         .dbg_dispatch   (dbg_dispatch),
         // .dbg_lq         (dbg_lq),
         .dbg_mt         (dbg_mt),
+        .dbg_prf        (dbg_prf),
         .dbg_rob2retire (dbg_rob2retire),
         .dbg_btq2retire (dbg_btq2retire),
         .dbg_retire2btq (dbg_retire2btq),
@@ -294,7 +296,7 @@ module testbench;
             block   = memory.unified_memory[pc[31:3]];
             inst    = block.word_level[pc[2]];
             reg_idx = verisimpleV.rob_0.r_out.entries[n].dst;
-            data    = verisimpleV.prf_0.phys_reg_file[
+            data    = verisimpleV.prf_0.file[
                 verisimpleV.rob_0.r_out.entries[n].tag
             ];
             // print the committed instructions to the writeback output file
@@ -678,6 +680,17 @@ module testbench;
 
     endtask
 
+    task print_prf;
+        logic [`PHYS_REG_SZ_R10K-1:0][$bits(DATA)-1:0] file;
+        execute2complete_dat cdat_in;
+        execute2prf ex_in;
+        prf2execute ex_out;
+
+        file    = dbg_prf.file;
+        cdat_in = dbg_prf.cdat_in;
+        ex_in   = dbg_prf.ex_in;
+        ex_out  = dbg_prf.ex_out;
+    endtask
 
     task print_custom_data;
         $display("  | >> CYCLE: %3d (t: %3d)", clock_count-1, $time);
@@ -687,6 +700,7 @@ module testbench;
         print_decode();
         print_dispatch();
         print_map_table();
+        print_prf();
         $display("  | << CYCLE: %3d (t: %3d)", clock_count-1, $time);
     endtask
 

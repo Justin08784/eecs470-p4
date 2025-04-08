@@ -8,6 +8,9 @@ module prf #(
     parameter NUM_RPORTS = `NUM_FU_TOTAL // 1: Read data will update combinationally if
                                //    write to same address
    )(
+    `ifdef DEBUG
+    output logic [DEPTH-1:0][WIDTH-1:0] dbg_file,
+    `endif
     input clock, //reset, flush, // QUESTION: do we need reset? or should we force write to happen before read at the same addr?
 
     // complete (write)
@@ -44,7 +47,7 @@ module prf #(
     // dispatch ??
 );
 
-    logic [DEPTH-1:0][WIDTH-1:0]  phys_reg_file;
+    logic [DEPTH-1:0][WIDTH-1:0] file;
 
     // Read ports
     always_comb begin
@@ -60,7 +63,7 @@ module prf #(
             end else if (cdat_in.en[1] && (cdat_in.ts[1] == s_t1s[i])) begin
                 s_v1s[i] = cdat_in.data[1]; // internal forwarding
             end else begin
-                s_v1s[i] = phys_reg_file[s_t1s[i]];
+                s_v1s[i] = file[s_t1s[i]];
             end
 
             if (s_t2s[i] == `ZERO_REG || !s_en2s[i]) begin
@@ -70,7 +73,7 @@ module prf #(
             end else if (cdat_in.en[1] && (cdat_in.ts[1] == s_t2s[i])) begin
                 s_v2s[i] = cdat_in.data[1]; // internal forwarding 
             end else begin
-                s_v2s[i] = phys_reg_file[s_t2s[i]];
+                s_v2s[i] = file[s_t2s[i]];
             end
             
         end
@@ -80,8 +83,12 @@ module prf #(
     always_ff @(posedge clock) begin
         foreach (cdat_in.en[i]) begin
             if (cdat_in.en[i] && !cdat_in.is_brch[i] && (cdat_in.ts[i] != `ZERO_REG))
-                phys_reg_file[cdat_in.ts[i]] <= cdat_in.data[i];
+                file[cdat_in.ts[i]] <= cdat_in.data[i];
         end
     end
+
+    `ifdef DEBUG
+    assign dbg_file = file;
+    `endif
 
 endmodule

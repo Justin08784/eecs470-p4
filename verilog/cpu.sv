@@ -48,6 +48,7 @@ module cpu (
     // output DBG_lq       dbg_lq,
     // output DBG_icache   dbg_icache, // icache is submodule of fetch; dont need separate line
     output DBG_mt       dbg_mt,
+    output DBG_prf      dbg_prf,
     output rob2retire dbg_rob2retire,
     output btq2retire dbg_btq2retire,
     output retire2btq dbg_retire2btq,
@@ -399,13 +400,23 @@ module cpu (
     //            Physical Register File            //
     //                                              //
     //////////////////////////////////////////////////  
+    `ifdef DEBUG
+    logic [`PHYS_REG_SZ_R10K-1:0][$bits(DATA)-1:0] dbg_file;
+    assign dbg_prf = '{
+        file    : dbg_file,
+        cdat_in : ex_2_cdat,
+        ex_in   : ex_2_prf,
+        ex_out  : prf_2_ex
+    };
+    `endif
 
     prf #(
-        .WIDTH(32),
-        .DEPTH(`PHYS_REG_SZ_R10K),
         .N(`N),
         .BYPASS_EN(1)
     ) prf_0 (
+        `ifdef DEBUG
+        .dbg_file   (dbg_file),
+        `endif
         .clock      (clock),
         .cdat_in    (ex_2_cdat),
 
