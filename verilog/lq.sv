@@ -88,6 +88,8 @@ module lq #(parameter
         //handle telling fetch the top 2 PC's
         retire_out.PC[0] = state[head].inst_pc;
         retire_out.PC[1] = state[head_plus_one].inst_pc;
+        retire_out.err_ld_ooo[0] = state[head].err_ld_ooo;
+        retire_out.err_ld_ooo[1] = state[head_plus_one].err_ld_ooo;
     end
 
 
