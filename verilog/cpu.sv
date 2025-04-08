@@ -41,26 +41,14 @@ module cpu (
     // Debug outputs: these signals are solely used for debugging in testbenches
     // Do not change for project 3
     // You should definitely change these for project 4
-    output DBG_btq dbg_btq,
+    output DBG_btq      dbg_btq,
+    output DBG_fetch    dbg_fetch,
+    output DBG_decode   dbg_decode,
+    output DBG_dispatch dbg_dispatch,
     output rob2retire dbg_rob2retire,
     output btq2retire dbg_btq2retire,
     output retire2btq dbg_retire2btq,
-    output sq2retire  dbg_sq2retire,
-    output ADDR  if_NPC_dbg,
-    output DATA  if_inst_dbg,
-    output logic if_valid_dbg,
-    output ADDR  if_id_NPC_dbg,
-    output DATA  if_id_inst_dbg,
-    output logic if_id_valid_dbg,
-    output ADDR  id_ex_NPC_dbg,
-    output DATA  id_ex_inst_dbg,
-    output logic id_ex_valid_dbg,
-    output ADDR  ex_mem_NPC_dbg,
-    output DATA  ex_mem_inst_dbg,
-    output logic ex_mem_valid_dbg,
-    output ADDR  mem_wb_NPC_dbg,
-    output DATA  mem_wb_inst_dbg,
-    output logic mem_wb_valid_dbg
+    output sq2retire  dbg_sq2retire
 );
     /* Global controls*/
     logic flush;
@@ -76,6 +64,10 @@ module cpu (
     retire2fetch retire_2_f;
 
     stage_if_p4 fetch_0(
+        `ifdef DEBUG
+        .dbg    (dbg_fetch),
+        `endif
+
         .clock  (clock),          // system clock
         .reset  (reset),          // system reset
         .flush  (flush),
@@ -99,7 +91,10 @@ module cpu (
     dispatch2decode disp_2_de;
 
     stage_id_p4 decoder0 (
-        // TODO: Sam's commit
+        `ifdef DEBUG
+        .dbg    (dbg_decode),
+        `endif
+
         .clock  (clock),
         .reset  (reset),
         .flush  (flush),
@@ -131,6 +126,10 @@ module cpu (
     sq2dispatch sq_2_dispatch;
 
     dispatch dispatcher(
+        `ifdef DEBUG
+        .dbg        (dbg_dispatch),
+        `endif
+
         .clock      (clock),
         .reset      (reset),
         .flush      (flush),

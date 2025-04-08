@@ -63,7 +63,10 @@ module testbench;
     retire2btq dbg_retire2btq;
     sq2retire  dbg_sq2retire;
 
-    DBG_btq     dbg_btq;
+    DBG_btq         dbg_btq;
+    DBG_fetch       dbg_fetch;
+    DBG_decode      dbg_decode;
+    DBG_dispatch    dbg_dispatch;
 
     // Instantiate the Pipeline
     cpu verisimpleV (
@@ -89,6 +92,9 @@ module testbench;
         .PC_reg(PC_reg),
 
         .dbg_btq        (dbg_btq),
+        .dbg_fetch      (dbg_fetch),
+        .dbg_decode     (dbg_decode),
+        .dbg_dispatch   (dbg_dispatch),
         .dbg_rob2retire (dbg_rob2retire),
         .dbg_btq2retire (dbg_btq2retire),
         .dbg_retire2btq (dbg_retire2btq),
@@ -432,6 +438,7 @@ module testbench;
         d_in    = dbg_btq.d_in;
         d_out   = dbg_btq.d_out;
 
+        $display(">> BTQ >>");
         for (int i = 0; i < `BTQ_SZ; ++i) begin
             $display("BTQ [%0d]: tgt: %x, NPC: %x, pred: %b, take: %b%s", 
                 i,
@@ -471,10 +478,119 @@ module testbench;
                 r_out.dat[i].take
             );
         end
+        $display("<< BTQ <<");
     endtask
+
+    task print_fetch;
+        logic           flush;
+        decode2fetch    d_in;
+        fetch2decode    d_out;
+        retire2fetch    r_in;
+        MEM_BLOCK [1:0] Imem_data;
+        ADDR [`N-1:0]   PC_reg;
+
+        flush       = dbg_fetch.flush;
+        d_in        = dbg_fetch.d_in;
+        d_out       = dbg_fetch.d_out;
+        r_in        = dbg_fetch.r_in;
+        Imem_data   = dbg_fetch.Imem_data;
+        PC_reg      = dbg_fetch.PC_reg;
+
+        $display(">> Fetch >>");
+        $display("r_in: {flush: %b, corrected_PC: 0x%x}", flush, r_in.corrected_PC);
+        $display("PC_reg:  %x", PC_reg);
+        $display("Imem_data: %x", Imem_data);
+        $display("<< Fetch <<");
+    endtask
+
+    task print_decode;
+        fetch2decode    f_in;
+        decode2fetch    f_out;
+        dispatch2decode d_in;
+        decode2dispatch d_out;
+
+        f_in    = dbg_decode.f_in;
+        f_out   = dbg_decode.f_out;
+        d_in    = dbg_decode.d_in;
+        d_out   = dbg_decode.d_out;
+
+        $display(">> ID >>", $time);
+        // $display("  %3d | FIFO: {used_scnt: %d, free_scnt: %d}",
+        //     $time,
+        //     used_scnt,
+        //     free_scnt
+        // );
+        $display("f_in:  {f_en_cnt: %d, PC: [%x, %x], inst: [%x, %x]}",
+            f_in.f_en_cnt,
+            f_in.f_en_cnt > 0 ? f_in.f_dat[0].PC : 0,
+            f_in.f_en_cnt > 1 ? f_in.f_dat[1].PC : 0,
+            f_in.f_en_cnt > 0 ? f_in.f_dat[0].inst : 0,
+            f_in.f_en_cnt > 1 ? f_in.f_dat[1].inst : 0,
+        );
+
+        $display("d_out: {d_en_cnt: %d, PC: [%x, %x], inst: [%x, %x]}",
+            d_in.dispatch_en_cnt,
+            d_out.d_dat[0].PC, 
+            d_out.d_dat[1].PC,
+            d_out.d_dat[0].inst, 
+            d_out.d_dat[1].inst
+        );
+        print_id_result(d_out.d_dat[0]);
+        print_id_result(d_out.d_dat[1]);
+        // $display("d_out.d_dat[0]: %b", d_out.d_dat[0]);
+        // $display("d_out.d_dat[1]: %b", d_out.d_dat[1]);
+        $display("<< ID <<", $time);
+    endtask
+
+    task print_dispatch;
+        decode2dispatch       decode_in;
+        dispatch2decode       decode_out;
+        rs2dispatch           rs_in;
+        dispatch2rs           rs_out;
+        rob2dispatch          rob_in;
+        dispatch2rob          rob_out;
+        free_list2dispatch    free_in;
+        dispatch2free_list    free_out;
+        sq2dispatch           sq_in;
+        dispatch2sq           sq_out;
+        btq2dispatch          btq_in;
+        dispatch2btq          btq_out;
+        execute2complete_tag  ctag_in;
+        map_table2dispatch    map_in;
+        dispatch2map_table    map_out;
+
+        decode_in  = dbg_dispatch.decode_in;
+        decode_out = dbg_dispatch.decode_out;
+        rs_in      = dbg_dispatch.rs_in;
+        rs_out     = dbg_dispatch.rs_out;
+        rob_in     = dbg_dispatch.rob_in;
+        rob_out    = dbg_dispatch.rob_out;
+        free_in    = dbg_dispatch.free_in;
+        free_out   = dbg_dispatch.free_out;
+        sq_in      = dbg_dispatch.sq_in;
+        sq_out     = dbg_dispatch.sq_out;
+        btq_in     = dbg_dispatch.btq_in;
+        btq_out    = dbg_dispatch.btq_out;
+        ctag_in    = dbg_dispatch.ctag_in;
+        map_in     = dbg_dispatch.map_in;
+        map_out    = dbg_dispatch.map_out;
+
+        $display("  %3d | >> Dispatch >>", $time);
+        $display("r_in.btq_rdy_scnt: %d",   btq_in.btq_rdy_scnt);
+        $display("btq_in.btq_rdy_scnt: %d",   btq_in.btq_rdy_scnt);
+        $display("rob_in.rob_rdy_scnt: %d",  rob_in.rob_rdy_scnt);
+        $display("decode_in.d_vld_scnt: %d",  decode_in.d_vld_scnt);
+        $display("free_in.free_rdy_scnt: %d",  free_in.free_rdy_scnt);
+        $display("decode_in.prvw_has_dests: %b", decode_in.prvw_has_dests);
+        $display("  %3d | << Dispatch <<", $time);
+    endtask
+
     task print_custom_data;
         $display("  | >> CYCLE: %3d (t: %3d)", clock_count-1, $time);
         print_btq();
+        print_fetch();
+        print_decode();
+        print_dispatch();
         $display("  | << CYCLE: %3d (t: %3d)", clock_count-1, $time);
     endtask
 

@@ -11,9 +11,13 @@
 `include "sys_defs.svh"
 
 module stage_if_p4 (
-    input           clock,          // system clock
-    input           reset,          // system reset
-    input           flush,
+    `ifdef DEBUG
+    output DBG_fetch dbg,
+    `endif
+
+    input   clock,
+    input   reset,
+    input   flush,
     //input     [1:0] if_valid,       // only go to next PC when true
     input   decode2fetch d_in,
     output  fetch2decode d_out,
@@ -140,21 +144,20 @@ module stage_if_p4 (
         end
     end
 
-    // debugging
-    `ifdef DEBUG
-    always_ff @(posedge clock) begin
-        if (!reset) begin
-            $display("  %3d | >> Fetch >>", $time);
-            $display("r_in: {flush: %b, corrected_PC: 0x%x}", flush, r_in.corrected_PC);
-            $display("PC_reg:  %x", PC_reg);
-            $display("Imem_data: %x", Imem_data);
-            $display("  %3d | << Fetch <<", $time);
-        end
-    end
-    `endif // DEBUG
 
     // //RE-EVALUATE
     // // assign valid_out = icache_valid ? (if_valid_q) : '0 && (if_valid_q[0] || if_valid_q[1]);
     // // assign valid_out[1] = icache_valid && if_valid_q[1] && (PC_reg % 8 == 0);
+
+    `ifdef DEBUG
+    assign dbg = '{
+        flush,
+        d_in,
+        d_out,
+        r_in,
+        Imem_data,
+        PC_reg
+    };
+    `endif
 
 endmodule // stage_if

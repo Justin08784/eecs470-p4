@@ -1008,6 +1008,46 @@ typedef struct packed {
 /* DEBUG STRUCTS */
 typedef struct packed {
     // internal state
+    // I/O
+    logic           flush;
+    decode2fetch    d_in;
+    fetch2decode    d_out;
+    retire2fetch    r_in;
+    MEM_BLOCK [1:0] Imem_data;
+    ADDR [`N-1:0]   PC_reg;
+} DBG_fetch;
+
+typedef struct packed {
+    // internal state
+    // I/O
+    fetch2decode    f_in;
+    decode2fetch    f_out;
+    dispatch2decode d_in;
+    decode2dispatch d_out;
+} DBG_decode;
+
+typedef struct packed {
+    // internal state
+    // I/O
+    decode2dispatch decode_in;
+    dispatch2decode decode_out;
+    rs2dispatch rs_in;
+    dispatch2rs rs_out;
+    rob2dispatch rob_in;
+    dispatch2rob rob_out;
+    free_list2dispatch free_in;
+    dispatch2free_list free_out;
+    sq2dispatch sq_in;
+    dispatch2sq sq_out;
+    btq2dispatch btq_in;
+    dispatch2btq btq_out;
+    execute2complete_tag ctag_in;
+    map_table2dispatch map_in;
+    dispatch2map_table map_out;
+} DBG_dispatch;
+
+typedef struct packed {
+    // internal state
     BTQ_ENTRY [`BTQ_SZ-1:0]      state;
     logic [$clog2(`BTQ_SZ)-1:0]  head;
     logic [$clog2(`BTQ_SZ)-1:0]  tail;
