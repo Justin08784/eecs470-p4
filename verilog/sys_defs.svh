@@ -480,7 +480,7 @@ typedef struct packed {
 } btq2dispatch;
 
 typedef struct packed {
-    logic   [$clog2(`N):0]  used_scnt;
+    logic   [$clog2(`N):0]  used_scnt; // FIXME: This is actually unused?
     BTQ_ENTRY [`N-1:0]      dat;
 } btq2retire;
 
@@ -959,6 +959,7 @@ typedef struct packed {
 
 typedef struct packed {
     ADDR [`N-1:0] PC;
+    logic[`N-1:0] err_ld_ooo;
 } lq2retire;
 
 typedef struct packed {
