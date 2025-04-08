@@ -78,7 +78,7 @@ module lq #(parameter
 
             for (int j = 0, int idx = 0; j < used; j++) begin
                 idx = (head + j) % LSQ_SZ;
-                if (state[idx].sq_idx == execST_in.st_sq_idx[i]) begin
+                if ((state[idx].sq_idx == execST_in.st_sq_idx[i]) && state[idx].d_vld) begin
                     set_err[i] = '1;
                     err_idx[i] = idx;
                 end
@@ -123,7 +123,7 @@ module lq #(parameter
             end
 
             //handle error flags
-            for (int unsigned i = 0; i < NUM_FU_LOAD; ++i) begin
+            for (int unsigned i = 0; i < NUM_FU_STORE; ++i) begin
                 if (set_err[i])
                     state[err_idx[i]].err_ld_ooo <= 1;
             end
