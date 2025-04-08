@@ -186,11 +186,6 @@ module cpu (
     sq2retire sq_2_retire;
     assign dbg_sq2retire = sq_2_retire;
 
-    sq2retire HARDCODED_sq2retire;
-    assign HARDCODED_sq2retire = '{
-        ret_rdy : `N,
-        sq_ret_complete : `TRUE
-    };
     retire retire0 (
         .clock(clock),
         .reset(reset),
@@ -198,14 +193,7 @@ module cpu (
         .btq_in(btq_2_retire),
         .btq_out(retire_2_btq),
 
-        /*
-        FIXME: hardcoded sq_in
-        If connected to true sq_2_retire, it stalls in `*.syn.out` (i.e.
-        reaches max cycle limit), even if it doesn't stall in `*.out`.
-
-        Actually I don't think this actually fixes the stalling problem.
-        */
-        .sq_in(HARDCODED_sq2retire),
+        .sq_in(sq_2_retire),
         // .sq_out(),
 
         .mispred(mispred),
