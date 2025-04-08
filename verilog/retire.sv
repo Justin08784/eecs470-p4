@@ -6,6 +6,9 @@ Retire (Manager)
 ================================================
 */
 module retire (
+    `ifdef DEBUG
+    output DBG_retire dbg,
+    `endif
     input clock, reset,
 
     input  rob2retire rob_in,
@@ -118,4 +121,17 @@ module retire (
         end
     end
     `endif // DEBUG
+
+    `ifdef DEBUG
+    assign dbg = '{
+        rob_in,
+        btq_in,
+        btq_out,
+        sq_in,
+        sq_out,
+        mispred,
+        mispred_target,
+        retire_exec
+    };
+    `endif
 endmodule

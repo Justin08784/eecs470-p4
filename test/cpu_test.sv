@@ -67,6 +67,7 @@ module testbench;
     DBG_prf         dbg_prf;
     DBG_rob         dbg_rob;
     DBG_rs          dbg_rs;
+    DBG_sq          dbg_sq;
 
     // Instantiate the Pipeline
     cpu verisimpleV (
@@ -99,7 +100,8 @@ module testbench;
         .dbg_mt         (dbg_mt),
         .dbg_prf        (dbg_prf),
         .dbg_rob        (dbg_rob),
-        .dbg_rs         (dbg_rs)
+        .dbg_rs         (dbg_rs),
+        .dbg_sq         (dbg_sq)
     );
 
 
@@ -811,7 +813,7 @@ module testbench;
         ex_out  = dbg_rs.ex_out;
         ctag_in = dbg_rs.ctag_in;
 
-        $display("  %3d | >> RS >>", $time);
+        $display("  | >> RS >>");
         print_id_result(d_in.d_dat[0]);
         print_id_result(d_in.d_dat[1]);
         for (int i = 0; i < `RS_SZ; ++i) begin
@@ -840,9 +842,115 @@ module testbench;
                 entries[i].dat.fu_idx,
             );
         end
-        $display("  %3d | << RS <<", $time);
+        $display("  | << RS <<");
 
     endtask
+
+    task print_sq;
+        // internal state
+        SQ_ENTRY [`LSQ_SZ-1:0]      state;
+        logic [$clog2(`LSQ_SZ)-1:0] head;
+        logic [$clog2(`LSQ_SZ)-1:0] tail;
+        logic [$clog2(`LSQ_SZ):0]   used;
+        // I/O
+
+        dispatch2sq   dis_2_sq;
+        execute2sq    exec_2_sq;
+        retire2sq     retire_2_sq;
+        MEM_TAG       mem2proc_transaction_tag;
+
+        sq2dispatch  sq_2_dis;
+        sq2execute   sq_2_exec;
+        // sq2rs sq_2_rs,
+        sq2retire    sq_2_retire;
+        stRET2mem    ret_2_mem;
+
+        state   = dbg_sq.state;
+        head    = dbg_sq.head;
+        tail    = dbg_sq.tail;
+        used    = dbg_sq.used;
+
+        dis_2_sq    = dbg_sq.dis_2_sq;
+        exec_2_sq   = dbg_sq.exec_2_sq;
+        retire_2_sq = dbg_sq.retire_2_sq;
+        mem2proc_transaction_tag = dbg_sq.mem2proc_transaction_tag;
+
+        sq_2_dis    = dbg_sq.sq_2_dis;
+        sq_2_exec   = dbg_sq.sq_2_exec;
+        sq_2_retire = dbg_sq.sq_2_retire;
+        ret_2_mem   = dbg_sq.ret_2_mem;
+
+        $display("  | >> SQ");
+        for (int i = 0; i < `LSQ_SZ; i++) begin
+            $display("Entry [%0d]: id=%0d, rob_idx=%0d, addr=%0d, data=%0d, d_valid=%b, addr mask=%4b%s",
+            i,
+            state[i].sq_idx,
+            state[i].rob_idx,
+            state[i].addr,
+            state[i].data,
+            state[i].d_vld,
+            // state[i].bytewise_addr,
+            state[i].bytewise_addr_mask,
+                (i == head && head == tail) 
+                    ? " << h/t"
+                    : (i == head) 
+                        ? " << h" 
+                        : (i == tail)
+                            ? " << t"
+                            : ""
+            );
+        end
+        $display("  | << SQ");
+    endtask
+
+    task print_retbuf;
+        DBG_retbuf dbg_retbuf;
+        // internal state
+        SQ_ENTRY [`LSQ_SZ-1:0]     state;
+        logic [$clog2(`LSQ_SZ)-1:0] head;
+        logic [$clog2(`LSQ_SZ)-1:0] tail;
+        logic [$clog2(`LSQ_SZ):0]   used;
+        // I/O
+        sq2stRET sq_2_ret;
+        MEM_TAG mem2proc_transaction_tag;
+        stRET2sq ret_2_sq;
+        forwardRET2sq forward_ret_2_sq;
+        stRET2mem ret_2_mem;
+
+        dbg_retbuf = dbg_sq.dbg_retbuf;
+        state   = dbg_retbuf.state;
+        head    = dbg_retbuf.head;
+        tail    = dbg_retbuf.tail;
+        used    = dbg_retbuf.used;
+
+        sq_2_ret                 = dbg_retbuf.sq_2_ret;
+        mem2proc_transaction_tag = dbg_retbuf.mem2proc_transaction_tag;
+        ret_2_sq                 = dbg_retbuf.ret_2_sq;
+        forward_ret_2_sq         = dbg_retbuf.forward_ret_2_sq;
+        ret_2_mem                = dbg_retbuf.ret_2_mem;
+
+        $display("  >> RET buffer");
+        for (int i = 0; i < `LSQ_SZ; i++) begin
+            $display("Entry [%0d]: id=%0d, rob_idx=%0d, addr=%0d, data=%0d, d_valid=%b%s",
+            i,
+            state[i].sq_idx,
+            state[i].rob_idx,
+            state[i].addr,
+            state[i].data,
+            state[i].d_vld,
+                (i == head && head == tail) 
+                    ? " << h/t"
+                    : (i == head) 
+                        ? " << h" 
+                        : (i == tail)
+                            ? " << t"
+                            : ""
+            );
+        end
+        $display("  | << RET buffer");
+
+    endtask
+
 
     task print_custom_data;
         $display("  | >> CYCLE: %3d (t: %3d)", clock_count-1, $time);
@@ -855,6 +963,8 @@ module testbench;
         print_prf();
         print_rob();
         print_rs();
+        print_sq();
+        print_retbuf();
         $display("  | << CYCLE: %3d (t: %3d)", clock_count-1, $time);
     endtask
 

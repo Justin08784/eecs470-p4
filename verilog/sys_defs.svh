@@ -1112,4 +1112,55 @@ typedef struct packed {
     execute2complete_tag ctag_in;
 } DBG_rs;
 
+typedef struct packed {
+    // internal state
+    // I/O
+    rob2retire rob_in;
+    btq2retire btq_in;
+    retire2btq btq_out;
+    sq2retire sq_in;
+    retire2sq sq_out;
+    logic mispred;
+    ADDR  mispred_target;
+    retire_final retire_exec;
+} DBG_retire;
+
+typedef struct packed {
+    // internal state
+    SQ_ENTRY [`LSQ_SZ-1:0]     state;
+    logic [$clog2(`LSQ_SZ)-1:0] head;
+    logic [$clog2(`LSQ_SZ)-1:0] tail;
+    logic [$clog2(`LSQ_SZ):0]   used;
+    // I/O
+    sq2stRET sq_2_ret;
+    MEM_TAG mem2proc_transaction_tag;
+
+    stRET2sq ret_2_sq;
+    forwardRET2sq forward_ret_2_sq;
+    stRET2mem ret_2_mem;
+} DBG_retbuf;
+
+typedef struct packed {
+    // internal state
+    SQ_ENTRY [`LSQ_SZ-1:0]     state;
+    logic [$clog2(`LSQ_SZ)-1:0] head;
+    logic [$clog2(`LSQ_SZ)-1:0] tail;
+    logic [$clog2(`LSQ_SZ):0]   used;
+    // I/O
+
+    dispatch2sq   dis_2_sq;
+    execute2sq    exec_2_sq;
+    retire2sq     retire_2_sq;
+    MEM_TAG       mem2proc_transaction_tag;
+
+    sq2dispatch  sq_2_dis;
+    sq2execute   sq_2_exec;
+    // sq2rs sq_2_rs,
+    sq2retire    sq_2_retire;
+    stRET2mem    ret_2_mem;
+
+    DBG_retbuf   dbg_retbuf;
+} DBG_sq;
+
+
 `endif // __SYS_DEFS_SVH__

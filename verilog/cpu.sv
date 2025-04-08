@@ -50,7 +50,8 @@ module cpu (
     output DBG_mt       dbg_mt,
     output DBG_prf      dbg_prf,
     output DBG_rob      dbg_rob,
-    output DBG_rs       dbg_rs
+    output DBG_rs       dbg_rs,
+    output DBG_sq       dbg_sq
 );
     /* Global controls*/
     logic flush;
@@ -289,6 +290,9 @@ module cpu (
         .NUM_FU_STORE(`NUM_FU_STORE),
         .NUM_FU_LOAD(`NUM_FU_LOAD)
     ) sq_0 (
+        `ifdef DEBUG
+        .dbg        (dbg_sq),
+        `endif
         .clock      (clock),
         .reset      (reset),
         .flush      (flush),
