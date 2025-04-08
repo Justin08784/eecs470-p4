@@ -81,8 +81,6 @@ module rob #(
             rob_rdy_scnt : free_scnt,
             rob_idxs     : comm_idxs
         };
-
-        $display("NEXT ROB_IDXS: %0d, %0d", comm_idxs[0], comm_idxs[1]);
     end
 
     always_ff @(posedge clock) begin

@@ -59,8 +59,8 @@ module retire (
                 break;
 
             ++r_en_cnt;
-            // if (rob_in.entries[i].wr_mem && (sq_rd_cnt < sq_in.ret_rdy))
-            //     ++sq_rd_cnt; // TODO: assign to sq_out.r_en
+            if (rob_in.entries[i].wr_mem)
+                ++sq_rd_cnt; // TODO: assign to sq_out.r_en
             // FIXME: Is checking sq_in.ret_rdy even necessary?
 
             if (!rob_in.entries[i].is_brch)
@@ -102,6 +102,8 @@ module retire (
             illegal  : tmp_illegal,
             is_brch  : tmp_is_brch
         };
+
+        sq_out.r_en = sq_rd_cnt;
     end
 
     `ifdef DEBUG

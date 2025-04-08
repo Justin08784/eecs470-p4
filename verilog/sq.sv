@@ -108,9 +108,7 @@ module sq #(parameter
             sq_2_rob.complete_rob_idxs[i] = state[next_complete.st_sq_idx[i]].rob_idx;
         end
         // sq_2_rob.ret_rdy = `MIN(sq_2_rob.ret_rdy,ret_2_sq.free_out);
-        sq_2_rob.sq_ret_complete = (ret_2_sq.empty && (used_scnt == 0)) ? '1 : '0;
-
-        // $display("SQ_RET_RDY: %0d", sq_2_retire.ret_rdy);
+        sq_2_retire.sq_ret_complete = (ret_2_sq.empty && (used_scnt == 0)) ? '1 : '0;
 
         //handle retirement write to mem
         sq_2_ret.ret_cnt   = retire_2_sq.r_en;
@@ -137,8 +135,6 @@ module sq #(parameter
                 idx = (head+j) % LSQ_SZ;
 
                 if (state[idx].d_vld && (state[idx].bytewise_addr[0] == start)) begin
-                    // $display("Mask: %4b", state[idx].bytewise_addr_mask);
-                    // $display("Addr: %0d, Data: %0d, Shifted: %0d, Offset: %0d", state[idx].addr, state[idx].data, shifted_data, offset);
                     sq_2_exec.forward_data[i][7:0]      = state[idx].bytewise_addr_mask[0] ? state[idx].data[7:0]      : sq_2_exec.forward_data[i][7:0];
                     sq_2_exec.forward_data[i][15:8]     = state[idx].bytewise_addr_mask[1] ? state[idx].data[15:8]     : sq_2_exec.forward_data[i][15:8];
                     sq_2_exec.forward_data[i][23:16]    = state[idx].bytewise_addr_mask[2] ? state[idx].data[23:16]    : sq_2_exec.forward_data[i][23:16];
@@ -151,8 +147,6 @@ module sq #(parameter
             end
 
             sq_2_exec.forward_en[i] = (sq_2_exec.forward_byte_en[i] != 0) ? '1 : '0;
-            
-            // $display("Forward data[%0d]: %0d", i, sq_2_exec.forward_data[i]);
         end
 
         for (int unsigned i = 0; i < NUM_FU_LOAD; i++) begin
@@ -190,8 +184,6 @@ module sq #(parameter
                 sq_2_exec.forward_data[i] &= 16'hFFFF;
                 sq_2_exec.forward_byte_en[i] &= 2'b11;
             end
-
-            // $display("2. Forward_data[%0d]: %0d, %4b", i, sq_2_exec.forward_data[i],sq_2_exec.forward_byte_en[i]);
         end
     end
 
@@ -205,7 +197,6 @@ module sq #(parameter
 
         for (int i = 0; i < `NUM_FU_STORE; i++) begin
             modulo4[i] = exec_2_sq.st_addr[i] % 4;
-            // $display("ADDR: %0d, MOD: %0d, SIZE: %0d", exec_2_sq.st_addr[i], modulo4[i], exec_2_sq.st_mem_size[i]);
             for (int j = 0; j < 4; j++) begin
                 bytewise_addr[i][j] = exec_2_sq.st_addr[i] - modulo4[i] + j;
             end
@@ -213,9 +204,6 @@ module sq #(parameter
             if (exec_2_sq.st_mem_size[i] == BYTE)       bytewise_addr_mask[i][modulo4[i]] = 1;
             else if (exec_2_sq.st_mem_size[i] == HALF)  bytewise_addr_mask[i][modulo4[i]+:1] = '1;
             else                                        bytewise_addr_mask[i] = '1;
-
-            // $display("bytewise addr[%0d], %0d, %0d, %0d, %0d", exec_2_sq.st_addr[i], bytewise_addr[i][0], bytewise_addr[i][1], bytewise_addr[i][2], bytewise_addr[i][3]);
-            // $display("bytewise mask: %4b", bytewise_addr_mask[i]);
         end
 
         
@@ -234,8 +222,6 @@ module sq #(parameter
 
 
     always_ff @(posedge clock) begin
-
-        // $display("SQ_RET_RDY: %0d, head: %0d, valid: %b", sq_2_retire.ret_rdy, head, state[head].d_vld);
         
         if (reset || flush) begin
             used    <= 0;
@@ -270,7 +256,7 @@ module sq #(parameter
             // handle execute updates
             for (int unsigned i = 0, int cur_idx = 0; i < NUM_ST_PORTS; ++i) begin
                 cur_idx = exec_2_sq.st_sq_idx[i];
-                // $display("EX IN [%0d]: en: %b, sq_idx: %0d, addr: %0d, data: %0d, mem_size: %0d", i, exec_2_sq.st_ex_en[i], exec_2_sq.st_sq_idx[i], exec_2_sq.st_addr[i], exec_2_sq.st_data[i], exec_2_sq.st_mem_size[i]);
+                
                 if (exec_2_sq.st_ex_en[i]) begin
                     state[cur_idx].addr                 <= exec_2_sq.st_addr[i];
                     state[cur_idx].bytewise_addr        <= bytewise_addr[i];
@@ -283,7 +269,6 @@ module sq #(parameter
             end
 
             // handle dispatch (ins)
-            // $display("d_en_cnt: %d", d_in.d_en_cnt);
             for (int unsigned i = 0, int cur_idx = 0; i < NUM_DPORTS; ++i) begin
                 if (i >= dis_2_sq.sq_d_en_cnt)
                     continue;
@@ -419,8 +404,6 @@ module post_ret_buffer #(parameter
                 if (state[idx].sq_idx == sq_2_ret.forward_sq_idx[i]) forward_ret_2_sq.sq_idx_found[i] = '1;
 
                 if (state[idx].d_vld && (state[idx].bytewise_addr[0] == start)) begin
-                    // $display("Mask: %4b", state[idx].bytewise_addr_mask);
-                    // $display("Addr: %0d, Data: %0d, Shifted: %0d, Offset: %0d", state[idx].addr, state[idx].data, shifted_data, offset);
                     forward_ret_2_sq.forward_data[i][7:0]   = state[idx].bytewise_addr_mask[0] ? state[idx].data[7:0]      : forward_ret_2_sq.forward_data[i][7:0];
                     forward_ret_2_sq.forward_data[i][15:8]  = state[idx].bytewise_addr_mask[1] ? state[idx].data[15:8]     : forward_ret_2_sq.forward_data[i][15:8];
                     forward_ret_2_sq.forward_data[i][23:16] = state[idx].bytewise_addr_mask[2] ? state[idx].data[23:16]    : forward_ret_2_sq.forward_data[i][23:16];
@@ -434,8 +417,6 @@ module post_ret_buffer #(parameter
             end
 
             forward_ret_2_sq.forward_en[i] = (forward_ret_2_sq.forward_byte_en[i] != 0) ? '1 : '0;
-
-            // $display("RET Forward data[%0d]: %0d, Addr: %0d, Offset: %0d", i, forward_ret_2_sq.forward_data[i], sq_2_ret.forward_addr[i], (8*(2**(sq_2_ret.forward_addr[i] % 4))-8));
         end
     end
 
