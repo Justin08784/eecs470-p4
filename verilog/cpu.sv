@@ -185,6 +185,7 @@ module cpu (
     ADDR  mispred_target;
     sq2retire sq_2_retire;
     assign dbg_sq2retire = sq_2_retire;
+    retire2sq retire_2_sq;
 
     retire retire0 (
         .clock(clock),
@@ -194,7 +195,7 @@ module cpu (
         .btq_out(retire_2_btq),
 
         .sq_in(sq_2_retire),
-        // .sq_out(),
+        .sq_out(retire_2_sq),
 
         .mispred(mispred),
         .mispred_target(mispred_target),
@@ -261,8 +262,6 @@ module cpu (
     //                                              //
     //////////////////////////////////////////////////  
 
-    rob2sq rob_2_sq;
-
     rob #(
         .ROB_SZ(`ROB_SZ),
         .N(`N)
@@ -274,9 +273,7 @@ module cpu (
         .r_in       (retire_exec),
         .cdat_in    (ex_2_cdat),
         .d_out      (rob_2_dispatch),
-        .d_in       (dispatch_2_rob),
-        .sq_in      (sq_2_retire),
-        .sq_out     (rob_2_sq)
+        .d_in       (dispatch_2_rob)
     );
 
     //////////////////////////////////////////////////
@@ -306,7 +303,7 @@ module cpu (
 
         .dis_2_sq(dispatch_2_sq),
         .exec_2_sq(exec_2_sq),
-        .rob_2_sq(rob_2_sq), //using the rob_2_sq packet here seems to be causing false retirements from the SQ. Will investigate Sunday 4/6. 
+        .retire_2_sq(retire_2_sq), //using the retire_2_sq packet here seems to be causing false retirements from the SQ. Will investigate Sunday 4/6. 
         //As is, can still see packets entering the SQ, and should be able to retire the top 2 entries "properly", they just won't actually write to memory.
         //But this will still work if you just want to make sure that you can actually make it through a program to the wfi
         .mem2proc_transaction_tag(temp_tag),

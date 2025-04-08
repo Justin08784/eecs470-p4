@@ -928,11 +928,6 @@ typedef struct packed {
 } sq2rs;
 
 typedef struct packed {
-    logic   [$clog2(`N):0] r_en;
-    // ROB_IDX [`N-1:0] r_pos;
-} rob2sq;
-
-typedef struct packed {
     logic       [`NUM_FU_STORE-1:0] st_ex_en; //tells SQ that a valid store is coming in on that line (bus, not count)
     LSQ_IDX     [`NUM_FU_STORE-1:0] st_sq_idx; //the SQ IDXs of the incoming stores, found in the ID_RESULT packet
     ADDR        [`NUM_FU_STORE-1:0] st_addr; //address that the stores are pointing to
@@ -964,6 +959,11 @@ typedef struct packed {
     logic [$clog2(`N):0]    ret_rdy;
     logic                   sq_ret_complete;
 } sq2retire;
+
+typedef struct packed {
+    logic   [$clog2(`N):0] r_en;
+    // ROB_IDX [`N-1:0] r_pos;
+} retire2sq;
 
 typedef struct packed {
     MEM_COMMAND   Dmem_command;    // The memory command

@@ -18,11 +18,7 @@ module rob #(
 
     // dispatch (write)
     output rob2dispatch d_out,
-    input  dispatch2rob d_in,
-
-    //SQ
-    input  sq2retire sq_in,
-    output rob2sq sq_out
+    input  dispatch2rob d_in
 );
     localparam NUM_DPORTS = N; // dispatch ports (in-order)
     localparam NUM_RPORTS = N; // retire ports (in-order)
@@ -50,8 +46,6 @@ module rob #(
     assign used_scnt    = `MIN(used, NUM_RPORTS);
 
     always_comb begin
-        sq_out = '0;
-
         for (int unsigned i = 0; i < NUM_RPORTS; ++i)
             rtre_idxs[i] = (head + i) % ROB_SZ;
         for (int unsigned i = 0; i < NUM_DPORTS; ++i)
@@ -64,10 +58,6 @@ module rob #(
             /* preview mode–– just display all valid entries in read window even
             if not all will get retired this cycle */
             r_out.entries[i] = state[rtre_idxs[i]];
-
-            //tell SQ to retire entries
-            // if (state[rtre_idxs[i]].wr_mem)
-            //     ++sq_out.r_en;
         end
 
         // handle dispatch (outs)

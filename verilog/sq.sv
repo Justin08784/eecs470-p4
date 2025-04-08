@@ -15,16 +15,16 @@ module sq #(parameter
     input reset,
     input flush,
 
-    input dispatch2sq dis_2_sq,
-    input execute2sq exec_2_sq,
-    input rob2sq rob_2_sq,
-    input MEM_TAG mem2proc_transaction_tag,
+    input dispatch2sq   dis_2_sq,
+    input execute2sq    exec_2_sq,
+    input retire2sq     retire_2_sq,
+    input MEM_TAG       mem2proc_transaction_tag,
 
-    output sq2dispatch sq_2_dis,
-    output sq2execute sq_2_exec,
+    output sq2dispatch  sq_2_dis,
+    output sq2execute   sq_2_exec,
     // output sq2rs sq_2_rs,
-    output sq2retire sq_2_retire,
-    output stRET2mem ret_2_mem
+    output sq2retire    sq_2_retire,
+    output stRET2mem    ret_2_mem
 );
 
     localparam NUM_DPORTS = N; // dispatch ports (in-order)
@@ -106,7 +106,7 @@ module sq #(parameter
         // $display("SQ_RET_RDY: %0d", sq_2_retire.ret_rdy);
 
         //handle retirement write to mem
-        sq_2_ret.ret_cnt   = rob_2_sq.r_en;
+        sq_2_ret.ret_cnt   = retire_2_sq.r_en;
         sq_2_ret.ret_st[0] = state[head];
         sq_2_ret.ret_st[1] = state[head_plus_one];
 
@@ -239,8 +239,8 @@ module sq #(parameter
             last_used_sq_idx <= LSQ_SZ_DBL + 1; //outside of SQ range so that if a load occurs before the first store we don't flag it falsely
             // sq_2_retire <= '0;
         end else begin
-            used    <= used + dis_2_sq.sq_d_en_cnt - rob_2_sq.r_en;
-            head    <= (head + rob_2_sq.r_en) % LSQ_SZ;
+            used    <= used + dis_2_sq.sq_d_en_cnt - retire_2_sq.r_en;
+            head    <= (head + retire_2_sq.r_en) % LSQ_SZ;
             tail    <= (tail + dis_2_sq.sq_d_en_cnt) % LSQ_SZ;
             tail_dbl <= (tail_dbl + dis_2_sq.sq_d_en_cnt) % LSQ_SZ_DBL;
             last_used_sq_idx <= (last_used_sq_idx + dis_2_sq.sq_d_en_cnt) % LSQ_SZ_DBL;

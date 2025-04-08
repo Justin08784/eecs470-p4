@@ -15,7 +15,7 @@ module retire (
     output retire2btq btq_out,
 
     input  sq2retire sq_in,
-    // output retire2sq sq_out,
+    output retire2sq sq_out,
 
     output logic mispred,
     output ADDR  mispred_target,
@@ -33,6 +33,14 @@ module retire (
     logic        [`N-1:0] tmp_is_brch;
 
     always_comb begin
+        // FIXME: >>
+        // sq_out logic migrated from rob (when it still had rob2sq)
+        sq_out = '0;
+        //tell SQ to retire entries
+        // if (state[rtre_idxs[i]].wr_mem)
+        //     ++sq_out.r_en;
+        // FIXME: <<
+
         mispred = 0;
         mispred_target = '0;
 
