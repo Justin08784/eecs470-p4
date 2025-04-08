@@ -177,6 +177,7 @@ end
 // handle btq output
 logic [`N-1:0] is_brch;
 logic [`N-1:0] wr_mem;
+logic [`N-1:0] rd_mem;
 always_comb begin
     foreach(rename_en[i])
         rename_en[i] = i < rename_en_cnt;
@@ -185,8 +186,11 @@ always_comb begin
         is_brch[i]  = rename_in[i].is_brch;
     foreach(wr_mem[i])
         wr_mem[i]   = rename_in[i].wr_mem;
+    foreach(rd_mem[i])
+        rd_mem[i]   = rename_in[i].rd_mem;
 
     sq_out.rename_en_cnt= $countones(rename_en & wr_mem);
+    lq_out.rename_en_cnt= $countones(rename_en & rd_mem);
     btq_out.en_cnt      = $countones(rename_en & is_brch);
 end
 
@@ -207,12 +211,9 @@ end
 RENAME_COMMIT_PKT [`N-1:0] tmp_alloc2rename;
 logic [`N-1:0] rd_src1s;
 logic [`N-1:0] rd_src2s;
-logic [$clog2(`N):0] sq_wr_idx;
-logic [$clog2(`N):0] lq_wr_idx;
 logic [$clog2(`N):0] btq_wr_idx;
 always_comb begin
     tmp_alloc2rename = '0;
-    // sq_wr_idx   = 0;
     btq_wr_idx  = 0;
 
     for (int i = 0; i < `N; ++i) begin
@@ -266,14 +267,15 @@ fifo #(
 
 /* >> ==== 3. Commit Stage ==== >> */
 
+logic [$clog2(`N):0] sq_wr_idx;
+logic [$clog2(`N):0] lq_wr_idx;
 // handle rs output 
 always_comb begin
     commit_en_cnt   = `MIN(rename_vld_scnt, rs_in.rs_rdy_scnt);
     rs_out.d_en_cnt = commit_en_cnt;
     rs_out.d_dat    = '0;
-    sq_wr_idx = 0;
-    lq_wr_idx = 0;
-    lq_out = '0;
+    sq_wr_idx       = 0;
+    lq_wr_idx       = 0;
 
     for (int i = 0; i < `N; i++) begin
         rs_out.d_dat[i] = commit_in[i].dat;
@@ -293,7 +295,6 @@ always_comb begin
 
         if (commit_in[i].dat.rd_mem) begin
             rs_out.d_dat[i].sq_idx = sq_in.next_ids[lq_wr_idx];
-            lq_out.lq_d_en_cnt++;
             lq_out.rob_idx[lq_wr_idx] = rob_in.rob_idxs[i];
             lq_out.sq_idx[lq_wr_idx] = (sq_in.last_used_sq_idx + sq_wr_idx) % `LSQ_SZ_DBL;
             ++lq_wr_idx;
@@ -301,6 +302,7 @@ always_comb begin
     end
 
     sq_out.sq_d_en_cnt = sq_wr_idx;
+    lq_out.lq_d_en_cnt = lq_wr_idx;
 end
 
 // handle rob output 

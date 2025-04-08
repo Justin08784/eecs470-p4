@@ -663,6 +663,10 @@ typedef struct packed {
 } dispatch2sq;
 
 typedef struct packed {
+    // alloc
+    // rename 
+    logic   [$clog2(`N):0]  rename_en_cnt;
+    // commit
     logic   [$clog2(`N):0]  lq_d_en_cnt;
         // To: LSQ
         // - number of enabled dispatch lines WHO NEED A LD/ST 

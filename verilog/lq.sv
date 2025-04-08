@@ -36,15 +36,12 @@ module lq #(parameter
 
     LQ_ENTRY [LSQ_SZ-1:0]       state;
     logic [$clog2(LSQ_SZ):0]    used, free;
+    logic [$clog2(2*`N):0]      rsvd; // sz(rename_buf) = 2*`N
 
     logic [NUM_RPORTS-1:0][$clog2(LSQ_SZ)-1:0] r_idxs;
     logic [NUM_DPORTS-1:0][$clog2(LSQ_SZ)-1:0] d_idxs;
 
-    `ifdef DEBUG
-    assign state_dbg            = state;
-    `endif 
-    assign free                 = LSQ_SZ - used;
-    assign free_scnt            = `MIN(free, NUM_DPORTS);
+    assign free_scnt            = `MIN(free - rsvd, NUM_DPORTS);
     assign used_scnt            = `MIN(used, NUM_RPORTS);
 
 
@@ -59,7 +56,7 @@ module lq #(parameter
 
         // handle dispatch (outs)
         lq_2_dis <= '{
-            lq_rdy_scnt : `MIN(free, NUM_DPORTS),
+            lq_rdy_scnt : free_scnt,
             lq_tail     : tail
         };
 
@@ -87,11 +84,17 @@ module lq #(parameter
     always_ff @(posedge clock) begin
         if (reset || flush) begin
             used    <= 0;
+            free    <= LSQ_SZ;
+            rsvd    <= 0;
+
             head    <= 0;
             tail    <= 0;
             state   <= '0;
         end else begin
             used    <= used + dis_2_lq.lq_d_en_cnt - retire_2_lq.r_en;
+            free    <= free - dis_2_lq.lq_d_en_cnt + retire_2_lq.r_en;
+            rsvd    <= rsvd + dis_2_lq.rename_en_cnt - dis_2_lq.lq_d_en_cnt;
+
             head    <= (head + retire_2_lq.r_en) % LSQ_SZ;
             tail    <= (tail + dis_2_lq.lq_d_en_cnt) % LSQ_SZ;
             
