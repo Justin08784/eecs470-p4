@@ -1114,19 +1114,6 @@ typedef struct packed {
 
 typedef struct packed {
     // internal state
-    // I/O
-    rob2retire rob_in;
-    btq2retire btq_in;
-    retire2btq btq_out;
-    sq2retire sq_in;
-    retire2sq sq_out;
-    logic mispred;
-    ADDR  mispred_target;
-    retire_final retire_exec;
-} DBG_retire;
-
-typedef struct packed {
-    // internal state
     SQ_ENTRY [`LSQ_SZ-1:0]     state;
     logic [$clog2(`LSQ_SZ)-1:0] head;
     logic [$clog2(`LSQ_SZ)-1:0] tail;
@@ -1161,6 +1148,19 @@ typedef struct packed {
 
     DBG_retbuf   dbg_retbuf;
 } DBG_sq;
+
+typedef struct packed {
+    // internal state
+    // I/O
+    rob2retire rob_in;
+    btq2retire btq_in;
+    retire2btq btq_out;
+    sq2retire sq_in;
+    retire2sq sq_out;
+    logic mispred;
+    ADDR  mispred_target;
+    retire_final retire_exec;
+} DBG_retire;
 
 
 `endif // __SYS_DEFS_SVH__

@@ -101,26 +101,6 @@ module retire (
             is_brch  : tmp_is_brch
         };
     end
-    
-    `ifdef DEBUG
-    always_ff @(posedge clock) begin
-        if (!reset) begin
-            $display("  %3d | >> retire >>", $time);
-            for (int i = 0; i < `N; ++i) begin
-                $display("btq_out [%0d]: tgt: %x, NPC: %x, pred: %b, take: %b", 
-                    i,
-                    btq_in.dat[i].tgt,
-                    btq_in.dat[i].NPC,
-                    btq_in.dat[i].pred,
-                    btq_in.dat[i].take
-                );
-            end
-            $display("btq_rd_cnt: %0d", btq_rd_cnt);
-            $display("retire_exec.r_en_cnt: %0d", retire_exec.r_en_cnt);
-            $display("  %3d | << retire <<", $time);
-        end
-    end
-    `endif // DEBUG
 
     `ifdef DEBUG
     assign dbg = '{

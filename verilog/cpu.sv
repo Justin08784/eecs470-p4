@@ -51,7 +51,8 @@ module cpu (
     output DBG_prf      dbg_prf,
     output DBG_rob      dbg_rob,
     output DBG_rs       dbg_rs,
-    output DBG_sq       dbg_sq
+    output DBG_sq       dbg_sq,
+    output DBG_retire   dbg_retire
 );
     /* Global controls*/
     logic flush;
@@ -171,6 +172,9 @@ module cpu (
     ADDR            mispred_target;
 
     retire retire0 (
+        `ifdef DEBUG
+        .dbg    (dbg_retire),
+        `endif
         .clock  (clock),
         .reset  (reset),
 

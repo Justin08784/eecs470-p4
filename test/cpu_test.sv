@@ -68,6 +68,7 @@ module testbench;
     DBG_rob         dbg_rob;
     DBG_rs          dbg_rs;
     DBG_sq          dbg_sq;
+    DBG_retire      dbg_retire;
 
     // Instantiate the Pipeline
     cpu verisimpleV (
@@ -101,7 +102,8 @@ module testbench;
         .dbg_prf        (dbg_prf),
         .dbg_rob        (dbg_rob),
         .dbg_rs         (dbg_rs),
-        .dbg_sq         (dbg_sq)
+        .dbg_sq         (dbg_sq),
+        .dbg_retire     (dbg_retire)
     );
 
 
@@ -951,6 +953,40 @@ module testbench;
 
     endtask
 
+    task print_retire;
+        rob2retire rob_in;
+        btq2retire btq_in;
+        retire2btq btq_out;
+        sq2retire sq_in;
+        retire2sq sq_out;
+        logic mispred;
+        ADDR  mispred_target;
+        retire_final retire_exec;
+
+        rob_in         = dbg_retire.rob_in;
+        btq_in         = dbg_retire.btq_in;
+        btq_out        = dbg_retire.btq_out;
+        sq_in          = dbg_retire.sq_in;
+        sq_out         = dbg_retire.sq_out;
+        mispred        = dbg_retire.mispred;
+        mispred_target = dbg_retire.mispred_target;
+        retire_exec    = dbg_retire.retire_exec;
+
+        $display("  | >> retire >>");
+        for (int i = 0; i < `N; ++i) begin
+            $display("btq_out [%0d]: tgt: %x, NPC: %x, pred: %b, take: %b", 
+                i,
+                btq_in.dat[i].tgt,
+                btq_in.dat[i].NPC,
+                btq_in.dat[i].pred,
+                btq_in.dat[i].take
+            );
+        end
+        $display("btq_rd_cnt: %0d", btq_out.rd_cnt);
+        $display("retire_exec.r_en_cnt: %0d", retire_exec.r_en_cnt);
+        $display("  | << retire <<");
+    endtask
+
 
     task print_custom_data;
         $display("  | >> CYCLE: %3d (t: %3d)", clock_count-1, $time);
@@ -965,6 +1001,7 @@ module testbench;
         print_rs();
         print_sq();
         print_retbuf();
+        print_retire();
         $display("  | << CYCLE: %3d (t: %3d)", clock_count-1, $time);
     endtask
 
