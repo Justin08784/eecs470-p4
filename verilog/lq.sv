@@ -121,7 +121,8 @@ module lq #(parameter
                     rob_idx : dis_2_lq.rob_idx[i],
                     addr     : '0,
                     d_vld     : '0,
-                    mem_size : '0
+                    mem_size : '0,
+                    inst_pc : dis_2_lq.inst_pc[i]
                 };
             end
         end

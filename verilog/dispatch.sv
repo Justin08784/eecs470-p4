@@ -297,6 +297,7 @@ always_comb begin
             rs_out.d_dat[i].sq_idx = sq_in.next_ids[lq_wr_idx];
             lq_out.rob_idx[lq_wr_idx] = rob_in.rob_idxs[i];
             lq_out.sq_idx[lq_wr_idx] = (sq_in.last_used_sq_idx + sq_wr_idx) % `LSQ_SZ_DBL;
+            lq_out.inst_pc[lq_wr_idx] = commit_in[i].dat.PC;
             ++lq_wr_idx;
         end
     end

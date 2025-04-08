@@ -437,6 +437,7 @@ typedef struct packed {
     logic rd_mem;
     logic halt;
     logic illegal;
+    logic err_ld_ooo;
 } ROB_ENTRY;
 
 //allowing one bit greater than strictly necessary 
@@ -462,6 +463,7 @@ typedef struct packed {
     ADDR addr;
     logic d_vld;
     MEM_SIZE mem_size;
+    ADDR inst_pc;
 } LQ_ENTRY;
 
 // BTQ stuff
@@ -673,6 +675,7 @@ typedef struct packed {
         //   (i.e. may only be a strict subset of dispatching insns!)
     ROB_IDX [`N-1:0] rob_idx;
     LSQ_IDX [`N-1:0] sq_idx;
+    ADDR    [`N-1:0] inst_pc;
 } dispatch2lq;
 
 typedef struct packed {

@@ -148,7 +148,8 @@ module rob #(
                     t_old   : d_in.t_old[i],
                     dst     : d_in.dst[i],
                     halt    : d_in.halt[i],
-                    illegal : d_in.illegal[i]
+                    illegal : d_in.illegal[i],
+                    err_ld_ooo : '0
                 };
             end
         end

@@ -61,7 +61,6 @@ module sq #(parameter
         `endif
         .clock(clock),
         .reset(reset),
-        .flush(flush),
         .sq_2_ret(sq_2_ret),
         .mem2proc_transaction_tag(mem2proc_transaction_tag),
         .ret_2_sq(ret_2_sq),
@@ -328,7 +327,6 @@ module post_ret_buffer #(parameter
     `endif
     input clock,
     input reset,
-    input flush,
 
     input sq2stRET sq_2_ret,
     input MEM_TAG mem2proc_transaction_tag,
@@ -422,7 +420,7 @@ module post_ret_buffer #(parameter
 
 
     always_ff @(posedge clock) begin
-        if (reset || flush) begin
+        if (reset) begin
             used    <= 0;
             head    <= 0;
             tail    <= 0;
