@@ -16,6 +16,7 @@ module rob #(
 
     // complete (write)
     input  execute2complete_dat cdat_in,
+    input sq2rob sq_in,
 
     // dispatch (write)
     output rob2dispatch d_out,
@@ -83,10 +84,6 @@ module rob #(
     end
 
     always_ff @(posedge clock) begin
-<<<<<<< HEAD
-            // $display("SQ_RET_COMPLETE: %b",sq_in.sq_ret_complete);
-=======
->>>>>>> aa3f0befeaac910e36991c7a295eb0cbf60ad146
         if (reset || flush) begin
             used    <= 0;
             free    <= ROB_SZ;

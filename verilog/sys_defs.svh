@@ -900,6 +900,12 @@ typedef struct packed {
     logic   [$clog2(`N):0]  complete_en;
     ROB_IDX [`N-1:0]        complete_rob_idxs;
     logic                   sq_ret_complete;
+} sq2rob;
+
+typedef struct packed {
+    logic   [$clog2(`N):0]  complete_en;
+    ROB_IDX [`N-1:0]        complete_rob_idxs;
+    logic                   sq_ret_complete;
 } sq2retire;
 
 typedef struct packed {

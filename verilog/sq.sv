@@ -22,7 +22,7 @@ module sq #(parameter
 
     output sq2dispatch  sq_2_dis,
     output sq2execute   sq_2_exec,
-    // output sq2rs sq_2_rs,
+    output sq2rob       sq_2_rob,
     output sq2retire    sq_2_retire,
     output stRET2mem    ret_2_mem
 );

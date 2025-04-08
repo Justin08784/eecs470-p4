@@ -256,6 +256,8 @@ module cpu (
     //                                              //
     //////////////////////////////////////////////////  
 
+    sq2rob sq_2_rob;
+
     rob #(
         .ROB_SZ(`ROB_SZ),
         .N(`N)
@@ -269,6 +271,7 @@ module cpu (
         .r_out      (rob_2_retire),
         .r_in       (retire_exec),
         .cdat_in    (ex_2_cdat),
+        .sq_in      (sq_2_rob),
         .d_out      (rob_2_dispatch),
         .d_in       (dispatch_2_rob)
     );
@@ -306,6 +309,7 @@ module cpu (
 
         .exec_2_sq  (exec_2_sq),
         .sq_2_exec  (sq_2_exec),
+        .sq_2_rob   (sq_2_rob),
 
         .retire_2_sq(retire_2_sq), //using the retire_2_sq packet here seems to be causing false retirements from the SQ. Will investigate Sunday 4/6. 
         //As is, can still see packets entering the SQ, and should be able to retire the top 2 entries "properly", they just won't actually write to memory.
