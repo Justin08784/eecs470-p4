@@ -65,6 +65,8 @@ module testbench;
     DBG_lq          dbg_lq;
     DBG_mt          dbg_mt;
     DBG_prf         dbg_prf;
+    DBG_rob         dbg_rob;
+    DBG_rs          dbg_rs;
 
     // Instantiate the Pipeline
     cpu verisimpleV (
@@ -95,7 +97,9 @@ module testbench;
         .dbg_dispatch   (dbg_dispatch),
         // .dbg_lq         (dbg_lq),
         .dbg_mt         (dbg_mt),
-        .dbg_prf        (dbg_prf)
+        .dbg_prf        (dbg_prf),
+        .dbg_rob        (dbg_rob),
+        .dbg_rs         (dbg_rs)
     );
 
 
@@ -440,6 +444,16 @@ module testbench;
         );
     endfunction
 
+    function get_fu_name(input FU_IDX fu_idx, output string name);
+        case (fu_idx)
+            FU_ALU:     name = "ALU";
+            FU_MULT:    name = "MULT";
+            FU_LOAD:    name = "LOAD";
+            FU_STORE:   name = "STORE";
+            default:    name = "Unknown FU";
+        endcase
+    endfunction
+
     task print_btq;
         // internal state
         BTQ_ENTRY [`BTQ_SZ-1:0]      state;
@@ -711,6 +725,125 @@ module testbench;
         ex_out  = dbg_prf.ex_out;
     endtask
 
+    task print_rob;
+        ROB_ENTRY [`ROB_SZ-1:0]     state;
+        logic [$clog2(`ROB_SZ)-1:0]  head;
+        logic [$clog2(`ROB_SZ)-1:0]  tail;
+        logic [$clog2(`ROB_SZ):0]   used;
+        logic [$clog2(`ROB_SZ):0]   free;
+        logic [$clog2(4*`N):0]      rsvd;
+        // I/O
+        rob2retire  r_out;
+        retire_final r_in;
+        execute2complete_dat cdat_in;
+        rob2dispatch d_out;
+        dispatch2rob d_in;
+
+        state   = dbg_rob.state;
+        head    = dbg_rob.head;
+        tail    = dbg_rob.tail;
+        used    = dbg_rob.used;
+        free    = dbg_rob.free;
+        rsvd    = dbg_rob.rsvd;
+
+        r_out   = dbg_rob.r_out;
+        r_in    = dbg_rob.r_in;
+        cdat_in = dbg_rob.cdat_in;
+        d_out   = dbg_rob.d_out;
+        d_in    = dbg_rob.d_in;
+
+        $display("  | >> ROB >>");
+        $display("r_out: en_cnt: %d", r_out.r_vld_cnt);
+        for (int i = 0; i < `N; ++i) begin
+            $display("r_out[%d]: tag: %d, t_old: %d, dst: %d, halt: %d, illegal: %d, is_brch: %d",
+                i,
+                r_out.entries[i].tag,
+                r_out.entries[i].t_old,
+                r_out.entries[i].dst,
+                r_out.entries[i].halt,
+                r_out.entries[i].illegal,
+                r_out.entries[i].is_brch
+            );
+        end
+
+        for (int i = 0; i < `ROB_SZ; ++i) begin
+            $display("Rob[%2d]: cpl %b, t: %2d, t_old: %2d, dst: %2d, is_brch: %b, wr_mem: %b, rd_mem: %b, halt: %0b, illegal: %0b%s",
+                i,
+                state[i].cpl,
+                state[i].tag,
+                state[i].t_old,
+                state[i].dst,
+                state[i].is_brch,
+                state[i].wr_mem,
+                state[i].rd_mem,
+                state[i].halt,
+                state[i].illegal,
+                (i == head && head == tail) 
+                    ? " << h/t"
+                    : (i == head) 
+                        ? " << h" 
+                        : (i == tail)
+                            ? " << t"
+                            : ""
+            );
+
+            if (i == tail)
+                break;
+        end
+        $display("  | << ROB <<");
+
+    endtask
+
+    task print_rs;
+        // internal state
+        RS_ENTRY [`RS_SZ-1:0] entries; // ms1 test: remove one RS entry (caught)
+        // I/O
+        dispatch2rs d_in;
+        rs2dispatch d_out;
+        execute2rs  ex_in;
+        rs2execute  ex_out;
+        execute2complete_tag ctag_in;
+
+        entries = dbg_rs.entries;
+        d_in    = dbg_rs.d_in;
+        d_out   = dbg_rs.d_out;
+        ex_in   = dbg_rs.ex_in;
+        ex_out  = dbg_rs.ex_out;
+        ctag_in = dbg_rs.ctag_in;
+
+        $display("  %3d | >> RS >>", $time);
+        print_id_result(d_in.d_dat[0]);
+        print_id_result(d_in.d_dat[1]);
+        for (int i = 0; i < `RS_SZ; ++i) begin
+            string fu_name;
+            get_fu_name(entries[i].dat.fu_idx, fu_name);
+
+            if (!entries[i].busy) begin
+                $display("Entry [%2d]:", i);
+                continue;
+            end
+
+            $display("Entry [%2d]: pc=0x%x, id=%3d (%x), busy=%b, issued=%b, t=%2d, t1=%2d, t2=%2d, t1_rdy=%b, t2_rdy=%b, fu=%s(%2d)",
+                i, 
+                entries[i].dat.PC,
+                entries[i].dat.id, 
+                entries[i].dat.inst,
+                entries[i].busy, 
+                entries[i].issued, 
+                entries[i].dat.t, 
+                entries[i].dat.t1, 
+                entries[i].dat.t2, 
+                entries[i].dat.t1_rdy, 
+                entries[i].dat.t2_rdy, 
+                
+                entries[i].busy ? fu_name : "*",
+                entries[i].dat.fu_idx,
+            );
+        end
+        $display("  %3d | << RS <<", $time);
+
+    endtask
+
     task print_custom_data;
         $display("  | >> CYCLE: %3d (t: %3d)", clock_count-1, $time);
         print_btq();
@@ -720,6 +853,8 @@ module testbench;
         print_dispatch();
         print_map_table();
         print_prf();
+        print_rob();
+        print_rs();
         $display("  | << CYCLE: %3d (t: %3d)", clock_count-1, $time);
     endtask
 

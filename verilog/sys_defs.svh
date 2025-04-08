@@ -1085,4 +1085,31 @@ typedef struct packed {
     prf2execute ex_out;
 } DBG_prf;
 
+typedef struct packed {
+    // internal state
+    ROB_ENTRY [`ROB_SZ-1:0]     state;
+    logic [$clog2(`ROB_SZ)-1:0]  head;
+    logic [$clog2(`ROB_SZ)-1:0]  tail;
+    logic [$clog2(`ROB_SZ):0]   used;
+    logic [$clog2(`ROB_SZ):0]   free;
+    logic [$clog2(4*`N):0]      rsvd;
+    // I/O
+    rob2retire  r_out;
+    retire_final r_in;
+    execute2complete_dat cdat_in;
+    rob2dispatch d_out;
+    dispatch2rob d_in;
+} DBG_rob;
+
+typedef struct packed {
+    // internal state
+    RS_ENTRY [`RS_SZ-1:0] entries; // ms1 test: remove one RS entry (caught)
+    // I/O
+    dispatch2rs d_in;
+    rs2dispatch d_out;
+    execute2rs  ex_in;
+    rs2execute  ex_out;
+    execute2complete_tag ctag_in;
+} DBG_rs;
+
 `endif // __SYS_DEFS_SVH__

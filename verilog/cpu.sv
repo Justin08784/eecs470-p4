@@ -48,7 +48,9 @@ module cpu (
     // output DBG_lq       dbg_lq,
     // output DBG_icache   dbg_icache, // icache is submodule of fetch; dont need separate line
     output DBG_mt       dbg_mt,
-    output DBG_prf      dbg_prf
+    output DBG_prf      dbg_prf,
+    output DBG_rob      dbg_rob,
+    output DBG_rs       dbg_rs
 );
     /* Global controls*/
     logic flush;
@@ -229,6 +231,9 @@ module cpu (
     prf2execute     prf_2_ex;
 
     rs rs_0(
+        `ifdef DEBUG
+        .dbg        (dbg_rs),
+        `endif
         .clock  (clock),
         .reset  (reset),
         .flush  (flush),
@@ -250,6 +255,9 @@ module cpu (
         .ROB_SZ(`ROB_SZ),
         .N(`N)
     ) rob_0 (
+        `ifdef DEBUG
+        .dbg        (dbg_rob),
+        `endif
         .clock      (clock),
         .reset      (reset),
         .flush      (flush),
