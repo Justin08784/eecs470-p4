@@ -13,6 +13,7 @@
 module stage_if_p4 (
     `ifdef DEBUG
     output DBG_fetch dbg,
+    DBG_icache dbg_icache,
     `endif
 
     input   clock,
@@ -45,6 +46,9 @@ module stage_if_p4 (
     //logic [1:0] valid_out;
 
     // icache icache_0 (
+    //     `ifdef DEBUG
+    //     .dbg        (dbg_icache)
+    //     `endif
     //     // inputs
     //     .clock                      (clock),
     //     .reset                      (reset),
@@ -156,7 +160,8 @@ module stage_if_p4 (
         d_out,
         r_in,
         Imem_data,
-        PC_reg
+        PC_reg,
+        dbg_icache
     };
     `endif
 

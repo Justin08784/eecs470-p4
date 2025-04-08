@@ -67,6 +67,8 @@ module testbench;
     DBG_fetch       dbg_fetch;
     DBG_decode      dbg_decode;
     DBG_dispatch    dbg_dispatch;
+    DBG_lq          dbg_lq;
+    DBG_mt          dbg_mt;
 
     // Instantiate the Pipeline
     cpu verisimpleV (
@@ -95,6 +97,8 @@ module testbench;
         .dbg_fetch      (dbg_fetch),
         .dbg_decode     (dbg_decode),
         .dbg_dispatch   (dbg_dispatch),
+        // .dbg_lq         (dbg_lq),
+        .dbg_mt         (dbg_mt),
         .dbg_rob2retire (dbg_rob2retire),
         .dbg_btq2retire (dbg_btq2retire),
         .dbg_retire2btq (dbg_retire2btq),
@@ -481,6 +485,56 @@ module testbench;
         $display("<< BTQ <<");
     endtask
 
+    task print_icache();
+        DBG_icache dbg_icache;
+
+        // internal state
+        logic changed_addr;
+        logic [12-`ICACHE_LINE_BITS:0] current_tag,   last_tag,   write_tag;
+        logic [`ICACHE_LINE_BITS -1:0] current_index, last_index, write_index;
+        logic                          got_mem_data;
+        MSHR_entry [15:0] MSHR;
+        ICACHE_TAG [`ICACHE_LINES-1:0] icache_tags;
+        // I/O
+        MEM_TAG   Imem2proc_transaction_tag;
+        MEM_BLOCK Imem2proc_data;
+        MEM_TAG   Imem2proc_data_tag;
+        ADDR proc2Icache_addr;
+        MEM_COMMAND proc2Imem_command;
+        ADDR        proc2Imem_addr;
+        MEM_BLOCK Icache_data_out;
+        logic     Icache_valid_out;
+
+        dbg_icache = dbg_fetch.dbg_icache;
+        changed_addr                = dbg_icache.changed_addr;
+        current_tag                 = dbg_icache.current_tag;
+        last_tag                    = dbg_icache.last_tag;
+        write_tag                   = dbg_icache.write_tag;
+        current_index               = dbg_icache.current_index;
+        last_index                  = dbg_icache.last_index;
+        write_index                 = dbg_icache.write_index;
+        got_mem_data                = dbg_icache.got_mem_data;
+        MSHR                        = dbg_icache.MSHR;
+        icache_tags                 = dbg_icache.icache_tags;
+        // I/O
+        Imem2proc_transaction_tag   = dbg_icache.Imem2proc_transaction_tag;
+        Imem2proc_data              = dbg_icache.Imem2proc_data;
+        Imem2proc_data_tag          = dbg_icache.Imem2proc_data_tag;
+        proc2Icache_addr            = dbg_icache.proc2Icache_addr;
+        proc2Imem_command           = dbg_icache.proc2Imem_command;
+        proc2Imem_addr              = dbg_icache.proc2Imem_addr;
+        Icache_data_out             = dbg_icache.Icache_data_out;
+        Icache_valid_out            = dbg_icache.Icache_valid_out;
+
+        $display("  | >> ICACHE >>", $time);
+        $display("tags: {cur: %x, last: %x, wr: %x}", current_tag, last_tag, write_tag);
+        $display("read: {en %b, addr: %x, data: %x}", 1'b1, current_index, Icache_data_out);
+        $display("writ: {en %b, addr: %x, data: %x}", got_mem_data, write_index, Imem2proc_data);
+        $display("changed_addr: %b, proc2Imem_command: %1d, proc2Imem_addr: %x", changed_addr, proc2Imem_command, proc2Imem_addr);
+        $display("last: {tag: %x, idx: %x} -> curr {tag: %x, idx: %x} <changed: %b>", last_tag, last_index, current_tag, current_index, changed_addr);
+        $display("  | << ICACHE <<", $time);
+    endtask
+
     task print_fetch;
         logic           flush;
         decode2fetch    d_in;
@@ -585,12 +639,54 @@ module testbench;
         $display("  %3d | << Dispatch <<", $time);
     endtask
 
+    task print_map_table();
+        struct packed {
+            PHYS_REG_IDX t;
+        } [`NUM_ARCH_REG-1:0] entries;
+        arch_map2map_table am_in;
+        dispatch2map_table d_in;
+        map_table2dispatch d_out;
+
+        entries = dbg_mt.entries;
+        am_in   = dbg_mt.am_in;
+        d_in    = dbg_mt.d_in;
+        d_out   = dbg_mt.d_out;
+
+        $display(">> MT >>", $time);
+        $display("dis_in:   {en_cnt: %d, [(%0d->%0d, %d, %d), (%0d->%0d, %d, %d)]}",
+            d_in.en_cnt,
+            d_in.dsts[0],
+            d_in.ts[0],
+            d_in.src1s[0],
+            d_in.src2s[0],
+            d_in.dsts[1],
+            d_in.ts[1],
+            d_in.src1s[1],
+            d_in.src2s[1]
+        );
+        $display("dis_out:  {en_cnt: %d, [(told: %0d, t1: %0d, t2: %0d), (told: %0d, t1: %0d, t2: %0d)]}",
+            d_in.en_cnt,
+            d_out.ts_old[0],
+            d_out.t1s[0],
+            d_out.t2s[0],
+
+            d_out.ts_old[1],
+            d_out.t1s[1],
+            d_out.t2s[1]
+        );
+        $display("<< MT <<", $time);
+
+    endtask
+
+
     task print_custom_data;
         $display("  | >> CYCLE: %3d (t: %3d)", clock_count-1, $time);
         print_btq();
         print_fetch();
+        print_icache();
         print_decode();
         print_dispatch();
+        print_map_table();
         $display("  | << CYCLE: %3d (t: %3d)", clock_count-1, $time);
     endtask
 

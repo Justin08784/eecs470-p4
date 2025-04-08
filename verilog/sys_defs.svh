@@ -1008,6 +1008,25 @@ typedef struct packed {
 /* DEBUG STRUCTS */
 typedef struct packed {
     // internal state
+    logic changed_addr;
+    logic [12-`ICACHE_LINE_BITS:0] current_tag,   last_tag,   write_tag;
+    logic [`ICACHE_LINE_BITS -1:0] current_index, last_index, write_index;
+    logic                          got_mem_data;
+    MSHR_entry [15:0] MSHR;
+    ICACHE_TAG [`ICACHE_LINES-1:0] icache_tags;
+    // I/O
+    MEM_TAG   Imem2proc_transaction_tag;
+    MEM_BLOCK Imem2proc_data;
+    MEM_TAG   Imem2proc_data_tag;
+    ADDR proc2Icache_addr;
+    MEM_COMMAND proc2Imem_command;
+    ADDR        proc2Imem_addr;
+    MEM_BLOCK Icache_data_out;
+    logic     Icache_valid_out;
+} DBG_icache;
+
+typedef struct packed {
+    // internal state
     // I/O
     logic           flush;
     decode2fetch    d_in;
@@ -1015,6 +1034,8 @@ typedef struct packed {
     retire2fetch    r_in;
     MEM_BLOCK [1:0] Imem_data;
     ADDR [`N-1:0]   PC_reg;
+    // submodule
+    DBG_icache      dbg_icache;
 } DBG_fetch;
 
 typedef struct packed {
@@ -1060,5 +1081,32 @@ typedef struct packed {
     btq2dispatch         d_out;
 } DBG_btq;
 
+typedef struct packed {
+    // internal state
+    SQ_ENTRY    [`LSQ_SZ-1:0]           state;
+    logic       [$clog2(`LSQ_SZ)-1:0]    head;
+    logic       [$clog2(`LSQ_SZ)-1:0]    tail;
+    logic       [$clog2(`LSQ_SZ):0]      used;
+    // I/O
+    dispatch2lq dis_2_lq;
+    execute2lq exec_2_lq;
+    rob2lq rob_2_lq;
+
+    lq2dispatch lq_2_dis;
+    lq2rob lq_2_rob;
+} DBG_lq;
+
+
+typedef struct packed {
+    // internal state
+    struct packed {
+        PHYS_REG_IDX t;
+    } [`NUM_ARCH_REG-1:0] entries;
+
+    // I/O
+    arch_map2map_table am_in;
+    dispatch2map_table d_in;
+    map_table2dispatch d_out;
+} DBG_mt;
 
 `endif // __SYS_DEFS_SVH__

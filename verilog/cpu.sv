@@ -45,6 +45,9 @@ module cpu (
     output DBG_fetch    dbg_fetch,
     output DBG_decode   dbg_decode,
     output DBG_dispatch dbg_dispatch,
+    // output DBG_lq       dbg_lq,
+    // output DBG_icache   dbg_icache, // icache is submodule of fetch; dont need separate line
+    output DBG_mt       dbg_mt,
     output rob2retire dbg_rob2retire,
     output btq2retire dbg_btq2retire,
     output retire2btq dbg_retire2btq,
@@ -346,6 +349,9 @@ module cpu (
     map_table #(
         .N(`N)
     ) map_table_0 (
+        `ifdef DEBUG
+        .dbg    (dbg_mt),
+        `endif
         .clock  (clock),
         .reset  (reset),
         .flush  (flush),

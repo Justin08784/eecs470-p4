@@ -15,13 +15,11 @@ Map Table
 module map_table #(parameter 
     N=`N
 ) (
-    input clock, reset, flush,
-
     `ifdef DEBUG
-    output struct packed {
-        PHYS_REG_IDX t;
-    } [`NUM_ARCH_REG-1:0] entries_dbg,
+    output DBG_mt dbg,
     `endif
+
+    input clock, reset, flush,
 
     // flush
     input arch_map2map_table am_in,
@@ -39,9 +37,6 @@ module map_table #(parameter
     struct packed {
         PHYS_REG_IDX t;
     } [`NUM_ARCH_REG-1:0] entries, entries_n;
-    `ifdef DEBUG
-    assign entries_dbg = entries;
-    `endif
 
     always_comb begin
         entries_n = entries;
@@ -92,34 +87,12 @@ module map_table #(parameter
     end
 
     `ifdef DEBUG
-    // debugging
-    always_ff @(posedge clock) begin
-        if (!reset) begin
-            $display("  %3d | >> MT >>", $time);
-            $display("dis_in:   {en_cnt: %d, [(%0d->%0d, %d, %d), (%0d->%0d, %d, %d)]}",
-                d_in.en_cnt,
-                d_in.dsts[0],
-                d_in.ts[0],
-                d_in.src1s[0],
-                d_in.src2s[0],
-                d_in.dsts[1],
-                d_in.ts[1],
-                d_in.src1s[1],
-                d_in.src2s[1]
-            );
-            $display("dis_out:  {en_cnt: %d, [(told: %0d, t1: %0d, t2: %0d), (told: %0d, t1: %0d, t2: %0d)]}",
-                d_in.en_cnt,
-                d_out.ts_old[0],
-                d_out.t1s[0],
-                d_out.t2s[0],
-
-                d_out.ts_old[1],
-                d_out.t1s[1],
-                d_out.t2s[1]
-            );
-            $display("  %3d | << MT <<", $time);
-        end
-    end
+    assign dbg = '{
+        entries,
+        am_in,
+        d_in,
+        d_out
+    };
     `endif
 
 endmodule
