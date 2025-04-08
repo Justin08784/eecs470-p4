@@ -28,7 +28,8 @@ import "DPI-C" function string decode_inst(int inst);
 //import "DPI-C" function void close_pipeline_output_file();
 
 
-`define TB_MAX_CYCLES 5000//50000000
+`define TB_MAX_CYCLES 50
+// `define TB_MAX_CYCLES 50000000
 
 
 // Debug cycle limits, both inclusive
@@ -423,7 +424,7 @@ module testbench;
     // OPTIONAL: Print our your data here
     // It will go to the $program.log file
     function print_id_result(input ID_RESULT x);
-        $display("ID_RESULT: id=%3d t=%2d t1=%2d t2=%2d t1_rdy=%b t2_rdy=%b fu_idx=%2d rob_idx=%2d btq_idx=%2d is_brch:%b inst=%h PC=%h NPC=%h opa_select=%1d opb_select=%1d dest_reg_idx=%2d alu_func=%1d mult=%b rd_mem=%b wr_mem=%b cond_branch=%b uncond_branch=%b halt=%b illegal=%b csr_op=%b",
+        $display("ID_RESULT: id=%3d t=%2d t1=%2d t2=%2d t1_rdy=%b t2_rdy=%b fu_idx=%2d rob_idx=%2d btq_idx=%2d sq_idx=%2d lq_idx=%2d is_brch:%b inst=%h PC=%h NPC=%h opa_select=%1d opb_select=%1d dest_reg_idx=%2d alu_func=%1d mult=%b rd_mem=%b wr_mem=%b cond_branch=%b uncond_branch=%b halt=%b illegal=%b csr_op=%b",
             x.id,
             x.t,
             x.t1,
@@ -433,6 +434,8 @@ module testbench;
             x.fu_idx,
             x.rob_idx,
             x.btq_idx,
+            x.sq_idx,
+            x.lq_idx,
             x.is_brch,
             x.inst,
             x.PC,
