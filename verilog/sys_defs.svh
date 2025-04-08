@@ -437,7 +437,6 @@ typedef struct packed {
     logic rd_mem;
     logic halt;
     logic illegal;
-    logic err_ld_ooo;
 } ROB_ENTRY;
 
 //allowing one bit greater than strictly necessary 
@@ -457,13 +456,12 @@ typedef struct packed {
 } SQ_ENTRY;
 
 typedef struct packed {
-    LSQ_IDX lq_idx;
     LSQ_IDX sq_idx;
-    ROB_IDX rob_idx;
     ADDR addr;
     logic d_vld;
     MEM_SIZE mem_size;
     ADDR inst_pc;
+    logic err_ld_ooo;
 } LQ_ENTRY;
 
 // BTQ stuff
@@ -980,8 +978,6 @@ typedef struct packed {
     LSQ_IDX     [`NUM_FU_LOAD-1:0]  ld_lq_idx; //LQ IDX for the incoming loads (found in ID_RESULT packet).
     ADDR        [`NUM_FU_LOAD-1:0]  ld_addr; //address that the load is loading from
     MEM_SIZE    [`NUM_FU_LOAD-1:0]  ld_mem_size; //MEM_SIZE'(id_ex_reg.inst.r.funct3[1:0]); <-- HOW TO FIND THIS. size being loaded (BYTE, HALF, WORD)
-    logic       [`NUM_FU_STORE-1:0] st_en; //this comes from the STORE FUs, and tells teh LQ if a valid SQ IDX is coming in on that line (bus, not count)
-    LSQ_IDX     [`NUM_FU_STORE-1:0] st_sq_idx; //SQ_IDX associated with st_en. These two items are used to check if any loads and stores have happened out-of-order to flag in the ROB
     //LQ doesn't need to talk back to execute
 
     //NOTE: the "ld_" items should be sent to LQ as soon as the address to load from is resolved and the query begins. In addition, we still want to set their complete flags in the
@@ -989,6 +985,11 @@ typedef struct packed {
 
     //NOTE: the "st_" items should be sent to LQ as soon as the address to store to is resolved and the data is being sent to the SQ.
 } execute2lq;
+
+typedef struct packed {
+    logic       [`NUM_FU_STORE-1:0] st_en; //this comes from the STORE FUs, and tells the LQ if a valid SQ IDX is coming in on that line (bus, not count)
+    LSQ_IDX     [`NUM_FU_STORE-1:0] st_sq_idx; //SQ_IDX associated with st_en. These two items are used to check if any loads and stores have happened out-of-order to flag in the ROB
+} execeuteST2lq;
 
 typedef struct packed {
     ADDR  addr;

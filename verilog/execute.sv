@@ -411,7 +411,7 @@ module str_ex(
     input   sq2execute sq_in,
     output  execute2sq sq_out,
     // FIXME: Isn't an lq2execute needed? <-- Answer: No, if an issue is found when forwarding the SQ_IDX to LQ, it is flagged in the ROB to restart from that PC
-    output  execute2lq lq_out,
+    output  execeuteST2lq st_lq_out,
 
     /* BACKEND */
     output logic    [`NUM_FU_STORE-1:0]  o_vld,
@@ -458,9 +458,10 @@ module str_ex(
             sq_out.st_addr[i]       = addr;
             sq_out.st_data[i]       = rs2;
             sq_out.st_mem_size[i]   = i_regs[i].dat.mem_size;
-            /* FIXME: What about rd_unsigned? We are not using this
-            in lq???? */
-            // $display("EX OUT [%0d]: en: %b, sq_idx: %0d, addr: %0d, data: %0d, mem_size: %0d", i, sq_out.st_ex_en[i], sq_out.st_sq_idx[i], sq_out.st_addr[i], sq_out.st_data[i], sq_out.st_mem_size[i]);
+
+            st_lq_out.st_en[i]      = i_vld[i];
+            st_lq_out.st_sq_idx[i]  = i_regs[i].dat.sq_idx;
+
         end
     end
 
@@ -613,6 +614,7 @@ module stage_ex_p4 (
     output  execute2sq sq_out,
     // FIXME: Isn't an lq2execute needed?
     output  execute2lq lq_out,
+    output  execeuteST2lq st_lq_out,
 
     input   prf2execute prf_in,
     output  execute2prf prf_out,

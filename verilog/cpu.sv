@@ -340,6 +340,7 @@ module cpu (
     //////////////////////////////////////////////////
 
     execute2lq exec_2_lq;
+    execeuteST2lq execST_2_lq;
 
     lq lq_0(
         `ifdef DEBUG
@@ -352,6 +353,7 @@ module cpu (
         .dis_2_lq(dis_2_lq),
         .retire_2_lq(retire_2_lq),
         .exec_2_lq(exec_2_lq),
+        .execST_in(execST_2_lq),
 
         .lq_2_dis(lq_2_dis),
         .lq_2_rob(lq_2_rob),
@@ -376,6 +378,7 @@ module cpu (
         .sq_out (exec_2_sq),
 
         .lq_out (exec_2_lq),
+        .st_lq_out (execST_2_lq),
 
         .prf_in (prf_2_ex),
         .prf_out(ex_2_prf),

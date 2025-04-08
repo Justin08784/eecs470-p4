@@ -18,6 +18,7 @@ module lq #(parameter
 
     input dispatch2lq dis_2_lq,
     input execute2lq exec_2_lq,
+    input execeuteST2lq execST_in,
     input retire2lq retire_2_lq,
 
     output lq2dispatch lq_2_dis,
@@ -47,6 +48,8 @@ module lq #(parameter
 
 
     LSQ_IDX head_plus_one;
+    logic [NUM_FU_LOAD-1:0] set_err;
+    LSQ_IDX [NUM_FU_LOAD-1:0] err_idx;
     always_comb begin
         lq_2_rob = '0;
 
@@ -68,14 +71,16 @@ module lq #(parameter
         else                                                    lq_2_rob.ret_rdy = 0;      
 
         //handle checking if LQ got ahead of SQ and needs to flag it in ROB
+        set_err = '0;
+        err_idx = '0;
         for (int i = 0; i < NUM_FU_STORE; i++) begin
-            if (!exec_2_lq.st_en[i]) continue;
+            if (!execST_in.st_en[i]) continue;
 
             for (int j = 0, int idx = 0; j < used; j++) begin
                 idx = (head + j) % LSQ_SZ;
-                if (state[idx].sq_idx == exec_2_lq.st_sq_idx[i]) begin
-                    lq_2_rob.err_en[i] = '1;
-                    lq_2_rob.rob_idx[i] = state[idx].rob_idx;
+                if (state[idx].sq_idx == execST_in.st_sq_idx[i]) begin
+                    set_err[i] = '1;
+                    err_idx[i] = idx;
                 end
             end
         end
@@ -115,19 +120,24 @@ module lq #(parameter
 
             end
 
+            //handle error flags
+            for (int unsigned i = 0; i < NUM_FU_LOAD; ++i) begin
+                if (set_err[i])
+                    state[err_idx[i]].err_ld_ooo <= 1;
+            end
+
             // handle dispatch (ins)
             for (int unsigned i = 0, int cur_idx = 0; i < NUM_DPORTS; ++i) begin
                 if (i >= dis_2_lq.lq_d_en_cnt)
                     continue;
                 cur_idx = d_idxs[i];
                 state[cur_idx] <= '{
-                    lq_idx     : d_idxs[i],
                     sq_idx : dis_2_lq.sq_idx[i],
-                    rob_idx : dis_2_lq.rob_idx[i],
                     addr     : '0,
                     d_vld     : '0,
                     mem_size : '0,
-                    inst_pc : dis_2_lq.inst_pc[i]
+                    inst_pc : dis_2_lq.inst_pc[i],
+                    err_ld_ooo : '0
                 };
             end
         end

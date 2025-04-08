@@ -135,12 +135,6 @@ module rob #(
                     state[sq_in.complete_rob_idxs[i]].cpl <= 1;
             end
 
-            //handle LQ errors
-            for (int unsigned i = 0; i < `NUM_FU_LOAD; ++i) begin
-                if (lq_in.err_en[i])
-                    state[lq_in.rob_idx[i]].err_ld_ooo <= 1;
-            end
-
             // handle dispatch (ins)
             for (int unsigned i = 0, int cur_idx = 0; i < NUM_DPORTS; ++i) begin
                 if (i >= d_in.d_en_cnt)
@@ -155,8 +149,7 @@ module rob #(
                     t_old   : d_in.t_old[i],
                     dst     : d_in.dst[i],
                     halt    : d_in.halt[i],
-                    illegal : d_in.illegal[i],
-                    err_ld_ooo : '0
+                    illegal : d_in.illegal[i]
                 };
             end
         end
