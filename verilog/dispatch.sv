@@ -217,7 +217,6 @@ always_comb begin
     btq_wr_idx  = 0;
 
     for (int i = 0; i < `N; ++i) begin
-        $display("I: %0d, ROB_IDX[i]: %0d", i, rob_in.rob_idxs[i]);
         tmp_alloc2rename[i].dat         = rename_in[i];
 
         tmp_alloc2rename[i].dat.t       = map_out.ts[i];
