@@ -18,6 +18,10 @@ module rs #(parameter
     NUM_FU_LOAD=`NUM_FU_LOAD,
     NUM_FU_STORE=`NUM_FU_STORE
 ) (
+    `ifdef DEBUG
+    output DBG_rs dbg,
+    `endif
+
     input clock,
     input reset,
     input flush,
@@ -32,25 +36,17 @@ module rs #(parameter
     b00 +> b01 +> b10 (cannot increment further)
     0      1      2 
     */
-    output  rs2dispatch     d_out,
-    input   dispatch2rs     d_in,
+    input  dispatch2rs  d_in,
+    output rs2dispatch  d_out,
 
     // issue
-    input   execute2rs                      ex_in,
-    output  rs2execute                      ex_out,
-
-
-    `ifdef DEBUG
-    output  RS_ENTRY    [RS_SZ-1:0]       entries_dbg,
-    `endif 
+    input  execute2rs   ex_in,
+    output rs2execute   ex_out,
 
     // complete (CDB)
     input execute2complete_tag  ctag_in
 );
     RS_ENTRY [RS_SZ-1:0]       entries; // ms1 test: remove one RS entry (caught)
-    `ifdef DEBUG
-    assign entries_dbg = entries;
-    `endif 
 
     logic [RS_SZ-1:0] busy_vec;
     logic [RS_SZ-1:0] issd_vec;
@@ -314,18 +310,6 @@ module rs #(parameter
     end
 
 
-    `ifndef SYNTH
-    function get_fu_name(input FU_IDX fu_idx, output string name);
-        case (fu_idx)
-            FU_ALU:     name = "ALU";
-            FU_MULT:    name = "MULT";
-            FU_LOAD:    name = "LOAD";
-            FU_STORE:   name = "STORE";
-            default:    name = "Unknown FU";
-        endcase
-    endfunction
-    `endif
-
     always_ff @(posedge clock) begin
         if (reset || flush) begin
             entries  <= '0;
@@ -360,43 +344,20 @@ module rs #(parameter
             end
 
         end
-
-        `ifdef DEBUG
-        if (!reset) begin
-            $display("  %3d | >> RS >>", $time);
-            print_id_result(d_in.d_dat[0]);
-            print_id_result(d_in.d_dat[1]);
-            for (int i = 0; i < RS_SZ; ++i) begin
-                string fu_name;
-                get_fu_name(entries[i].dat.fu_idx, fu_name);
-
-                if (!entries[i].busy) begin
-                    $display("Entry [%2d]:", i);
-                    continue;
-                end
-
-                $display("Entry [%2d]: pc=0x%x, id=%3d (%x), busy=%b, rob_idx=%0d, issued=%b, t=%2d, t1=%2d, t2=%2d, t1_rdy=%b, t2_rdy=%b, fu=%s(%2d)",
-                    i, 
-                    entries[i].dat.PC,
-                    entries[i].dat.id, 
-                    entries[i].dat.inst,
-                    entries[i].busy, 
-                    entries[i].dat.rob_idx, 
-                    entries[i].issued, 
-                    entries[i].dat.t, 
-                    entries[i].dat.t1, 
-                    entries[i].dat.t2, 
-                    entries[i].dat.t1_rdy, 
-                    entries[i].dat.t2_rdy, 
-                    
-                    entries[i].busy ? fu_name : "*",
-                    entries[i].dat.fu_idx,
-                );
-            end
-            $display("  %3d | << RS <<", $time);
-        end
-        `endif
     end
+
+    `ifdef DEBUG
+    assign dbg = ' {
+        // internal state
+        entries, // ms1 test: remove one RS entry (caught)
+        // I/O
+        d_in,
+        d_out,
+        ex_in,
+        ex_out,
+        ctag_in
+    };
+    `endif
 
 
 endmodule

@@ -216,6 +216,10 @@ endmodule // decoder
 
 
 module stage_id_p4 (
+    `ifdef DEBUG
+    output DBG_decode dbg,
+    `endif
+
     input              clock,           // system clock
     input              reset,           // system reset
     input              flush,
@@ -390,7 +394,7 @@ module stage_id_p4 (
             need to check && (i < prvw_vld_cnt) for either condition!
             */
             d_out.prvw_has_dests[i] = d_out.d_dat[i].dest_reg_idx != `ZERO_REG;
-            d_out.prvw_is_brch[i]   = d_out.d_dat[i].is_branch;
+            d_out.prvw_is_brch[i]   = d_out.d_dat[i].is_brch;
         end
     end
 
@@ -400,39 +404,16 @@ module stage_id_p4 (
         end else begin
             insn_id <= insn_id + non_illegal_cnt;
         end
-
-
-        `ifdef DEBUG
-        if (!reset) begin
-            $display("  %3d | >> ID >>", $time);
-            // $display("  %3d | FIFO: {used_scnt: %d, free_scnt: %d}",
-            //     $time,
-            //     used_scnt,
-            //     free_scnt
-            // );
-            $display("f_in:  {f_en_cnt: %d, PC: [%x, %x], inst: [%x, %x]}",
-                f_in.f_en_cnt,
-                f_in.f_en_cnt > 0 ? f_in.f_dat[0].PC : 0,
-                f_in.f_en_cnt > 1 ? f_in.f_dat[1].PC : 0,
-                f_in.f_en_cnt > 0 ? f_in.f_dat[0].inst : 0,
-                f_in.f_en_cnt > 1 ? f_in.f_dat[1].inst : 0,
-            );
-
-            $display("d_out: {d_en_cnt: %d, PC: [%x, %x], inst: [%x, %x]}",
-                d_in.dispatch_en_cnt,
-                d_out.d_dat[0].PC, 
-                d_out.d_dat[1].PC,
-                d_out.d_dat[0].inst, 
-                d_out.d_dat[1].inst
-            );
-            print_id_result(d_out.d_dat[0]);
-            print_id_result(d_out.d_dat[1]);
-            // $display("d_out.d_dat[0]: %b", d_out.d_dat[0]);
-            // $display("d_out.d_dat[1]: %b", d_out.d_dat[1]);
-            $display("  %3d | << ID <<", $time);
-        end
-        `endif
     end
+
+    `ifdef DEBUG
+    assign dbg = '{
+        f_in,
+        f_out,
+        d_in,
+        d_out
+    };
+    `endif
 
 endmodule // stage_id
 

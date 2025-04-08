@@ -8,6 +8,10 @@ typedef struct packed {
 module dispatch #(parameter 
     N=`N
 ) (
+    `ifdef DEBUG
+    output DBG_dispatch dbg,
+    `endif
+
     input clock, reset, flush,
     // DECODE
     input   decode2dispatch decode_in,
@@ -139,9 +143,9 @@ always_comb begin
 
     lim_cnt_btq = 0;
     for (int unsigned i = 0, int used_cnt = 0; i < `N; ++i) begin
-        if (used_cnt + rename_in[i].is_branch > btq_in.btq_rdy_scnt)
+        if (used_cnt + rename_in[i].is_brch > btq_in.btq_rdy_scnt)
             break;
-        used_cnt += rename_in[i].is_branch;
+        used_cnt += rename_in[i].is_brch;
         ++lim_cnt_btq;
     end
     rename_en_cnt = `MIN(lim_cnt_btq, rename_en_cnt);
@@ -166,7 +170,7 @@ always_comb begin
         rename_en[i] = i < rename_en_cnt;
 
     foreach(is_brch[i])
-        is_brch[i]  = rename_in[i].is_branch;
+        is_brch[i]  = rename_in[i].is_brch;
     foreach(wr_mem[i])
         wr_mem[i]   = rename_in[i].wr_mem;
 
@@ -216,7 +220,7 @@ always_comb begin
         tmp_alloc2rename[i].dat.t1_rdy  = !rd_src1s[i];
         tmp_alloc2rename[i].dat.t2_rdy  = !rd_src2s[i];
 
-        if (rename_in[i].is_branch) begin
+        if (rename_in[i].is_brch) begin
             tmp_alloc2rename[i].dat.btq_idx = btq_in.btq_idxs[btq_wr_idx];
             btq_out.NPC[btq_wr_idx] = rename_in[i].NPC;
             ++btq_wr_idx;
@@ -280,7 +284,7 @@ always_comb begin
 
     for (int i = 0; i < `N; i++) begin
         //handling src tags
-        rob_out.is_brch[i]  = commit_in[i].dat.is_branch;
+        rob_out.is_brch[i]  = commit_in[i].dat.is_brch;
         rob_out.wr_mem[i]   = commit_in[i].dat.wr_mem;
         rob_out.rd_mem[i]   = commit_in[i].dat.rd_mem;
         rob_out.tag[i]      = commit_in[i].dat.t;
@@ -292,24 +296,6 @@ always_comb begin
         rob_out.illegal[i]  = commit_in[i].dat.illegal;
     end
 end
-
-// debug
-`ifdef DEBUG
-always_ff @(posedge clock) begin
-
-    if (!reset) begin
-        $display("  %3d | >> Dispatch >>", $time);
-        $display("r_in.btq_rdy_scnt: %d",   btq_in.btq_rdy_scnt);
-        $display("btq_in.btq_rdy_scnt: %d",   btq_in.btq_rdy_scnt);
-        $display("rob_in.rob_rdy_scnt: %d",  rob_in.rob_rdy_scnt);
-        $display("decode_in.d_vld_scnt: %d",  decode_in.d_vld_scnt);
-        $display("free_in.free_rdy_scnt: %d",  free_in.free_rdy_scnt);
-        $display("decode_in.prvw_has_dests: %b", decode_in.prvw_has_dests);
-        $display("  %3d | << Dispatch <<", $time);
-    end
-
-end
-`endif
 
 always_ff @(posedge clock) begin
     
@@ -326,6 +312,26 @@ always_ff @(posedge clock) begin
         end
     end
 end
+
+`ifdef DEBUG
+assign dbg = '{
+    decode_in,
+    decode_out,
+    rs_in,
+    rs_out,
+    rob_in,
+    rob_out,
+    free_in,
+    free_out,
+    sq_in,
+    sq_out,
+    btq_in,
+    btq_out,
+    ctag_in,
+    map_in,
+    map_out
+};
+`endif
 
 endmodule
 

@@ -5,9 +5,10 @@ module rob #(
     parameter N=`N
 ) (
     `ifdef DEBUG
-    output  ROB_ENTRY   [ROB_SZ-1:0]    state_dbg,
+    output  DBG_rob dbg,
     `endif 
-    input                       clock, reset, flush,
+
+    input clock, reset, flush,
 
     // retire (read)
     output rob2retire r_out,
@@ -18,11 +19,7 @@ module rob #(
 
     // dispatch (write)
     output rob2dispatch d_out,
-    input  dispatch2rob d_in,
-
-    //SQ
-    input  sq2rob sq_in,
-    output rob2sq sq_out
+    input  dispatch2rob d_in
 );
     localparam NUM_DPORTS = N; // dispatch ports (in-order)
     localparam NUM_RPORTS = N; // retire ports (in-order)
@@ -45,13 +42,10 @@ module rob #(
     logic [NUM_RPORTS-1:0][$clog2(ROB_SZ)-1:0] rtre_idxs;
     logic [NUM_DPORTS-1:0][$clog2(ROB_SZ)-1:0] comm_idxs;
 
-    assign state_dbg    = state;
     assign free_scnt    = `MIN(free - rsvd, NUM_DPORTS);
     assign used_scnt    = `MIN(used, NUM_RPORTS);
 
     always_comb begin
-        sq_out = '0;
-
         for (int unsigned i = 0; i < NUM_RPORTS; ++i)
             rtre_idxs[i] = (head + i) % ROB_SZ;
         for (int unsigned i = 0; i < NUM_DPORTS; ++i)
@@ -59,49 +53,18 @@ module rob #(
 
         // handle retire (outs)
         r_out = '0;
-        for (int unsigned i = 0; i < used_scnt; ++i) begin
-            // $display("SQ_RET_COMPLETE: %b",sq_in.sq_ret_complete);
-            // $display("Entry[%0d]: wr_mem: %0d, mem_ret_rdy: %0d", rtre_idxs[i], state[rtre_idxs[i]].wr_mem, sq_in.ret_rdy);
-            if (state[rtre_idxs[i]].halt && (~sq_in.sq_ret_complete)) begin
-                // $display("stopping halt %0d, %0d", i, rtre_idxs[i]); //ensures that the SQ and SQ retirement buffer are empty before halting
-                break;
-            end
-            // else if (state[rtre_idxs[i]].wr_mem && (sq_in.ret_rdy > i)) begin
-            //     ++r_out.r_en_cnt;
-            //     ++sq_out.r_en;
-            //     // $display("retire store %0d, %0d", i, rtre_idxs[i]);
-            // end
-            else if (!state[rtre_idxs[i]].cpl) begin
-                // $display("incomplete %0d, %0d", i, rtre_idxs[i]);
-                break;
-            end
-            else begin
-                // $display("incrementing %0d, %0d", i, rtre_idxs[i]);
-                ++r_out.r_en_cnt;
-                if (state[rtre_idxs[i]].wr_mem) ++sq_out.r_en;
-            end
-        end
-
+        r_out.r_vld_cnt = used_scnt;
         for (int unsigned i = 0; i < used_scnt; ++i) begin
             /* preview mode–– just display all valid entries in read window even
             if not all will get retired this cycle */
-            r_out.tag[i]    = state[rtre_idxs[i]].tag;
-            r_out.t_old[i]  = state[rtre_idxs[i]].t_old;
-            r_out.dst[i]    = state[rtre_idxs[i]].dst;
-            r_out.halt[i]   = state[rtre_idxs[i]].halt;
-            r_out.illegal[i]= state[rtre_idxs[i]].illegal;
-            r_out.brch_vld[i]= state[rtre_idxs[i]].is_brch;
-
-            //tell SQ to retire entries
-            // if (state[rtre_idxs[i]].wr_mem)
-            //     ++sq_out.r_en;
+            r_out.entries[i] = state[rtre_idxs[i]];
         end
 
         // handle dispatch (outs)
         /*
         TODO: This tradeoff needs consideration for performance
         Option 1: 
-        d_out.rob_rdy_scnt = `MIN(free + r_out.r_en_cnt, NUM_DPORTS);
+        d_out.rob_rdy_scnt = `MIN(free + r_out.r_vld_cnt, NUM_DPORTS);
         + avoids dispatch stalls when ROB is full if N branches retire per cycle
         - longer combinational delay due to dependency on r_en_cnt
 
@@ -111,7 +74,7 @@ module rob #(
         */
         // The true number of same-cycle free slots is free + r_en_cnt
         d_out = '{
-            // rob_rdy_scnt : `MIN(free + r_out.r_en_cnt, NUM_DPORTS),
+            // rob_rdy_scnt : `MIN(free + r_out.r_vld_cnt, NUM_DPORTS),
             rob_rdy_scnt : free_scnt,
             rob_idxs     : comm_idxs
         };
@@ -120,7 +83,10 @@ module rob #(
     end
 
     always_ff @(posedge clock) begin
+<<<<<<< HEAD
             // $display("SQ_RET_COMPLETE: %b",sq_in.sq_ret_complete);
+=======
+>>>>>>> aa3f0befeaac910e36991c7a295eb0cbf60ad146
         if (reset || flush) begin
             used    <= 0;
             free    <= ROB_SZ;
@@ -131,9 +97,9 @@ module rob #(
             state   <= '0;
         end else begin
             `ifndef SYNTH
-            if (d_in.d_en_cnt > free + r_out.r_en_cnt)
+            if (d_in.d_en_cnt > free + r_out.r_vld_cnt)
                 $error("ROB overflow!");
-            if (r_out.r_en_cnt > used + d_in.d_en_cnt)
+            if (r_out.r_vld_cnt > used + d_in.d_en_cnt)
                 $error("ROB underflow!");
             `endif
             used    <= used + d_in.d_en_cnt - r_in.r_en_cnt;
@@ -190,52 +156,23 @@ module rob #(
             end
         end
     end
-
-    // `ifdef DEBUG
-    always_ff @(posedge clock) begin
-        if (!reset) begin
-            $display("  %3d | >> ROB >>", $time);
-            $display("r_out: en_cnt: %d", r_out.r_en_cnt);
-            for (int i = 0; i < `N; ++i) begin
-                $display("r_out[%d]: tag: %d, t_old: %d, dst: %d, halt: %d, illegal: %d, brch_vld: %d",
-                    i,
-                    r_out.tag[i],
-                    r_out.t_old[i],
-                    r_out.dst[i],
-                    r_out.halt[i],
-                    r_out.illegal[i],
-                    r_out.brch_vld[i]
-                );
-            end
-
-            for (int i = 0; i < `ROB_SZ; ++i) begin
-                $display("Rob[%2d]: cpl %b, t: %2d, t_old: %2d, dst: %2d, is_brch: %b, wr_mem: %b, rd_mem: %b, halt: %0b, illegal: %0b%s",
-                    i,
-                    state[i].cpl,
-                    state[i].tag,
-                    state[i].t_old,
-                    state[i].dst,
-                    state[i].is_brch,
-                    state[i].wr_mem,
-                    state[i].rd_mem,
-                    state[i].halt,
-                    state[i].illegal,
-                    (i == head && head == tail) 
-                        ? " << h/t"
-                        : (i == head) 
-                            ? " << h" 
-                            : (i == tail)
-                                ? " << t"
-                                : ""
-                );
-
-                if (i == tail)
-                    break;
-            end
-            $display("  %3d | << ROB <<", $time);
-
-        end
-    end
-    // `endif
+    
+    `ifdef DEBUG
+    assign dbg = '{
+        // internal state
+        state,
+        head,
+        tail,
+        used,
+        free,
+        rsvd,
+        // I/O
+        r_out,
+        r_in,
+        cdat_in,
+        d_out,
+        d_in
+    };
+    `endif
 
 endmodule
