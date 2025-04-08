@@ -1,0 +1,15 @@
+
+Final memory state and exit status:
+
+@@@ Unified Memory contents hex on left, decimal on right: 
+@@@
+@@@ mem[    0] = 00100113000010b7 : 4504780743381175
+@@@ mem[    8] = 000080930020a023 : 141368850685987
+@@@ mem[   16] = 0000809300008093 : 141368848580755
+@@@ mem[   24] = 0000000000008093 : 32915
+@@@
+@@@ mem[ 4096] = 0000000000000001 : 1
+@@@
+@@@
+@@@ System halted on illegal instruction
+@@@

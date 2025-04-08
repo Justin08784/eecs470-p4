@@ -43,10 +43,10 @@
 // functional units (you should decide if you want more or fewer types of FUs)
 `define NUM_FU_ALU 2
 `define NUM_FU_MULT 2
-`define NUM_FU_LOAD 4
-`define NUM_FU_STORE 4
+`define NUM_FU_LOAD 1
+`define NUM_FU_STORE 1
 // `define NUM_FU_TOTAL `NUM_FU_ALU + `NUM_FU_MULT + `NUM_FU_LOAD + `NUM_FU_STORE
-`define NUM_FU_TOTAL `NUM_FU_ALU + `NUM_FU_MULT
+`define NUM_FU_TOTAL `NUM_FU_ALU + `NUM_FU_MULT + `NUM_FU_LOAD + `NUM_FU_STORE
 
 // number of mult stages (2, 4) (you likely don't need 8)
 `define MULT_STAGES 16
@@ -54,7 +54,9 @@
 
 
 `define BTB_ENTRIES 256
-`define BTB_TAG_WIDTH 10
+`define BTB_TAG_WIDTH 12
+
+`define PREFETCH_CAP 48 // <- how far ahead we can prefetch
 
 ///////////////////////////////
 // --- Compil. Controls ---- //
@@ -65,7 +67,7 @@
 
 `ifndef SYNTH
 // comment out to disable DEBUG:
-`define DEBUG
+// `define DEBUG
 `endif
 
 ///////////////////////////////
@@ -414,9 +416,9 @@ typedef struct packed {
  * some slight changes
  */
 typedef struct packed {
-    ADDR    NPC;
-    DATA    data;
-    REG_IDX reg_idx;
+    // ADDR    NPC;
+    // DATA    data;
+    // REG_IDX reg_idx;
     logic   halt;
     logic   illegal;
     logic   valid;
@@ -431,19 +433,36 @@ typedef struct packed {
     REG_IDX dst;
     
     logic is_brch;
+    logic wr_mem;
+    logic rd_mem;
     logic halt;
     logic illegal;
 } ROB_ENTRY;
 
-typedef logic [$clog2(`LSQ_SZ_DBL)-1:0] LSQ_IDX;
+//allowing one bit greater than strictly necessary 
+//so that we can use values above what we will see 
+//in the LSQ as the initial value for SQ_IDX in 
+//dispatch if a load comes before the first store
+typedef logic [$clog2(`LSQ_SZ_DBL):0] LSQ_IDX; 
 typedef struct packed {
     LSQ_IDX sq_idx;
     ROB_IDX rob_idx;
     ADDR addr;
+    ADDR [3:0] bytewise_addr;
+    logic [3:0] bytewise_addr_mask;
     DATA data;
     logic d_vld;
     MEM_SIZE mem_size; //MEM_SIZE'(id_ex_reg.inst.r.funct3[1:0]); <-- HOW TO FIND THIS. DO THIS WHEN PUTTING ENTRY IN FROM DISPATCH OR FROM EXECUTE
 } SQ_ENTRY;
+
+typedef struct packed {
+    LSQ_IDX lq_idx;
+    LSQ_IDX sq_idx;
+    ROB_IDX rob_idx;
+    ADDR addr;
+    logic d_vld;
+    MEM_SIZE mem_size;
+} LQ_ENTRY;
 
 // BTQ stuff
 // typedef logic [$clog2(`BTQ_SZ)-1:0] BTQ_IDX;
@@ -479,23 +498,24 @@ typedef struct packed {
     logic   [$clog2(`N):0]  rd_cnt;
 } retire2btq;
 
-// same as rob2retire, but with r_en_cnt potentially adjusted to account for branch mispredicts
-typedef struct {
+typedef struct packed {
     logic [$clog2(`N):0]        r_en_cnt; // final final
     PHYS_REG_IDX [`N-1:0]       tag;
     PHYS_REG_IDX [`N-1:0]       t_old;
     REG_IDX      [`N-1:0]       dst;
     logic        [`N-1:0]       halt;
     logic        [`N-1:0]       illegal;
-    logic        [`N-1:0]       brch_vld;
+    logic        [`N-1:0]       is_brch;
 } retire_final;
 
-typedef struct {
-    logic   mispred;
+typedef struct packed {
     ADDR    corrected_PC;
 } retire2fetch;
 
 typedef struct packed {
+    /* Alloc */
+    /* Rename */
+    /* Commit */
     logic   [$clog2(`N):0] en_cnt;
         // How many branch instructions dispatching?
         // Sender must ensure branch insns packed to lowest indices.
@@ -522,7 +542,9 @@ typedef struct packed {
     FU_IDX          fu_idx;
     ROB_IDX         rob_idx;
     BTQ_IDX         btq_idx;
-    logic           is_branch; // Is inst a branch?
+    // FIXME: This was originally separate (sq_idx and lq_idx). Was that necessary?
+    LSQ_IDX         lsq_idx;
+    logic           is_brch; // Is inst a branch?
     
 
     /* from ID_EX_PACKET */
@@ -550,7 +572,7 @@ typedef struct packed {
 // TODO: remember to remove for synthesis? does this prevent synthesis?
 `ifndef SYNTH
 function print_id_result(input ID_RESULT x);
-    $display("ID_RESULT: id=%0d t=%0d t1=%0d t2=%0d t1_rdy=%b t2_rdy=%b fu_idx=%0d rob_idx=%0d btq_idx=%0d is_branch:%b inst=%h PC=%h NPC=%h opa_select=%0d opb_select=%0d dest_reg_idx=%0d alu_func=%0d mult=%b rd_mem=%b wr_mem=%b cond_branch=%b uncond_branch=%b halt=%b illegal=%b csr_op=%b",
+    $display("ID_RESULT: id=%3d t=%2d t1=%2d t2=%2d t1_rdy=%b t2_rdy=%b fu_idx=%2d rob_idx=%2d btq_idx=%2d is_brch:%b inst=%h PC=%h NPC=%h opa_select=%1d opb_select=%1d dest_reg_idx=%2d alu_func=%1d mult=%b rd_mem=%b wr_mem=%b cond_branch=%b uncond_branch=%b halt=%b illegal=%b csr_op=%b",
         x.id,
         x.t,
         x.t1,
@@ -560,7 +582,7 @@ function print_id_result(input ID_RESULT x);
         x.fu_idx,
         x.rob_idx,
         x.btq_idx,
-        x.is_branch,
+        x.is_brch,
         x.inst,
         x.PC,
         x.NPC,
@@ -581,22 +603,25 @@ endfunction
 `endif
 
 typedef struct packed {
+    /* ETB bypass control */
+    logic bypass1;  // set iff 1) awaken by a complete to its src1 AND 2) issued same cycle
+        /* Q: How to implement?
+        A: Set if a complete readies our src1. Clear if we do not issue same cycle.
+        If an insn issues 1 or more cycles *after* all of its source operands
+        have been readied, then they will be ready in the PRF, and thus bypass
+        is needed. */
+    logic bypass2;
+
+    /* This is a ridiculous optimization. Try impl a simple CAM first. */
+    logic [$clog2(`N)-1:0]  cdb_idx1;   // which cdb slot to bypass for src1 (valid iff bypass1 set)
+    logic [$clog2(`N)-1:0]  cdb_idx2;
+} BYPASS_TAG;
+
+typedef struct packed {
     logic           busy;
     logic           issued;
     ID_RESULT       dat;
 } RS_ENTRY;
-
-typedef struct packed {
-    logic       busy;
-
-    /*
-    NOTE: This is a generic struct which could hold the execute-necessary data
-    for ANY operation type, but a lot of the fields may go wasted. Might be
-    better to define FU-specific structs to hold only the data necessary for
-    that specific FU group. (Jonah says not to; dont overcomplicate things)
-    */
-    ID_RESULT   dat;
-} FU_ENTRY;
 
 // By Fetch
 typedef struct packed {
@@ -624,6 +649,9 @@ typedef struct packed {
 } dispatch2decode;
 
 typedef struct packed {
+    /* Alloc */
+    /* Rename */
+    /* Commit */
     logic       [$clog2(`N):0] d_en_cnt;
         // - To: RS
         // - Number of enabled dispatch lines? (replacement for d_vld)
@@ -636,7 +664,11 @@ typedef struct packed {
 } dispatch2rs;
 
 typedef struct packed {
-    logic   [$clog2(`N):0]            d_en_cnt;
+    /* Alloc */
+    logic   [$clog2(`N):0]  alloc_en_cnt;
+    /* Rename */
+    /* Commit */
+    logic   [$clog2(`N):0]  d_en_cnt;
         // To: ROB
         // - Number of enabled dispatch lines?
     logic [`N-1:0][$clog2(`PHYS_REG_SZ_R10K)-1:0] tag;
@@ -647,6 +679,8 @@ typedef struct packed {
     //(ONLY HERE FOR CURRENT ROB TESTBENCH)
     REG_IDX [`N-1:0] dst;
     logic [`N-1:0] is_brch;
+    logic [`N-1:0] wr_mem;
+    logic [`N-1:0] rd_mem;
     logic [`N-1:0] halt;
     logic [`N-1:0] illegal;
 } dispatch2rob;
@@ -660,20 +694,27 @@ typedef struct packed {
 } dispatch2free_list;
 
 typedef struct packed {
-    logic   [$clog2(`N):0]  lsq_d_en_cnt;
+    logic   [$clog2(`N):0]  sq_d_en_cnt;
         // To: LSQ
         // - number of enabled dispatch lines WHO NEED A LD/ST 
         //   (i.e. may only be a strict subset of dispatching insns!)
     ROB_IDX [`N-1:0] rob_idx;
-} dispatch2lsq;
+} dispatch2sq;
+
+typedef struct packed {
+    logic   [$clog2(`N):0]  lq_d_en_cnt;
+        // To: LSQ
+        // - number of enabled dispatch lines WHO NEED A LD/ST 
+        //   (i.e. may only be a strict subset of dispatching insns!)
+    ROB_IDX [`N-1:0] rob_idx;
+    LSQ_IDX [`N-1:0] sq_idx;
+} dispatch2lq;
 
 typedef struct packed {
     logic         [$clog2(`N):0] en_cnt;
         // - Number of enabled dispatch lines?
         // - NOTE: For in-order stuff with serial deps (like dispatch), use c(ou)nts;
         // otherwise use en(able) buses.
-    logic         [`N-1:0] rd_src1s;
-    logic         [`N-1:0] rd_src2s;
     REG_IDX       [`N-1:0] src1s;
     REG_IDX       [`N-1:0] src2s;
     REG_IDX       [`N-1:0] dsts;
@@ -705,10 +746,21 @@ typedef struct packed {
 } rs2dispatch;
 
 typedef struct packed {
+    /* Requested by issue arbiter 
+    (only ALU needs gnt by CDB arbiter to 'en')*/
     logic       [`NUM_FU_ALU-1:0]    fu_vld_alu;
-    logic       [`NUM_FU_MULT-1:0]   fu_vld_mult;
-    logic       [`NUM_FU_STORE-1:0]  fu_vld_store;
-    logic       [`NUM_FU_LOAD-1:0]   fu_vld_load;
+
+    /* Selected for issue */
+    logic       [`NUM_FU_ALU-1:0]    fu_en_alu;
+    logic       [`NUM_FU_MULT-1:0]   fu_en_mult;
+    logic       [`NUM_FU_STORE-1:0]  fu_en_store;
+    logic       [`NUM_FU_LOAD-1:0]   fu_en_load;
+
+    BYPASS_TAG  [`NUM_FU_ALU-1:0]    bytag_alu;
+    BYPASS_TAG  [`NUM_FU_MULT-1:0]   bytag_mul;
+    BYPASS_TAG  [`NUM_FU_LOAD-1:0]   bytag_ldr;
+    BYPASS_TAG  [`NUM_FU_STORE-1:0]  bytag_str;
+
     ID_RESULT   [`NUM_FU_ALU-1:0]    fu_dat_alu;
     ID_RESULT   [`NUM_FU_MULT-1:0]   fu_dat_mult;
     ID_RESULT   [`NUM_FU_STORE-1:0]  fu_dat_store;
@@ -729,24 +781,27 @@ typedef struct packed {
 } rob2dispatch;
 
 typedef struct packed {
-    logic           [$clog2(`N):0]      r_en_cnt;
+    logic       [$clog2(`N):0]  r_vld_cnt;
         // From: retire (ROB)
-        // - number of enabled retire lines
-    PHYS_REG_IDX    [`N-1:0]            tag;
-        // From: retire (ROB)
+        // - number of valid retire lines
+    ROB_ENTRY   [`N-1:0]        entries; 
         // - IMPORTANT: Set from lowest indices in program-order. NO GAPS!!!
-    PHYS_REG_IDX    [`N-1:0]            t_old;
-        // From: retire (ROB)
-        // - pregs being returned to free list
-    REG_IDX         [`N-1:0]            dst;
 
-    // control signals for cpu.sv
-    logic           [`N-1:0]            halt;
-    logic           [`N-1:0]            illegal;
+    // PHYS_REG_IDX    [`N-1:0]            tag;
+    //     // From: retire (ROB)
+    //     // - IMPORTANT: Set from lowest indices in program-order. NO GAPS!!!
+    // PHYS_REG_IDX    [`N-1:0]            t_old;
+    //     // From: retire (ROB)
+    //     // - pregs being returned to free list
+    // REG_IDX         [`N-1:0]            dst;
 
-    // BTQ-specific retirement stuff
-    logic           [`N-1:0]            brch_vld;
-        // Bus: which of the insns are 1) retiring AND 2) branches?
+    // // control signals for cpu.sv
+    // logic           [`N-1:0]            halt;
+    // logic           [`N-1:0]            illegal;
+
+    // // BTQ-specific retirement stuff
+    // logic           [`N-1:0]            is_brch;
+    //     // Bus: which of the insns are 1) retiring AND 2) branches?
 } rob2retire;
 
 
@@ -756,26 +811,35 @@ typedef struct packed {
     logic       [`NUM_FU_MULT-1:0]   fu_rdy_mult;
     logic       [`NUM_FU_STORE-1:0]  fu_rdy_store;
     logic       [`NUM_FU_LOAD-1:0]   fu_rdy_load;
+
+    logic       [`NUM_FU_ALU-1:0]    fu_cdb_gnt_alu; // 1-cycle insns need to win CDB arb. to issue
 } execute2rs;
 
 typedef struct packed {
-    /* TODO: Better to make this a union, with shared c_en and is_branch
+    /* TODO: Better to make this a union, with shared c_en and is_brch
     at the top, and union over non-branch and branch-specific stuff? */
-    logic           [`N-1:0] c_en;
-    logic           [`N-1:0] is_branch;
+    logic           [`N-1:0] en;
+    PHYS_REG_IDX    [`N-1:0] ts;
+} execute2complete_tag;
+
+typedef struct packed {
+    /* TODO: Better to make this a union, with shared c_en and is_brch
+    at the top, and union over non-branch and branch-specific stuff? */
+    logic           [`N-1:0] en;
+    logic           [`N-1:0] is_brch;
         // - From: EX
-    PHYS_REG_IDX    [`N-1:0] c_ts;
+    PHYS_REG_IDX    [`N-1:0] ts;
         // - From: EX
-    ROB_IDX         [`N-1:0] c_rob_idxs;
+    ROB_IDX         [`N-1:0] rob_idxs;
         // - From: EX
-    DATA            [`N-1:0] c_data;
-        // doubles as branch target if is_branch true
+    DATA            [`N-1:0] data;
+        // doubles as branch target if is_brch true
 
     // BTQ-specific completion stuff
     BTQ_IDX [`N-1:0] btq_idxs; 
         // Entries to which we are completing
     logic   [`N-1:0] take;
-} execute2complete;
+} execute2complete_dat;
 
 // By Free List
 typedef struct packed {
@@ -798,7 +862,7 @@ typedef struct packed {
 
 typedef struct packed {
    // ADDR [`N-1:0]  PC,
-    logic [`N-1:0] [11:0] target;
+    logic [`N-1:0] [15:0] target;
     logic [`N-1:0] hit;
 } btb2fetch;
 
@@ -806,10 +870,22 @@ typedef struct packed {
 typedef struct packed {
     logic [`N-1:0][31:0] PC;
     logic [`N-1:0] is_taken;
-    logic [`N-1:0] [11:0] target;
+    logic [`N-1:0] [15:0] target;
 } execute2btb;
 
+typedef struct packed {
+    ADDR [`N-1:0] PC;
+} fetch2predictor;
 
+typedef struct packed {
+    logic [`N-1:0] prediction;
+} predictor2fetch;
+
+typedef struct packed {
+    logic [`N-1:0] update_enable;
+    logic [`N-1:0]taken;
+    ADDR [`N-1:0] PC;
+} retire2predictor;
 
 // By Arch Map
 `define NUM_ARCH_REG 32
@@ -819,68 +895,75 @@ typedef struct packed {
     } [`NUM_ARCH_REG-1:0] state; 
 } arch_map2map_table;
 
+`define BY_FU(type) \
+struct packed { \
+    type [`NUM_FU_ALU-1:0]   alu; \
+    type [`NUM_FU_MULT-1:0]  mul; \
+    type [`NUM_FU_LOAD-1:0]  lod; \
+    type [`NUM_FU_STORE-1:0] str; \
+}
+
 typedef struct packed {
-    logic   [`NUM_FU_ALU-1:0]   alu;
-    logic   [`NUM_FU_MULT-1:0]  mul;
-} LOGIC_BY_FU;
-typedef struct packed {
-    PHYS_REG_IDX [`NUM_FU_ALU-1:0]   alu;
-    PHYS_REG_IDX [`NUM_FU_MULT-1:0]  mul;
-} PRI_BY_FU;
-typedef struct packed {
-    LOGIC_BY_FU s_en1s;
-    LOGIC_BY_FU s_en2s;
-    PRI_BY_FU   s_t1s;
-    PRI_BY_FU   s_t2s;
+    `BY_FU(logic)           s_en1s;
+    `BY_FU(logic)           s_en2s;
+    `BY_FU(PHYS_REG_IDX)    s_t1s;
+    `BY_FU(PHYS_REG_IDX)    s_t2s;
 } execute2prf;
 
-typedef struct packed {
-    DATA    [`NUM_FU_ALU-1:0]   alu;
-    DATA    [`NUM_FU_MULT-1:0]  mul;
-} DATA_BY_FU;
 typedef struct packed{
-    DATA_BY_FU s_v1s;
-    DATA_BY_FU s_v2s;
+    `BY_FU(DATA)    s_v1s;
+    `BY_FU(DATA)    s_v2s;
 } prf2execute;
 
-// By LSQ
+// By SQ
 typedef struct packed {
-    logic   [$clog2(`N):0]      sq_rdy_scnt;
-    logic   [$clog2(`LSQ_SZ):0] sq_tail;
-} lsq2dispatch;
+    logic   [$clog2(`N):0]  sq_rdy_scnt;
+    LSQ_IDX                 last_used_sq_idx;
+    LSQ_IDX [`N-1:0]        next_ids;
+} sq2dispatch;
 
 typedef struct packed {
     logic       [`NUM_FU_STORE-1:0] en;
     LSQ_IDX     [`NUM_FU_STORE-1:0] sq_idx_cdb;
-} lsq2rs;
+} sq2rs;
 
 typedef struct packed {
     logic   [$clog2(`N):0] r_en;
-    ROB_IDX [`N-1:0] r_pos;
-} rob2lsq;
+    // ROB_IDX [`N-1:0] r_pos;
+} rob2sq;
 
 typedef struct packed {
-    logic       [`NUM_FU_STORE-1:0] ex_en;
-    LSQ_IDX     [`NUM_FU_STORE-1:0] sq_idx;
-    ADDR        [`NUM_FU_STORE-1:0] addr;
-    DATA        [`NUM_FU_STORE-1:0] data;
-    MEM_SIZE    [`NUM_FU_STORE-1:0] st_mem_size; //MEM_SIZE'(id_ex_reg.inst.r.funct3[1:0]); <-- HOW TO FIND THIS. DO THIS WHEN PUTTING ENTRY IN FROM DISPATCH OR FROM EXECUTE
-    logic       [`NUM_FU_LOAD-1:0] forward_req_en;
-    ADDR        [`NUM_FU_LOAD-1:0] forward_addr;
-    MEM_SIZE    [`NUM_FU_LOAD-1:0] ld_mem_size; //MEM_SIZE'(id_ex_reg.inst.r.funct3[1:0]); <-- HOW TO FIND THIS. DO THIS WHEN PUTTING ENTRY IN FROM DISPATCH OR FROM EXECUTE
-} execute2lsq;
+    logic       [`NUM_FU_STORE-1:0] st_ex_en; //tells SQ that a valid store is coming in on that line (bus, not count)
+    LSQ_IDX     [`NUM_FU_STORE-1:0] st_sq_idx; //the SQ IDXs of the incoming stores, found in the ID_RESULT packet
+    ADDR        [`NUM_FU_STORE-1:0] st_addr; //address that the stores are pointing to
+    DATA        [`NUM_FU_STORE-1:0] st_data; //the data to be stored
+    MEM_SIZE    [`NUM_FU_STORE-1:0] st_mem_size; //MEM_SIZE'(id_ex_reg.inst.r.funct3[1:0]); <-- HOW TO FIND THIS. the size of the data to store. Will be BYTE, HALF, or WORD
+    logic       [`NUM_FU_LOAD-1:0] forward_req_en; //tells the SQ that a store-load forwarding request is coming in on that line (bus, not count)
+    LSQ_IDX     [`NUM_FU_LOAD-1:0] forward_sq_idx; //the SQ IDXs of the loads that are requesting a forward (all loads are assigned the SQ_IDX of the store that most recently was dispatched in the ID_RESULT packet)
+    ADDR        [`NUM_FU_LOAD-1:0] forward_addr; //the address of the forwarding request
+    MEM_SIZE    [`NUM_FU_LOAD-1:0] forward_mem_size; //MEM_SIZE'(id_ex_reg.inst.r.funct3[1:0]); <-- HOW TO FIND THIS. the size of teh data forward requested. Will be BYTE, HALF, or WORD
+
+    //NOTE:the "st_" items should be sent to SQ as soon as the address to store to is resolved and the process begins. Once the data is sent to the SQ, the store FU's job is complete.
+    //In addition, we still want to set their complete flags in the rob after execution is complete so that we can retire them.
+} execute2sq;
 
 typedef struct packed {
-    logic       [`NUM_FU_LOAD-1:0] forward_en;
-    ADDR        [`NUM_FU_LOAD-1:0] forward_addr;
-    DATA        [`NUM_FU_LOAD-1:0] forward_data;
-    MEM_SIZE    [`NUM_FU_LOAD-1:0] forward_mem_size;
-} lsq2execute;
+    logic       [`NUM_FU_LOAD-1:0]          forward_en; //tells the load FU if valid data to be forwarded was found (will be ready by the posedge of the next clock cycle)
+    DATA        [`NUM_FU_LOAD-1:0]          forward_data; //the data being forwarded
+    MEM_SIZE    [`NUM_FU_LOAD-1:0]          forward_mem_size; //the size of the data being forwarded. Will always match the size of the request
+    logic       [`NUM_FU_LOAD-1:0] [3:0]    forward_byte_en; //a 4-wide mask telling which of the bytes are valid data being forwarded. This allows cases where you request 4000-4003, and SQ returns a match on 400-4001 and 4003 but not 4002 (and similar cases)
+    //example for byte mask:
+    //request addr 4000 size WORD
+    //SQ match 4000-4001 (HALF)
+    //SQ match 4003 (BYTE)
+    //Return data 32'b: 4003 4002 4001 4000
+    //byte mask:   4'b   1    0    1    1
+} sq2execute;
 
 typedef struct packed {
     logic [$clog2(`N):0]    ret_rdy;
     logic                   sq_ret_complete;
-} lsq2rob;
+} sq2retire;
 
 typedef struct packed {
     MEM_COMMAND   Dmem_command;    // The memory command
@@ -893,23 +976,64 @@ typedef struct packed {
     logic       [$clog2(`N):0] ret_cnt;
     SQ_ENTRY    [`N-1:0] ret_st;
     logic       [`NUM_FU_LOAD-1:0] forward_req_en;
-    LSQ_IDX     [`NUM_FU_LOAD-1:0] sq_idx;
+    LSQ_IDX     [`NUM_FU_LOAD-1:0] forward_sq_idx;
     ADDR        [`NUM_FU_LOAD-1:0] forward_addr;
-    MEM_SIZE    [`NUM_FU_LOAD-1:0] ld_mem_size;
-} lsq2stRET;
+    MEM_SIZE    [`NUM_FU_LOAD-1:0] forward_mem_size;
+} sq2stRET;
 
 typedef struct packed {
     logic [$clog2(`N):0]    free_out;
     logic                   empty;
-    logic       [`NUM_FU_LOAD-1:0] forward_en;
-    ADDR        [`NUM_FU_LOAD-1:0] forward_addr;
-    DATA        [`NUM_FU_LOAD-1:0] forward_data;
-    MEM_SIZE    [`NUM_FU_LOAD-1:0] forward_mem_size;
-} stRET2lsq;
+} stRET2sq;
+
+typedef struct packed {
+    logic       [`NUM_FU_LOAD-1:0]          forward_en;
+    ADDR        [`NUM_FU_LOAD-1:0]          forward_addr;
+    DATA        [`NUM_FU_LOAD-1:0]          forward_data;
+    MEM_SIZE    [`NUM_FU_LOAD-1:0]          forward_mem_size;
+    logic       [`NUM_FU_LOAD-1:0] [3:0]    forward_byte_en;
+    logic       [`NUM_FU_LOAD-1:0]          sq_idx_found;    
+} forwardRET2sq;
+
+typedef struct packed {
+    logic   [$clog2(`N):0]      lq_rdy_scnt;
+    logic   [$clog2(`LSQ_SZ):0] lq_tail;
+} lq2dispatch;
+
+typedef struct packed {
+    logic   [$clog2(`N):0]      ret_rdy;
+    logic   [`NUM_FU_LOAD-1:0]  err_en;
+    ROB_IDX [`NUM_FU_LOAD-1:0]  rob_idx;
+} lq2rob;
+
+typedef struct packed {
+    logic   [$clog2(`N):0] r_en;
+    ROB_IDX [`N-1:0] r_pos;
+} rob2lq;
+
+typedef struct packed {
+    logic       [`NUM_FU_LOAD-1:0]  ld_ex_en; //tells LQ that a valid load is coming in on that line (bus, not count)
+    LSQ_IDX     [`NUM_FU_LOAD-1:0]  ld_lq_idx; //LQ IDX for the incoming loads (found in ID_RESULT packet).
+    ADDR        [`NUM_FU_LOAD-1:0]  ld_addr; //address that the load is loading from
+    MEM_SIZE    [`NUM_FU_LOAD-1:0]  ld_mem_size; //MEM_SIZE'(id_ex_reg.inst.r.funct3[1:0]); <-- HOW TO FIND THIS. size being loaded (BYTE, HALF, WORD)
+    logic       [`NUM_FU_STORE-1:0] st_en; //this comes from the STORE FUs, and tells teh LQ if a valid SQ IDX is coming in on that line (bus, not count)
+    LSQ_IDX     [`NUM_FU_STORE-1:0] st_sq_idx; //SQ_IDX associated with st_en. These two items are used to check if any loads and stores have happened out-of-order to flag in the ROB
+    //LQ doesn't need to talk back to execute
+
+    //NOTE: the "ld_" items should be sent to LQ as soon as the address to load from is resolved and the query begins. In addition, we still want to set their complete flags in the
+    //rob after execution is complete so that we can retire them.
+
+    //NOTE: the "st_" items should be sent to LQ as soon as the address to store to is resolved and the data is being sent to the SQ.
+} execute2lq;
 
 typedef struct packed {
     ROB_IDX rob_idx;
     PHYS_REG_IDX tag;
 } DST;
+
+typedef struct packed {
+    ADDR  addr;
+    logic valid;
+} MSHR_entry;
 
 `endif // __SYS_DEFS_SVH__

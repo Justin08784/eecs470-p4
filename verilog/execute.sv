@@ -19,13 +19,17 @@ Flow chart
      ↓
 [Staging FIFO (s_buf)]  ← just buffers instruction for 1 cycle
      ↓
-[ops register (alu_ops, mul_ops)]  ← PRF values fetched here
+[regs register (r_buf)]  ← PRF values fetched here
      ↓
-[Functional Unit (ALU or MUL)]
+[Functional Unit (ALU, MUL, LOD, or STR)]
      ↓
-[Completion FIFO (cpl_buf)] ← waits for CDB slot
-     ↓
-[ CDB Output Reg (c_out) ] ← selected for writeback this cycle
+[CDB Output Reg (c_out)] ← selected for writeback this cycle
+
+CDB arbitration:
+- For 1-cycle op, arbitration occurs in [RS] -> [s_buf]
+- For ≥ 4 cycle ops, it occurs in [FU]
+- For < 4 cycle ops, it occurs *before* [FU] (but we dont support any
+ops in this category, so we wouldn't know)
 */
 
 typedef struct packed {
@@ -37,18 +41,10 @@ typedef struct packed {
     logic is_brch;
 } CPL_CAND;
 
-typedef struct packed {
-    CPL_CAND [`NUM_FU_ALU-1:0]  alu;
-    CPL_CAND [`NUM_FU_MULT-1:0] mul;
-} CPL_CAND_BY_FU;
-
-typedef struct packed {
-    ID_RESULT [`NUM_FU_ALU-1:0]  alu;
-    ID_RESULT [`NUM_FU_MULT-1:0] mul;
-} ID_RESULT_BY_FU;
-
 /* Slices (or "views") of ID_RESULT needed for each FU type */
 typedef struct packed {
+    BYPASS_TAG      bytag;
+
     PHYS_REG_IDX    t;
     PHYS_REG_IDX    t1;
     PHYS_REG_IDX    t2;
@@ -67,6 +63,8 @@ typedef struct packed {
 } ID_ALU_VIEW;
 
 typedef struct packed {
+    BYPASS_TAG      bytag;
+
     PHYS_REG_IDX    t;
     PHYS_REG_IDX    t1;
     PHYS_REG_IDX    t2;
@@ -74,25 +72,75 @@ typedef struct packed {
     logic[2:0]      func;
 } ID_MUL_VIEW;
 
+typedef struct packed {
+    BYPASS_TAG      bytag;
+    // alu_func   = ALU_ADD;
+    // opa_select = OPA_IS_RS1
+    // opb_select = OPB_IS_I_IMM
+
+    PHYS_REG_IDX    t;
+    PHYS_REG_IDX    t1;
+    DATA            opb;
+
+    LSQ_IDX         lq_idx;
+    ROB_IDX         rob_idx;
+    MEM_SIZE        mem_size;
+    logic           rd_unsigned;
+} ID_LOD_VIEW;
+
+typedef struct packed {
+    BYPASS_TAG      bytag;
+    // alu_func   = ALU_ADD;
+    // opa_select = OPA_IS_RS1
+    // opb_select = OPB_IS_S_IMM
+
+    PHYS_REG_IDX    t1;
+    PHYS_REG_IDX    t2;
+    DATA            opb;
+
+    LSQ_IDX         sq_idx;
+    ROB_IDX         rob_idx;
+    MEM_SIZE        mem_size;
+} ID_STR_VIEW;
+
+typedef struct packed {
+    DATA rs1;
+    DATA rs2;
+    ID_ALU_VIEW dat;
+} ALU_REGS;
+typedef struct packed {
+    DATA rs1;
+    DATA rs2;
+    ID_MUL_VIEW dat;
+} MUL_REGS;
+typedef struct packed {
+    DATA rs1;
+    ID_LOD_VIEW dat;
+} LOD_REGS;
+typedef struct packed {
+    DATA rs1;
+    DATA rs2;
+    ID_STR_VIEW dat;
+} STR_REGS;
+
 /* Operand data needed for each FU type */
 typedef struct packed {
-    logic       [`NUM_FU_ALU-1:0]       bsy; // unused; same as en
-    DATA        [`NUM_FU_ALU-1:0]       opa, opb;
-    ALU_FUNC    [`NUM_FU_ALU-1:0]       alu_func;
-    logic       [`NUM_FU_ALU-1:0][2:0]  branch_func; // Which branch condition to check
-    logic       [`NUM_FU_ALU-1:0]       cond_branch;
-    logic       [`NUM_FU_ALU-1:0]       uncond_branch;
+    DATA            opa, opb;
+    DATA            rs1, rs2;
+    ALU_FUNC        alu_func;
+    logic   [2:0]   branch_func; // Which branch condition to check
+    logic           cond_branch;
+    logic           uncond_branch;
 
-    PHYS_REG_IDX    [`NUM_FU_ALU-1:0]   t;
-    ROB_IDX         [`NUM_FU_ALU-1:0]   rob_idx;
-    BTQ_IDX         [`NUM_FU_ALU-1:0]   btq_idx;
+    PHYS_REG_IDX    t;
+    ROB_IDX         rob_idx;
+    BTQ_IDX         btq_idx;
 } ALU_OPS;
 
 typedef struct packed {
-    logic       [`NUM_FU_MULT-1:0]      bsy;
-    DATA        [`NUM_FU_MULT-1:0]      rs1, rs2;
-    MULT_FUNC   [`NUM_FU_MULT-1:0]      func;
-    DST         [`NUM_FU_MULT-1:0]      dst;
+    DATA        rs1, rs2;
+    MULT_FUNC   func;
+    DST         dst;
 } MUL_OPS;
 
 // ALU: computes the result of FUNC applied with operands A and B
@@ -100,6 +148,8 @@ typedef struct packed {
 module alu (
     input DATA      opa,
     input DATA      opb,
+    input DATA      rs1,
+    input DATA      rs2,
     input ALU_FUNC  alu_func,
     input [2:0]     branch_func, // Which branch condition to check
 
@@ -126,12 +176,12 @@ module alu (
 
     always_comb begin
         case (branch_func)
-            3'b000:  take = signed'(opa) == signed'(opb); // BEQ
-            3'b001:  take = signed'(opa) != signed'(opb); // BNE
-            3'b100:  take = signed'(opa) <  signed'(opb); // BLT
-            3'b101:  take = signed'(opa) >= signed'(opb); // BGE
-            3'b110:  take = opa < opb;                    // BLTU
-            3'b111:  take = opa >= opb;                   // BGEU
+            3'b000:  take = signed'(rs1) == signed'(rs2); // BEQ
+            3'b001:  take = signed'(rs1) != signed'(rs2); // BNE
+            3'b100:  take = signed'(rs1) <  signed'(rs2); // BLT
+            3'b101:  take = signed'(rs1) >= signed'(rs2); // BGE
+            3'b110:  take = rs1 <  rs2;                    // BLTU
+            3'b111:  take = rs1 >= rs2;                   // BGEU
             default: take = `FALSE;
         endcase
     end
@@ -145,26 +195,106 @@ module alu_ex(
     input flush,
 
     /* FRONTEND */
-    output logic [`NUM_FU_ALU-1:0]          ex_rdy,
-        // ready to accept from alu_ins?
-    input [`NUM_FU_ALU-1:0]                 en,
-        // insns to accept from alu_ins
-    ALU_OPS ops,
+    output logic    [`NUM_FU_ALU-1:0]   i_rdy,
+        // ready to accept from regs.o_dat.alu?
+    input  logic    [`NUM_FU_ALU-1:0]   i_vld,
+        // insns to accept from regs.o_dat.alu
+    input  ALU_REGS [`NUM_FU_ALU-1:0]   i_regs,
         // insn metadata/operands
 
+    input  execute2complete_dat         cdat,
+
     /* BACKEND */
-    output logic [`NUM_FU_ALU-1:0]      vld,
-    output CPL_CAND [`NUM_FU_ALU-1:0]   cands,
-        // completion requests
-    input  logic [`NUM_FU_ALU-1:0]      cpl_gnt
+    output logic    [`NUM_FU_ALU-1:0]   o_vld,
+    output CPL_CAND [`NUM_FU_ALU-1:0]   o_cands,
+    input  logic    [`NUM_FU_ALU-1:0]   o_rdy 
         // completion grant
 );
-    /*
-    credit[i] = num available slots in fifo[i]
-              = buf_sz - (num in-flight through FU[i] + num waiting in fifo[i])
-    */
-    localparam buf_sz = 4;
-    logic [`NUM_FU_ALU-1:0][$clog2(buf_sz):0] credits;
+    ALU_OPS [`NUM_FU_ALU-1:0] ops;
+    always_comb begin
+        DATA opa, opb;
+        logic bypass1, bypass2;
+        DATA  tmp_rs1, tmp_rs2;
+        DATA rs1, rs2;
+        foreach(ops[i]) begin
+            tmp_rs1 = '0;
+            tmp_rs2 = '0;
+            bypass1 = 0;
+            bypass2 = 0;
+            foreach(cdat.en[n]) begin
+                if (!cdat.en[n] || cdat.ts[n] == '0)
+                    continue;
+                if (i_regs[i].dat.t1 == cdat.ts[n]) begin
+                    bypass1 |= 1;
+                    tmp_rs1 |= cdat.data[n];
+                end
+                if (i_regs[i].dat.t2 == cdat.ts[n]) begin
+                    bypass2 |= 1;
+                    tmp_rs2 |= cdat.data[n];
+                end
+            end
+            rs1 = bypass1 ? tmp_rs1 : i_regs[i].rs1;
+            rs2 = bypass2 ? tmp_rs2 : i_regs[i].rs2;
+
+            // ALU opA mux
+            case (i_regs[i].dat.opa_select)
+                OPA_IS_RS1:  opa = rs1;
+                OPA_IS_NPC:  opa = i_regs[i].dat.NPC;
+                OPA_IS_PC:   opa = i_regs[i].dat.PC;
+                OPA_IS_ZERO: opa = 0;
+                default:     opa = 32'hdeadface; // dead face
+            endcase
+
+            // ALU opB mux
+            case (i_regs[i].dat.opb_select)
+                OPB_IS_RS2:   opb =  rs2;
+                OPB_IS_I_IMM: opb = `RV32_signext_Iimm(i_regs[i].dat.inst);
+                OPB_IS_S_IMM: opb = `RV32_signext_Simm(i_regs[i].dat.inst);
+                OPB_IS_B_IMM: opb = `RV32_signext_Bimm(i_regs[i].dat.inst);
+                OPB_IS_U_IMM: opb = `RV32_signext_Uimm(i_regs[i].dat.inst);
+                OPB_IS_J_IMM: opb = `RV32_signext_Jimm(i_regs[i].dat.inst);
+                default:      opb = 32'hfacefeed; // face feed
+            endcase
+            ops[i] = '{
+                rs1         : rs1,
+                rs2         : rs2,
+                opa         : opa,
+                opb         : opb,
+                alu_func    : i_regs[i].dat.alu_func,
+                branch_func : i_regs[i].dat.inst.b.funct3,
+                t           : i_regs[i].dat.t,
+                rob_idx     : i_regs[i].dat.rob_idx,
+                btq_idx     : i_regs[i].dat.btq_idx,
+                cond_branch        : i_regs[i].dat.cond_branch,
+                uncond_branch      : i_regs[i].dat.uncond_branch
+            };
+        end
+    end
+
+    `ifdef DEBUG
+    always_ff @(posedge clock) begin
+        if (!reset) begin
+            $display("alu_ex: cdb <%b>[%2d -> %2d], <%b>[%2d -> %2d]",
+                cdat.en[0],
+                cdat.ts[0],
+                cdat.data[0],
+                cdat.en[1],
+                cdat.ts[1],
+                cdat.data[1]
+            );
+
+            for (int unsigned i = 0; i < `NUM_FU_ALU; ++i) begin
+                $display("%2d bytag: (b1:%b, idx1:%b) (b2:%b, idx2:%b)",
+                    i,
+                    i_regs[i].dat.bytag.bypass1,
+                    i_regs[i].dat.bytag.cdb_idx1,
+                    i_regs[i].dat.bytag.bypass2,
+                    i_regs[i].dat.bytag.cdb_idx2,
+                );
+            end
+        end
+    end
+    `endif // DEBUG
 
     // execute
     generate
@@ -174,61 +304,165 @@ module alu_ex(
         for (genvar i = 0; i < `NUM_FU_ALU; ++i) begin : gen_alus
             alu alu_0 ( 
                 // Inputs
-                .opa        (ops.opa[i]),
-                .opb        (ops.opb[i]),
-                .alu_func   (ops.alu_func[i]),
-                .branch_func(ops.branch_func[i]), // Which branch condition to check
+                .opa        (ops[i].opa),
+                .opb        (ops[i].opb),
+                .rs1        (ops[i].rs1),
+                .rs2        (ops[i].rs2),
+                .alu_func   (ops[i].alu_func),
+                .branch_func(ops[i].branch_func), // Which branch condition to check
 
+                // Output (directly to cdat_out)
                 .take(tmp_take[i]), // True/False condition result (will return FALSE if branch is low)
-                .result(tmp_res[i]) // will return 32'hfacebeec if branch is high (Sentinel, hopefully none of our alu computations result in that value)
+                .result(tmp_res[i]) // will return 32'hfacebeec if branch is high
             );
 
             assign tmp_data[i] = '{
-                t       : ops.t[i],
-                rob_idx : ops.rob_idx[i],
+                t       : ops[i].t,
+                rob_idx : ops[i].rob_idx,
                 data    : tmp_res[i],
-                btq_idx : ops.btq_idx[i],
+                btq_idx : ops[i].btq_idx,
                 take    : tmp_take[i],
-                is_brch : ops.cond_branch[i] || ops.uncond_branch[i]
+                is_brch : ops[i].cond_branch || ops[i].uncond_branch
             };
 
-            // <FU>_outs: where executed insns wait until completion
-            fifo #(
-                .INSTANCE_ID(10+i),
-                .DEPTH(buf_sz),
-                .WIDTH($bits(CPL_CAND)),
-                .NUM_RPORTS(1),
-                .NUM_WPORTS(1),
-                .ENABLE_INTR_FWD(`FALSE)
-            ) cpl_buf (
-                .clock      (clock),
-                .reset      (reset),
-                .flush      (flush),
-                .wr_en_cnt  (en[i]),
-                .wr_data    (tmp_data[i]),
-                .rd_en_cnt  (cpl_gnt[i]),
-                .rd_data    (cands[i]),
-
-                .free_scnt  (),
-                .used_scnt  (vld[i])
-            );
+            assign o_vld[i] = i_vld[i];
+            assign i_rdy[i] = o_rdy[i];
+            assign o_cands[i] = tmp_data[i];
         end
     endgenerate
+endmodule
+
+module lod_ex(
+    input clock,
+    input reset,
+    input flush,
+
+    /* FRONTEND */
+    output logic    [`NUM_FU_LOAD-1:0]  i_rdy,
+    input  logic    [`NUM_FU_LOAD-1:0]  i_vld,
+    input  LOD_REGS [`NUM_FU_LOAD-1:0]  i_regs,
+    
+    input  execute2complete_dat         cdat,
+
+    input   sq2execute sq_in,
+    output  execute2sq sq_out,
+    // FIXME: Isn't an lq2execute needed?
+    output  execute2lq lq_out,
+
+    /* BACKEND */
+    output logic    [`NUM_FU_LOAD-1:0]  o_vld,
+    output CPL_CAND [`NUM_FU_LOAD-1:0]  o_cands,
+    input  logic    [`NUM_FU_LOAD-1:0]  o_rdy 
+        // completion grant
+);
+    // FIXME: Is this right? 
+    assign i_rdy = '1;
+    // FIXME: hardcoded
+    assign o_vld    = '0;
+    assign o_cands  = '0;
 
     always_comb begin
-        foreach (ex_rdy[i])
-            ex_rdy[i] = credits[i] > 0;
-    end
+        logic bypass1;
+        DATA  rs1, tmp_rs1;
+        ADDR  addr;
+        foreach(i_vld[i]) begin
+            tmp_rs1 = '0;
+            bypass1 = 0;
+            foreach(cdat.en[n]) begin
+                if (!cdat.en[n] || cdat.ts[n] == '0)
+                    continue;
+                if (i_regs[i].dat.t1 == cdat.ts[n]) begin
+                    bypass1 |= 1;
+                    tmp_rs1 |= cdat.data[n];
+                end
+            end
+            rs1 = bypass1 ? tmp_rs1 : i_regs[i].rs1;
+            
+            // load address computation
+            addr = rs1 + i_regs[i].dat.opb;
 
-    always_ff @(posedge clock) begin
-        if (reset || flush) begin
-            foreach(credits[i])
-                credits[i] <= buf_sz;
-        end else begin
-            foreach(credits[i])
-                credits[i] <= credits[i] - en[i] + cpl_gnt[i];
+            lq_out.ld_ex_en[i]      = i_vld[i];
+            lq_out.ld_lq_idx[i]     = i_regs[i].dat.lq_idx;
+            lq_out.ld_addr[i]       = addr;
+            lq_out.ld_mem_size[i]   = i_regs[i].dat.mem_size;
+            /* FIXME: What about rd_unsigned? We are not using this
+            in lq???? */
         end
     end
+
+    /* TODO: CAND generation logic. Also, how do we know when
+    a load result is ready without an lq2execute line? */
+endmodule
+
+module str_ex(
+    input clock,
+    input reset,
+    input flush,
+
+    /* FRONTEND */
+    output logic    [`NUM_FU_STORE-1:0]  i_rdy,
+    input  logic    [`NUM_FU_STORE-1:0]  i_vld,
+    input  STR_REGS [`NUM_FU_STORE-1:0]  i_regs,
+    
+    input  execute2complete_dat         cdat,
+
+    input   sq2execute sq_in,
+    output  execute2sq sq_out,
+    // FIXME: Isn't an lq2execute needed? <-- Answer: No, if an issue is found when forwarding the SQ_IDX to LQ, it is flagged in the ROB to restart from that PC
+    output  execute2lq lq_out,
+
+    /* BACKEND */
+    output logic    [`NUM_FU_STORE-1:0]  o_vld,
+    output CPL_CAND [`NUM_FU_STORE-1:0]  o_cands,
+    input  logic    [`NUM_FU_STORE-1:0]  o_rdy 
+        // completion grant
+);
+    // FIXME: Is this right? 
+    assign i_rdy = '1;
+    // FIXME: hardcoded
+    assign o_vld    = '0;
+    assign o_cands  = '0;
+
+    always_comb begin
+        logic bypass1, bypass2;
+        DATA  rs1, tmp_rs1;
+        DATA  rs2, tmp_rs2;
+        ADDR  addr;
+        foreach(i_vld[i]) begin
+            tmp_rs1 = '0;
+            tmp_rs2 = '0;
+            bypass1 = 0;
+            bypass2 = 0;
+            foreach(cdat.en[n]) begin
+                if (!cdat.en[n] || cdat.ts[n] == '0)
+                    continue;
+                if (i_regs[i].dat.t1 == cdat.ts[n]) begin
+                    bypass1 |= 1;
+                    tmp_rs1 |= cdat.data[n];
+                end
+                if (i_regs[i].dat.t2 == cdat.ts[n]) begin
+                    bypass2 |= 1;
+                    tmp_rs2 |= cdat.data[n];
+                end
+            end
+            rs1 = bypass1 ? tmp_rs1 : i_regs[i].rs1;
+            rs2 = bypass2 ? tmp_rs2 : i_regs[i].rs2;
+            
+            // store address computation
+            addr = rs1 + i_regs[i].dat.opb;
+
+            sq_out.st_ex_en[i]      = i_vld[i];
+            sq_out.st_sq_idx[i]     = i_regs[i].dat.sq_idx;
+            sq_out.st_addr[i]       = addr;
+            sq_out.st_data[i]       = rs2;
+            sq_out.st_mem_size[i]   = i_regs[i].dat.mem_size;
+            /* FIXME: What about rd_unsigned? We are not using this
+            in lq???? */
+            // $display("EX OUT [%0d]: en: %b, sq_idx: %0d, addr: %0d, data: %0d, mem_size: %0d", i, sq_out.st_ex_en[i], sq_out.st_sq_idx[i], sq_out.st_addr[i], sq_out.st_data[i], sq_out.st_mem_size[i]);
+        end
+    end
+
+    /* TODO: CAND generation logic. */
 endmodule
 
 module mul_ex(
@@ -237,47 +471,122 @@ module mul_ex(
     input flush,
 
     /* FRONTEND */
-    output logic [`NUM_FU_MULT-1:0]     ex_rdy,
-        // ready to accept from mul_ins?
-    input [`NUM_FU_MULT-1:0]            en,
-        // insns to accept from mul_ins
-    MUL_OPS ops,
+    output logic    [`NUM_FU_MULT-1:0]  i_rdy,
+        // ready to accept from regs.o_dat.mul?
+    input  logic    [`NUM_FU_MULT-1:0]  i_vld,
+        // insns to accept from regs.o_dat.mul
+    input  MUL_REGS [`NUM_FU_MULT-1:0]  i_regs,
         // insn metadata/operands
 
+    /* Early CDB arbitration */
+    output logic [`NUM_FU_MULT-1:0]     cdb_req,
+    output PHYS_REG_IDX [`NUM_FU_MULT-1:0] ctag_ts,
+    input  logic [`NUM_FU_MULT-1:0]     cdb_gnt,
+
+    input  execute2complete_dat         cdat,
+
     /* BACKEND */
-    output logic [`NUM_FU_MULT-1:0]     vld,
-    output CPL_CAND [`NUM_FU_MULT-1:0]  cands,
+    output logic    [`NUM_FU_MULT-1:0]  o_vld,
+    output CPL_CAND [`NUM_FU_MULT-1:0]  o_cands,
         // completion requests
-    input  logic [`NUM_FU_MULT-1:0]     cpl_gnt
+    input  logic    [`NUM_FU_MULT-1:0]  o_rdy
         // completion grant
 );
-    localparam buf_sz = `MULT_STAGES;
-    logic [`NUM_FU_MULT-1:0][$clog2(buf_sz):0] credits;
+    MUL_OPS [`NUM_FU_MULT-1:0] ops;
+    always_comb begin
+        logic bypass1, bypass2;
+        DATA  tmp_rs1, tmp_rs2;
+        DATA rs1, rs2;
+        foreach (ops[i]) begin
+            tmp_rs1 = '0;
+            tmp_rs2 = '0;
+            bypass1 = 0;
+            bypass2 = 0;
+            foreach(cdat.en[n]) begin
+                if (!cdat.en[n] || cdat.ts[n] == '0)
+                    continue;
+                if (i_regs[i].dat.t1 == cdat.ts[n]) begin
+                    bypass1 |= 1;
+                    tmp_rs1 |= cdat.data[n];
+                end
+                if (i_regs[i].dat.t2 == cdat.ts[n]) begin
+                    bypass2 |= 1;
+                    tmp_rs2 |= cdat.data[n];
+                end
+            end
+            rs1 = bypass1 ? tmp_rs1 : i_regs[i].rs1;
+            rs2 = bypass2 ? tmp_rs2 : i_regs[i].rs2;
+            
+            ops[i] = '{
+                rs1  : rs1,
+                rs2  : rs2,
+                func : i_regs[i].dat.func,
+                dst  : '{
+                    rob_idx : i_regs[i].dat.rob_idx,
+                    tag     : i_regs[i].dat.t
+                }
+            };
+        end
+    end
+
+    `ifdef DEBUG
+    always_ff @(posedge clock) begin
+        if (!reset) begin
+            $display("mul_ex: cdb <%b>[%2d -> %2d], <%b>[%2d -> %2d]",
+                cdat.en[0],
+                cdat.ts[0],
+                cdat.data[0],
+                cdat.en[1],
+                cdat.ts[1],
+                cdat.data[1]
+            );
+
+            for (int unsigned i = 0; i < `NUM_FU_MULT; ++i) begin
+                $display("%2d bytag: (b1:%b, idx1:%b) (b2:%b, idx2:%b)",
+                    i,
+                    i_regs[i].dat.bytag.bypass1,
+                    i_regs[i].dat.bytag.cdb_idx1,
+                    i_regs[i].dat.bytag.bypass2,
+                    i_regs[i].dat.bytag.cdb_idx2,
+                );
+            end
+        end
+    end
+    `endif // DEBUG
 
     // execute
     generate
-        logic       [`NUM_FU_MULT-1:0] tmp_done;
         DATA        [`NUM_FU_MULT-1:0] tmp_res;
         DST         [`NUM_FU_MULT-1:0] tmp_dst;
-        CPL_CAND    [`NUM_FU_MULT-1:0] tmp_data;
+
+        logic       [`NUM_FU_MULT-1:0] cpl_buf_rdy;
         for (genvar i = 0; i < `NUM_FU_MULT; ++i) begin : gen_mults
-            mult mult_0 ( 
+            mult #(
+                .ID(i)
+            ) mult_0 ( 
                 .clock  (clock),
                 .reset  (reset),
                 .flush  (flush),
-                .start  (en[i]),
-                .dst_in (ops.dst[i]),
-                .rs1    (ops.rs1[i]),
-                .rs2    (ops.rs2[i]),
-                .func   (ops.func[i]),
 
-                // Output
+                .i_vld  (i_vld[i]),
+                .i_rdy  (i_rdy[i]),
+                .dst_in (ops[i].dst),
+                .rs1    (ops[i].rs1),
+                .rs2    (ops[i].rs2),
+                .func   (ops[i].func),
+
+                .cdb_req(cdb_req[i]),
+                .ctag_t (ctag_ts[i]),
+                .cdb_gnt(cdb_gnt[i]),
+
+                // Output (directly to cdat_out)
+                .o_vld  (o_vld[i]),
+                .o_rdy  (o_rdy[i]),
                 .dst_out(tmp_dst[i]),
-                .result (tmp_res[i]),
-                .done   (tmp_done[i])
+                .result (tmp_res[i])
             );
 
-            assign tmp_data[i] = '{
+            assign o_cands[i] = '{
                 t       : tmp_dst[i].tag,
                 rob_idx : tmp_dst[i].rob_idx,
                 data    : tmp_res[i],
@@ -285,45 +594,8 @@ module mul_ex(
                 take    : '0,
                 is_brch : '0
             };
-
-            // <FU>_outs: where executed insns wait until completion
-            fifo #(
-                .INSTANCE_ID(20+i),
-                .DEPTH(buf_sz),
-                .WIDTH($bits(CPL_CAND)),
-                .NUM_RPORTS(1),
-                .NUM_WPORTS(1),
-                .ENABLE_INTR_FWD(`FALSE)
-            ) cpl_buf (
-                .clock      (clock),
-                .reset      (reset),
-                .flush      (flush),
-                .wr_en_cnt  (tmp_done[i]),
-                .wr_data    (tmp_data[i]),
-                .rd_en_cnt  (cpl_gnt[i]),
-                .rd_data    (cands[i]),
-
-                .free_scnt  (),
-                .used_scnt  (vld[i])
-            );
-           
         end
     endgenerate
-
-    always_comb begin
-        foreach (ex_rdy[i])
-            ex_rdy[i] = credits[i] > 0;
-    end
-
-    always_ff @(posedge clock) begin
-        if (reset || flush) begin
-            foreach(credits[i])
-                credits[i] <= buf_sz;
-        end else begin
-            foreach(credits[i])
-                credits[i] <= credits[i] - en[i] + cpl_gnt[i];
-        end
-    end
 endmodule
 
 module stage_ex_p4 (
@@ -334,28 +606,42 @@ module stage_ex_p4 (
     input   rs2execute rs_in,
     output  execute2rs rs_out,
 
+    input   sq2execute sq_in,
+    output  execute2sq sq_out,
+    // FIXME: Isn't an lq2execute needed?
+    output  execute2lq lq_out,
+
     input   prf2execute prf_in,
     output  execute2prf prf_out,
 
-    // TODO: wrap this stuff into execute2complete. Wrap crap here in general.
-    output  execute2complete c_out
+    output  execute2complete_tag ctag_out,
+    output  execute2complete_dat cdat_out
 
 );
-
-    // <FU>_ins: staging; where just-issued insns wait for 1 cycle to pull their operands
+    /* >> ======== STAGE 1: Issue Staging ======== >> */
+    // (where just-issued insns wait for 1 cycle)
     struct packed {
-        LOGIC_BY_FU     rdy;
-        LOGIC_BY_FU     vld;
+        `BY_FU(logic)   i_rdy;
+        `BY_FU(logic)   o_vld;
         struct packed {
             ID_ALU_VIEW [`NUM_FU_ALU-1:0]   alu;
             ID_MUL_VIEW [`NUM_FU_MULT-1:0]  mul;
-        } dat;
-    } ins;
+            ID_LOD_VIEW [`NUM_FU_LOAD-1:0]  lod;
+            ID_STR_VIEW [`NUM_FU_STORE-1:0] str;
+        } i_dat, o_dat;
+    } iss;
 
-    logic [`NUM_FU_ALU-1:0]     alu_ops_rdy;
-    logic [`NUM_FU_MULT-1:0]    mul_ops_rdy;
-    logic [`NUM_FU_ALU-1:0]     alu_in2ops_en;
-    logic [`NUM_FU_MULT-1:0]    mul_in2ops_en;
+    struct packed {
+        `BY_FU(logic) i_rdy;
+        `BY_FU(logic) o_vld;
+        struct packed {
+            ALU_REGS [`NUM_FU_ALU-1:0]   alu;
+            MUL_REGS [`NUM_FU_MULT-1:0]  mul;
+            LOD_REGS [`NUM_FU_LOAD-1:0]  lod;
+            STR_REGS [`NUM_FU_STORE-1:0] str;
+        } i_dat, o_dat;
+    } regs;
+    
     generate
         /* Staging buffers (sbufs):
 
@@ -368,15 +654,10 @@ module stage_ex_p4 (
             2) issue selection logic in RS
         Adding internal forwarding would defeat its entire purpose.
         */
-        // TODO: Make these into FIFOs with only the subset of fields needed
-        // for the ALU type. Conserve space.
-        assign alu_in2ops_en = ins.vld.alu & alu_ops_rdy;
-        assign mul_in2ops_en = ins.vld.mul & mul_ops_rdy;
-        ID_ALU_VIEW tmp_alu_el[`NUM_FU_ALU-1:0];
-        ID_MUL_VIEW tmp_mul_el[`NUM_FU_MULT-1:0];
-
         for (genvar i = 0; i < `NUM_FU_ALU; ++i) begin : gen_alu_sbufs
-            assign tmp_alu_el[i] = '{
+            assign iss.i_dat.alu[i] = '{
+                bytag   : rs_in.bytag_alu[i],
+
                 t       : rs_in.fu_dat_alu[i].t,
                 t1      : rs_in.fu_dat_alu[i].t1,
                 t2      : rs_in.fu_dat_alu[i].t2,
@@ -393,364 +674,586 @@ module stage_ex_p4 (
                 cond_branch : rs_in.fu_dat_alu[i].cond_branch,
                 uncond_branch : rs_in.fu_dat_alu[i].uncond_branch
             };
-            fifo #(
-                .DEPTH(2),
-                .WIDTH($bits(ID_ALU_VIEW)),
-                .NUM_RPORTS(1),
-                .NUM_WPORTS(1),
-                .ENABLE_INTR_FWD(`FALSE)
-            ) s_buf (
-                .clock      (clock),
-                .reset      (reset),
-                .flush      (flush),
-                .wr_en_cnt  (rs_in.fu_vld_alu[i]),
-                .wr_data    (tmp_alu_el[i]),
-                .rd_en_cnt  (alu_in2ops_en[i]),
-                .rd_data    (ins.dat.alu[i]),
 
-                .free_scnt  (ins.rdy.alu[i]),
-                .used_scnt  (ins.vld.alu[i])
+            assign iss.i_rdy.alu[i] = 1;
+            flop #(
+                .WIDTH($bits(ID_ALU_VIEW))
+            ) sbuf_alu (
+                .clock (clock),
+                .reset (reset),
+                .flush (flush),
+
+                .i_vld (rs_in.fu_en_alu[i]),
+                .i_dat (iss.i_dat.alu[i]),
+
+                .o_vld (iss.o_vld.alu[i]),
+                .o_dat (iss.o_dat.alu[i])
             );
         end
         
         for (genvar i = 0; i < `NUM_FU_MULT; ++i) begin : gen_mul_sbufs
-            assign tmp_mul_el[i] = '{
+            assign iss.i_dat.mul[i] = '{
+                bytag   : rs_in.bytag_mul[i],
+
                 t       : rs_in.fu_dat_mult[i].t,
                 t1      : rs_in.fu_dat_mult[i].t1,
                 t2      : rs_in.fu_dat_mult[i].t2,
                 rob_idx : rs_in.fu_dat_mult[i].rob_idx,
                 func    : rs_in.fu_dat_mult[i].inst.r.funct3
             };
-            fifo #(
-                .DEPTH(2),
-                .WIDTH($bits(ID_MUL_VIEW)),
-                .NUM_RPORTS(1),
-                .NUM_WPORTS(1),
-                .ENABLE_INTR_FWD(`FALSE)
-            ) s_buf (
-                .clock      (clock),
-                .reset      (reset),
-                .flush      (flush),
-                .wr_en_cnt  (rs_in.fu_vld_mult[i]),
-                .wr_data    (tmp_mul_el[i]),
-                .rd_en_cnt  (mul_in2ops_en[i]),
-                .rd_data    (ins.dat.mul[i]),
 
-                .free_scnt  (ins.rdy.mul[i]),
-                .used_scnt  (ins.vld.mul[i])
+            ppln_skid #(
+                .WIDTH($bits(ID_MUL_VIEW))
+            ) sbuf_mul (
+                .clock (clock),
+                .reset (reset),
+                .flush (flush),
+
+                .i_vld (rs_in.fu_en_mult[i]),
+                .i_rdy (iss.i_rdy.mul[i]),
+                .i_dat (iss.i_dat.mul[i]),
+
+                .o_vld (iss.o_vld.mul[i]),
+                .o_rdy (regs.i_rdy.mul[i]),
+                .o_dat (iss.o_dat.mul[i])
+            );
+        end
+
+        for (genvar i = 0; i < `NUM_FU_LOAD; ++i) begin : gen_lod_sbufs
+            assign iss.i_dat.lod[i] = '{
+                bytag   : rs_in.bytag_ldr[i],
+
+                t       : rs_in.fu_dat_load[i].t,
+                t1      : rs_in.fu_dat_load[i].t1,
+                opb     : `RV32_signext_Iimm(rs_in.fu_dat_load[i].inst),
+
+                lq_idx  : rs_in.fu_dat_load[i].lsq_idx,
+                rob_idx : rs_in.fu_dat_load[i].rob_idx,
+                mem_size: MEM_SIZE'(rs_in.fu_dat_load[i].inst.r.funct3[1:0]),
+                rd_unsigned : rs_in.fu_dat_load[i].inst.r.funct3[2]
+            };
+
+            ppln_skid #(
+                .WIDTH($bits(ID_LOD_VIEW))
+            ) sbuf_lod (
+                .clock (clock),
+                .reset (reset),
+                .flush (flush),
+
+                .i_vld (rs_in.fu_en_load[i]),
+                .i_rdy (iss.i_rdy.lod[i]),
+                .i_dat (iss.i_dat.lod[i]),
+
+                .o_vld (iss.o_vld.lod[i]),
+                .o_rdy (regs.i_rdy.lod[i]),
+                .o_dat (iss.o_dat.lod[i])
+            );
+        end
+
+        for (genvar i = 0; i < `NUM_FU_STORE; ++i) begin : gen_str_sbufs
+            assign iss.i_dat.str[i] = '{
+                bytag   : rs_in.bytag_str[i],
+
+                t1      : rs_in.fu_dat_store[i].t1,
+                t2      : rs_in.fu_dat_store[i].t2,
+                opb     : `RV32_signext_Simm(rs_in.fu_dat_store[i].inst),
+
+                sq_idx  : rs_in.fu_dat_store[i].lsq_idx,
+                rob_idx : rs_in.fu_dat_store[i].rob_idx,
+                mem_size: MEM_SIZE'(rs_in.fu_dat_store[i].inst.r.funct3[1:0])
+            };
+
+            ppln_skid #(
+                .WIDTH($bits(ID_STR_VIEW))
+            ) sbuf_str (
+                .clock (clock),
+                .reset (reset),
+                .flush (flush),
+
+                .i_vld (rs_in.fu_en_store[i]),
+                .i_rdy (iss.i_rdy.str[i]),
+                .i_dat (iss.i_dat.str[i]),
+
+                .o_vld (iss.o_vld.str[i]),
+                .o_rdy (regs.i_rdy.str[i]),
+                .o_dat (iss.o_dat.str[i])
             );
         end
     endgenerate
 
-    // request operands from PRF (separate stage)
+    /* >> ======== STAGE 2: PRF Read ======== >> */
+    // fetch rs1, rs2 from PRF **IF NOT BYPASSING**
     always_comb begin
         prf_out = '0;
-        foreach (alu_in2ops_en[i]) begin
-            if (!alu_in2ops_en[i])
-                continue;
-            prf_out.s_en1s.alu[i]   = ins.dat.alu[i].opa_select == OPA_IS_RS1;
-            prf_out.s_en2s.alu[i]   = ins.dat.alu[i].opb_select == OPB_IS_RS2;
-            prf_out.s_t1s.alu[i]    = ins.dat.alu[i].t1; 
-            prf_out.s_t2s.alu[i]    = ins.dat.alu[i].t2; 
+        foreach (iss.o_vld.alu[i]) begin
+            prf_out.s_en1s.alu[i]   = iss.o_vld.alu[i];
+            prf_out.s_en2s.alu[i]   = iss.o_vld.alu[i];
+            prf_out.s_t1s.alu[i]    = iss.o_dat.alu[i].t1; 
+            prf_out.s_t2s.alu[i]    = iss.o_dat.alu[i].t2; 
         end
-        foreach (mul_in2ops_en[i]) begin
-            if (!mul_in2ops_en[i])
-                continue;
-            prf_out.s_en1s.mul[i]   = 1;
-            prf_out.s_en2s.mul[i]   = 1;
-            prf_out.s_t1s.mul[i]    = ins.dat.mul[i].t1; 
-            prf_out.s_t2s.mul[i]    = ins.dat.mul[i].t2; 
+        foreach (iss.o_vld.mul[i]) begin
+            prf_out.s_en1s.mul[i]   = iss.o_vld.mul[i];
+            prf_out.s_en2s.mul[i]   = iss.o_vld.mul[i];
+            prf_out.s_t1s.mul[i]    = iss.o_dat.mul[i].t1; 
+            prf_out.s_t2s.mul[i]    = iss.o_dat.mul[i].t2; 
+        end
+        foreach (iss.o_vld.lod[i]) begin
+            prf_out.s_en1s.lod[i]   = iss.o_vld.lod[i];
+            prf_out.s_t1s.lod[i]    = iss.o_dat.lod[i].t1; 
+        end
+        foreach (iss.o_vld.str[i]) begin
+            prf_out.s_en1s.str[i]   = iss.o_vld.str[i];
+            prf_out.s_en2s.str[i]   = iss.o_vld.str[i];
+            prf_out.s_t1s.str[i]    = iss.o_dat.str[i].t1; 
+            prf_out.s_t2s.str[i]    = iss.o_dat.str[i].t2; 
         end
     end
 
-    // receive/decode operands from PRF
-    ALU_OPS alu_ops, alu_ops_n;
-    MUL_OPS mul_ops, mul_ops_n;
-
-    logic [`NUM_FU_ALU-1:0]     alu_ex_rdy;
-    logic [`NUM_FU_MULT-1:0]    mul_ex_rdy;
+    struct packed {
+        `BY_FU(logic) i_rdy;
+        `BY_FU(logic) o_vld;
+    } ex;
     always_comb begin
-        alu_ops_n = '0;
-        foreach(alu_in2ops_en[i]) begin
-            if(!alu_in2ops_en[i]) 
-                continue;
-
-            // ALU opA mux
-            case (ins.dat.alu[i].opa_select)
-                OPA_IS_RS1:  alu_ops_n.opa[i] = prf_in.s_v1s.alu[i];
-                OPA_IS_NPC:  alu_ops_n.opa[i] = ins.dat.alu[i].NPC;
-                OPA_IS_PC:   alu_ops_n.opa[i] = ins.dat.alu[i].PC;
-                OPA_IS_ZERO: alu_ops_n.opa[i] = 0;
-                default:     alu_ops_n.opa[i]= 32'hdeadface; // dead face
-            endcase
-
-            // ALU opB mux
-            case (ins.dat.alu[i].opb_select)
-                OPB_IS_RS2:   alu_ops_n.opb[i] =  prf_in.s_v2s.alu[i];
-                OPB_IS_I_IMM: alu_ops_n.opb[i] = `RV32_signext_Iimm(ins.dat.alu[i].inst);
-                OPB_IS_S_IMM: alu_ops_n.opb[i] = `RV32_signext_Simm(ins.dat.alu[i].inst);
-                OPB_IS_B_IMM: alu_ops_n.opb[i] = `RV32_signext_Bimm(ins.dat.alu[i].inst);
-                OPB_IS_U_IMM: alu_ops_n.opb[i] = `RV32_signext_Uimm(ins.dat.alu[i].inst);
-                OPB_IS_J_IMM: alu_ops_n.opb[i] = `RV32_signext_Jimm(ins.dat.alu[i].inst);
-                default:      alu_ops_n.opb[i] = 32'hfacefeed; // face feed
-            endcase
-
-            alu_ops_n.bsy[i]         = ins.vld.alu[i] | (alu_ops.bsy & ~alu_ex_rdy);
-            alu_ops_n.alu_func[i]    = ins.dat.alu[i].alu_func;
-            alu_ops_n.branch_func[i] = ins.dat.alu[i].inst.b.funct3;
-            alu_ops_n.t[i]           = ins.dat.alu[i].t;
-            alu_ops_n.rob_idx[i]     = ins.dat.alu[i].rob_idx;
-            alu_ops_n.btq_idx[i]     = ins.dat.alu[i].btq_idx;
-            alu_ops_n.cond_branch[i]        = ins.dat.alu[i].cond_branch;
-            alu_ops_n.uncond_branch[i]      = ins.dat.alu[i].uncond_branch;
+        foreach (iss.o_vld.alu[i]) begin
+            regs.i_dat.alu[i] = '{
+                rs1 : prf_in.s_v1s.alu[i],
+                rs2 : prf_in.s_v2s.alu[i],
+                dat : iss.o_dat.alu[i]
+            };
         end
-
-        mul_ops_n = '0;
-        foreach (mul_in2ops_en[i]) begin
-            if (!mul_in2ops_en[i])
-                continue;
-            mul_ops_n.bsy[i] = ins.vld.mul[i] | (mul_ops.bsy & ~mul_ex_rdy);
-            mul_ops_n.rs1[i] = prf_in.s_v1s.mul[i];
-            mul_ops_n.rs2[i] = prf_in.s_v2s.mul[i];
-            mul_ops_n.func[i] = ins.dat.mul[i].func;
-            mul_ops_n.dst[i] = '{
-                rob_idx : ins.dat.mul[i].rob_idx,
-                tag     : ins.dat.mul[i].t
+        foreach (iss.o_vld.mul[i]) begin
+            regs.i_dat.mul[i] = '{
+                rs1 : prf_in.s_v1s.mul[i],
+                rs2 : prf_in.s_v2s.mul[i],
+                dat : iss.o_dat.mul[i]
+            };
+        end
+        foreach (iss.o_vld.lod[i]) begin
+            regs.i_dat.lod[i] = '{
+                rs1 : prf_in.s_v1s.lod[i],
+                dat : iss.o_dat.lod[i]
+            };
+        end
+        foreach (iss.o_vld.str[i]) begin
+            regs.i_dat.str[i] = '{
+                rs1 : prf_in.s_v1s.str[i],
+                rs2 : prf_in.s_v2s.str[i],
+                dat : iss.o_dat.str[i]
             };
         end
     end
 
+    generate
+        assign regs.i_rdy.alu = '1;
+        for (genvar i = 0; i < `NUM_FU_ALU; ++i) begin : gen_alu_rbufs
+            flop #(
+                .WIDTH($bits(ALU_REGS))
+            ) rbuf_alu (
+                .clock (clock),
+                .reset (reset),
+                .flush (flush),
 
-    // structure results into generic cdb candidates array
-    LOGIC_BY_FU vld;
+                .i_vld (iss.o_vld.alu[i]),
+                .i_dat (regs.i_dat.alu[i]),
 
-    CPL_CAND_BY_FU cands;
+                .o_vld (regs.o_vld.alu[i]),
+                .o_dat (regs.o_dat.alu[i])
+            );
+        end
+
+        for (genvar i = 0; i < `NUM_FU_MULT; ++i) begin : gen_mul_rbufs
+            skid #(
+                .WIDTH($bits(MUL_REGS))
+            ) rbuf_mul (
+                .clock (clock),
+                .reset (reset),
+                .flush (flush),
+
+                .i_vld (iss.o_vld.mul[i]),
+                .i_rdy (regs.i_rdy.mul[i]),
+                .i_dat (regs.i_dat.mul[i]),
+
+                .o_vld (regs.o_vld.mul[i]),
+                .o_rdy (ex.i_rdy.mul[i]),
+                .o_dat (regs.o_dat.mul[i])
+            );
+        end
+
+        for (genvar i = 0; i < `NUM_FU_LOAD; ++i) begin : gen_lod_rbufs
+            skid #(
+                .WIDTH($bits(LOD_REGS))
+            ) rbuf_lod (
+                .clock (clock),
+                .reset (reset),
+                .flush (flush),
+
+                .i_vld (iss.o_vld.lod[i]),
+                .i_rdy (regs.i_rdy.lod[i]),
+                .i_dat (regs.i_dat.lod[i]),
+
+                .o_vld (regs.o_vld.lod[i]),
+                .o_rdy (ex.i_rdy.lod[i]),
+                .o_dat (regs.o_dat.lod[i])
+            );
+        end
+
+        for (genvar i = 0; i < `NUM_FU_STORE; ++i) begin : gen_str_rbufs
+            skid #(
+                .WIDTH($bits(STR_REGS))
+            ) rbuf_str (
+                .clock (clock),
+                .reset (reset),
+                .flush (flush),
+
+                .i_vld (iss.o_vld.str[i]),
+                .i_rdy (regs.i_rdy.str[i]),
+                .i_dat (regs.i_dat.str[i]),
+
+                .o_vld (regs.o_vld.str[i]),
+                .o_rdy (ex.i_rdy.str[i]),
+                .o_dat (regs.o_dat.str[i])
+            );
+        end
+    endgenerate
+
+    /* >> ======== STAGE ?: (early) CDB arbitration ======== >> */
+    // If 1-cycle operation (e.g. ALU), this is before issue staging.
+    // Else if a longer-latency insn, this is in the middle of execution.
+
+    `BY_FU(CPL_CAND) cands;
     CPL_CAND [`NUM_FU_TOTAL-1:0] cands_flat;
     assign cands_flat = cands;
+    
+    /*
+    Complete grant bus shift register
+    */
+    logic [1:0][`N-1:0][`NUM_FU_TOTAL-1:0]  cdb2fu_gbus_shr;
+    logic [`N-1:0][`NUM_FU_TOTAL-1:0]       cdb2fu_gbus;
+    `BY_FU(logic) [1:0] cdb_gnt_shr;
 
-    logic [`N-1:0][`NUM_FU_TOTAL-1:0] cdb2fu_gbus;
-    LOGIC_BY_FU cpl_gnt;
+    `BY_FU(logic) cdb_req;
+    assign cdb_req.str = '0;
+    `BY_FU(logic) cdb_gnt;
+    assign cdb_req.alu = rs_in.fu_vld_alu;
+    // cdb_req.mul set by mul_ex
+    assign cdb_req.lod = ex.o_vld.lod;
 
-    logic [`NUM_FU_ALU-1:0] alu_ops2ex_en;
-    assign alu_ops2ex_en = alu_ops.bsy & alu_ex_rdy;
+    psel_gen #(
+        .WIDTH(`NUM_FU_TOTAL),
+        .REQS(`N)
+    ) cdb_arb (
+        .req    (cdb_req),  // flatten (alu + mul bits) => single [NUM_FU_TOTAL-1:0] bus
+        .gnt    (cdb_gnt),  // flatten => single bus
+        .gnt_bus(cdb2fu_gbus)
+    );
+    
+    /* >> ======== STAGE 3: Execution ======== >> */
+    // Includes operand decode/CDB bypass just before 1st cycle of execution.
+
     alu_ex alu_ex0 (
         .clock  (clock),
         .reset  (reset),
         .flush  (flush),
 
-        .en     (alu_ops2ex_en),
-        .ops    (alu_ops),
-        .ex_rdy (alu_ex_rdy),
+        .i_vld  (regs.o_vld.alu),
+        .i_regs (regs.o_dat.alu),
+        .i_rdy  (ex.i_rdy.alu),
 
-        .vld    (vld.alu),
-        .cands  (cands.alu),
-        .cpl_gnt(cpl_gnt.alu)
+        .o_vld  (ex.o_vld.alu),
+        .o_cands(cands.alu),
+        .o_rdy  (cdb_gnt_shr[1].alu),
+
+        /* CDB bypass */
+        .cdat   (cdat_out)
     );
 
-    logic [`NUM_FU_MULT-1:0] mul_ops2ex_en;
-    assign mul_ops2ex_en = mul_ops.bsy & mul_ex_rdy;
+    `BY_FU(PHYS_REG_IDX) ctag_ts;
+    PHYS_REG_IDX [`NUM_FU_TOTAL-1:0] ctag_ts_flat;
+    
     mul_ex mul_ex0 (
         .clock  (clock),
         .reset  (reset),
         .flush  (flush),
 
-        .en     (mul_ops2ex_en),
-        .ops    (mul_ops),
-        .ex_rdy (mul_ex_rdy),
+        .i_vld  (regs.o_vld.mul),
+        .i_regs (regs.o_dat.mul),
+        .i_rdy  (ex.i_rdy.mul),
 
-        .vld    (vld.mul),
-        .cands  (cands.mul),
-        .cpl_gnt(cpl_gnt.mul)
+        .cdb_req(cdb_req.mul),
+        .ctag_ts(ctag_ts.mul),
+        .cdb_gnt(cdb_gnt.mul),
+
+        .o_vld  (ex.o_vld.mul),
+        .o_cands(cands.mul),
+        .o_rdy  (cdb_gnt_shr[1].mul),
+
+        /* CDB bypass */
+        .cdat   (cdat_out)
     );
 
-    psel_gen #(
-        .WIDTH(`NUM_FU_TOTAL),
-        .REQS(`N)
-    ) sel_cpl (
-        .req(vld),      // flatten (alu + mul bits) => single [NUM_FU_TOTAL-1:0] bus
-        .gnt(cpl_gnt),  // flatten => single bus
-        .gnt_bus(cdb2fu_gbus)
+    lod_ex lod_ex0 (
+        .clock  (clock),
+        .reset  (reset),
+        .flush  (flush),
+
+        .i_vld  (regs.o_vld.lod),
+        .i_regs (regs.o_dat.lod),
+        .i_rdy  (ex.i_rdy.lod),
+
+        .o_vld  (ex.o_vld.lod),
+        .o_cands(cands.lod),
+        /* FIXME: How exactly do we do CDB arbitration for loads/stores?
+        And how does it fit in our ETB system? */
+        .o_rdy  (cdb_gnt_shr[0].lod),
+
+        /* CDB bypass */
+        .cdat   (cdat_out)
     );
 
-    execute2complete c_out_n;
+    str_ex str_ex0 (
+        .clock  (clock),
+        .reset  (reset),
+        .flush  (flush),
+
+        .i_vld  (regs.o_vld.str),
+        .i_regs (regs.o_dat.str),
+        .i_rdy  (ex.i_rdy.str),
+
+        .o_vld  (ex.o_vld.str),
+        .o_cands(cands.str),
+        /* FIXME: How exactly do we do CDB arbitration for loads/stores?
+        And how does it fit in our ETB system? */
+        .o_rdy  (cdb_gnt_shr[0].str),
+
+        .sq_in(sq_in),
+        .sq_out(sq_out),
+
+        /* CDB bypass */
+        .cdat   (cdat_out)
+    );
+
+    /* >> ======== STAGE 4/?: CDB data/tag broadcast ======== >> */
+    // Tag broadcast occurs with CDB arbitration
+    // Data broadcast is the final stage of the execute pipeline.
+    execute2complete_tag ctag_out_n;
+    execute2complete_dat cdat_out_n;
     always_comb begin
-        alu_ops_rdy = ~alu_ops.bsy | alu_ex_rdy;
-        mul_ops_rdy = ~mul_ops.bsy | mul_ex_rdy;
-
         rs_out = '{
-            fu_rdy_alu      : ins.rdy.alu,
-            fu_rdy_mult     : ins.rdy.mul,
-            fu_rdy_load     : '0,
-            fu_rdy_store    : '0
+            fu_cdb_gnt_alu  : cdb_gnt.alu,
+
+            fu_rdy_alu      : iss.i_rdy.alu,
+            fu_rdy_mult     : iss.i_rdy.mul,
+            fu_rdy_load     : iss.i_rdy.lod,
+            fu_rdy_store    : iss.i_rdy.str
         };
 
-        c_out_n = '0;
-        foreach (cdb2fu_gbus[c, f]) begin
+        foreach (rs_in.fu_dat_alu[i])
+            ctag_ts.alu[i] = rs_in.fu_dat_alu[i].t;
+        ctag_ts_flat = ctag_ts;
+
+        ctag_out_n = '0;
+        cdat_out_n = '0;
+        foreach(cdb2fu_gbus_shr[_, c, f]) begin
             if (cdb2fu_gbus[c][f]) begin
-                c_out_n.c_en[c]       |= 1;
-                c_out_n.c_ts[c]       |= cands_flat[f].t;
-                c_out_n.c_rob_idxs[c] |= cands_flat[f].rob_idx;
-                c_out_n.c_data[c]     |= cands_flat[f].data;
-                // TODO: fill these
-                c_out_n.btq_idxs[c]   |= cands_flat[f].btq_idx;
-                c_out_n.is_branch[c]  |= cands_flat[f].is_brch;
-                c_out_n.take[c]       |= cands_flat[f].take;
+                ctag_out_n.en[c]  |= 1;
+                ctag_out_n.ts[c]  |= ctag_ts_flat[f];
+            end
+
+            if (cdb2fu_gbus_shr[1][c][f]) begin
+                cdat_out_n.en[c]          |= 1;
+                cdat_out_n.ts[c]          |= cands_flat[f].t;
+                cdat_out_n.rob_idxs[c]    |= cands_flat[f].rob_idx;
+                cdat_out_n.data[c]        |= cands_flat[f].data;
+                cdat_out_n.btq_idxs[c]    |= cands_flat[f].btq_idx;
+                cdat_out_n.is_brch[c]   |= cands_flat[f].is_brch;
+                cdat_out_n.take[c]        |= cands_flat[f].take;
+            end
+
+        end
+    end
+
+    always_ff @(posedge clock) begin
+        if (reset || flush) begin
+            cdb2fu_gbus_shr <= '0;
+            cdb_gnt_shr     <= '0;
+            ctag_out <= '0;
+            cdat_out <= '0;
+        end else begin
+            cdb2fu_gbus_shr[0]  <= cdb2fu_gbus;
+            cdb_gnt_shr[0]      <= cdb_gnt;
+            for (int unsigned i = 0; i < 1; ++i) begin
+                cdb2fu_gbus_shr[i+1] <= cdb2fu_gbus_shr[i];
+                cdb_gnt_shr[i+1]     <= cdb_gnt_shr[i];
+            end
+            ctag_out <= ctag_out_n;
+            cdat_out <= cdat_out_n;
+
+            if (ctag_out.en[0] && ctag_out.en[1]
+                && ctag_out.ts[0] == ctag_out.ts[1]
+                && ctag_out.ts[0] != '0) begin
+                $error("💥 DUPLICATE CDB_TAG TAG: slot %0d and %0d both write tag %0d", 0, 1, ctag_out.ts[1]);
+            end
+            if (cdat_out.en[0] && cdat_out.en[1]
+                && cdat_out.ts[0] == cdat_out.ts[1]
+                && cdat_out.ts[0] != '0) begin
+                $error("💥 DUPLICATE CDB_DAT tag: slot %0d and %0d both write tag %0d", 0, 1, cdat_out.ts[1]);
             end
         end
     end
 
-
-    always_ff @(posedge clock) begin
-        if (reset || flush) begin
-            alu_ops     <= '0;
-            mul_ops     <= '0;
-            c_out       <= '0;
-        end else begin
-            alu_ops     <= alu_ops_n;
-            mul_ops     <= mul_ops_n;
-            /*
-            We buffer c_out for 1 cycle to break the comb. chain...
-            cpl_buf.used_scnt(vld) -> psel_gen(vld) -> cpl_buf.rd_en_cnt(cpl_gnt)
-            -> cpl_buf.rd_data(cands) -> c_out $#BREAK HERE#$ -> RS issue
-            -> FU sbuf.wr_data()
-
-            TODO: Buffering c_out for 1 cycle feels a little questionable.
-            Are you sure you're not adding an unnecessary cycle of latency for
-            free_list and rob who practically already wait for 1 cycle because
-            they have INTR_FWD disabled? Can you simply reenable INTR_FWD for
-            them with minimal latency cost?
-            */
-            c_out       <= c_out_n;
-
-        end
-    end
-
-    `ifndef SYNTH
+    `ifdef DEBUG
     always_ff @(posedge clock) begin
         if (!reset) begin
             $display("  %3d | >> EXECUTE", $time);
 
             for (int i = 0; i < `NUM_FU_ALU; ++i) begin
-                $display("alu_ins[%0d]: rdy: %b, vld: %b, t: %2d, t1: %2d, t2: %2d, rob_idx: %2d, btq_idx: %2d, inst: 0x%x, PC: 0x%x, NPC: 0x%x, cond_branch: %b, uncond_branch: %b",
+                $display("alu_iss[%0d]: rdy: %b, vld: %b, t: %2d, t1: %2d, t2: %2d, rob_idx: %2d, btq_idx: %2d, inst: 0x%x, PC: 0x%x, NPC: 0x%x, cond_branch: %b, uncond_branch: %b",
                     i,
-                    ins.rdy.alu[i],
-                    ins.vld.alu[i],
-                    ins.dat.alu[i].t,
-                    ins.dat.alu[i].t1,
-                    ins.dat.alu[i].t2,
-                    ins.dat.alu[i].rob_idx,
-                    ins.dat.alu[i].btq_idx,
-                    ins.dat.alu[i].inst,
-                    ins.dat.alu[i].PC,
-                    ins.dat.alu[i].NPC,
-                    ins.dat.alu[i].cond_branch,
-                    ins.dat.alu[i].uncond_branch
+                    iss.i_rdy.alu[i],
+                    iss.o_vld.alu[i],
+                    iss.o_dat.alu[i].t,
+                    iss.o_dat.alu[i].t1,
+                    iss.o_dat.alu[i].t2,
+                    iss.o_dat.alu[i].rob_idx,
+                    iss.o_dat.alu[i].btq_idx,
+                    iss.o_dat.alu[i].inst,
+                    iss.o_dat.alu[i].PC,
+                    iss.o_dat.alu[i].NPC,
+                    iss.o_dat.alu[i].cond_branch,
+                    iss.o_dat.alu[i].uncond_branch
+                );
+                $display("  bytag: (b1:%b, idx1:%b) (b2:%b, idx2:%b)",
+                    iss.o_dat.alu[i].bytag.bypass1,
+                    iss.o_dat.alu[i].bytag.cdb_idx1,
+                    iss.o_dat.alu[i].bytag.bypass2,
+                    iss.o_dat.alu[i].bytag.cdb_idx2,
                 );
             end
 
             for (int i = 0; i < `NUM_FU_MULT; ++i) begin
-                $display("mul_ins[%0d]: rdy: %b, vld: %b, t: %2d, t1: %2d, t2: %2d, rob_idx: %2d, func: 0x%x",
+                $display("mul_iss[%0d]: rdy: %b, vld: %b, t: %2d, t1: %2d, t2: %2d, rob_idx: %2d, func: 0x%x",
                     i,
-                    ins.rdy.mul[i],
-                    ins.vld.mul[i],
-                    ins.dat.mul[i].t,
-                    ins.dat.mul[i].t1,
-                    ins.dat.mul[i].t2,
-                    ins.dat.mul[i].rob_idx,
-                    ins.dat.mul[i].func
+                    iss.i_rdy.mul[i],
+                    iss.o_vld.mul[i],
+                    iss.o_dat.mul[i].t,
+                    iss.o_dat.mul[i].t1,
+                    iss.o_dat.mul[i].t2,
+                    iss.o_dat.mul[i].rob_idx,
+                    iss.o_dat.mul[i].func
+                );
+                $display("  bytag: (b1:%b, idx1: %b) (b2: %b, idx2:%b)",
+                    iss.o_dat.mul[i].bytag.bypass1,
+                    iss.o_dat.mul[i].bytag.cdb_idx1,
+                    iss.o_dat.mul[i].bytag.bypass2,
+                    iss.o_dat.mul[i].bytag.cdb_idx2,
                 );
             end
 
             for (int i = 0; i < `NUM_FU_ALU; ++i) begin
-                $display("alu_ops[%0d]: bsy: %b, opa: 0x%x, opb: 0x%x, alu_func: %b, branch_func: %b, cond_branch: %b, uncond_branch: %b, t: %2d, rob_idx: %2d, btq_idx: %2d",
+                $display("regs.o_dat.alu[%0d]: bsy: %b, rs1: 0x%x, rs2: 0x%x",
                     i,
-                    alu_ops.bsy[i],
-                    alu_ops.opa[i],
-                    alu_ops.opb[i],
-                    alu_ops.alu_func[i],
-                    alu_ops.branch_func[i],
-                    alu_ops.cond_branch[i],
-                    alu_ops.uncond_branch[i],
-                    alu_ops.t[i],
-                    alu_ops.rob_idx[i],
-                    alu_ops.btq_idx[i]
+                    regs.o_vld.alu[i],
+                    regs.o_dat.alu[i].rs1,
+                    regs.o_dat.alu[i].rs2
                 );
+                $display("  bytag: (b1:%b, idx1:%b) (b2:%b, idx2:%b)",
+                    regs.o_dat.alu[i].dat.bytag.bypass1,
+                    regs.o_dat.alu[i].dat.bytag.cdb_idx1,
+                    regs.o_dat.alu[i].dat.bytag.bypass2,
+                    regs.o_dat.alu[i].dat.bytag.cdb_idx2,
+                );
+                // $display("regs.o_dat.alu[%0d]: bsy: %b, opa: 0x%x, opb: 0x%x, alu_func: %b, branch_func: %b, cond_branch: %b, uncond_branch: %b, t: %2d, rob_idx: %2d, btq_idx: %2d",
+                //     i,
+                //     regs.o_vld.alu[i],
+                //     regs.o_dat.alu[i].opa,
+                //     regs.o_dat.alu[i].opb,
+                //     regs.o_dat.alu[i].alu_func,
+                //     regs.o_dat.alu[i].branch_func,
+                //     regs.o_dat.alu[i].cond_branch,
+                //     regs.o_dat.alu[i].uncond_branch,
+                //     regs.o_dat.alu[i].t,
+                //     regs.o_dat.alu[i].rob_idx,
+                //     regs.o_dat.alu[i].btq_idx
+                // );
             end
 
             for (int i = 0; i < `NUM_FU_MULT; ++i) begin
-                $display("mul_ops[%0d]: bsy: %b, rs1: 0x%x, rs2: 0x%x, func: %b, t: %2d, rob_idx: %2d",
+                $display("regs.o_dat.mul[%0d]: bsy: %b, rs1: 0x%x, rs2: 0x%x",
                     i,
-                    mul_ops.bsy[i],
-                    mul_ops.rs1[i],
-                    mul_ops.rs2[i],
-                    mul_ops.func[i],
-                    mul_ops.dst[i].tag,
-                    mul_ops.dst[i].rob_idx
+                    regs.o_vld.mul[i],
+                    regs.o_dat.mul[i].rs1,
+                    regs.o_dat.mul[i].rs2
                 );
+                $display("  bytag: (b1:%b, idx1:%b) (b2:%b, idx2:%b)",
+                    regs.o_dat.mul[i].dat.bytag.bypass1,
+                    regs.o_dat.mul[i].dat.bytag.cdb_idx1,
+                    regs.o_dat.mul[i].dat.bytag.bypass2,
+                    regs.o_dat.mul[i].dat.bytag.cdb_idx2,
+                );
+                // $display("regs.o_dat.mul[%0d]: bsy: %b, rs1: 0x%x, rs2: 0x%x, func: %b, t: %2d, rob_idx: %2d",
+                //     i,
+                //     regs.o_vld.mul[i],
+                //     regs.o_dat.mul[i].rs1,
+                //     regs.o_dat.mul[i].rs2,
+                //     regs.o_dat.mul[i].func,
+                //     regs.o_dat.mul[i].dst.tag,
+                //     regs.o_dat.mul[i].dst.rob_idx
+                // );
             end
 
-            $display("c_out: rdy_alu: %b  rdy_mult: %b  rdy_store: %b  rdy_load: %b  cpl_gnt: %b",
+            $display("c_out: rdy_alu:{%b} rdy_mult:{%b} rdy_store:{%b} rdy_load:{%b}",
                 rs_out.fu_rdy_alu,
                 rs_out.fu_rdy_mult,
                 rs_out.fu_rdy_store,
                 rs_out.fu_rdy_load,
-                cpl_gnt
             );
 
-            for (int i = 0; i < `N; ++i) begin
-                $display("c_out[%0d]: c_en: %b, is_branch: %b, c_ts: %2d, c_rob_idxs: %2d, c_data: %x, btq_idxs: %d, take: %b",
-                    i,
-                    c_out.c_en[i],
-                    c_out.is_branch[i],
-                    c_out.c_ts[i],
-                    c_out.c_rob_idxs[i],
-                    c_out.c_data[i],
-                    c_out.btq_idxs[i],
-                    c_out.take[i]
-                );
+            $display("\ncdb_req: alu:{%b} mul:{%b}", cdb_req.alu, cdb_req.mul);
+            $display("ctag_ts: alu:{%2d, %2d} mul:{%2d, %2d}",
+                ctag_ts.alu[1], ctag_ts.alu[0], ctag_ts.mul[1], ctag_ts.mul[0]);
+            $display("cdb_gnt: alu:{%b} mul:{%b}", cdb_gnt.alu, cdb_gnt.mul);
+            for (int i = 0; i < 2; ++i) begin
+                $display("cdb_gnt[%0d]: alu:{%b} mul:{%b}", i, cdb_gnt_shr[i].alu, cdb_gnt_shr[i].mul);
+            end
+
+            $display("");
+            for (int n = 0; n < `N; ++n) begin
+                $display("cdb2fu_gbus[%0d]: %b", n, cdb2fu_gbus[n]);
+            end
+            for (int s = 0; s < 2; ++s) begin
+                for (int n = 0; n < `N; ++n) begin
+                    $display("cdb2fu_gbus[%0d][%0d]: %b", s, n, cdb2fu_gbus_shr[s][n]);
+                end
             end
 
 
-            // for (int i = 0; i < 4; ++i) begin
-            //     $display("all_vld[%0d]: %b", i, all_vld[i]);
-            // end
-            // $display("all_vld: %b", all_vld);
-            // $display("");
-            // for (int i = 0; i < 4; ++i) begin
-            //     $display("cpl_gnt[%0d]: %b", i, cpl_gnt[i]);
-            // end
-            // $display("cpl_gnt: %b", cpl_gnt);
-            // $display("");
-            // for (int c = 0; c < 2; ++c) begin
-            //     for (int f = 0; f < 4; ++f) begin
-            //         $display("cdb2fu_gbus[%0d][%0d]: %b", c, f, cdb2fu_gbus[c][f]);
-            //     end
-            // end
-            // $display("");
-            // for (int i = 0; i < 4; ++i) begin
-            //     $display("cand[%0d]: t: %0d rob_idx: %0d data: %x", i, all_cands[i].t, all_cands[i].rob_idx, all_cands[i].data);
-            // end
-            // $display("<prf_out> en: %b s_t1s: [%0d, %0d, %0d, %0d] s_t2s: [%0d, %0d, %0d, %0d]",
-            //     prf_out.prf_en,
-            //     prf_out.s_t1s[0],
-            //     prf_out.s_t1s[1],
-            //     prf_out.s_t1s[2],
-            //     prf_out.s_t1s[3],
-            //     prf_out.s_t2s[0],
-            //     prf_out.s_t2s[1],
-            //     prf_out.s_t2s[2],
-            //     prf_out.s_t2s[3]
-            // );
-            // $display("alu: (rdy: %b, res: %x), (rdy: %b, res: %x), mul: (rdy: %b, res: %x), (rdy: %b, res: %x)",
-            //     alu_outs.rdy[0],
-            //     alu_outs.res[0],
-            //     alu_outs.rdy[1],
-            //     alu_outs.res[1],
-            //     mul_outs.rdy[0],
-            //     mul_outs.res[0],
-            //     mul_outs.rdy[1],
-            //     mul_outs.res[1]
-            // );
+            for (int i = 0; i < `N; ++i) begin
+                $display("ctag_out_n[%0d]: en: %b, ts: %2d",
+                    i,
+                    ctag_out_n.en[i],
+                    ctag_out_n.ts[i],
+                );
+            end
+            for (int i = 0; i < `N; ++i) begin
+                $display("ctag_out[%0d]: en: %b, ts: %2d",
+                    i,
+                    ctag_out.en[i],
+                    ctag_out.ts[i],
+                );
+            end
+            for (int i = 0; i < `N; ++i) begin
+                $display("cdat_out[%0d]: en: %b, is_brch: %b, ts: %2d, rob_idxs: %2d, data: %x, btq_idxs: %d, take: %b",
+                    i,
+                    cdat_out.en[i],
+                    cdat_out.is_brch[i],
+                    cdat_out.ts[i],
+                    cdat_out.rob_idxs[i],
+                    cdat_out.data[i],
+                    cdat_out.btq_idxs[i],
+                    cdat_out.take[i]
+                );
+            end
+
             $display("<prf_in >        s_v1s: [%0d, %0d, %0d, %0d] s_v2s: [%0d, %0d, %0d, %0d]",
                 prf_in.s_v1s[0],
                 prf_in.s_v1s[1],
@@ -764,6 +1267,6 @@ module stage_ex_p4 (
             $display("  %3d | << EXECUTE", $time);
         end
     end
-    `endif // SYNTH
+    `endif // DEBUG
 
 endmodule // stage_ex

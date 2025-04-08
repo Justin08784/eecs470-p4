@@ -23,7 +23,7 @@ module btq #(
     output btq2retire       r_out,
 
     // complete (write)
-    input  execute2complete c_in, // TODO: handling from EX
+    input  execute2complete_dat cdat_in, // TODO: handling from EX
 
     // dispatch (write)
     input  dispatch2btq d_in,
@@ -96,12 +96,12 @@ module btq #(
 
             // handle complete (ins)
             for (int unsigned i = 0, int cur_idx = 0; i < NUM_CPORTS; ++i) begin
-                if (!c_in.c_en[i] || !c_in.is_branch[i])
+                if (!cdat_in.en[i] || !cdat_in.is_brch[i])
                     continue;
-                cur_idx = c_in.btq_idxs[i];
+                cur_idx = cdat_in.btq_idxs[i];
 
-                state[cur_idx].tgt  <= c_in.c_data[i];
-                state[cur_idx].take <= c_in.take[i];
+                state[cur_idx].tgt  <= cdat_in.data[i];
+                state[cur_idx].take <= cdat_in.take[i];
             end
 
             // handle dispatch (ins)
@@ -120,7 +120,7 @@ module btq #(
         end
     end
 
-    `ifndef SYNTH
+    `ifdef DEBUG
     always_ff @(posedge clock) begin
         if (!reset) begin
             $display("  %3d | >> BTQ >>", $time);
@@ -139,15 +139,17 @@ module btq #(
                                 ? " << t"
                                 : ""
                 );
+                if (i == tail)
+                    break;
             end
 
             for (int i = 0; i < `N; ++i) begin
-                $display("c_in[%0d]: c_en: %b, is_branch: %b, c_btq_idxs: %d, take: %b", 
+                $display("cdat_in[%0d]: c_en: %b, is_brch: %b, c_btq_idxs: %d, take: %b", 
                     i,
-                    c_in.c_en[i],
-                    c_in.is_branch[i],
-                    c_in.btq_idxs[i],
-                    c_in.take[i]
+                    cdat_in.en[i],
+                    cdat_in.is_brch[i],
+                    cdat_in.btq_idxs[i],
+                    cdat_in.take[i]
                 );
             end
             $display("r_in: rd_cnt %d", r_in.rd_cnt);
@@ -164,6 +166,6 @@ module btq #(
             $display("  %3d | << BTQ <<", $time);
         end
     end
-    `endif // SYNTH
+    `endif // DEBUG
 
 endmodule

@@ -285,7 +285,8 @@ module stage_id_p4 (
                 fu_idx      : tmp[i].fu_idx,
                 rob_idx     : '0,
                 btq_idx     : '0,
-                is_branch   : tmp[i].cond_branch || tmp[i].uncond_branch,
+                lsq_idx     : '0,
+                is_brch   : tmp[i].cond_branch || tmp[i].uncond_branch,
 
                 inst        : f_in.f_dat[i].inst,
                 PC          : f_in.f_dat[i].PC,
@@ -388,7 +389,7 @@ module stage_id_p4 (
             need to check && (i < prvw_vld_cnt) for either condition!
             */
             d_out.prvw_has_dests[i] = d_out.d_dat[i].dest_reg_idx != `ZERO_REG;
-            d_out.prvw_is_brch[i]   = d_out.d_dat[i].is_branch;
+            d_out.prvw_is_brch[i]   = d_out.d_dat[i].is_brch;
         end
     end
 
@@ -400,7 +401,7 @@ module stage_id_p4 (
         end
 
 
-        `ifndef SYNTH
+        `ifdef DEBUG
         if (!reset) begin
             $display("  %3d | >> ID >>", $time);
             // $display("  %3d | FIFO: {used_scnt: %d, free_scnt: %d}",

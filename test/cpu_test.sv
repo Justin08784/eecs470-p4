@@ -55,7 +55,7 @@ module testbench;
     MEM_SIZE    proc2mem_size;
 
     COMMIT_PACKET [`N-1:0] committed_insts;
-    ADDR PC_reg;
+    ADDR [`N-1:0] PC_reg;
     EXCEPTION_CODE error_status = NO_ERROR;
 
     ADDR  if_NPC_dbg;
@@ -74,6 +74,11 @@ module testbench;
     DATA  mem_wb_inst_dbg;
     logic mem_wb_valid_dbg;
 
+    rob2retire dbg_rob2retire;
+    btq2retire dbg_btq2retire;
+    retire2btq dbg_retire2btq;
+    sq2retire  dbg_sq2retire;
+
 
     // Instantiate the Pipeline
     cpu verisimpleV (
@@ -81,7 +86,10 @@ module testbench;
         .clock (clock),
         .reset (reset),
         //.mem2proc_transaction_tag (mem2proc_transaction_tag),
-        .mem2proc_data            ({memory.unified_memory[PC_reg[15:3]]}),
+        .mem2proc_data            ({
+            memory.unified_memory[PC_reg[1][15:3]],
+            memory.unified_memory[PC_reg[0][15:3]]
+        }),
         //.mem2proc_data_tag        (mem2proc_data_tag),
 
         // Outputs
@@ -95,6 +103,10 @@ module testbench;
         .committed_insts (committed_insts),
         .PC_reg(PC_reg),
 
+        .dbg_rob2retire (dbg_rob2retire),
+        .dbg_btq2retire (dbg_btq2retire),
+        .dbg_retire2btq (dbg_retire2btq),
+        .dbg_sq2retire  (dbg_sq2retire),
         .if_NPC_dbg       (if_NPC_dbg),
         .if_inst_dbg      (if_inst_dbg),
         .if_valid_dbg     (if_valid_dbg),
@@ -236,7 +248,7 @@ module testbench;
             for (int i = 0, int cur_idx = 0; i < `N; ++i) begin
                 if (i >= verisimpleV.rob_0.d_in.d_en_cnt)
                     break;
-                cur_idx = verisimpleV.rob_0.d_idxs[i];
+                cur_idx = verisimpleV.rob_0.comm_idxs[i];
                 rob_debug[cur_idx] = '{
                     halt    : verisimpleV.rob_0.d_in.halt[i],
                     illegal : verisimpleV.rob_0.d_in.illegal[i],
@@ -284,9 +296,9 @@ module testbench;
         (only *.out is graded after all), since hierarchical references
         do not work in synthesis
         */
-        `ifndef SYNTH
+        `ifdef DEBUG
         $display("  %3d | >> cpu_test >>", $time);
-        `endif // SYNTH
+        `endif // DEBUG
         for (int n = 0, int cur_idx = 0; n < `N; ++n) begin
             if (!committed_insts[n].valid)
                 continue;
@@ -296,13 +308,13 @@ module testbench;
             illegal = committed_insts[n].illegal;
 
             `ifndef SYNTH
-            cur_idx = verisimpleV.rob_0.r_idxs[n];
+            cur_idx = verisimpleV.rob_0.rtre_idxs[n];
             pc      = rob_debug[cur_idx].NPC - 4;
             block   = memory.unified_memory[pc[31:3]];
             inst    = block.word_level[pc[2]];
-            reg_idx = verisimpleV.rob_0.r_out.dst[n];
+            reg_idx = verisimpleV.rob_0.r_out.entries[n].dst;
             data    = verisimpleV.prf_0.phys_reg_file[
-                verisimpleV.arch_map_0.entries_n[reg_idx].t
+                verisimpleV.rob_0.r_out.entries[n].tag
             ];
             // print the committed instructions to the writeback output file
             if (reg_idx == `ZERO_REG) begin
@@ -315,6 +327,7 @@ module testbench;
                           data);
             end
             rob_debug.delete(cur_idx);
+            `ifdef DEBUG
             $display("commit[%0d]: (pc: 0x%x, inst: 0x%x) vld: %b, halt: %b, illegal: %b",
                 n,
                 pc,
@@ -323,6 +336,7 @@ module testbench;
                 committed_insts[n].halt,
                 committed_insts[n].illegal
             );
+            `endif // DEBUG
 
             `endif // SYNTH
 
@@ -335,7 +349,7 @@ module testbench;
                 break;
             end
         end
-        `ifndef SYNTH
+        `ifdef DEBUG
         $display("  %3d | << cpu_test <<", $time);
         `endif // SYNTH
 

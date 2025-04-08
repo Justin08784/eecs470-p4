@@ -20,7 +20,6 @@ module map_table #(parameter
     `ifdef DEBUG
     output struct packed {
         PHYS_REG_IDX t;
-        logic cpl;
     } [`NUM_ARCH_REG-1:0] entries_dbg,
     `endif
 
@@ -30,7 +29,6 @@ module map_table #(parameter
     // retire ??
 
     // complete
-    input execute2complete c_in,
 
     // issue ??
 
@@ -40,7 +38,6 @@ module map_table #(parameter
 );
     struct packed {
         PHYS_REG_IDX t;
-        logic cpl;
     } [`NUM_ARCH_REG-1:0] entries, entries_n;
     `ifdef DEBUG
     assign entries_dbg = entries;
@@ -49,18 +46,6 @@ module map_table #(parameter
     always_comb begin
         entries_n = entries;
         d_out = '0;
-        // handle completes
-        for (int i = 0; i < N; ++i) begin
-            /* Checking for preg#0 is presumably not necessary since it cannot
-            be allocated as a dest reg. */
-            // if (!c_in.c_en[i] || c_in.c_ts[i] == `0)
-            //     continue;
-            if (!c_in.c_en[i])
-                continue;
-            for (int r = 0; r < `NUM_ARCH_REG; ++r) begin
-                entries_n[r].cpl |= (entries_n[r].t == c_in.c_ts[i]);
-            end
-        end
 
         // handle renames
         for (int i = 0; i < d_in.en_cnt; ++i) begin
@@ -70,13 +55,10 @@ module map_table #(parameter
             */
             d_out.t1s[i]    = entries_n[d_in.src1s[i]].t;
             d_out.t2s[i]    = entries_n[d_in.src2s[i]].t;
-            d_out.cpl1s[i]  = !d_in.rd_src1s[i] || entries_n[d_in.src1s[i]].cpl;
-            d_out.cpl2s[i]  = !d_in.rd_src2s[i] || entries_n[d_in.src2s[i]].cpl;
 
             if (d_in.dsts[i] != `ZERO_REG) begin
                 d_out.ts_old[i]             = entries_n[d_in.dsts[i]].t;
                 entries_n[d_in.dsts[i]].t   = d_in.ts[i];
-                entries_n[d_in.dsts[i]].cpl = 0;
             end
         end
     end
@@ -85,35 +67,31 @@ module map_table #(parameter
         if (reset) begin
             for (int r = 1; r < `NUM_ARCH_REG; ++r) begin
                 entries[r] <= '{
-                    t   : r,    // ✅ Map PRx = Rx (Arch Reg x → PRx)
-                    cpl : 1     // Mark all as initially completed
+                    t : r    // ✅ Map PRx = Rx (Arch Reg x → PRx)
                 };
             end
             entries[`ZERO_REG]  <= '{
-                t   : '0,
-                cpl : 1
+                t   : '0
             }; // Ensure ZERO_REG always maps to PR0
         end else if (flush) begin
             for (int unsigned r = 0; r < `NUM_ARCH_REG; ++r) begin
                 entries[r] <= '{
-                    t   : am_in.state[r].t,
-                    cpl : 1
+                    t   : am_in.state[r].t
                 };
             end
         end else begin
             entries <= entries_n;
             `ifndef SYNTH
-            if (entries[`ZERO_REG].t != '0 || !entries[`ZERO_REG].cpl) begin
-                $error("ERROR: entries[0] was modified! Got: {t:%0d, cpl:%b}", 
-                    entries[`ZERO_REG].t,
-                    entries[`ZERO_REG].cpl
+            if (entries[`ZERO_REG].t != '0) begin
+                $error("ERROR: entries[0] was modified! Got: {t:%0d}", 
+                    entries[`ZERO_REG].t
                 );
             end
             `endif
         end
     end
 
-    `ifndef SYNTH
+    `ifdef DEBUG
     // debugging
     always_ff @(posedge clock) begin
         if (!reset) begin
@@ -129,19 +107,15 @@ module map_table #(parameter
                 d_in.src1s[1],
                 d_in.src2s[1]
             );
-            $display("dis_out:  {en_cnt: %d, [(told: %0d, t1: %0d<%b>, t2: %0d<%b>), (told: %0d, t1: %0d<%b>, t2: %0d<%b>)]}",
+            $display("dis_out:  {en_cnt: %d, [(told: %0d, t1: %0d, t2: %0d), (told: %0d, t1: %0d, t2: %0d)]}",
                 d_in.en_cnt,
                 d_out.ts_old[0],
                 d_out.t1s[0],
-                d_out.cpl1s[0],
                 d_out.t2s[0],
-                d_out.cpl2s[0],
 
                 d_out.ts_old[1],
                 d_out.t1s[1],
-                d_out.cpl1s[1],
-                d_out.t2s[1],
-                d_out.cpl2s[1]
+                d_out.t2s[1]
             );
             $display("  %3d | << MT <<", $time);
         end

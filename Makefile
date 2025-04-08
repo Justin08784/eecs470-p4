@@ -189,7 +189,7 @@ GREP = grep -E --color=auto
 # ---- Modules to Test ---- #
 
 # TODO: add more modules here
-MODULES = cpu mult rob rs fifo free_list dispatch prf map_table stage_id_p4 execute fetch btb lsq
+MODULES = cpu mult rob rs fifo free_list dispatch prf map_table stage_id_p4 execute fetch btb sq post_ret_buffer gshare skid_buffer lq
 
 # TODO: update this if you add more header files
 ALL_HEADERS = $(CPU_HEADERS)
@@ -212,6 +212,11 @@ ROB_FILES = verilog/sys_defs.svh verilog/memDP.sv verilog/FIFO.sv
 build/rob.simv: $(ROB_FILES)
 build/rob.cov: $(ROB_FILES)
 synth/rob.vg: $(ROB_FILES)
+
+FIFO_FILES = verilog/sys_defs.svh
+build/fifo.simv: $(FIFO_FILES)
+build/fifo.cov: $(FIFO_FILES)
+synth/fifo.vg: $(FIFO_FILES)
 
 FIFO_FILES = verilog/sys_defs.svh
 build/fifo.simv: $(FIFO_FILES)
@@ -268,10 +273,25 @@ build/btq.simv: $(BTB_FILES)
 build/btq.cov: $(BTB_FILES)
 build/btq.vg: $(BTB_FILES)
 
-LSQ_FILES = verilog/sys_defs.svh 
-build/lsq.simv: $(LSQ_FILES)
-build/lsq.cov: $(LSQ_FILES)
-synth/lsq.vg: $(LSQ_FILES)
+SQ_FILES = verilog/sys_defs.svh
+build/sq.simv: $(SQ_FILES)
+build/sq.cov: $(SQ_FILES)
+synth/sq.vg: $(SQ_FILES)
+
+LQ_FILES = verilog/sys_defs.svh
+build/lq.simv: $(LQ_FILES)
+build/lq.cov: $(LQ_FILES)
+synth/lq.vg: $(LQ_FILES)
+
+POST_RET_BUFFER_FILES = verilog/sys_defs.svh
+build/post_ret_buffer.simv: $(POST_RET_BUFFER_FILES)
+build/post_ret_buffer.cov: $(POST_RET_BUFFER_FILES)
+synth/post_ret_buffer.vg: $(POST_RET_BUFFER_FILES)
+
+GSHARE_FILES = verilog/sys_defs.svh verilog/gshare.sv verilog/prediction_buffer.sv verilog/global_history_register.sv verilog/pht.sv
+build/gshare.simv: $(GSHARE_FILES)
+build/gshare.cov: $(GSHARE_FILES)
+synth/gshare.vg: $(GSHARE_FILES)
 
 
 #################################
@@ -309,7 +329,15 @@ CPU_SOURCES = verilog/cpu.sv \
 			  verilog/fetch.sv \
 			  verilog/execute.sv \
 			  verilog/btq.sv \
-			  verilog/btb.sv
+			  verilog/btb.sv \
+			  verilog/gshare.sv \
+			  verilog/prediction_buffer.sv \
+			  verilog/skid_buffer.sv \
+			  verilog/global_history_register.sv \
+			  verilog/pht.sv \
+			  verilog/retire.sv \
+			  verilog/sq.sv
+
 
 build/cpu.simv: $(CPU_SOURCES) $(CPU_HEADERS) $(CPU_TESTBENCH)
 synth/cpu.vg: $(CPU_SOURCES) $(CPU_HEADERS)

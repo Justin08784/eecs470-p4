@@ -14,8 +14,19 @@ module cpu (
     input clock, // System clock
     input reset, // System reset
 
-    //input MEM_TAG   mem2proc_transaction_tag, // Memory tag for current transaction
-    input MEM_BLOCK mem2proc_data,            // Data coming back from memory
+    input MEM_TAG   mem2proc_transaction_tag, // Memory tag for current transaction
+    input MEM_BLOCK [1:0] mem2proc_data,            // Data coming back from memory
+        /*
+        Q: Why 2 mem blocks when each mem block supplies a double word
+        i.e. 8 bytes i.e. 2 insns? Isn't this enough to support 2-size fetch?
+        A (Justin): No, it is not; fetch at a double-word misaligned PC will
+        straddle double word block boundaries.
+
+        An address is "double word-aligned" iff its lowest 3 bits are 000.
+        If PC_reg = 3'b100, the first instruction (PC) is in the *second half* of
+        mem2proc_data[0], but the next instruction (PC + 4) is in the *first half*
+        of mem2proc_data[1]. One memory block isn't enough to cover both.
+        */
     //input MEM_TAG   mem2proc_data_tag,        // Tag for which transaction data is for
 
     //output MEM_COMMAND proc2mem_command, // Command sent to memory
@@ -25,11 +36,15 @@ module cpu (
 
     // Note: these are assigned at the very bottom of the module
     output COMMIT_PACKET [`N-1:0] committed_insts,
-    output ADDR PC_reg,
+    output ADDR [`N-1:0] PC_reg,
 
     // Debug outputs: these signals are solely used for debugging in testbenches
     // Do not change for project 3
     // You should definitely change these for project 4
+    output rob2retire dbg_rob2retire,
+    output btq2retire dbg_btq2retire,
+    output retire2btq dbg_retire2btq,
+    output sq2retire  dbg_sq2retire,
     output ADDR  if_NPC_dbg,
     output DATA  if_inst_dbg,
     output logic if_valid_dbg,
@@ -46,339 +61,6 @@ module cpu (
     output DATA  mem_wb_inst_dbg,
     output logic mem_wb_valid_dbg
 );
-
-    //////////////////////////////////////////////////
-    //                                              //
-    //                Pipeline Wires                //
-    //                                              //
-    //////////////////////////////////////////////////
-
-    // // Pipeline register enables
-    // logic if_id_enable, id_ex_enable, ex_mem_enable, mem_wb_enable;
-
-    // // From IF stage to memory
-    // MEM_COMMAND Imem_command; // Command sent to memory
-
-    // // Outputs from IF-Stage and IF/ID Pipeline Register
-    // ADDR Imem_addr;
-    // IF_ID_PACKET if_packet, if_id_reg;
-
-    // // Outputs from ID stage and ID/EX Pipeline Register
-    // ID_EX_PACKET id_packet, id_ex_reg;
-
-    // // Outputs from EX-Stage and EX/MEM Pipeline Register
-    // EX_MEM_PACKET ex_packet, ex_mem_reg;
-
-    // // Outputs from MEM-Stage and MEM/WB Pipeline Register
-    // MEM_WB_PACKET mem_packet, mem_wb_reg;
-
-    // // Outputs from MEM-Stage to memory
-    // ADDR        Dmem_addr;
-    // MEM_BLOCK   Dmem_store_data;
-    // MEM_COMMAND Dmem_command;
-    // MEM_SIZE    Dmem_size;
-
-    // // Outputs from WB-Stage (These loop back to the register file in ID)
-    // COMMIT_PACKET wb_packet;
-
-    // // Logic for stalling memory stage
-    // logic       load_stall;
-    // logic       new_load;
-    // logic       mem_tag_match;
-    // logic       rd_mem_q;       // previous load
-    // MEM_TAG     outstanding_mem_tag;    // tag load is waiting in
-    // MEM_COMMAND Dmem_command_filtered;  // removes redundant loads
-
-    // //////////////////////////////////////////////////
-    // //                                              //
-    // //                Memory Outputs                //
-    // //                                              //
-    // //////////////////////////////////////////////////
-
-    // // these signals go to and from the processor and memory
-    // // we give precedence to the mem stage over instruction fetch
-    // // note that there is no latency in project 3
-    // // but there will be a 100ns latency in project 4
-
-    // always_comb begin
-    //     if (Dmem_command != MEM_NONE) begin  // read or write DATA from memory
-    //         proc2mem_command = Dmem_command_filtered;
-    //         proc2mem_size    = Dmem_size;
-    //         proc2mem_addr    = Dmem_addr;
-    //     end else begin                      // read an INSTRUCTION from memory
-    //         proc2mem_command = Imem_command;
-    //         proc2mem_addr    = Imem_addr;
-    //         proc2mem_size    = DOUBLE;      // instructions load a full memory line (64 bits)
-    //     end
-    //     proc2mem_data = Dmem_store_data;
-    // end
-
-    // //////////////////////////////////////////////////
-    // //                                              //
-    // //                  Valid Bit                   //
-    // //                                              //
-    // //////////////////////////////////////////////////
-
-    // // This state controls the stall signal that artificially forces IF
-    // // to stall until the previous instruction has completed.
-    // // For project 3, start by assigning if_valid to always be 1
-
-    // logic if_valid, start_valid_on_reset, wb_valid;
-
-
-    // always_ff @(posedge clock) begin
-    //     // Start valid on reset. Other stages (ID,EX,MEM,WB) start as invalid
-    //     // Using a separate always_ff is necessary since if_valid is combinational
-    //     // Assigning if_valid = reset doesn't work as you'd hope :/
-    //     start_valid_on_reset <= reset;
-    // end
-
-    // // valid bit will cycle through the pipeline and come back from the wb stage
-    // assign if_valid = start_valid_on_reset || wb_valid;
-
-    // //////////////////////////////////////////////////
-    // //                                              //
-    // //                  IF-Stage                    //
-    // //                                              //
-    // //////////////////////////////////////////////////
-
-    // stage_if stage_if_0 (
-    //     // Inputs
-    //     .clock (clock),
-    //     .reset (reset),
-    //     .if_valid      (if_valid),
-    //     .take_branch   (ex_mem_reg.take_branch),
-    //     .branch_target (ex_mem_reg.alu_result),
-    //     .Imem_data     (mem2proc_data),
-        
-    //     //.Imem2proc_transaction_tag(mem2proc_transaction_tag),
-    //     //.Imem2proc_data_tag       (mem2proc_data_tag),
-
-    //     // Outputs
-    //     //.Imem_command  (Imem_command),
-    //     .if_packet     (if_packet),
-    //     //.Imem_addr     (Imem_addr)
-    //     .PC_reg        (PC_reg),
-    //     .PC_reg4       (PC_reg4)
-    // );
-
-    // // debug outputs
-    // assign if_NPC_dbg   = if_packet.NPC;
-    // assign if_inst_dbg  = if_packet.inst;
-    // assign if_valid_dbg = if_packet.valid;
-
-    // //////////////////////////////////////////////////
-    // //                                              //
-    // //            IF/ID Pipeline Register           //
-    // //                                              //
-    // //////////////////////////////////////////////////
-
-    // assign if_id_enable = !load_stall;
-
-    // always_ff @(posedge clock) begin
-    //     if (reset) begin
-    //         if_id_reg.inst  <= `NOP;
-    //         if_id_reg.valid <= `FALSE;
-    //         if_id_reg.NPC   <= 0;
-    //         if_id_reg.PC    <= 0;
-    //     end else if (if_id_enable) begin
-    //         if_id_reg <= if_packet;
-    //     end
-    // end
-
-    // // debug outputs
-    // assign if_id_NPC_dbg   = if_id_reg.NPC;
-    // assign if_id_inst_dbg  = if_id_reg.inst;
-    // assign if_id_valid_dbg = if_id_reg.valid;
-
-    // //////////////////////////////////////////////////
-    // //                                              //
-    // //                  ID-Stage                    //
-    // //                                              //
-    // //////////////////////////////////////////////////
-
-    // stage_id stage_id_0 (
-    //     // Inputs
-    //     .clock (clock),
-    //     .reset (reset),
-    //     .if_id_reg       (if_id_reg),
-    //     .wb_regfile_en   (wb_packet.valid),
-    //     .wb_regfile_idx  (wb_packet.reg_idx),
-    //     .wb_regfile_data (wb_packet.data),
-
-    //     // Output
-    //     .id_packet (id_packet)
-    // );
-
-    // //////////////////////////////////////////////////
-    // //                                              //
-    // //            ID/EX Pipeline Register           //
-    // //                                              //
-    // //////////////////////////////////////////////////
-
-    // assign id_ex_enable = !load_stall;
-
-    // always_ff @(posedge clock) begin
-    //     if (reset) begin
-    //         id_ex_reg <= '{
-    //             `NOP, // we can't simply assign 0 because NOP is non-zero
-    //             32'b0, // PC
-    //             32'b0, // NPC
-    //             32'b0, // rs1 select
-    //             32'b0, // rs2 select
-    //             OPA_IS_RS1,
-    //             OPB_IS_RS2,
-    //             `ZERO_REG,
-    //             ALU_ADD,
-    //             1'b0, // mult
-    //             1'b0, // rd_mem
-    //             1'b0, // wr_mem
-    //             1'b0, // cond
-    //             1'b0, // uncond
-    //             1'b0, // halt
-    //             1'b0, // illegal
-    //             1'b0, // csr_op
-    //             1'b0  // valid
-    //         };
-    //     end else if (id_ex_enable) begin
-    //         id_ex_reg <= id_packet;
-    //     end
-    // end
-
-    // // debug outputs
-    // assign id_ex_NPC_dbg   = id_ex_reg.NPC;
-    // assign id_ex_inst_dbg  = id_ex_reg.inst;
-    // assign id_ex_valid_dbg = id_ex_reg.valid;
-
-    // //////////////////////////////////////////////////
-    // //                                              //
-    // //                  EX-Stage                    //
-    // //                                              //
-    // //////////////////////////////////////////////////
-
-    // // stage_ex stage_ex_0 (
-    // //     // Input
-    // //     .id_ex_reg (id_ex_reg),
-
-    // //     // Output
-    // //     .ex_packet (ex_packet)
-    // // );
-
-    // //////////////////////////////////////////////////
-    // //                                              //
-    // //           EX/MEM Pipeline Register           //
-    // //                                              //
-    // //////////////////////////////////////////////////
-
-    // assign ex_mem_enable = !load_stall;
-
-    // always_ff @(posedge clock) begin
-    //     if (reset) begin
-    //         ex_mem_inst_dbg <= `NOP; // debug output
-    //         ex_mem_reg      <= 0;    // the defaults can all be zero!
-    //     end else if (ex_mem_enable) begin
-    //         ex_mem_inst_dbg <= id_ex_inst_dbg; // debug output, just forwarded from ID
-    //         ex_mem_reg      <= ex_packet;
-    //     end
-    // end
-
-    // // debug outputs
-    // assign ex_mem_NPC_dbg   = ex_mem_reg.NPC;
-    // assign ex_mem_valid_dbg = ex_mem_reg.valid;
-
-    // //////////////////////////////////////////////////
-    // //                                              //
-    // //                 MEM-Stage                    //
-    // //                                              //
-    // //////////////////////////////////////////////////
-
-    // // New address if:
-    // // 1) Previous instruction wasn't a load
-    // // 2) Load address changed
-    // logic valid_load;
-    // assign valid_load = ex_mem_reg.valid && ex_mem_reg.rd_mem; 
-    // assign new_load = valid_load && !rd_mem_q;
-
-    // assign mem_tag_match = outstanding_mem_tag == mem2proc_data_tag;
-    // assign load_stall    = new_load || (valid_load && !mem_tag_match);
-
-    // assign Dmem_command_filtered = new_load || ex_mem_reg.wr_mem ? Dmem_command : MEM_NONE;
-
-    // always_ff @(posedge clock) begin
-    //     if (reset) begin
-    //         rd_mem_q            <= 1'b0;
-    //         outstanding_mem_tag <= '0;
-    //     end else begin
-    //         rd_mem_q            <= valid_load;
-    //         outstanding_mem_tag <= new_load      ? mem2proc_transaction_tag : 
-    //                                mem_tag_match ? '0 : outstanding_mem_tag;
-    //     end
-    // end
-
-    // stage_mem stage_mem_0 (
-    //     // Inputs
-    //     .ex_mem_reg      (ex_mem_reg),
-    //     .Dmem_load_data  (mem2proc_data),
-
-    //     // Outputs
-    //     .mem_packet      (mem_packet),
-    //     .Dmem_command    (Dmem_command),
-    //     .Dmem_size       (Dmem_size),
-    //     .Dmem_addr       (Dmem_addr),
-    //     .Dmem_store_data (Dmem_store_data)
-    // );
-
-    // //////////////////////////////////////////////////
-    // //                                              //
-    // //           MEM/WB Pipeline Register           //
-    // //                                              //
-    // //////////////////////////////////////////////////
-
-    // assign mem_wb_enable = 1'b1; // always enabled
-
-    // always_ff @(posedge clock) begin
-    //     if (reset || load_stall) begin
-    //         mem_wb_inst_dbg <= `NOP; // debug output
-    //         mem_wb_reg      <= 0;    // the defaults can all be zero!
-    //     end else if (mem_wb_enable) begin
-    //         mem_wb_inst_dbg <= ex_mem_inst_dbg; // debug output, just forwarded from EX
-    //         mem_wb_reg      <= mem_packet;
-    //     end
-    // end
-
-    // // debug outputs
-    // assign mem_wb_NPC_dbg   = mem_wb_reg.NPC;
-    // assign mem_wb_valid_dbg = mem_wb_reg.valid;
-
-    // //////////////////////////////////////////////////
-    // //                                              //
-    // //                  WB-Stage                    //
-    // //                                              //
-    // //////////////////////////////////////////////////
-
-    // stage_wb stage_wb_0 (
-    //     // Input
-    //     .mem_wb_reg (mem_wb_reg), // doesn't use all of these
-
-    //     // Output
-    //     .wb_packet (wb_packet)
-    // );
-
-    // // This signal is solely used by if_valid for the initial stalling behavior
-    // always_ff @(posedge clock) begin
-    //     if (reset) wb_valid <= 0;
-    //     else       wb_valid <= mem_wb_reg.valid;
-    // end
-
-    // //////////////////////////////////////////////////
-    // //                                              //
-    // //               Pipeline Outputs               //
-    // //                                              //
-    // //////////////////////////////////////////////////
-
-    // // Output the committed instruction to the testbench for counting
-    // assign committed_insts[0] = wb_packet;
-
     /* Global controls*/
     logic flush;
 
@@ -452,10 +134,15 @@ module cpu (
     map_table2dispatch map_2_dispatch;
     dispatch2btq dispatch_2_btq;
     btq2dispatch btq_2_dispatch;
+    execute2complete_tag ex_2_ctag;
+    execute2complete_dat ex_2_cdat;
+    dispatch2sq dispatch_2_sq;
+    sq2dispatch sq_2_dispatch;
 
     dispatch dispatcher(
         .clock(clock),
         .reset(reset),
+        .flush(flush),
 
         .decode_in(de_2_disp),
         .decode_out(disp_2_de),
@@ -466,11 +153,13 @@ module cpu (
         .rob_in(rob_2_dispatch),
         .rob_out(dispatch_2_rob),
 
+        .ctag_in(ex_2_ctag),
+
         .free_in(fl_2_dispatch),
         .free_out(dispatch_2_fl),
 
-        .lsq_in('0),
-        .lsq_out(),
+        .sq_in(sq_2_dispatch),
+        .sq_out(dispatch_2_sq),
 
         .btq_in(btq_2_dispatch),
         .btq_out(dispatch_2_btq),
@@ -485,62 +174,55 @@ module cpu (
     //                                              //
     //////////////////////////////////////////////////  
     rob2retire rob_2_retire;
+    assign dbg_rob2retire = rob_2_retire;
     // TODO: collects from both rob2retire and btq2retire
     btq2retire btq_2_retire;
+    assign dbg_btq2retire = btq_2_retire;
     retire2btq retire_2_btq;
-    retire_final        retire_exec;
-    logic [$clog2(`N):0] btq_rd_cnt;
-    logic [$clog2(`N):0] allowed_retire_cnt; // FUCK ME
+    assign dbg_retire2btq = retire_2_btq;
+    retire_final retire_exec;
     logic mispred;
-    logic mispred_target;
-    always_comb begin
-        mispred = 0;
-        mispred_target = '0;
-        btq_rd_cnt = 0;
-        allowed_retire_cnt = 0;
-        retire_2_f = '{default:'0};
-        for (int unsigned i = 0; i < rob_2_retire.r_en_cnt; ++i) begin
-            ++allowed_retire_cnt;
-            if (!rob_2_retire.brch_vld[i])
-                continue;
+    ADDR  mispred_target;
+    sq2retire sq_2_retire;
+    assign dbg_sq2retire = sq_2_retire;
 
-            ++btq_rd_cnt;
-            if (btq_2_retire.dat[btq_rd_cnt].pred != btq_2_retire.dat[btq_rd_cnt].take) begin
-                mispred = 1;
-                mispred_target = btq_2_retire.dat[btq_rd_cnt].tgt;
-                retire_2_f = '{
-                    mispred : mispred,
-                    corrected_PC : btq_2_retire.dat[btq_rd_cnt]
-                        ? btq_2_retire.dat[btq_rd_cnt].NPC
-                        : btq_2_retire.dat[btq_rd_cnt].tgt
-                };
-                break;
-            end 
-            // ++btq_rd_cnt;
-        end
+    sq2retire HARDCODED_sq2retire;
+    assign HARDCODED_sq2retire = '{
+        ret_rdy : `N,
+        sq_ret_complete : `TRUE
+    };
+    retire retire0 (
+        .clock(clock),
+        .reset(reset),
+        .rob_in(rob_2_retire),
+        .btq_in(btq_2_retire),
+        .btq_out(retire_2_btq),
 
-        retire_2_btq = '{
-            rd_cnt : btq_rd_cnt
-        };
+        /*
+        FIXME: hardcoded sq_in
+        If connected to true sq_2_retire, it stalls in `*.syn.out` (i.e.
+        reaches max cycle limit), even if it doesn't stall in `*.out`.
 
-        retire_exec = '{
-            // only the count *may* be adjusted
-            r_en_cnt    : allowed_retire_cnt,
+        Actually I don't think this actually fixes the stalling problem.
+        */
+        .sq_in(HARDCODED_sq2retire),
+        // .sq_out(),
 
-            // the rest of the fields stay the same
-            tag         : rob_2_retire.tag,
-            t_old       : rob_2_retire.t_old,
-            dst         : rob_2_retire.dst,
-            halt        : rob_2_retire.halt,
-            illegal     : rob_2_retire.illegal,
-            brch_vld    : rob_2_retire.brch_vld
-        };
-    end
+        .mispred(mispred),
+        .mispred_target(mispred_target),
+        .retire_exec(retire_exec)
+    );
 
     always_ff @(posedge clock) begin
+        if (reset) begin
+            flush       <= '0;
+            retire_2_f  <= '0;
+        end else begin
 /* ======================================== */
-        flush <= mispred;
+            flush       <= mispred;
+            retire_2_f  <= '{corrected_PC : mispred_target};
 /* ======================================== */
+        end
     end
 
 
@@ -549,14 +231,13 @@ module cpu (
     //           Branch target queue (BTQ)          //
     //                                              //
     //////////////////////////////////////////////////  
-    execute2complete ex_2_complete;
     btq btq_0(
         .clock(clock),
         .reset(reset),
         .flush(flush),
         .r_in (retire_2_btq),
         .r_out(btq_2_retire),
-        .c_in(ex_2_complete),
+        .cdat_in(ex_2_cdat),
         .d_in(dispatch_2_btq),
         .d_out(btq_2_dispatch)
     );
@@ -583,7 +264,7 @@ module cpu (
         .ex_in(ex_2_rs),
         .ex_out(rs_2_ex),
 
-        .c_in(ex_2_complete)
+        .ctag_in(ex_2_ctag)
     );
     
     //////////////////////////////////////////////////
@@ -591,6 +272,8 @@ module cpu (
     //                Re-Order Buffer               //
     //                                              //
     //////////////////////////////////////////////////  
+
+    rob2sq rob_2_sq;
 
     rob #(
         .ROB_SZ(`ROB_SZ),
@@ -600,10 +283,52 @@ module cpu (
         .reset      (reset),
         .flush      (flush),
         .r_out      (rob_2_retire),
-        .c_in       (ex_2_complete),
+        .r_in       (retire_exec),
+        .cdat_in    (ex_2_cdat),
         .d_out      (rob_2_dispatch),
-        .d_in       (dispatch_2_rob)
+        .d_in       (dispatch_2_rob),
+        .sq_in      (sq_2_retire),
+        .sq_out     (rob_2_sq)
     );
+
+    //////////////////////////////////////////////////
+    //                                              //
+    //                      SQ                      //
+    //                                              //
+    ////////////////////////////////////////////////// 
+
+    execute2sq exec_2_sq;
+    // MEM_TAG mem2proc_transaction_tag;
+    MEM_TAG temp_tag;
+
+    sq2execute sq_2_exec;
+    stRET2mem ret_2_mem;
+    assign temp_tag = (ret_2_mem.Dmem_command == MEM_STORE) ? 1 : 0;
+
+    sq #(
+        .N(`N),
+        .LSQ_SZ(`LSQ_SZ),
+        .LSQ_SZ_DBL(`LSQ_SZ_DBL),
+        .NUM_FU_STORE(`NUM_FU_STORE),
+        .NUM_FU_LOAD(`NUM_FU_LOAD)
+    ) sq_0 (
+        .clock(clock),
+        .reset(reset),
+        .flush(flush),
+
+        .dis_2_sq(dispatch_2_sq),
+        .exec_2_sq(exec_2_sq),
+        .rob_2_sq(rob_2_sq), //using the rob_2_sq packet here seems to be causing false retirements from the SQ. Will investigate Sunday 4/6. 
+        //As is, can still see packets entering the SQ, and should be able to retire the top 2 entries "properly", they just won't actually write to memory.
+        //But this will still work if you just want to make sure that you can actually make it through a program to the wfi
+        .mem2proc_transaction_tag(temp_tag),
+
+        .sq_2_dis(sq_2_dispatch),
+        .sq_2_exec(sq_2_exec),
+        .sq_2_retire(sq_2_retire),
+        .ret_2_mem(ret_2_mem)
+);
+
 
     //////////////////////////////////////////////////
     //                                              //
@@ -612,13 +337,20 @@ module cpu (
     ////////////////////////////////////////////////// 
 
     
+    execute2lq ex_2_lq;
     stage_ex_p4 ex_0 (
         .clock(clock),
         .reset(reset),
         .flush(flush),
         .rs_in(rs_2_ex),
         .rs_out(ex_2_rs),
-        .c_out(ex_2_complete),
+
+        .sq_in(sq_2_exec),
+        .sq_out(exec_2_sq), // TODO: hook up to sq
+        .lq_out(ex_2_lq), // TODO: hook up to lq
+
+        .ctag_out(ex_2_ctag),
+        .cdat_out(ex_2_cdat),
         .prf_out(prf_out),
         .prf_in(prf_in)
     );
@@ -631,13 +363,14 @@ module cpu (
     //                                              //
     //////////////////////////////////////////////////  
 
+    arch_map2map_table am_2_mt;
     map_table #(
         .N(`N)
     ) map_table_0 (
         .clock(clock),
         .reset(reset),
         .flush(flush),
-        .c_in(ex_2_complete),
+        .am_in(am_2_mt),
         .d_in(dispatch_2_map),
         .d_out(map_2_dispatch)
     );
@@ -653,6 +386,7 @@ module cpu (
     ) arch_map_0 (
         .clock(clock),
         .reset(reset),
+        .mt_out(am_2_mt),
         .r_in(retire_exec)
     );
 
@@ -688,10 +422,10 @@ module cpu (
         .clock(clock),
         //.reset(reset),
         //.flush(),
-        .c_en   (ex_2_complete.c_en),
-        .c_is_branch (ex_2_complete.is_branch),
-        .c_ts   (ex_2_complete.c_ts),
-        .c_vs   (ex_2_complete.c_data),
+        .c_en   (ex_2_cdat.en),
+        .c_is_brch (ex_2_cdat.is_brch),
+        .c_ts   (ex_2_cdat.ts),
+        .c_vs   (ex_2_cdat.data),
 
         // NOTE: Here each X_BY_FU type is coerced into a flat X array type
         .s_en1s (prf_out.s_en1s),
@@ -702,9 +436,19 @@ module cpu (
         .s_v2s  (prf_in.s_v2s)
     );
 
+
+    // //////////////////////////////////////////////////
+    // //                                              //
+    // //               Pipeline Outputs               //
+    // //                                              //
+    // //////////////////////////////////////////////////
+
+    // // Output the committed instruction to the testbench for counting
     always_comb begin
         committed_insts = '0;
         foreach(committed_insts[i]) begin
+            if (flush) // system is flushing; CANNOT COMMIT!
+                break;
             if (i >= retire_exec.r_en_cnt)
                 continue;
             committed_insts[i].valid      = 1;

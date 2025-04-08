@@ -13,7 +13,7 @@ module prf #(
     // complete (write)
     input logic         [N-1:0] c_en,
         // - Enabled complete lines?
-    input logic         [N-1:0] c_is_branch,
+    input logic         [N-1:0] c_is_brch,
     input PHYS_REG_IDX  [N-1:0] c_ts, // tags
     input DATA          [N-1:0] c_vs, // vals
         // From: complete (EX)
@@ -60,20 +60,20 @@ module prf #(
             // TODO: enable should be more granular–– per t1/t2. Some insns only need to read 1 value.
             if (s_t1s[i] == `ZERO_REG || !s_en1s[i]) begin
                 s_v1s[i] = '0;
-            // end else if (c_en[0] && (c_ts[0] == s_t1s[i])) begin
-            //     s_v1s[i] = c_vs[0]; // internal forwarding
-            // end else if (c_en[1] && (c_ts[1] == s_t1s[i])) begin
-            //     s_v1s[i] = c_vs[1]; // internal forwarding
+            end else if (c_en[0] && (c_ts[0] == s_t1s[i])) begin
+                s_v1s[i] = c_vs[0]; // internal forwarding
+            end else if (c_en[1] && (c_ts[1] == s_t1s[i])) begin
+                s_v1s[i] = c_vs[1]; // internal forwarding
             end else begin
                 s_v1s[i] = phys_reg_file[s_t1s[i]];
             end
 
             if (s_t2s[i] == `ZERO_REG || !s_en2s[i]) begin
                 s_v2s[i] = '0;
-            // end else if (c_en[0] && (c_ts[0] == s_t2s[i])) begin
-            //     s_v2s[i] = c_vs[0]; // internal forwarding
-            // end else if (c_en[1] && (c_ts[1] == s_t2s[i])) begin
-            //     s_v2s[i] = c_vs[1]; // internal forwarding 
+            end else if (c_en[0] && (c_ts[0] == s_t2s[i])) begin
+                s_v2s[i] = c_vs[0]; // internal forwarding
+            end else if (c_en[1] && (c_ts[1] == s_t2s[i])) begin
+                s_v2s[i] = c_vs[1]; // internal forwarding 
             end else begin
                 s_v2s[i] = phys_reg_file[s_t2s[i]];
             end
@@ -84,7 +84,7 @@ module prf #(
     // Write port
     always_ff @(posedge clock) begin
         foreach (c_en[i]) begin
-            if (c_en[i] && !c_is_branch[i] && (c_ts[i] != `ZERO_REG))
+            if (c_en[i] && !c_is_brch[i] && (c_ts[i] != `ZERO_REG))
                 phys_reg_file[c_ts[i]] <= c_vs[i];
         end
     end
