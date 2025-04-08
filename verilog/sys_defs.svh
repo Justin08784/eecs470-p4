@@ -878,15 +878,15 @@ struct packed { \
 }
 
 typedef struct packed {
-    `BY_FU(logic)           s_en1s;
-    `BY_FU(logic)           s_en2s;
-    `BY_FU(PHYS_REG_IDX)    s_t1s;
-    `BY_FU(PHYS_REG_IDX)    s_t2s;
+    `BY_FU(logic)           en1s;
+    `BY_FU(logic)           en2s;
+    `BY_FU(PHYS_REG_IDX)    t1s;
+    `BY_FU(PHYS_REG_IDX)    t2s;
 } execute2prf;
 
 typedef struct packed{
-    `BY_FU(DATA)    s_v1s;
-    `BY_FU(DATA)    s_v2s;
+    `BY_FU(DATA)    v1s;
+    `BY_FU(DATA)    v2s;
 } prf2execute;
 
 // By SQ

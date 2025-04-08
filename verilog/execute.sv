@@ -789,26 +789,26 @@ module stage_ex_p4 (
     always_comb begin
         prf_out = '0;
         foreach (iss.o_vld.alu[i]) begin
-            prf_out.s_en1s.alu[i]   = iss.o_vld.alu[i];
-            prf_out.s_en2s.alu[i]   = iss.o_vld.alu[i];
-            prf_out.s_t1s.alu[i]    = iss.o_dat.alu[i].t1; 
-            prf_out.s_t2s.alu[i]    = iss.o_dat.alu[i].t2; 
+            prf_out.en1s.alu[i]   = iss.o_vld.alu[i];
+            prf_out.en2s.alu[i]   = iss.o_vld.alu[i];
+            prf_out.t1s.alu[i]    = iss.o_dat.alu[i].t1; 
+            prf_out.t2s.alu[i]    = iss.o_dat.alu[i].t2; 
         end
         foreach (iss.o_vld.mul[i]) begin
-            prf_out.s_en1s.mul[i]   = iss.o_vld.mul[i];
-            prf_out.s_en2s.mul[i]   = iss.o_vld.mul[i];
-            prf_out.s_t1s.mul[i]    = iss.o_dat.mul[i].t1; 
-            prf_out.s_t2s.mul[i]    = iss.o_dat.mul[i].t2; 
+            prf_out.en1s.mul[i]   = iss.o_vld.mul[i];
+            prf_out.en2s.mul[i]   = iss.o_vld.mul[i];
+            prf_out.t1s.mul[i]    = iss.o_dat.mul[i].t1; 
+            prf_out.t2s.mul[i]    = iss.o_dat.mul[i].t2; 
         end
         foreach (iss.o_vld.lod[i]) begin
-            prf_out.s_en1s.lod[i]   = iss.o_vld.lod[i];
-            prf_out.s_t1s.lod[i]    = iss.o_dat.lod[i].t1; 
+            prf_out.en1s.lod[i]   = iss.o_vld.lod[i];
+            prf_out.t1s.lod[i]    = iss.o_dat.lod[i].t1; 
         end
         foreach (iss.o_vld.str[i]) begin
-            prf_out.s_en1s.str[i]   = iss.o_vld.str[i];
-            prf_out.s_en2s.str[i]   = iss.o_vld.str[i];
-            prf_out.s_t1s.str[i]    = iss.o_dat.str[i].t1; 
-            prf_out.s_t2s.str[i]    = iss.o_dat.str[i].t2; 
+            prf_out.en1s.str[i]   = iss.o_vld.str[i];
+            prf_out.en2s.str[i]   = iss.o_vld.str[i];
+            prf_out.t1s.str[i]    = iss.o_dat.str[i].t1; 
+            prf_out.t2s.str[i]    = iss.o_dat.str[i].t2; 
         end
     end
 
@@ -819,28 +819,28 @@ module stage_ex_p4 (
     always_comb begin
         foreach (iss.o_vld.alu[i]) begin
             regs.i_dat.alu[i] = '{
-                rs1 : prf_in.s_v1s.alu[i],
-                rs2 : prf_in.s_v2s.alu[i],
+                rs1 : prf_in.v1s.alu[i],
+                rs2 : prf_in.v2s.alu[i],
                 dat : iss.o_dat.alu[i]
             };
         end
         foreach (iss.o_vld.mul[i]) begin
             regs.i_dat.mul[i] = '{
-                rs1 : prf_in.s_v1s.mul[i],
-                rs2 : prf_in.s_v2s.mul[i],
+                rs1 : prf_in.v1s.mul[i],
+                rs2 : prf_in.v2s.mul[i],
                 dat : iss.o_dat.mul[i]
             };
         end
         foreach (iss.o_vld.lod[i]) begin
             regs.i_dat.lod[i] = '{
-                rs1 : prf_in.s_v1s.lod[i],
+                rs1 : prf_in.v1s.lod[i],
                 dat : iss.o_dat.lod[i]
             };
         end
         foreach (iss.o_vld.str[i]) begin
             regs.i_dat.str[i] = '{
-                rs1 : prf_in.s_v1s.str[i],
-                rs2 : prf_in.s_v2s.str[i],
+                rs1 : prf_in.v1s.str[i],
+                rs2 : prf_in.v2s.str[i],
                 dat : iss.o_dat.str[i]
             };
         end
@@ -1257,15 +1257,15 @@ module stage_ex_p4 (
                 );
             end
 
-            $display("<prf_in >        s_v1s: [%0d, %0d, %0d, %0d] s_v2s: [%0d, %0d, %0d, %0d]",
-                prf_in.s_v1s[0],
-                prf_in.s_v1s[1],
-                prf_in.s_v1s[2],
-                prf_in.s_v1s[3],
-                prf_in.s_v2s[0],
-                prf_in.s_v2s[1],
-                prf_in.s_v2s[2],
-                prf_in.s_v2s[3]
+            $display("<prf_in >        v1s: [%0d, %0d, %0d, %0d] v2s: [%0d, %0d, %0d, %0d]",
+                prf_in.v1s[0],
+                prf_in.v1s[1],
+                prf_in.v1s[2],
+                prf_in.v1s[3],
+                prf_in.v2s[0],
+                prf_in.v2s[1],
+                prf_in.v2s[2],
+                prf_in.v2s[3]
             );
             $display("  %3d | << EXECUTE", $time);
         end

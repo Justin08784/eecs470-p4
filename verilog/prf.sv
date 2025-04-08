@@ -11,12 +11,7 @@ module prf #(
     input clock, //reset, flush, // QUESTION: do we need reset? or should we force write to happen before read at the same addr?
 
     // complete (write)
-    input logic         [N-1:0] c_en,
-        // - Enabled complete lines?
-    input logic         [N-1:0] c_is_brch,
-    input PHYS_REG_IDX  [N-1:0] c_ts, // tags
-    input DATA          [N-1:0] c_vs, // vals
-        // From: complete (EX)
+    input execute2complete_dat cdat_in,
 
     // issue (read)
     //output DATA         [31:0]  state,
@@ -60,20 +55,20 @@ module prf #(
             // TODO: enable should be more granular–– per t1/t2. Some insns only need to read 1 value.
             if (s_t1s[i] == `ZERO_REG || !s_en1s[i]) begin
                 s_v1s[i] = '0;
-            end else if (c_en[0] && (c_ts[0] == s_t1s[i])) begin
-                s_v1s[i] = c_vs[0]; // internal forwarding
-            end else if (c_en[1] && (c_ts[1] == s_t1s[i])) begin
-                s_v1s[i] = c_vs[1]; // internal forwarding
+            end else if (cdat_in.en[0] && (cdat_in.ts[0] == s_t1s[i])) begin
+                s_v1s[i] = cdat_in.data[0]; // internal forwarding
+            end else if (cdat_in.en[1] && (cdat_in.ts[1] == s_t1s[i])) begin
+                s_v1s[i] = cdat_in.data[1]; // internal forwarding
             end else begin
                 s_v1s[i] = phys_reg_file[s_t1s[i]];
             end
 
             if (s_t2s[i] == `ZERO_REG || !s_en2s[i]) begin
                 s_v2s[i] = '0;
-            end else if (c_en[0] && (c_ts[0] == s_t2s[i])) begin
-                s_v2s[i] = c_vs[0]; // internal forwarding
-            end else if (c_en[1] && (c_ts[1] == s_t2s[i])) begin
-                s_v2s[i] = c_vs[1]; // internal forwarding 
+            end else if (cdat_in.en[0] && (cdat_in.ts[0] == s_t2s[i])) begin
+                s_v2s[i] = cdat_in.data[0]; // internal forwarding
+            end else if (cdat_in.en[1] && (cdat_in.ts[1] == s_t2s[i])) begin
+                s_v2s[i] = cdat_in.data[1]; // internal forwarding 
             end else begin
                 s_v2s[i] = phys_reg_file[s_t2s[i]];
             end
@@ -83,9 +78,9 @@ module prf #(
 
     // Write port
     always_ff @(posedge clock) begin
-        foreach (c_en[i]) begin
-            if (c_en[i] && !c_is_brch[i] && (c_ts[i] != `ZERO_REG))
-                phys_reg_file[c_ts[i]] <= c_vs[i];
+        foreach (cdat_in.en[i]) begin
+            if (cdat_in.en[i] && !cdat_in.is_brch[i] && (cdat_in.ts[i] != `ZERO_REG))
+                phys_reg_file[cdat_in.ts[i]] <= cdat_in.data[i];
         end
     end
 

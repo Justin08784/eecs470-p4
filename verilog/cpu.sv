@@ -233,8 +233,8 @@ module cpu (
     execute2rs      ex_2_rs; 
     rs2execute      rs_2_ex;
 
-    execute2prf     prf_out;
-    prf2execute     prf_in;
+    execute2prf     ex_2_prf;
+    prf2execute     prf_2_ex;
 
     rs rs_0(
         .clock  (clock),
@@ -330,8 +330,8 @@ module cpu (
 
         .lq_out (ex_2_lq),
 
-        .prf_in (prf_in),
-        .prf_out(prf_out),
+        .prf_in (prf_2_ex),
+        .prf_out(ex_2_prf),
 
         .ctag_out   (ex_2_ctag),
         .cdat_out   (ex_2_cdat)
@@ -406,21 +406,20 @@ module cpu (
         .N(`N),
         .BYPASS_EN(1)
     ) prf_0 (
-        .clock(clock),
-        //.reset(reset),
-        //.flush(),
-        .c_en       (ex_2_cdat.en),
-        .c_is_brch  (ex_2_cdat.is_brch),
-        .c_ts       (ex_2_cdat.ts),
-        .c_vs       (ex_2_cdat.data),
+        .clock      (clock),
+        .cdat_in    (ex_2_cdat),
 
-        // NOTE: Here each X_BY_FU type is coerced into a flat X array type
-        .s_en1s     (prf_out.s_en1s),
-        .s_en2s     (prf_out.s_en2s),
-        .s_t1s      (prf_out.s_t1s),
-        .s_t2s      (prf_out.s_t2s),
-        .s_v1s      (prf_in.s_v1s),
-        .s_v2s      (prf_in.s_v2s)
+        /* 
+        Here each X_BY_FU type is coerced into a flat X array type
+        This convenience is why we opt to avoid wrapping these I/Os into
+        x2y structs.
+        */
+        .s_en1s     (ex_2_prf.en1s),
+        .s_en2s     (ex_2_prf.en2s),
+        .s_t1s      (ex_2_prf.t1s),
+        .s_t2s      (ex_2_prf.t2s),
+        .s_v1s      (prf_2_ex.v1s),
+        .s_v2s      (prf_2_ex.v2s)
     );
 
 
