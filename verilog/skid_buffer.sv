@@ -49,7 +49,6 @@ module skid #(
     input   logic   o_rdy,
     output  logic   [WIDTH-1:0] o_dat,
 
-    output  logic   [WIDTH-1:0] o_snoop, // expose state for CDB snooping
     input   logic   [WIDTH-1:0] i_snoop, // post-snooping
 
     output  SKID_STATE dbg
@@ -65,7 +64,6 @@ module skid #(
         i_rdy = !vld || o_rdy;
         o_dat = dat;
         o_vld = vld;
-        o_snoop = dat; 
     end
 
     always_ff @(posedge clock) begin
