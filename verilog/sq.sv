@@ -84,7 +84,7 @@ module sq #(parameter
             next_ids[i] = (tail_dbl + i) % LSQ_SZ_DBL;
 
         // handle dispatch (outs)
-        sq_2_dis <= '{
+        sq_2_dis = '{
             sq_rdy_scnt         : free_scnt,
             last_used_sq_idx    : last_used_sq_idx,
             next_ids            : next_ids,
