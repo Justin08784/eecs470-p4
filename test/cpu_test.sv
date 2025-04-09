@@ -80,7 +80,7 @@ module testbench;
         // Inputs
         .clock (clock),
         .reset (reset),
-        //.mem2proc_transaction_tag (mem2proc_transaction_tag),
+        .mem2proc_transaction_tag (mem2proc_transaction_tag),
         .mem2proc_data            ({
             memory.unified_memory[PC_reg[1][15:3]],
             memory.unified_memory[PC_reg[0][15:3]]
@@ -88,11 +88,11 @@ module testbench;
         //.mem2proc_data_tag        (mem2proc_data_tag),
 
         // Outputs
-        //.proc2mem_command (proc2mem_command),
-        //.proc2mem_addr    (proc2mem_addr),
-        //.proc2mem_data    (proc2mem_data),
+        .proc2mem_command (proc2mem_command),
+        .proc2mem_addr    (proc2mem_addr),
+        .proc2mem_data    (proc2mem_data),
 `ifndef CACHE_MODE
-        //.proc2mem_size    (proc2mem_size),
+        .proc2mem_size    (proc2mem_size),
 `endif
 
         .committed_insts (committed_insts),

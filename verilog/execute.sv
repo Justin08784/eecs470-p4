@@ -550,7 +550,6 @@ module str_ex(
             st_lq_out.st_en[i]      = i_vld[i];
             st_lq_out.st_sq_idx[i]  = i_regs[i].dat.sq_idx;
 
-            $display("SENDING[%0d]: en: %b, sq_idx: %0d", i, i_vld[i], i_regs[i].dat.sq_idx);
 
         end
     end

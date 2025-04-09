@@ -29,10 +29,10 @@ module cpu (
         */
     //input MEM_TAG   mem2proc_data_tag,        // Tag for which transaction data is for
 
-    //output MEM_COMMAND proc2mem_command, // Command sent to memory
-    //output ADDR        proc2mem_addr,    // Address sent to memory
-    //output MEM_BLOCK   proc2mem_data,    // Data sent to memory
-    //output MEM_SIZE    proc2mem_size,    // Data size sent to memory
+    output MEM_COMMAND proc2mem_command, // Command sent to memory
+    output ADDR        proc2mem_addr,    // Address sent to memory
+    output MEM_BLOCK   proc2mem_data,    // Data sent to memory
+    output MEM_SIZE    proc2mem_size,    // Data size sent to memory
 
     // Note: these are assigned at the very bottom of the module
     output COMMIT_PACKET [`N-1:0] committed_insts,
@@ -56,6 +56,32 @@ module cpu (
 );
     /* Global controls*/
     logic flush;
+
+
+    //handle assigning the correct priority for memory
+    stRET2mem ret_2_mem;
+    MEM_TAG sq_mem2proc_transaction_tag;
+    always_comb begin
+        proc2mem_command = '0;
+        proc2mem_addr = '0;
+        proc2mem_data = '0;
+        proc2mem_size = '0;
+        sq_mem2proc_transaction_tag = '0;
+        
+        if (ret_2_mem.Dmem_command == MEM_STORE) begin
+            proc2mem_command = ret_2_mem.Dmem_command;
+            proc2mem_addr = ret_2_mem.Dmem_addr;
+            proc2mem_data = ret_2_mem.Dmem_store_data;
+            proc2mem_size = ret_2_mem.Dmem_size;
+            sq_mem2proc_transaction_tag = mem2proc_transaction_tag;
+        end
+        // else if (load logic here) begin <-- LOAD REQUESTS COME NEXT (technically this wil probably come from dcache, but will be a load request regardless)
+
+        // end
+        // else begin <-- FETCH REQUESTS COME LAST (always complete memory operations first to get stuff commited to memory and to keep the processor FUs chugging)
+
+        // end
+    end
 
     //////////////////////////////////////////////////
     //                                              //
@@ -297,9 +323,7 @@ module cpu (
     execute2sq exec_2_sq;
     // MEM_TAG mem2proc_transaction_tag;
     MEM_TAG temp_tag;
-
     sq2execute sq_2_exec;
-    stRET2mem ret_2_mem;
     assign temp_tag = (ret_2_mem.Dmem_command == MEM_STORE) ? 1 : 0;
 
     sq #(
@@ -328,7 +352,7 @@ module cpu (
         //But this will still work if you just want to make sure that you can actually make it through a program to the wfi
         .sq_2_retire(sq_2_retire),
 
-        .mem2proc_transaction_tag(temp_tag),
+        .mem2proc_transaction_tag(sq_mem2proc_transaction_tag), //temp_tag  sq_mem2proc_transaction_tag
         .ret_2_mem(ret_2_mem)
 );
 

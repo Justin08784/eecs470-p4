@@ -358,7 +358,7 @@ module post_ret_buffer #(parameter
     assign free_scnt            = `MIN(free, NUM_DPORTS);
     assign used_scnt            = `MIN(used, NUM_RPORTS);
 
-    logic [$clog2(N):0] ret_success;
+    logic ret_success;
     logic [1:0] writeMod;
     logic [4:0] writeOffset;
     always_comb begin
