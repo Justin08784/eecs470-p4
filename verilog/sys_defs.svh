@@ -56,7 +56,7 @@
 `define BTB_ENTRIES 256
 `define BTB_TAG_WIDTH 12
 
-`define PREFETCH_CAP 48 // <- how far ahead we can prefetch
+`define PREFETCH_CAP 24 // <- how far ahead we can prefetch
 
 ///////////////////////////////
 // --- Compil. Controls ---- //
@@ -110,7 +110,7 @@ typedef logic [$clog2(`PHYS_REG_SZ_R10K)-1:0] PHYS_REG_IDX;
 // processor will have to account for this effect on mem.
 // Notably, you can no longer write data without first reading.
 // TODO: uncomment this line once you've implemented your cache
-//`define CACHE_MODE
+`define CACHE_MODE
 
 // you are not allowed to change this definition for your final processor
 // the project 3 processor has a massive boost in performance just from having no mem latency
@@ -585,6 +585,11 @@ typedef struct packed {
     logic       [$clog2(`N):0]  f_en_cnt;
     IF_ID_PACKET    [`N-1:0]    f_dat;
 } fetch2decode;
+
+typedef struct packed {
+    MEM_COMMAND proc2mem_command;
+    ADDR        proc2mem_addr;
+} fetch2mem;
 
 // By decode
 typedef struct packed {

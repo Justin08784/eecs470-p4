@@ -81,11 +81,8 @@ module testbench;
         .clock (clock),
         .reset (reset),
         .mem2proc_transaction_tag (mem2proc_transaction_tag),
-        .mem2proc_data            ({
-            memory.unified_memory[PC_reg[1][15:3]],
-            memory.unified_memory[PC_reg[0][15:3]]
-        }),
-        //.mem2proc_data_tag        (mem2proc_data_tag),
+        .mem2proc_data            (mem2proc_data),
+        .mem2proc_data_tag        (mem2proc_data_tag),
 
         // Outputs
         .proc2mem_command (proc2mem_command),
@@ -96,7 +93,6 @@ module testbench;
 `endif
 
         .committed_insts (committed_insts),
-        .PC_reg(PC_reg),
 
         .dbg_btq        (dbg_btq),
         .dbg_fetch      (dbg_fetch),
