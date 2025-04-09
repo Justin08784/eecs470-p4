@@ -368,6 +368,8 @@ module fake_dcache #(
     always_comb begin
         rvld = '0;
         foreach (ren[i]) begin
+            if (!ren[i])
+                continue;
             rdat[i] = i;
             rvld[i]  = 1;
 
@@ -401,52 +403,63 @@ module lod_ex(
 );
     localparam BAY_SZ = 4;
     typedef struct packed {
-        logic           vld;
-        logic           got; // got data?
-        PHYS_REG_IDX    t;
-        ROB_IDX         rob_idx;
-        ADDR            addr;
-        MEM_SIZE        mem_size;
-    } BAY_ENTRY;
+        logic           [`NUM_FU_LOAD-1:0][BAY_SZ-1:0] vld;
+        logic           [`NUM_FU_LOAD-1:0][BAY_SZ-1:0] got; // got data?
+        PHYS_REG_IDX    [`NUM_FU_LOAD-1:0][BAY_SZ-1:0] t;
+        ROB_IDX         [`NUM_FU_LOAD-1:0][BAY_SZ-1:0] rob_idx;
+        ADDR            [`NUM_FU_LOAD-1:0][BAY_SZ-1:0] addr;
+        MEM_SIZE        [`NUM_FU_LOAD-1:0][BAY_SZ-1:0] mem_size;
+
+        DATA            [`NUM_FU_LOAD-1:0][BAY_SZ-1:0] dat;
+    } LOAD_BAYS;
+    logic [`NUM_FU_LOAD-1:0][BAY_SZ-1:0] rvld;
+    DATA  [`NUM_FU_LOAD-1:0][BAY_SZ-1:0] rdat;
+
 
     // FIXME: Is this right? 
     // FIXME: hardcoded
-    assign o_vld    = '0;
-    assign o_cands  = '0;
 
-    BAY_ENTRY [`NUM_FU_LOAD-1:0][BAY_SZ-1:0] bays; // waiting bays
-    logic     [`NUM_FU_LOAD-1:0][BAY_SZ-1:0] vld;
-    logic     [`NUM_FU_LOAD-1:0][BAY_SZ-1:0] got;
+    LOAD_BAYS bays; // waiting bays
     logic     [`NUM_FU_LOAD-1:0][BAY_SZ-1:0] fu2in_gnt;
+    logic     [`NUM_FU_LOAD-1:0][BAY_SZ-1:0] fu2out_gnt;
     always_comb begin
-        foreach(vld[f, i]) begin
-            vld[f][i] = bays[f][i].vld;
-            got[f][i] = bays[f][i].got;
-            i_rdy[f] = |(~vld[f]);
+        for (int f = 0; f < `NUM_FU_MULT; ++f) begin
+            i_rdy[f] = |(~bays.vld[f]);
+            o_vld[f] = |(bays.vld[f] & bays.got[f]);
         end
     end
 
     fake_dcache #(
-        .NUM_RPORTS(BAY_SZ)
+        .NUM_RPORTS(`NUM_FU_LOAD * BAY_SZ)
     ) cache0 (
         .clock(clock),
         .reset(reset),
 
-        .ren    (vld[0] & ~got[0]),
-        .raddr  (),
-        .rsize  (),
-        .rdat   (),
-        .rvld   ()
+        .ren    (bays.vld & ~bays.got),
+        .raddr  (bays.addr),
+        .rsize  (bays.mem_size),
+        .rdat   (rdat),
+        .rvld   (rvld)
     );
 
     generate
-        for (genvar f = 0; f < `NUM_FU_LOAD; ++f) begin : gen_bays
+        for (genvar f = 0; f < `NUM_FU_LOAD; ++f) begin : gen_arb_in
             psel_gen #(
                 .WIDTH(BAY_SZ),
                 .REQS(1)
-            ) cdb_arb (
-                .req    (~vld[f]),
+            ) arb_in (
+                .req    (~bays.vld[f]),
                 .gnt    (fu2in_gnt[f])
+            );
+        end
+
+        for (genvar f = 0; f < `NUM_FU_LOAD; ++f) begin : gen_arb_out
+            psel_gen #(
+                .WIDTH(BAY_SZ),
+                .REQS(1)
+            ) arb_out (
+                .req    (bays.vld[f] & bays.got[f]),
+                .gnt    (fu2out_gnt[f])
             );
         end
     endgenerate
@@ -468,38 +481,83 @@ module lod_ex(
             in lq???? */
 
         end
+
+        o_cands = '0;
+        foreach (fu2out_gnt[f, i]) begin
+            if (!(fu2out_gnt[f][i] && o_rdy[f]))
+                continue;
+            o_cands[i] |= '{
+                t       : bays.t[f][i],
+                rob_idx : bays.rob_idx[f][i],
+                data    : bays.dat[f][i],
+                btq_idx : '0,
+                take    : '0,
+                is_brch : '0
+            };
+        end
     end
 
     always_ff @(posedge clock) begin
         if (reset || flush) begin
             bays <= '0;
         end else begin
-            $display("  %3d | >> BAYS", $time);
             foreach (fu2in_gnt[f, i]) begin
-                $display("bays[%2d][%2d]: vld=%b, t=%2d, rob_idx=%2d, addr=%x, mem_size=%2d",
-                    f,
-                    i,
-                    bays[f][i].vld,
-                    bays[f][i].t,
-                    bays[f][i].rob_idx,
-                    bays[f][i].addr,
-                    bays[f][i].mem_size
-                );
-                if (!(fu2in_gnt[f][i] && i_vld[i]))
+                if (!(fu2in_gnt[f][i] && i_vld[f]))
                     continue;
 
-                bays[f][i] <= '{
-                    vld     : 1,
-                    got     : 0,
-                    t       : i_regs[f].dat.t,
-                    rob_idx : i_regs[f].dat.rob_idx,
-                    addr    : tmp_addrs[f],
-                    mem_size: tmp_sizes[f]
-                };
+                bays.vld     [f][i] <= 1;
+                bays.got     [f][i] <= 0;
+                bays.t       [f][i] <= i_regs[f].dat.t;
+                bays.rob_idx [f][i] <= i_regs[f].dat.rob_idx;
+                bays.addr    [f][i] <= tmp_addrs[f];
+                bays.mem_size[f][i] <= tmp_sizes[f];
+                bays.dat     [f][i] <= '0;
+            end
+
+            foreach (rvld[f, i]) begin
+                if (!rvld[f][i])
+                    continue;
+                bays.got[f][i] <= 1;
+                bays.dat[f][i] <= rdat[f][i];
+            end
+
+            foreach (fu2out_gnt[f, i]) begin
+                if (!(fu2out_gnt[f][i] && o_rdy[f]))
+                    continue;
+                bays.vld     [f][i] <= 0;
+                bays.got     [f][i] <= 0;
+                bays.t       [f][i] <= '0;
+                bays.rob_idx [f][i] <= '0;
+                bays.addr    [f][i] <= '0;
+                bays.mem_size[f][i] <= '0;
+                bays.dat     [f][i] <= '0;
+            end
+        end
+    end
+
+    `ifdef DEBUG
+    always_ff @(posedge clock) begin
+        if (!reset) begin
+            $display("  %3d | >> BAYS", $time);
+            $display("i_rdy: %b, i_vld: %b", i_rdy, i_vld);
+            $display("ren: %b, rvld: %b", bays.vld & ~bays.got, rvld);
+            foreach (fu2in_gnt[f, i]) begin
+                $display("bays[%2d][%2d]: vld=%b, got=%b, t=%2d, rob_idx=%2d, addr=%x, mem_size=%2d, dat=%x",
+                    f,
+                    i,
+                    bays.vld    [f][i],
+                    bays.got    [f][i],
+                    bays.t      [f][i],
+                    bays.rob_idx[f][i],
+                    bays.addr   [f][i],
+                    bays.mem_size[f][i],
+                    bays.dat    [f][i]
+                );
             end
             $display("  %3d | << BAYS", $time);
         end
     end
+    `endif
 
     /* TODO: CAND generation logic. Also, how do we know when
     a load result is ready without an lq2execute line? */
