@@ -73,6 +73,7 @@ module sq #(parameter
     LSQ_IDX [N-1:0] next_ids;
     execute2sq next_complete;
     always_comb begin
+        sq_2_rob = '0;
 
         for (int unsigned i = 0; i < NUM_RPORTS; ++i)
             r_idxs[i] = (head + i) % LSQ_SZ;
@@ -96,9 +97,6 @@ module sq #(parameter
 
         //handle sq to ROB for retirement
         head_plus_one = (head + 1) % LSQ_SZ;
-        // if (state[head].d_vld && state[head_plus_one].d_vld)    sq_2_rob.ret_rdy = 2;
-        // else if (state[head].d_vld)                             sq_2_rob.ret_rdy = 1;
-        // else                                                    sq_2_rob.ret_rdy = 0;
 
         sq_2_rob.complete_en = next_complete.st_ex_en;
         for (int i = 0; i < NUM_FU_STORE; i++) begin

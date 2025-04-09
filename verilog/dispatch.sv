@@ -196,6 +196,7 @@ end
 
 // handle map table output 
 always_comb begin
+    map_out = '0;
     map_out.en_cnt  = rename_en_cnt;
 
     for (int i = 0; i < rename_en_cnt; i++) begin
@@ -215,6 +216,7 @@ logic [$clog2(`N):0] btq_wr_idx;
 always_comb begin
     tmp_alloc2rename = '0;
     btq_wr_idx  = 0;
+    btq_out.NPC = '0;
 
     for (int i = 0; i < `N; ++i) begin
         tmp_alloc2rename[i].dat         = rename_in[i];
@@ -275,6 +277,10 @@ always_comb begin
     rs_out.d_dat    = '0;
     sq_wr_idx       = 0;
     lq_wr_idx       = 0;
+    lq_out.rob_idx = '0; //handling latch prevention
+    lq_out.sq_idx = '0;
+    lq_out.inst_pc = '0;
+    sq_out.rob_idx = '0;
 
     for (int i = 0; i < `N; i++) begin
         rs_out.d_dat[i] = commit_in[i].dat;
