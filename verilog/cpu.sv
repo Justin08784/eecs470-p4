@@ -403,6 +403,12 @@ module cpu (
     decode2fetch decode_2_f;
     retire2fetch retire_2_f;
 
+    fetch2btb fetch_2_btb;
+    btb2fetch btb_2_fetch;
+
+    fetch2predictor fetch_2_pred;
+    predictor2fetch pred_2_fetch;
+
     stage_if_p4 fetch_0(
         .clock(clock),          // system clock
         .reset(reset),          // system reset
@@ -414,6 +420,12 @@ module cpu (
         // .branch_target('0),  // target pc: use if take_branch is TRUE CHANGE!!!!!!
         .r_in(retire_2_f),
         .Imem_data(mem2proc_data),      // data coming back from Instruction memory
+
+        .btb_in(btb_2_fetch),
+        .pred_in(pred_2_fetch),
+
+        .btb_out(fetch_2_btb),
+        .pred_out(fetch_2_pred),
 
         // tags from memory
         // input MEM_TAG  Imem2proc_transaction_tag, // Should be zero unless there is a response
@@ -503,23 +515,44 @@ module cpu (
     logic [$clog2(`N):0] btq_rd_cnt;
     logic [$clog2(`N):0] allowed_retire_cnt; // FUCK ME
     logic mispred;
-    ADDR  mispred_target;
+    ADDR  [`N-1:0] mispred_target;
+    logic [`N-1:0] branch_taken;
+    logic [`N-1:0] update_en;
+
+    ADDR [`N-1:0] PC_original;
+
+    //assign update_en[0] = (rob_2_retire.r_en_cnt == 1);
+    //assign update_en[1] = (rob_2_retire.r_en_cnt == 2);
+
     always_comb begin
         mispred = 0;
         mispred_target = '0;
         btq_rd_cnt = 0;
         allowed_retire_cnt = 0;
+        branch_taken = 2'b00;
+        update_en = 2'b00;
+        PC_original = '0;
         for (int unsigned i = 0; i < rob_2_retire.r_en_cnt; ++i) begin
             ++allowed_retire_cnt;
+
+           //update_en[i] = 1'b1;
+            update_en[i] = 1;
             if (!rob_2_retire.brch_vld[i])
                 continue;
+
+            PC_original[i] = btq_2_retire.dat[btq_rd_cnt].PC;
+           // update_en[i] = 1'b1;
 
             if (btq_2_retire.dat[btq_rd_cnt].pred != btq_2_retire.dat[btq_rd_cnt].take) begin
                 // is mispred?
                 mispred = 1;
+                
                 mispred_target = btq_2_retire.dat[btq_rd_cnt].take
                     ? btq_2_retire.dat[btq_rd_cnt].tgt
                     : btq_2_retire.dat[btq_rd_cnt].NPC;
+
+                branch_taken[i] = btq_2_retire.dat[btq_rd_cnt].take ? 1'b1 : 1'b0;
+
                 ++btq_rd_cnt;
                 break;
             end 
@@ -566,10 +599,39 @@ module cpu (
             `endif // DEBUG
 /* ======================================== */
             flush       <= mispred;
-            retire_2_f  <= '{corrected_PC : mispred_target};
+            retire_2_f  <= '{corrected_PC : mispred_target, is_taken : branch_taken, update_enable : update_en, PC : PC_original};
+            $display("CORRECTED_PC %x", retire_2_f.corrected_PC);
+            $display("IS_TAKEN %2b", retire_2_f.is_taken);
+            $display("UPDATE ENABLE %2b", retire_2_f.update_enable);
+            $display("ORIGINAL PC: %x", retire_2_f.PC);
+            //$display("PC_original %x", PC_original);
 /* ======================================== */
         end
     end
+
+
+    
+    gshare gshare_0(
+        .clock(clock),
+        .reset(reset),
+        .fetch_2_pred(fetch_2_pred),
+        .predict_taken(pred_2_fetch)
+    );
+
+
+    //////////////////////////////////////////////////
+    //                                              //
+    //          Branch target buffer (BTB)          //
+    //                                              //
+    //////////////////////////////////////////////////  
+
+    btb btb_0(
+        .clock(clock),
+        .reset(reset),
+        .fetch_in(fetch_2_btb),
+        //.retire_in(ret_2_btb),
+        .fetch_out(btb_2_fetch)
+    );
 
 
     //////////////////////////////////////////////////

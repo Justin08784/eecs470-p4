@@ -9,7 +9,7 @@ module btb_tb;
  
   fetch2btb    fetch_in;
 
-  retire2btb  retire_in;
+  //retire2btb  fetch_in;
 
   btb2fetch    fetch_out;
 
@@ -18,7 +18,7 @@ module btb_tb;
     .clock(clock),
     .reset(reset),
     .fetch_in(fetch_in),
-    .retire_in(retire_in),
+  //  .fetch_in(fetch_in),
     .fetch_out(fetch_out)
   );
 
@@ -37,13 +37,13 @@ module btb_tb;
    //  $display("Before inputting", fetch_out.hit[1]);
 
     // Cycle 1: send taken branch
-    retire_in.PC[0] = 32'h00000100;
-    retire_in.is_taken[0] = 1;
-    retire_in.target[0] = 16'h00AA;//12'h0AA;
+    fetch_in.correct_PC[0] = 32'h00000100;
+    fetch_in.is_taken[0] = 1;
+    fetch_in.target[0] = 16'h00AA;//12'h0AA;
 
-    retire_in.PC[1] = 32'h00000104;
-    retire_in.is_taken[1] = 0;
-    retire_in.target[1] = 0;
+    fetch_in.correct_PC[1] = 32'h00000104;
+    fetch_in.is_taken[1] = 0;
+    fetch_in.target[1] = 0;
 
     @(negedge clock); // Commit write to BTB
 
@@ -105,13 +105,13 @@ module btb_tb;
     // --------------------------
     // Cycle 5: Train second entry at PC = 0x00000200
     // --------------------------
-    retire_in.PC[0] = 32'h00000200;
-    retire_in.is_taken[0] = 1;
-    retire_in.target[0] = 16'h0123; //12'h123;
+    fetch_in.correct_PC[0] = 32'h00000200;
+    fetch_in.is_taken[0] = 1;
+    fetch_in.target[0] = 16'h0123; //12'h123;
 
-    retire_in.PC[1] = 32'h00000204;
-    retire_in.is_taken[1] = 1;
-    retire_in.target[1] = 16'h0456;//12'h456;
+    fetch_in.correct_PC[1] = 32'h00000204;
+    fetch_in.is_taken[1] = 1;
+    fetch_in.target[1] = 16'h0456;//12'h456;
 
     @(negedge clock); // write to BTB
 
@@ -133,11 +133,11 @@ module btb_tb;
     // --------------------------
     // Cycle 6: Overwrite target at 0x00000100
     // --------------------------
-    retire_in.PC[0] = 32'h00000100;
-    retire_in.is_taken[0] = 1;
-    retire_in.target[0] = 16'h00BB; //12'h0BB; // different target now
+    fetch_in.correct_PC[0] = 32'h00000100;
+    fetch_in.is_taken[0] = 1;
+    fetch_in.target[0] = 16'h00BB; //12'h0BB; // different target now
 
-    retire_in.is_taken[1] = 0;
+    fetch_in.is_taken[1] = 0;
 
     @(negedge clock);
 
@@ -158,10 +158,10 @@ module btb_tb;
     @(negedge clock);
     reset = 0;
 
-    retire_in.PC[0] = '0;
-    retire_in.PC[1] = '0;
-    retire_in.is_taken = '0;
-    retire_in.target = '0;
+    fetch_in.correct_PC[0] = '0;
+    fetch_in.correct_PC[1] = '0;
+    fetch_in.is_taken = '0;
+    fetch_in.target = '0;
 
     fetch_in.PC[0] = 32'h00000100;
     fetch_in.PC[1] = 32'h00000200;

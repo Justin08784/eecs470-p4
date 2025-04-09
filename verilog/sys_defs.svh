@@ -61,11 +61,11 @@
 ///////////////////////////////
 /* How can we implement this in the Makefile? */
 // comment out to enable synth only constructions
-`define SYNTH
+//`define SYNTH
 
 `ifndef SYNTH
 // comment out to disable DEBUG:
-// `define DEBUG
+`define DEBUG
 `endif
 
 ///////////////////////////////
@@ -473,6 +473,7 @@ typedef struct packed {
     ADDR    NPC;   // PC + 4 (i.e. address if we dont take the branch)
     logic   pred;
     logic   take;
+    ADDR    PC;
 } BTQ_ENTRY;
 
 typedef struct packed {
@@ -501,7 +502,24 @@ typedef struct packed {
 } retire_final;
 
 typedef struct packed {
-    ADDR    corrected_PC;
+    ADDR [`N-1:0] corrected_PC;
+
+
+
+    //retire2btb
+    /*COMMENT OUT FOR NOW BUT NEED BACK IN*///ADDR [`N-1:0] PC;
+    logic [`N-1:0] is_taken;
+   // logic [`N-1:0] [15:0] target;
+
+    //retire2predictor
+    logic [`N-1:0] update_enable;
+    //logic [`N-1:0]taken;
+    ADDR [`N-1:0] PC;
+
+    //logic [`N-1:0][31:0] PC;
+    //logic [`N-1:0] is_taken;
+    //logic [`N-1:0] [15:0] target;
+
 } retire2fetch;
 
 typedef struct packed {
@@ -509,6 +527,7 @@ typedef struct packed {
         // How many branch instructions dispatching?
         // Sender must ensure branch insns packed to lowest indices.
     ADDR    [`N-1:0]       NPC;
+    ADDR    [`N-1:0]       PC;
 } dispatch2btq;
 
 // Reservation station stuff
@@ -810,7 +829,17 @@ typedef struct packed {
 } free_list2dispatch;
 
 typedef struct packed {
-    logic [`N-1:0][31:0] PC;
+    //logic [`N-1:0][31:0] PC;
+
+    ADDR [`N-1:0] PC;
+
+    
+    //retire2btb stuff
+    ADDR [`N-1:0] correct_PC;
+    logic [`N-1:0] is_taken;
+    logic [`N-1:0] [15:0] target;
+
+
 } fetch2btb;
 
 typedef struct packed {
@@ -828,6 +857,12 @@ typedef struct packed {
 
 typedef struct packed {
     ADDR [`N-1:0] PC;
+
+    //retire2predictor stuff
+    logic [`N-1:0] update_enable;
+    logic [`N-1:0]taken;
+    ADDR [`N-1:0] correct_PC;
+
 } fetch2predictor;
 
 typedef struct packed {

@@ -23,6 +23,12 @@ module stage_if_p4 (
     input retire2fetch r_in,
     input MEM_BLOCK [1:0] Imem_data,      // data coming back from Instruction memory
 
+
+    input btb2fetch btb_in,
+    input predictor2fetch pred_in,
+
+    output fetch2btb btb_out,
+    output fetch2predictor pred_out,
     // tags from memory
     // input MEM_TAG  Imem2proc_transaction_tag, // Should be zero unless there is a response
     // input MEM_TAG  Imem2proc_data_tag,
@@ -31,6 +37,8 @@ module stage_if_p4 (
     //output IF_ID_PACKET [1:0] if_packet,
     // output ADDR         Imem_addr, // address sent to Instruction memory
     output ADDR [`N-1:0] PC_reg
+
+    
 );
 
     // ADDR PC_reg; // PCs we are currently fetching
@@ -90,6 +98,8 @@ module stage_if_p4 (
     logic [$clog2(`N):0]    free_scnt, used_scnt, f_cnt;
     IF_ID_PACKET [`N-1:0]   f_dat;
 
+    logic vld;
+
     logic off; // 1 if PC is dw-misaligned (i.e. starts at 2nd word of double word)
     always_comb begin
         d_out.f_en_cnt = `MIN(used_scnt, d_in.d_rdy_cnt);
@@ -105,6 +115,7 @@ module stage_if_p4 (
                 NPC   : PC_reg[i] + 4,
                 valid : vld
             };
+            $display("DECODE PC: %x", PC_reg[i]);
         end
     end
 
@@ -127,18 +138,77 @@ module stage_if_p4 (
         .used_scnt  (used_scnt)
     );
 
+    logic [1:0] predict_taken;
+
+    logic [1:0] mux_result_prediction; 
+
+    logic [1:0] btb_hit;
+
+    logic [1:0] [15:0] btb_target;
+
+    assign mux_result_prediction[0] = predict_taken[0]; //btb_hit[0];
+
+   // assign pred_out = mux_result
+    assign mux_result_prediction[1] = predict_taken[1] && btb_hit[1];
+
+    //if btb
+
+    logic [4:0] taken_count;
+
+    assign btb_hit = btb_in.hit;
+
+   /* always_comb begin
+     $display("btb_hit: %2b", btb_hit);
+    end
+
+    always_comb begin
+        $display("PC REG COMB: %x", PC_reg);
+    end*/
+
     always_ff @(posedge clock) begin
         if (reset) begin
             foreach(PC_reg[i])
                 PC_reg[i] <= 4*i; // initial PC value is 0 (the memory address where our program starts)
+                taken_count = 5'b0;
+                //mux_result_prediction <= 2'b00;
         end else if (flush) begin
             foreach(PC_reg[i])
                 PC_reg[i] <= 4*i + r_in.corrected_PC;  // initial PC value is 0 (the memory address where our program starts)
+        end else if(mux_result_prediction[0]) begin
+                $display("PREDICTING TAKEN:");
+                taken_count = taken_count + 1;
+               // foreach(PC_reg[i])
+                 //   PC_reg[i] <= 24;
+                //PC_reg[1] <= 24;
+                //$display("TAKEN COUNT: %5x", taken_count);
+                $display("MUX RESULT: %1x", mux_result_prediction[0]);
+                //$display("PREDICT TAKEN: %1x", predict_taken[0]);
+               // $display("BTB HIT: %1x", btb_hit[0]);
+                $display("FETCHING NEW TARGET: %x", btb_in.target);
+                PC_reg[0] <= {16'b0000000000000000,btb_in.target};
         end else begin
             foreach(PC_reg[i])
                 PC_reg[i] <= PC_reg[i] + 4*f_cnt; // ...or transition to next PC if valid
-        end
+        end 
     end
+
+
+    assign btb_out.target = r_in.corrected_PC[15:0];
+    assign btb_out.is_taken = r_in.is_taken;
+    assign btb_out.correct_PC =  r_in.PC;
+
+    assign btb_out.PC =  /*r_in.update_enable ? r_in.PC :*/ PC_reg;
+
+
+    assign btb_target = btb_in.target;
+
+
+    assign pred_out.PC = /*r_in.update_enable ? r_in.PC :*/ PC_reg;
+    assign pred_out.update_enable = r_in.update_enable;
+    assign pred_out.taken = r_in.is_taken;
+    assign pred_out.correct_PC =  r_in.PC;
+     
+    assign predict_taken = pred_in.prediction;
 
     // debugging
     `ifdef DEBUG
@@ -148,7 +218,23 @@ module stage_if_p4 (
             $display("r_in: {flush: %b, corrected_PC: 0x%x}", flush, r_in.corrected_PC);
             $display("PC_reg:  %x", PC_reg);
             $display("Imem_data: %x", Imem_data);
-            $display("  %3d | << Fetch <<", $time);
+
+            $display("FETCH2BTB: PC: %x", PC_reg);
+            //btb_out.target <= r_in.corrected_PC[15:0];
+
+            $display("FETCH RECEIVED CORRECT PC: %x", r_in.corrected_PC);
+            $display("SEND_TAKEN_TO_BTB: %2b", r_in.is_taken);
+            $display("FETCH RECEIVED ORIGINAL PC: %x", r_in.PC);
+           // $display("BTB TARGET: %x", r_in.corrected_PC[15:0]);
+
+
+            $display("FETCH2PRED: PC: %x", PC_reg);
+            $display("FETCH2PRED UPDATE ENABLE: %x", r_in.update_enable);
+            $display("FETCH2PRED TAKEN: %x", r_in.is_taken);
+            $display("FETCH2PRED CORRECT_PC: %x", r_in.PC);
+
+
+           $display("  %3d | << Fetch <<", $time);  
         end
     end
     `endif // DEBUG

@@ -6,9 +6,9 @@ module gshare (
     input  logic              reset,
 
     input  fetch2predictor    fetch_2_pred,
-    input  retire2predictor   ret_2_pred,
+    //input  retire2predictor   fetch_2_pred,
 
-    output logic [`N-1:0]     predict_taken
+    output predictor2fetch     predict_taken
 );
 
     logic [7:0] globalBHR;
@@ -23,7 +23,7 @@ module gshare (
     global_history_register ghr (
         .clock(clock),
         .reset(reset),
-        .ret_2_pred(ret_2_pred),
+        .fetch_2_pred(fetch_2_pred),
         .globalBHR(globalBHR)
     );
 
@@ -42,11 +42,11 @@ module gshare (
         .enq_bhr1(globalBHR),
 
         // Dequeue for update
-        .deq_valid0(ret_2_pred.update_enable[0]),
+        .deq_valid0(fetch_2_pred.update_enable[0]),
         .deq_PC0(deq_PC0),
         .deq_bhr0(bhr_at_fetch0),
 
-        .deq_valid1(ret_2_pred.update_enable[1]),
+        .deq_valid1(fetch_2_pred.update_enable[1]),
         .deq_PC1(deq_PC1),
         .deq_bhr1(bhr_at_fetch1),
 
@@ -71,10 +71,10 @@ module gshare (
         $display("  prediction[0] = %1b", prediction[0]);
         $display("  prediction[1] = %1b", prediction[1]);
 
-        $display("  ret_2_pred.taken[0] = %1b", ret_2_pred.taken[0]);
-        $display("  ret_2_pred.taken[1] = %1b", ret_2_pred.taken[1]);
-      //  ret_2_pred.taken[0]
-        //ret_2_pred.taken[0]
+        $display("  fetch_2_pred.taken[0] = %1b", fetch_2_pred.taken[0]);
+        $display("  fetch_2_pred.taken[1] = %1b", fetch_2_pred.taken[1]);
+      //  fetch_2_pred.taken[0]
+        //fetch_2_pred.taken[0]
 
     end*/
 
@@ -90,13 +90,13 @@ module gshare (
         .prediction1(prediction[1]),
 
         // Updates
-        .update_enable0(ret_2_pred.update_enable[0] && buffer_ready0),
+        .update_enable0(fetch_2_pred.update_enable[0] && buffer_ready0),
         .update_index0(update_index[0]),
-        .update_taken0(ret_2_pred.taken[0]),
+        .update_taken0(fetch_2_pred.taken[0]),
 
-        .update_enable1(ret_2_pred.update_enable[1] && buffer_ready1),
+        .update_enable1(fetch_2_pred.update_enable[1] && buffer_ready1),
         .update_index1(update_index[1]),
-        .update_taken1(ret_2_pred.taken[1])
+        .update_taken1(fetch_2_pred.taken[1])
     );
 
 
@@ -110,6 +110,10 @@ module gshare (
         $display("buffer_ready0 = %b  buffer_ready1 = %b", buffer_ready0, buffer_ready1);
         $display("  prediction[0] = %1b", prediction[0]);
         $display("  prediction[1] = %1b", prediction[1]);
+
+        $display("  globalBHR = %b", globalBHR);
+        $display("  fetch_in.PC[0] = %d", fetch_2_pred.correct_PC[0]);
+        $display("  fetch_in.PC[1] = %d", fetch_2_pred.correct_PC[1]);
     end
 
 

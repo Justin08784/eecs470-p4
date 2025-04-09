@@ -114,7 +114,8 @@ module btq #(
                     NPC     : d_in.NPC[i],
                     // TODO: pred and take need to be set by fetch! I think?
                     pred    : '0,
-                    take    : '0
+                    take    : '0,
+                    PC      : d_in.PC[i]
                 };
             end
         end
