@@ -844,6 +844,8 @@ module stage_ex_p4 (
     generate
         assign regs.i_rdy.alu = '1;
         for (genvar i = 0; i < `NUM_FU_ALU; ++i) begin : gen_alu_rbufs
+            /* Unlike mul, lod, str, we *shouldn't* need snooping because
+            we *should* never stall post issue. */
             flop #(
                 .WIDTH($bits(ALU_REGS))
             ) rbuf_alu (
@@ -860,12 +862,19 @@ module stage_ex_p4 (
         end
 
         for (genvar i = 0; i < `NUM_FU_MULT; ++i) begin : gen_mul_rbufs
+            /* Even if we are stalled, we must snoop the CDB to make sure
+            we don't miss the 1 cycle bypass window. */
+            MUL_REGS snp;
             skid #(
+                .ENABLE_SNOOP(`TRUE),
                 .WIDTH($bits(MUL_REGS))
             ) rbuf_mul (
                 .clock (clock),
                 .reset (reset),
                 .flush (flush),
+
+                .o_snoop(snp),
+                .i_snoop(mul_snoop(snp, cdat_out)),
 
                 .i_vld (iss.o_vld.mul[i]),
                 .i_rdy (regs.i_rdy.mul[i]),
@@ -878,12 +887,17 @@ module stage_ex_p4 (
         end
 
         for (genvar i = 0; i < `NUM_FU_LOAD; ++i) begin : gen_lod_rbufs
+            LOD_REGS snp;
             skid #(
+                .ENABLE_SNOOP(`TRUE),
                 .WIDTH($bits(LOD_REGS))
             ) rbuf_lod (
                 .clock (clock),
                 .reset (reset),
                 .flush (flush),
+
+                .o_snoop(snp),
+                .i_snoop(lod_snoop(snp, cdat_out)),
 
                 .i_vld (iss.o_vld.lod[i]),
                 .i_rdy (regs.i_rdy.lod[i]),
@@ -896,12 +910,17 @@ module stage_ex_p4 (
         end
 
         for (genvar i = 0; i < `NUM_FU_STORE; ++i) begin : gen_str_rbufs
+            STR_REGS snp;
             skid #(
+                .ENABLE_SNOOP(`TRUE),
                 .WIDTH($bits(STR_REGS))
             ) rbuf_str (
                 .clock (clock),
                 .reset (reset),
                 .flush (flush),
+
+                .o_snoop(snp),
+                .i_snoop(str_snoop(snp, cdat_out)),
 
                 .i_vld (iss.o_vld.str[i]),
                 .i_rdy (regs.i_rdy.str[i]),
