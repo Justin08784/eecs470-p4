@@ -418,14 +418,15 @@ module lod_ex(
 
     // FIXME: Is this right? 
     // FIXME: hardcoded
-    assign o_vld    = '0;
-    assign o_cands  = '0;
 
     LOAD_BAYS bays; // waiting bays
     logic     [`NUM_FU_LOAD-1:0][BAY_SZ-1:0] fu2in_gnt;
+    logic     [`NUM_FU_LOAD-1:0][BAY_SZ-1:0] fu2out_gnt;
     always_comb begin
-        for (int f = 0; f < `NUM_FU_MULT; ++f)
+        for (int f = 0; f < `NUM_FU_MULT; ++f) begin
             i_rdy[f] = |(~bays.vld[f]);
+            o_vld[f] = |(bays.vld[f] & bays.got[f]);
+        end
     end
 
     fake_dcache #(
@@ -442,13 +443,23 @@ module lod_ex(
     );
 
     generate
-        for (genvar f = 0; f < `NUM_FU_LOAD; ++f) begin : gen_bays
+        for (genvar f = 0; f < `NUM_FU_LOAD; ++f) begin : gen_arb_in
             psel_gen #(
                 .WIDTH(BAY_SZ),
                 .REQS(1)
-            ) cdb_arb (
+            ) arb_in (
                 .req    (~bays.vld[f]),
                 .gnt    (fu2in_gnt[f])
+            );
+        end
+
+        for (genvar f = 0; f < `NUM_FU_LOAD; ++f) begin : gen_arb_out
+            psel_gen #(
+                .WIDTH(BAY_SZ),
+                .REQS(1)
+            ) arb_out (
+                .req    (bays.vld[f] & bays.got[f]),
+                .gnt    (fu2out_gnt[f])
             );
         end
     endgenerate
@@ -469,6 +480,20 @@ module lod_ex(
             /* FIXME: What about rd_unsigned? We are not using this
             in lq???? */
 
+        end
+
+        o_cands = '0;
+        foreach (fu2out_gnt[f, i]) begin
+            if (!(fu2out_gnt[f][i] && o_rdy[f]))
+                continue;
+            o_cands[i] |= '{
+                t       : bays.t[f][i],
+                rob_idx : bays.rob_idx[f][i],
+                data    : bays.dat[f][i],
+                btq_idx : '0,
+                take    : '0,
+                is_brch : '0
+            };
         end
     end
 
@@ -496,8 +521,8 @@ module lod_ex(
                 bays.dat[f][i] <= rdat[f][i];
             end
 
-            foreach (bays.got[f, i]) begin
-                if (!bays.got[f][i])
+            foreach (fu2out_gnt[f, i]) begin
+                if (!(fu2out_gnt[f][i] && o_rdy[f]))
                     continue;
                 bays.vld     [f][i] <= 0;
                 bays.got     [f][i] <= 0;
