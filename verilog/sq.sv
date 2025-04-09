@@ -69,8 +69,6 @@ module sq #(parameter
         .ret_2_mem(ret_2_mem)
     );
 
-
-    LSQ_IDX head_plus_one;
     LSQ_IDX [N-1:0] next_ids;
     execute2sq next_complete;
     always_comb begin
@@ -98,22 +96,20 @@ module sq #(parameter
         // };
 
         //handle sq to ROB for retirement
-        head_plus_one = (head + 1) % LSQ_SZ;
-
         sq_2_rob.complete_en = next_complete.st_ex_en;
         for (int i = 0; i < NUM_FU_STORE; i++) begin
-            if (i >= next_complete.st_ex_en) continue;
+            if (i >= next_complete.st_ex_en)
+                continue;
 
             sq_2_rob.complete_rob_idxs[i] = state[next_complete.st_sq_idx[i]].rob_idx;
         end
         // sq_2_rob.ret_rdy = `MIN(sq_2_rob.ret_rdy,ret_2_sq.free_out);
-        sq_2_retire.sq_ret_complete = (ret_2_sq.empty && (used_scnt == 0)) ? '1 : '0;
+        sq_2_retire.sq_ret_complete = ret_2_sq.empty && (used_scnt == 0);
 
         //handle retirement write to mem
-        sq_2_ret.ret_cnt   = retire_2_sq.r_en;
-        sq_2_ret.ret_st[0] = state[head];
-        sq_2_ret.ret_st[1] = state[head_plus_one];
-
+        sq_2_ret.ret_cnt    = retire_2_sq.r_en;
+        foreach (r_idxs[i])
+            sq_2_ret.ret_st[i] = state[r_idxs[i]];
     end
 
 
