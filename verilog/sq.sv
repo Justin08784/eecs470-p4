@@ -89,12 +89,6 @@ module sq #(parameter
             no_store_yet        : no_store_yet
         };
 
-        //handle LSQ CDB to RS
-        // sq_2_rs <= '{
-        //     en : exec_2_sq.st_ex_en,
-        //     sq_idx_cdb     : exec_2_sq.st_sq_idx
-        // };
-
         //handle sq to ROB for retirement
         sq_2_rob.complete_en = next_complete.st_ex_en;
         for (int i = 0; i < NUM_FU_STORE; i++) begin
@@ -103,8 +97,7 @@ module sq #(parameter
 
             sq_2_rob.complete_rob_idxs[i] = state[next_complete.st_sq_idx[i]].rob_idx;
         end
-        // sq_2_rob.ret_rdy = `MIN(sq_2_rob.ret_rdy,ret_2_sq.free_out);
-        sq_2_retire.sq_ret_complete = ret_2_sq.empty && (used_scnt == 0);
+        sq_2_retire.sq_ret_complete = (ret_2_sq.used_scnt == 0) && (used_scnt == 0);
 
         //handle retirement write to mem
         sq_2_ret.ret_cnt    = retire_2_sq.r_en;
@@ -243,13 +236,6 @@ module sq #(parameter
 
             next_complete <= exec_2_sq;
 
-            //to ROB
-            // if (state[head].d_vld && state[head_plus_one].d_vld)    sq_2_retire.ret_rdy <= 2;
-            // else if (state[head].d_vld)                             sq_2_retire.ret_rdy <= 1;
-            // else                                                    sq_2_retire.ret_rdy <= 0;
-            // // sq_2_retire.ret_rdy = `MIN(sq_2_retire.ret_rdy,ret_2_sq.free_out);
-            // sq_2_retire.sq_ret_complete <= sq_ret_complete;
-            
             // handle execute updates
             for (int unsigned i = 0, int cur_idx = 0; i < NUM_ST_PORTS; ++i) begin
                 cur_idx = exec_2_sq.st_sq_idx[i];
@@ -368,8 +354,8 @@ module post_ret_buffer #(parameter
             d_idxs[i] = (tail + i) % LSQ_SZ;
 
         // handle ret_2_sq
-        ret_2_sq.free_out = free_scnt;//`MIN(free, NUM_DPORTS);
-        ret_2_sq.empty = (used_scnt == 0) ? '1 : '0;
+        ret_2_sq.free_scnt  = free_scnt;
+        ret_2_sq.used_scnt  = used_scnt;
 
         //handle retirement write to mem
         ret_2_mem = '0;
