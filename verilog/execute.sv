@@ -486,7 +486,7 @@ module lod_ex(
         foreach (fu2out_gnt[f, i]) begin
             if (!(fu2out_gnt[f][i] && o_rdy[f]))
                 continue;
-            o_cands[i] |= '{
+            o_cands[f] |= '{
                 t       : bays.t[f][i],
                 rob_idx : bays.rob_idx[f][i],
                 data    : bays.dat[f][i],
@@ -539,7 +539,15 @@ module lod_ex(
     always_ff @(posedge clock) begin
         if (!reset) begin
             $display("  %3d | >> BAYS", $time);
-            $display("i_rdy: %b, i_vld: %b", i_rdy, i_vld);
+            $display("i_rdy: %b, i_vld: %b, o_vld: %b, o_rdy: %b", i_rdy, i_vld, o_vld, o_rdy);
+            $display("ocands: t: %2d, rob_idx: %2d, data: %x, btq_idx: %2d, take: %b, is_brch: %b",
+                o_cands[0].t,
+                o_cands[0].rob_idx,
+                o_cands[0].data,
+                o_cands[0].btq_idx,
+                o_cands[0].take,
+                o_cands[0].is_brch,
+            );
             $display("ren: %b, rvld: %b", bays.vld & ~bays.got, rvld);
             foreach (fu2in_gnt[f, i]) begin
                 $display("bays[%2d][%2d]: vld=%b, got=%b, t=%2d, rob_idx=%2d, addr=%x, mem_size=%2d, dat=%x",
@@ -1119,7 +1127,7 @@ module stage_ex_p4 (
         .o_cands(cands.lod),
         /* FIXME: How exactly do we do CDB arbitration for loads/stores?
         And how does it fit in our ETB system? */
-        .o_rdy  (cdb_gnt_shr[0].lod)
+        .o_rdy  (cdb_gnt_shr[1].lod)
     );
 
     str_ex str_ex0 (
