@@ -341,8 +341,11 @@ module lod_ex(
 
     /* FRONTEND */
     output logic    [`NUM_FU_LOAD-1:0]  i_rdy,
+        // ready to accept from regs.o_dat.lod?
     input  logic    [`NUM_FU_LOAD-1:0]  i_vld,
+        // insns to accept from regs.o_dat.lod
     input  LOD_REGS [`NUM_FU_LOAD-1:0]  i_regs,
+        // insn metadata/operands
     
     input  execute2complete_dat         cdat,
 
