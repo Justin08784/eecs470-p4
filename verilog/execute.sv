@@ -145,6 +145,69 @@ typedef struct packed {
     ROB_IDX         rob_idx;
 } MUL_OPS;
 
+/* CDB snooping/bypassing functions */
+function automatic ALU_REGS alu_snoop(
+    input ALU_REGS v,
+    input execute2complete_dat cdat
+);
+    ALU_REGS rv = v;
+    foreach (cdat.en[n]) begin
+        if (!cdat.en[n] || cdat.ts[n] == '0)
+            continue;
+        if (rv.dat.t1 == cdat.ts[n])
+            rv.rs1 = cdat.data[n];
+        if (rv.dat.t2 == cdat.ts[n])
+            rv.rs2 = cdat.data[n];
+    end
+    return rv;
+endfunction
+
+function automatic MUL_REGS mul_snoop(
+    input MUL_REGS v,
+    input execute2complete_dat cdat
+);
+    MUL_REGS rv = v;
+    foreach (cdat.en[n]) begin
+        if (!cdat.en[n] || cdat.ts[n] == '0)
+            continue;
+        if (rv.dat.t1 == cdat.ts[n])
+            rv.rs1 = cdat.data[n];
+        if (rv.dat.t2 == cdat.ts[n])
+            rv.rs2 = cdat.data[n];
+    end
+    return rv;
+endfunction
+
+function automatic LOD_REGS lod_snoop(
+    input LOD_REGS v,
+    input execute2complete_dat cdat
+);
+    LOD_REGS rv = v;
+    foreach (cdat.en[n]) begin
+        if (!cdat.en[n] || cdat.ts[n] == '0)
+            continue;
+        if (rv.dat.t1 == cdat.ts[n])
+            rv.rs1 = cdat.data[n];
+    end
+    return rv;
+endfunction
+
+function automatic STR_REGS str_snoop(
+    input STR_REGS v,
+    input execute2complete_dat cdat
+);
+    STR_REGS rv = v;
+    foreach (cdat.en[n]) begin
+        if (!cdat.en[n] || cdat.ts[n] == '0)
+            continue;
+        if (rv.dat.t1 == cdat.ts[n])
+            rv.rs1 = cdat.data[n];
+        if (rv.dat.t2 == cdat.ts[n])
+            rv.rs2 = cdat.data[n];
+    end
+    return rv;
+endfunction
+
 // ALU: computes the result of FUNC applied with operands A and B
 // This module is purely combinational
 module alu (
@@ -204,8 +267,6 @@ module alu_ex(
     input  ALU_REGS [`NUM_FU_ALU-1:0]   i_regs,
         // insn metadata/operands
 
-    input  execute2complete_dat         cdat,
-
     /* BACKEND */
     output logic    [`NUM_FU_ALU-1:0]   o_vld,
     output CPL_CAND [`NUM_FU_ALU-1:0]   o_cands,
@@ -215,32 +276,10 @@ module alu_ex(
     ALU_OPS [`NUM_FU_ALU-1:0] ops;
     always_comb begin
         DATA opa, opb;
-        logic bypass1, bypass2;
-        DATA  tmp_rs1, tmp_rs2;
-        DATA rs1, rs2;
         foreach(ops[i]) begin
-            tmp_rs1 = '0;
-            tmp_rs2 = '0;
-            bypass1 = 0;
-            bypass2 = 0;
-            foreach(cdat.en[n]) begin
-                if (!cdat.en[n] || cdat.ts[n] == '0)
-                    continue;
-                if (i_regs[i].dat.t1 == cdat.ts[n]) begin
-                    bypass1 |= 1;
-                    tmp_rs1 |= cdat.data[n];
-                end
-                if (i_regs[i].dat.t2 == cdat.ts[n]) begin
-                    bypass2 |= 1;
-                    tmp_rs2 |= cdat.data[n];
-                end
-            end
-            rs1 = bypass1 ? tmp_rs1 : i_regs[i].rs1;
-            rs2 = bypass2 ? tmp_rs2 : i_regs[i].rs2;
-
             // ALU opA mux
             case (i_regs[i].dat.opa_select)
-                OPA_IS_RS1:  opa = rs1;
+                OPA_IS_RS1:  opa = i_regs[i].rs1;
                 OPA_IS_NPC:  opa = i_regs[i].dat.NPC;
                 OPA_IS_PC:   opa = i_regs[i].dat.PC;
                 OPA_IS_ZERO: opa = 0;
@@ -249,7 +288,7 @@ module alu_ex(
 
             // ALU opB mux
             case (i_regs[i].dat.opb_select)
-                OPB_IS_RS2:   opb =  rs2;
+                OPB_IS_RS2:   opb =  i_regs[i].rs2;
                 OPB_IS_I_IMM: opb = `RV32_signext_Iimm(i_regs[i].dat.inst);
                 OPB_IS_S_IMM: opb = `RV32_signext_Simm(i_regs[i].dat.inst);
                 OPB_IS_B_IMM: opb = `RV32_signext_Bimm(i_regs[i].dat.inst);
@@ -258,8 +297,8 @@ module alu_ex(
                 default:      opb = 32'hfacefeed; // face feed
             endcase
             ops[i] = '{
-                rs1         : rs1,
-                rs2         : rs2,
+                rs1         : i_regs[i].rs1,
+                rs2         : i_regs[i].rs2,
                 opa         : opa,
                 opb         : opb,
                 alu_func    : i_regs[i].dat.alu_func,
@@ -267,36 +306,11 @@ module alu_ex(
                 t           : i_regs[i].dat.t,
                 rob_idx     : i_regs[i].dat.rob_idx,
                 btq_idx     : i_regs[i].dat.btq_idx,
-                cond_branch        : i_regs[i].dat.cond_branch,
-                uncond_branch      : i_regs[i].dat.uncond_branch
+                cond_branch     : i_regs[i].dat.cond_branch,
+                uncond_branch   : i_regs[i].dat.uncond_branch
             };
         end
     end
-
-    `ifdef DEBUG
-    always_ff @(posedge clock) begin
-        if (!reset) begin
-            $display("alu_ex: cdb <%b>[%2d -> %2d], <%b>[%2d -> %2d]",
-                cdat.en[0],
-                cdat.ts[0],
-                cdat.data[0],
-                cdat.en[1],
-                cdat.ts[1],
-                cdat.data[1]
-            );
-
-            for (int unsigned i = 0; i < `NUM_FU_ALU; ++i) begin
-                $display("%2d bytag: (b1:%b, idx1:%b) (b2:%b, idx2:%b)",
-                    i,
-                    i_regs[i].dat.bytag.bypass1,
-                    i_regs[i].dat.bytag.cdb_idx1,
-                    i_regs[i].dat.bytag.bypass2,
-                    i_regs[i].dat.bytag.cdb_idx2,
-                );
-            end
-        end
-    end
-    `endif // DEBUG
 
     // execute
     generate
@@ -347,8 +361,6 @@ module lod_ex(
     input  LOD_REGS [`NUM_FU_LOAD-1:0]  i_regs,
         // insn metadata/operands
     
-    input  execute2complete_dat         cdat,
-
     input   sq2execute sq_in,
     output  execute2sq sq_out,
     // FIXME: Isn't an lq2execute needed?
@@ -400,24 +412,10 @@ module lod_ex(
     MEM_SIZE    [`NUM_FU_LOAD-1:0] tmp_sizes;
 
     always_comb begin
-        logic bypass1;
-        DATA  rs1, tmp_rs1;
         ADDR  addr;
         foreach(i_vld[i]) begin
-            tmp_rs1 = '0;
-            bypass1 = 0;
-            foreach(cdat.en[n]) begin
-                if (!cdat.en[n] || cdat.ts[n] == '0)
-                    continue;
-                if (i_regs[i].dat.t1 == cdat.ts[n]) begin
-                    bypass1 |= 1;
-                    tmp_rs1 |= cdat.data[n];
-                end
-            end
-            rs1 = bypass1 ? tmp_rs1 : i_regs[i].rs1;
-            
             // load address computation
-            addr = rs1 + i_regs[i].dat.opb;
+            addr = i_regs[i].rs1 + i_regs[i].dat.opb;
 
             lq_out.ld_ex_en[i]      = i_vld[i];
             lq_out.ld_lq_idx[i]     = i_regs[i].dat.lq_idx;
@@ -475,8 +473,6 @@ module str_ex(
     input  logic    [`NUM_FU_STORE-1:0]  i_vld,
     input  STR_REGS [`NUM_FU_STORE-1:0]  i_regs,
     
-    input  execute2complete_dat         cdat,
-
     input   sq2execute sq_in,
     output  execute2sq sq_out,
     // FIXME: Isn't an lq2execute needed? <-- Answer: No, if an issue is found when forwarding the SQ_IDX to LQ, it is flagged in the ROB to restart from that PC
@@ -495,37 +491,15 @@ module str_ex(
     assign o_cands  = '0;
 
     always_comb begin
-        logic bypass1, bypass2;
-        DATA  rs1, tmp_rs1;
-        DATA  rs2, tmp_rs2;
         ADDR  addr;
         foreach(i_vld[i]) begin
-            tmp_rs1 = '0;
-            tmp_rs2 = '0;
-            bypass1 = 0;
-            bypass2 = 0;
-            foreach(cdat.en[n]) begin
-                if (!cdat.en[n] || cdat.ts[n] == '0)
-                    continue;
-                if (i_regs[i].dat.t1 == cdat.ts[n]) begin
-                    bypass1 |= 1;
-                    tmp_rs1 |= cdat.data[n];
-                end
-                if (i_regs[i].dat.t2 == cdat.ts[n]) begin
-                    bypass2 |= 1;
-                    tmp_rs2 |= cdat.data[n];
-                end
-            end
-            rs1 = bypass1 ? tmp_rs1 : i_regs[i].rs1;
-            rs2 = bypass2 ? tmp_rs2 : i_regs[i].rs2;
-            
             // store address computation
-            addr = rs1 + i_regs[i].dat.opb;
+            addr = i_regs[i].rs1 + i_regs[i].dat.opb;
 
             sq_out.st_ex_en[i]      = i_vld[i];
             sq_out.st_sq_idx[i]     = i_regs[i].dat.sq_idx;
             sq_out.st_addr[i]       = addr;
-            sq_out.st_data[i]       = rs2;
+            sq_out.st_data[i]       = i_regs[i].rs2;
             sq_out.st_mem_size[i]   = i_regs[i].dat.mem_size;
 
             st_lq_out.st_en[i]      = i_vld[i];
@@ -557,8 +531,6 @@ module mul_ex(
     output PHYS_REG_IDX [`NUM_FU_MULT-1:0] ctag_ts,
     input  logic [`NUM_FU_MULT-1:0]     cdb_gnt,
 
-    input  execute2complete_dat         cdat,
-
     /* BACKEND */
     output logic    [`NUM_FU_MULT-1:0]  o_vld,
     output CPL_CAND [`NUM_FU_MULT-1:0]  o_cands,
@@ -568,63 +540,16 @@ module mul_ex(
 );
     MUL_OPS [`NUM_FU_MULT-1:0] ops;
     always_comb begin
-        logic bypass1, bypass2;
-        DATA  tmp_rs1, tmp_rs2;
-        DATA rs1, rs2;
         foreach (ops[i]) begin
-            tmp_rs1 = '0;
-            tmp_rs2 = '0;
-            bypass1 = 0;
-            bypass2 = 0;
-            foreach(cdat.en[n]) begin
-                if (!cdat.en[n] || cdat.ts[n] == '0)
-                    continue;
-                if (i_regs[i].dat.t1 == cdat.ts[n]) begin
-                    bypass1 |= 1;
-                    tmp_rs1 |= cdat.data[n];
-                end
-                if (i_regs[i].dat.t2 == cdat.ts[n]) begin
-                    bypass2 |= 1;
-                    tmp_rs2 |= cdat.data[n];
-                end
-            end
-            rs1 = bypass1 ? tmp_rs1 : i_regs[i].rs1;
-            rs2 = bypass2 ? tmp_rs2 : i_regs[i].rs2;
-            
             ops[i] = '{
-                rs1  : rs1,
-                rs2  : rs2,
-                func : i_regs[i].dat.func,
+                rs1     : i_regs[i].rs1,
+                rs2     : i_regs[i].rs2,
+                func    : i_regs[i].dat.func,
                 t       : i_regs[i].dat.t,
                 rob_idx : i_regs[i].dat.rob_idx
             };
         end
     end
-
-    `ifdef DEBUG
-    always_ff @(posedge clock) begin
-        if (!reset) begin
-            $display("mul_ex: cdb <%b>[%2d -> %2d], <%b>[%2d -> %2d]",
-                cdat.en[0],
-                cdat.ts[0],
-                cdat.data[0],
-                cdat.en[1],
-                cdat.ts[1],
-                cdat.data[1]
-            );
-
-            for (int unsigned i = 0; i < `NUM_FU_MULT; ++i) begin
-                $display("%2d bytag: (b1:%b, idx1:%b) (b2:%b, idx2:%b)",
-                    i,
-                    i_regs[i].dat.bytag.bypass1,
-                    i_regs[i].dat.bytag.cdb_idx1,
-                    i_regs[i].dat.bytag.bypass2,
-                    i_regs[i].dat.bytag.cdb_idx2,
-                );
-            end
-        end
-    end
-    `endif // DEBUG
 
     // execute
     generate
@@ -922,6 +847,9 @@ module stage_ex_p4 (
     generate
         assign regs.i_rdy.alu = '1;
         for (genvar i = 0; i < `NUM_FU_ALU; ++i) begin : gen_alu_rbufs
+            /* Unlike mul, lod, str, we *shouldn't* need snooping to feed back
+            into rbuf (via i_snoop) because we *should* never stall post issue. */
+            ALU_REGS raw;
             flop #(
                 .WIDTH($bits(ALU_REGS))
             ) rbuf_alu (
@@ -933,17 +861,24 @@ module stage_ex_p4 (
                 .i_dat (regs.i_dat.alu[i]),
 
                 .o_vld (regs.o_vld.alu[i]),
-                .o_dat (regs.o_dat.alu[i])
+                .o_dat (raw)
             );
+            assign regs.o_dat.alu[i] = alu_snoop(raw, cdat_out);
         end
 
         for (genvar i = 0; i < `NUM_FU_MULT; ++i) begin : gen_mul_rbufs
+            /* Even if we are stalled, we must snoop the CDB to make sure
+            we don't miss the 1 cycle bypass window. */
+            MUL_REGS raw;
             skid #(
+                .ENABLE_SNOOP(`TRUE),
                 .WIDTH($bits(MUL_REGS))
             ) rbuf_mul (
                 .clock (clock),
                 .reset (reset),
                 .flush (flush),
+
+                .i_snoop(regs.o_dat.mul[i]),
 
                 .i_vld (iss.o_vld.mul[i]),
                 .i_rdy (regs.i_rdy.mul[i]),
@@ -951,17 +886,22 @@ module stage_ex_p4 (
 
                 .o_vld (regs.o_vld.mul[i]),
                 .o_rdy (ex.i_rdy.mul[i]),
-                .o_dat (regs.o_dat.mul[i])
+                .o_dat (raw)
             );
+            assign regs.o_dat.mul[i] = mul_snoop(raw, cdat_out);
         end
 
         for (genvar i = 0; i < `NUM_FU_LOAD; ++i) begin : gen_lod_rbufs
+            LOD_REGS raw;
             skid #(
+                .ENABLE_SNOOP(`TRUE),
                 .WIDTH($bits(LOD_REGS))
             ) rbuf_lod (
                 .clock (clock),
                 .reset (reset),
                 .flush (flush),
+
+                .i_snoop(regs.o_dat.lod[i]),
 
                 .i_vld (iss.o_vld.lod[i]),
                 .i_rdy (regs.i_rdy.lod[i]),
@@ -969,17 +909,22 @@ module stage_ex_p4 (
 
                 .o_vld (regs.o_vld.lod[i]),
                 .o_rdy (ex.i_rdy.lod[i]),
-                .o_dat (regs.o_dat.lod[i])
+                .o_dat (raw)
             );
+            assign regs.o_dat.lod[i] = lod_snoop(raw, cdat_out);
         end
 
         for (genvar i = 0; i < `NUM_FU_STORE; ++i) begin : gen_str_rbufs
+            STR_REGS raw;
             skid #(
+                .ENABLE_SNOOP(`TRUE),
                 .WIDTH($bits(STR_REGS))
             ) rbuf_str (
                 .clock (clock),
                 .reset (reset),
                 .flush (flush),
+
+                .i_snoop(regs.o_dat.str[i]),
 
                 .i_vld (iss.o_vld.str[i]),
                 .i_rdy (regs.i_rdy.str[i]),
@@ -987,8 +932,9 @@ module stage_ex_p4 (
 
                 .o_vld (regs.o_vld.str[i]),
                 .o_rdy (ex.i_rdy.str[i]),
-                .o_dat (regs.o_dat.str[i])
+                .o_dat (raw)
             );
+            assign regs.o_dat.str[i] = str_snoop(raw, cdat_out);
         end
     endgenerate
 
@@ -1037,10 +983,7 @@ module stage_ex_p4 (
 
         .o_vld  (ex.o_vld.alu),
         .o_cands(cands.alu),
-        .o_rdy  (cdb_gnt_shr[1].alu),
-
-        /* CDB bypass */
-        .cdat   (cdat_out)
+        .o_rdy  (cdb_gnt_shr[1].alu)
     );
 
     `BY_FU(PHYS_REG_IDX) ctag_ts;
@@ -1061,10 +1004,7 @@ module stage_ex_p4 (
 
         .o_vld  (ex.o_vld.mul),
         .o_cands(cands.mul),
-        .o_rdy  (cdb_gnt_shr[1].mul),
-
-        /* CDB bypass */
-        .cdat   (cdat_out)
+        .o_rdy  (cdb_gnt_shr[1].mul)
     );
 
     lod_ex lod_ex0 (
@@ -1080,10 +1020,7 @@ module stage_ex_p4 (
         .o_cands(cands.lod),
         /* FIXME: How exactly do we do CDB arbitration for loads/stores?
         And how does it fit in our ETB system? */
-        .o_rdy  (cdb_gnt_shr[0].lod),
-
-        /* CDB bypass */
-        .cdat   (cdat_out)
+        .o_rdy  (cdb_gnt_shr[0].lod)
     );
 
     str_ex str_ex0 (
@@ -1102,10 +1039,7 @@ module stage_ex_p4 (
         .o_rdy  (cdb_gnt_shr[0].str),
 
         .sq_in(sq_in),
-        .sq_out(sq_out),
-
-        /* CDB bypass */
-        .cdat   (cdat_out)
+        .sq_out(sq_out)
     );
 
     /* >> ======== STAGE 4/?: CDB data/tag broadcast ======== >> */

@@ -31,6 +31,7 @@ endmodule
 
 module skid #(
     parameter int unsigned WIDTH,
+    parameter logic ENABLE_SNOOP = `FALSE,
     type SKID_STATE = struct packed {
         logic vld;
         logic [WIDTH-1:0] dat;
@@ -47,6 +48,8 @@ module skid #(
     output  logic   o_vld,
     input   logic   o_rdy,
     output  logic   [WIDTH-1:0] o_dat,
+
+    input   logic   [WIDTH-1:0] i_snoop, // post-snooping
 
     output  SKID_STATE dbg
 );
@@ -70,6 +73,13 @@ module skid #(
         end else if (i_rdy) begin
             dat <= i_dat;
             vld <= i_vld;
+        end else if (ENABLE_SNOOP) begin
+            if (!(vld && !o_rdy)) begin
+                // should be (vld && !o_rdy), right?
+                $error("skid: snoop: unexpected");
+                $fatal;
+            end
+            dat <= i_snoop;
         end
     end
 endmodule
