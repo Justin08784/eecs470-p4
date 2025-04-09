@@ -74,8 +74,8 @@ module retire (
                 ++sq_rd_cnt; 
                 
             if (rob_in.entries[i].rd_mem) begin
-                if (0) begin // TODO: enable when lq_in.err_ld_ooo is actually set
-                // if (lq_in.err_ld_ooo[lq_rd_cnt]) begin
+                // if (0) begin // TODO: enable when lq_in.err_ld_ooo is actually set
+                if (lq_in.err_ld_ooo[lq_rd_cnt]) begin
                     ld_ooo  = 1;
                     ld_PC   = lq_in.PC[lq_rd_cnt];
                     break;

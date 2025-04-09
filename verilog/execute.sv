@@ -392,7 +392,6 @@ module lod_ex(
     
     input   sq2execute sq_in,
     output  execute2sq sq_out,
-    // FIXME: Isn't an lq2execute needed?
     output  execute2lq lq_out,
 
     /* BACKEND */
@@ -477,8 +476,9 @@ module lod_ex(
             lq_out.ld_lq_idx[i]     = i_regs[i].dat.lq_idx;
             lq_out.ld_addr[i]       = tmp_addrs[i];
             lq_out.ld_mem_size[i]   = tmp_sizes[i];
+            $display("LQ_OUT: en: %b, lq_idx: %0d, addr: %0d", lq_out.ld_ex_en[i], lq_out.ld_lq_idx[i], lq_out.ld_addr[i]);
             /* FIXME: What about rd_unsigned? We are not using this
-            in lq???? */
+            in lq???? */ //ANSWER: This needs to be used in the load FU
 
         end
 
@@ -1125,6 +1125,7 @@ module stage_ex_p4 (
 
         .o_vld  (ex.o_vld.lod),
         .o_cands(cands.lod),
+        .lq_out(lq_out),
         /* FIXME: How exactly do we do CDB arbitration for loads/stores?
         And how does it fit in our ETB system? */
         .o_rdy  (cdb_gnt_shr[1].lod)
@@ -1146,7 +1147,8 @@ module stage_ex_p4 (
         .o_rdy  (cdb_gnt_shr[0].str),
 
         .sq_in(sq_in),
-        .sq_out(sq_out)
+        .sq_out(sq_out),
+        .st_lq_out(st_lq_out)
     );
 
     /* >> ======== STAGE 4/?: CDB data/tag broadcast ======== >> */
