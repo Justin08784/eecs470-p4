@@ -231,7 +231,7 @@ module sq #(parameter
             tail    <= 0;
             tail_dbl <= 0;
             state   <= '0;
-            last_used_sq_idx <= LSQ_SZ_DBL + 1; //outside of SQ range so that if a load occurs before the first store we don't flag it falsely
+            last_used_sq_idx <= LSQ_SZ_DBL - 1; //outside of SQ range so that if a load occurs before the first store we don't flag it falsely
             next_complete <= '0;
             no_store_yet <= '1;
         end else begin
@@ -242,7 +242,7 @@ module sq #(parameter
             head    <= (head + retire_2_sq.r_en) % LSQ_SZ;
             tail    <= (tail + dis_2_sq.sq_d_en_cnt) % LSQ_SZ;
             tail_dbl <= (tail_dbl + dis_2_sq.sq_d_en_cnt) % LSQ_SZ_DBL;
-            last_used_sq_idx <= (last_used_sq_idx + dis_2_sq.sq_d_en_cnt) % LSQ_SZ_DBL;
+            last_used_sq_idx <= dis_2_sq.sq_d_en_cnt > 0 ? (last_used_sq_idx + dis_2_sq.sq_d_en_cnt) % LSQ_SZ_DBL : last_used_sq_idx;
             no_store_yet <= (dis_2_sq.sq_d_en_cnt > 0) | no_store_yet;
 
             next_complete <= exec_2_sq;
