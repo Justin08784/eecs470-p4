@@ -28,7 +28,7 @@ import "DPI-C" function string decode_inst(int inst);
 //import "DPI-C" function void close_pipeline_output_file();
 
 
-`define TB_MAX_CYCLES 50000000
+`define TB_MAX_CYCLES 5000//50000000
 
 
 module testbench;
@@ -85,23 +85,19 @@ module testbench;
         // Inputs
         .clock (clock),
         .reset (reset),
-        //.mem2proc_transaction_tag (mem2proc_transaction_tag),
-        .mem2proc_data            ({
-            memory.unified_memory[PC_reg[1][15:3]],
-            memory.unified_memory[PC_reg[0][15:3]]
-        }),
-        //.mem2proc_data_tag        (mem2proc_data_tag),
+        .mem2proc_transaction_tag (mem2proc_transaction_tag),
+        .mem2proc_data            (mem2proc_data),
+        .mem2proc_data_tag        (mem2proc_data_tag),
 
         // Outputs
-        //.proc2mem_command (proc2mem_command),
-        //.proc2mem_addr    (proc2mem_addr),
-        //.proc2mem_data    (proc2mem_data),
+        .proc2mem_command (proc2mem_command),
+        .proc2mem_addr    (proc2mem_addr),
+        .proc2mem_data    (proc2mem_data),
 `ifndef CACHE_MODE
-        //.proc2mem_size    (proc2mem_size),
+        .proc2mem_size    (proc2mem_size),
 `endif
 
         .committed_insts (committed_insts),
-        .PC_reg(PC_reg),
 
         .dbg_rob2retire (dbg_rob2retire),
         .dbg_btq2retire (dbg_btq2retire),

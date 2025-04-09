@@ -84,7 +84,7 @@ module icache (
     // Note: cache tags, not memory tags
     logic [12-`ICACHE_LINE_BITS:0] current_tag,   last_tag,   write_tag;
     logic [`ICACHE_LINE_BITS -1:0] current_index, last_index, write_index;
-    logic                          got_mem_data;
+    logic                          got_mem_data, flushed;
     MSHR_entry [15:0] MSHR;
 
 
@@ -157,6 +157,7 @@ module icache (
             // current_mem_tag  <= '0;
             // miss_outstanding <= '0;
             icache_tags      <= '0; // Set all cache tags and valid bits to 0
+            flushed          <=  0;
             PC_prefetch      <= proc2Icache_addr;
             MSHR <= '0;
             //MSHR_update      <= 1;
@@ -181,7 +182,8 @@ module icache (
                 icache_tags[write_index].tags  <= write_tag;
                 icache_tags[write_index].valid <= 1'b1;
             end
-            PC_prefetch      <= (!Icache_valid_out && flush) ? proc2Icache_addr : (PC_prefetch - proc2Icache_addr == `PREFETCH_CAP ? PC_prefetch : PC_prefetch + 8);
+            flushed          <= flush;
+            PC_prefetch      <= (!Icache_valid_out && flushed) ? proc2Icache_addr : (PC_prefetch - proc2Icache_addr == `PREFETCH_CAP ? PC_prefetch : PC_prefetch + 8);
             if(Imem2proc_transaction_tag != 0) begin
                 MSHR[Imem2proc_transaction_tag].addr    <= proc2Imem_addr;
                 MSHR[Imem2proc_transaction_tag].valid   <= 1;
