@@ -48,8 +48,8 @@ module lq #(parameter
 
 
     LSQ_IDX head_plus_one;
-    logic [NUM_FU_LOAD-1:0] set_err;
-    LSQ_IDX [NUM_FU_LOAD-1:0] err_idx;
+    logic [NUM_FU_STORE+NUM_FU_LOAD-1:0] set_err;
+    LSQ_IDX [NUM_FU_STORE+NUM_FU_LOAD-1:0] err_idx;
     always_comb begin
         lq_2_rob = '0;
 
@@ -82,6 +82,16 @@ module lq #(parameter
                     set_err[i] = '1;
                     err_idx[i] = idx;
                 end
+            end
+        end
+        //check for st/ld on the same cycle (error since st won't be commited until next clock edge)
+        for (int i = 0; i < NUM_FU_LOAD; i++) begin
+            for (int j = 0; j < NUM_FU_STORE; j++) begin
+                if (!execST_in.st_en[j]) continue;
+
+                if (execST_in.st_sq_idx[j] == state[exec_2_lq.ld_lq_idx[i]].sq_idx)
+                    set_err[i+NUM_FU_STORE] = 1;
+                    err_idx[i+NUM_FU_STORE] = exec_2_lq.ld_lq_idx[i];
             end
         end
 
@@ -123,7 +133,7 @@ module lq #(parameter
             end
 
             //handle error flags
-            for (int unsigned i = 0; i < NUM_FU_STORE; ++i) begin
+            for (int unsigned i = 0; i < NUM_FU_STORE+NUM_FU_LOAD; ++i) begin
                 if (set_err[i])
                     state[err_idx[i]].err_ld_ooo <= 1;
             end
