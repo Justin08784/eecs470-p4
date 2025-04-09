@@ -145,6 +145,69 @@ typedef struct packed {
     ROB_IDX         rob_idx;
 } MUL_OPS;
 
+/* CDB snooping/bypassing functions */
+function automatic ALU_REGS alu_snoop(
+    input ALU_REGS v,
+    input execute2complete_dat cdat
+);
+    ALU_REGS rv = v;
+    foreach (cdat.en[n]) begin
+        if (!cdat.en[n] || cdat.ts[n] == '0)
+            continue;
+        if (rv.dat.t1 == cdat.ts[n])
+            rv.rs1 = cdat.data[n];
+        if (rv.dat.t2 == cdat.ts[n])
+            rv.rs2 = cdat.data[n];
+    end
+    return rv;
+endfunction
+
+function automatic MUL_REGS mul_snoop(
+    input MUL_REGS v,
+    input execute2complete_dat cdat
+);
+    MUL_REGS rv = v;
+    foreach (cdat.en[n]) begin
+        if (!cdat.en[n] || cdat.ts[n] == '0)
+            continue;
+        if (rv.dat.t1 == cdat.ts[n])
+            rv.rs1 = cdat.data[n];
+        if (rv.dat.t2 == cdat.ts[n])
+            rv.rs2 = cdat.data[n];
+    end
+    return rv;
+endfunction
+
+function automatic LOD_REGS lod_snoop(
+    input LOD_REGS v,
+    input execute2complete_dat cdat
+);
+    LOD_REGS rv = v;
+    foreach (cdat.en[n]) begin
+        if (!cdat.en[n] || cdat.ts[n] == '0)
+            continue;
+        if (rv.dat.t1 == cdat.ts[n])
+            rv.rs1 = cdat.data[n];
+    end
+    return rv;
+endfunction
+
+function automatic STR_REGS str_snoop(
+    input STR_REGS v,
+    input execute2complete_dat cdat
+);
+    STR_REGS rv = v;
+    foreach (cdat.en[n]) begin
+        if (!cdat.en[n] || cdat.ts[n] == '0)
+            continue;
+        if (rv.dat.t1 == cdat.ts[n])
+            rv.rs1 = cdat.data[n];
+        if (rv.dat.t2 == cdat.ts[n])
+            rv.rs2 = cdat.data[n];
+    end
+    return rv;
+endfunction
+
 // ALU: computes the result of FUNC applied with operands A and B
 // This module is purely combinational
 module alu (
@@ -213,62 +276,43 @@ module alu_ex(
         // completion grant
 );
     ALU_OPS [`NUM_FU_ALU-1:0] ops;
+    ALU_REGS[`NUM_FU_ALU-1:0] i_regs_snpd;
     always_comb begin
         DATA opa, opb;
-        logic bypass1, bypass2;
-        DATA  tmp_rs1, tmp_rs2;
-        DATA rs1, rs2;
         foreach(ops[i]) begin
-            tmp_rs1 = '0;
-            tmp_rs2 = '0;
-            bypass1 = 0;
-            bypass2 = 0;
-            foreach(cdat.en[n]) begin
-                if (!cdat.en[n] || cdat.ts[n] == '0)
-                    continue;
-                if (i_regs[i].dat.t1 == cdat.ts[n]) begin
-                    bypass1 |= 1;
-                    tmp_rs1 |= cdat.data[n];
-                end
-                if (i_regs[i].dat.t2 == cdat.ts[n]) begin
-                    bypass2 |= 1;
-                    tmp_rs2 |= cdat.data[n];
-                end
-            end
-            rs1 = bypass1 ? tmp_rs1 : i_regs[i].rs1;
-            rs2 = bypass2 ? tmp_rs2 : i_regs[i].rs2;
+            i_regs_snpd[i] = alu_snoop(i_regs[i], cdat);
 
             // ALU opA mux
-            case (i_regs[i].dat.opa_select)
-                OPA_IS_RS1:  opa = rs1;
-                OPA_IS_NPC:  opa = i_regs[i].dat.NPC;
-                OPA_IS_PC:   opa = i_regs[i].dat.PC;
+            case (i_regs_snpd[i].dat.opa_select)
+                OPA_IS_RS1:  opa = i_regs_snpd[i].rs1;
+                OPA_IS_NPC:  opa = i_regs_snpd[i].dat.NPC;
+                OPA_IS_PC:   opa = i_regs_snpd[i].dat.PC;
                 OPA_IS_ZERO: opa = 0;
                 default:     opa = 32'hdeadface; // dead face
             endcase
 
             // ALU opB mux
-            case (i_regs[i].dat.opb_select)
-                OPB_IS_RS2:   opb =  rs2;
-                OPB_IS_I_IMM: opb = `RV32_signext_Iimm(i_regs[i].dat.inst);
-                OPB_IS_S_IMM: opb = `RV32_signext_Simm(i_regs[i].dat.inst);
-                OPB_IS_B_IMM: opb = `RV32_signext_Bimm(i_regs[i].dat.inst);
-                OPB_IS_U_IMM: opb = `RV32_signext_Uimm(i_regs[i].dat.inst);
-                OPB_IS_J_IMM: opb = `RV32_signext_Jimm(i_regs[i].dat.inst);
+            case (i_regs_snpd[i].dat.opb_select)
+                OPB_IS_RS2:   opb =  i_regs_snpd[i].rs2;
+                OPB_IS_I_IMM: opb = `RV32_signext_Iimm(i_regs_snpd[i].dat.inst);
+                OPB_IS_S_IMM: opb = `RV32_signext_Simm(i_regs_snpd[i].dat.inst);
+                OPB_IS_B_IMM: opb = `RV32_signext_Bimm(i_regs_snpd[i].dat.inst);
+                OPB_IS_U_IMM: opb = `RV32_signext_Uimm(i_regs_snpd[i].dat.inst);
+                OPB_IS_J_IMM: opb = `RV32_signext_Jimm(i_regs_snpd[i].dat.inst);
                 default:      opb = 32'hfacefeed; // face feed
             endcase
             ops[i] = '{
-                rs1         : rs1,
-                rs2         : rs2,
+                rs1         : i_regs_snpd[i].rs1,
+                rs2         : i_regs_snpd[i].rs2,
                 opa         : opa,
                 opb         : opb,
-                alu_func    : i_regs[i].dat.alu_func,
-                branch_func : i_regs[i].dat.inst.b.funct3,
-                t           : i_regs[i].dat.t,
-                rob_idx     : i_regs[i].dat.rob_idx,
-                btq_idx     : i_regs[i].dat.btq_idx,
-                cond_branch        : i_regs[i].dat.cond_branch,
-                uncond_branch      : i_regs[i].dat.uncond_branch
+                alu_func    : i_regs_snpd[i].dat.alu_func,
+                branch_func : i_regs_snpd[i].dat.inst.b.funct3,
+                t           : i_regs_snpd[i].dat.t,
+                rob_idx     : i_regs_snpd[i].dat.rob_idx,
+                btq_idx     : i_regs_snpd[i].dat.btq_idx,
+                cond_branch     : i_regs_snpd[i].dat.cond_branch,
+                uncond_branch   : i_regs_snpd[i].dat.uncond_branch
             };
         end
     end
@@ -363,30 +407,19 @@ module lod_ex(
     assign o_vld    = '0;
     assign o_cands  = '0;
 
+    LOD_REGS [`NUM_FU_LOAD-1:0] i_regs_snpd;
     always_comb begin
-        logic bypass1;
-        DATA  rs1, tmp_rs1;
         ADDR  addr;
         foreach(i_vld[i]) begin
-            tmp_rs1 = '0;
-            bypass1 = 0;
-            foreach(cdat.en[n]) begin
-                if (!cdat.en[n] || cdat.ts[n] == '0)
-                    continue;
-                if (i_regs[i].dat.t1 == cdat.ts[n]) begin
-                    bypass1 |= 1;
-                    tmp_rs1 |= cdat.data[n];
-                end
-            end
-            rs1 = bypass1 ? tmp_rs1 : i_regs[i].rs1;
+            i_regs_snpd[i] = lod_snoop(i_regs[i], cdat);
             
             // load address computation
-            addr = rs1 + i_regs[i].dat.opb;
+            addr = i_regs_snpd[i].rs1 + i_regs_snpd[i].dat.opb;
 
             lq_out.ld_ex_en[i]      = i_vld[i];
-            lq_out.ld_lq_idx[i]     = i_regs[i].dat.lq_idx;
+            lq_out.ld_lq_idx[i]     = i_regs_snpd[i].dat.lq_idx;
             lq_out.ld_addr[i]       = addr;
-            lq_out.ld_mem_size[i]   = i_regs[i].dat.mem_size;
+            lq_out.ld_mem_size[i]   = i_regs_snpd[i].dat.mem_size;
             /* FIXME: What about rd_unsigned? We are not using this
             in lq???? */
         end
@@ -425,39 +458,20 @@ module str_ex(
     assign o_vld    = '0;
     assign o_cands  = '0;
 
+    STR_REGS [`NUM_FU_STORE-1:0] i_regs_snpd;
     always_comb begin
-        logic bypass1, bypass2;
-        DATA  rs1, tmp_rs1;
-        DATA  rs2, tmp_rs2;
         ADDR  addr;
         foreach(i_vld[i]) begin
-            tmp_rs1 = '0;
-            tmp_rs2 = '0;
-            bypass1 = 0;
-            bypass2 = 0;
-            foreach(cdat.en[n]) begin
-                if (!cdat.en[n] || cdat.ts[n] == '0)
-                    continue;
-                if (i_regs[i].dat.t1 == cdat.ts[n]) begin
-                    bypass1 |= 1;
-                    tmp_rs1 |= cdat.data[n];
-                end
-                if (i_regs[i].dat.t2 == cdat.ts[n]) begin
-                    bypass2 |= 1;
-                    tmp_rs2 |= cdat.data[n];
-                end
-            end
-            rs1 = bypass1 ? tmp_rs1 : i_regs[i].rs1;
-            rs2 = bypass2 ? tmp_rs2 : i_regs[i].rs2;
+            i_regs_snpd[i] = str_snoop(i_regs[i], cdat);
             
             // store address computation
-            addr = rs1 + i_regs[i].dat.opb;
+            addr = i_regs_snpd[i].rs1 + i_regs_snpd[i].dat.opb;
 
             sq_out.st_ex_en[i]      = i_vld[i];
-            sq_out.st_sq_idx[i]     = i_regs[i].dat.sq_idx;
+            sq_out.st_sq_idx[i]     = i_regs_snpd[i].dat.sq_idx;
             sq_out.st_addr[i]       = addr;
-            sq_out.st_data[i]       = rs2;
-            sq_out.st_mem_size[i]   = i_regs[i].dat.mem_size;
+            sq_out.st_data[i]       = i_regs_snpd[i].rs2;
+            sq_out.st_mem_size[i]   = i_regs_snpd[i].dat.mem_size;
             /* FIXME: What about rd_unsigned? We are not using this
             in lq???? */
             // $display("EX OUT [%0d]: en: %b, sq_idx: %0d, addr: %0d, data: %0d, mem_size: %0d", i, sq_out.st_ex_en[i], sq_out.st_sq_idx[i], sq_out.st_addr[i], sq_out.st_data[i], sq_out.st_mem_size[i]);
@@ -495,36 +509,17 @@ module mul_ex(
         // completion grant
 );
     MUL_OPS [`NUM_FU_MULT-1:0] ops;
+    MUL_REGS[`NUM_FU_MULT-1:0] i_regs_snpd;
     always_comb begin
-        logic bypass1, bypass2;
-        DATA  tmp_rs1, tmp_rs2;
-        DATA rs1, rs2;
         foreach (ops[i]) begin
-            tmp_rs1 = '0;
-            tmp_rs2 = '0;
-            bypass1 = 0;
-            bypass2 = 0;
-            foreach(cdat.en[n]) begin
-                if (!cdat.en[n] || cdat.ts[n] == '0)
-                    continue;
-                if (i_regs[i].dat.t1 == cdat.ts[n]) begin
-                    bypass1 |= 1;
-                    tmp_rs1 |= cdat.data[n];
-                end
-                if (i_regs[i].dat.t2 == cdat.ts[n]) begin
-                    bypass2 |= 1;
-                    tmp_rs2 |= cdat.data[n];
-                end
-            end
-            rs1 = bypass1 ? tmp_rs1 : i_regs[i].rs1;
-            rs2 = bypass2 ? tmp_rs2 : i_regs[i].rs2;
+            i_regs_snpd[i] = mul_snoop(i_regs[i], cdat);
             
             ops[i] = '{
-                rs1  : rs1,
-                rs2  : rs2,
-                func : i_regs[i].dat.func,
-                t       : i_regs[i].dat.t,
-                rob_idx : i_regs[i].dat.rob_idx
+                rs1     : i_regs_snpd[i].rs1,
+                rs2     : i_regs_snpd[i].rs2,
+                func    : i_regs_snpd[i].dat.func,
+                t       : i_regs_snpd[i].dat.t,
+                rob_idx : i_regs_snpd[i].dat.rob_idx
             };
         end
     end
