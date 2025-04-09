@@ -38,6 +38,7 @@ module sq #(parameter
     logic [$clog2(LSQ_SZ)-1:0]      tail;
     logic [$clog2(LSQ_SZ_DBL)-1:0]  tail_dbl;
     LSQ_IDX                         last_used_sq_idx;
+    logic                           no_store_yet;
 
     SQ_ENTRY [LSQ_SZ-1:0]           state;
     logic [$clog2(LSQ_SZ):0]        used, free;
@@ -86,7 +87,8 @@ module sq #(parameter
         sq_2_dis <= '{
             sq_rdy_scnt         : free_scnt,
             last_used_sq_idx    : last_used_sq_idx,
-            next_ids            : next_ids
+            next_ids            : next_ids,
+            no_store_yet        : no_store_yet
         };
 
         //handle LSQ CDB to RS
@@ -231,6 +233,7 @@ module sq #(parameter
             state   <= '0;
             last_used_sq_idx <= LSQ_SZ_DBL + 1; //outside of SQ range so that if a load occurs before the first store we don't flag it falsely
             next_complete <= '0;
+            no_store_yet <= '1;
         end else begin
             used    <= used + dis_2_sq.sq_d_en_cnt - retire_2_sq.r_en;
             free    <= free - dis_2_sq.sq_d_en_cnt + retire_2_sq.r_en;
@@ -240,6 +243,7 @@ module sq #(parameter
             tail    <= (tail + dis_2_sq.sq_d_en_cnt) % LSQ_SZ;
             tail_dbl <= (tail_dbl + dis_2_sq.sq_d_en_cnt) % LSQ_SZ_DBL;
             last_used_sq_idx <= (last_used_sq_idx + dis_2_sq.sq_d_en_cnt) % LSQ_SZ_DBL;
+            no_store_yet <= (dis_2_sq.sq_d_en_cnt > 0) | no_store_yet;
 
             next_complete <= exec_2_sq;
 

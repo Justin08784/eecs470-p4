@@ -294,14 +294,18 @@ always_comb begin
 
         if (commit_in[i].dat.wr_mem) begin
             rs_out.d_dat[i].sq_idx = sq_in.next_ids[sq_wr_idx];
+            $display("ASSIGNING: idx: %0d", sq_in.next_ids[sq_wr_idx]);
             sq_out.rob_idx[sq_wr_idx] = rob_in.rob_idxs[i];
             ++sq_wr_idx;
         end
 
         if (commit_in[i].dat.rd_mem) begin
             rs_out.d_dat[i].sq_idx = sq_in.next_ids[lq_wr_idx];
-            lq_out.rob_idx[lq_wr_idx] = rob_in.rob_idxs[i];
-            lq_out.sq_idx[lq_wr_idx] = (sq_in.last_used_sq_idx + sq_wr_idx) % `LSQ_SZ_DBL;
+            // lq_out.rob_idx[lq_wr_idx] = rob_in.rob_idxs[i];
+            // lq_out.sq_idx[lq_wr_idx] = sq_in.no_store_yet ? (sq_wr_idx > 0) ? sq_wr_idx-1 : 33 : (sq_in.last_used_sq_idx + sq_wr_idx - 1) % `LSQ_SZ_DBL;
+            if (sq_in.no_store_yet && (sq_wr_idx > 0)) lq_out.sq_idx[lq_wr_idx] = sq_wr_idx-1;
+            else if (sq_in.no_store_yet) lq_out.sq_idx[lq_wr_idx] = `LSQ_SZ_DBL + 1;
+            else lq_out.sq_idx[lq_wr_idx] = (sq_in.last_used_sq_idx + sq_wr_idx - 1) % `LSQ_SZ_DBL;
             lq_out.inst_pc[lq_wr_idx] = commit_in[i].dat.PC;
             ++lq_wr_idx;
         end
