@@ -357,11 +357,44 @@ module lod_ex(
     input  logic    [`NUM_FU_LOAD-1:0]  o_rdy 
         // completion grant
 );
+    localparam BAY_SZ = 4;
+    typedef struct packed {
+        logic           bsy;
+        PHYS_REG_IDX    t;
+        ROB_IDX         rob_idx;
+        ADDR            addr;
+        MEM_SIZE        mem_size;
+    } BAY_ENTRY;
+
     // FIXME: Is this right? 
-    assign i_rdy = '1;
     // FIXME: hardcoded
     assign o_vld    = '0;
     assign o_cands  = '0;
+
+    BAY_ENTRY [`NUM_FU_LOAD-1:0][BAY_SZ-1:0] bays; // waiting bays
+    logic     [`NUM_FU_LOAD-1:0][BAY_SZ-1:0] bsy;
+    logic     [`NUM_FU_LOAD-1:0][BAY_SZ-1:0] fu2in_gnt;
+    always_comb begin
+        foreach(bsy[fu, bay]) begin
+            bsy[fu][bay] = bays[fu][bay].bsy;
+            i_rdy[fu] = |(~bsy[fu]);
+        end
+    end
+
+    generate
+        for (genvar fu = 0; fu < `NUM_FU_LOAD; ++fu) begin : gen_bays
+            psel_gen #(
+                .WIDTH(BAY_SZ),
+                .REQS(1)
+            ) cdb_arb (
+                .req    (~bsy[fu]),
+                .gnt    (fu2in_gnt[fu])
+            );
+        end
+    endgenerate
+
+    ADDR        [`NUM_FU_LOAD-1:0] tmp_addrs;
+    MEM_SIZE    [`NUM_FU_LOAD-1:0] tmp_sizes;
 
     always_comb begin
         logic bypass1;
@@ -389,6 +422,27 @@ module lod_ex(
             lq_out.ld_mem_size[i]   = i_regs[i].dat.mem_size;
             /* FIXME: What about rd_unsigned? We are not using this
             in lq???? */
+
+            tmp_addrs[i] = addr;
+            tmp_sizes[i] = i_regs[i].dat.mem_size;
+        end
+    end
+
+    always_ff @(posedge clock) begin
+        if (reset || flush) begin
+            bays <= '0;
+        end else begin
+            foreach (fu2in_gnt[fu, bay]) begin
+                if (fu2in_gnt[fu][bay] && i_vld[fu]) begin
+                    bays[fu][bay] <= '{
+                        bsy     : 1,
+                        t       : i_regs[fu].dat.t,
+                        rob_idx : i_regs[fu].dat.rob_idx,
+                        addr    : tmp_addrs[fu],
+                        mem_size: tmp_sizes[fu]
+                    };
+                end
+            end
         end
     end
 
