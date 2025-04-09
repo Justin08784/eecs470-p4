@@ -870,6 +870,7 @@ typedef struct packed {
     logic   [$clog2(`N):0]  sq_rdy_scnt;
     LSQ_IDX                 last_used_sq_idx;
     LSQ_IDX [`N-1:0]        next_ids;
+    logic                   no_store_yet;
 } sq2dispatch;
 
 typedef struct packed {

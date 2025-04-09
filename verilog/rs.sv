@@ -203,6 +203,7 @@ module rs #(parameter
         fu2issuer_load  = '0;
         fu2issuer_store = '0;
         ex_out.fu_vld_alu   = '0;
+        ex_out.fu_en_alu    = '0;
         ex_out.fu_en_mult   = '0;
         ex_out.fu_en_store  = '0;
         ex_out.fu_en_load   = '0;
