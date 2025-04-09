@@ -312,31 +312,6 @@ module alu_ex(
         end
     end
 
-    `ifdef DEBUG
-    always_ff @(posedge clock) begin
-        if (!reset) begin
-            $display("alu_ex: cdb <%b>[%2d -> %2d], <%b>[%2d -> %2d]",
-                cdat.en[0],
-                cdat.ts[0],
-                cdat.data[0],
-                cdat.en[1],
-                cdat.ts[1],
-                cdat.data[1]
-            );
-
-            for (int unsigned i = 0; i < `NUM_FU_ALU; ++i) begin
-                $display("%2d bytag: (b1:%b, idx1:%b) (b2:%b, idx2:%b)",
-                    i,
-                    i_regs[i].dat.bytag.bypass1,
-                    i_regs[i].dat.bytag.cdb_idx1,
-                    i_regs[i].dat.bytag.bypass2,
-                    i_regs[i].dat.bytag.cdb_idx2,
-                );
-            end
-        end
-    end
-    `endif // DEBUG
-
     // execute
     generate
         CPL_CAND    [`NUM_FU_ALU-1:0] tmp_data;
@@ -575,31 +550,6 @@ module mul_ex(
             };
         end
     end
-
-    `ifdef DEBUG
-    always_ff @(posedge clock) begin
-        if (!reset) begin
-            $display("mul_ex: cdb <%b>[%2d -> %2d], <%b>[%2d -> %2d]",
-                cdat.en[0],
-                cdat.ts[0],
-                cdat.data[0],
-                cdat.en[1],
-                cdat.ts[1],
-                cdat.data[1]
-            );
-
-            for (int unsigned i = 0; i < `NUM_FU_MULT; ++i) begin
-                $display("%2d bytag: (b1:%b, idx1:%b) (b2:%b, idx2:%b)",
-                    i,
-                    i_regs[i].dat.bytag.bypass1,
-                    i_regs[i].dat.bytag.cdb_idx1,
-                    i_regs[i].dat.bytag.bypass2,
-                    i_regs[i].dat.bytag.cdb_idx2,
-                );
-            end
-        end
-    end
-    `endif // DEBUG
 
     // execute
     generate
