@@ -69,8 +69,11 @@ module cpu (
         proc2mem_size = '0;
         sq_mem2proc_transaction_tag = '0;
         fetch_mem2proc_transaction_tag = '0;
+
+        $display("MEM_TAG: %0d", mem2proc_transaction_tag);
         
         if (ret_2_mem.Dmem_command == MEM_STORE) begin
+            $display("STORE");
             proc2mem_command = ret_2_mem.Dmem_command;
             proc2mem_addr = ret_2_mem.Dmem_addr;
             proc2mem_data = ret_2_mem.Dmem_store_data;
@@ -81,8 +84,10 @@ module cpu (
 
         // end
         else if (fetch_2_mem.proc2mem_command == MEM_LOAD) begin // <-- FETCH REQUESTS COME LAST (always complete memory operations first to get stuff commited to memory and to keep the processor FUs chugging)
+            $display("FETCH");
             proc2mem_command = fetch_2_mem.proc2mem_command;
             proc2mem_addr = fetch_2_mem.proc2mem_addr;
+            proc2mem_size = DOUBLE;
             fetch_mem2proc_transaction_tag = mem2proc_transaction_tag;
         end
     end

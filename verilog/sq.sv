@@ -432,6 +432,10 @@ module post_ret_buffer #(parameter
             head    <= (head + ret_success) % LSQ_SZ;
             tail    <= (tail + sq_2_ret.ret_cnt) % LSQ_SZ;
 
+            $display("SEND_TO_MEM: %0d", ret_2_mem.Dmem_command);
+            $display("ADDR: %0d", ret_2_mem.Dmem_addr);
+            $display("MEM_SIZE: %0d", ret_2_mem.Dmem_size);
+
             // handle sq to ret buffer (ins)
             for (int unsigned i = 0, int cur_idx = 0; i < NUM_DPORTS; ++i) begin
                 if (i >= sq_2_ret.ret_cnt)

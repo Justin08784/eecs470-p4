@@ -23,11 +23,11 @@ module mem (
 
     output MEM_TAG   mem2proc_transaction_tag, // Memory tag for current transaction (0 = can't accept)
     output MEM_BLOCK mem2proc_data,            // Data for a load
-    output MEM_TAG   mem2proc_data_tag,         // Tag for finished transactions (0 = no value)
-    output MEM_BLOCK unified_memory [`MEM_64BIT_LINES-1:0]
+    output MEM_TAG   mem2proc_data_tag         // Tag for finished transactions (0 = no value)
+    // output MEM_BLOCK unified_memory [`MEM_64BIT_LINES-1:0]
 );
 
-    // logic [63:0] unified_memory [`MEM_64BIT_LINES-1:0];
+    logic [63:0] unified_memory [`MEM_64BIT_LINES-1:0];
 
     MEM_BLOCK   next_mem2proc_data;
     MEM_TAG     next_mem2proc_transaction_tag, next_mem2proc_data_tag;
