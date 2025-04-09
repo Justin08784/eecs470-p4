@@ -893,7 +893,7 @@ module testbench;
 
         $display("  | >> SQ");
         for (int i = 0; i < `LSQ_SZ; i++) begin
-            $display("Entry [%0d]: id=%0d, rob_idx=%0d, addr=%0d, data=%0d, d_valid=%b, addr mask=%4b%s",
+            $display("Entry [%2d]: sq_idx=%2d, rob_idx=%2d, addr=%4x, data=%x, d_valid=%b, addr mask=%4b%s",
             i,
             state[i].sq_idx,
             state[i].rob_idx,
@@ -944,7 +944,7 @@ module testbench;
 
         $display("  | >> LQ");
         for (int i = 0; i < `LSQ_SZ; i++) begin
-            $display("Entry [%0d]: sq_idx=%0d, PC=%0d, addr=%0d, d_valid=%b, err_ld_ooo=%b%s",
+            $display("Entry [%2d]: sq_idx=%2d, PC=%2d, addr=%4x, d_valid=%b, err_ld_ooo=%b%s",
             i,
             state[i].sq_idx,
             state[i].inst_pc,
@@ -991,7 +991,7 @@ module testbench;
 
         $display("  >> RET buffer");
         for (int i = 0; i < `LSQ_SZ; i++) begin
-            $display("Entry [%0d]: id=%0d, rob_idx=%0d, addr=%0d, data=%0d, d_valid=%b%s",
+            $display("Entry [%2d]: sq_idx=%2d, rob_idx=%2d, addr=%4x, data=%x, d_valid=%b%s",
             i,
             state[i].sq_idx,
             state[i].rob_idx,
