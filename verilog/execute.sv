@@ -1260,8 +1260,8 @@ module stage_ex_p4 (
             );
 
             $display("\ncdb_req: alu:{%b} mul:{%b}", cdb_req.alu, cdb_req.mul);
-            $display("ctag_ts: alu:{%2d, %2d} mul:{%2d, %2d}",
-                ctag_ts.alu[1], ctag_ts.alu[0], ctag_ts.mul[1], ctag_ts.mul[0]);
+            // $display("ctag_ts: alu:{%2d, %2d} mul:{%2d, %2d}",
+            //     ctag_ts.alu[1], ctag_ts.alu[0], ctag_ts.mul[1], ctag_ts.mul[0]);
             $display("cdb_gnt: alu:{%b} mul:{%b}", cdb_gnt.alu, cdb_gnt.mul);
             for (int i = 0; i < 2; ++i) begin
                 $display("cdb_gnt[%0d]: alu:{%b} mul:{%b}", i, cdb_gnt_shr[i].alu, cdb_gnt_shr[i].mul);
