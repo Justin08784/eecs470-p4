@@ -435,17 +435,29 @@ module lod_ex(
         if (reset || flush) begin
             bays <= '0;
         end else begin
+            $display("  %3d | >> BAYS", $time);
             foreach (fu2in_gnt[fu, bay]) begin
-                if (fu2in_gnt[fu][bay] && i_vld[fu]) begin
-                    bays[fu][bay] <= '{
-                        bsy     : 1,
-                        t       : i_regs[fu].dat.t,
-                        rob_idx : i_regs[fu].dat.rob_idx,
-                        addr    : tmp_addrs[fu],
-                        mem_size: tmp_sizes[fu]
-                    };
-                end
+                $display("bays[%2d][%2d]: bsy=%b, t=%2d, rob_idx=%2d, addr=%x, mem_size=%2d",
+                    fu,
+                    bay,
+                    bays[fu][bay].bsy,
+                    bays[fu][bay].t,
+                    bays[fu][bay].rob_idx,
+                    bays[fu][bay].addr,
+                    bays[fu][bay].mem_size
+                );
+                if (!(fu2in_gnt[fu][bay] && i_vld[fu]))
+                    continue;
+
+                bays[fu][bay] <= '{
+                    bsy     : 1,
+                    t       : i_regs[fu].dat.t,
+                    rob_idx : i_regs[fu].dat.rob_idx,
+                    addr    : tmp_addrs[fu],
+                    mem_size: tmp_sizes[fu]
+                };
             end
+            $display("  %3d | << BAYS", $time);
         end
     end
 
