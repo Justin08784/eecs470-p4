@@ -15,7 +15,7 @@ module cpu (
     input reset, // System reset
 
     input MEM_TAG   mem2proc_transaction_tag, // Memory tag for current transaction
-    input MEM_BLOCK [1:0] mem2proc_data,            // Data coming back from memory
+    input MEM_BLOCK mem2proc_data,            // Data coming back from memory
         /*
         Q: Why 2 mem blocks when each mem block supplies a double word
         i.e. 8 bytes i.e. 2 insns? Isn't this enough to support 2-size fetch?
@@ -27,16 +27,15 @@ module cpu (
         mem2proc_data[0], but the next instruction (PC + 4) is in the *first half*
         of mem2proc_data[1]. One memory block isn't enough to cover both.
         */
-    //input MEM_TAG   mem2proc_data_tag,        // Tag for which transaction data is for
+    input MEM_TAG   mem2proc_data_tag,        // Tag for which transaction data is for
 
-    //output MEM_COMMAND proc2mem_command, // Command sent to memory
-    //output ADDR        proc2mem_addr,    // Address sent to memory
-    //output MEM_BLOCK   proc2mem_data,    // Data sent to memory
-    //output MEM_SIZE    proc2mem_size,    // Data size sent to memory
+    output MEM_COMMAND proc2mem_command, // Command sent to memory
+    output ADDR        proc2mem_addr,    // Address sent to memory
+    output MEM_BLOCK   proc2mem_data,    // Data sent to memory
+    output MEM_SIZE    proc2mem_size,    // Data size sent to memory
 
     // Note: these are assigned at the very bottom of the module
     output COMMIT_PACKET [`N-1:0] committed_insts,
-    output ADDR [`N-1:0] PC_reg,
 
     // Debug outputs: these signals are solely used for debugging in testbenches
     // Do not change for project 3
@@ -75,13 +74,15 @@ module cpu (
         .clock  (clock),          // system clock
         .reset  (reset),          // system reset
         .flush  (flush),
-
         .d_in   (decode_2_f),
-        .d_out  (f_2_decode),
         .r_in   (retire_2_f),
-
         .Imem_data  (mem2proc_data),      // data coming back from Instruction memory
-        .PC_reg     (PC_reg)
+        .Imem2proc_transaction_tag(mem2proc_transaction_tag),
+        .Imem2proc_data_tag(mem2proc_data_tag),
+
+        .Imem_command(proc2mem_command),
+        .Imem_addr(proc2mem_addr),
+        .d_out  (f_2_decode)
     );
 
 
