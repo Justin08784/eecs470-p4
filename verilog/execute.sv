@@ -401,38 +401,33 @@ module lod_ex(
 );
     localparam BAY_SZ = 4;
     typedef struct packed {
-        logic           vld;
-        logic           got; // got data?
-        PHYS_REG_IDX    t;
-        ROB_IDX         rob_idx;
-        ADDR            addr;
-        MEM_SIZE        mem_size;
-    } BAY_ENTRY;
+        logic           [`NUM_FU_LOAD-1:0][BAY_SZ-1:0] vld;
+        logic           [`NUM_FU_LOAD-1:0][BAY_SZ-1:0] got; // got data?
+        PHYS_REG_IDX    [`NUM_FU_LOAD-1:0][BAY_SZ-1:0] t;
+        ROB_IDX         [`NUM_FU_LOAD-1:0][BAY_SZ-1:0] rob_idx;
+        ADDR            [`NUM_FU_LOAD-1:0][BAY_SZ-1:0] addr;
+        MEM_SIZE        [`NUM_FU_LOAD-1:0][BAY_SZ-1:0] mem_size;
+    } LOAD_BAYS;
 
     // FIXME: Is this right? 
     // FIXME: hardcoded
     assign o_vld    = '0;
     assign o_cands  = '0;
 
-    BAY_ENTRY [`NUM_FU_LOAD-1:0][BAY_SZ-1:0] bays; // waiting bays
-    logic     [`NUM_FU_LOAD-1:0][BAY_SZ-1:0] vld;
-    logic     [`NUM_FU_LOAD-1:0][BAY_SZ-1:0] got;
+    LOAD_BAYS bays; // waiting bays
     logic     [`NUM_FU_LOAD-1:0][BAY_SZ-1:0] fu2in_gnt;
     always_comb begin
-        foreach(vld[f, i]) begin
-            vld[f][i] = bays[f][i].vld;
-            got[f][i] = bays[f][i].got;
-            i_rdy[f] = |(~vld[f]);
-        end
+        for (int f = 0; f < `NUM_FU_MULT; ++f)
+            i_rdy[f] = |(~bays.vld[f]);
     end
 
     fake_dcache #(
-        .NUM_RPORTS(BAY_SZ)
+        .NUM_RPORTS(`NUM_FU_LOAD * BAY_SZ)
     ) cache0 (
         .clock(clock),
         .reset(reset),
 
-        .ren    (vld[0] & ~got[0]),
+        .ren    (bays.vld & ~bays.got),
         .raddr  (),
         .rsize  (),
         .rdat   (),
@@ -445,7 +440,7 @@ module lod_ex(
                 .WIDTH(BAY_SZ),
                 .REQS(1)
             ) cdb_arb (
-                .req    (~vld[f]),
+                .req    (~bays.vld[f]),
                 .gnt    (fu2in_gnt[f])
             );
         end
@@ -474,32 +469,40 @@ module lod_ex(
         if (reset || flush) begin
             bays <= '0;
         end else begin
+            foreach (fu2in_gnt[f, i]) begin
+                if (!(fu2in_gnt[f][i] && i_vld[f]))
+                    continue;
+
+                bays.vld     [f][i] <= 1;
+                bays.got     [f][i] <= 0;
+                bays.t       [f][i] <= i_regs[f].dat.t;
+                bays.rob_idx [f][i] <= i_regs[f].dat.rob_idx;
+                bays.addr    [f][i] <= tmp_addrs[f];
+                bays.mem_size[f][i] <= tmp_sizes[f];
+            end
+        end
+    end
+
+    `ifdef DEBUG
+    always_ff @(posedge clock) begin
+        if (!reset) begin
             $display("  %3d | >> BAYS", $time);
+            $display("i_rdy: %b, i_vld: %b", i_rdy, i_vld);
             foreach (fu2in_gnt[f, i]) begin
                 $display("bays[%2d][%2d]: vld=%b, t=%2d, rob_idx=%2d, addr=%x, mem_size=%2d",
                     f,
                     i,
-                    bays[f][i].vld,
-                    bays[f][i].t,
-                    bays[f][i].rob_idx,
-                    bays[f][i].addr,
-                    bays[f][i].mem_size
+                    bays.vld    [f][i],
+                    bays.t      [f][i],
+                    bays.rob_idx[f][i],
+                    bays.addr   [f][i],
+                    bays.mem_size[f][i]
                 );
-                if (!(fu2in_gnt[f][i] && i_vld[i]))
-                    continue;
-
-                bays[f][i] <= '{
-                    vld     : 1,
-                    got     : 0,
-                    t       : i_regs[f].dat.t,
-                    rob_idx : i_regs[f].dat.rob_idx,
-                    addr    : tmp_addrs[f],
-                    mem_size: tmp_sizes[f]
-                };
             end
             $display("  %3d | << BAYS", $time);
         end
     end
+    `endif
 
     /* TODO: CAND generation logic. Also, how do we know when
     a load result is ready without an lq2execute line? */
