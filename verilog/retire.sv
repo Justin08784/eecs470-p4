@@ -69,10 +69,6 @@ module retire (
             if (rob_in.entries[i].halt && !sq_in.sq_ret_complete)
                 break;
 
-            ++r_en_cnt;
-            if (rob_in.entries[i].wr_mem)
-                ++sq_rd_cnt; 
-                
             if (rob_in.entries[i].rd_mem) begin
                 // if (0) begin // TODO: enable when lq_in.err_ld_ooo is actually set
                 if (lq_in.err_ld_ooo[lq_rd_cnt]) begin
@@ -82,6 +78,11 @@ module retire (
                 end
                 ++lq_rd_cnt; 
             end
+            
+            ++r_en_cnt;
+            if (rob_in.entries[i].wr_mem)
+                ++sq_rd_cnt; 
+                
 
             if (!rob_in.entries[i].is_brch)
                 continue;
@@ -151,6 +152,7 @@ module retire (
         btq_out,
         sq_in,
         sq_out,
+        lq_in,
         mispred,
         mispred_target,
         retire_exec
