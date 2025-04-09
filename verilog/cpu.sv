@@ -40,25 +40,18 @@ module cpu (
     // Debug outputs: these signals are solely used for debugging in testbenches
     // Do not change for project 3
     // You should definitely change these for project 4
-    output rob2retire dbg_rob2retire,
-    output btq2retire dbg_btq2retire,
-    output retire2btq dbg_retire2btq,
-    output sq2retire  dbg_sq2retire,
-    output ADDR  if_NPC_dbg,
-    output DATA  if_inst_dbg,
-    output logic if_valid_dbg,
-    output ADDR  if_id_NPC_dbg,
-    output DATA  if_id_inst_dbg,
-    output logic if_id_valid_dbg,
-    output ADDR  id_ex_NPC_dbg,
-    output DATA  id_ex_inst_dbg,
-    output logic id_ex_valid_dbg,
-    output ADDR  ex_mem_NPC_dbg,
-    output DATA  ex_mem_inst_dbg,
-    output logic ex_mem_valid_dbg,
-    output ADDR  mem_wb_NPC_dbg,
-    output DATA  mem_wb_inst_dbg,
-    output logic mem_wb_valid_dbg
+    output DBG_btq      dbg_btq,
+    output DBG_fetch    dbg_fetch,
+    output DBG_decode   dbg_decode,
+    output DBG_dispatch dbg_dispatch,
+    // output DBG_lq       dbg_lq,
+    // output DBG_icache   dbg_icache, // icache is submodule of fetch; dont need separate line
+    output DBG_mt       dbg_mt,
+    output DBG_prf      dbg_prf,
+    output DBG_rob      dbg_rob,
+    output DBG_rs       dbg_rs,
+    output DBG_sq       dbg_sq,
+    output DBG_retire   dbg_retire
 );
     /* Global controls*/
     logic flush;
@@ -74,6 +67,10 @@ module cpu (
     retire2fetch retire_2_f;
 
     stage_if_p4 fetch_0(
+        `ifdef DEBUG
+        .dbg    (dbg_fetch),
+        `endif
+
         .clock  (clock),          // system clock
         .reset  (reset),          // system reset
         .flush  (flush),
@@ -99,7 +96,10 @@ module cpu (
     dispatch2decode disp_2_de;
 
     stage_id_p4 decoder0 (
-        // TODO: Sam's commit
+        `ifdef DEBUG
+        .dbg    (dbg_decode),
+        `endif
+
         .clock  (clock),
         .reset  (reset),
         .flush  (flush),
@@ -131,6 +131,10 @@ module cpu (
     sq2dispatch sq_2_dispatch;
 
     dispatch dispatcher(
+        `ifdef DEBUG
+        .dbg        (dbg_dispatch),
+        `endif
+
         .clock      (clock),
         .reset      (reset),
         .flush      (flush),
@@ -168,12 +172,10 @@ module cpu (
     logic           mispred;
     ADDR            mispred_target;
 
-    assign dbg_rob2retire   = rob_2_retire;
-    assign dbg_btq2retire   = btq_2_retire;
-    assign dbg_retire2btq   = retire_2_btq;
-    assign dbg_sq2retire    = sq_2_retire;
-
     retire retire0 (
+        `ifdef DEBUG
+        .dbg    (dbg_retire),
+        `endif
         .clock  (clock),
         .reset  (reset),
 
@@ -207,6 +209,10 @@ module cpu (
     //                                              //
     //////////////////////////////////////////////////  
     btq btq_0(
+        `ifdef DEBUG
+        .dbg    (dbg_btq),
+        `endif
+
         .clock  (clock),
         .reset  (reset),
         .flush  (flush),
@@ -227,10 +233,13 @@ module cpu (
     execute2rs      ex_2_rs; 
     rs2execute      rs_2_ex;
 
-    execute2prf     prf_out;
-    prf2execute     prf_in;
+    execute2prf     ex_2_prf;
+    prf2execute     prf_2_ex;
 
     rs rs_0(
+        `ifdef DEBUG
+        .dbg        (dbg_rs),
+        `endif
         .clock  (clock),
         .reset  (reset),
         .flush  (flush),
@@ -252,6 +261,9 @@ module cpu (
         .ROB_SZ(`ROB_SZ),
         .N(`N)
     ) rob_0 (
+        `ifdef DEBUG
+        .dbg        (dbg_rob),
+        `endif
         .clock      (clock),
         .reset      (reset),
         .flush      (flush),
@@ -283,6 +295,9 @@ module cpu (
         .NUM_FU_STORE(`NUM_FU_STORE),
         .NUM_FU_LOAD(`NUM_FU_LOAD)
     ) sq_0 (
+        `ifdef DEBUG
+        .dbg        (dbg_sq),
+        `endif
         .clock      (clock),
         .reset      (reset),
         .flush      (flush),
@@ -324,8 +339,8 @@ module cpu (
 
         .lq_out (ex_2_lq),
 
-        .prf_in (prf_in),
-        .prf_out(prf_out),
+        .prf_in (prf_2_ex),
+        .prf_out(ex_2_prf),
 
         .ctag_out   (ex_2_ctag),
         .cdat_out   (ex_2_cdat)
@@ -343,6 +358,9 @@ module cpu (
     map_table #(
         .N(`N)
     ) map_table_0 (
+        `ifdef DEBUG
+        .dbg    (dbg_mt),
+        `endif
         .clock  (clock),
         .reset  (reset),
         .flush  (flush),
@@ -390,28 +408,37 @@ module cpu (
     //            Physical Register File            //
     //                                              //
     //////////////////////////////////////////////////  
+    `ifdef DEBUG
+    logic [`PHYS_REG_SZ_R10K-1:0][$bits(DATA)-1:0] dbg_file;
+    assign dbg_prf = '{
+        file    : dbg_file,
+        cdat_in : ex_2_cdat,
+        ex_in   : ex_2_prf,
+        ex_out  : prf_2_ex
+    };
+    `endif
 
     prf #(
-        .WIDTH(32),
-        .DEPTH(`PHYS_REG_SZ_R10K),
         .N(`N),
         .BYPASS_EN(1)
     ) prf_0 (
-        .clock(clock),
-        //.reset(reset),
-        //.flush(),
-        .c_en       (ex_2_cdat.en),
-        .c_is_brch  (ex_2_cdat.is_brch),
-        .c_ts       (ex_2_cdat.ts),
-        .c_vs       (ex_2_cdat.data),
+        `ifdef DEBUG
+        .dbg_file   (dbg_file),
+        `endif
+        .clock      (clock),
+        .cdat_in    (ex_2_cdat),
 
-        // NOTE: Here each X_BY_FU type is coerced into a flat X array type
-        .s_en1s     (prf_out.s_en1s),
-        .s_en2s     (prf_out.s_en2s),
-        .s_t1s      (prf_out.s_t1s),
-        .s_t2s      (prf_out.s_t2s),
-        .s_v1s      (prf_in.s_v1s),
-        .s_v2s      (prf_in.s_v2s)
+        /* 
+        Here each X_BY_FU type is coerced into a flat X array type
+        This convenience is why we opt to avoid wrapping these I/Os into
+        x2y structs.
+        */
+        .s_en1s     (ex_2_prf.en1s),
+        .s_en2s     (ex_2_prf.en2s),
+        .s_t1s      (ex_2_prf.t1s),
+        .s_t2s      (ex_2_prf.t2s),
+        .s_v1s      (prf_2_ex.v1s),
+        .s_v2s      (prf_2_ex.v2s)
     );
 
 

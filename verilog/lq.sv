@@ -9,8 +9,9 @@ module lq #(parameter
     NUM_FU_LOAD=`NUM_FU_LOAD
 ) (
     `ifdef DEBUG
-    output  SQ_ENTRY   [LSQ_SZ-1:0]    state_dbg,
+    output DBG_lq dbg,
     `endif 
+
     input clock,
     input reset,
     input flush,
@@ -138,6 +139,23 @@ module lq #(parameter
             `endif
         end
     end
+
+    `ifdef DEBUG
+    assign dbg = '{
+        // internal state
+        state,
+        head,
+        tail,
+        used,
+        // I/O
+        dis_2_lq,
+        exec_2_lq,
+        rob_2_lq,
+
+        lq_2_dis,
+        lq_2_rob
+    } DBG_lq;
+    `endif 
 
 
 endmodule

@@ -559,39 +559,6 @@ typedef struct packed {
     // logic    valid;
 } ID_RESULT;
 
-// TODO: remember to remove for synthesis? does this prevent synthesis?
-`ifndef SYNTH
-function print_id_result(input ID_RESULT x);
-    $display("ID_RESULT: id=%3d t=%2d t1=%2d t2=%2d t1_rdy=%b t2_rdy=%b fu_idx=%2d rob_idx=%2d btq_idx=%2d is_brch:%b inst=%h PC=%h NPC=%h opa_select=%1d opb_select=%1d dest_reg_idx=%2d alu_func=%1d mult=%b rd_mem=%b wr_mem=%b cond_branch=%b uncond_branch=%b halt=%b illegal=%b csr_op=%b",
-        x.id,
-        x.t,
-        x.t1,
-        x.t2,
-        x.t1_rdy,
-        x.t2_rdy,
-        x.fu_idx,
-        x.rob_idx,
-        x.btq_idx,
-        x.is_brch,
-        x.inst,
-        x.PC,
-        x.NPC,
-        x.opa_select,
-        x.opb_select,
-        x.dest_reg_idx,
-        x.alu_func,
-        x.mult,
-        x.rd_mem,
-        x.wr_mem,
-        x.cond_branch,
-        x.uncond_branch,
-        x.halt,
-        x.illegal,
-        x.csr_op
-    );
-endfunction
-`endif
-
 typedef struct packed {
     /* ETB bypass control */
     logic bypass1;  // set iff 1) awaken by a complete to its src1 AND 2) issued same cycle
@@ -878,15 +845,15 @@ struct packed { \
 }
 
 typedef struct packed {
-    `BY_FU(logic)           s_en1s;
-    `BY_FU(logic)           s_en2s;
-    `BY_FU(PHYS_REG_IDX)    s_t1s;
-    `BY_FU(PHYS_REG_IDX)    s_t2s;
+    `BY_FU(logic)           en1s;
+    `BY_FU(logic)           en2s;
+    `BY_FU(PHYS_REG_IDX)    t1s;
+    `BY_FU(PHYS_REG_IDX)    t2s;
 } execute2prf;
 
 typedef struct packed{
-    `BY_FU(DATA)    s_v1s;
-    `BY_FU(DATA)    s_v2s;
+    `BY_FU(DATA)    v1s;
+    `BY_FU(DATA)    v2s;
 } prf2execute;
 
 // By SQ
@@ -1001,13 +968,199 @@ typedef struct packed {
 } execute2lq;
 
 typedef struct packed {
-    ROB_IDX rob_idx;
-    PHYS_REG_IDX tag;
-} DST;
-
-typedef struct packed {
     ADDR  addr;
     logic valid;
 } MSHR_entry;
+
+/* DEBUG STRUCTS */
+typedef struct packed {
+    // internal state
+    logic changed_addr;
+    logic [12-`ICACHE_LINE_BITS:0] current_tag,   last_tag,   write_tag;
+    logic [`ICACHE_LINE_BITS -1:0] current_index, last_index, write_index;
+    logic                          got_mem_data;
+    MSHR_entry [15:0] MSHR;
+    ICACHE_TAG [`ICACHE_LINES-1:0] icache_tags;
+    // I/O
+    MEM_TAG   Imem2proc_transaction_tag;
+    MEM_BLOCK Imem2proc_data;
+    MEM_TAG   Imem2proc_data_tag;
+    ADDR proc2Icache_addr;
+    MEM_COMMAND proc2Imem_command;
+    ADDR        proc2Imem_addr;
+    MEM_BLOCK Icache_data_out;
+    logic     Icache_valid_out;
+} DBG_icache;
+
+typedef struct packed {
+    // internal state
+    // I/O
+    logic           flush;
+    decode2fetch    d_in;
+    fetch2decode    d_out;
+    retire2fetch    r_in;
+    MEM_BLOCK [1:0] Imem_data;
+    ADDR [`N-1:0]   PC_reg;
+    // submodule
+    DBG_icache      dbg_icache;
+} DBG_fetch;
+
+typedef struct packed {
+    // internal state
+    // I/O
+    fetch2decode    f_in;
+    decode2fetch    f_out;
+    dispatch2decode d_in;
+    decode2dispatch d_out;
+} DBG_decode;
+
+typedef struct packed {
+    // internal state
+    // I/O
+    decode2dispatch decode_in;
+    dispatch2decode decode_out;
+    rs2dispatch rs_in;
+    dispatch2rs rs_out;
+    rob2dispatch rob_in;
+    dispatch2rob rob_out;
+    free_list2dispatch free_in;
+    dispatch2free_list free_out;
+    sq2dispatch sq_in;
+    dispatch2sq sq_out;
+    btq2dispatch btq_in;
+    dispatch2btq btq_out;
+    execute2complete_tag ctag_in;
+    map_table2dispatch map_in;
+    dispatch2map_table map_out;
+} DBG_dispatch;
+
+typedef struct packed {
+    // internal state
+    BTQ_ENTRY [`BTQ_SZ-1:0]      state;
+    logic [$clog2(`BTQ_SZ)-1:0]  head;
+    logic [$clog2(`BTQ_SZ)-1:0]  tail;
+    logic [$clog2(`BTQ_SZ):0]    used;
+    // I/O
+    retire2btq           r_in;
+    btq2retire           r_out;
+    execute2complete_dat cdat_in;
+    dispatch2btq         d_in;
+    btq2dispatch         d_out;
+} DBG_btq;
+
+typedef struct packed {
+    // internal state
+    SQ_ENTRY    [`LSQ_SZ-1:0]           state;
+    logic       [$clog2(`LSQ_SZ)-1:0]    head;
+    logic       [$clog2(`LSQ_SZ)-1:0]    tail;
+    logic       [$clog2(`LSQ_SZ):0]      used;
+    // I/O
+    dispatch2lq dis_2_lq;
+    execute2lq exec_2_lq;
+    rob2lq rob_2_lq;
+
+    lq2dispatch lq_2_dis;
+    lq2rob lq_2_rob;
+} DBG_lq;
+
+
+typedef struct packed {
+    // internal state
+    struct packed {
+        PHYS_REG_IDX t;
+    } [`NUM_ARCH_REG-1:0] entries;
+
+    // I/O
+    arch_map2map_table am_in;
+    dispatch2map_table d_in;
+    map_table2dispatch d_out;
+} DBG_mt;
+
+typedef struct packed {
+    // internal state
+    logic [`PHYS_REG_SZ_R10K-1:0][$bits(DATA)-1:0] file;
+    // I/O
+    execute2complete_dat cdat_in;
+    execute2prf ex_in;
+    prf2execute ex_out;
+} DBG_prf;
+
+typedef struct packed {
+    // internal state
+    ROB_ENTRY [`ROB_SZ-1:0]     state;
+    logic [$clog2(`ROB_SZ)-1:0]  head;
+    logic [$clog2(`ROB_SZ)-1:0]  tail;
+    logic [$clog2(`ROB_SZ):0]   used;
+    logic [$clog2(`ROB_SZ):0]   free;
+    logic [$clog2(4*`N):0]      rsvd;
+    // I/O
+    rob2retire  r_out;
+    retire_final r_in;
+    execute2complete_dat cdat_in;
+    rob2dispatch d_out;
+    dispatch2rob d_in;
+} DBG_rob;
+
+typedef struct packed {
+    // internal state
+    RS_ENTRY [`RS_SZ-1:0] entries; // ms1 test: remove one RS entry (caught)
+    // I/O
+    dispatch2rs d_in;
+    rs2dispatch d_out;
+    execute2rs  ex_in;
+    rs2execute  ex_out;
+    execute2complete_tag ctag_in;
+} DBG_rs;
+
+typedef struct packed {
+    // internal state
+    SQ_ENTRY [`LSQ_SZ-1:0]     state;
+    logic [$clog2(`LSQ_SZ)-1:0] head;
+    logic [$clog2(`LSQ_SZ)-1:0] tail;
+    logic [$clog2(`LSQ_SZ):0]   used;
+    // I/O
+    sq2stRET sq_2_ret;
+    MEM_TAG mem2proc_transaction_tag;
+
+    stRET2sq ret_2_sq;
+    forwardRET2sq forward_ret_2_sq;
+    stRET2mem ret_2_mem;
+} DBG_retbuf;
+
+typedef struct packed {
+    // internal state
+    SQ_ENTRY [`LSQ_SZ-1:0]     state;
+    logic [$clog2(`LSQ_SZ)-1:0] head;
+    logic [$clog2(`LSQ_SZ)-1:0] tail;
+    logic [$clog2(`LSQ_SZ):0]   used;
+    // I/O
+
+    dispatch2sq   dis_2_sq;
+    execute2sq    exec_2_sq;
+    retire2sq     retire_2_sq;
+    MEM_TAG       mem2proc_transaction_tag;
+
+    sq2dispatch  sq_2_dis;
+    sq2execute   sq_2_exec;
+    // sq2rs sq_2_rs,
+    sq2retire    sq_2_retire;
+    stRET2mem    ret_2_mem;
+
+    DBG_retbuf   dbg_retbuf;
+} DBG_sq;
+
+typedef struct packed {
+    // internal state
+    // I/O
+    rob2retire rob_in;
+    btq2retire btq_in;
+    retire2btq btq_out;
+    sq2retire sq_in;
+    retire2sq sq_out;
+    logic mispred;
+    ADDR  mispred_target;
+    retire_final retire_exec;
+} DBG_retire;
+
 
 `endif // __SYS_DEFS_SVH__
