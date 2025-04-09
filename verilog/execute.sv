@@ -486,7 +486,7 @@ module lod_ex(
         foreach (fu2out_gnt[f, i]) begin
             if (!(fu2out_gnt[f][i] && o_rdy[f]))
                 continue;
-            o_cands[i] |= '{
+            o_cands[i] |= CPL_CAND'{
                 t       : bays.t[f][i],
                 rob_idx : bays.rob_idx[f][i],
                 data    : bays.dat[f][i],

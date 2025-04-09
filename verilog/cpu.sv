@@ -69,8 +69,6 @@ module cpu (
         proc2mem_size = '0;
         sq_mem2proc_transaction_tag = '0;
         fetch_mem2proc_transaction_tag = '0;
-
-        $display("MEM_TAG: %0d", mem2proc_transaction_tag);
         
         if (ret_2_mem.Dmem_command == MEM_STORE) begin
             $display("STORE");
