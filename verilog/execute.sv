@@ -368,6 +368,8 @@ module fake_dcache #(
     always_comb begin
         rvld = '0;
         foreach (ren[i]) begin
+            if (!ren[i])
+                continue;
             rdat[i] = i;
             rvld[i]  = 1;
 
@@ -407,7 +409,12 @@ module lod_ex(
         ROB_IDX         [`NUM_FU_LOAD-1:0][BAY_SZ-1:0] rob_idx;
         ADDR            [`NUM_FU_LOAD-1:0][BAY_SZ-1:0] addr;
         MEM_SIZE        [`NUM_FU_LOAD-1:0][BAY_SZ-1:0] mem_size;
+
+        DATA            [`NUM_FU_LOAD-1:0][BAY_SZ-1:0] dat;
     } LOAD_BAYS;
+    logic [`NUM_FU_LOAD-1:0][BAY_SZ-1:0] rvld;
+    DATA  [`NUM_FU_LOAD-1:0][BAY_SZ-1:0] rdat;
+
 
     // FIXME: Is this right? 
     // FIXME: hardcoded
@@ -428,10 +435,10 @@ module lod_ex(
         .reset(reset),
 
         .ren    (bays.vld & ~bays.got),
-        .raddr  (),
-        .rsize  (),
-        .rdat   (),
-        .rvld   ()
+        .raddr  (bays.addr),
+        .rsize  (bays.mem_size),
+        .rdat   (rdat),
+        .rvld   (rvld)
     );
 
     generate
@@ -479,6 +486,26 @@ module lod_ex(
                 bays.rob_idx [f][i] <= i_regs[f].dat.rob_idx;
                 bays.addr    [f][i] <= tmp_addrs[f];
                 bays.mem_size[f][i] <= tmp_sizes[f];
+                bays.dat     [f][i] <= '0;
+            end
+
+            foreach (rvld[f, i]) begin
+                if (!rvld[f][i])
+                    continue;
+                bays.got[f][i] <= 1;
+                bays.dat[f][i] <= rdat[f][i];
+            end
+
+            foreach (bays.got[f, i]) begin
+                if (!bays.got[f][i])
+                    continue;
+                bays.vld     [f][i] <= 0;
+                bays.got     [f][i] <= 0;
+                bays.t       [f][i] <= '0;
+                bays.rob_idx [f][i] <= '0;
+                bays.addr    [f][i] <= '0;
+                bays.mem_size[f][i] <= '0;
+                bays.dat     [f][i] <= '0;
             end
         end
     end
@@ -488,15 +515,18 @@ module lod_ex(
         if (!reset) begin
             $display("  %3d | >> BAYS", $time);
             $display("i_rdy: %b, i_vld: %b", i_rdy, i_vld);
+            $display("ren: %b, rvld: %b", bays.vld & ~bays.got, rvld);
             foreach (fu2in_gnt[f, i]) begin
-                $display("bays[%2d][%2d]: vld=%b, t=%2d, rob_idx=%2d, addr=%x, mem_size=%2d",
+                $display("bays[%2d][%2d]: vld=%b, got=%b, t=%2d, rob_idx=%2d, addr=%x, mem_size=%2d, dat=%x",
                     f,
                     i,
                     bays.vld    [f][i],
+                    bays.got    [f][i],
                     bays.t      [f][i],
                     bays.rob_idx[f][i],
                     bays.addr   [f][i],
-                    bays.mem_size[f][i]
+                    bays.mem_size[f][i],
+                    bays.dat    [f][i]
                 );
             end
             $display("  %3d | << BAYS", $time);
