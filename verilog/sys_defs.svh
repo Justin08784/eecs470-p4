@@ -42,7 +42,7 @@
 
 // functional units (you should decide if you want more or fewer types of FUs)
 `define NUM_FU_ALU 2
-`define NUM_FU_MULT 2
+`define NUM_FU_MULT 1
 `define NUM_FU_LOAD 1
 `define NUM_FU_STORE 1
 // `define NUM_FU_TOTAL `NUM_FU_ALU + `NUM_FU_MULT + `NUM_FU_LOAD + `NUM_FU_STORE
@@ -63,11 +63,11 @@
 ///////////////////////////////
 /* How can we implement this in the Makefile? */
 // comment out to enable synth only constructions
-// `define SYNTH
+`define SYNTH
 
 `ifndef SYNTH
 // comment out to disable DEBUG:
-`define DEBUG
+// `define DEBUG
 `endif
 
 ///////////////////////////////

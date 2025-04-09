@@ -28,8 +28,8 @@ import "DPI-C" function string decode_inst(int inst);
 //import "DPI-C" function void close_pipeline_output_file();
 
 
-`define TB_MAX_CYCLES 5000
-// `define TB_MAX_CYCLES 50000000
+// `define TB_MAX_CYCLES 5000
+`define TB_MAX_CYCLES 50000000
 
 
 // Debug cycle limits, both inclusive
@@ -80,7 +80,7 @@ module testbench;
         // Inputs
         .clock (clock),
         .reset (reset),
-        //.mem2proc_transaction_tag (mem2proc_transaction_tag),
+        .mem2proc_transaction_tag (mem2proc_transaction_tag),
         .mem2proc_data            ({
             memory.unified_memory[PC_reg[1][15:3]],
             memory.unified_memory[PC_reg[0][15:3]]
