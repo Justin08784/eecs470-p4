@@ -447,12 +447,17 @@ typedef struct packed {
 //in the LSQ as the initial value for SQ_IDX in 
 //dispatch if a load comes before the first store
 typedef logic [$clog2(`LSQ_SZ_DBL):0] LSQ_IDX; 
+typedef union packed {
+    logic [3:0][7:0]  byte_level;
+    logic [1:0][15:0] half_level;
+    logic [31:0]      word_level;
+} DATA_BLOCK;
 typedef struct packed {
     LSQ_IDX sq_idx;
     ROB_IDX rob_idx;
     ADDR addr;
     logic [3:0] bytewise_addr_mask;
-    DATA data;
+    DATA_BLOCK data;
     logic d_vld;
     MEM_SIZE mem_size; //MEM_SIZE'(id_ex_reg.inst.r.funct3[1:0]); <-- HOW TO FIND THIS. DO THIS WHEN PUTTING ENTRY IN FROM DISPATCH OR FROM EXECUTE
 } SQ_ENTRY;

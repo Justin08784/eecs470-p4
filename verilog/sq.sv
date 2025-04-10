@@ -132,14 +132,23 @@ module sq #(parameter
     );
 
 
+    logic       [LD_BAY_SZ-1:0]      forward_en;
+    DATA_BLOCK  [LD_BAY_SZ-1:0]      forward_data;
+    MEM_SIZE    [LD_BAY_SZ-1:0]      forward_mem_size;
+    logic       [LD_BAY_SZ-1:0][3:0] forward_byte_en;
+    // per bay tmps
     WADDR start;
     logic [LSQ_SZ-1:0]      used_range;
     logic [LSQ_SZ-1:0]      addr_match;
     logic [LSQ_SZ-1:0][3:0] byte_match;
     logic [LSQ_SZ-1:0][3:0] byte_m1hot;
     always_comb begin
-        sq_2_exec = '0;
+        forward_en       = '0;
+        forward_data     = '0;
+        forward_mem_size = '0;
+        forward_byte_en  = '0;
 
+        // FIXME: maybe have a valid bit per entry instead of recomputing this every cycle?
         used_range = '0;
         for (int off = 0, int j = head;
             off < used; 
@@ -181,11 +190,20 @@ module sq #(parameter
             end
 
             foreach (byte_match[j])
-                sq_2_exec.forward_byte_en[i] |= byte_match[j];
+                forward_byte_en[i] |= byte_match[j];
+            forward_en[i] = forward_byte_en[i] != 0;
 
-            sq_2_exec.forward_en[i] = sq_2_exec.forward_byte_en[i] != 0;
+            foreach (byte_m1hot[j, b]) begin
+                if (!byte_m1hot[j][b])
+                    continue;
+                forward_data[i].byte_level[b] |= state[j].data.byte_level[b];
+            end
         end
+    end
 
+    /* FIXME: Why does this logic only ever read from ret buf? Why no data from
+    sq_entry data? */
+    always_comb begin
         for (int unsigned i = 0; i < LD_BAY_SZ; i++) begin
             sq_2_exec.forward_en[i] |= forward_ret_2_sq.forward_en[i];
             if (forward_ret_2_sq.sq_idx_found[i]) begin
