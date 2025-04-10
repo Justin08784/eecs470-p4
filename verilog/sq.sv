@@ -298,7 +298,7 @@ endmodule
 
 module post_ret_buffer #(parameter 
     N=`N,
-    LSQ_SZ=`LSQ_SZ,
+    SQ_RET_BUF_SZ=`SQ_RET_BUF_SZ,
     LSQ_SZ_DBL=`LSQ_SZ_DBL,
     NUM_FU_STORE=`NUM_FU_STORE,
     NUM_FU_LOAD=`NUM_FU_LOAD,
@@ -325,16 +325,16 @@ module post_ret_buffer #(parameter
     logic [$clog2(NUM_DPORTS):0]    free_scnt;
     logic [$clog2(NUM_RPORTS):0]    used_scnt;
 
-    logic [$clog2(LSQ_SZ)-1:0]  head;
-    logic [$clog2(LSQ_SZ)-1:0]  tail;
+    logic [$clog2(SQ_RET_BUF_SZ)-1:0]  head;
+    logic [$clog2(SQ_RET_BUF_SZ)-1:0]  tail;
 
-    SQ_ENTRY [LSQ_SZ-1:0]       state;
-    logic [$clog2(LSQ_SZ):0]    used, free;
+    SQ_ENTRY [SQ_RET_BUF_SZ-1:0]       state;
+    logic [$clog2(SQ_RET_BUF_SZ):0]    used, free;
 
-    logic [NUM_RPORTS-1:0][$clog2(LSQ_SZ)-1:0] r_idxs;
-    logic [NUM_DPORTS-1:0][$clog2(LSQ_SZ)-1:0] d_idxs;
+    logic [NUM_RPORTS-1:0][$clog2(SQ_RET_BUF_SZ)-1:0] r_idxs;
+    logic [NUM_DPORTS-1:0][$clog2(SQ_RET_BUF_SZ)-1:0] d_idxs;
 
-    assign free                 = LSQ_SZ - used;
+    assign free                 = SQ_RET_BUF_SZ - used;
     assign free_scnt            = `MIN(free, NUM_DPORTS);
     assign used_scnt            = `MIN(used, NUM_RPORTS);
 
@@ -347,9 +347,9 @@ module post_ret_buffer #(parameter
         writeOffset = '0;
 
         for (int unsigned i = 0; i < NUM_RPORTS; ++i)
-            r_idxs[i] = (head + i) % LSQ_SZ;
+            r_idxs[i] = (head + i) % SQ_RET_BUF_SZ;
         for (int unsigned i = 0; i < NUM_DPORTS; ++i)
-            d_idxs[i] = (tail + i) % LSQ_SZ;
+            d_idxs[i] = (tail + i) % SQ_RET_BUF_SZ;
 
         // handle ret_2_sq
         ret_2_sq.free_scnt  = free_scnt;
@@ -379,7 +379,7 @@ module post_ret_buffer #(parameter
 
             start = sq_2_ret.forward_addr[i] - (sq_2_ret.forward_addr[i] % 4);
             for (int unsigned j = 0, int unsigned idx = 0; j < used; ++j) begin
-                idx = (head+j) % LSQ_SZ;
+                idx = (head+j) % SQ_RET_BUF_SZ;
 
                 if (state[idx].sq_idx == sq_2_ret.forward_sq_idx[i]) forward_ret_2_sq.sq_idx_found[i] = '1;
 
@@ -409,8 +409,8 @@ module post_ret_buffer #(parameter
             state   <= '0;
         end else begin
             used    <= used + sq_2_ret.ret_cnt - ret_success;
-            head    <= (head + ret_success) % LSQ_SZ;
-            tail    <= (tail + sq_2_ret.ret_cnt) % LSQ_SZ;
+            head    <= (head + ret_success) % SQ_RET_BUF_SZ;
+            tail    <= (tail + sq_2_ret.ret_cnt) % SQ_RET_BUF_SZ;
 
             // handle sq to ret buffer (ins)
             for (int unsigned i = 0, int cur_idx = 0; i < NUM_DPORTS; ++i) begin

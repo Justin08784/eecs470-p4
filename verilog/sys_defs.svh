@@ -37,8 +37,9 @@
 
 // worry about these later
 `define BRANCH_PRED_SZ xx
-`define LSQ_SZ 16
-`define LSQ_SZ_DBL 32
+`define LSQ_SZ 8
+`define LSQ_SZ_DBL 16
+`define SQ_RET_BUF_SZ 4
 
 // functional units (you should decide if you want more or fewer types of FUs)
 `define NUM_FU_ALU 2
