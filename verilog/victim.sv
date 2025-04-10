@@ -126,7 +126,8 @@ module victim_cache (
                 // update prios
                 foreach (vld[i]) begin
                     if (i == widx
-                        || !prio[widx]
+                        // || !prio[widx]
+                        || !vld[i]
                         || &prio[i])    // prio is already at max 
                         continue;
                     prio[i] <= prio[i] + 1;

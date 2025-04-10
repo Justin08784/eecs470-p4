@@ -117,6 +117,10 @@ module victim_test();
     //     end
     // endtask
 
+    function automatic logic[13:0] append3(logic[10:0] addr);
+        return {addr, 3'b000};
+    endfunction
+
     initial begin
         $display("\nStart Testbench");
         clock = 0;
@@ -127,18 +131,23 @@ module victim_test();
         print_state(dbg);
 
         // ---------- Test 1 ---------- //
-        wr(12, 0'h1234);
+        wr(1, append3(1));
         @(negedge clock);
+        print_state(dbg);
+        wr(2, append3(2));
+        @(negedge clock);
+        print_state(dbg);
+        wr(3, append3(3));
+        @(negedge clock);
+        print_state(dbg);
+        wr(4, append3(4));
+        @(negedge clock);
+        print_state(dbg);
+        wr(5, append3(5));
+        @(negedge clock);
+        print_state(dbg);
+
         clr_all();
-        print_state(dbg);
-
-        @(negedge clock);
-
-        print_state(dbg);
-        @(negedge clock);
-
-        print_state(dbg);
-        @(negedge clock);
 
 
         $finish;
