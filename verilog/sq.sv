@@ -97,7 +97,7 @@ module sq #(parameter
         end
         
         // retire
-        retire_out.sq_ret_complete = (ret_2_sq.used_scnt == 0)&& (used_scnt == 0);
+        retire_out.sq_ret_complete = (ret_2_sq.used_scnt == 0) && (used_scnt == 0);
     end
 
 
@@ -242,7 +242,7 @@ module sq #(parameter
 
     always_comb begin
         ex_out = '0;
-        for (int unsigned i = 0; i < LD_BAY_SZ; i++) begin
+        for (int unsigned i = 0, int wr_off = 0; i < LD_BAY_SZ; i++) begin
             /* BUG: test5, 6. sq_idx_found not being set properly */
             if (forward_ret_2_sq.sq_idx_found[i]) begin
                 ex_out.forward_en[i]                |= forward_ret_2_sq.forward_en[i];
@@ -254,29 +254,21 @@ module sq #(parameter
                 ex_out.forward_byte_en[i]           |= forward_byte_en[i];
             end
 
-            if ((ld_in.forward_addr[i] % 4) == 1) begin
-                ex_out.forward_data[i]       = ex_out.forward_data[i] >> 8;
-                ex_out.forward_byte_en[i]    = ex_out.forward_byte_en[i] >> 8;
-            end
-            else if ((ld_in.forward_addr[i] % 4) == 2) begin
-                ex_out.forward_data[i]       = ex_out.forward_data[i] >> 16;
-                ex_out.forward_byte_en[i]    = ex_out.forward_byte_en[i] >> 16;
-            end
-            else if ((ld_in.forward_addr[i] % 4) == 3) begin
-                ex_out.forward_data[i]       = ex_out.forward_data[i] >> 24;
-                ex_out.forward_byte_en[i]    = ex_out.forward_byte_en[i] >> 24;
-            end
+            wr_off = 8 * iw_off(ld_in.forward_addr[i]);
+            ex_out.forward_data[i]       = ex_out.forward_data[i] >> wr_off;
+            ex_out.forward_byte_en[i]    = ex_out.forward_byte_en[i] >> wr_off;
 
             //ensure don't accidentally give more data than it wants
-            if (ld_in.forward_mem_size[i] == BYTE) begin
-                ex_out.forward_data[i] &= 8'hFF;
-                ex_out.forward_byte_en[i] &= 1'b1;
-            end
-            else if (ld_in.forward_mem_size[i] == HALF) begin
-                ex_out.forward_data[i] &= 16'hFFFF;
-                ex_out.forward_byte_en[i] &= 2'b11;
-            end
-
+            case (ld_in.forward_mem_size[i])
+                BYTE: begin
+                    ex_out.forward_data[i]      &= 8'hFF;
+                    ex_out.forward_byte_en[i]   &= 1'b1;
+                end
+                HALF: begin
+                    ex_out.forward_data[i]      &= 16'hFFFF;
+                    ex_out.forward_byte_en[i]   &= 2'b11;
+                end
+            endcase
         end
     end
 
@@ -289,9 +281,11 @@ module sq #(parameter
         for (int i = 0; i < `NUM_FU_STORE; i++) begin
             modulo4[i] = iw_off(ex_in.st_addr[i]);
 
-            if (ex_in.st_mem_size[i] == BYTE)       bytewise_addr_mask[i][modulo4[i]] = 1;
-            else if (ex_in.st_mem_size[i] == HALF)  bytewise_addr_mask[i][modulo4[i]+:1] = '1;
-            else                                        bytewise_addr_mask[i] = '1;
+            case (ex_in.st_mem_size[i])
+                BYTE:   bytewise_addr_mask[i][modulo4[i]]       = 1;
+                HALF:   bytewise_addr_mask[i][modulo4[i]+:1]    = '1;
+                default:bytewise_addr_mask[i]                   = '1;
+            endcase
         end
 
         
@@ -300,11 +294,8 @@ module sq #(parameter
     logic [`NUM_FU_STORE-1:0] [4:0] updateOffset;
     always_comb begin
         updateOffset = '0;
-
-        for (int i = 0; i < `NUM_FU_STORE; i++) begin
+        for (int i = 0; i < `NUM_FU_STORE; i++)
             updateOffset[i] = 8 * iw_off(ex_in.st_addr[i]);
-            // shifted_data = state[idx].data << offset;
-        end
     end
 
 
@@ -479,7 +470,7 @@ module post_ret_buffer #(parameter
             for (int unsigned j = 0, int unsigned idx = 0; j < used; ++j) begin
                 idx = (head+j) % LSQ_SZ;
 
-                if (state[idx].sq_idx == sq_2_ret.forward_sq_idx[i])
+                if (state[idx].sq_idx <= sq_2_ret.forward_sq_idx[i])
                     forward_ret_2_sq.sq_idx_found[i] = '1;
 
                 if (state[idx].d_vld && (get_waddr(state[idx].addr) == start)) begin
