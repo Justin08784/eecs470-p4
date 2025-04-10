@@ -88,6 +88,8 @@ module victim_test();
         STATE s
     );
         $display("== CACHE ==");
+        $display("rd (%b): %x(%b) <- MEM[%x]", ren, rdat, rvld, raddr);
+        $display("wr (%b): MEM[%x] <- %x", wen, waddr, wdat);
         for (int i = 0; i < sz; ++i) begin
             $display("cache[%1d]: vld=%b, tag=%x, dat=%x, prio=%1d",
                 i,
@@ -97,6 +99,7 @@ module victim_test();
                 s.prio[i]
             );
         end
+        $display("");
     endtask
 
     // task chk(
@@ -132,6 +135,7 @@ module victim_test();
 
         // ---------- Test 1 ---------- //
         wr(1, append3(1));
+        rd(append3(4));
         @(negedge clock);
         print_state(dbg);
         wr(2, append3(2));
