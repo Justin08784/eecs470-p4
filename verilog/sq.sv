@@ -118,6 +118,11 @@ module sq #(parameter
     end
 
 
+    WADDR start;
+    logic [LSQ_SZ-1:0]      used_range;
+    logic [LSQ_SZ-1:0]      addr_match;
+    logic [LSQ_SZ-1:0][3:0] byte_match;
+    logic [LSQ_SZ-1:0][3:0] byte_m1hot;
     always_comb begin
         sq_2_exec = '0;
 
@@ -127,26 +132,48 @@ module sq #(parameter
         sq_2_ret.forward_addr       = ld_2_sq.forward_addr;
         sq_2_ret.forward_mem_size   = ld_2_sq.forward_mem_size;
 
-        for (int unsigned i = 0, WADDR start = 0; i < LD_BAY_SZ; i++) begin
+        used_range = '0;
+        for (int off = 0, int j = head;
+            off < used; 
+            ++off, j = (j + 1) % LSQ_SZ) begin
+            used_range[j] = 1;
+        end
+
+        for (int unsigned i = 0; i < LD_BAY_SZ; i++) begin
             if (!ld_2_sq.forward_req_en[i])
                 continue;
-
             start = get_waddr(ld_2_sq.forward_addr[i]);
-            for (int unsigned j = 0, int unsigned idx = 0; j < used; ++j) begin
-                idx = (head+j) % LSQ_SZ;
 
-                if (state[idx].d_vld && (get_waddr(state[idx].addr) == start)) begin
-                    sq_2_exec.forward_data[i][7:0]      = state[idx].bytewise_addr_mask[0] ? state[idx].data[7:0]      : sq_2_exec.forward_data[i][7:0];
-                    sq_2_exec.forward_data[i][15:8]     = state[idx].bytewise_addr_mask[1] ? state[idx].data[15:8]     : sq_2_exec.forward_data[i][15:8];
-                    sq_2_exec.forward_data[i][23:16]    = state[idx].bytewise_addr_mask[2] ? state[idx].data[23:16]    : sq_2_exec.forward_data[i][23:16];
-                    sq_2_exec.forward_data[i][31:24]    = state[idx].bytewise_addr_mask[3] ? state[idx].data[31:24]    : sq_2_exec.forward_data[i][31:24];
+            addr_match = '0;
+            byte_match = '0;
+            byte_m1hot = '0;
 
-                    sq_2_exec.forward_byte_en[i] |= state[idx].bytewise_addr_mask;
-                end
-
-                if (state[idx].sq_idx == ld_2_sq.forward_sq_idx[i])
-                    break;
+            foreach (addr_match[j]) begin
+                addr_match[j] = used_range[j]
+                    && state[j].d_vld                                   // got data?
+                    && (get_waddr(state[j].addr) == start)              // match word-aligned addr? 
+                    && (state[j].sq_idx < ld_2_sq.forward_sq_idx[i]);   // is older?
             end
+
+            foreach (byte_match[j, b]) begin
+                byte_match[j][b] = addr_match[j]
+                    && state[j].bytewise_addr_mask[b];
+            end
+
+            for (int b = 0; b < 4; ++b) begin
+                for (int off = 0, int unsigned j = tail;
+                    off < used;
+                    ++off, j = j ? (j - 1) : LSQ_SZ - 1) begin
+                    if (!byte_match[j][b])
+                        continue;
+
+                    byte_m1hot[j][b] = 1;
+                    break;
+                end
+            end
+
+            foreach (byte_match[j])
+                sq_2_exec.forward_byte_en[i] |= byte_match[j];
 
             sq_2_exec.forward_en[i] = sq_2_exec.forward_byte_en[i] != 0;
         end
