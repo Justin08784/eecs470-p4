@@ -470,6 +470,7 @@ module post_ret_buffer #(parameter
             for (int unsigned j = 0, int unsigned idx = 0; j < used; ++j) begin
                 idx = (head+j) % LSQ_SZ;
 
+                // FIXME: This used to be ==. Is this <= correct?
                 if (state[idx].sq_idx <= sq_2_ret.forward_sq_idx[i])
                     forward_ret_2_sq.sq_idx_found[i] = '1;
 
