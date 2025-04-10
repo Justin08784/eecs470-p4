@@ -52,6 +52,8 @@ module sq #(parameter
     sq2stRET sq_2_ret;
     stRET2sq ret_2_sq;
     forwardRET2sq forward_ret_2_sq;
+    sq2execute next_sq_2_exec;
+    sq2execute uncombined_forward_data;
 
     assign free_scnt    = `MIN(free - rsvd, NUM_DPORTS);
     assign used_scnt    = `MIN(used, NUM_RPORTS);
@@ -109,7 +111,7 @@ module sq #(parameter
 
 
     always_comb begin
-        sq_2_exec = '0;
+        next_sq_2_exec = '0;
 
         //handle data forwarding
         sq_2_ret.forward_req_en     = ld_2_sq.forward_req_en;
@@ -126,32 +128,37 @@ module sq #(parameter
                 idx = (head+j) % LSQ_SZ;
 
                 if (state[idx].d_vld && ({state[idx].addr[31:2],2'b0} == start)) begin
-                    sq_2_exec.forward_data[i][7:0]      = state[idx].bytewise_addr_mask[0] ? state[idx].data[7:0]      : sq_2_exec.forward_data[i][7:0];
-                    sq_2_exec.forward_data[i][15:8]     = state[idx].bytewise_addr_mask[1] ? state[idx].data[15:8]     : sq_2_exec.forward_data[i][15:8];
-                    sq_2_exec.forward_data[i][23:16]    = state[idx].bytewise_addr_mask[2] ? state[idx].data[23:16]    : sq_2_exec.forward_data[i][23:16];
-                    sq_2_exec.forward_data[i][31:24]    = state[idx].bytewise_addr_mask[3] ? state[idx].data[31:24]    : sq_2_exec.forward_data[i][31:24];
+                    next_sq_2_exec.forward_data[i][7:0]      = state[idx].bytewise_addr_mask[0] ? state[idx].data[7:0]      : next_sq_2_exec.forward_data[i][7:0];
+                    next_sq_2_exec.forward_data[i][15:8]     = state[idx].bytewise_addr_mask[1] ? state[idx].data[15:8]     : next_sq_2_exec.forward_data[i][15:8];
+                    next_sq_2_exec.forward_data[i][23:16]    = state[idx].bytewise_addr_mask[2] ? state[idx].data[23:16]    : next_sq_2_exec.forward_data[i][23:16];
+                    next_sq_2_exec.forward_data[i][31:24]    = state[idx].bytewise_addr_mask[3] ? state[idx].data[31:24]    : next_sq_2_exec.forward_data[i][31:24];
 
-                    sq_2_exec.forward_byte_en[i] |= state[idx].bytewise_addr_mask;
+                    next_sq_2_exec.forward_byte_en[i] |= state[idx].bytewise_addr_mask;
                 end
 
                 if (state[idx].sq_idx == ld_2_sq.forward_sq_idx[i]) break;
             end
 
-            sq_2_exec.forward_en[i] = (sq_2_exec.forward_byte_en[i] != 0) ? '1 : '0;
+            next_sq_2_exec.forward_en[i] = (next_sq_2_exec.forward_byte_en[i] != 0) ? '1 : '0;
         end
 
+    end
+
+    always_comb begin
         for (int unsigned i = 0; i < LD_BAY_SZ; i++) begin
             sq_2_exec.forward_en[i] |= forward_ret_2_sq.forward_en[i];
             if (forward_ret_2_sq.sq_idx_found[i]) begin
                 sq_2_exec.forward_data[i] = forward_ret_2_sq.forward_data[i];
+                sq_2_exec.forward_byte_en[i] = forward_ret_2_sq.forward_byte_en[i];
             end
             else begin
-                sq_2_exec.forward_data[i][7:0]      = ~sq_2_exec.forward_byte_en[i][0] ? forward_ret_2_sq.forward_data[i][7:0]      : sq_2_exec.forward_data[i][7:0];
-                sq_2_exec.forward_data[i][15:8]     = ~sq_2_exec.forward_byte_en[i][1] ? forward_ret_2_sq.forward_data[i][15:8]     : sq_2_exec.forward_data[i][15:8];
-                sq_2_exec.forward_data[i][23:16]    = ~sq_2_exec.forward_byte_en[i][2] ? forward_ret_2_sq.forward_data[i][23:16]    : sq_2_exec.forward_data[i][23:16];
-                sq_2_exec.forward_data[i][31:24]    = ~sq_2_exec.forward_byte_en[i][3] ? forward_ret_2_sq.forward_data[i][31:24]    : sq_2_exec.forward_data[i][31:24];
+                sq_2_exec.forward_data[i][7:0]      = uncombined_forward_data.forward_byte_en[i][0] ? uncombined_forward_data.forward_data[i][7:0]      : forward_ret_2_sq.forward_data[i][7:0];
+                sq_2_exec.forward_data[i][15:8]     = uncombined_forward_data.forward_byte_en[i][1] ? uncombined_forward_data.forward_data[i][15:8]     : forward_ret_2_sq.forward_data[i][15:8];
+                sq_2_exec.forward_data[i][23:16]    = uncombined_forward_data.forward_byte_en[i][2] ? uncombined_forward_data.forward_data[i][23:16]    : forward_ret_2_sq.forward_data[i][23:16];
+                sq_2_exec.forward_data[i][31:24]    = uncombined_forward_data.forward_byte_en[i][3] ? uncombined_forward_data.forward_data[i][31:24]    : forward_ret_2_sq.forward_data[i][31:24];
+                sq_2_exec.forward_byte_en[i] |= forward_ret_2_sq.forward_byte_en[i];
             end
-            sq_2_exec.forward_byte_en[i] |= forward_ret_2_sq.forward_byte_en[i];
+            
 
             if ((ld_2_sq.forward_addr[i] % 4) == 1) begin
                 sq_2_exec.forward_data[i]       = sq_2_exec.forward_data[i] >> 8;
@@ -222,6 +229,7 @@ module sq #(parameter
             last_used_sq_idx <= LSQ_SZ_DBL - 1; //outside of SQ range so that if a load occurs before the first store we don't flag it falsely
             next_complete <= '0;
             no_store_yet <= '1;
+            uncombined_forward_data <= '0;
         end else begin
             used    <= used + dis_2_sq.sq_d_en_cnt - retire_2_sq.r_en;
             free    <= free - dis_2_sq.sq_d_en_cnt + retire_2_sq.r_en;
@@ -234,6 +242,7 @@ module sq #(parameter
             no_store_yet <= (dis_2_sq.sq_d_en_cnt > 0) | no_store_yet;
 
             next_complete <= exec_2_sq;
+            uncombined_forward_data <= next_sq_2_exec;
 
             // handle execute updates
             for (int unsigned i = 0, int cur_idx = 0; i < NUM_ST_PORTS; ++i) begin
@@ -334,6 +343,8 @@ module post_ret_buffer #(parameter
     logic [NUM_RPORTS-1:0][$clog2(SQ_RET_BUF_SZ)-1:0] r_idxs;
     logic [NUM_DPORTS-1:0][$clog2(SQ_RET_BUF_SZ)-1:0] d_idxs;
 
+    forwardRET2sq next_forward_ret_2_sq;
+
     assign free                 = SQ_RET_BUF_SZ - used;
     assign free_scnt            = `MIN(free, NUM_DPORTS);
     assign used_scnt            = `MIN(used, NUM_RPORTS);
@@ -372,7 +383,7 @@ module post_ret_buffer #(parameter
 
 
     always_comb begin
-        forward_ret_2_sq = '0;
+        next_forward_ret_2_sq = '0;
 
         for (int unsigned i = 0, ADDR start = 0; i < LD_BAY_SZ; i++) begin
             if (!sq_2_ret.forward_req_en[i]) continue;
@@ -381,22 +392,22 @@ module post_ret_buffer #(parameter
             for (int unsigned j = 0, int unsigned idx = 0; j < used; ++j) begin
                 idx = (head+j) % SQ_RET_BUF_SZ;
 
-                if (state[idx].sq_idx == sq_2_ret.forward_sq_idx[i]) forward_ret_2_sq.sq_idx_found[i] = '1;
+                if (state[idx].sq_idx == sq_2_ret.forward_sq_idx[i]) next_forward_ret_2_sq.sq_idx_found[i] = '1;
 
                 if (state[idx].d_vld && ({state[idx].addr[31:2],2'b0} == start)) begin
-                    forward_ret_2_sq.forward_data[i][7:0]   = state[idx].bytewise_addr_mask[0] ? state[idx].data[7:0]      : forward_ret_2_sq.forward_data[i][7:0];
-                    forward_ret_2_sq.forward_data[i][15:8]  = state[idx].bytewise_addr_mask[1] ? state[idx].data[15:8]     : forward_ret_2_sq.forward_data[i][15:8];
-                    forward_ret_2_sq.forward_data[i][23:16] = state[idx].bytewise_addr_mask[2] ? state[idx].data[23:16]    : forward_ret_2_sq.forward_data[i][23:16];
-                    forward_ret_2_sq.forward_data[i][31:24] = state[idx].bytewise_addr_mask[3] ? state[idx].data[31:24]    : forward_ret_2_sq.forward_data[i][31:24];
+                    next_forward_ret_2_sq.forward_data[i][7:0]   = state[idx].bytewise_addr_mask[0] ? state[idx].data[7:0]      : next_forward_ret_2_sq.forward_data[i][7:0];
+                    next_forward_ret_2_sq.forward_data[i][15:8]  = state[idx].bytewise_addr_mask[1] ? state[idx].data[15:8]     : next_forward_ret_2_sq.forward_data[i][15:8];
+                    next_forward_ret_2_sq.forward_data[i][23:16] = state[idx].bytewise_addr_mask[2] ? state[idx].data[23:16]    : next_forward_ret_2_sq.forward_data[i][23:16];
+                    next_forward_ret_2_sq.forward_data[i][31:24] = state[idx].bytewise_addr_mask[3] ? state[idx].data[31:24]    : next_forward_ret_2_sq.forward_data[i][31:24];
 
 
-                    forward_ret_2_sq.forward_byte_en[i] |= state[idx].bytewise_addr_mask;
+                    next_forward_ret_2_sq.forward_byte_en[i] |= state[idx].bytewise_addr_mask;
                 end
 
                 if (state[idx].sq_idx == sq_2_ret.forward_sq_idx[i]) break;
             end
 
-            forward_ret_2_sq.forward_en[i] = (forward_ret_2_sq.forward_byte_en[i] != 0) ? '1 : '0;
+            next_forward_ret_2_sq.forward_en[i] = (next_forward_ret_2_sq.forward_byte_en[i] != 0) ? '1 : '0;
         end
     end
 
@@ -407,10 +418,13 @@ module post_ret_buffer #(parameter
             head    <= 0;
             tail    <= 0;
             state   <= '0;
+            forward_ret_2_sq <= '0;
         end else begin
             used    <= used + sq_2_ret.ret_cnt - ret_success;
             head    <= (head + ret_success) % SQ_RET_BUF_SZ;
             tail    <= (tail + sq_2_ret.ret_cnt) % SQ_RET_BUF_SZ;
+
+            forward_ret_2_sq <= next_forward_ret_2_sq;
 
             // handle sq to ret buffer (ins)
             for (int unsigned i = 0, int cur_idx = 0; i < NUM_DPORTS; ++i) begin
