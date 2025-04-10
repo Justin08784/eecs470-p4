@@ -293,6 +293,8 @@ module stage_id_p4 (
                 lq_idx      : '0,
                 is_brch   : tmp[i].cond_branch || tmp[i].uncond_branch,
 
+                bhr         : f_in.f_dat[i].bhr, 
+
                 inst        : f_in.f_dat[i].inst,
                 PC          : f_in.f_dat[i].PC,
                 NPC         : f_in.f_dat[i].NPC,

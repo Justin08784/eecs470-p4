@@ -4,7 +4,7 @@ module btb(
     input  logic        clock, reset,
     input  fetch2btb  fetch_in,
  
-    input  execute2btb execute_in,
+    //input  retire2btb retire_in,
 
     output btb2fetch   fetch_out         
 
@@ -23,17 +23,25 @@ logic [`BTB_TAG_WIDTH-1:0] tag;
 
 `include "../test/btb_sva.svh"
 
+
+//assign fetch_out.hit = 2'b00;
+//assign fetch_out.target = 2'b00;
+
 always_comb begin
+    fetch_out.hit = 2'b00;
     for(int i = 0; i < `N; i++) begin
 
         index = fetch_in.PC[i][9:2];
         tag = fetch_in.PC[i][21:10];
+
+        $display("INPUT PC BTB: %x", fetch_in.PC);
 
         if(valid_array[index] && tag_array[index] == tag) begin
             fetch_out.hit[i] = 1'b1;
             fetch_out.target[i] = target_array[index];
            // $display("valid_array[index] is ", valid_array);
            // $display("index ", index);
+           $display("BTB HIT!!");
         end else begin
             fetch_out.hit[i] = 1'b0;
             fetch_out.target[i] = '0;
@@ -42,6 +50,7 @@ always_comb begin
     end
 
 end
+
 
 logic [7:0] reg_index;
 
@@ -55,14 +64,18 @@ always_ff @(posedge clock) begin
         // $display("VALID ARRAY ON RESET", valid_array);
     end else begin
         for(int i = 0; i < `N; i++) begin
-            if(execute_in.is_taken[i]) begin
-                reg_index = execute_in.PC[i][9:2];
-                tag_array[reg_index] <= execute_in.PC[i][21:10];
-                target_array[reg_index] <= execute_in.target[i]; //[13:2]
+            if(fetch_in.is_taken[i]) begin
+                reg_index = fetch_in.correct_PC[i][9:2];
+                tag_array[reg_index] <= fetch_in.correct_PC[i][21:10];
+                target_array[reg_index] <= fetch_in.target[0]; //[13:2]
                 valid_array[reg_index] <= 1'b1;
+                $display("UPDATING_BTB_TARGET!: %x", fetch_in.target[0]);
             end
         end
     end
+    $display("INCOMING_PC: %x", fetch_in.correct_PC);
+    $display("INCOMiNG_TAKEN: %2b", fetch_in.is_taken);
+    $display("TARGET: %2b", fetch_in.target);
 end
 
 

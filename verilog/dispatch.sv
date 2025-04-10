@@ -238,6 +238,9 @@ always_comb begin
         if (rename_in[i].is_brch) begin
             tmp_alloc2rename[i].dat.btq_idx = btq_in.btq_idxs[btq_wr_idx];
             btq_out.NPC[btq_wr_idx] = rename_in[i].NPC;
+            btq_out.PC[btq_wr_idx] =      rename_in[i].PC;
+
+            btq_out.bhr[btq_wr_idx] = rename_in[i].bhr;
             ++btq_wr_idx;
         end
     end

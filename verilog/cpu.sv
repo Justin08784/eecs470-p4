@@ -99,6 +99,12 @@ module cpu (
     retire2fetch retire_2_f;
     lq2retire lq_2_retire;
 
+    fetch2btb fetch_2_btb;
+    btb2fetch btb_2_fetch;
+
+    fetch2predictor fetch_2_pred;
+    predictor2fetch pred_2_fetch;
+
     stage_if_p4 fetch_0(
         `ifdef DEBUG
         .dbg    (dbg_fetch),
@@ -116,6 +122,12 @@ module cpu (
         .Imem_command(fetch_2_mem.proc2mem_command),
         .Imem_addr(fetch_2_mem.proc2mem_addr),
         .d_out  (f_2_decode)
+        .btb_in(btb_2_fetch),
+        .pred_in(pred_2_fetch),
+
+        .btb_out(fetch_2_btb),
+        .pred_out(fetch_2_pred),
+
     );
 
 
@@ -243,6 +255,30 @@ module cpu (
 /* ======================================== */
         end
     end
+
+
+    
+    gshare gshare_0(
+        .clock(clock),
+        .reset(reset),
+        .fetch_2_pred(fetch_2_pred),
+        .pred_2_fetch(pred_2_fetch)
+    );
+
+
+    //////////////////////////////////////////////////
+    //                                              //
+    //          Branch target buffer (BTB)          //
+    //                                              //
+    //////////////////////////////////////////////////  
+
+    btb btb_0(
+        .clock(clock),
+        .reset(reset),
+        .fetch_in(fetch_2_btb),
+        //.retire_in(ret_2_btb),
+        .fetch_out(btb_2_fetch)
+    );
 
 
     //////////////////////////////////////////////////
