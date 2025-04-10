@@ -923,8 +923,6 @@ module testbench;
         retire2lq     retire_2_lq;
 
         lq2dispatch  lq_2_dis;
-        // sq2rs sq_2_rs,
-        lq2rob    lq_2_rob;
 
         state   = dbg_lq.state;
         head    = dbg_lq.head;
@@ -936,7 +934,6 @@ module testbench;
         retire_2_lq = dbg_lq.retire_2_lq;
 
         lq_2_dis    = dbg_lq.lq_2_dis;
-        lq_2_rob   = dbg_lq.lq_2_rob;
 
         $display("  | >> LQ");
         for (int i = 0; i < `LSQ_SZ; i++) begin

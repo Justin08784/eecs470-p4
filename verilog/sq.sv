@@ -407,7 +407,7 @@ module post_ret_buffer #(parameter
                 if (state[idx].sq_idx == sq_2_ret.forward_sq_idx[i]) break;
             end
 
-            next_forward_ret_2_sq.forward_en[i] = (next_forward_ret_2_sq.forward_byte_en[i] != 0) ? '1 : '0;
+            next_forward_ret_2_sq.forward_en[i] = (next_forward_ret_2_sq.forward_byte_en[i] != 0);
         end
     end
 

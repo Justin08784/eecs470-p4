@@ -65,11 +65,11 @@
 ///////////////////////////////
 /* How can we implement this in the Makefile? */
 // comment out to enable synth only constructions
-`define SYNTH
+// `define SYNTH
 
 `ifndef SYNTH
 // comment out to disable DEBUG:
-// `define DEBUG
+`define DEBUG
 `endif
 
 ///////////////////////////////
@@ -973,12 +973,6 @@ typedef struct packed {
 } lq2retire;
 
 typedef struct packed {
-    logic   [$clog2(`N):0]      ret_rdy;
-    logic   [`NUM_FU_LOAD-1:0]  err_en;
-    ROB_IDX [`NUM_FU_LOAD-1:0]  rob_idx;
-} lq2rob;
-
-typedef struct packed {
     logic   [$clog2(`N):0] r_en;
     ROB_IDX [`N-1:0] r_pos;
 } retire2lq;
@@ -1094,7 +1088,6 @@ typedef struct packed {
     retire2lq retire_2_lq;
 
     lq2dispatch lq_2_dis;
-    lq2rob lq_2_rob;
 } DBG_lq;
 
 

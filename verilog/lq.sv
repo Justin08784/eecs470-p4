@@ -22,7 +22,6 @@ module lq #(parameter
     input retire2lq retire_2_lq,
 
     output lq2dispatch lq_2_dis,
-    output lq2rob lq_2_rob,
     output lq2retire retire_out
 );
 
@@ -47,11 +46,9 @@ module lq #(parameter
     assign used_scnt            = `MIN(used, NUM_RPORTS);
 
 
-    LSQ_IDX head_plus_one;
     logic [NUM_FU_STORE+NUM_FU_LOAD-1:0] set_err;
     LSQ_IDX [NUM_FU_STORE+NUM_FU_LOAD-1:0] err_idx;
     always_comb begin
-        lq_2_rob = '0;
 
         for (int unsigned i = 0; i < NUM_RPORTS; ++i)
             r_idxs[i] = (head + i) % LSQ_SZ;
@@ -62,13 +59,7 @@ module lq #(parameter
         lq_2_dis = '{
             lq_rdy_scnt : free_scnt,
             lq_tail     : tail
-        };
-
-        //handle lsq to ROB for retirement
-        head_plus_one = (head + 1) % LSQ_SZ;
-        if (state[head].d_vld && state[head_plus_one].d_vld)    lq_2_rob.ret_rdy = 2;
-        else if (state[head].d_vld)                             lq_2_rob.ret_rdy = 1;
-        else                                                    lq_2_rob.ret_rdy = 0;      
+        };   
 
         //handle checking if LQ got ahead of SQ and needs to flag it in ROB
         set_err = '0;
@@ -97,9 +88,9 @@ module lq #(parameter
 
         //handle telling fetch the top 2 PC's
         retire_out.PC[0] = state[head].inst_pc;
-        retire_out.PC[1] = state[head_plus_one].inst_pc;
+        retire_out.PC[1] = state[r_idxs[0]].inst_pc;
         retire_out.err_ld_ooo[0] = state[head].err_ld_ooo;
-        retire_out.err_ld_ooo[1] = state[head_plus_one].err_ld_ooo;
+        retire_out.err_ld_ooo[1] = state[r_idxs[1]].err_ld_ooo;
     end
 
 
@@ -167,8 +158,7 @@ module lq #(parameter
         exec_2_lq,
         retire_2_lq,
 
-        lq_2_dis,
-        lq_2_rob
+        lq_2_dis
     };
     `endif 
 
