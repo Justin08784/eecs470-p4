@@ -1,9 +1,7 @@
     li x2, 5
+    li x4, 6
     sw x2, 120(x0)
-    lw x3, 120(x0)
-    sw x2, 132(x0)
-    sw x2, 132(x0)
-    sw x2, 136(x0)
-    lw x4, 132(x0)
-    lw x6, 120(x0)
+    li x5, 4
+    add x7, x4, x5
+    lw x3, 110(x7)
     wfi

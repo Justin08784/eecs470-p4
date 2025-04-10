@@ -511,7 +511,36 @@ module lod_ex(
             ld_sq_out.forward_mem_size[i] = bays.mem_size[f][i];
             ld_sq_out.forward_sq_idx[i] = bays.sq_idx[f][i];
         end
+    end
 
+    //ST-LD forwarding parsing logic
+    logic [`NUM_FU_LOAD-1:0][LD_BAY_SZ-1:0] next_got;
+    logic [3:0]             [LD_BAY_SZ-1:0] next_st_frwd_byte_mask;
+    DATA  [`NUM_FU_LOAD-1:0][LD_BAY_SZ-1:0] next_dat;
+    always_comb begin
+        next_got = '0;
+        next_st_frwd_byte_mask = '0;
+        next_dat = '0;
+        foreach (rvld[f, i]) begin
+
+            // if (rvld[f][i]) begin
+            //     next_got[f][i] = 1;
+            //     next_dat[f][i] = rdat[f][i];
+            // end
+
+            if (sq_in.forward_en[i]) begin
+                if (sq_in.forward_byte_en[i][0]) next_dat[f][i][7:0] = sq_in.forward_data[i][7:0];
+                if (sq_in.forward_byte_en[i][1]) next_dat[f][i][15:8] = sq_in.forward_data[i][15:8];
+                if (sq_in.forward_byte_en[i][2]) next_dat[f][i][23:16] = sq_in.forward_data[i][23:16];
+                if (sq_in.forward_byte_en[i][3]) next_dat[f][i][31:24] = sq_in.forward_data[i][31:24];
+                next_st_frwd_byte_mask = bays.st_frwd_byte_mask[f][i] | sq_in.forward_byte_en[i];
+
+                next_got[f][i] |= ($countones(next_st_frwd_byte_mask) == (2**bays.mem_size[f][i]));
+
+                $display("FORWARDING_OCCURING: %0d, mask: %4b, final_data: %0d, ones: %0d, size: %0d, next_got:%b", sq_in.forward_data[i], sq_in.forward_byte_en[i], next_dat[f][i],$countones(next_st_frwd_byte_mask),2**bays.mem_size[f][i],next_got[f][i]);
+            end
+
+        end
     end
 
     always_ff @(posedge clock) begin
@@ -534,11 +563,10 @@ module lod_ex(
                 bays.st_frwd_byte_mask[f][i] <= '0;
             end
 
-            foreach (rvld[f, i]) begin
-                if (!rvld[f][i])
-                    continue;
-                bays.got[f][i] <= 1;
-                bays.dat[f][i] <= rdat[f][i];
+            foreach (next_got[f, i]) begin
+                bays.got[f][i] <= next_got[f][i];
+                bays.dat[f][i] <= next_dat[f][i];
+                bays.st_frwd_byte_mask[f][i] <= next_st_frwd_byte_mask[f][i];
             end
 
             foreach (fu2out_gnt[f, i]) begin
