@@ -518,24 +518,31 @@ module lod_ex(
     logic [3:0]             [LD_BAY_SZ-1:0] next_st_frwd_byte_mask;
     DATA  [`NUM_FU_LOAD-1:0][LD_BAY_SZ-1:0] next_dat;
     always_comb begin
-        next_got = '0;
+        next_got = bays.got;
         next_st_frwd_byte_mask = '0;
-        next_dat = '0;
+        next_dat = bays.dat;
         foreach (rvld[f, i]) begin
+            if (bays.got[f][i])
+                continue;
+            if (!sq_in.forward_en[i])
+                continue;
 
             // if (rvld[f][i]) begin
             //     next_got[f][i] = 1;
             //     next_dat[f][i] = rdat[f][i];
             // end
 
-            if (sq_in.forward_en[i]) begin
-                if (sq_in.forward_byte_en[i][0]) next_dat[f][i][7:0] = sq_in.forward_data[i][7:0];
-                if (sq_in.forward_byte_en[i][1]) next_dat[f][i][15:8] = sq_in.forward_data[i][15:8];
-                if (sq_in.forward_byte_en[i][2]) next_dat[f][i][23:16] = sq_in.forward_data[i][23:16];
-                if (sq_in.forward_byte_en[i][3]) next_dat[f][i][31:24] = sq_in.forward_data[i][31:24];
-                next_st_frwd_byte_mask = bays.st_frwd_byte_mask[f][i] | sq_in.forward_byte_en[i];
+            if (sq_in.forward_byte_en[i][0])
+                next_dat[f][i][7:0] = sq_in.forward_data[i][7:0];
+            if (sq_in.forward_byte_en[i][1])
+                next_dat[f][i][15:8] = sq_in.forward_data[i][15:8];
+            if (sq_in.forward_byte_en[i][2])
+                next_dat[f][i][23:16] = sq_in.forward_data[i][23:16];
+            if (sq_in.forward_byte_en[i][3])
+                next_dat[f][i][31:24] = sq_in.forward_data[i][31:24];
+            next_st_frwd_byte_mask = bays.st_frwd_byte_mask[f][i] | sq_in.forward_byte_en[i];
 
-                next_got[f][i] |= ($countones(next_st_frwd_byte_mask) == (2**bays.mem_size[f][i]));
+            next_got[f][i] |= ($countones(next_st_frwd_byte_mask) == (2**bays.mem_size[f][i]));
 
                 // $display("FORWARDING_OCCURING: %0d, mask: %4b, final_data: %0d, ones: %0d, size: %0d, next_got:%b", sq_in.forward_data[i], sq_in.forward_byte_en[i], next_dat[f][i],$countones(next_st_frwd_byte_mask),2**bays.mem_size[f][i],next_got[f][i]);
             end
