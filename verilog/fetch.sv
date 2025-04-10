@@ -113,7 +113,8 @@ module stage_if_p4 (
                 inst  : vld ? Imem_data[i].word_level[off] : `NOP,
                 PC    : PC_reg[i],
                 NPC   : PC_reg[i] + 4,
-                valid : vld
+                valid : vld,
+                bhr   : pred_in.bhr
             };
             $display("DECODE PC: %x", PC_reg[i]);
         end
@@ -146,7 +147,7 @@ module stage_if_p4 (
 
     logic [1:0] [15:0] btb_target;
 
-    assign mux_result_prediction[0] = predict_taken[0]; //btb_hit[0];
+    assign mux_result_prediction[0] = predict_taken[0] && btb_hit[0];
 
    // assign pred_out = mux_result
     assign mux_result_prediction[1] = predict_taken[1] && btb_hit[1];
@@ -174,7 +175,7 @@ module stage_if_p4 (
         end else if (flush) begin
             foreach(PC_reg[i])
                 PC_reg[i] <= 4*i + r_in.corrected_PC;  // initial PC value is 0 (the memory address where our program starts)
-        end else if(mux_result_prediction[0]) begin
+        end else if(mux_result_prediction) begin
                 $display("PREDICTING TAKEN:");
                 taken_count = taken_count + 1;
                // foreach(PC_reg[i])
@@ -193,7 +194,7 @@ module stage_if_p4 (
     end
 
 
-    assign btb_out.target = r_in.corrected_PC[15:0];
+    assign btb_out.target = r_in.corrected_PC;
     assign btb_out.is_taken = r_in.is_taken;
     assign btb_out.correct_PC =  r_in.PC;
 
@@ -207,6 +208,7 @@ module stage_if_p4 (
     assign pred_out.update_enable = r_in.update_enable;
     assign pred_out.taken = r_in.is_taken;
     assign pred_out.correct_PC =  r_in.PC;
+    assign pred_out.retired_bhr = r_in.retired_bhr;
      
     assign predict_taken = pred_in.prediction;
 
@@ -232,6 +234,8 @@ module stage_if_p4 (
             $display("FETCH2PRED UPDATE ENABLE: %x", r_in.update_enable);
             $display("FETCH2PRED TAKEN: %x", r_in.is_taken);
             $display("FETCH2PRED CORRECT_PC: %x", r_in.PC);
+            $display("FETCH2PRED RETIRED_BHR0: %b", r_in.retired_bhr[0]);
+            $display("FETCH2PRED RETIRED_BHR1: %b", r_in.retired_bhr[1]);
 
 
            $display("  %3d | << Fetch <<", $time);  

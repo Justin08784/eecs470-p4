@@ -1,4 +1,4 @@
-    addi x2, x0, 100      # 0: x2 = 5 (loop counter)
+    addi x2, x0, 100      # 0: x2 = 100 (loop counter)
 loop:
     addi x3, x2, 3      # 4: x3 = x2 + 3 (just some operation)
     mul x4, x2, x3      # x4 = x2 * x3

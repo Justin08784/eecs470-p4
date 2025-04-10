@@ -336,6 +336,7 @@ typedef struct packed {
     ADDR  PC;
     ADDR  NPC; // PC + 4
     logic valid;
+    logic [7:0] bhr;
 } IF_ID_PACKET;
 
 /**
@@ -474,6 +475,7 @@ typedef struct packed {
     logic   pred;
     logic   take;
     ADDR    PC;
+    logic [7:0] bhr;
 } BTQ_ENTRY;
 
 typedef struct packed {
@@ -516,9 +518,13 @@ typedef struct packed {
     //logic [`N-1:0]taken;
     ADDR [`N-1:0] PC;
 
+    //logic [7:0] bhr;
+
     //logic [`N-1:0][31:0] PC;
     //logic [`N-1:0] is_taken;
     //logic [`N-1:0] [15:0] target;
+
+    logic [`N-1:0] [7:0] retired_bhr;
 
 } retire2fetch;
 
@@ -528,6 +534,8 @@ typedef struct packed {
         // Sender must ensure branch insns packed to lowest indices.
     ADDR    [`N-1:0]       NPC;
     ADDR    [`N-1:0]       PC;
+
+    logic   [`N-1:0] [7:0] bhr;
 } dispatch2btq;
 
 // Reservation station stuff
@@ -551,6 +559,8 @@ typedef struct packed {
     ROB_IDX         rob_idx;
     BTQ_IDX         btq_idx;
     logic           is_branch; // Is inst a branch?
+
+    logic   [7:0]   bhr;
     
 
     /* from ID_EX_PACKET */
@@ -863,10 +873,13 @@ typedef struct packed {
     logic [`N-1:0]taken;
     ADDR [`N-1:0] correct_PC;
 
+    logic [`N-1:0] [7:0] retired_bhr;
+
 } fetch2predictor;
 
 typedef struct packed {
     logic [`N-1:0] prediction;
+    logic [`N-1:0] [7:0]    bhr;
 } predictor2fetch;
 
 typedef struct packed {

@@ -520,6 +520,7 @@ module cpu (
     logic [`N-1:0] update_en;
 
     ADDR [`N-1:0] PC_original;
+    logic [`N-1:0] [7:0] bhr_from_btq;
 
     //assign update_en[0] = (rob_2_retire.r_en_cnt == 1);
     //assign update_en[1] = (rob_2_retire.r_en_cnt == 2);
@@ -532,6 +533,7 @@ module cpu (
         branch_taken = 2'b00;
         update_en = 2'b00;
         PC_original = '0;
+        bhr_from_btq = '0;
         for (int unsigned i = 0; i < rob_2_retire.r_en_cnt; ++i) begin
             ++allowed_retire_cnt;
 
@@ -543,6 +545,8 @@ module cpu (
             PC_original[i] = btq_2_retire.dat[btq_rd_cnt].PC;
            // update_en[i] = 1'b1;
 
+            bhr_from_btq[i] = btq_2_retire.dat[btq_rd_cnt].bhr;
+            
             if (btq_2_retire.dat[btq_rd_cnt].pred != btq_2_retire.dat[btq_rd_cnt].take) begin
                 // is mispred?
                 mispred = 1;
@@ -585,12 +589,13 @@ module cpu (
             `ifdef DEBUG
             $display("  %3d | >> retire >>", $time);
             for (int i = 0; i < `N; ++i) begin
-                $display("btq_out [%0d]: tgt: %x, NPC: %x, pred: %b, take: %b", 
+                $display("btq_out [%0d]: tgt: %x, NPC: %x, pred: %b, take: %b, bhr: %b",
                     i,
                     btq_2_retire.dat[i].tgt,
                     btq_2_retire.dat[i].NPC,
                     btq_2_retire.dat[i].pred,
-                    btq_2_retire.dat[i].take
+                    btq_2_retire.dat[i].take,
+                    btq_2_retire.dat[i].bhr
                 );
             end
             $display("btq_rd_cnt: %0d", btq_rd_cnt);
@@ -599,11 +604,13 @@ module cpu (
             `endif // DEBUG
 /* ======================================== */
             flush       <= mispred;
-            retire_2_f  <= '{corrected_PC : mispred_target, is_taken : branch_taken, update_enable : update_en, PC : PC_original};
+            retire_2_f  <= '{corrected_PC : mispred_target, is_taken : branch_taken, update_enable : update_en, PC : PC_original, retired_bhr : bhr_from_btq};
             $display("CORRECTED_PC %x", retire_2_f.corrected_PC);
             $display("IS_TAKEN %2b", retire_2_f.is_taken);
             $display("UPDATE ENABLE %2b", retire_2_f.update_enable);
             $display("ORIGINAL PC: %x", retire_2_f.PC);
+            $display("RETIRED BHR0: %x", btq_2_retire.dat[0].bhr);
+            $display("RETIRED BHR1: %x", btq_2_retire.dat[1].bhr);
             //$display("PC_original %x", PC_original);
 /* ======================================== */
         end
@@ -615,7 +622,7 @@ module cpu (
         .clock(clock),
         .reset(reset),
         .fetch_2_pred(fetch_2_pred),
-        .predict_taken(pred_2_fetch)
+        .pred_2_fetch(pred_2_fetch)
     );
 
 

@@ -91,6 +91,9 @@ always_comb begin
         brch_packed_idx[i] = wr_idx;
         btq_out.NPC[wr_idx] = decode_in.d_dat[i].NPC;
         btq_out.PC[wr_idx] = decode_in.d_dat[i].PC;
+
+        btq_out.bhr[wr_idx] = decode_in.d_dat[i].bhr;
+
         ++wr_idx;
     end
 
