@@ -537,7 +537,7 @@ module lod_ex(
 
                 next_got[f][i] |= ($countones(next_st_frwd_byte_mask) == (2**bays.mem_size[f][i]));
 
-                $display("FORWARDING_OCCURING: %0d, mask: %4b, final_data: %0d, ones: %0d, size: %0d, next_got:%b", sq_in.forward_data[i], sq_in.forward_byte_en[i], next_dat[f][i],$countones(next_st_frwd_byte_mask),2**bays.mem_size[f][i],next_got[f][i]);
+                // $display("FORWARDING_OCCURING: %0d, mask: %4b, final_data: %0d, ones: %0d, size: %0d, next_got:%b", sq_in.forward_data[i], sq_in.forward_byte_en[i], next_dat[f][i],$countones(next_st_frwd_byte_mask),2**bays.mem_size[f][i],next_got[f][i]);
             end
 
         end

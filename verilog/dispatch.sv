@@ -294,7 +294,6 @@ always_comb begin
 
         if (commit_in[i].dat.wr_mem) begin
             rs_out.d_dat[i].sq_idx = sq_in.next_ids[sq_wr_idx];
-            $display("ASSIGNING: idx: %0d", sq_in.next_ids[sq_wr_idx]);
             sq_out.rob_idx[sq_wr_idx] = rob_in.rob_idxs[i];
             ++sq_wr_idx;
         end
