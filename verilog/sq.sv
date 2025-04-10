@@ -26,16 +26,18 @@ module sq #(parameter
     input reset,
     input flush,
 
-    input dispatch2sq   dis_2_sq,
-    input execute2sq    exec_2_sq,
-    input executeLD2sq  ld_2_sq,
-    input retire2sq     retire_2_sq,
+    /* Q: Why did I rename? We are already in the sq module; we HAVE context.
+    There is no need to tattoo sq on every siganl. It is NOISE. */
+    input dispatch2sq   dis_in,
+    input execute2sq    ex_in,
+    input executeLD2sq  ld_in,
+    input retire2sq     retire_in,
     input MEM_TAG       mem2proc_transaction_tag,
 
-    output sq2dispatch  sq_2_dis,
-    output sq2execute   sq_2_exec,
-    output sq2rob       sq_2_rob,
-    output sq2retire    sq_2_retire,
+    output sq2dispatch  dis_out,
+    output sq2execute   ex_out,
+    output sq2rob       rob_out,
+    output sq2retire    retire_out,
     output stRET2mem    ret_2_mem
 );
 
@@ -77,7 +79,7 @@ module sq #(parameter
             next_ids[i] = (tail_dbl + i) % LSQ_SZ_DBL;
 
         // handle dispatch (outs)
-        sq_2_dis = '{
+        dis_out = '{
             sq_rdy_scnt         : free_scnt,
             last_used_sq_idx    : last_used_sq_idx,
             next_ids            : next_ids,
@@ -85,17 +87,17 @@ module sq #(parameter
         };
 
         //handle sq to ROB for retirement
-        sq_2_rob = '0;
-        sq_2_rob.complete_en = next_complete.st_ex_en;
+        rob_out = '0;
+        rob_out.complete_en = next_complete.st_ex_en;
         for (int i = 0; i < NUM_FU_STORE; i++) begin
             if (i >= next_complete.st_ex_en)
                 continue;
 
-            sq_2_rob.complete_rob_idxs[i] = state[next_complete.st_sq_idx[i]].rob_idx;
+            rob_out.complete_rob_idxs[i] = state[next_complete.st_sq_idx[i]].rob_idx;
         end
         
         // retire
-        sq_2_retire.sq_ret_complete = (ret_2_sq.used_scnt == 0)&& (used_scnt == 0);
+        retire_out.sq_ret_complete = (ret_2_sq.used_scnt == 0)&& (used_scnt == 0);
     end
 
 
@@ -106,14 +108,14 @@ module sq #(parameter
 
         sq_2_ret = '{
             //handle retirement write to mem
-            ret_cnt    : retire_2_sq.r_en,
+            ret_cnt    : retire_in.r_en,
             ret_st     : tmp_ret_st,
 
             //handle data forwarding
-            forward_req_en      : ld_2_sq.forward_req_en,
-            forward_sq_idx      : ld_2_sq.forward_sq_idx,
-            forward_addr        : ld_2_sq.forward_addr,
-            forward_mem_size    : ld_2_sq.forward_mem_size
+            forward_req_en      : ld_in.forward_req_en,
+            forward_sq_idx      : ld_in.forward_sq_idx,
+            forward_addr        : ld_in.forward_addr,
+            forward_mem_size    : ld_in.forward_mem_size
         };
     end
 
@@ -157,19 +159,19 @@ module sq #(parameter
         end
 
         for (int unsigned i = 0; i < LD_BAY_SZ; i++) begin
-            start = get_waddr(ld_2_sq.forward_addr[i]);
+            start = get_waddr(ld_in.forward_addr[i]);
             addr_match = '0;
             byte_match = '0;
             byte_m1hot = '0;
 
-            if (!ld_2_sq.forward_req_en[i])
+            if (!ld_in.forward_req_en[i])
                 continue;
 
             foreach (addr_match[j]) begin
                 addr_match[j] = used_range[j]
                     && state[j].d_vld                                   // got data?
                     && (get_waddr(state[j].addr) == start)              // match word-aligned addr? 
-                    && (state[j].sq_idx < ld_2_sq.forward_sq_idx[i]);   // is older?
+                    && (state[j].sq_idx < ld_in.forward_sq_idx[i]);   // is older?
             end
 
             foreach (byte_match[j, b]) begin
@@ -205,39 +207,39 @@ module sq #(parameter
     sq_entry data? */
     always_comb begin
         for (int unsigned i = 0; i < LD_BAY_SZ; i++) begin
-            sq_2_exec.forward_en[i] |= forward_ret_2_sq.forward_en[i];
+            ex_out.forward_en[i] |= forward_ret_2_sq.forward_en[i];
             if (forward_ret_2_sq.sq_idx_found[i]) begin
-                sq_2_exec.forward_data[i] = forward_ret_2_sq.forward_data[i];
+                ex_out.forward_data[i] = forward_ret_2_sq.forward_data[i];
             end
             else begin
-                sq_2_exec.forward_data[i][7:0]      = ~sq_2_exec.forward_byte_en[i][0] ? forward_ret_2_sq.forward_data[i][7:0]      : sq_2_exec.forward_data[i][7:0];
-                sq_2_exec.forward_data[i][15:8]     = ~sq_2_exec.forward_byte_en[i][1] ? forward_ret_2_sq.forward_data[i][15:8]     : sq_2_exec.forward_data[i][15:8];
-                sq_2_exec.forward_data[i][23:16]    = ~sq_2_exec.forward_byte_en[i][2] ? forward_ret_2_sq.forward_data[i][23:16]    : sq_2_exec.forward_data[i][23:16];
-                sq_2_exec.forward_data[i][31:24]    = ~sq_2_exec.forward_byte_en[i][3] ? forward_ret_2_sq.forward_data[i][31:24]    : sq_2_exec.forward_data[i][31:24];
+                ex_out.forward_data[i][7:0]      = ~ex_out.forward_byte_en[i][0] ? forward_ret_2_sq.forward_data[i][7:0]      : ex_out.forward_data[i][7:0];
+                ex_out.forward_data[i][15:8]     = ~ex_out.forward_byte_en[i][1] ? forward_ret_2_sq.forward_data[i][15:8]     : ex_out.forward_data[i][15:8];
+                ex_out.forward_data[i][23:16]    = ~ex_out.forward_byte_en[i][2] ? forward_ret_2_sq.forward_data[i][23:16]    : ex_out.forward_data[i][23:16];
+                ex_out.forward_data[i][31:24]    = ~ex_out.forward_byte_en[i][3] ? forward_ret_2_sq.forward_data[i][31:24]    : ex_out.forward_data[i][31:24];
             end
-            sq_2_exec.forward_byte_en[i] |= forward_ret_2_sq.forward_byte_en[i];
+            ex_out.forward_byte_en[i] |= forward_ret_2_sq.forward_byte_en[i];
 
-            if ((ld_2_sq.forward_addr[i] % 4) == 1) begin
-                sq_2_exec.forward_data[i]       = sq_2_exec.forward_data[i] >> 8;
-                sq_2_exec.forward_byte_en[i]    = sq_2_exec.forward_byte_en[i] >> 8;
+            if ((ld_in.forward_addr[i] % 4) == 1) begin
+                ex_out.forward_data[i]       = ex_out.forward_data[i] >> 8;
+                ex_out.forward_byte_en[i]    = ex_out.forward_byte_en[i] >> 8;
             end
-            else if ((ld_2_sq.forward_addr[i] % 4) == 2) begin
-                sq_2_exec.forward_data[i]       = sq_2_exec.forward_data[i] >> 16;
-                sq_2_exec.forward_byte_en[i]    = sq_2_exec.forward_byte_en[i] >> 16;
+            else if ((ld_in.forward_addr[i] % 4) == 2) begin
+                ex_out.forward_data[i]       = ex_out.forward_data[i] >> 16;
+                ex_out.forward_byte_en[i]    = ex_out.forward_byte_en[i] >> 16;
             end
-            else if ((ld_2_sq.forward_addr[i] % 4) == 3) begin
-                sq_2_exec.forward_data[i]       = sq_2_exec.forward_data[i] >> 24;
-                sq_2_exec.forward_byte_en[i]    = sq_2_exec.forward_byte_en[i] >> 24;
+            else if ((ld_in.forward_addr[i] % 4) == 3) begin
+                ex_out.forward_data[i]       = ex_out.forward_data[i] >> 24;
+                ex_out.forward_byte_en[i]    = ex_out.forward_byte_en[i] >> 24;
             end
 
             //ensure don't accidentally give more data than it wants
-            if (ld_2_sq.forward_mem_size[i] == BYTE) begin
-                sq_2_exec.forward_data[i] &= 8'hFF;
-                sq_2_exec.forward_byte_en[i] &= 1'b1;
+            if (ld_in.forward_mem_size[i] == BYTE) begin
+                ex_out.forward_data[i] &= 8'hFF;
+                ex_out.forward_byte_en[i] &= 1'b1;
             end
-            else if (ld_2_sq.forward_mem_size[i] == HALF) begin
-                sq_2_exec.forward_data[i] &= 16'hFFFF;
-                sq_2_exec.forward_byte_en[i] &= 2'b11;
+            else if (ld_in.forward_mem_size[i] == HALF) begin
+                ex_out.forward_data[i] &= 16'hFFFF;
+                ex_out.forward_byte_en[i] &= 2'b11;
             end
 
         end
@@ -250,10 +252,10 @@ module sq #(parameter
         modulo4 = '0;
 
         for (int i = 0; i < `NUM_FU_STORE; i++) begin
-            modulo4[i] = iw_off(exec_2_sq.st_addr[i]);
+            modulo4[i] = iw_off(ex_in.st_addr[i]);
 
-            if (exec_2_sq.st_mem_size[i] == BYTE)       bytewise_addr_mask[i][modulo4[i]] = 1;
-            else if (exec_2_sq.st_mem_size[i] == HALF)  bytewise_addr_mask[i][modulo4[i]+:1] = '1;
+            if (ex_in.st_mem_size[i] == BYTE)       bytewise_addr_mask[i][modulo4[i]] = 1;
+            else if (ex_in.st_mem_size[i] == HALF)  bytewise_addr_mask[i][modulo4[i]+:1] = '1;
             else                                        bytewise_addr_mask[i] = '1;
         end
 
@@ -265,7 +267,7 @@ module sq #(parameter
         updateOffset = '0;
 
         for (int i = 0; i < `NUM_FU_STORE; i++) begin
-            updateOffset[i] = 8 * iw_off(exec_2_sq.st_addr[i]);
+            updateOffset[i] = 8 * iw_off(ex_in.st_addr[i]);
             // shifted_data = state[idx].data << offset;
         end
     end
@@ -286,27 +288,27 @@ module sq #(parameter
             next_complete <= '0;
             no_store_yet <= '1;
         end else begin
-            used    <= used + dis_2_sq.sq_d_en_cnt - retire_2_sq.r_en;
-            free    <= free - dis_2_sq.sq_d_en_cnt + retire_2_sq.r_en;
-            rsvd    <= rsvd - dis_2_sq.sq_d_en_cnt + dis_2_sq.rename_en_cnt;
+            used    <= used + dis_in.sq_d_en_cnt - retire_in.r_en;
+            free    <= free - dis_in.sq_d_en_cnt + retire_in.r_en;
+            rsvd    <= rsvd - dis_in.sq_d_en_cnt + dis_in.rename_en_cnt;
 
-            head    <= (head + retire_2_sq.r_en) % LSQ_SZ;
-            tail    <= (tail + dis_2_sq.sq_d_en_cnt) % LSQ_SZ;
-            tail_dbl <= (tail_dbl + dis_2_sq.sq_d_en_cnt) % LSQ_SZ_DBL;
-            last_used_sq_idx <= dis_2_sq.sq_d_en_cnt > 0 ? (last_used_sq_idx + dis_2_sq.sq_d_en_cnt) % LSQ_SZ_DBL : last_used_sq_idx;
-            no_store_yet <= (dis_2_sq.sq_d_en_cnt > 0) | no_store_yet;
+            head    <= (head + retire_in.r_en) % LSQ_SZ;
+            tail    <= (tail + dis_in.sq_d_en_cnt) % LSQ_SZ;
+            tail_dbl <= (tail_dbl + dis_in.sq_d_en_cnt) % LSQ_SZ_DBL;
+            last_used_sq_idx <= dis_in.sq_d_en_cnt > 0 ? (last_used_sq_idx + dis_in.sq_d_en_cnt) % LSQ_SZ_DBL : last_used_sq_idx;
+            no_store_yet <= (dis_in.sq_d_en_cnt > 0) | no_store_yet;
 
-            next_complete <= exec_2_sq;
+            next_complete <= ex_in;
 
             // handle execute updates
             for (int unsigned i = 0, int cur_idx = 0; i < NUM_ST_PORTS; ++i) begin
-                cur_idx = exec_2_sq.st_sq_idx[i];
+                cur_idx = ex_in.st_sq_idx[i];
                 
-                if (exec_2_sq.st_ex_en[i]) begin
-                    state[cur_idx].addr                 <= exec_2_sq.st_addr[i];
+                if (ex_in.st_ex_en[i]) begin
+                    state[cur_idx].addr                 <= ex_in.st_addr[i];
                     state[cur_idx].bytewise_addr_mask   <= bytewise_addr_mask[i];
-                    state[cur_idx].data                 <= (exec_2_sq.st_data[i] << updateOffset[i]);
-                    state[cur_idx].mem_size             <= exec_2_sq.st_mem_size[i];
+                    state[cur_idx].data                 <= (ex_in.st_data[i] << updateOffset[i]);
+                    state[cur_idx].mem_size             <= ex_in.st_mem_size[i];
                     state[cur_idx].d_vld                <= '1;
                 end
 
@@ -314,12 +316,12 @@ module sq #(parameter
 
             // handle dispatch (ins)
             for (int unsigned i = 0, int cur_idx = 0; i < NUM_DPORTS; ++i) begin
-                if (i >= dis_2_sq.sq_d_en_cnt)
+                if (i >= dis_in.sq_d_en_cnt)
                     continue;
                 cur_idx = d_idxs[i];
                 state[cur_idx] <= '{
                     sq_idx              : next_ids[i],
-                    rob_idx             : dis_2_sq.rob_idx[i],
+                    rob_idx             : dis_in.rob_idx[i],
                     addr                : '0,
                     bytewise_addr_mask  : '0,
                     data                : '0,
@@ -340,15 +342,15 @@ module sq #(parameter
         tail,
         used,
         // I/O
-        dis_2_sq,
-        exec_2_sq,
-        retire_2_sq,
+        dis_in,
+        ex_in,
+        retire_in,
         mem2proc_transaction_tag,
 
-        sq_2_dis,
-        sq_2_exec,
+        dis_out,
+        ex_out,
         // sq2rs sq_2_rs,
-        sq_2_retire,
+        retire_out,
         ret_2_mem,
 
         dbg_retbuf
