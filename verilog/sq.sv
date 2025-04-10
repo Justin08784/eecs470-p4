@@ -144,6 +144,10 @@ module sq #(parameter
     logic [LSQ_SZ-1:0]      addr_match;
     logic [LSQ_SZ-1:0][3:0] byte_match;
     logic [LSQ_SZ-1:0][3:0] byte_m1hot;
+
+    logic [LD_BAY_SZ-1:0][LSQ_SZ-1:0]      tmp_addr_match;
+    logic [LD_BAY_SZ-1:0][LSQ_SZ-1:0][3:0] tmp_byte_match;
+    logic [LD_BAY_SZ-1:0][LSQ_SZ-1:0][3:0] tmp_byte_m1hot;
     always_comb begin
         forward_en       = '0;
         forward_data     = '0;
@@ -200,25 +204,55 @@ module sq #(parameter
                     continue;
                 forward_data[i].byte_level[b] |= state[j].data.byte_level[b];
             end
+
+            tmp_addr_match[i] = addr_match;
+            tmp_byte_match[i] = byte_match;
+            tmp_byte_m1hot[i] = byte_m1hot;
         end
     end
 
-    /* FIXME: Why does this logic only ever read from ret buf? Why no data from
-    sq_entry data? */
+    `ifdef DEBUG
+    always_ff @(posedge clock) begin
+        if (!reset) begin
+            $display("=== Forwarding Info ===");
+            $display("-- used_range:     %b, head: %d, used: %d",   used_range, head, used);
+            $display("-- addr_match:     %b",   tmp_addr_match);
+            $display("-- byte_match:     %b",   tmp_byte_match);
+            $display("-- byte_m1hot:     %b",   tmp_byte_m1hot);
+            for (int i = 0; i < LD_BAY_SZ; i++) begin
+                $display("Bay %0d:", i);
+                $display("  req_en     = %0b", ld_in.forward_req_en[i]);
+                $display("  sq_idx     = %0d", ld_in.forward_sq_idx[i]);
+                $display("  addr       = 0x%08x", ld_in.forward_addr[i]);
+                $display("  mem_size   = %0d", ld_in.forward_mem_size[i]); // BYTE=0, HALF=1, WORD=2 (assuming enum encoding)
+                $display("  forward_en       = %0b", forward_en[i]);
+                $display("  forward_data     = 0x%8h", forward_data[i]);
+                $display("  forward_mem_size = %0d", forward_mem_size[i]);
+                $display("  forward_byte_en  = %4b", forward_byte_en[i]);
+                $display("  ret_2_sq.sq_found         = %0b",   forward_ret_2_sq.sq_idx_found[i]);
+                $display("  ret_2_sq.forward_en       = %0b",   forward_ret_2_sq.forward_en[i]);
+                $display("  ret_2_sq.forward_data     = 0x%8h", forward_ret_2_sq.forward_data[i]);
+                $display("  ret_2_sq.forward_mem_size = %0d",   forward_ret_2_sq.forward_mem_size[i]);
+                $display("  ret_2_sq.forward_byte_en  = %4b",   forward_ret_2_sq.forward_byte_en[i]);
+            end
+            $display("========================");
+        end
+    end
+    `endif
+
     always_comb begin
         ex_out = '0;
         for (int unsigned i = 0; i < LD_BAY_SZ; i++) begin
-            ex_out.forward_en[i] |= forward_ret_2_sq.forward_en[i];
+            /* BUG: test5, 6. sq_idx_found not being set properly */
             if (forward_ret_2_sq.sq_idx_found[i]) begin
-                ex_out.forward_data[i] = forward_ret_2_sq.forward_data[i];
+                ex_out.forward_en[i]                |= forward_ret_2_sq.forward_en[i];
+                ex_out.forward_data[i].word_level   |= forward_ret_2_sq.forward_data[i];
+                ex_out.forward_byte_en[i]           |= forward_ret_2_sq.forward_byte_en[i];
+            end else begin
+                ex_out.forward_en[i]                |= forward_en[i];
+                ex_out.forward_data[i]              |= forward_data[i];
+                ex_out.forward_byte_en[i]           |= forward_byte_en[i];
             end
-            else begin
-                ex_out.forward_data[i][7:0]      = ~ex_out.forward_byte_en[i][0] ? forward_ret_2_sq.forward_data[i][7:0]      : ex_out.forward_data[i][7:0];
-                ex_out.forward_data[i][15:8]     = ~ex_out.forward_byte_en[i][1] ? forward_ret_2_sq.forward_data[i][15:8]     : ex_out.forward_data[i][15:8];
-                ex_out.forward_data[i][23:16]    = ~ex_out.forward_byte_en[i][2] ? forward_ret_2_sq.forward_data[i][23:16]    : ex_out.forward_data[i][23:16];
-                ex_out.forward_data[i][31:24]    = ~ex_out.forward_byte_en[i][3] ? forward_ret_2_sq.forward_data[i][31:24]    : ex_out.forward_data[i][31:24];
-            end
-            ex_out.forward_byte_en[i] |= forward_ret_2_sq.forward_byte_en[i];
 
             if ((ld_in.forward_addr[i] % 4) == 1) begin
                 ex_out.forward_data[i]       = ex_out.forward_data[i] >> 8;
