@@ -118,8 +118,8 @@ module sq #(parameter
         sq_2_ret.forward_mem_size   = ld_2_sq.forward_mem_size;
 
         for (int unsigned i = 0, ADDR start = 0; i < LD_BAY_SZ; i++) begin
-
-            if (!ld_2_sq.forward_req_en[i]) continue;
+            if (!ld_2_sq.forward_req_en[i])
+                continue;
 
             start = ld_2_sq.forward_addr[i] - (ld_2_sq.forward_addr[i] % 4);
             for (int unsigned j = 0, int unsigned idx = 0; j < used; ++j) begin
@@ -134,7 +134,8 @@ module sq #(parameter
                     sq_2_exec.forward_byte_en[i] |= state[idx].bytewise_addr_mask;
                 end
 
-                if (state[idx].sq_idx == ld_2_sq.forward_sq_idx[i]) break;
+                if (state[idx].sq_idx == ld_2_sq.forward_sq_idx[i])
+                    break;
             end
 
             sq_2_exec.forward_en[i] = (sq_2_exec.forward_byte_en[i] != 0) ? '1 : '0;
@@ -375,13 +376,15 @@ module post_ret_buffer #(parameter
         forward_ret_2_sq = '0;
 
         for (int unsigned i = 0, ADDR start = 0; i < LD_BAY_SZ; i++) begin
-            if (!sq_2_ret.forward_req_en[i]) continue;
+            if (!sq_2_ret.forward_req_en[i])
+                continue;
 
             start = sq_2_ret.forward_addr[i] - (sq_2_ret.forward_addr[i] % 4);
             for (int unsigned j = 0, int unsigned idx = 0; j < used; ++j) begin
                 idx = (head+j) % LSQ_SZ;
 
-                if (state[idx].sq_idx == sq_2_ret.forward_sq_idx[i]) forward_ret_2_sq.sq_idx_found[i] = '1;
+                if (state[idx].sq_idx == sq_2_ret.forward_sq_idx[i])
+                    forward_ret_2_sq.sq_idx_found[i] = '1;
 
                 if (state[idx].d_vld && ({state[idx].addr[31:2],2'b0} == start)) begin
                     forward_ret_2_sq.forward_data[i][7:0]   = state[idx].bytewise_addr_mask[0] ? state[idx].data[7:0]      : forward_ret_2_sq.forward_data[i][7:0];
@@ -393,7 +396,8 @@ module post_ret_buffer #(parameter
                     forward_ret_2_sq.forward_byte_en[i] |= state[idx].bytewise_addr_mask;
                 end
 
-                if (state[idx].sq_idx == sq_2_ret.forward_sq_idx[i]) break;
+                if (state[idx].sq_idx == sq_2_ret.forward_sq_idx[i])
+                    break;
             end
 
             forward_ret_2_sq.forward_en[i] = (forward_ret_2_sq.forward_byte_en[i] != 0) ? '1 : '0;
