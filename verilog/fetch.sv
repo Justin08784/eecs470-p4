@@ -147,10 +147,10 @@ module stage_if_p4 (
 
     logic [1:0] [15:0] btb_target;
 
-    assign mux_result_prediction[0] = predict_taken[0] && btb_hit[0];
+    assign mux_result_prediction[0] = /*predict_taken[0] &&*/ btb_hit[0];
 
    // assign pred_out = mux_result
-    assign mux_result_prediction[1] = predict_taken[1] && btb_hit[1];
+    assign mux_result_prediction[1] = /*predict_taken[1] &&*/ btb_hit[1];
 
     //if btb
 
@@ -175,7 +175,7 @@ module stage_if_p4 (
         end else if (flush) begin
             foreach(PC_reg[i])
                 PC_reg[i] <= 4*i + r_in.corrected_PC;  // initial PC value is 0 (the memory address where our program starts)
-        end else if(mux_result_prediction) begin
+        end else if(mux_result_prediction[0]) begin
                 $display("PREDICTING TAKEN:");
                 taken_count = taken_count + 1;
                // foreach(PC_reg[i])
@@ -186,7 +186,8 @@ module stage_if_p4 (
                 //$display("PREDICT TAKEN: %1x", predict_taken[0]);
                // $display("BTB HIT: %1x", btb_hit[0]);
                 $display("FETCHING NEW TARGET: %x", btb_in.target);
-                PC_reg[0] <= {16'b0000000000000000,btb_in.target};
+                foreach(PC_reg[i])
+                    PC_reg[i] <=  mux_result_prediction[i] ? {16'b0,btb_in.target[i]} : PC_reg[i] + 4*f_cnt;
         end else begin
             foreach(PC_reg[i])
                 PC_reg[i] <= PC_reg[i] + 4*f_cnt; // ...or transition to next PC if valid
