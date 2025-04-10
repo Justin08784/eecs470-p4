@@ -1013,6 +1013,7 @@ module testbench;
         retire2btq btq_out;
         sq2retire sq_in;
         retire2sq sq_out;
+        lq2retire lq_in;
         logic mispred;
         ADDR  mispred_target;
         retire_final retire_exec;
@@ -1022,6 +1023,7 @@ module testbench;
         btq_out        = dbg_retire.btq_out;
         sq_in          = dbg_retire.sq_in;
         sq_out         = dbg_retire.sq_out;
+        lq_in          = dbg_retire.lq_in;
         mispred        = dbg_retire.mispred;
         mispred_target = dbg_retire.mispred_target;
         retire_exec    = dbg_retire.retire_exec;
@@ -1037,6 +1039,15 @@ module testbench;
             );
         end
         $display("btq_rd_cnt: %0d", btq_out.rd_cnt);
+
+        for (int i = 0; i < `N; ++i) begin
+            $display("lq_in [%2d]: PC: %x, err_ld_ooo: %b",
+                i,
+                lq_in.PC[i],
+                lq_in.err_ld_ooo[i]
+            );
+        end
+
         $display("retire_exec.r_en_cnt: %0d", retire_exec.r_en_cnt);
         $display("  | << retire <<");
     endtask

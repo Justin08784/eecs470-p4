@@ -68,7 +68,7 @@
 
 `ifndef SYNTH
 // comment out to disable DEBUG:
-`define DEBUG
+// `define DEBUG
 `endif
 
 ///////////////////////////////
@@ -948,8 +948,8 @@ typedef struct packed {
 } sq2stRET;
 
 typedef struct packed {
-    logic [$clog2(`N):0]    free_out;
-    logic                   empty;
+    logic [$clog2(`N):0]    free_scnt;
+    logic [$clog2(`N):0]    used_scnt;
 } stRET2sq;
 
 typedef struct packed {
@@ -1190,6 +1190,7 @@ typedef struct packed {
     retire2btq btq_out;
     sq2retire sq_in;
     retire2sq sq_out;
+    lq2retire lq_in;
     logic mispred;
     ADDR  mispred_target;
     retire_final retire_exec;

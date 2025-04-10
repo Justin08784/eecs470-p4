@@ -59,7 +59,7 @@ module lq #(parameter
             d_idxs[i] = (tail + i) % LSQ_SZ;
 
         // handle dispatch (outs)
-        lq_2_dis <= '{
+        lq_2_dis = '{
             lq_rdy_scnt : free_scnt,
             lq_tail     : tail
         };
