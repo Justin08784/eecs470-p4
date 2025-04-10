@@ -66,26 +66,9 @@ module sq #(parameter
     assign free_scnt    = `MIN(free - rsvd, NUM_DPORTS);
     assign used_scnt    = `MIN(used, NUM_RPORTS);
 
-
-    DBG_retbuf dbg_retbuf;
-    post_ret_buffer buf_dut(
-        `ifdef DEBUG
-        .dbg(dbg_retbuf),
-        `endif
-        .clock(clock),
-        .reset(reset),
-        .sq_2_ret(sq_2_ret),
-        .mem2proc_transaction_tag(mem2proc_transaction_tag),
-        .ret_2_sq(ret_2_sq),
-        .forward_ret_2_sq(forward_ret_2_sq),
-        .ret_2_mem(ret_2_mem)
-    );
-
     LSQ_IDX [N-1:0] next_ids;
     execute2sq next_complete;
     always_comb begin
-        sq_2_rob = '0;
-
         for (int unsigned i = 0; i < NUM_RPORTS; ++i)
             r_idxs[i] = (head + i) % LSQ_SZ;
         for (int unsigned i = 0; i < NUM_DPORTS; ++i)
@@ -102,6 +85,7 @@ module sq #(parameter
         };
 
         //handle sq to ROB for retirement
+        sq_2_rob = '0;
         sq_2_rob.complete_en = next_complete.st_ex_en;
         for (int i = 0; i < NUM_FU_STORE; i++) begin
             if (i >= next_complete.st_ex_en)
@@ -109,9 +93,11 @@ module sq #(parameter
 
             sq_2_rob.complete_rob_idxs[i] = state[next_complete.st_sq_idx[i]].rob_idx;
         end
-        sq_2_retire.sq_ret_complete = (ret_2_sq.used_scnt == 0) && (used_scnt == 0);
-
+        
+        // retire
+        sq_2_retire.sq_ret_complete = (ret_2_sq.used_scnt == 0)&& (used_scnt == 0);
     end
+
 
     SQ_ENTRY [`N-1:0] tmp_ret_st;
     always_comb begin
@@ -130,6 +116,20 @@ module sq #(parameter
             forward_mem_size    : ld_2_sq.forward_mem_size
         };
     end
+
+    DBG_retbuf dbg_retbuf;
+    post_ret_buffer buf_dut(
+        `ifdef DEBUG
+        .dbg(dbg_retbuf),
+        `endif
+        .clock(clock),
+        .reset(reset),
+        .sq_2_ret(sq_2_ret),
+        .mem2proc_transaction_tag(mem2proc_transaction_tag),
+        .ret_2_sq(ret_2_sq),
+        .forward_ret_2_sq(forward_ret_2_sq),
+        .ret_2_mem(ret_2_mem)
+    );
 
 
     WADDR start;
