@@ -189,7 +189,7 @@ GREP = grep -E --color=auto
 # ---- Modules to Test ---- #
 
 # TODO: add more modules here
-MODULES = cpu mult rob rs fifo free_list dispatch prf map_table stage_id_p4 execute fetch btb sq post_ret_buffer gshare skid_buffer lq
+MODULES = cpu mult rob rs fifo free_list dispatch prf map_table stage_id_p4 execute fetch btb sq post_ret_buffer gshare skid_buffer lq victim
 
 # TODO: update this if you add more header files
 ALL_HEADERS = $(CPU_HEADERS)
@@ -283,6 +283,11 @@ build/lq.simv: $(LQ_FILES)
 build/lq.cov: $(LQ_FILES)
 synth/lq.vg: $(LQ_FILES)
 
+VICTIM_FILES = verilog/sys_defs.svh verilog/psel_gen.sv
+build/victim.simv: $(VICTIM_FILES)
+build/victim.cov: $(VICTIM_FILES)
+synth/victim.vg: $(VICTIM_FILES)
+
 POST_RET_BUFFER_FILES = verilog/sys_defs.svh
 build/post_ret_buffer.simv: $(POST_RET_BUFFER_FILES)
 build/post_ret_buffer.cov: $(POST_RET_BUFFER_FILES)
@@ -336,6 +341,7 @@ CPU_SOURCES = verilog/cpu.sv \
 			  verilog/global_history_register.sv \
 			  verilog/pht.sv \
 			  verilog/retire.sv \
+			  verilog/victim.sv \
 			  verilog/sq.sv \
 			  verilog/lq.sv
 
