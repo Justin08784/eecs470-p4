@@ -86,6 +86,8 @@ typedef logic [31:0] ADDR;
 typedef logic [31:0] DATA;
 typedef logic [4:0] REG_IDX;
 
+typedef logic [15:2] WADDR;
+
 /* 
 NEED CLARIFICATION:
 NOTE: We will use PHYS_REG_IDX = 0 as a sentinel (to denote "no register" / "is immediate operand").
