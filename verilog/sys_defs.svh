@@ -449,7 +449,6 @@ typedef struct packed {
     LSQ_IDX sq_idx;
     ROB_IDX rob_idx;
     ADDR addr;
-    ADDR [3:0] bytewise_addr;
     logic [3:0] bytewise_addr_mask;
     DATA data;
     logic d_vld;

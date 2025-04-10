@@ -136,7 +136,7 @@ module sq #(parameter
             for (int unsigned j = 0, int unsigned idx = 0; j < used; ++j) begin
                 idx = (head+j) % LSQ_SZ;
 
-                if (state[idx].d_vld && (state[idx].bytewise_addr[0] == start)) begin
+                if (state[idx].d_vld && ({state[idx].addr[31:2],2'b0} == start)) begin
                     sq_2_exec.forward_data[i][7:0]      = state[idx].bytewise_addr_mask[0] ? state[idx].data[7:0]      : sq_2_exec.forward_data[i][7:0];
                     sq_2_exec.forward_data[i][15:8]     = state[idx].bytewise_addr_mask[1] ? state[idx].data[15:8]     : sq_2_exec.forward_data[i][15:8];
                     sq_2_exec.forward_data[i][23:16]    = state[idx].bytewise_addr_mask[2] ? state[idx].data[23:16]    : sq_2_exec.forward_data[i][23:16];
@@ -190,19 +190,14 @@ module sq #(parameter
         end
     end
 
-    ADDR [`NUM_FU_STORE-1:0] [3:0] bytewise_addr;
     logic [`NUM_FU_STORE-1:0] [3:0] bytewise_addr_mask;
     logic [`NUM_FU_STORE-1:0] [1:0] modulo4;
     always_comb begin
-        bytewise_addr = '0;
         bytewise_addr_mask = '0;
         modulo4 = '0;
 
         for (int i = 0; i < `NUM_FU_STORE; i++) begin
             modulo4[i] = exec_2_sq.st_addr[i] % 4;
-            for (int j = 0; j < 4; j++) begin
-                bytewise_addr[i][j] = exec_2_sq.st_addr[i] - modulo4[i] + j;
-            end
 
             if (exec_2_sq.st_mem_size[i] == BYTE)       bytewise_addr_mask[i][modulo4[i]] = 1;
             else if (exec_2_sq.st_mem_size[i] == HALF)  bytewise_addr_mask[i][modulo4[i]+:1] = '1;
@@ -264,7 +259,6 @@ module sq #(parameter
                 
                 if (exec_2_sq.st_ex_en[i]) begin
                     state[cur_idx].addr                 <= exec_2_sq.st_addr[i];
-                    state[cur_idx].bytewise_addr        <= bytewise_addr[i];
                     state[cur_idx].bytewise_addr_mask   <= bytewise_addr_mask[i];
                     state[cur_idx].data                 <= (exec_2_sq.st_data[i] << updateOffset[i]);
                     state[cur_idx].mem_size             <= exec_2_sq.st_mem_size[i];
@@ -282,7 +276,6 @@ module sq #(parameter
                     sq_idx              : next_ids[i],
                     rob_idx             : dis_2_sq.rob_idx[i],
                     addr                : '0,
-                    bytewise_addr       : '0,
                     bytewise_addr_mask  : '0,
                     data                : '0,
                     d_vld               : '0,
@@ -408,7 +401,7 @@ module post_ret_buffer #(parameter
 
                 if (state[idx].sq_idx == sq_2_ret.forward_sq_idx[i]) forward_ret_2_sq.sq_idx_found[i] = '1;
 
-                if (state[idx].d_vld && (state[idx].bytewise_addr[0] == start)) begin
+                if (state[idx].d_vld && ({state[idx].addr[31:2],2'b0} == start)) begin
                     forward_ret_2_sq.forward_data[i][7:0]   = state[idx].bytewise_addr_mask[0] ? state[idx].data[7:0]      : forward_ret_2_sq.forward_data[i][7:0];
                     forward_ret_2_sq.forward_data[i][15:8]  = state[idx].bytewise_addr_mask[1] ? state[idx].data[15:8]     : forward_ret_2_sq.forward_data[i][15:8];
                     forward_ret_2_sq.forward_data[i][23:16] = state[idx].bytewise_addr_mask[2] ? state[idx].data[23:16]    : forward_ret_2_sq.forward_data[i][23:16];
