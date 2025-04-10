@@ -206,6 +206,7 @@ module sq #(parameter
     /* FIXME: Why does this logic only ever read from ret buf? Why no data from
     sq_entry data? */
     always_comb begin
+        ex_out = '0;
         for (int unsigned i = 0; i < LD_BAY_SZ; i++) begin
             ex_out.forward_en[i] |= forward_ret_2_sq.forward_en[i];
             if (forward_ret_2_sq.sq_idx_found[i]) begin
