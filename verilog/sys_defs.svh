@@ -910,7 +910,7 @@ typedef struct packed {
 
 typedef struct packed {
     logic       [`LD_BAY_SZ-1:0]          forward_en; //tells the load FU if valid data to be forwarded was found (will be ready by the posedge of the next clock cycle)
-    DATA        [`LD_BAY_SZ-1:0]          forward_data; //the data being forwarded
+    DATA_BLOCK  [`LD_BAY_SZ-1:0]          forward_data; //the data being forwarded
     MEM_SIZE    [`LD_BAY_SZ-1:0]          forward_mem_size; //the size of the data being forwarded. Will always match the size of the request
     logic       [`LD_BAY_SZ-1:0] [3:0]    forward_byte_en; //a 4-wide mask telling which of the bytes are valid data being forwarded. This allows cases where you request 4000-4003, and SQ returns a match on 400-4001 and 4003 but not 4002 (and similar cases)
     //example for byte mask:

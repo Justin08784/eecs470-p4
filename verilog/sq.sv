@@ -51,7 +51,6 @@ module sq #(parameter
     logic [$clog2(LSQ_SZ)-1:0]      head;
     logic [$clog2(LSQ_SZ)-1:0]      tail;
     logic [$clog2(LSQ_SZ_DBL)-1:0]  tail_dbl;
-    LSQ_IDX                         last_used_sq_idx;
     logic                           no_store_yet;
 
     SQ_ENTRY [LSQ_SZ-1:0]           state;
@@ -81,7 +80,7 @@ module sq #(parameter
         // handle dispatch (outs)
         dis_out = '{
             sq_rdy_scnt         : free_scnt,
-            last_used_sq_idx    : last_used_sq_idx,
+            last_used_sq_idx    : tail_dbl,
             next_ids            : next_ids,
             no_store_yet        : no_store_yet
         };
@@ -255,8 +254,8 @@ module sq #(parameter
             end
 
             wr_off = 8 * iw_off(ld_in.forward_addr[i]);
-            ex_out.forward_data[i]       = ex_out.forward_data[i] >> wr_off;
-            ex_out.forward_byte_en[i]    = ex_out.forward_byte_en[i] >> wr_off;
+            ex_out.forward_data[i]       = ex_out.forward_data[i]       >> wr_off;
+            ex_out.forward_byte_en[i]    = ex_out.forward_byte_en[i]    >> wr_off;
 
             //ensure don't accidentally give more data than it wants
             case (ld_in.forward_mem_size[i])
@@ -310,7 +309,6 @@ module sq #(parameter
             tail    <= 0;
             tail_dbl <= 0;
             state   <= '0;
-            last_used_sq_idx <= LSQ_SZ_DBL - 1; //outside of SQ range so that if a load occurs before the first store we don't flag it falsely
             next_complete <= '0;
             no_store_yet <= '1;
         end else begin
@@ -318,10 +316,9 @@ module sq #(parameter
             free    <= free - dis_in.sq_d_en_cnt + retire_in.r_en;
             rsvd    <= rsvd - dis_in.sq_d_en_cnt + dis_in.rename_en_cnt;
 
-            head    <= (head + retire_in.r_en) % LSQ_SZ;
-            tail    <= (tail + dis_in.sq_d_en_cnt) % LSQ_SZ;
-            tail_dbl <= (tail_dbl + dis_in.sq_d_en_cnt) % LSQ_SZ_DBL;
-            last_used_sq_idx <= dis_in.sq_d_en_cnt > 0 ? (last_used_sq_idx + dis_in.sq_d_en_cnt) % LSQ_SZ_DBL : last_used_sq_idx;
+            head        <= (head + retire_in.r_en) % LSQ_SZ;
+            tail        <= (tail + dis_in.sq_d_en_cnt) % LSQ_SZ;
+            tail_dbl    <= (tail_dbl + dis_in.sq_d_en_cnt) % LSQ_SZ_DBL;
             no_store_yet <= (dis_in.sq_d_en_cnt > 0) | no_store_yet;
 
             next_complete <= ex_in;
@@ -471,7 +468,7 @@ module post_ret_buffer #(parameter
                 idx = (head+j) % LSQ_SZ;
 
                 // FIXME: This used to be ==. Is this <= correct?
-                if (state[idx].sq_idx <= sq_2_ret.forward_sq_idx[i])
+                if (state[idx].sq_idx == sq_2_ret.forward_sq_idx[i])
                     forward_ret_2_sq.sq_idx_found[i] = '1;
 
                 if (state[idx].d_vld && (get_waddr(state[idx].addr) == start)) begin
