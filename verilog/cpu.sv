@@ -328,17 +328,18 @@ module cpu (
     ////////////////////////////////////////////////// 
 
     execute2sq exec_2_sq;
-    // MEM_TAG mem2proc_transaction_tag;
-    MEM_TAG temp_tag;
+    executeLD2sq exec_ld_2_sq;
+    // MEM_TAG temp_tag;
     sq2execute sq_2_exec;
-    assign temp_tag = (ret_2_mem.Dmem_command == MEM_STORE) ? 1 : 0;
+    // assign temp_tag = (ret_2_mem.Dmem_command == MEM_STORE) ? 1 : 0;
 
     sq #(
         .N(`N),
         .LSQ_SZ(`LSQ_SZ),
         .LSQ_SZ_DBL(`LSQ_SZ_DBL),
         .NUM_FU_STORE(`NUM_FU_STORE),
-        .NUM_FU_LOAD(`NUM_FU_LOAD)
+        .NUM_FU_LOAD(`NUM_FU_LOAD),
+        .LD_BAY_SZ(`LD_BAY_SZ)
     ) sq_0 (
         `ifdef DEBUG
         .dbg        (dbg_sq),
@@ -351,6 +352,7 @@ module cpu (
         .sq_2_dis   (sq_2_dispatch),
 
         .exec_2_sq  (exec_2_sq),
+        .ld_2_sq    (exec_ld_2_sq),
         .sq_2_exec  (sq_2_exec),
         .sq_2_rob   (sq_2_rob),
 
@@ -410,6 +412,7 @@ module cpu (
 
         .lq_out (exec_2_lq),
         .st_lq_out (execST_2_lq),
+        .ld_sq_out (exec_ld_2_sq),
 
         .prf_in (prf_2_ex),
         .prf_out(ex_2_prf),

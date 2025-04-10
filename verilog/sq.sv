@@ -6,7 +6,8 @@ module sq #(parameter
     LSQ_SZ=`LSQ_SZ,
     LSQ_SZ_DBL=`LSQ_SZ_DBL,
     NUM_FU_STORE=`NUM_FU_STORE,
-    NUM_FU_LOAD=`NUM_FU_LOAD
+    NUM_FU_LOAD=`NUM_FU_LOAD,
+    LD_BAY_SZ=`LD_BAY_SZ
 ) (
     `ifdef DEBUG
     output DBG_sq dbg,
@@ -17,6 +18,7 @@ module sq #(parameter
 
     input dispatch2sq   dis_2_sq,
     input execute2sq    exec_2_sq,
+    input executeLD2sq  ld_2_sq,
     input retire2sq     retire_2_sq,
     input MEM_TAG       mem2proc_transaction_tag,
 
@@ -121,15 +123,16 @@ module sq #(parameter
         sq_2_exec = '0;
 
         //handle data forwarding
-        sq_2_ret.forward_req_en     = exec_2_sq.forward_req_en;
-        sq_2_ret.forward_sq_idx     = exec_2_sq.forward_sq_idx;
-        sq_2_ret.forward_addr       = exec_2_sq.forward_addr;
-        sq_2_ret.forward_mem_size   = exec_2_sq.forward_mem_size;
+        sq_2_ret.forward_req_en     = ld_2_sq.forward_req_en;
+        sq_2_ret.forward_sq_idx     = ld_2_sq.forward_sq_idx;
+        sq_2_ret.forward_addr       = ld_2_sq.forward_addr;
+        sq_2_ret.forward_mem_size   = ld_2_sq.forward_mem_size;
 
-        for (int unsigned i = 0, ADDR start = 0; i < NUM_FU_LOAD; i++) begin
-            if (!exec_2_sq.forward_req_en[i]) continue;
+        for (int unsigned i = 0, ADDR start = 0; i < LD_BAY_SZ; i++) begin
 
-            start = exec_2_sq.forward_addr[i] - (exec_2_sq.forward_addr[i] % 4);
+            if (!ld_2_sq.forward_req_en[i]) continue;
+
+            start = ld_2_sq.forward_addr[i] - (ld_2_sq.forward_addr[i] % 4);
             for (int unsigned j = 0, int unsigned idx = 0; j < used; ++j) begin
                 idx = (head+j) % LSQ_SZ;
 
@@ -142,13 +145,13 @@ module sq #(parameter
                     sq_2_exec.forward_byte_en[i] |= state[idx].bytewise_addr_mask;
                 end
 
-                if (state[idx].sq_idx == exec_2_sq.forward_sq_idx[i]) break;
+                if (state[idx].sq_idx == ld_2_sq.forward_sq_idx[i]) break;
             end
 
             sq_2_exec.forward_en[i] = (sq_2_exec.forward_byte_en[i] != 0) ? '1 : '0;
         end
 
-        for (int unsigned i = 0; i < NUM_FU_LOAD; i++) begin
+        for (int unsigned i = 0; i < LD_BAY_SZ; i++) begin
             sq_2_exec.forward_en[i] |= forward_ret_2_sq.forward_en[i];
             if (forward_ret_2_sq.sq_idx_found[i]) begin
                 sq_2_exec.forward_data[i] = forward_ret_2_sq.forward_data[i];
@@ -161,34 +164,35 @@ module sq #(parameter
             end
             sq_2_exec.forward_byte_en[i] |= forward_ret_2_sq.forward_byte_en[i];
 
-            if ((exec_2_sq.forward_addr[i] % 4) == 1) begin
+            if ((ld_2_sq.forward_addr[i] % 4) == 1) begin
                 sq_2_exec.forward_data[i]       = sq_2_exec.forward_data[i] >> 8;
                 sq_2_exec.forward_byte_en[i]    = sq_2_exec.forward_byte_en[i] >> 8;
             end
-            else if ((exec_2_sq.forward_addr[i] % 4) == 2) begin
+            else if ((ld_2_sq.forward_addr[i] % 4) == 2) begin
                 sq_2_exec.forward_data[i]       = sq_2_exec.forward_data[i] >> 16;
                 sq_2_exec.forward_byte_en[i]    = sq_2_exec.forward_byte_en[i] >> 16;
             end
-            else if ((exec_2_sq.forward_addr[i] % 4) == 3) begin
+            else if ((ld_2_sq.forward_addr[i] % 4) == 3) begin
                 sq_2_exec.forward_data[i]       = sq_2_exec.forward_data[i] >> 24;
                 sq_2_exec.forward_byte_en[i]    = sq_2_exec.forward_byte_en[i] >> 24;
             end
 
             //ensure don't accidentally give more data than it wants
-            if (exec_2_sq.forward_mem_size[i] == BYTE) begin
+            if (ld_2_sq.forward_mem_size[i] == BYTE) begin
                 sq_2_exec.forward_data[i] &= 8'hFF;
                 sq_2_exec.forward_byte_en[i] &= 1'b1;
             end
-            else if (exec_2_sq.forward_mem_size[i] == HALF) begin
+            else if (ld_2_sq.forward_mem_size[i] == HALF) begin
                 sq_2_exec.forward_data[i] &= 16'hFFFF;
                 sq_2_exec.forward_byte_en[i] &= 2'b11;
             end
+
         end
     end
 
-    ADDR [`NUM_FU_LOAD-1:0] [3:0] bytewise_addr;
-    logic [`NUM_FU_LOAD-1:0] [3:0] bytewise_addr_mask;
-    logic [`NUM_FU_LOAD-1:0] [1:0] modulo4;
+    ADDR [`NUM_FU_STORE-1:0] [3:0] bytewise_addr;
+    logic [`NUM_FU_STORE-1:0] [3:0] bytewise_addr_mask;
+    logic [`NUM_FU_STORE-1:0] [1:0] modulo4;
     always_comb begin
         bytewise_addr = '0;
         bytewise_addr_mask = '0;
@@ -322,7 +326,8 @@ module post_ret_buffer #(parameter
     LSQ_SZ=`LSQ_SZ,
     LSQ_SZ_DBL=`LSQ_SZ_DBL,
     NUM_FU_STORE=`NUM_FU_STORE,
-    NUM_FU_LOAD=`NUM_FU_LOAD
+    NUM_FU_LOAD=`NUM_FU_LOAD,
+    LD_BAY_SZ=`LD_BAY_SZ
 ) (
     `ifdef DEBUG
     output DBG_retbuf dbg,
@@ -394,7 +399,7 @@ module post_ret_buffer #(parameter
     always_comb begin
         forward_ret_2_sq = '0;
 
-        for (int unsigned i = 0, ADDR start = 0; i < NUM_FU_LOAD; i++) begin
+        for (int unsigned i = 0, ADDR start = 0; i < LD_BAY_SZ; i++) begin
             if (!sq_2_ret.forward_req_en[i]) continue;
 
             start = sq_2_ret.forward_addr[i] - (sq_2_ret.forward_addr[i] % 4);

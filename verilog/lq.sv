@@ -130,8 +130,6 @@ module lq #(parameter
                     state[cur_idx].d_vld <= '1;
                 end
 
-                $display("UPDATING: en: %b, idx: %0d, addr: %0d", exec_2_lq.ld_ex_en[i],exec_2_lq.ld_lq_idx[i],exec_2_lq.ld_addr[i]);
-
             end
 
             //handle error flags

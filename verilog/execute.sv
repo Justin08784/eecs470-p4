@@ -83,6 +83,7 @@ typedef struct packed {
     DATA            opb;
 
     LSQ_IDX         lq_idx;
+    LSQ_IDX         sq_idx;
     ROB_IDX         rob_idx;
     MEM_SIZE        mem_size;
     logic           rd_unsigned;
@@ -393,6 +394,7 @@ module lod_ex(
     input   sq2execute sq_in,
     output  execute2sq sq_out,
     output  execute2lq lq_out,
+    output  executeLD2sq ld_sq_out,
 
     /* BACKEND */
     output logic    [`NUM_FU_LOAD-1:0]  o_vld,
@@ -400,27 +402,29 @@ module lod_ex(
     input  logic    [`NUM_FU_LOAD-1:0]  o_rdy 
         // completion grant
 );
-    localparam BAY_SZ = 4;
+    localparam LD_BAY_SZ = `LD_BAY_SZ;//4;
     typedef struct packed {
-        logic           [`NUM_FU_LOAD-1:0][BAY_SZ-1:0] vld;
-        logic           [`NUM_FU_LOAD-1:0][BAY_SZ-1:0] got; // got data?
-        PHYS_REG_IDX    [`NUM_FU_LOAD-1:0][BAY_SZ-1:0] t;
-        ROB_IDX         [`NUM_FU_LOAD-1:0][BAY_SZ-1:0] rob_idx;
-        ADDR            [`NUM_FU_LOAD-1:0][BAY_SZ-1:0] addr;
-        MEM_SIZE        [`NUM_FU_LOAD-1:0][BAY_SZ-1:0] mem_size;
+        logic           [`NUM_FU_LOAD-1:0][LD_BAY_SZ-1:0]  vld;
+        logic           [`NUM_FU_LOAD-1:0][LD_BAY_SZ-1:0]  got; // got data?
+        PHYS_REG_IDX    [`NUM_FU_LOAD-1:0][LD_BAY_SZ-1:0]  t;
+        ROB_IDX         [`NUM_FU_LOAD-1:0][LD_BAY_SZ-1:0]  rob_idx;
+        ADDR            [`NUM_FU_LOAD-1:0][LD_BAY_SZ-1:0]  addr;
+        MEM_SIZE        [`NUM_FU_LOAD-1:0][LD_BAY_SZ-1:0]  mem_size;
 
-        DATA            [`NUM_FU_LOAD-1:0][BAY_SZ-1:0] dat;
+        LSQ_IDX         [`NUM_FU_LOAD-1:0][LD_BAY_SZ-1:0]  sq_idx;
+        logic           [3:0]             [LD_BAY_SZ-1:0]  st_frwd_byte_mask;
+        DATA            [`NUM_FU_LOAD-1:0][LD_BAY_SZ-1:0]  dat;
     } LOAD_BAYS;
-    logic [`NUM_FU_LOAD-1:0][BAY_SZ-1:0] rvld;
-    DATA  [`NUM_FU_LOAD-1:0][BAY_SZ-1:0] rdat;
+    logic [`NUM_FU_LOAD-1:0][LD_BAY_SZ-1:0] rvld;
+    DATA  [`NUM_FU_LOAD-1:0][LD_BAY_SZ-1:0] rdat;
 
 
     // FIXME: Is this right? 
     // FIXME: hardcoded
 
     LOAD_BAYS bays; // waiting bays
-    logic     [`NUM_FU_LOAD-1:0][BAY_SZ-1:0] fu2in_gnt;
-    logic     [`NUM_FU_LOAD-1:0][BAY_SZ-1:0] fu2out_gnt;
+    logic     [`NUM_FU_LOAD-1:0][LD_BAY_SZ-1:0] fu2in_gnt;
+    logic     [`NUM_FU_LOAD-1:0][LD_BAY_SZ-1:0] fu2out_gnt;
     always_comb begin
         for (int f = 0; f < `NUM_FU_MULT; ++f) begin
             i_rdy[f] = |(~bays.vld[f]);
@@ -429,7 +433,7 @@ module lod_ex(
     end
 
     fake_dcache #(
-        .NUM_RPORTS(`NUM_FU_LOAD * BAY_SZ)
+        .NUM_RPORTS(`NUM_FU_LOAD * LD_BAY_SZ)
     ) cache0 (
         .clock(clock),
         .reset(reset),
@@ -444,7 +448,7 @@ module lod_ex(
     generate
         for (genvar f = 0; f < `NUM_FU_LOAD; ++f) begin : gen_arb_in
             psel_gen #(
-                .WIDTH(BAY_SZ),
+                .WIDTH(LD_BAY_SZ),
                 .REQS(1)
             ) arb_in (
                 .req    (~bays.vld[f]),
@@ -454,7 +458,7 @@ module lod_ex(
 
         for (genvar f = 0; f < `NUM_FU_LOAD; ++f) begin : gen_arb_out
             psel_gen #(
-                .WIDTH(BAY_SZ),
+                .WIDTH(LD_BAY_SZ),
                 .REQS(1)
             ) arb_out (
                 .req    (bays.vld[f] & bays.got[f]),
@@ -476,7 +480,6 @@ module lod_ex(
             lq_out.ld_lq_idx[i]     = i_regs[i].dat.lq_idx;
             lq_out.ld_addr[i]       = tmp_addrs[i];
             lq_out.ld_mem_size[i]   = tmp_sizes[i];
-            $display("LQ_OUT: en: %b, lq_idx: %0d, addr: %0d", lq_out.ld_ex_en[i], lq_out.ld_lq_idx[i], lq_out.ld_addr[i]);
             /* FIXME: What about rd_unsigned? We are not using this
             in lq???? */ //ANSWER: This needs to be used in the load FU
 
@@ -497,7 +500,22 @@ module lod_ex(
         end
     end
 
+    //ST-LD forwarding request logic
+    always_comb begin
+        ld_sq_out = '0;
+        foreach (bays.vld[f,i]) begin
+            if (!bays.vld[f][i]) continue;
+
+            ld_sq_out.forward_req_en[i] = bays.vld[f][i];
+            ld_sq_out.forward_addr[i] = bays.addr[f][i];
+            ld_sq_out.forward_mem_size[i] = bays.mem_size[f][i];
+            ld_sq_out.forward_sq_idx[i] = bays.sq_idx[f][i];
+        end
+
+    end
+
     always_ff @(posedge clock) begin
+
         if (reset || flush) begin
             bays <= '0;
         end else begin
@@ -512,6 +530,8 @@ module lod_ex(
                 bays.addr    [f][i] <= tmp_addrs[f];
                 bays.mem_size[f][i] <= tmp_sizes[f];
                 bays.dat     [f][i] <= '0;
+                bays.sq_idx  [f][i] <= i_regs[f].dat.sq_idx;
+                bays.st_frwd_byte_mask[f][i] <= '0;
             end
 
             foreach (rvld[f, i]) begin
@@ -531,6 +551,8 @@ module lod_ex(
                 bays.addr    [f][i] <= '0;
                 bays.mem_size[f][i] <= '0;
                 bays.dat     [f][i] <= '0;
+                bays.sq_idx  [f][i] <= '0;
+                bays.st_frwd_byte_mask[f][i] <= '0;
             end
         end
     end
@@ -581,7 +603,6 @@ module str_ex(
     input  logic    [`NUM_FU_STORE-1:0]  i_vld,
     input  STR_REGS [`NUM_FU_STORE-1:0]  i_regs,
     
-    input   sq2execute sq_in,
     output  execute2sq sq_out,
     // FIXME: Isn't an lq2execute needed? <-- Answer: No, if an issue is found when forwarding the SQ_IDX to LQ, it is flagged in the ROB to restart from that PC
     output  execeuteST2lq st_lq_out,
@@ -718,6 +739,7 @@ module stage_ex_p4 (
     // FIXME: Isn't an lq2execute needed?
     output  execute2lq lq_out,
     output  execeuteST2lq st_lq_out,
+    output  executeLD2sq ld_sq_out,
 
     input   prf2execute prf_in,
     output  execute2prf prf_out,
@@ -836,6 +858,7 @@ module stage_ex_p4 (
                 opb     : `RV32_signext_Iimm(rs_in.fu_dat_load[i].inst),
 
                 lq_idx  : rs_in.fu_dat_load[i].lq_idx,
+                sq_idx  : rs_in.fu_dat_load[i].sq_idx,
                 rob_idx : rs_in.fu_dat_load[i].rob_idx,
                 mem_size: MEM_SIZE'(rs_in.fu_dat_load[i].inst.r.funct3[1:0]),
                 rd_unsigned : rs_in.fu_dat_load[i].inst.r.funct3[2]
@@ -1126,6 +1149,8 @@ module stage_ex_p4 (
         .o_vld  (ex.o_vld.lod),
         .o_cands(cands.lod),
         .lq_out(lq_out),
+        .ld_sq_out(ld_sq_out),
+        .sq_in(sq_in),
         /* FIXME: How exactly do we do CDB arbitration for loads/stores?
         And how does it fit in our ETB system? */
         .o_rdy  (cdb_gnt_shr[1].lod)
@@ -1146,7 +1171,6 @@ module stage_ex_p4 (
         And how does it fit in our ETB system? */
         .o_rdy  (cdb_gnt_shr[0].str),
 
-        .sq_in(sq_in),
         .sq_out(sq_out),
         .st_lq_out(st_lq_out)
     );
