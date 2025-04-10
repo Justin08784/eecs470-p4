@@ -111,10 +111,24 @@ module sq #(parameter
         end
         sq_2_retire.sq_ret_complete = (ret_2_sq.used_scnt == 0) && (used_scnt == 0);
 
-        //handle retirement write to mem
-        sq_2_ret.ret_cnt    = retire_2_sq.r_en;
+    end
+
+    SQ_ENTRY [`N-1:0] tmp_ret_st;
+    always_comb begin
         foreach (r_idxs[i])
-            sq_2_ret.ret_st[i] = state[r_idxs[i]];
+            tmp_ret_st[i] = state[r_idxs[i]];
+
+        sq_2_ret = '{
+            //handle retirement write to mem
+            ret_cnt    : retire_2_sq.r_en,
+            ret_st     : tmp_ret_st,
+
+            //handle data forwarding
+            forward_req_en      : ld_2_sq.forward_req_en,
+            forward_sq_idx      : ld_2_sq.forward_sq_idx,
+            forward_addr        : ld_2_sq.forward_addr,
+            forward_mem_size    : ld_2_sq.forward_mem_size
+        };
     end
 
 
@@ -126,12 +140,6 @@ module sq #(parameter
     always_comb begin
         sq_2_exec = '0;
 
-        //handle data forwarding
-        sq_2_ret.forward_req_en     = ld_2_sq.forward_req_en;
-        sq_2_ret.forward_sq_idx     = ld_2_sq.forward_sq_idx;
-        sq_2_ret.forward_addr       = ld_2_sq.forward_addr;
-        sq_2_ret.forward_mem_size   = ld_2_sq.forward_mem_size;
-
         used_range = '0;
         for (int off = 0, int j = head;
             off < used; 
@@ -140,13 +148,13 @@ module sq #(parameter
         end
 
         for (int unsigned i = 0; i < LD_BAY_SZ; i++) begin
-            if (!ld_2_sq.forward_req_en[i])
-                continue;
             start = get_waddr(ld_2_sq.forward_addr[i]);
-
             addr_match = '0;
             byte_match = '0;
             byte_m1hot = '0;
+
+            if (!ld_2_sq.forward_req_en[i])
+                continue;
 
             foreach (addr_match[j]) begin
                 addr_match[j] = used_range[j]
