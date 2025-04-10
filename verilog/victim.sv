@@ -14,9 +14,16 @@ function automatic logic[1:0] iw_off(input ADDR addr);
     return addr[1:0];
 endfunction
 
-module victim_cache #(
-    parameter int NUM_RPORTS=1
-) (
+
+localparam sz = 4;
+typedef struct packed {
+    logic       [sz-1:0]        vld;
+    logic       [sz-1:0][15:3]  tag;
+    MEM_BLOCK   [sz-1:0]        dat;
+    logic       [sz-1:0][1:0]   prio;
+} STATE;
+
+module victim_cache (
     input logic clock,
     input logic reset,
 
@@ -27,15 +34,22 @@ module victim_cache #(
 
     input  logic    ren,
     input  ADDR     raddr,
-    // input  MEM_SIZE rsize,
     output DATA     rdat,
-    output logic    rvld
+    output logic    rvld,
+
+    output STATE    dbg
 );
-    localparam sz = 4;
-    logic [sz-1:0]          vld;
-    logic [sz-1:0][15:3]    tag;
-    MEM_BLOCK [sz-1:0]      dat;
-    logic [sz-1:0][1:0]     prio;
+    logic       [sz-1:0]        vld;
+    logic       [sz-1:0][15:3]  tag;
+    MEM_BLOCK   [sz-1:0]        dat;
+    logic       [sz-1:0][1:0]   prio;
+
+    assign dbg = '{
+        vld,
+        tag,
+        dat,
+        prio
+    };
 
     logic [$clog2(sz)-1:0]  ridx;
     always_comb begin
