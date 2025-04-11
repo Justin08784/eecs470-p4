@@ -7,7 +7,7 @@ module victim_test();
         logic       [sz-1:0]        vld;
         logic       [sz-1:0][15:3]  tag;
         MEM_BLOCK   [sz-1:0]        dat;
-        logic       [sz-1:0][1:0]   prio;
+        logic       [sz-1:0][sz-1:0]age;
     } STATE;
 
     logic clock;
@@ -88,15 +88,15 @@ module victim_test();
         STATE s
     );
         $display("== CACHE ==");
-        $display("rd (%b): %x(%b) <- MEM[%x]", ren, rdat, rvld, raddr);
-        $display("wr (%b): MEM[%x] <- %x", wen, waddr, wdat);
+        $display("rd (%b): MEM[%x] -> %x (%b)", ren, get_dwaddr(raddr), rdat, rvld);
+        $display("wr (%b): MEM[%x] <- %x", wen, get_dwaddr(waddr), wdat);
         for (int i = 0; i < sz; ++i) begin
-            $display("cache[%1d]: vld=%b, tag=%x, dat=%x, prio=%1d",
+            $display("cache[%1d]: vld=%b, tag=%x, dat=%x, age=%b",
                 i,
                 s.vld[i],
                 s.tag[i],
                 s.dat[i],
-                s.prio[i]
+                s.age[i]
             );
         end
         $display("");
@@ -146,6 +146,7 @@ module victim_test();
         print_state(dbg);
         wr(4, append3(4));
         @(negedge clock);
+        // clr_all();
         print_state(dbg);
         wr(5, append3(5));
         @(negedge clock);

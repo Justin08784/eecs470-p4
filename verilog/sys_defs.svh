@@ -162,6 +162,31 @@ typedef struct packed {
     logic                          valid;
 } ICACHE_TAG;
 
+typedef union packed {
+    logic [3:0][7:0]  byte_level;
+    logic [1:0][15:0] half_level;
+    logic      [31:0] word_level;
+} DATA_BLOCK;
+
+// Get word address; restricting to only actually used 16 LSB.
+function automatic logic[13:0] waddr(input ADDR addr);
+    return addr[15:2];
+endfunction
+// Double word address
+function automatic logic[12:0] dwaddr(input ADDR addr);
+    return addr[15:3];
+endfunction
+
+// In-word byte offset
+function automatic logic[1:0] iw_off(input ADDR addr);
+    return addr[1:0];
+endfunction
+
+// In-double-word byte offset
+function automatic logic[2:0] idw_off(input ADDR addr);
+    return addr[2:0];
+endfunction
+
 ///////////////////////////////
 // ---- Exception Codes ---- //
 ///////////////////////////////
@@ -454,7 +479,7 @@ typedef struct packed {
     ROB_IDX rob_idx;
     ADDR addr;
     logic [3:0] bytewise_addr_mask;
-    DATA data;
+    DATA_BLOCK data;
     logic d_vld;
     MEM_SIZE mem_size; //MEM_SIZE'(id_ex_reg.inst.r.funct3[1:0]); <-- HOW TO FIND THIS. DO THIS WHEN PUTTING ENTRY IN FROM DISPATCH OR FROM EXECUTE
 } SQ_ENTRY;
@@ -964,7 +989,7 @@ typedef struct packed {
 
 typedef struct packed {
     logic       [`LD_BAY_SZ-1:0]          forward_en; //tells the load FU if valid data to be forwarded was found (will be ready by the posedge of the next clock cycle)
-    DATA        [`LD_BAY_SZ-1:0]          forward_data; //the data being forwarded
+    DATA_BLOCK  [`LD_BAY_SZ-1:0]          forward_data; //the data being forwarded
     MEM_SIZE    [`LD_BAY_SZ-1:0]          forward_mem_size; //the size of the data being forwarded. Will always match the size of the request
     logic       [`LD_BAY_SZ-1:0] [3:0]    forward_byte_en; //a 4-wide mask telling which of the bytes are valid data being forwarded. This allows cases where you request 4000-4003, and SQ returns a match on 400-4001 and 4003 but not 4002 (and similar cases)
     //example for byte mask:
@@ -1016,7 +1041,7 @@ typedef struct packed {
 typedef struct packed {
     logic       [`LD_BAY_SZ-1:0]          forward_en;
     ADDR        [`LD_BAY_SZ-1:0]          forward_addr;
-    DATA        [`LD_BAY_SZ-1:0]          forward_data;
+    DATA_BLOCK  [`LD_BAY_SZ-1:0]          forward_data;
     MEM_SIZE    [`LD_BAY_SZ-1:0]          forward_mem_size;
     logic       [`LD_BAY_SZ-1:0] [3:0]    forward_byte_en;
     logic       [`LD_BAY_SZ-1:0]          sq_idx_found;    

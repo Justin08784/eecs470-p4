@@ -1,26 +1,16 @@
 `include "sys_defs.svh"
 
-/* Get word address; restricting to only actually used 16 LSB. */
-// function automatic WADDR get_waddr(input ADDR addr);
-//     return addr[15:2];
-// endfunction
-
+/* Get double word address; restricting to only actually used 16 LSB. */
 function automatic logic[12:0] get_dwaddr(input ADDR addr);
     return addr[15:3];
 endfunction
-
-/* In-word offset */
-function automatic logic[1:0] iw_off(input ADDR addr);
-    return addr[1:0];
-endfunction
-
 
 localparam sz = 4;
 typedef struct packed {
     logic       [sz-1:0]        vld;
     logic       [sz-1:0][15:3]  tag;
     MEM_BLOCK   [sz-1:0]        dat;
-    logic       [sz-1:0][1:0]   prio;
+    logic       [sz-1:0][sz-1:0]age;
 } STATE;
 
 module victim_cache (
@@ -42,27 +32,26 @@ module victim_cache (
     logic       [sz-1:0]        vld;
     logic       [sz-1:0][15:3]  tag;
     MEM_BLOCK   [sz-1:0]        dat;
-    logic       [sz-1:0][1:0]   prio;
+    logic       [sz-1:0][sz-1:0]age;    // age[i, j] := i is NOT younger than j
 
     assign dbg = '{
         vld,
         tag,
         dat,
-        prio
+        age
     };
 
-    logic [$clog2(sz)-1:0]  ridx;
+    logic [sz-1:0] rmsk;
     always_comb begin
-        ridx = '0;
-        rvld = 0;
+        rmsk = '0;
         rdat = '0;
         foreach(tag[i]) begin
-            if (ren && vld[i] && (get_dwaddr(raddr) == tag[i])) begin
-                ridx |= i;
-                rvld |= 1;
-                rdat |= dat[i];
+            if (ren && vld[i] && tag[i] == get_dwaddr(raddr)) begin
+                rmsk[i] |= 1;
+                rdat    |= dat[i];
             end
         end
+        rvld = |rmsk;
     end
 
     logic [sz-1:0] free_gnt;
@@ -74,33 +63,15 @@ module victim_cache (
         .gnt(free_gnt)
     );
 
-    logic [$clog2(sz)-1:0]  widx;
-    logic [$clog2(sz)-1:0]  max_idx, max_val;
+    logic [sz-1:0] wmsk;
+    logic [sz-1:0] lru;
     always_comb begin
-        widx = '0;
-        max_idx = '0;
-        max_val = '0;
-        /* WARNING: free_gnt is a bit vector */
-        if (free_gnt) begin
-            // free entry available
-            foreach (free_gnt[i]) begin
-                if (!free_gnt[i])
-                    continue;
-                widx |= i;
-            end
+        foreach (lru[i])
+            lru[i] = &age[i];
 
-        end else begin
-            // evict a block
-            foreach (prio[i]) begin
-                if (prio[i] <= max_val)
-                    continue;
-                max_idx = i;
-                max_val = prio[i];
-            end
-
-            widx |= max_idx;
-
-        end
+        wmsk = |free_gnt
+            ? free_gnt  // free entry available
+            : lru;      // evict a block
     end
 
     always_ff @(posedge clock) begin
@@ -108,29 +79,34 @@ module victim_cache (
             vld <= '0;
             tag <= '0;
             dat <= '0;
-            prio <= '0;
+            foreach (age[i, j])
+                age[i][j] <= i == j;
         end else begin
-            if (rvld) begin
-                vld[ridx] <= 0;
-                tag[ridx] <= '0;
-                dat[ridx] <= '0;
-                prio[ridx] <= '0;
+            foreach (rmsk[i]) begin
+                if (!rmsk[i])
+                    continue;
+                vld[i] <= 0;
+                tag[i] <= '0;
+                dat[i] <= '0;
+                age[i] <= '0;
             end
+            // $display("wmsk: %b", wmsk);
 
             if (wen) begin
-                vld[widx] <= 1;
-                tag[widx] <= get_dwaddr(waddr);
-                dat[widx] <= wdat;
-                prio[widx] <= '0;
-
-                // update prios
-                foreach (vld[i]) begin
-                    if (i == widx
-                        // || !prio[widx]
-                        || !vld[i]
-                        || &prio[i])    // prio is already at max 
+                foreach(wmsk[i]) begin
+                    if (!wmsk[i])
                         continue;
-                    prio[i] <= prio[i] + 1;
+                    vld[i] <= 1;
+                    tag[i] <= get_dwaddr(waddr);
+                    dat[i] <= wdat;
+                end
+
+                foreach(age[i, j]) begin
+                    if (wmsk[i]) begin
+                        age[i][j] <= i == j;
+                    end else if (wmsk[j]) begin
+                        age[i][j] <= 1;
+                    end
                 end
             end
         end

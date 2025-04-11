@@ -516,7 +516,7 @@ module lod_ex(
     //ST-LD forwarding parsing logic
     logic [`NUM_FU_LOAD-1:0][LD_BAY_SZ-1:0] next_got;
     logic [3:0]             [LD_BAY_SZ-1:0] next_st_frwd_byte_mask;
-    DATA  [`NUM_FU_LOAD-1:0][LD_BAY_SZ-1:0] next_dat;
+    DATA_BLOCK  [`NUM_FU_LOAD-1:0][LD_BAY_SZ-1:0] next_dat;
     always_comb begin
         next_got = bays.got;
         next_st_frwd_byte_mask = '0;
@@ -533,13 +533,13 @@ module lod_ex(
             // end
 
             if (sq_in.forward_byte_en[i][0])
-                next_dat[f][i][7:0] = sq_in.forward_data[i][7:0];
+                next_dat[f][i].byte_level[0] = sq_in.forward_data[i].byte_level[0];
             if (sq_in.forward_byte_en[i][1])
-                next_dat[f][i][15:8] = sq_in.forward_data[i][15:8];
+                next_dat[f][i].byte_level[1] = sq_in.forward_data[i].byte_level[1];
             if (sq_in.forward_byte_en[i][2])
-                next_dat[f][i][23:16] = sq_in.forward_data[i][23:16];
+                next_dat[f][i].byte_level[2] = sq_in.forward_data[i].byte_level[2];
             if (sq_in.forward_byte_en[i][3])
-                next_dat[f][i][31:24] = sq_in.forward_data[i][31:24];
+                next_dat[f][i].byte_level[3] = sq_in.forward_data[i].byte_level[3];
             next_st_frwd_byte_mask = bays.st_frwd_byte_mask[f][i] | sq_in.forward_byte_en[i];
 
             next_got[f][i] |= ($countones(next_st_frwd_byte_mask) == (2**bays.mem_size[f][i]));
