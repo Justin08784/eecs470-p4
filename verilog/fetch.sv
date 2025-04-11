@@ -21,47 +21,40 @@ module stage_if_p4 (
     input   flush,
     //input     [1:0] if_valid,       // only go to next PC when true
     input   decode2fetch d_in,
-    output  fetch2decode d_out,
-
-    // input           take_branch,    // taken-branch signal
-    // input ADDR      branch_target,  // target pc: use if take_branch is TRUE
     input retire2fetch r_in,
-    input MEM_BLOCK [1:0] Imem_data,      // data coming back from Instruction memory
+    input MEM_BLOCK Imem_data,      // data coming back from Instruction memory
 
     // tags from memory
-    // input MEM_TAG  Imem2proc_transaction_tag, // Should be zero unless there is a response
-    // input MEM_TAG  Imem2proc_data_tag,
+    input MEM_TAG  Imem2proc_transaction_tag, // Should be zero unless there is a response
+    input MEM_TAG  Imem2proc_data_tag,
 
-    // output MEM_COMMAND  Imem_command, // Command sent to memory
-    //output IF_ID_PACKET [1:0] if_packet,
-    // output ADDR         Imem_addr, // address sent to Instruction memory
-    output ADDR [`N-1:0] PC_reg
+    output MEM_COMMAND  Imem_command, // Command sent to memory
+    output ADDR         Imem_addr, // address sent to Instruction memory
+    output  fetch2decode d_out
 );
 
-    // ADDR PC_reg; // PCs we are currently fetching
-    // MEM_BLOCK icache_out;
-    // logic  icache_valid;
+    ADDR PC_reg; // PCs we are currently fetching
+    MEM_BLOCK icache_out;
+    logic  icache_valid;
     // INST [1:0] fifo_insns;
 
     //logic [1:0] valid_out;
 
-    // icache icache_0 (
-    //     `ifdef DEBUG
-    //     .dbg        (dbg_icache)
-    //     `endif
-    //     // inputs
-    //     .clock                      (clock),
-    //     .reset                      (reset),
-    //     .Imem2proc_transaction_tag  (Imem2proc_transaction_tag),
-    //     .Imem2proc_data             (Imem_data),
-    //     .Imem2proc_data_tag         (Imem2proc_data_tag),
-    //     .proc2Icache_addr           (PC_reg),
-    //     // outputs
-    //     .proc2Imem_command          (Imem_command),
-    //     .proc2Imem_addr             (Imem_addr),
-    //     .Icache_data_out            (icache_out), // Data is mem[proc2Icache_addr]
-    //     .Icache_valid_out           (icache_valid) // When valid is high
-    // );
+    icache icache_0 (
+        // inputs
+        .clock                      (clock),
+        .reset                      (reset),
+        .flush                      (flush),
+        .Imem2proc_transaction_tag  (Imem2proc_transaction_tag),
+        .Imem2proc_data             (Imem_data),
+        .Imem2proc_data_tag         (Imem2proc_data_tag),
+        .proc2Icache_addr           (PC_reg),
+        // outputs
+        .proc2Imem_command          (Imem_command),
+        .proc2Imem_addr             (Imem_addr),
+        .Icache_data_out            (icache_out), // Data is mem[proc2Icache_addr]
+        .Icache_valid_out           (icache_valid) // When valid is high
+    );
 
     // logic [$clog2(`N):0] if_valid_q;
 
@@ -97,20 +90,21 @@ module stage_if_p4 (
 
     logic [$clog2(`N):0]    free_scnt, used_scnt, f_cnt;
     IF_ID_PACKET [`N-1:0]   f_dat;
-
+    ADDR PC_reg_temp;
     logic off; // 1 if PC is dw-misaligned (i.e. starts at 2nd word of double word)
+
     always_comb begin
         d_out.f_en_cnt = `MIN(used_scnt, d_in.d_rdy_cnt);
-
-        f_cnt = free_scnt < `N ? 0 : `N; // no partial fetches (for simplicity)! 
+        off = PC_reg[2]; 
+        f_cnt = !icache_valid ? 0 : (off ? `MIN(1, free_scnt) : free_scnt);
 
         for (int unsigned i = 0, logic vld = 0; i < `N; ++i) begin
-            off = PC_reg[i][2]; 
             vld = i < f_cnt;
+            PC_reg_temp = PC_reg + 4*i;
             f_dat[i] = '{
-                inst  : vld ? Imem_data[i].word_level[off] : `NOP,
-                PC    : PC_reg[i],
-                NPC   : PC_reg[i] + 4,
+                inst  : vld ? icache_out.word_level[PC_reg_temp[2]] : `NOP,
+                PC    : PC_reg_temp,
+                NPC   : PC_reg_temp + 4,
                 valid : vld
             };
         end
@@ -137,14 +131,11 @@ module stage_if_p4 (
 
     always_ff @(posedge clock) begin
         if (reset) begin
-            foreach(PC_reg[i])
-                PC_reg[i] <= 4*i; // initial PC value is 0 (the memory address where our program starts)
+            PC_reg <= 0; // initial PC value is 0 (the memory address where our program starts)
         end else if (flush) begin
-            foreach(PC_reg[i])
-                PC_reg[i] <= 4*i + r_in.corrected_PC;  // initial PC value is 0 (the memory address where our program starts)
+            PC_reg <= r_in.corrected_PC;  // initial PC value is 0 (the memory address where our program starts)
         end else begin
-            foreach(PC_reg[i])
-                PC_reg[i] <= PC_reg[i] + 4*f_cnt; // ...or transition to next PC if valid
+            PC_reg <= PC_reg + 4*f_cnt; // ...or transition to next PC if valid
         end
     end
 
