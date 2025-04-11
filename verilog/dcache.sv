@@ -28,10 +28,8 @@ module dcache #(
 
 
     // input from lsq
-    input logic [NUM_READ-1:0]        Dcache_valid_in,
     input MEM_COMMAND                 proc2Dcache_command,   // ✅ Bradley: only one command to dcache, so the load will see the effect fo store
     input ADDR [NUM_READ-1:0]         proc2Dcache_raddr,
-    input MEM_BLOCK [NUM_READ-1:0]    proc2Dcache_rdata,
 
     input ADDR          proc2Dcache_waddr,
     input MEM_BLOCK     proc2Dcache_wdata,
@@ -51,8 +49,6 @@ module dcache #(
     output MEM_COMMAND   Dcache2Dmem_command, // ✅ Bradley: IF Dcache and SQ have conflict on memory LET LOAD GO FIRST!!!!!
     output ADDR          Dcache2Dmem_addr
 );
-
-
     localparam NUM_CACHE_LINES  =  `DCACHE_LINES;
     localparam NUM_SETS        = NUM_CACHE_LINES / ASSOCIATIVITY;
     localparam SET_INDEX_BITS  = $clog2(NUM_SETS);
@@ -264,42 +260,43 @@ module dcache #(
 
     always_comb begin
         for (int i=0; i< NUM_SETS; i++) begin
-            if (lru_update_enable) begin
-                if (read_operation && !(write_store || write_mshr)) begin
-                    for (int r=0; r<NUM_READ; r++) begin
-                        if (i == current_read_set_index[r]) begin
-                            lru_updates[i] = update_lru(lru[current_read_set_index[r]], hit_way);
-                        end else begin
-                            lru_updates[i] = lru[i];
-                        end
-                    end
+            if (!lru_update_enable) begin
+                lru_updates[i] = lru[i];
+                continue;
+            end
 
-                end else if ((write_store || write_mshr) && !read_operation) begin
-                    if (i == current_write_set_index) begin
+            if (read_operation && !(write_store || write_mshr)) begin
+                for (int r=0; r<NUM_READ; r++) begin
+                    if (i == current_read_set_index[r]) begin
+                        lru_updates[i] = update_lru(lru[current_read_set_index[r]], hit_way);
+                    end else begin
+                        lru_updates[i] = lru[i];
+                    end
+                end
+
+            end else if ((write_store || write_mshr) && !read_operation) begin
+                if (i == current_write_set_index) begin
+                    lru_updates[i] = update_lru(lru[current_write_set_index], lru_way[current_write_set_index]);
+                    break;
+                end else begin
+                    lru_updates[i] = lru[i];
+                end
+
+            end else if ((write_store || write_mshr) && read_operation) begin
+                for (int r=0; r<NUM_READ; r++) begin
+                    if ((i == current_read_set_index[r]) && (current_write_set_index == current_read_set_index[r])) begin
+                        lru_updates[i] = update_lru(update_lru(lru[current_read_set_index[r]], hit_way), lru_way[current_write_set_index]);
+                        break;
+                    end else if (i == current_read_set_index[r]) begin
+                        lru_updates[i] = update_lru(lru[current_read_set_index[r]], hit_way);
+                        break;
+                    end else if (i == current_write_set_index) begin
                         lru_updates[i] = update_lru(lru[current_write_set_index], lru_way[current_write_set_index]);
                         break;
                     end else begin
                         lru_updates[i] = lru[i];
                     end
-
-                end else if ((write_store || write_mshr) && read_operation) begin
-                    for (int r=0; r<NUM_READ; r++) begin
-                        if ((i == current_read_set_index[r]) && (current_write_set_index == current_read_set_index[r])) begin
-                            lru_updates[i] = update_lru(update_lru(lru[current_read_set_index[r]], hit_way), lru_way[current_write_set_index]);
-                            break;
-                        end else if (i == current_read_set_index[r]) begin
-                            lru_updates[i] = update_lru(lru[current_read_set_index[r]], hit_way);
-                            break;
-                        end else if (i == current_write_set_index) begin
-                            lru_updates[i] = update_lru(lru[current_write_set_index], lru_way[current_write_set_index]);
-                            break;
-                        end else begin
-                            lru_updates[i] = lru[i];
-                        end
-                    end
                 end
-            end else begin
-                lru_updates[i] = lru[i];
             end
         end
     end
