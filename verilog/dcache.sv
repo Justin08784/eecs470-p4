@@ -82,7 +82,7 @@ module dcache #(
         MEM_SIZE    mem_size;
         logic       ready;
     } MSHR_ENTRY;
-    MSHR_ENTRY  [NUM_MSHRS-1:0] mshr, mshr_n;
+    MSHR_ENTRY  [MSHR_SZ-1:0] mshr, mshr_n;
 
     struct packed {
         logic   [NUM_SETS-1:0][ASSOC-1:0] vld;
@@ -212,6 +212,17 @@ module dcache #(
             miss_n = '{
                 addr : waddr,
                 size : wsize
+            };
+        end
+
+        if (mem_in_transaction_tag != 0) begin
+            mshr_n[mem_in_transaction_tag] = '{
+                allocated   : 1,
+                addr        : miss.addr,
+                trans_tag   : mem_in_transaction_tag,
+                mem_data    : '0,
+                mem_size    : miss.size,
+                ready       : 0
             };
         end
     end
