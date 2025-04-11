@@ -300,7 +300,6 @@ module cpu (
     //////////////////////////////////////////////////  
 
     sq2rob sq_2_rob;
-    lq2rob lq_2_rob;
 
     rob #(
         .ROB_SZ(`ROB_SZ),
@@ -317,8 +316,7 @@ module cpu (
         .cdat_in    (ex_2_cdat),
         .sq_in      (sq_2_rob),
         .d_out      (rob_2_dispatch),
-        .d_in       (dispatch_2_rob),
-        .lq_in      (lq_2_rob)
+        .d_in       (dispatch_2_rob)
     );
 
     //////////////////////////////////////////////////
@@ -389,7 +387,6 @@ module cpu (
         .execST_in(execST_2_lq),
 
         .lq_2_dis(lq_2_dis),
-        .lq_2_rob(lq_2_rob),
         .retire_out(lq_2_retire)
     );
 
