@@ -121,12 +121,12 @@ module cpu (
 
         .Imem_command(fetch_2_mem.proc2mem_command),
         .Imem_addr(fetch_2_mem.proc2mem_addr),
-        .d_out  (f_2_decode)
+        .d_out  (f_2_decode),
         .btb_in(btb_2_fetch),
         .pred_in(pred_2_fetch),
 
         .btb_out(fetch_2_btb),
-        .pred_out(fetch_2_pred),
+        .pred_out(fetch_2_pred)
 
     );
 
@@ -221,6 +221,12 @@ module cpu (
     retire_final    retire_exec;
     logic           flush_n;
     ADDR            corrected_PC_n;
+    logic [`N-1:0] branch_taken;
+    logic [`N-1:0] update_en;
+    ADDR [`N-1:0] PC_original;
+    logic [`N-1:0] [7:0] bhr_from_btq;
+
+    retire2fetch ret_2_fetch;
 
     retire retire0 (
         `ifdef DEBUG
@@ -239,6 +245,11 @@ module cpu (
 
         .flush          (flush_n),
         .corrected_PC   (corrected_PC_n),
+        .branch_taken  (branch_taken),
+        .update_en     (update_en),
+        .PC_original   (PC_original),
+        .bhr_from_btq   (bhr_from_btq),
+        //.ret_2_fetch    (ret_2_fetch),
         .retire_exec    (retire_exec)
     );
 
@@ -250,7 +261,7 @@ module cpu (
 /* ======================================== */
             flush       <= flush_n;
             retire_2_f  <= '{
-                corrected_PC : corrected_PC_n
+                corrected_PC : corrected_PC_n, is_taken : branch_taken, update_en : update_en, PC : PC_original, retired_bhr : bhr_from_btq
             };
 /* ======================================== */
         end

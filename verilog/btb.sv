@@ -45,6 +45,7 @@ always_comb begin
         end else begin
             fetch_out.hit[i] = 1'b0;
             fetch_out.target[i] = '0;
+           $display("BTB MISS!!");
         end
 
     end

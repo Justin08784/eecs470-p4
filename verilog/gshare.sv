@@ -112,7 +112,7 @@ module gshare (
     assign pred_2_fetch.prediction[1] = prediction[1];
 
     always_ff @(posedge clock) begin
-        $display("RETIRED BHR0 = 0b%0b  RETIRED BHR1 = 0b%0b", fetch_2_pred.retired_bhr[0], fetch_2_pred.retired_bhr[1]);
+        $display("RETIRED BHR0 = 8b%0b  RETIRED BHR1 = 8b%0b", fetch_2_pred.retired_bhr[0], fetch_2_pred.retired_bhr[1]);
       
         $display("update_index0 = %b  update_index1 = %b", update_index[0], update_index[1]);
         $display("buffer_ready0 = %b  buffer_ready1 = %b", buffer_ready0, buffer_ready1);
