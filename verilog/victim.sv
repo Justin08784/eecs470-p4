@@ -90,7 +90,7 @@ module victim_cache (
                 dat[i] <= '0;
                 age[i] <= '0;
             end
-            $display("wmsk: %b", wmsk);
+            // $display("wmsk: %b", wmsk);
 
             if (wen) begin
                 foreach(wmsk[i]) begin
