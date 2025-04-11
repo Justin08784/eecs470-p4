@@ -28,8 +28,8 @@ import "DPI-C" function string decode_inst(int inst);
 //import "DPI-C" function void close_pipeline_output_file();
 
 
-// `define TB_MAX_CYCLES 500
-`define TB_MAX_CYCLES 50000000
+`define TB_MAX_CYCLES 500
+// `define TB_MAX_CYCLES 50000000
 
 
 // Debug cycle limits, both inclusive
@@ -832,7 +832,7 @@ module testbench;
                 continue;
             end
 
-            $display("Entry [%2d]: pc=0x%x, id=%3d (%x), busy=%b, issued=%b, t=%2d, t1=%2d, t2=%2d, t1_rdy=%b, t2_rdy=%b, fu=%s(%2d)",
+            $display("Entry [%2d]: pc=0x%x, id=%3d (%x), busy=%b, issued=%b, t=%2d, t1=%2d, t2=%2d, t1_rdy=%b, t2_rdy=%b, fu=%s(%2d), sq_idx=%0d",
                 i, 
                 entries[i].dat.PC,
                 entries[i].dat.id, 
@@ -847,6 +847,7 @@ module testbench;
                 
                 entries[i].busy ? fu_name : "*",
                 entries[i].dat.fu_idx,
+                entries[i].dat.sq_idx
             );
         end
         $display("  | << RS <<");
