@@ -71,16 +71,16 @@ module dcache #(
         logic ready;
     } MSHR_ENTRY;
 
-    DCACHE_ENTRY dcache [NUM_SETS][ASSOCIATIVITY];  // keep track of dcache tags
-    MSHR_ENTRY mshr [NUM_MSHRS];
-    logic [ASSOCIATIVITY-1:0][WAY_INDEX_BITS-1:0] lru [NUM_SETS];  // keep track of LRU
+    DCACHE_ENTRY[NUM_SETS-1:0][ASSOCIATIVITY-1:0] dcache;  // keep track of dcache tags
+    MSHR_ENTRY  [NUM_MSHRS-1:0] mshr;
+    logic       [NUM_SETS-1:0][ASSOCIATIVITY-1:0][WAY_INDEX_BITS-1:0] lru;  // keep track of LRU
 
-    logic      [NUM_READ-1:0] re_array    [ASSOCIATIVITY];
-    ADDR       [NUM_READ-1:0] raddr_array [ASSOCIATIVITY];
-    MEM_BLOCK  [NUM_READ-1:0] rdata_array [ASSOCIATIVITY];
-    logic      we_array    [ASSOCIATIVITY];
-    ADDR       waddr_array [ASSOCIATIVITY];
-    MEM_BLOCK  wdata_array [ASSOCIATIVITY];
+    logic      [ASSOCIATIVITY-1:0][NUM_READ-1:0] re_array;
+    ADDR       [ASSOCIATIVITY-1:0][NUM_READ-1:0] raddr_array;
+    MEM_BLOCK  [ASSOCIATIVITY-1:0][NUM_READ-1:0] rdata_array;
+    logic      [ASSOCIATIVITY-1:0] we_array;
+    ADDR       [ASSOCIATIVITY-1:0] waddr_array;
+    MEM_BLOCK  [ASSOCIATIVITY-1:0] wdata_array;
 
     // cache
     genvar w;
@@ -123,8 +123,8 @@ module dcache #(
     logic  write_store;
     logic  write_mshr;
 
-    logic [WAY_INDEX_BITS-1:0] lru_way[NUM_SETS];                          // keep track of the LRU
-    logic [ASSOCIATIVITY-1:0][WAY_INDEX_BITS-1:0] lru_updates [NUM_SETS];  // the order of used way, mru-way goes to index 0, lru->3
+    logic [NUM_SETS-1:0][WAY_INDEX_BITS-1:0] lru_way;                          // keep track of the LRU
+    logic [NUM_SETS-1:0][ASSOCIATIVITY-1:0][WAY_INDEX_BITS-1:0] lru_updates;  // the order of used way, mru-way goes to index 0, lru->3
 
     ADDR     cachemiss_addr;     // delay addr and memsize for one cycle to keep track of info to store to mshr
     MEM_SIZE cachemiss_memsize;  // (bc the transaction_tag comes back from memory in the next cycle after receving request)
@@ -133,18 +133,19 @@ module dcache #(
     // find which way has the cache hit and read from memdp
     always_comb begin
         read_operation = 0;
-        for (int r = 0; r< NUM_READ; r++) begin
-            cache_hit[r] = 0;
-            hit_way[r]   = '0;
+        cache_hit   = '0;
+        hit_way     = '0;
+        re_array    = '0;
+        raddr_array = '0;
+
+        foreach(current_read_tag[r]) begin
             current_read_tag[r]       = proc2Dcache_raddr[r][31:32-TAG_WIDTH];
             current_read_set_index[r] = proc2Dcache_raddr[r][SET_INDEX_BITS+2:3];
-            for (int i=0; i<ASSOCIATIVITY; i++) begin
-                re_array[i][r]    = 0;
-                raddr_array[i][r] = '0;
-            end
+        end
 
+        for (int r = 0; r < NUM_READ; r++) begin
             if (proc2Dcache_command == MEM_LOAD) begin
-                for (int i=0; i<ASSOCIATIVITY; i++) begin
+                for (int i = 0; i < ASSOCIATIVITY; i++) begin
                     if (dcache[current_read_set_index[r]][i].valid && dcache[current_read_set_index[r]][i].tag == current_read_tag[r]) begin  // hit
                         cache_hit[r] = 1;
                         hit_way[r]   = i;
@@ -178,7 +179,7 @@ module dcache #(
         end
     end
 
-    logic mshr_complete [NUM_MSHRS];  // 1 if the mshr entry has written to cache
+    logic [NUM_MSHRS-1:0] mshr_complete;  // 1 if the mshr entry has written to cache
 
     // write to memdp
     // set complete bit when mshr finished writing to memdp
@@ -396,7 +397,9 @@ module dcache #(
     end
 
        // helper function LRU
-    function automatic [ASSOCIATIVITY-1:0][WAY_INDEX_BITS-1:0] update_lru(input logic[ASSOCIATIVITY-1:0][WAY_INDEX_BITS-1:0] current_lru_order, input logic [WAY_INDEX_BITS-1:0] mru);
+    function automatic [ASSOCIATIVITY-1:0][WAY_INDEX_BITS-1:0]
+    update_lru(input logic[ASSOCIATIVITY-1:0][WAY_INDEX_BITS-1:0] current_lru_order,
+               input logic [WAY_INDEX_BITS-1:0] mru);
         logic [WAY_INDEX_BITS-1:0] pos;
         logic [ASSOCIATIVITY-1:0][WAY_INDEX_BITS-1:0] updated_lru_order;
         pos                    = 0;
