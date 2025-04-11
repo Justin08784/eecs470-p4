@@ -121,7 +121,7 @@ module sq #(parameter
             for (int unsigned j = 0, int unsigned idx = 0; j < used; ++j) begin
                 idx = (head+j) % LSQ_SZ;
 
-                if (state[idx].d_vld && (state[idx].addr[31:2] == ld_2_sq.forward_addr[i][31:2])) begin
+                if (state[idx].d_vld && (waddr(state[idx].addr) == waddr(ld_2_sq.forward_addr[i]))) begin
                     next_sq_2_exec.forward_data[i][7:0]      = state[idx].bytewise_addr_mask[0] ? state[idx].data[7:0]      : next_sq_2_exec.forward_data[i][7:0];
                     next_sq_2_exec.forward_data[i][15:8]     = state[idx].bytewise_addr_mask[1] ? state[idx].data[15:8]     : next_sq_2_exec.forward_data[i][15:8];
                     next_sq_2_exec.forward_data[i][23:16]    = state[idx].bytewise_addr_mask[2] ? state[idx].data[23:16]    : next_sq_2_exec.forward_data[i][23:16];
@@ -154,7 +154,7 @@ module sq #(parameter
     end
 
     always_comb begin
-        for (int unsigned i = 0; i < LD_BAY_SZ; i++) begin
+        for (int unsigned i = 0, int unsigned word_off = 0; i < LD_BAY_SZ; i++) begin
             sq_2_exec.forward_en[i] |= forward_ret_2_sq.forward_en[i];
             if (forward_ret_2_sq.sq_idx_found[i]) begin
                 sq_2_exec.forward_data[i] = forward_ret_2_sq.forward_data[i];
@@ -168,19 +168,9 @@ module sq #(parameter
                 sq_2_exec.forward_byte_en[i] |= forward_ret_2_sq.forward_byte_en[i];
             end
             
-
-            if ((ld_2_sq.forward_addr[i][1:0]) == 1) begin
-                sq_2_exec.forward_data[i]       = sq_2_exec.forward_data[i] >> 8;
-                sq_2_exec.forward_byte_en[i]    = sq_2_exec.forward_byte_en[i] >> 8;
-            end
-            else if ((ld_2_sq.forward_addr[i][1:0]) == 2) begin
-                sq_2_exec.forward_data[i]       = sq_2_exec.forward_data[i] >> 16;
-                sq_2_exec.forward_byte_en[i]    = sq_2_exec.forward_byte_en[i] >> 16;
-            end
-            else if ((ld_2_sq.forward_addr[i][1:0]) == 3) begin
-                sq_2_exec.forward_data[i]       = sq_2_exec.forward_data[i] >> 24;
-                sq_2_exec.forward_byte_en[i]    = sq_2_exec.forward_byte_en[i] >> 24;
-            end
+            word_off = iw_off(ld_2_sq.forward_addr[i]);
+            sq_2_exec.forward_data[i]       >>= 8 * word_off;
+            sq_2_exec.forward_byte_en[i]    >>= 8 * word_off;
 
             //ensure don't accidentally give more data than it wants
             if (ld_2_sq.forward_mem_size[i] == BYTE) begin
@@ -196,16 +186,14 @@ module sq #(parameter
     end
 
     logic [`NUM_FU_STORE-1:0] [3:0] bytewise_addr_mask;
-    // logic [`NUM_FU_STORE-1:0] [1:0] modulo4;
     always_comb begin
         bytewise_addr_mask = '0;
-        // modulo4 = '0;
 
-        for (int i = 0; i < `NUM_FU_STORE; i++) begin
-            // modulo4[i] = exec_2_sq.st_addr[i] % 4;
+        for (int i = 0, int unsigned word_off = 0; i < `NUM_FU_STORE; i++) begin
+            word_off = iw_off(exec_2_sq.st_addr[i]);
 
-            if (exec_2_sq.st_mem_size[i] == BYTE)       bytewise_addr_mask[i][exec_2_sq.st_addr[i][1:0]] = 1;
-            else if (exec_2_sq.st_mem_size[i] == HALF)  bytewise_addr_mask[i][exec_2_sq.st_addr[i][1:0]+:1] = '1;
+            if (exec_2_sq.st_mem_size[i] == BYTE)       bytewise_addr_mask[i][word_off] = 1;
+            else if (exec_2_sq.st_mem_size[i] == HALF)  bytewise_addr_mask[i][word_off+:1] = '1;
             else                                        bytewise_addr_mask[i] = '1;
         end
 
@@ -215,12 +203,8 @@ module sq #(parameter
     logic [`NUM_FU_STORE-1:0] [4:0] updateOffset;
     always_comb begin
         updateOffset = '0;
-
-        for (int i = 0, logic [1:0] modulo4 = 0; i < `NUM_FU_STORE; i++) begin
-            modulo4 = exec_2_sq.st_addr[i] % 4;
-            updateOffset[i] = (modulo4 == 0) ? 0 : (modulo4 == 1) ? 8 : (modulo4 == 2) ? 16 : 24;
-            // shifted_data = state[idx].data << offset;
-        end
+        for (int i = 0; i < `NUM_FU_STORE; i++)
+            updateOffset[i] = 8 * iw_off(exec_2_sq.st_addr[i]);
     end
 
     /* >> ======== SECTION: Dispatch ======== >> */
@@ -388,8 +372,7 @@ module post_ret_buffer #(parameter
         //handle retirement write to mem
         ret_2_mem = '0;
         if (head != tail) begin
-            writeMod = state[head].addr[1:0];// % 4;
-            writeOffset = (writeMod == 0) ? 0 : (writeMod == 1) ? 8 : (writeMod == 2) ? 16 : 24;
+            writeOffset = 8 * iw_off(state[head].addr);
 
             ret_2_mem.Dmem_command      = MEM_STORE;
             ret_2_mem.Dmem_addr         = state[head].addr;

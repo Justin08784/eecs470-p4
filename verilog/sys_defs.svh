@@ -162,6 +162,25 @@ typedef struct packed {
     logic                          valid;
 } ICACHE_TAG;
 
+// Get word address; restricting to only actually used 16 LSB.
+function automatic logic[13:0] waddr(input ADDR addr);
+    return addr[15:2];
+endfunction
+// Double word address
+function automatic logic[12:0] dwaddr(input ADDR addr);
+    return addr[15:3];
+endfunction
+
+// In-word byte offset
+function automatic logic[1:0] iw_off(input ADDR addr);
+    return addr[1:0];
+endfunction
+
+// In-double-word byte offset
+function automatic logic[2:0] idw_off(input ADDR addr);
+    return addr[2:0];
+endfunction
+
 ///////////////////////////////
 // ---- Exception Codes ---- //
 ///////////////////////////////
