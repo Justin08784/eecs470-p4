@@ -20,8 +20,7 @@
 
 module dcache #(
     parameter ASSOC     = 4,
-    parameter MSHR_SZ = 16,
-    parameter NUM_READ  = 2
+    parameter MSHR_SZ = 16
 ) (
     input logic clock,
     input logic reset,
@@ -36,11 +35,11 @@ module dcache #(
 
 
     // input from lsq
-    input logic [NUM_READ-1:0]      ren,
-    input ADDR [NUM_READ-1:0]       raddr,
-    input MEM_SIZE [NUM_READ-1:0]   rsize,   // only for load, store always write the whole block (might need to change)
-    output logic [NUM_READ-1:0]     rvld,  // indicates cache hit
-    output MEM_BLOCK [NUM_READ-1:0] rdat,
+    input logic ren,
+    input ADDR  raddr,
+    input MEM_SIZE  rsize,   // only for load, store always write the whole block (might need to change)
+    output logic    rvld,  // indicates cache hit
+    output MEM_BLOCK rdat,
 
     input logic                     wen,
     input ADDR                      waddr,
@@ -63,10 +62,10 @@ module dcache #(
     typedef logic [$clog2(ASSOC)-1:0]   WAY;
 
     function automatic TAG get_tag(input ADDR addr);
-        return [15:16-TAG_WIDTH];
+        return addr[15:16-TAG_BITS];
     endfunction
     function automatic SID get_sid(input ADDR addr);
-        return [SET_INDEX_BITS+OFFSET_BITS-1 : OFFSET_BITS];
+        return addr[SET_INDEX_BITS+OFFSET_BITS-1 : OFFSET_BITS];
     endfunction
     function automatic OFF get_off(input ADDR addr);
         return addr[OFFSET_BITS-1:0];
@@ -77,25 +76,25 @@ module dcache #(
         TAG     [NUM_SETS-1:0][ASSOC-1:0] tag;
     } cache_hdr;
 
-    TAG     [NUM_READ-1:0] cur_tag;
-    SID     [NUM_READ-1:0] cur_sid;
-    logic   [NUM_READ-1:0] rhit;
-    WAY     [NUM_READ-1:0] rway;
-    logic   [NUM_READ-1:0] rhit;
+    TAG     cur_tag;
+    SID     cur_sid;
+    logic   rhit;
+    WAY     rway;
+    MEM_BLOCK [NUM_SETS-1:0] tmp_rdat;
 
     generate
         for (genvar s = 0; s < NUM_SETS; ++s) begin : gen_sets
             memDP #(
                 .WIDTH     ($bits(MEM_BLOCK)),
                 .DEPTH     (ASSOC),
-                .READ_PORTS(NUM_READ),
+                .READ_PORTS(1),
                 .BYPASS_EN (0)
             ) set_i (
                 .clock(clock),
                 .reset(reset),
                 .re   (ren),
-                .raddr(rway[i]),
-                .rdata(rdat),
+                .raddr(rway),
+                .rdata(tmp_rdat[s]),
                 .we   (),
                 .waddr(),
                 .wdata()
@@ -104,24 +103,18 @@ module dcache #(
     endgenerate
 
     always_comb begin
-        foreach (ren[i]) begin
-            cur_tag[i] = get_tag(raddr[i]);
-            cur_sid[i] = get_sid(raddr[i]);
-        end
+        cur_tag = get_tag(raddr);
+        cur_sid = get_sid(raddr);
 
         rway = '0;
-        foreach (cache_hdr.tag[i, j]) begin
-            if (cur_tag[i] != cache_hdr.tag[cur_sid[i]][j])
+        for (int i = 0; i < ASSOC; ++i) begin
+            if (cur_tag != cache_hdr.tag[cur_sid][i])
                 continue;
-            rway[i] |= j;
+            rway |= i;
+            rhit |= 1;
         end
 
-        rhit = '0;
-        rdat = '0;
-        foreach (rhit[i]) begin
-            rhit[i] = |rway[i];
-            rdat[i] = 
-        end
+        rdat = tmp_rdat[cur_sid][rway];
     end
 
 
