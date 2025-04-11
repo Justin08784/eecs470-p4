@@ -33,8 +33,6 @@ module sq #(parameter
     localparam NUM_RPORTS = N; // retire ports (in-order)
     localparam NUM_ST_PORTS = NUM_FU_STORE; // ex-2-sq ports
     localparam NUM_LD_PORTS = NUM_FU_LOAD;
-    logic [$clog2(NUM_DPORTS):0]    free_scnt;
-    logic [$clog2(NUM_RPORTS):0]    used_scnt;
 
     logic [$clog2(LSQ_SZ)-1:0]      head;
     logic [$clog2(LSQ_SZ)-1:0]      tail;
@@ -46,20 +44,30 @@ module sq #(parameter
     logic [$clog2(LSQ_SZ):0]        used, free;
     logic [$clog2(2*`N):0]          rsvd; // sz(rename_buf) = 2*`N
 
-    logic [NUM_RPORTS-1:0][$clog2(LSQ_SZ)-1:0] r_idxs;
-    logic [NUM_DPORTS-1:0][$clog2(LSQ_SZ)-1:0] d_idxs;
-
-    sq2stRET sq_2_ret;
-    stRET2sq ret_2_sq;
-    forwardRET2sq forward_ret_2_sq;
-    sq2execute next_sq_2_exec;
-    sq2execute uncombined_forward_data;
-
+    logic [$clog2(NUM_DPORTS):0]    free_scnt;
+    logic [$clog2(NUM_RPORTS):0]    used_scnt;
     assign free_scnt    = `MIN(free - rsvd, NUM_DPORTS);
     assign used_scnt    = `MIN(used, NUM_RPORTS);
 
+    logic [NUM_RPORTS-1:0][$clog2(LSQ_SZ)-1:0] r_idxs;
+    logic [NUM_DPORTS-1:0][$clog2(LSQ_SZ)-1:0] d_idxs;
+    LSQ_IDX [N-1:0] next_ids;
+    always_comb begin
+        for (int unsigned i = 0; i < NUM_RPORTS; ++i)
+            r_idxs[i] = (head + i) % LSQ_SZ;
+        for (int unsigned i = 0; i < NUM_DPORTS; ++i)
+            d_idxs[i] = (tail + i) % LSQ_SZ;
+        for (int unsigned i = 0; i < NUM_DPORTS; ++i)
+            next_ids[i] = (tail_dbl + i) % LSQ_SZ_DBL;
+    end
 
-    DBG_retbuf dbg_retbuf;
+
+    /* >> ======== SECTION: Retirement ======== >> */
+    execute2sq      next_complete;
+    sq2stRET        sq_2_ret;
+    stRET2sq        ret_2_sq;
+    DBG_retbuf      dbg_retbuf;
+    forwardRET2sq   forward_ret_2_sq;
     post_ret_buffer buf_dut(
         `ifdef DEBUG
         .dbg(dbg_retbuf),
@@ -73,26 +81,8 @@ module sq #(parameter
         .ret_2_mem(ret_2_mem)
     );
 
-    LSQ_IDX [N-1:0] next_ids;
-    execute2sq next_complete;
     always_comb begin
         sq_2_rob = '0;
-
-        for (int unsigned i = 0; i < NUM_RPORTS; ++i)
-            r_idxs[i] = (head + i) % LSQ_SZ;
-        for (int unsigned i = 0; i < NUM_DPORTS; ++i)
-            d_idxs[i] = (tail + i) % LSQ_SZ;
-        for (int unsigned i = 0; i < NUM_DPORTS; ++i)
-            next_ids[i] = (tail_dbl + i) % LSQ_SZ_DBL;
-
-        // handle dispatch (outs)
-        sq_2_dis = '{
-            sq_rdy_scnt         : free_scnt,
-            last_used_sq_idx    : last_used_sq_idx,
-            next_ids            : next_ids,
-            no_store_yet        : no_store_yet
-        };
-
         //handle sq to ROB for retirement
         sq_2_rob.complete_en = next_complete.st_ex_en;
         for (int i = 0; i < NUM_FU_STORE; i++) begin
@@ -107,8 +97,12 @@ module sq #(parameter
         sq_2_ret.ret_cnt    = retire_2_sq.r_en;
         foreach (r_idxs[i])
             sq_2_ret.ret_st[i] = state[r_idxs[i]];
+
     end
 
+    /* >> ======== SECTION: Execute ======== >> */
+    sq2execute next_sq_2_exec;
+    sq2execute uncombined_forward_data;
     // LSQ_IDX [LD_BAY_SZ-1:0] [3:0] most_recent_bytes;
     always_comb begin
         next_sq_2_exec = '0;
@@ -229,6 +223,16 @@ module sq #(parameter
         end
     end
 
+    /* >> ======== SECTION: Dispatch ======== >> */
+    always_comb begin
+        // handle dispatch (outs)
+        sq_2_dis = '{
+            sq_rdy_scnt         : free_scnt,
+            last_used_sq_idx    : last_used_sq_idx,
+            next_ids            : next_ids,
+            no_store_yet        : no_store_yet
+        };
+    end
 
     always_ff @(posedge clock) begin
         
