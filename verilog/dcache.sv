@@ -80,11 +80,10 @@ module dcache #(
         AGE     [NUM_SETS-1:0]            age;
     } cache_hdr;
 
-    logic   rhit;
-    WAY     rway;
     MEM_BLOCK [NUM_SETS-1:0]            tmp_rdat;
     logic     [NUM_SETS-1:0][ASSOC-1:0] free_gnt;
-
+    logic   rhit, whit;
+    WAY     rway, wway;
     generate
         for (genvar s = 0; s < NUM_SETS; ++s) begin : gen_sets
             memDP #(
@@ -113,28 +112,27 @@ module dcache #(
         end
     endgenerate
 
+    /* Read */
     always_comb begin
         TAG     cur_tag;
         SID     cur_sid;
         cur_tag = get_tag(raddr);
         cur_sid = get_sid(raddr);
 
+        rhit = 0;
         rway = '0;
         for (int i = 0; i < ASSOC; ++i) begin
             if (cur_tag != cache_hdr.tag[cur_sid][i])
                 continue;
-            rway |= i;
-            rhit |= 1;
+            rway = i;
+            rhit = 1;
         end
 
         rdat = tmp_rdat[cur_sid][rway];
     end
 
 
-    logic   [ASSOC-1:0] wmsk;
-    logic   whit;
-    WAY     wway;
-    logic   [NUM_SETS-1:0][ASSOC-1:0] lru;
+    /* Write */
     always_comb begin
         TAG     cur_tag;
         SID     cur_sid;
@@ -142,29 +140,34 @@ module dcache #(
         cur_sid = get_sid(waddr);
 
         // Is block in cache?
+        whit = 0;
         wway = '0;
         for (int i = 0; i < ASSOC; ++i) begin
             if (cur_tag != cache_hdr.tag[cur_sid][i])
                 continue;
-            wway |= i;
-            whit |= 1;
+            wway = i;
+            whit = 1;
         end
+    end
+
+    /* Eviction */
+    logic   [ASSOC-1:0] victim_msk;
+    logic   [NUM_SETS-1:0][ASSOC-1:0] lru;
+    always_comb begin
+        /* TODO: Set these to tag, sid of block incoming from mem. */
+        TAG     cur_tag;
+        SID     cur_sid;
+        cur_tag = '0;
+        cur_sid = '0;
 
         /* FIXME: Placeholder LRU. Currently
         is 'bully 0 way' policy. */
         foreach(lru[s, i])
             lru[s][i] = i == 0;
 
-        wmsk = |free_gnt[cur_sid]
+        victim_msk = |free_gnt[cur_sid]
             ? free_gnt[cur_sid]
             : lru;
-
-        wway = '0;
-        foreach (wmsk[i]) begin
-            if (!wmsk[i])
-                continue;
-            wway |= i;
-        end
     end
 
 
