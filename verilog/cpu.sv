@@ -379,12 +379,12 @@ module cpu (
         .reset(reset),
         .flush(flush),
 
-        .dis_2_lq(dis_2_lq),
-        .retire_2_lq(retire_2_lq),
-        .exec_2_lq(exec_2_lq),
+        .dispatch_in(dis_2_lq),
+        .retire_in(retire_2_lq),
+        .execute_in(exec_2_lq),
         .execST_in(execST_2_lq),
 
-        .lq_2_dis(lq_2_dis),
+        .dispatch_out(lq_2_dis),
         .retire_out(lq_2_retire)
     );
 

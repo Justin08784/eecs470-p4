@@ -16,12 +16,12 @@ module lq #(parameter
     input reset,
     input flush,
 
-    input dispatch2lq dis_2_lq,
-    input execute2lq exec_2_lq,
+    input dispatch2lq dispatch_in,
+    input execute2lq execute_in,
     input execeuteST2lq execST_in,
-    input retire2lq retire_2_lq,
+    input retire2lq retire_in,
 
-    output lq2dispatch lq_2_dis,
+    output lq2dispatch dispatch_out,
     output lq2retire retire_out
 );
 
@@ -48,19 +48,31 @@ module lq #(parameter
 
     logic [NUM_FU_STORE+NUM_FU_LOAD-1:0] set_err;
     LSQ_IDX [NUM_FU_STORE+NUM_FU_LOAD-1:0] err_idx;
-    always_comb begin
 
+    always_comb begin
         for (int unsigned i = 0; i < NUM_RPORTS; ++i)
             r_idxs[i] = (head + i) % LSQ_SZ;
         for (int unsigned i = 0; i < NUM_DPORTS; ++i)
             d_idxs[i] = (tail + i) % LSQ_SZ;
+    end
 
+    always_comb begin
         // handle dispatch (outs)
-        lq_2_dis = '{
+        dispatch_out = '{
             lq_rdy_scnt : free_scnt,
             lq_tail     : tail
-        };   
+        }; 
+    end
 
+    always_comb begin
+        //handle telling fetch the top 2 PC's
+        retire_out.PC[0] = state[head].inst_pc;
+        retire_out.PC[1] = state[r_idxs[0]].inst_pc;
+        retire_out.err_ld_ooo[0] = state[head].err_ld_ooo;
+        retire_out.err_ld_ooo[1] = state[r_idxs[1]].err_ld_ooo;
+    end
+
+    always_comb begin
         //handle checking if LQ got ahead of SQ and needs to flag it in ROB
         set_err = '0;
         err_idx = '0;
@@ -80,17 +92,11 @@ module lq #(parameter
             for (int j = 0; j < NUM_FU_STORE; j++) begin
                 if (!execST_in.st_en[j]) continue;
 
-                if (execST_in.st_sq_idx[j] == state[exec_2_lq.ld_lq_idx[i]].sq_idx)
+                if (execST_in.st_sq_idx[j] == state[execute_in.ld_lq_idx[i]].sq_idx)
                     set_err[i+NUM_FU_STORE] = 1;
-                    err_idx[i+NUM_FU_STORE] = exec_2_lq.ld_lq_idx[i];
+                    err_idx[i+NUM_FU_STORE] = execute_in.ld_lq_idx[i];
             end
         end
-
-        //handle telling fetch the top 2 PC's
-        retire_out.PC[0] = state[head].inst_pc;
-        retire_out.PC[1] = state[r_idxs[0]].inst_pc;
-        retire_out.err_ld_ooo[0] = state[head].err_ld_ooo;
-        retire_out.err_ld_ooo[1] = state[r_idxs[1]].err_ld_ooo;
     end
 
 
@@ -104,20 +110,20 @@ module lq #(parameter
             tail    <= 0;
             state   <= '0;
         end else begin
-            used    <= used + dis_2_lq.lq_d_en_cnt - retire_2_lq.r_en;
-            free    <= free - dis_2_lq.lq_d_en_cnt + retire_2_lq.r_en;
-            rsvd    <= rsvd + dis_2_lq.rename_en_cnt - dis_2_lq.lq_d_en_cnt;
+            used    <= used + dispatch_in.lq_d_en_cnt - retire_in.r_en;
+            free    <= free - dispatch_in.lq_d_en_cnt + retire_in.r_en;
+            rsvd    <= rsvd + dispatch_in.rename_en_cnt - dispatch_in.lq_d_en_cnt;
 
-            head    <= (head + retire_2_lq.r_en) % LSQ_SZ;
-            tail    <= (tail + dis_2_lq.lq_d_en_cnt) % LSQ_SZ;
+            head    <= (head + retire_in.r_en) % LSQ_SZ;
+            tail    <= (tail + dispatch_in.lq_d_en_cnt) % LSQ_SZ;
             
             // handle execute updates
             for (int unsigned i = 0, int cur_idx = 0; i < NUM_ST_PORTS; ++i) begin
-                cur_idx = exec_2_lq.ld_lq_idx[i];
+                cur_idx = execute_in.ld_lq_idx[i];
 
-                if (exec_2_lq.ld_ex_en[i]) begin
-                    state[cur_idx].addr <= exec_2_lq.ld_addr[i];
-                    state[cur_idx].mem_size <= exec_2_lq.ld_mem_size[i];
+                if (execute_in.ld_ex_en[i]) begin
+                    state[cur_idx].addr <= execute_in.ld_addr[i];
+                    state[cur_idx].mem_size <= execute_in.ld_mem_size[i];
                     state[cur_idx].d_vld <= '1;
                 end
 
@@ -131,15 +137,15 @@ module lq #(parameter
 
             // handle dispatch (ins)
             for (int unsigned i = 0, int cur_idx = 0; i < NUM_DPORTS; ++i) begin
-                if (i >= dis_2_lq.lq_d_en_cnt)
+                if (i >= dispatch_in.lq_d_en_cnt)
                     continue;
                 cur_idx = d_idxs[i];
                 state[cur_idx] <= '{
-                    sq_idx : dis_2_lq.sq_idx[i],
+                    sq_idx : dispatch_in.sq_idx[i],
                     addr     : '0,
                     d_vld     : '0,
                     mem_size : '0,
-                    inst_pc : dis_2_lq.inst_pc[i],
+                    inst_pc : dispatch_in.inst_pc[i],
                     err_ld_ooo : '0
                 };
             end
@@ -154,11 +160,11 @@ module lq #(parameter
         tail,
         used,
         // I/O
-        dis_2_lq,
-        exec_2_lq,
-        retire_2_lq,
+        dispatch_in,
+        execute_in,
+        retire_in,
 
-        lq_2_dis
+        dispatch_out
     };
     `endif 
 
