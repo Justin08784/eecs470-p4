@@ -146,6 +146,7 @@ module victim_test();
         print_state(dbg);
         wr(4, append3(4));
         @(negedge clock);
+        // clr_all();
         print_state(dbg);
         wr(5, append3(5));
         @(negedge clock);
