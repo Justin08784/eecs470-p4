@@ -98,6 +98,11 @@ module sq #(parameter
         foreach (r_idxs[i])
             sq_2_ret.ret_st[i] = state[r_idxs[i]];
 
+        //handle data forwarding
+        sq_2_ret.forward_req_en     = ld_2_sq.forward_req_en;
+        sq_2_ret.forward_sq_idx     = ld_2_sq.forward_sq_idx;
+        sq_2_ret.forward_addr       = ld_2_sq.forward_addr;
+        sq_2_ret.forward_mem_size   = ld_2_sq.forward_mem_size;
     end
 
     /* >> ======== SECTION: Execute ======== >> */
@@ -108,12 +113,6 @@ module sq #(parameter
         next_sq_2_exec = '0;
         // most_recent_bytes = '0;
 
-        //handle data forwarding
-        sq_2_ret.forward_req_en     = ld_2_sq.forward_req_en;
-        sq_2_ret.forward_sq_idx     = ld_2_sq.forward_sq_idx;
-        sq_2_ret.forward_addr       = ld_2_sq.forward_addr;
-        sq_2_ret.forward_mem_size   = ld_2_sq.forward_mem_size;
-
         for (int unsigned i = 0; i < LD_BAY_SZ; i++) begin
 
             if (!ld_2_sq.forward_req_en[i]) continue;
@@ -122,10 +121,10 @@ module sq #(parameter
                 idx = (head+j) % LSQ_SZ;
 
                 if (state[idx].d_vld && (waddr(state[idx].addr) == waddr(ld_2_sq.forward_addr[i]))) begin
-                    next_sq_2_exec.forward_data[i][7:0]      = state[idx].bytewise_addr_mask[0] ? state[idx].data[7:0]      : next_sq_2_exec.forward_data[i][7:0];
-                    next_sq_2_exec.forward_data[i][15:8]     = state[idx].bytewise_addr_mask[1] ? state[idx].data[15:8]     : next_sq_2_exec.forward_data[i][15:8];
-                    next_sq_2_exec.forward_data[i][23:16]    = state[idx].bytewise_addr_mask[2] ? state[idx].data[23:16]    : next_sq_2_exec.forward_data[i][23:16];
-                    next_sq_2_exec.forward_data[i][31:24]    = state[idx].bytewise_addr_mask[3] ? state[idx].data[31:24]    : next_sq_2_exec.forward_data[i][31:24];
+                    next_sq_2_exec.forward_data[i].byte_level[0] = state[idx].bytewise_addr_mask[0] ? state[idx].data.byte_level[0] : next_sq_2_exec.forward_data[i].byte_level[0];
+                    next_sq_2_exec.forward_data[i].byte_level[1] = state[idx].bytewise_addr_mask[1] ? state[idx].data.byte_level[1] : next_sq_2_exec.forward_data[i].byte_level[1];
+                    next_sq_2_exec.forward_data[i].byte_level[2] = state[idx].bytewise_addr_mask[2] ? state[idx].data.byte_level[2] : next_sq_2_exec.forward_data[i].byte_level[2];
+                    next_sq_2_exec.forward_data[i].byte_level[3] = state[idx].bytewise_addr_mask[3] ? state[idx].data.byte_level[3] : next_sq_2_exec.forward_data[i].byte_level[3];
 
                     next_sq_2_exec.forward_byte_en[i] |= state[idx].bytewise_addr_mask;
                 end
@@ -154,6 +153,7 @@ module sq #(parameter
     end
 
     always_comb begin
+        sq_2_exec = '0;
         for (int unsigned i = 0, int unsigned word_off = 0; i < LD_BAY_SZ; i++) begin
             sq_2_exec.forward_en[i] |= forward_ret_2_sq.forward_en[i];
             if (forward_ret_2_sq.sq_idx_found[i]) begin
@@ -161,10 +161,10 @@ module sq #(parameter
                 sq_2_exec.forward_byte_en[i] = forward_ret_2_sq.forward_byte_en[i];
             end
             else begin
-                sq_2_exec.forward_data[i][7:0]      = uncombined_forward_data.forward_byte_en[i][0] ? uncombined_forward_data.forward_data[i][7:0]      : forward_ret_2_sq.forward_data[i][7:0];
-                sq_2_exec.forward_data[i][15:8]     = uncombined_forward_data.forward_byte_en[i][1] ? uncombined_forward_data.forward_data[i][15:8]     : forward_ret_2_sq.forward_data[i][15:8];
-                sq_2_exec.forward_data[i][23:16]    = uncombined_forward_data.forward_byte_en[i][2] ? uncombined_forward_data.forward_data[i][23:16]    : forward_ret_2_sq.forward_data[i][23:16];
-                sq_2_exec.forward_data[i][31:24]    = uncombined_forward_data.forward_byte_en[i][3] ? uncombined_forward_data.forward_data[i][31:24]    : forward_ret_2_sq.forward_data[i][31:24];
+                sq_2_exec.forward_data[i].byte_level[0] = uncombined_forward_data.forward_byte_en[i][0] ? uncombined_forward_data.forward_data[i].byte_level[0] : forward_ret_2_sq.forward_data[i].byte_level[0];
+                sq_2_exec.forward_data[i].byte_level[1] = uncombined_forward_data.forward_byte_en[i][1] ? uncombined_forward_data.forward_data[i].byte_level[1] : forward_ret_2_sq.forward_data[i].byte_level[1];
+                sq_2_exec.forward_data[i].byte_level[2] = uncombined_forward_data.forward_byte_en[i][2] ? uncombined_forward_data.forward_data[i].byte_level[2] : forward_ret_2_sq.forward_data[i].byte_level[2];
+                sq_2_exec.forward_data[i].byte_level[3] = uncombined_forward_data.forward_byte_en[i][3] ? uncombined_forward_data.forward_data[i].byte_level[3] : forward_ret_2_sq.forward_data[i].byte_level[3];
                 sq_2_exec.forward_byte_en[i] |= forward_ret_2_sq.forward_byte_en[i];
             end
             
@@ -403,11 +403,11 @@ module post_ret_buffer #(parameter
 
                 if (state[idx].sq_idx == sq_2_ret.forward_sq_idx[i]) next_forward_ret_2_sq.sq_idx_found[i] = '1;
 
-                if (state[idx].d_vld && (state[idx].addr[31:2] == sq_2_ret.forward_addr[i][31:2])) begin
-                    next_forward_ret_2_sq.forward_data[i][7:0]   = state[idx].bytewise_addr_mask[0] ? state[idx].data[7:0]      : next_forward_ret_2_sq.forward_data[i][7:0];
-                    next_forward_ret_2_sq.forward_data[i][15:8]  = state[idx].bytewise_addr_mask[1] ? state[idx].data[15:8]     : next_forward_ret_2_sq.forward_data[i][15:8];
-                    next_forward_ret_2_sq.forward_data[i][23:16] = state[idx].bytewise_addr_mask[2] ? state[idx].data[23:16]    : next_forward_ret_2_sq.forward_data[i][23:16];
-                    next_forward_ret_2_sq.forward_data[i][31:24] = state[idx].bytewise_addr_mask[3] ? state[idx].data[31:24]    : next_forward_ret_2_sq.forward_data[i][31:24];
+                if (state[idx].d_vld && (waddr(state[idx].addr) == waddr(sq_2_ret.forward_addr[i]))) begin
+                    next_forward_ret_2_sq.forward_data[i].byte_level[0] = state[idx].bytewise_addr_mask[0] ? state[idx].data.byte_level[0] : next_forward_ret_2_sq.forward_data[i].byte_level[0];
+                    next_forward_ret_2_sq.forward_data[i].byte_level[1] = state[idx].bytewise_addr_mask[1] ? state[idx].data.byte_level[1] : next_forward_ret_2_sq.forward_data[i].byte_level[1];
+                    next_forward_ret_2_sq.forward_data[i].byte_level[2] = state[idx].bytewise_addr_mask[2] ? state[idx].data.byte_level[2] : next_forward_ret_2_sq.forward_data[i].byte_level[2];
+                    next_forward_ret_2_sq.forward_data[i].byte_level[3] = state[idx].bytewise_addr_mask[3] ? state[idx].data.byte_level[3] : next_forward_ret_2_sq.forward_data[i].byte_level[3];
 
 
                     next_forward_ret_2_sq.forward_byte_en[i] |= state[idx].bytewise_addr_mask;
