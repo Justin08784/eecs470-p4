@@ -173,14 +173,19 @@ module sq #(parameter
             sq_2_exec.forward_byte_en[i]    >>= 8 * word_off;
 
             //ensure don't accidentally give more data than it wants
-            if (ld_2_sq.forward_mem_size[i] == BYTE) begin
-                sq_2_exec.forward_data[i] &= 8'hFF;
-                sq_2_exec.forward_byte_en[i] &= 1'b1;
-            end
-            else if (ld_2_sq.forward_mem_size[i] == HALF) begin
-                sq_2_exec.forward_data[i] &= 16'hFFFF;
-                sq_2_exec.forward_byte_en[i] &= 2'b11;
-            end
+            case (ld_2_sq.forward_mem_size[i])
+                BYTE: begin
+                    sq_2_exec.forward_data[i]       &= 8'hFF;
+                    sq_2_exec.forward_byte_en[i]    &= 1'b1;
+                end
+                HALF: begin
+                    sq_2_exec.forward_data[i]       &= 16'hFFFF;
+                    sq_2_exec.forward_byte_en[i]    &= 2'b11;
+                end
+                default: begin
+                    // FIXME: what to put for default case?
+                end
+            endcase
 
         end
     end
@@ -192,9 +197,11 @@ module sq #(parameter
         for (int i = 0, int unsigned word_off = 0; i < `NUM_FU_STORE; i++) begin
             word_off = iw_off(exec_2_sq.st_addr[i]);
 
-            if (exec_2_sq.st_mem_size[i] == BYTE)       bytewise_addr_mask[i][word_off] = 1;
-            else if (exec_2_sq.st_mem_size[i] == HALF)  bytewise_addr_mask[i][word_off+:1] = '1;
-            else                                        bytewise_addr_mask[i] = '1;
+            case (exec_2_sq.st_mem_size[i])
+                BYTE:   bytewise_addr_mask[i][word_off]     = 1;
+                HALF:   bytewise_addr_mask[i][word_off+:1]  = '1;
+                default:bytewise_addr_mask[i]               = '1;
+            endcase
         end
 
         
