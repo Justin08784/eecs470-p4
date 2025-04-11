@@ -20,7 +20,7 @@
 
 module dcache #(
     parameter ASSOC   = 4,
-    parameter MSHR_SZ = 32
+    parameter MSHR_SZ = 16
 ) (
     input logic clock,
     input logic reset,
@@ -35,15 +35,17 @@ module dcache #(
 
 
     // input from lsq
-    input logic ren,
-    input ADDR  raddr,
-    input MEM_SIZE  rsize,   // only for load, store always write the whole block (might need to change)
-    output logic    rvld,  // indicates cache hit
-    output MEM_BLOCK rdat,
+    input logic         ren,
+    input ADDR          raddr,
+    input MEM_SIZE      rsize,   // only for load, store always write the whole block (might need to change)
+    output logic        rvld,  // indicates cache hit
+    output MEM_BLOCK    rdat,
 
-    input logic                     wen,
-    input ADDR                      waddr,
-    input MEM_BLOCK                 wdat,
+    input logic         wen,
+    input ADDR          waddr,
+    input MEM_SIZE      wsize,
+    output logic        wvld,  // indicates cache hit
+    input MEM_BLOCK     wdat,
 
     output struct packed {
         ADDR        addr;
@@ -71,6 +73,16 @@ module dcache #(
     function automatic OFF get_off(input ADDR addr);
         return addr[OFFSET_BITS-1:0];
     endfunction
+
+    typedef struct packed {
+        logic       allocated;
+        ADDR        addr;
+        MEM_TAG     trans_tag;
+        MEM_BLOCK   mem_data;
+        MEM_SIZE    mem_size;
+        logic       ready;
+    } MSHR_ENTRY;
+    MSHR_ENTRY  [NUM_MSHRS-1:0] mshr, mshr_n;
 
     struct packed {
         logic   [NUM_SETS-1:0][ASSOC-1:0] vld;
@@ -122,13 +134,15 @@ module dcache #(
         rhit = 0;
         rway = '0;
         for (int i = 0; i < ASSOC; ++i) begin
-            if (cur_tag != cache_hdr.tag[cur_sid][i])
+            if (!(cache_hdr.vld[cur_sid][i]
+                && cur_tag == cache_hdr.tag[cur_sid][i]))
                 continue;
             rway = i;
             rhit = 1;
         end
 
         rdat = tmp_rdat[cur_sid][rway];
+        rvld = rhit;
     end
 
 
@@ -143,12 +157,67 @@ module dcache #(
         whit = 0;
         wway = '0;
         for (int i = 0; i < ASSOC; ++i) begin
-            if (cur_tag != cache_hdr.tag[cur_sid][i])
+            if (!(cache_hdr.vld[cur_sid][i]
+                && cur_tag == cache_hdr.tag[cur_sid][i]))
                 continue;
             wway = i;
             whit = 1;
         end
+        wvld = whit;
     end
+
+
+    /* Request to MEM */
+    typedef struct packed {
+        ADDR     addr; // delay addr and memsize for one cycle to keep track of info to store to mshr
+        MEM_SIZE size; // (bc the transaction_tag comes back from memory in the next cycle after receving request)
+    } MISS_PKT; // pre MSHR
+    MISS_PKT miss, miss_n;
+
+                        // fifo #(
+                        //     .INSTANCE_ID(69),
+                        //     .DEPTH(MSHR_SZ),
+                        //     .WIDTH($bits(MISS_PKT)),
+                        //     .NUM_RPORTS(1),
+                        //     .NUM_WPORTS(2),
+                        //     .ENABLE_INTR_FWD(`FALSE)
+                        // ) miss_queue (
+                        //     .clock      (clock),
+                        //     .reset      (reset),
+                        //     .flush      (flush),
+                        //     .wr_en_cnt  (),
+                        //     .wr_data    (),
+                        //     .rd_en_cnt  (),
+                        //     .rd_data    (),
+
+                        //     .free_scnt  (),
+                        //     .used_scnt  ()
+                        // );
+
+    always_comb begin
+        mshr_n = mshr;
+        miss_n = '0;
+        mem_out_command = MEM_NONE;
+
+        if (ren && !rhit) begin
+            mem_out_command = MEM_LOAD;
+            mem_out_addr = raddr;
+            miss_n = '{
+                addr : raddr,
+                size : rsize
+            };
+        end else if (wen && !whit) begin
+            mem_out_command = MEM_LOAD;
+            mem_out_addr = waddr;
+            miss_n = '{
+                addr : waddr,
+                size : wsize
+            };
+        end
+    end
+
+    /* Handle MEM tag */
+
 
     /* Eviction */
     logic   [ASSOC-1:0] victim_msk;
@@ -173,8 +242,13 @@ module dcache #(
 
     always_ff @(posedge clock) begin
         if (reset) begin
-            cache_hdr <= '0;
+            cache_hdr   <= '0;
+            mshr        <= '0;
+            miss        <= '0;
         end else begin
+            // cache_hdr   <= '0;
+            mshr        <= mshr_n;
+            miss        <= miss_n;
         end
     end
 
