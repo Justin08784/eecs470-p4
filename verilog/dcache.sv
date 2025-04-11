@@ -19,8 +19,8 @@
 
 
 module dcache #(
-    parameter ASSOC     = 4,
-    parameter MSHR_SZ = 16
+    parameter ASSOC   = 4,
+    parameter MSHR_SZ = 32
 ) (
     input logic clock,
     input logic reset,
@@ -74,6 +74,8 @@ module dcache #(
 
     struct packed {
         logic   [NUM_SETS-1:0][ASSOC-1:0] vld;
+        /* FIXME: dirty bit is currently unused */
+        logic   [NUM_SETS-1:0][ASSOC-1:0] dirty;
         TAG     [NUM_SETS-1:0][ASSOC-1:0] tag;
         AGE     [NUM_SETS-1:0]            age;
     } cache_hdr;
@@ -130,6 +132,7 @@ module dcache #(
 
 
     logic   [ASSOC-1:0] wmsk;
+    logic   whit;
     WAY     wway;
     logic   [NUM_SETS-1:0][ASSOC-1:0] lru;
     always_comb begin
@@ -137,6 +140,15 @@ module dcache #(
         SID     cur_sid;
         cur_tag = get_tag(waddr);
         cur_sid = get_sid(waddr);
+
+        // Is block in cache?
+        wway = '0;
+        for (int i = 0; i < ASSOC; ++i) begin
+            if (cur_tag != cache_hdr.tag[cur_sid][i])
+                continue;
+            wway |= i;
+            whit |= 1;
+        end
 
         /* FIXME: Placeholder LRU. Currently
         is 'bully 0 way' policy. */
