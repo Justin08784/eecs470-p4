@@ -39,7 +39,7 @@ module dcache #(
     input MEM_SIZE [NUM_READ-1:0]     proc2Dcache_size,   // only for load, store always write the whole block (might need to change)
 
                                                        // output to lsq
-    output logic [NUM_READ-1:0]        Dcache_valid_out  // indicates cache hit
+    output logic [NUM_READ-1:0]        Dcache_valid_out,  // indicates cache hit
     output MEM_BLOCK [NUM_READ-1:0]    Dcache_data_out,
     output struct packed {
         ADDR addr;
@@ -48,7 +48,7 @@ module dcache #(
     } Dcache_miss_out,  // output info for load instruction that has the cache miss
 
                                             // output to memory
-    output MEM_COMMAND   Dcache2Dmem_command  // ✅ Bradley: IF Dcache and SQ have conflict on memory LET LOAD GO FIRST!!!!!
+    output MEM_COMMAND   Dcache2Dmem_command, // ✅ Bradley: IF Dcache and SQ have conflict on memory LET LOAD GO FIRST!!!!!
     output ADDR          Dcache2Dmem_addr
 );
 
@@ -344,7 +344,7 @@ module dcache #(
     always_ff @(posedge clock) begin
         if (reset) begin
             for (int m=0; m<NUM_MSHRS; m++) begin
-                mshr[m].allocated < = 0;
+                mshr[m].allocated <= 0;
                     // //mshr[m].command <= '0;
                     // mshr[m].addr <= '0;
                     // mshr[m].trans_tag <= '0;
@@ -354,44 +354,44 @@ module dcache #(
 
             for (int s=0; s<NUM_SETS; s++) begin
                 for (int w=0; w<ASSOCIATIVITY; w++) begin
-                    dcache[s][w].valid < = 0;
-                    dcache[s][w].tag <   = '0;
-                    lru[s][w] < = w;
+                    dcache[s][w].valid <= 0;
+                    dcache[s][w].tag <= '0;
+                    lru[s][w] <= w;
                 end
             end
-            lru_update_enable < = 0;
+            lru_update_enable <= 0;
         end else begin
 
             for (int m=0; m<NUM_MSHRS; m++) begin  // clear mshr entry when written to dcache
-                mshr[m] < = mshr_updates[m];
+                mshr[m] <= mshr_updates[m];
             end
 
             if (proc2Dcache_command==MEM_LOAD && cache_hit != '1) begin
-                cachemiss_addr    < = proc2Dcache_raddr[cache_miss_rport];  // 📌 if mem load did not go to memory immediately, NEED TO STORE THE CACHE MISS ADDR!!!
-                cachemiss_memsize < = proc2Dcache_size[cache_miss_rport];
+                cachemiss_addr    <= proc2Dcache_raddr[cache_miss_rport];  // 📌 if mem load did not go to memory immediately, NEED TO STORE THE CACHE MISS ADDR!!!
+                cachemiss_memsize <= proc2Dcache_size[cache_miss_rport];
             end
 
             if(read_operation || write_store || write_mshr) begin
-                lru_update_enable < = 1;
+                lru_update_enable <= 1;
             end else begin
-                lru_update_enable < = 0;
+                lru_update_enable <= 0;
             end
 
             for (int i=0; i< NUM_SETS; i++) begin
-                lru    [i] < = lru_updates[i];
-                lru_way[i] < = lru_updates[i][3];
+                lru    [i] <= lru_updates[i];
+                lru_way[i] <= lru_updates[i][3];
             end
 
             // update dcache entry when something is written to cache
             if (write_store) begin
-                dcache[current_write_set_index][lru_updates[current_write_set_index][3]].valid < = 1;
-                dcache[current_write_set_index][lru_updates[current_write_set_index][3]].tag <   = current_write_tag;
+                dcache[current_write_set_index][lru_updates[current_write_set_index][3]].valid <= 1;
+                dcache[current_write_set_index][lru_updates[current_write_set_index][3]].tag <= current_write_tag;
             end
             else if (write_mshr) begin
                 for (int m=0; m<NUM_MSHRS; m++) begin
                     if (mshr[m].ready) begin
-                        dcache[current_write_set_index][lru_updates[current_write_set_index][3]].valid < = 1;
-                        dcache[current_write_set_index][lru_updates[current_write_set_index][3]].tag <   = current_write_tag;
+                        dcache[current_write_set_index][lru_updates[current_write_set_index][3]].valid <= 1;
+                        dcache[current_write_set_index][lru_updates[current_write_set_index][3]].tag <= current_write_tag;
                     end
                 end
             end
