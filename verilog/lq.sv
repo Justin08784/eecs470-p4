@@ -92,7 +92,7 @@ module lq #(parameter
             for (int j = 0; j < NUM_FU_STORE; j++) begin
                 if (!execST_in.st_en[j]) continue;
 
-                if (execST_in.st_sq_idx[j] == state[execute_in.ld_lq_idx[i]].sq_idx)
+                if ((execST_in.st_sq_idx[j] == state[execute_in.ld_lq_idx[i]].sq_idx) && execute_in.ld_ex_en[i])
                     set_err[i+NUM_FU_STORE] = 1;
                     err_idx[i+NUM_FU_STORE] = execute_in.ld_lq_idx[i];
             end
