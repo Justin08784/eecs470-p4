@@ -299,7 +299,7 @@ always_comb begin
         end
 
         if (commit_in[i].dat.rd_mem) begin
-            rs_out.d_dat[i].sq_idx = sq_in.next_ids[lq_wr_idx];
+            rs_out.d_dat[i].sq_idx = (sq_in.no_store_yet && (sq_wr_idx == 0)) ? `LSQ_SZ_DBL : (sq_in.last_used_sq_idx + sq_wr_idx) % `LSQ_SZ_DBL;
             // lq_out.rob_idx[lq_wr_idx] = rob_in.rob_idxs[i];
             // lq_out.sq_idx[lq_wr_idx] = sq_in.no_store_yet ? (sq_wr_idx > 0) ? sq_wr_idx-1 : 33 : (sq_in.last_used_sq_idx + sq_wr_idx - 1) % `LSQ_SZ_DBL;
             // if (sq_in.no_store_yet && (sq_wr_idx > 0)) lq_out.sq_idx[lq_wr_idx] = sq_wr_idx-1;
@@ -308,6 +308,7 @@ always_comb begin
             lq_out.sq_idx[lq_wr_idx] = (sq_in.no_store_yet && (sq_wr_idx == 0)) ? `LSQ_SZ_DBL : (sq_in.last_used_sq_idx + sq_wr_idx) % `LSQ_SZ_DBL;
             lq_out.inst_pc[lq_wr_idx] = commit_in[i].dat.PC;
             ++lq_wr_idx;
+            // $display("UPDATING: last: %0d, wr_idx: %0d, tag: %0d", sq_in.last_used_sq_idx, sq_wr_idx, lq_out.sq_idx[lq_wr_idx]);
         end
     end
 
