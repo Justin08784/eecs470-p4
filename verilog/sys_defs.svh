@@ -129,6 +129,8 @@ typedef logic [3:0] MEM_TAG;
 `define ICACHE_LINES 32
 `define ICACHE_LINE_BITS $clog2(`ICACHE_LINES)
 
+`define DCACHE_LINES 32
+
 `define MEM_SIZE_IN_BYTES (64*1024)
 `define MEM_64BIT_LINES   (`MEM_SIZE_IN_BYTES/8)
 

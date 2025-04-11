@@ -189,7 +189,7 @@ GREP = grep -E --color=auto
 # ---- Modules to Test ---- #
 
 # TODO: add more modules here
-MODULES = cpu mult rob rs fifo free_list dispatch prf map_table stage_id_p4 execute fetch btb sq post_ret_buffer gshare skid_buffer lq
+MODULES = cpu mult rob rs fifo free_list dispatch prf map_table stage_id_p4 execute fetch btb sq post_ret_buffer gshare skid_buffer lq dcache
 
 # TODO: update this if you add more header files
 ALL_HEADERS = $(CPU_HEADERS)
@@ -292,6 +292,11 @@ GSHARE_FILES = verilog/sys_defs.svh verilog/gshare.sv verilog/prediction_buffer.
 build/gshare.simv: $(GSHARE_FILES)
 build/gshare.cov: $(GSHARE_FILES)
 synth/gshare.vg: $(GSHARE_FILES)
+
+DCACHE_FILES = verilog/sys_defs.svh verilog/memDP.sv
+build/dcache.simv: $(DCACHE_FILES)
+build/dcache.cov: $(DCACHE_FILES)
+synth/dcache.vg: $(DCACHE_FILES)
 
 
 #################################
