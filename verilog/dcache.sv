@@ -60,6 +60,7 @@ module dcache #(
     typedef logic [TAG_BITS-1:0]        TAG;
     typedef logic [OFFSET_BITS-1:0]     OFF;
     typedef logic [$clog2(ASSOC)-1:0]   WAY;
+    typedef logic [ASSOC-1:0][ASSOC-1:0]AGE;
 
     function automatic TAG get_tag(input ADDR addr);
         return addr[15:16-TAG_BITS];
@@ -74,13 +75,13 @@ module dcache #(
     struct packed {
         logic   [NUM_SETS-1:0][ASSOC-1:0] vld;
         TAG     [NUM_SETS-1:0][ASSOC-1:0] tag;
+        AGE     [NUM_SETS-1:0]            age;
     } cache_hdr;
 
-    TAG     cur_tag;
-    SID     cur_sid;
     logic   rhit;
     WAY     rway;
-    MEM_BLOCK [NUM_SETS-1:0] tmp_rdat;
+    MEM_BLOCK [NUM_SETS-1:0]            tmp_rdat;
+    logic     [NUM_SETS-1:0][ASSOC-1:0] free_gnt;
 
     generate
         for (genvar s = 0; s < NUM_SETS; ++s) begin : gen_sets
@@ -95,14 +96,24 @@ module dcache #(
                 .re   (ren),
                 .raddr(rway),
                 .rdata(tmp_rdat[s]),
-                .we   (),
+                .we   (wen),
                 .waddr(),
-                .wdata()
+                .wdata(wdat)
+            );
+
+            psel_gen #(
+                .WIDTH(ASSOC),
+                .REQS(1)
+            ) free_way (
+                .req (~cache_hdr.vld[s]),
+                .gnt (free_gnt[s])
             );
         end
     endgenerate
 
     always_comb begin
+        TAG     cur_tag;
+        SID     cur_sid;
         cur_tag = get_tag(raddr);
         cur_sid = get_sid(raddr);
 
@@ -115,6 +126,33 @@ module dcache #(
         end
 
         rdat = tmp_rdat[cur_sid][rway];
+    end
+
+
+    logic   [ASSOC-1:0] wmsk;
+    WAY     wway;
+    logic   [NUM_SETS-1:0][ASSOC-1:0] lru;
+    always_comb begin
+        TAG     cur_tag;
+        SID     cur_sid;
+        cur_tag = get_tag(waddr);
+        cur_sid = get_sid(waddr);
+
+        /* FIXME: Placeholder LRU. Currently
+        is 'bully 0 way' policy. */
+        foreach(lru[s, i])
+            lru[s][i] = i == 0;
+
+        wmsk = |free_gnt[cur_sid]
+            ? free_gnt[cur_sid]
+            : lru;
+
+        wway = '0;
+        foreach (wmsk[i]) begin
+            if (!wmsk[i])
+                continue;
+            wway |= i;
+        end
     end
 
 
