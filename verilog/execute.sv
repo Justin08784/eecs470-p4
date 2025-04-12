@@ -338,7 +338,7 @@ module alu_ex(
                 rob_idx : ops[i].rob_idx,
                 data    : tmp_res[i],
                 btq_idx : ops[i].btq_idx,
-                take    : tmp_take[i],
+                take    : tmp_take[i] || ops[i].uncond_branch,
                 is_brch : ops[i].cond_branch || ops[i].uncond_branch
             };
 
