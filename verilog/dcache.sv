@@ -35,17 +35,17 @@ module dcache #(
 
 
     // input from lsq
-    input logic         ren,
-    input ADDR          raddr,
-    input MEM_SIZE      rsize,   // only for load, store always write the whole block (might need to change)
-    output logic        rvld,  // indicates cache hit
-    output MEM_BLOCK    rdat,
+    input logic         ld_en,
+    input ADDR          ld_addr,
+    input MEM_SIZE      ld_size,   // only for load, store always write the whole block (might need to change)
+    output logic        ld_vld,  // indicates cache hit
+    output MEM_BLOCK    ld_dat,
 
-    input logic         wen,
-    input ADDR          waddr,
-    input MEM_SIZE      wsize,
-    output logic        wvld,  // indicates cache hit
-    input MEM_BLOCK     wdat,
+    input logic         st_en,
+    input ADDR          st_addr,
+    input MEM_SIZE      st_size,
+    output logic        st_vld,  // indicates cache hit
+    input MEM_BLOCK     st_dat,
 
     output struct packed {
         ADDR        addr;
@@ -107,12 +107,12 @@ module dcache #(
             ) set_i (
                 .clock(clock),
                 .reset(reset),
-                .re   (ren),
+                .re   (ld_en),
                 .raddr(rway),
                 .rdata(tmp_rdat[s]),
-                .we   (wen),
+                .we   (st_en),
                 .waddr(),
-                .wdata(wdat)
+                .wdata(st_dat)
             );
 
             psel_gen #(
@@ -129,8 +129,8 @@ module dcache #(
     always_comb begin
         TAG     cur_tag;
         SID     cur_sid;
-        cur_tag = get_tag(raddr);
-        cur_sid = get_sid(raddr);
+        cur_tag = get_tag(ld_addr);
+        cur_sid = get_sid(ld_addr);
 
         rhit = 0;
         rway = '0;
@@ -142,8 +142,8 @@ module dcache #(
             rhit = 1;
         end
 
-        rdat = tmp_rdat[cur_sid][rway];
-        rvld = ren && rhit;
+        ld_dat = tmp_rdat[cur_sid][rway];
+        ld_vld = ld_en && rhit;
     end
 
 
@@ -151,8 +151,8 @@ module dcache #(
     always_comb begin
         TAG     cur_tag;
         SID     cur_sid;
-        cur_tag = get_tag(waddr);
-        cur_sid = get_sid(waddr);
+        cur_tag = get_tag(st_addr);
+        cur_sid = get_sid(st_addr);
 
         // Is block in cache?
         whit = 0;
@@ -164,7 +164,7 @@ module dcache #(
             wway = i;
             whit = 1;
         end
-        wvld = wen && whit;
+        st_vld = st_en && whit;
     end
 
 
@@ -202,19 +202,19 @@ module dcache #(
         miss_n = '0;
         mem_out_command = MEM_NONE;
 
-        if (ren && !rhit) begin
+        if (ld_en && !rhit) begin
             mem_out_command = MEM_LOAD;
-            mem_out_addr = raddr;
+            mem_out_addr = ld_addr;
             miss_n = '{
-                addr : raddr,
-                size : rsize
+                addr : ld_addr,
+                size : ld_size
             };
-        end else if (wen && !whit) begin
+        end else if (st_en && !whit) begin
             mem_out_command = MEM_LOAD;
-            mem_out_addr = waddr;
+            mem_out_addr = st_addr;
             miss_n = '{
-                addr : waddr,
-                size : wsize
+                addr : st_addr,
+                size : st_size
             };
         end
 
@@ -252,6 +252,12 @@ module dcache #(
 
             mshr_n[mem_in_data_tag] = '0;
         end
+    end
+
+
+    /* Decide who actually gets to use the write port to the memDP */
+    always_comb begin
+
     end
 
 
