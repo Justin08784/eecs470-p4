@@ -104,10 +104,16 @@ module stage_if_p4 (
 
     logic off; // 1 if PC is dw-misaligned (i.e. starts at 2nd word of double word)
 
+    logic prediction_prop;
+
+    logic pred_stall;
+
+    
+
     always_comb begin
         d_out.f_en_cnt = `MIN(used_scnt, d_in.d_rdy_cnt);
         off = PC_reg[2]; 
-        f_cnt = !icache_valid ? 0 : (off ? `MIN(1, free_scnt) : free_scnt);
+        f_cnt = !icache_valid  ? 0 : ((off || mux_result_prediction == 2'b10) ? `MIN(1, free_scnt) : free_scnt);
 
         for (int unsigned i = 0, logic vld = 0; i < `N; ++i) begin
             vld = i < f_cnt;
@@ -119,9 +125,10 @@ module stage_if_p4 (
                 valid : vld,
                 bhr   : pred_in.bhr,
 
-                pred  : mux_result_prediction[1]
+                pred  : mux_result_prediction[0]
             };
             $display("DECODE PC: %x", PC_reg[i]);
+            $display("mux_result_prediction[1]: %x", mux_result_prediction[1]);
         end
     end
 
@@ -156,6 +163,8 @@ module stage_if_p4 (
    // assign pred_out = mux_result
     assign mux_result_prediction[1] = predict_taken[1] && btb_hit[1];
 
+    //assign prediction_prop = mux_result_prediction[0] | mux_result_prediction[1];
+
     //if btb
 
     logic [4:0] taken_count;
@@ -176,28 +185,27 @@ module stage_if_p4 (
                 PC_reg <= 0; // initial PC value is 0 (the memory address where our program starts)
                 //taken_count = 5'b0;
                 //mux_result_prediction <= 2'b00;
+              //  prediction_prop <= 0;
         end else if (flush) begin
-                PC_reg <= r_in.corrected_PC;  // initial PC value is 0 (the memory address where our program starts)
-        end else if(mux_result_prediction[1]) begin
+                PC_reg <= r_in.corrected_PC;
+                //prediction_prop <=0;  // initial PC value is 0 (the memory address where our program starts)
+        end else if(mux_result_prediction) begin
                 $display("PREDICTING TAKEN:");
-                //taken_count = taken_count + 1;
-               // foreach(PC_reg[i])
-                 //   PC_reg[i] <= 24;
-                //PC_reg[1] <= 24;
-                //$display("TAKEN COUNT: %5x", taken_count);
                 $display("MUX RESULT: %1x", mux_result_prediction[0]);
-                //$display("PREDICT TAKEN: %1x", predict_taken[0]);
-               // $display("BTB HIT: %1x", btb_hit[0]);
+
                 $display("FETCHING NEW TARGET: %x", btb_in.target[1]);
 
+                if(mux_result_prediction[0]) begin
+                    PC_reg <=  {16'b0,btb_in.target[0]};
+                end else if(mux_result_prediction[1])
+                    PC_reg <= PC_reg + 4*f_cnt;
 
-                PC_reg <=  {16'b0,btb_in.target[1]};
 
-               // foreach(PC_reg[i])
-                //    PC_reg <=  mux_result_prediction[i] ? {16'b0,btb_in.target[i]} : PC_reg[i] + 4*f_cnt;
+                //prediction_prop <= 1;       
         end else begin
             //foreach(PC_reg[i])
                 PC_reg <= PC_reg + 4*f_cnt; // ...or transition to next PC if valid
+                //prediction_prop <= 0;
         end 
     end
 

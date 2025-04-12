@@ -108,7 +108,8 @@ module retire (
             PC_original[i] = btq_in.dat[btq_rd_cnt].PC;
 
             bhr_from_btq[i] = btq_in.dat[btq_rd_cnt].bhr;
-
+            $display("BTQ_IN PC: 0x%x, BTQ_IN TGT: 0x%x} ", btq_in.dat[btq_rd_cnt].PC, btq_in.dat[btq_rd_cnt].tgt);
+            $display("BTQ_IN PRED: %x,  BTQ_IN TAKE: %x", btq_in.dat[btq_rd_cnt].pred, btq_in.dat[btq_rd_cnt].take);                
             if (btq_in.dat[btq_rd_cnt].pred != btq_in.dat[btq_rd_cnt].take) begin
                 $display("PREDICTION != TAKE");
                 // is mispred?
