@@ -91,10 +91,11 @@ module dcache #(
         AGE     [NUM_SETS-1:0]            age;
     } cache_hdr, cache_hdr_n;
 
-    MEM_BLOCK [NUM_SETS-1:0]            tmp_rdat;
-    logic     [NUM_SETS-1:0][ASSOC-1:0] free_gnt;
-    logic   ld_hit, st_hit;
-    WAY     ld_way, st_way;
+
+    logic       [NUM_SETS-1:0]  ren,  wen;
+    WAY         [NUM_SETS-1:0]  rway, wway;            
+    MEM_BLOCK   [NUM_SETS-1:0]  rdat, wdat;
+    logic       [NUM_SETS-1:0][ASSOC-1:0] free_gnt;
     generate
         for (genvar s = 0; s < NUM_SETS; ++s) begin : gen_sets
             memDP #(
@@ -107,12 +108,12 @@ module dcache #(
             ) set_i (
                 .clock(clock),
                 .reset(reset),
-                .re   (ld_en),
-                .raddr(ld_way),
-                .rdata(tmp_rdat[s]),
-                .we   (st_en),
-                .waddr(),
-                .wdata(st_dat)
+                .re   (ren [s]),
+                .raddr(rway[s]),
+                .rdata(rdat[s]),
+                .we   (wen [s]),
+                .waddr(wway[s]),
+                .wdata(wdat[s])
             );
 
             psel_gen #(
@@ -125,7 +126,9 @@ module dcache #(
         end
     endgenerate
 
-    /* Read */
+    /* Load */
+    logic   ld_hit;
+    WAY     ld_way;
     always_comb begin
         TAG     cur_tag;
         SID     cur_sid;
@@ -134,20 +137,22 @@ module dcache #(
 
         ld_hit = 0;
         ld_way = '0;
-        for (int i = 0; i < ASSOC; ++i) begin
-            if (!(cache_hdr.vld[cur_sid][i]
-                && cur_tag == cache_hdr.tag[cur_sid][i]))
+        for (int w = 0; w < ASSOC; ++w) begin
+            if (!(cache_hdr.vld[cur_sid][w]
+                && cur_tag == cache_hdr.tag[cur_sid][w]))
                 continue;
-            ld_way = i;
+            ld_way = w;
             ld_hit = 1;
         end
 
-        ld_dat = tmp_rdat[cur_sid][ld_way];
-        ld_vld = ld_en && ld_hit;
+        ld_dat = rdat[cur_sid][ld_way];
+        // ld_vld = ld_en && ld_hit;
     end
 
 
-    /* Write */
+    /* Store */
+    logic   st_hit;
+    WAY     st_way;
     always_comb begin
         TAG     cur_tag;
         SID     cur_sid;
@@ -157,14 +162,14 @@ module dcache #(
         // Is block in cache?
         st_hit = 0;
         st_way = '0;
-        for (int i = 0; i < ASSOC; ++i) begin
-            if (!(cache_hdr.vld[cur_sid][i]
-                && cur_tag == cache_hdr.tag[cur_sid][i]))
+        for (int w = 0; w < ASSOC; ++w) begin
+            if (!(cache_hdr.vld[cur_sid][w]
+                && cur_tag == cache_hdr.tag[cur_sid][w]))
                 continue;
-            st_way = i;
+            st_way = w;
             st_hit = 1;
         end
-        st_vld = st_en && st_hit;
+        // st_vld = st_en && st_hit;
     end
 
 
