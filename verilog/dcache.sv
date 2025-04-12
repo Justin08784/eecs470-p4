@@ -1,21 +1,21 @@
 // Get word address; restricting to only actually used 16 LSB.
- function automatic logic[13:0] waddr(input ADDR addr);
-     return addr[15:2];
- endfunction
- // Double word address
- function automatic logic[12:0] dwaddr(input ADDR addr);
-     return addr[15:3];
- endfunction
- 
- // In-word byte offset
- function automatic logic[1:0] iw_off(input ADDR addr);
-     return addr[1:0];
- endfunction
- 
- // In-double-word byte offset
- function automatic logic[2:0] idw_off(input ADDR addr);
-     return addr[2:0];
- endfunction
+function automatic logic[13:0] waddr(input ADDR addr);
+    return addr[15:2];
+endfunction
+// Double word address
+function automatic logic[12:0] dwaddr(input ADDR addr);
+    return addr[15:3];
+endfunction
+
+// In-word byte offset
+function automatic logic[1:0] iw_off(input ADDR addr);
+    return addr[1:0];
+endfunction
+
+// In-double-word byte offset
+function automatic logic[2:0] idw_off(input ADDR addr);
+    return addr[2:0];
+endfunction
 
 
 module dcache #(
@@ -129,49 +129,86 @@ module dcache #(
     /* Load */
     logic   ld_hit;
     WAY     ld_way;
+    SID     ld_sid;
+    TAG     ld_tag;
+    logic   [NUM_SETS-1:0]  ld_r_req, 
+                            ld_r_gnt;
     always_comb begin
-        TAG     cur_tag;
-        SID     cur_sid;
-        cur_tag = get_tag(ld_addr);
-        cur_sid = get_sid(ld_addr);
+        ld_tag = get_tag(ld_addr);
+        ld_sid = get_sid(ld_addr);
 
         ld_hit = 0;
         ld_way = '0;
+        ld_r_req = '0;
         for (int w = 0; w < ASSOC; ++w) begin
-            if (!(cache_hdr.vld[cur_sid][w]
-                && cur_tag == cache_hdr.tag[cur_sid][w]))
+            if (!(cache_hdr.vld[ld_sid][w]
+                && ld_tag == cache_hdr.tag[ld_sid][w]))
                 continue;
             ld_way = w;
             ld_hit = 1;
+            ld_r_req[w] = 1;
         end
 
-        ld_dat = rdat[cur_sid][ld_way];
+        // ld_dat = rdat[ld_sid][ld_way];
         // ld_vld = ld_en && ld_hit;
     end
-
 
     /* Store */
     logic   st_hit;
     WAY     st_way;
+    SID     st_sid;
+    TAG     st_tag;
+    logic   [NUM_SETS-1:0]  st_r_req, 
+                            st_r_gnt;
+    logic   [NUM_SETS-1:0]  st_w_req, 
+                            st_w_gnt;
     always_comb begin
-        TAG     cur_tag;
-        SID     cur_sid;
-        cur_tag = get_tag(st_addr);
-        cur_sid = get_sid(st_addr);
+        st_tag = get_tag(st_addr);
+        st_sid = get_sid(st_addr);
 
         // Is block in cache?
         st_hit = 0;
         st_way = '0;
+        st_r_req = '0;
+        st_w_req = '0;
         for (int w = 0; w < ASSOC; ++w) begin
-            if (!(cache_hdr.vld[cur_sid][w]
-                && cur_tag == cache_hdr.tag[cur_sid][w]))
+            if (!(cache_hdr.vld[st_sid][w]
+                && st_tag == cache_hdr.tag[st_sid][w]))
                 continue;
             st_way = w;
             st_hit = 1;
+            st_r_req[w] = 1;
+            st_w_req[w] = 1;
         end
         // st_vld = st_en && st_hit;
     end
 
+    // Who gets to read and write in each set?
+    typedef enum logic[1:0] {
+        NONE,
+        LOAD,
+        STOR,
+        INCM
+    } WHO;
+    WHO [NUM_SETS-1:0] r_who;
+    WHO [NUM_SETS-1:0] w_who;
+    always_comb begin
+        ren = '0;
+        wen = '0;
+        rway = '0;
+        wway = '0;
+
+        foreach (ren[s]) begin
+            r_who[s] = 
+                (ld_en && (ld_sid == s) && ld_hit) ? LOAD :
+                (st_en && (st_sid == s) && st_hit) ? STOR : 1;
+
+        end
+
+        // enum logic[1:0] {
+        // } who_w;
+
+    end
 
     /* Request to MEM */
     typedef struct packed {
