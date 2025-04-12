@@ -78,7 +78,7 @@ module dcache #(
         logic       allocated;
         ADDR        addr;
         MEM_TAG     trans_tag;
-        MEM_BLOCK   mem_data;
+        MEM_BLOCK   mem_data; // FIXME: Is this needed?
         MEM_SIZE    mem_size;
         logic       ready;
     } MSHR_ENTRY;
@@ -90,7 +90,7 @@ module dcache #(
         logic   [NUM_SETS-1:0][ASSOC-1:0] dirty;
         TAG     [NUM_SETS-1:0][ASSOC-1:0] tag;
         AGE     [NUM_SETS-1:0]            age;
-    } cache_hdr;
+    } cache_hdr, cache_hdr_n;
 
     MEM_BLOCK [NUM_SETS-1:0]            tmp_rdat;
     logic     [NUM_SETS-1:0][ASSOC-1:0] free_gnt;
@@ -142,7 +142,7 @@ module dcache #(
         end
 
         rdat = tmp_rdat[cur_sid][rway];
-        rvld = rhit;
+        rvld = ren && rhit;
     end
 
 
@@ -163,7 +163,7 @@ module dcache #(
             wway = i;
             whit = 1;
         end
-        wvld = whit;
+        wvld = wen && whit;
     end
 
 
@@ -174,26 +174,28 @@ module dcache #(
     } MISS_PKT; // pre MSHR
     MISS_PKT miss, miss_n;
 
-                        // fifo #(
-                        //     .INSTANCE_ID(69),
-                        //     .DEPTH(MSHR_SZ),
-                        //     .WIDTH($bits(MISS_PKT)),
-                        //     .NUM_RPORTS(1),
-                        //     .NUM_WPORTS(2),
-                        //     .ENABLE_INTR_FWD(`FALSE)
-                        // ) miss_queue (
-                        //     .clock      (clock),
-                        //     .reset      (reset),
-                        //     .flush      (flush),
-                        //     .wr_en_cnt  (),
-                        //     .wr_data    (),
-                        //     .rd_en_cnt  (),
-                        //     .rd_data    (),
+    /* Eviction */
+    logic   [NUM_SETS-1:0] any_free;
+    logic   [NUM_SETS-1:0][ASSOC-1:0] victim_msk;
+    logic   [NUM_SETS-1:0][ASSOC-1:0] lru;
+    always_comb begin
+        /* FIXME: Placeholder LRU. Currently
+        is 'bully 0 way' policy. */
+        foreach(lru[s, i])
+            lru[s][i] = i == 0;
 
-                        //     .free_scnt  (),
-                        //     .used_scnt  ()
-                        // );
+        foreach(any_free[s])
+            any_free[s] = |free_gnt[s];
 
+        foreach(victim_msk[s]) begin
+            victim_msk = any_free
+                ? free_gnt[s]
+                : lru;
+        end
+    end
+
+    /* Handle MEM tag */
+    MEM_BLOCK wdat_incoming;
     always_comb begin
         mshr_n = mshr;
         miss_n = '0;
@@ -225,29 +227,31 @@ module dcache #(
                 ready       : 0
             };
         end
-    end
 
-    /* Handle MEM tag */
+        /* FIXME: But there is only 1 write port to memDP, so you 
+        somehow need to arbitrate between STORE and incoming mem block.
+        Give priority to the incoming mem block. */
+        wdat_incoming = '0;
+        cache_hdr_n = cache_hdr;
+        if (mem_in_data_tag != 0) begin
+            TAG     cur_tag;
+            SID     cur_sid;
+            cur_tag = get_tag(mshr[mem_in_data_tag].addr);
+            cur_sid = get_sid(mshr[mem_in_data_tag].addr);
 
+            for (int w = 0; w < ASSOC; ++w) begin
+                if (!victim_msk[cur_sid][w])
+                    continue;
+                /* TODO: need to write back if dirty. This just overwrites i.e.
+                assumes clean */
+                cache_hdr_n.vld[cur_sid][w]     = 1;
+                cache_hdr_n.dirty[cur_sid][w]   = 0;
+                cache_hdr_n.tag[cur_sid][w]     = cur_tag;
+                cache_hdr_n.age[cur_sid]        = '0;
+            end
 
-    /* Eviction */
-    logic   [ASSOC-1:0] victim_msk;
-    logic   [NUM_SETS-1:0][ASSOC-1:0] lru;
-    always_comb begin
-        /* TODO: Set these to tag, sid of block incoming from mem. */
-        TAG     cur_tag;
-        SID     cur_sid;
-        cur_tag = '0;
-        cur_sid = '0;
-
-        /* FIXME: Placeholder LRU. Currently
-        is 'bully 0 way' policy. */
-        foreach(lru[s, i])
-            lru[s][i] = i == 0;
-
-        victim_msk = |free_gnt[cur_sid]
-            ? free_gnt[cur_sid]
-            : lru;
+            mshr_n[mem_in_data_tag] = '0;
+        end
     end
 
 
@@ -257,7 +261,7 @@ module dcache #(
             mshr        <= '0;
             miss        <= '0;
         end else begin
-            // cache_hdr   <= '0;
+            cache_hdr   <= cache_hdr_n;
             mshr        <= mshr_n;
             miss        <= miss_n;
         end
