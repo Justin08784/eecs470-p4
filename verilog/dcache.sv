@@ -93,8 +93,8 @@ module dcache #(
 
     MEM_BLOCK [NUM_SETS-1:0]            tmp_rdat;
     logic     [NUM_SETS-1:0][ASSOC-1:0] free_gnt;
-    logic   rhit, whit;
-    WAY     rway, wway;
+    logic   ld_hit, st_hit;
+    WAY     ld_way, st_way;
     generate
         for (genvar s = 0; s < NUM_SETS; ++s) begin : gen_sets
             memDP #(
@@ -108,7 +108,7 @@ module dcache #(
                 .clock(clock),
                 .reset(reset),
                 .re   (ld_en),
-                .raddr(rway),
+                .raddr(ld_way),
                 .rdata(tmp_rdat[s]),
                 .we   (st_en),
                 .waddr(),
@@ -132,18 +132,18 @@ module dcache #(
         cur_tag = get_tag(ld_addr);
         cur_sid = get_sid(ld_addr);
 
-        rhit = 0;
-        rway = '0;
+        ld_hit = 0;
+        ld_way = '0;
         for (int i = 0; i < ASSOC; ++i) begin
             if (!(cache_hdr.vld[cur_sid][i]
                 && cur_tag == cache_hdr.tag[cur_sid][i]))
                 continue;
-            rway = i;
-            rhit = 1;
+            ld_way = i;
+            ld_hit = 1;
         end
 
-        ld_dat = tmp_rdat[cur_sid][rway];
-        ld_vld = ld_en && rhit;
+        ld_dat = tmp_rdat[cur_sid][ld_way];
+        ld_vld = ld_en && ld_hit;
     end
 
 
@@ -155,16 +155,16 @@ module dcache #(
         cur_sid = get_sid(st_addr);
 
         // Is block in cache?
-        whit = 0;
-        wway = '0;
+        st_hit = 0;
+        st_way = '0;
         for (int i = 0; i < ASSOC; ++i) begin
             if (!(cache_hdr.vld[cur_sid][i]
                 && cur_tag == cache_hdr.tag[cur_sid][i]))
                 continue;
-            wway = i;
-            whit = 1;
+            st_way = i;
+            st_hit = 1;
         end
-        st_vld = st_en && whit;
+        st_vld = st_en && st_hit;
     end
 
 
@@ -202,14 +202,14 @@ module dcache #(
         miss_n = '0;
         mem_out_command = MEM_NONE;
 
-        if (ld_en && !rhit) begin
+        if (ld_en && !ld_hit) begin
             mem_out_command = MEM_LOAD;
             mem_out_addr = ld_addr;
             miss_n = '{
                 addr : ld_addr,
                 size : ld_size
             };
-        end else if (st_en && !whit) begin
+        end else if (st_en && !st_hit) begin
             mem_out_command = MEM_LOAD;
             mem_out_addr = st_addr;
             miss_n = '{
