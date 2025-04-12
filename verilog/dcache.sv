@@ -75,9 +75,8 @@ module dcache #(
     endfunction
 
     typedef struct packed {
-        logic       allocated;
+        logic       vld;
         ADDR        addr;
-        MEM_TAG     trans_tag;
         MEM_BLOCK   mem_data; // FIXME: Is this needed?
         MEM_SIZE    mem_size;
         logic       ready;
@@ -101,6 +100,8 @@ module dcache #(
             memDP #(
                 .WIDTH     ($bits(MEM_BLOCK)),
                 .DEPTH     (ASSOC),
+                /* TODO: change this 2 read ports with 1 dedicated for load,
+                1 for store. */
                 .READ_PORTS(1),
                 .BYPASS_EN (0)
             ) set_i (
@@ -219,9 +220,8 @@ module dcache #(
 
         if (mem_in_transaction_tag != 0) begin
             mshr_n[mem_in_transaction_tag] = '{
-                allocated   : 1,
+                vld         : 1,
                 addr        : miss.addr,
-                trans_tag   : mem_in_transaction_tag,
                 mem_data    : '0,
                 mem_size    : miss.size,
                 ready       : 0
