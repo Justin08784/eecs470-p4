@@ -146,7 +146,7 @@ module dcache #(
                 continue;
             ld_way = w;
             ld_hit = 1;
-            ld_r_req[w] = 1;
+            ld_r_req[ld_sid] = 1;
         end
 
         // ld_dat = rdat[ld_sid][ld_way];
@@ -177,8 +177,8 @@ module dcache #(
                 continue;
             st_way = w;
             st_hit = 1;
-            st_r_req[w] = 1;
-            st_w_req[w] = 1;
+            st_r_req[st_sid] = 1;
+            st_w_req[st_sid] = 1;
         end
         // st_vld = st_en && st_hit;
     end
@@ -237,7 +237,7 @@ module dcache #(
         end
     end
 
-    /* Handle MEM tag */
+    /* FILL handling. Handle MEM tag */
     MEM_BLOCK wdat_incoming;
     always_comb begin
         mshr_n = mshr;
