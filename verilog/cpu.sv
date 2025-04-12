@@ -234,6 +234,11 @@ module cpu (
         if (reset) begin
             flush       <= '0;
             retire_2_f  <= '0;
+        end else if (flush) begin
+            /* Pulse flush for 1 cycle. Ensures branches on mispredicted
+            control path cannot retrigger. */
+            flush       <= '0;
+            retire_2_f  <= '0;
         end else begin
 /* ======================================== */
             flush       <= flush_n;
