@@ -984,7 +984,7 @@ module testbench;
         ret_2_mem                = dbg_retbuf.ret_2_mem;
 
         $display("  >> RET buffer");
-        for (int i = 0; i < `LSQ_SZ; i++) begin
+        for (int i = 0; i < `SQ_RET_BUF_SZ; i++) begin
             $display("Entry [%2d]: sq_idx=%2d, rob_idx=%2d, addr=%4x, data=%x, d_valid=%b%s",
             i,
             state[i].sq_idx,

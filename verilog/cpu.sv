@@ -70,11 +70,11 @@ module cpu (
         sq_mem2proc_transaction_tag = '0;
         fetch_mem2proc_transaction_tag = '0;
         
-        if (ret_2_mem.Dmem_command == MEM_STORE) begin
-            proc2mem_command = ret_2_mem.Dmem_command;
-            proc2mem_addr = ret_2_mem.Dmem_addr;
-            proc2mem_data = ret_2_mem.Dmem_store_data;
-            proc2mem_size = ret_2_mem.Dmem_size;
+        if (ret_2_mem.Dmem_command[0] == MEM_STORE) begin
+            proc2mem_command = ret_2_mem.Dmem_command[0];
+            proc2mem_addr = ret_2_mem.Dmem_addr[0];
+            proc2mem_data = ret_2_mem.Dmem_store_data[0];
+            proc2mem_size = ret_2_mem.Dmem_size[0];
             sq_mem2proc_transaction_tag = mem2proc_transaction_tag;
         end
         // else if (load logic here) begin <-- LOAD REQUESTS COME NEXT (technically this wil probably come from dcache, but will be a load request regardless)
