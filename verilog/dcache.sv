@@ -90,6 +90,7 @@ module dcache #(
 
     output MEM_COMMAND   mem_out_command,
     output ADDR          mem_out_addr,
+    output MEM_BLOCK     mem_out_data,
 
     // input from lsq
     input logic         ld_vld,

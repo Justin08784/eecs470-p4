@@ -19,6 +19,7 @@ module dcache_test;
     MEM_TAG     mem_in_data_tag;
     MEM_COMMAND mem_out_command;
     ADDR        mem_out_addr;
+    MEM_BLOCK   mem_out_data;
 
     logic       ld_vld;
     ADDR        ld_addr;
@@ -32,11 +33,33 @@ module dcache_test;
     logic       st_status;
     MEM_BLOCK   st_dat;
 
+    // Instantiate the Data Memory
+    mem memory (
+        // Inputs
+        .clock              (clock),
+        .proc2mem_command   (mem_out_command),
+        .proc2mem_addr      (mem_out_addr),
+        .proc2mem_data      (mem_out_data),
+
+        // Outputs
+        .mem2proc_transaction_tag   (mem_in_transaction_tag),
+        .mem2proc_data              (mem_in_data),
+        .mem2proc_data_tag          (mem_in_data_tag)
+    );
+
     // Instantiate the DUT
     dcache dut (
         .dbg,
         .clock,
         .reset,
+
+        .mem_in_transaction_tag,
+        .mem_in_data,
+        .mem_in_data_tag,
+
+        .mem_out_command,
+        .mem_out_addr,
+        .mem_out_data,
 
         .ld_vld,
         .ld_addr,
@@ -79,10 +102,6 @@ module dcache_test;
 
     task clr_inputs();
         {   
-            mem_in_transaction_tag,
-            mem_in_data,
-            mem_in_data_tag,
-
             ld_vld,
             ld_addr,
             ld_size,
@@ -126,13 +145,26 @@ module dcache_test;
     end
 
     initial begin
+        logic [3:0][15:0] half_template;
+        for (logic [31:0] i = 0; i < `MEM_64BIT_LINES; ++i) begin
+            if (i >= 256) begin
+                memory.unified_memory[i] = '0;
+                continue;
+            end
+
+            for (int half = 0; half < 4; ++half)
+                half_template[half] = 4*i + half;
+            memory.unified_memory[i] = half_template;
+            $display("mem[%4x]: %x", 8*i, memory.unified_memory[i]);
+        end
+
         $display("Starting dcache testbench...");
         clock = 0;
         reset = 0;
         clr_inputs();
         do_reset();
 
-        wr(4, 0'hbeeffeed, WORD);
+        wr(4, 'hbeeffeed, WORD);
         @(negedge clock);
         @(negedge clock);
 

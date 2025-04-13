@@ -293,7 +293,7 @@ build/gshare.simv: $(GSHARE_FILES)
 build/gshare.cov: $(GSHARE_FILES)
 synth/gshare.vg: $(GSHARE_FILES)
 
-DCACHE_FILES = verilog/sys_defs.svh verilog/memDP.sv verilog/psel_gen.sv
+DCACHE_FILES = verilog/sys_defs.svh verilog/memDP.sv verilog/mem.sv verilog/psel_gen.sv
 build/dcache.simv: $(DCACHE_FILES)
 build/dcache.cov: $(DCACHE_FILES)
 synth/dcache.vg: $(DCACHE_FILES)
