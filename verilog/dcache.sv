@@ -121,9 +121,9 @@ module dcache #(
         logic       ready;
     } MSHR_ENTRY;
     MSHR_ENTRY  [MSHR_SZ-1:0] mshr, mshr_n;
-    assign mshr_n = mshr;
 
     CACHE_HEADER cache_hdr, cache_hdr_n;
+    MISS_PKT miss, miss_n;
 
     logic       [NUM_SETS-1:0]  ren,  wen;
     WAY         [NUM_SETS-1:0]  rway, wway;            
@@ -277,7 +277,7 @@ module dcache #(
         fl_sid = get_sid(mshr[mem_in_data_tag].addr);
         // cache_hdr_n = cache_hdr;
 
-        req[FILL] = 0;//fl_vld;
+        req[FILL] = fl_vld;
         rd_req_bus[FILL] = '0;
         wr_req_bus[FILL] = '0;
         rd_req_bus[FILL][fl_sid] = 1;
@@ -339,6 +339,41 @@ module dcache #(
         end
     end
 
+
+    // Mem tag arbiter: who gets to request mem_tag?
+    always_comb begin
+        mshr_n = mshr;
+        miss_n = '0;
+        mem_out_command = MEM_NONE;
+        mem_out_data = '0;
+
+        if (ld_vld && !ld_hit) begin
+            mem_out_command = MEM_LOAD;
+            mem_out_addr = ld_addr;
+            miss_n = '{
+                addr : ld_addr,
+                size : ld_size
+            };
+        end else if (st_vld && !st_hit) begin
+            mem_out_command = MEM_LOAD;
+            mem_out_addr = st_addr;
+            miss_n = '{
+                addr : st_addr,
+                size : st_size
+            };
+        end
+
+        if (mem_in_transaction_tag != 0) begin
+            mshr_n[mem_in_transaction_tag] = '{
+                vld         : 1,
+                addr        : miss.addr,
+                mem_data    : '0,
+                mem_size    : miss.size,
+                ready       : 0
+            };
+        end
+    end
+
     // Update header
     // TODO: this is also where we should do LRU update
     always_comb begin
@@ -352,6 +387,13 @@ module dcache #(
             cache_hdr_n.tag[st_sid][st_way]     = st_tag;
             cache_hdr_n.age[st_sid]             = '0;
         end
+
+        if (gnt[FILL]) begin
+            cache_hdr_n.vld[fl_sid][fl_way]     = 1;
+            cache_hdr_n.dirty[fl_sid][fl_way]   = 0;
+            cache_hdr_n.tag[fl_sid][fl_way]     = fl_tag;
+            cache_hdr_n.age[fl_sid]             = '0;
+        end
     end
 
     assign dbg = '{
@@ -362,11 +404,11 @@ module dcache #(
         if (reset) begin
             cache_hdr   <= '0;
             mshr        <= '0;
-            // miss        <= '0;
+            miss        <= '0;
         end else begin
             cache_hdr   <= cache_hdr_n;
             mshr        <= mshr_n;
-            // miss        <= miss_n;
+            miss        <= miss_n;
         end
     end
 endmodule;

@@ -1,7 +1,8 @@
-`include "sys_defs.svh"
-
 `ifndef __DCACHE_SVH__ 
 `define __DCACHE_SVH__ 
+
+`include "sys_defs.svh"
+
 
 localparam ASSOC   = 4; // i.e. NUM_WAYS
 localparam MSHR_SZ = 16;
@@ -68,6 +69,10 @@ typedef struct packed {
         state;
 } DBG_cache;
 
+typedef struct packed {
+    ADDR     addr; // delay addr and memsize for one cycle to keep track of info to store to mshr
+    MEM_SIZE size; // (bc the transaction_tag comes back from memory in the next cycle after receving request)
+} MISS_PKT; // pre MSHR
 
 
 

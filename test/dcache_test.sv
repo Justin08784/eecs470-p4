@@ -5,6 +5,15 @@
 WARNING: This must be run in DEBUG mode. (it won't compile otherwise)
 */
 
+function automatic string dbg_mem_cmd(input MEM_COMMAND cmd);
+    string rv;
+    case (cmd)
+        MEM_NONE:   rv = "NONE";
+        MEM_STORE:  rv = "STOR";
+        MEM_LOAD:   rv = "LOAD";
+    endcase
+    return rv;
+endfunction
 
 module dcache_test;
     // DBG
@@ -94,12 +103,6 @@ module dcache_test;
         st_dat  = v;
     endtask
 
-    task do_reset();
-        reset = 1;
-        @(negedge clock);
-        reset = 0;
-    endtask
-
     task clr_inputs();
         {   
             ld_vld,
@@ -130,17 +133,56 @@ module dcache_test;
     endtask
 
     // Clock generation
-    always #5 clock = ~clock;
+    localparam DCACHE_CLOCK = 20;
+    always begin
+        #(DCACHE_CLOCK/2);
+        clock = ~clock;
+    end
     always @(negedge clock) begin
         // #0;
+        $display("lod in: {vld: %b, addr: %4x, size: %1d}",
+            ld_vld,
+            ld_addr,
+            ld_size
+        );
+
+        $display("lod ot: {status: %b, dat: %x}",
+            ld_status,
+            ld_dat
+        );
+
+        $display("str in: {vld: %b, addr: %4x, size: %1d, dat: %x}",
+            st_vld,
+            st_addr,
+            st_size,
+            st_dat
+        );
+
+        $display("str ot: {status: %b}",
+            st_status
+        );
+
+        $display("mem in: {txn_tag: %2d, dat: %x, dat_tag: %2d}",
+            mem_in_transaction_tag,
+            mem_in_data,
+            mem_in_data_tag
+        );
+        $display("vld addres: %b", memory.valid_address);
+
+        $display("mem ot: {cmd: %s, addr: %4x, dat: %x}",
+            dbg_mem_cmd(mem_out_command),
+            mem_out_addr,
+            mem_out_data
+        );
+
         // $display("st_vld: %b", dut.st_vld);
         // $display("st_addr: %x", dut.st_addr);
         // $display("st_size: %1d", dut.st_size);
         // $display("st_status: %b", dut.st_status);
         // $display("st_dat: %x", dut.st_dat);
-        // $display("req: %b", dut.req);
-        // $display("gnt: %b", dut.gnt);
-        print_dbg();
+        $display("req: %b", dut.req);
+        $display("gnt: %b", dut.gnt);
+        // print_dbg();
         $display("");
     end
 
@@ -155,18 +197,25 @@ module dcache_test;
             for (int half = 0; half < 4; ++half)
                 half_template[half] = 4*i + half;
             memory.unified_memory[i] = half_template;
-            $display("mem[%4x]: %x", 8*i, memory.unified_memory[i]);
+            // $display("mem[%4x]: %x", 8*i, memory.unified_memory[i]);
         end
 
         $display("Starting dcache testbench...");
         clock = 0;
         reset = 0;
         clr_inputs();
-        do_reset();
+
+        reset = 1;
+        for (int i = 0; i < 6; ++i)
+            @(negedge clock);
+        #1;
+        reset = 0;
 
         wr(4, 'hbeeffeed, WORD);
         @(negedge clock);
-        @(negedge clock);
+        clr_inputs();
+        for (int i = 0; i < 20; ++i)
+            @(negedge clock);
 
         $display("Finished dcache testbench.");
         $finish;

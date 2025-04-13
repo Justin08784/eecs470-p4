@@ -1,8 +1,4 @@
 /* Request to MEM */
-typedef struct packed {
-    ADDR     addr; // delay addr and memsize for one cycle to keep track of info to store to mshr
-    MEM_SIZE size; // (bc the transaction_tag comes back from memory in the next cycle after receving request)
-} MISS_PKT; // pre MSHR
 MISS_PKT miss, miss_n;
 
 /* FILL handling. Handle MEM tag */
