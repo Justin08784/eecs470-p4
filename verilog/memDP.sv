@@ -29,6 +29,8 @@ module memDP
 
     input ICACHE_TAG [`ICACHE_LINES-1:0] tags,
 
+    output logic[DEPTH-1:0][WIDTH-1:0]  dbg, 
+
     // ------------------------------------------------------------ //
     //                      Write interface                         //
     // ------------------------------------------------------------ //
@@ -116,6 +118,7 @@ end
     endgenerate
 `endif
 
+assign dbg = memData;
 always_ff @(posedge clock) begin
     if (!reset) begin
         $display("  %3d | >> memDP", $time);

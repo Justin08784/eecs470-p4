@@ -106,6 +106,9 @@ endmodule;
 
 module dcache #(
 ) (
+    `ifdef DEBUG
+    output DBG_cache dbg,
+    `endif
     input logic clock,
     input logic reset,
 
@@ -169,29 +172,24 @@ module dcache #(
     MSHR_ENTRY  [MSHR_SZ-1:0] mshr, mshr_n;
     assign mshr_n = mshr;
 
-    struct packed {
-        logic   [NUM_SETS-1:0][ASSOC-1:0] vld;
-        /* FIXME: dirty bit is currently unused */
-        logic   [NUM_SETS-1:0][ASSOC-1:0] dirty;
-        TAG     [NUM_SETS-1:0][ASSOC-1:0] tag;
-        AGE     [NUM_SETS-1:0]            age;
-    } cache_hdr, cache_hdr_n;
-
+    CACHE_HEADER cache_hdr, cache_hdr_n;
 
     logic       [NUM_SETS-1:0]  ren,  wen;
     WAY         [NUM_SETS-1:0]  rway, wway;            
     MEM_BLOCK   [NUM_SETS-1:0]  rdat, wdat;
     logic       [NUM_SETS-1:0][ASSOC-1:0] free_gnt;
+    logic       [NUM_SETS-1:0][ASSOC-1:0][$bits(MEM_BLOCK)-1:0] dbg_state;
     generate
         for (genvar s = 0; s < NUM_SETS; ++s) begin : gen_sets
             memDP #(
                 .WIDTH     ($bits(MEM_BLOCK)),
                 .DEPTH     (ASSOC),
-                /* TODO: change this 2 read ports with 1 dedicated for load,
-                1 for store. */
                 .READ_PORTS(1),
                 .BYPASS_EN (0)
             ) set_i (
+                `ifdef DEBUG
+                .dbg(dbg_state[s]),
+                `endif
                 .clock(clock),
                 .reset(reset),
                 .re   (ren [s]),
@@ -241,6 +239,8 @@ module dcache #(
         rd_req_bus[LOAD] = '0;
         wr_req_bus[LOAD] = '0;
         rd_req_bus[LOAD][ld_sid] = 1;
+
+        ld_status = gnt[LOAD];
     end
 
     // Load: byte maniplation
@@ -287,6 +287,8 @@ module dcache #(
         wr_req_bus[STOR] = '0;
         rd_req_bus[STOR][st_sid] = 1;
         wr_req_bus[STOR][st_sid] = 1;
+
+        st_status = gnt[STOR];
     end
 
     // Store: byte manipulation
@@ -309,7 +311,8 @@ module dcache #(
         endcase
     end
 
-    /* Fill Request */
+    /* Fill */ // TODO: Fill is stubbed
+    // Fill: index decode + port request
     logic   fl_vld;
     WAY     fl_way;
     SID     fl_sid;
@@ -323,7 +326,7 @@ module dcache #(
         fl_sid = get_sid(mshr[mem_in_data_tag].addr);
         // cache_hdr_n = cache_hdr;
 
-        req[FILL] = fl_vld;
+        req[FILL] = 0;//fl_vld;
         rd_req_bus[FILL] = '0;
         wr_req_bus[FILL] = '0;
         rd_req_bus[FILL][fl_sid] = 1;
@@ -382,9 +385,12 @@ module dcache #(
                 default:;
             endcase
         end
-
     end
 
+    assign dbg = '{
+        hdr     : cache_hdr,
+        state   : dbg_state
+    };
     always_ff @(posedge clock) begin
         if (reset) begin
             cache_hdr   <= '0;

@@ -52,4 +52,19 @@ typedef enum logic[1:0] {
     // STOR = 3,
     // NUM_OPS
 } CACHE_OP_TAG;
+
+typedef struct packed {
+    logic   [NUM_SETS-1:0][ASSOC-1:0] vld;
+    /* FIXME: dirty bit is currently unused */
+    logic   [NUM_SETS-1:0][ASSOC-1:0] dirty;
+    TAG     [NUM_SETS-1:0][ASSOC-1:0] tag;
+    AGE     [NUM_SETS-1:0]            age;
+} CACHE_HEADER;
+
+
+typedef struct packed {
+    CACHE_HEADER hdr;
+    logic [NUM_SETS-1:0][ASSOC-1:0][$bits(MEM_BLOCK)-1:0]
+        state;
+} DBG_cache;
 `endif
