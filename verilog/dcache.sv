@@ -74,6 +74,12 @@ module dcache #(
         return addr[OFFSET_BITS-1:0];
     endfunction
 
+    /*
+    FIXME: MSHR needs to coalesce reads/loads, and partially
+    coalesce writes/stores (maybe have a queue of allocated load/store
+    per MSHR? This is important for stores, since they must be applied
+    in-order...)
+    */
     typedef struct packed {
         logic       vld;
         ADDR        addr;
@@ -125,98 +131,6 @@ module dcache #(
             );
         end
     endgenerate
-
-    /* Load */
-    logic   ld_hit;
-    WAY     ld_way;
-    SID     ld_sid;
-    TAG     ld_tag;
-    logic   [NUM_SETS-1:0]  ld_r_req, 
-                            ld_r_gnt;
-    always_comb begin
-        ld_tag = get_tag(ld_addr);
-        ld_sid = get_sid(ld_addr);
-
-        ld_hit = 0;
-        ld_way = '0;
-        ld_r_req = '0;
-        for (int w = 0; w < ASSOC; ++w) begin
-            if (!(cache_hdr.vld[ld_sid][w]
-                && ld_tag == cache_hdr.tag[ld_sid][w]))
-                continue;
-            ld_way = w;
-            ld_hit = 1;
-            ld_r_req[ld_sid] = 1;
-        end
-
-        // ld_dat = rdat[ld_sid][ld_way];
-        // ld_vld = ld_en && ld_hit;
-    end
-
-    /* Store */
-    logic   st_hit;
-    WAY     st_way;
-    SID     st_sid;
-    TAG     st_tag;
-    logic   [NUM_SETS-1:0]  st_r_req, 
-                            st_r_gnt;
-    logic   [NUM_SETS-1:0]  st_w_req, 
-                            st_w_gnt;
-    always_comb begin
-        st_tag = get_tag(st_addr);
-        st_sid = get_sid(st_addr);
-
-        // Is block in cache?
-        st_hit = 0;
-        st_way = '0;
-        st_r_req = '0;
-        st_w_req = '0;
-        for (int w = 0; w < ASSOC; ++w) begin
-            if (!(cache_hdr.vld[st_sid][w]
-                && st_tag == cache_hdr.tag[st_sid][w]))
-                continue;
-            st_way = w;
-            st_hit = 1;
-            st_r_req[st_sid] = 1;
-            st_w_req[st_sid] = 1;
-        end
-        // st_vld = st_en && st_hit;
-    end
-
-    // Who gets to read and write in each set?
-    typedef enum logic[1:0] {
-        NONE,
-        LOAD,
-        STOR,
-        INCM
-    } WHO;
-    WHO [NUM_SETS-1:0] r_who;
-    WHO [NUM_SETS-1:0] w_who;
-    always_comb begin
-        ren = '0;
-        wen = '0;
-        rway = '0;
-        wway = '0;
-
-        foreach (ren[s]) begin
-            r_who[s] = 
-                (ld_en && (ld_sid == s) && ld_hit) ? LOAD :
-                (st_en && (st_sid == s) && st_hit) ? STOR : 1;
-
-        end
-
-        // enum logic[1:0] {
-        // } who_w;
-
-    end
-
-    /* Request to MEM */
-    typedef struct packed {
-        ADDR     addr; // delay addr and memsize for one cycle to keep track of info to store to mshr
-        MEM_SIZE size; // (bc the transaction_tag comes back from memory in the next cycle after receving request)
-    } MISS_PKT; // pre MSHR
-    MISS_PKT miss, miss_n;
-
     /* Eviction */
     logic   [NUM_SETS-1:0] any_free;
     logic   [NUM_SETS-1:0][ASSOC-1:0] victim_msk;
@@ -237,8 +151,148 @@ module dcache #(
         end
     end
 
+    // Arbitration types
+    typedef enum logic[1:0] {
+        LOAD = 0,
+        FILL = 1,
+        STOR = 2,
+        NONE = 3
+    } WHO;
+    logic   [NONE-1:0][NUM_SETS-1:0] rd_req, rd_gnt;
+    logic   [NONE-1:0][NUM_SETS-1:0] wr_req, wr_gnt;
+    logic   [NONE-1:0][NUM_SETS-1:0] req, gnt;
+
+    /* Load */
+    logic   ld_hit;
+    WAY     ld_way;
+    SID     ld_sid;
+    TAG     ld_tag;
+    always_comb begin
+        ld_tag = get_tag(ld_addr);
+        ld_sid = get_sid(ld_addr);
+        ld_hit = 0;
+        ld_way = '0;
+        for (int w = 0; w < ASSOC; ++w) begin
+            if (!(cache_hdr.vld[ld_sid][w]
+                && ld_tag == cache_hdr.tag[ld_sid][w]))
+                continue;
+            ld_way = w;
+            ld_hit = 1;
+        end
+
+        rd_req[LOAD] = '0;
+        wr_req[LOAD] = '0;
+        rd_req[LOAD][ld_sid] = ld_en && ld_hit;
+    end
+
+    /* Store */
+    logic   st_hit;
+    WAY     st_way;
+    SID     st_sid;
+    TAG     st_tag;
+    always_comb begin
+        st_tag = get_tag(st_addr);
+        st_sid = get_sid(st_addr);
+
+        // Is block in cache?
+        st_hit = 0;
+        st_way = '0;
+        for (int w = 0; w < ASSOC; ++w) begin
+            if (!(cache_hdr.vld[st_sid][w]
+                && st_tag == cache_hdr.tag[st_sid][w]))
+                continue;
+            st_way = w;
+            st_hit = 1;
+        end
+
+        rd_req[STOR] = '0;
+        wr_req[STOR] = '0;
+        rd_req[STOR][st_sid] = st_en && st_hit;
+    end
+
+    /* Fill */
+    logic   fl_en;
+    WAY     fl_way;
+    SID     fl_sid;
+    TAG     fl_tag;
+    always_comb begin
+        /* FIXME: But there is only 1 write port to memDP, so you 
+        somehow need to arbitrate between STORE and incoming mem block.
+        Give priority to the incoming mem block. */
+        fl_en  = mem_in_data_tag != 0;
+        fl_tag = get_tag(mshr[mem_in_data_tag].addr);
+        fl_sid = get_sid(mshr[mem_in_data_tag].addr);
+        // cache_hdr_n = cache_hdr;
+
+        rd_req[FILL][fl_sid] = fl_en;
+        wr_req[FILL][fl_sid] = fl_en;
+
+        for (int w = 0; w < ASSOC; ++w) begin
+            if (!victim_msk[fl_sid][w])
+                continue;
+            /* TODO: need to write back if dirty. This just overwrites i.e.
+            assumes clean */
+            cache_hdr_n.vld[fl_sid][w]     = 1;
+            cache_hdr_n.dirty[fl_sid][w]   = 0;
+            cache_hdr_n.tag[fl_sid][w]     = fl_tag;
+            cache_hdr_n.age[fl_sid]        = '0;
+        end
+    end
+
+    // Port arbiter: Who gets to read and write in each set?
+    always_comb begin
+        ren = '0;
+        wen = '0;
+        rway = '0;
+        wway = '0;
+
+        rd_gnt = '0;
+        wr_gnt = '0;
+        gnt    = '0;
+        for (int s = 0; s < NUM_SETS; ++s) begin
+            for (int who = 0; who < NONE; ++who) begin
+                if (!rd_req[who][s])
+                    continue;
+                rd_gnt[who][s] = 1;
+                break;
+            end
+
+            for (int who = 0; who < NONE; ++who) begin
+                if (!wr_req[who][s])
+                    continue;
+                wr_gnt[who][s] = 1;
+                break;
+            end
+        end
+
+        gnt[FILL] = (~rd_req[FILL] | rd_gnt[FILL]) & wr_gnt[FILL];
+        gnt[LOAD] = rd_gnt[LOAD];
+        gnt[STOR] = rd_gnt[STOR] & wr_gnt[STOR];
+
+
+        // foreach (ren[s]) begin
+        //     r_who[s] = 
+        //         (ld_req && (ld_sid == s)) ? LOAD :
+        //         (fl_req && (fl_sid == s)) ? FILL :
+        //         (st_req && (st_sid == s)) ? STOR : NONE;
+
+        //     w_who[s] = 
+        //         (fl_req && (fl_sid == s)) ? FILL :
+        //         (st_req && (st_sid == s)) ? STOR : NONE;
+
+        // end
+
+    end
+
+    /* Request to MEM */
+    typedef struct packed {
+        ADDR     addr; // delay addr and memsize for one cycle to keep track of info to store to mshr
+        MEM_SIZE size; // (bc the transaction_tag comes back from memory in the next cycle after receving request)
+    } MISS_PKT; // pre MSHR
+    MISS_PKT miss, miss_n;
+
+
     /* FILL handling. Handle MEM tag */
-    MEM_BLOCK wdat_incoming;
     always_comb begin
         mshr_n = mshr;
         miss_n = '0;
@@ -268,31 +322,6 @@ module dcache #(
                 mem_size    : miss.size,
                 ready       : 0
             };
-        end
-
-        /* FIXME: But there is only 1 write port to memDP, so you 
-        somehow need to arbitrate between STORE and incoming mem block.
-        Give priority to the incoming mem block. */
-        wdat_incoming = '0;
-        cache_hdr_n = cache_hdr;
-        if (mem_in_data_tag != 0) begin
-            TAG     cur_tag;
-            SID     cur_sid;
-            cur_tag = get_tag(mshr[mem_in_data_tag].addr);
-            cur_sid = get_sid(mshr[mem_in_data_tag].addr);
-
-            for (int w = 0; w < ASSOC; ++w) begin
-                if (!victim_msk[cur_sid][w])
-                    continue;
-                /* TODO: need to write back if dirty. This just overwrites i.e.
-                assumes clean */
-                cache_hdr_n.vld[cur_sid][w]     = 1;
-                cache_hdr_n.dirty[cur_sid][w]   = 0;
-                cache_hdr_n.tag[cur_sid][w]     = cur_tag;
-                cache_hdr_n.age[cur_sid]        = '0;
-            end
-
-            mshr_n[mem_in_data_tag] = '0;
         end
     end
 
