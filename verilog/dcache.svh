@@ -26,6 +26,12 @@ function automatic OFF get_off(input ADDR addr);
     return addr[OFFSET_BITS-1:0];
 endfunction
 
+typedef struct packed {
+    logic [2:0] byte_off;
+    logic [1:0] half_off;
+    logic       word_off;
+} DW_ACCESS;
+
 /*
 NOTE: The cache op tag doubles as priority value,
 with max priority at lowest tag value! */

@@ -10,6 +10,16 @@ function automatic logic[12:0] dwaddr(input ADDR addr);
     return addr[15:3];
 endfunction
 
+function automatic logic idw_word(input ADDR addr);
+    return addr[2];
+endfunction
+function automatic logic [1:0] idw_half(input ADDR addr);
+    return addr[2:1];
+endfunction
+function automatic logic [2:0] idw_byte(input ADDR addr);
+    return addr[2:0];
+endfunction
+
 // In-word byte offset
 function automatic logic[1:0] iw_off(input ADDR addr);
     return addr[1:0];
@@ -208,11 +218,12 @@ module dcache #(
         rd_req_bus, wr_req_bus,
         rd_gnt_bus, wr_gnt_bus;
 
-    /* Load Request */
+    /* Load */
     logic   ld_hit;
     WAY     ld_way;
     SID     ld_sid;
     TAG     ld_tag;
+    // Load: index decode + port request
     always_comb begin
         ld_tag = get_tag(ld_addr);
         ld_sid = get_sid(ld_addr);
@@ -232,7 +243,26 @@ module dcache #(
         rd_req_bus[LOAD][ld_sid] = 1;
     end
 
-    /* Store Request */
+    // Load: byte maniplation
+    DW_ACCESS ld_acc;
+    always_comb begin
+        ld_acc = '{
+            byte_off : idw_byte(ld_addr),
+            half_off : idw_half(ld_addr),
+            word_off : idw_word(ld_addr)
+        };
+
+        ld_dat = '0;
+        case (ld_size)
+            BYTE  : ld_dat = rdat[ld_sid].byte_level[ld_acc.byte_off];
+            HALF  : ld_dat = rdat[ld_sid].half_level[ld_acc.half_off];
+            WORD  : ld_dat = rdat[ld_sid].word_level[ld_acc.word_off];
+            DOUBLE: ld_dat = rdat[ld_sid];
+        endcase
+    end
+
+    /* Store */
+    // Store: index decode + port request
     logic   st_hit;
     WAY     st_way;
     SID     st_sid;
@@ -259,6 +289,26 @@ module dcache #(
         wr_req_bus[STOR][st_sid] = 1;
     end
 
+    // Store: byte manipulation
+    MEM_BLOCK st_prew_dat;
+    MEM_BLOCK st_posw_dat;
+    DW_ACCESS st_acc;
+    always_comb begin
+        st_prew_dat = rdat[st_sid];
+        st_posw_dat = st_prew_dat;
+        st_acc = '{
+            byte_off : idw_byte(st_addr),
+            half_off : idw_half(st_addr),
+            word_off : idw_word(st_addr)
+        };
+        case (st_size)
+            BYTE  : st_posw_dat.byte_level[st_acc.byte_off] = st_dat.byte_level[0];
+            HALF  : st_posw_dat.half_level[st_acc.half_off] = st_dat.half_level[0];
+            WORD  : st_posw_dat.word_level[st_acc.word_off] = st_dat.word_level[0];
+            DOUBLE: st_posw_dat = st_dat;
+        endcase
+    end
+
     /* Fill Request */
     logic   fl_vld;
     WAY     fl_way;
@@ -278,7 +328,6 @@ module dcache #(
         wr_req_bus[FILL] = '0;
         rd_req_bus[FILL][fl_sid] = 1;
         wr_req_bus[FILL][fl_sid] = 1;
-
     end
 
     // Port arbiter: which op gets to read and write in each set?
@@ -305,17 +354,9 @@ module dcache #(
             if (!rd_gnt_bus[op][s])
                 continue;
             case (op)
-                LOAD: begin
-                    rway[s] = ld_way;
-                    ld_dat  = rdat;
-                end
-                FILL: begin
-                    // TODO: handle
-                    // rway[s] = fl_way;
-                end
-                STOR: begin
-                    rway[s] = st_way;
-                end
+                LOAD: rway[s] = ld_way;
+                FILL: rway[s] = fl_way; // TODO: handle
+                STOR: rway[s] = st_way;
                 default:;
             endcase
         end
@@ -330,14 +371,13 @@ module dcache #(
                     // TODO: handle for victim cache
                     // wway[s] = ld_way;
                 end
-                FILL: begin
-                    // TODO: handle
+                FILL: begin // TODO: handle
                     // wway[s] = fl_way;
                     // wdat[s] = mem_in_data;
                 end
                 STOR: begin
                     wway[s] = st_way;
-                    wdat[s] = st_dat;
+                    wdat[s] = st_posw_dat;
                 end
                 default:;
             endcase
