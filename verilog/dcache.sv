@@ -104,28 +104,23 @@ module dcache #(
     input  MEM_BLOCK     mem_in_data,
     input  MEM_TAG       mem_in_data_tag,
 
-    output MEM_COMMAND   mem_out_command, // ✅ Bradley: IF Dcache and SQ have conflict on memory LET LOAD GO FIRST!!!!!
+    output MEM_COMMAND   mem_out_command,
     output ADDR          mem_out_addr,
 
-
     // input from lsq
-    input logic         ld_en,
+    input logic         ld_vld,
     input ADDR          ld_addr,
-    input MEM_SIZE      ld_size,   // only for load, store always write the ople block (might need to change)
-    output logic        ld_vld,  // indicates cache hit
+    input MEM_SIZE      ld_size,    // only for load, store always write the ople block (might need to change)
+    // FIXME: this status needs to be a more complex enum type, I think
+    output logic        ld_status,
     output MEM_BLOCK    ld_dat,
 
-    input logic         st_en,
+    input logic         st_vld,
     input ADDR          st_addr,
     input MEM_SIZE      st_size,
-    output logic        st_vld,  // indicates cache hit
-    input MEM_BLOCK     st_dat,
-
-    output struct packed {
-        ADDR        addr;
-        MEM_BLOCK   data;
-        MEM_SIZE    size;
-    } miss_out // ????
+    // FIXME: this status needs to be a more complex enum type, I think
+    output logic        st_status,
+    input MEM_BLOCK     st_dat
 );
     localparam NUM_CACHE_LINES  =  `DCACHE_LINES;
     localparam NUM_SETS         = NUM_CACHE_LINES / ASSOC;
@@ -162,6 +157,7 @@ module dcache #(
         logic       ready;
     } MSHR_ENTRY;
     MSHR_ENTRY  [MSHR_SZ-1:0] mshr, mshr_n;
+    assign mshr_n = mshr;
 
     struct packed {
         logic   [NUM_SETS-1:0][ASSOC-1:0] vld;
@@ -205,32 +201,14 @@ module dcache #(
             );
         end
     endgenerate
-    /* Eviction */
-    logic   [NUM_SETS-1:0] any_free;
-    logic   [NUM_SETS-1:0][ASSOC-1:0] victim_msk;
-    logic   [NUM_SETS-1:0][ASSOC-1:0] lru;
-    always_comb begin
-        /* FIXME: Placeholder LRU. Currently
-        is 'bully 0 way' policy. */
-        foreach(lru[s, i])
-            lru[s][i] = i == 0;
-
-        foreach(any_free[s])
-            any_free[s] = |free_gnt[s];
-
-        foreach(victim_msk[s]) begin
-            victim_msk = any_free
-                ? free_gnt[s]
-                : lru;
-        end
-    end
 
     // Arbitration types
-    logic [NUM_OPS-1:0][NUM_SETS-1:0]  rd_req_bus, wr_req_bus,
-                                    rd_gnt_bus, wr_gnt_bus;
     logic [NUM_OPS-1:0] req, gnt;
+    logic [NUM_OPS-1:0][NUM_SETS-1:0]
+        rd_req_bus, wr_req_bus,
+        rd_gnt_bus, wr_gnt_bus;
 
-    /* Load */
+    /* Load Request */
     logic   ld_hit;
     WAY     ld_way;
     SID     ld_sid;
@@ -248,12 +226,13 @@ module dcache #(
             ld_hit = 1;
         end
 
+        req[LOAD] = ld_vld && ld_hit;
         rd_req_bus[LOAD] = '0;
         wr_req_bus[LOAD] = '0;
-        rd_req_bus[LOAD][ld_sid] = ld_en && ld_hit;
+        rd_req_bus[LOAD][ld_sid] = 1;
     end
 
-    /* Store */
+    /* Store Request */
     logic   st_hit;
     WAY     st_way;
     SID     st_sid;
@@ -273,13 +252,15 @@ module dcache #(
             st_hit = 1;
         end
 
+        req[STOR] = st_vld && st_hit;
         rd_req_bus[STOR] = '0;
         wr_req_bus[STOR] = '0;
-        rd_req_bus[STOR][st_sid] = st_en && st_hit;
+        rd_req_bus[STOR][st_sid] = 1;
+        wr_req_bus[STOR][st_sid] = 1;
     end
 
-    /* Fill */
-    logic   fl_en;
+    /* Fill Request */
+    logic   fl_vld;
     WAY     fl_way;
     SID     fl_sid;
     TAG     fl_tag;
@@ -287,29 +268,20 @@ module dcache #(
         /* FIXME: But there is only 1 write port to memDP, so you 
         somehow need to arbitrate between STORE and incoming mem block.
         Give priority to the incoming mem block. */
-        fl_en  = mem_in_data_tag != 0;
+        fl_vld  = mem_in_data_tag != 0;
         fl_tag = get_tag(mshr[mem_in_data_tag].addr);
         fl_sid = get_sid(mshr[mem_in_data_tag].addr);
         // cache_hdr_n = cache_hdr;
 
+        req[FILL] = fl_vld;
         rd_req_bus[FILL] = '0;
         wr_req_bus[FILL] = '0;
-        rd_req_bus[FILL][fl_sid] = fl_en;
-        wr_req_bus[FILL][fl_sid] = fl_en;
+        rd_req_bus[FILL][fl_sid] = 1;
+        wr_req_bus[FILL][fl_sid] = 1;
 
-        for (int w = 0; w < ASSOC; ++w) begin
-            if (!victim_msk[fl_sid][w])
-                continue;
-            /* TODO: need to write back if dirty. This just overwrites i.e.
-            assumes clean */
-            cache_hdr_n.vld[fl_sid][w]     = 1;
-            cache_hdr_n.dirty[fl_sid][w]   = 0;
-            cache_hdr_n.tag[fl_sid][w]     = fl_tag;
-            cache_hdr_n.age[fl_sid]        = '0;
-        end
     end
 
-    // Port arbiter: op gets to read and write in each set?
+    // Port arbiter: which op gets to read and write in each set?
     port_arbiter arb (
         .req        (req),
         .rd_req_bus (rd_req_bus),
@@ -319,6 +291,7 @@ module dcache #(
         .rd_gnt_bus (rd_gnt_bus),
         .wr_gnt_bus (wr_gnt_bus)
     );
+
     always_comb begin
         ren = '0;
         wen = '0;
@@ -338,7 +311,7 @@ module dcache #(
                 end
                 FILL: begin
                     // TODO: handle
-                    rway[s] = fl_way;
+                    // rway[s] = fl_way;
                 end
                 STOR: begin
                     rway[s] = st_way;
@@ -354,13 +327,13 @@ module dcache #(
                 continue;
             case (op)
                 LOAD: begin
-                    wway[s] = ld_way;
-                    ld_dat  = rdat;
+                    // TODO: handle for victim cache
+                    // wway[s] = ld_way;
                 end
                 FILL: begin
                     // TODO: handle
-                    wway[s] = fl_way;
-                    wdat[s] = mem_in_data;
+                    // wway[s] = fl_way;
+                    // wdat[s] = mem_in_data;
                 end
                 STOR: begin
                     wway[s] = st_way;
@@ -370,81 +343,17 @@ module dcache #(
             endcase
         end
 
-
-        // foreach (ren[s]) begin
-        //     r_op[s] = 
-        //         (ld_req && (ld_sid == s)) ? LOAD :
-        //         (fl_req && (fl_sid == s)) ? FILL :
-        //         (st_req && (st_sid == s)) ? STOR : NUM_OPS;
-
-        //     w_op[s] = 
-        //         (fl_req && (fl_sid == s)) ? FILL :
-        //         (st_req && (st_sid == s)) ? STOR : NUM_OPS;
-
-        // end
-
     end
-
-    /* Request to MEM */
-    typedef struct packed {
-        ADDR     addr; // delay addr and memsize for one cycle to keep track of info to store to mshr
-        MEM_SIZE size; // (bc the transaction_tag comes back from memory in the next cycle after receving request)
-    } MISS_PKT; // pre MSHR
-    MISS_PKT miss, miss_n;
-
-
-    /* FILL handling. Handle MEM tag */
-    always_comb begin
-        mshr_n = mshr;
-        miss_n = '0;
-        mem_out_command = MEM_NONE;
-
-        if (ld_en && !ld_hit) begin
-            mem_out_command = MEM_LOAD;
-            mem_out_addr = ld_addr;
-            miss_n = '{
-                addr : ld_addr,
-                size : ld_size
-            };
-        end else if (st_en && !st_hit) begin
-            mem_out_command = MEM_LOAD;
-            mem_out_addr = st_addr;
-            miss_n = '{
-                addr : st_addr,
-                size : st_size
-            };
-        end
-
-        if (mem_in_transaction_tag != 0) begin
-            mshr_n[mem_in_transaction_tag] = '{
-                vld         : 1,
-                addr        : miss.addr,
-                mem_data    : '0,
-                mem_size    : miss.size,
-                ready       : 0
-            };
-        end
-    end
-
-
-    /* Decide who actually gets to use the write port to the memDP */
-    always_comb begin
-
-    end
-
 
     always_ff @(posedge clock) begin
         if (reset) begin
             cache_hdr   <= '0;
             mshr        <= '0;
-            miss        <= '0;
+            // miss        <= '0;
         end else begin
             cache_hdr   <= cache_hdr_n;
             mshr        <= mshr_n;
-            miss        <= miss_n;
+            // miss        <= miss_n;
         end
     end
-
-
-
 endmodule;
