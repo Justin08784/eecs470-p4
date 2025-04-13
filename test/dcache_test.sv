@@ -17,10 +17,7 @@ module dcache_test;
     logic reset;
 
     // Instantiate the DUT
-    dcache #(
-        .ASSOC(4),
-        .MSHR_SZ(16)
-    ) dut (
+    dcache dut (
     );
 
     // Clock generation

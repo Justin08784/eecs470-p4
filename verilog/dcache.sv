@@ -1,3 +1,6 @@
+`include "sys_defs.svh"
+`include "dcache.svh"
+
 // Get word address; restricting to only actually used 16 LSB.
 function automatic logic[13:0] waddr(input ADDR addr);
     return addr[15:2];
@@ -18,9 +21,52 @@ function automatic logic[2:0] idw_off(input ADDR addr);
 endfunction
 
 
+module port_arbiter #(
+    type ARB_BUS = logic [NUM_OPS-1:0][NUM_SETS-1:0]
+) (
+    input   logic [NUM_OPS-1:0] req,
+    input   ARB_BUS rd_req_bus, wr_req_bus,
+
+    output  logic [NUM_OPS-1:0] gnt,
+    output  ARB_BUS rd_gnt_bus, wr_gnt_bus
+);
+    logic   [NUM_OPS-1:0][NUM_SETS-1:0] gnt_bus;
+
+    always_comb begin
+        rd_gnt_bus = '0;
+        wr_gnt_bus = '0;
+        gnt        = '0;
+        for (int s = 0; s < NUM_SETS; ++s) begin
+            for (int op = 0; op < NUM_OPS; ++op) begin
+                if (!rd_req_bus[op][s])
+                    continue;
+                rd_gnt_bus[op][s] = 1;
+                break;
+            end
+
+            for (int op = 0; op < NUM_OPS; ++op) begin
+                if (!wr_req_bus[op][s])
+                    continue;
+                wr_gnt_bus[op][s] = 1;
+                break;
+            end
+        end
+
+        foreach (gnt_bus[op, s])
+            gnt_bus[op][s] = req[op]
+                && (!rd_req_bus[op][s] || rd_gnt_bus[op][s])
+                && (!wr_req_bus[op][s] || wr_gnt_bus[op][s]);
+        foreach (gnt[op])
+            gnt[op] = |gnt_bus[op];
+
+        // gnt[FILL] = (~rd_req_bus[FILL] | rd_gnt_bus[FILL]) & wr_gnt_bus[FILL];
+        // gnt[LOAD] = rd_gnt_bus[LOAD];
+        // gnt[STOR] = rd_gnt_bus[STOR] & wr_gnt_bus[STOR];
+    end
+endmodule;
+
+
 module dcache #(
-    parameter ASSOC   = 4,
-    parameter MSHR_SZ = 16
 ) (
     input logic clock,
     input logic reset,
@@ -37,7 +83,7 @@ module dcache #(
     // input from lsq
     input logic         ld_en,
     input ADDR          ld_addr,
-    input MEM_SIZE      ld_size,   // only for load, store always write the whole block (might need to change)
+    input MEM_SIZE      ld_size,   // only for load, store always write the ople block (might need to change)
     output logic        ld_vld,  // indicates cache hit
     output MEM_BLOCK    ld_dat,
 
@@ -152,15 +198,9 @@ module dcache #(
     end
 
     // Arbitration types
-    typedef enum logic[1:0] {
-        LOAD = 0,
-        FILL = 1,
-        STOR = 2,
-        NONE = 3
-    } WHO;
-    logic   [NONE-1:0][NUM_SETS-1:0] rd_req, rd_gnt;
-    logic   [NONE-1:0][NUM_SETS-1:0] wr_req, wr_gnt;
-    logic   [NONE-1:0][NUM_SETS-1:0] req, gnt;
+    logic [NUM_OPS-1:0][NUM_SETS-1:0]  rd_req_bus, wr_req_bus,
+                                    rd_gnt_bus, wr_gnt_bus;
+    logic [NUM_OPS-1:0] req, gnt;
 
     /* Load */
     logic   ld_hit;
@@ -180,9 +220,9 @@ module dcache #(
             ld_hit = 1;
         end
 
-        rd_req[LOAD] = '0;
-        wr_req[LOAD] = '0;
-        rd_req[LOAD][ld_sid] = ld_en && ld_hit;
+        rd_req_bus[LOAD] = '0;
+        wr_req_bus[LOAD] = '0;
+        rd_req_bus[LOAD][ld_sid] = ld_en && ld_hit;
     end
 
     /* Store */
@@ -205,9 +245,9 @@ module dcache #(
             st_hit = 1;
         end
 
-        rd_req[STOR] = '0;
-        wr_req[STOR] = '0;
-        rd_req[STOR][st_sid] = st_en && st_hit;
+        rd_req_bus[STOR] = '0;
+        wr_req_bus[STOR] = '0;
+        rd_req_bus[STOR][st_sid] = st_en && st_hit;
     end
 
     /* Fill */
@@ -224,8 +264,10 @@ module dcache #(
         fl_sid = get_sid(mshr[mem_in_data_tag].addr);
         // cache_hdr_n = cache_hdr;
 
-        rd_req[FILL][fl_sid] = fl_en;
-        wr_req[FILL][fl_sid] = fl_en;
+        rd_req_bus[FILL] = '0;
+        wr_req_bus[FILL] = '0;
+        rd_req_bus[FILL][fl_sid] = fl_en;
+        wr_req_bus[FILL][fl_sid] = fl_en;
 
         for (int w = 0; w < ASSOC; ++w) begin
             if (!victim_msk[fl_sid][w])
@@ -239,46 +281,77 @@ module dcache #(
         end
     end
 
-    // Port arbiter: Who gets to read and write in each set?
+    // Port arbiter: op gets to read and write in each set?
+    port_arbiter arb (
+        .req        (req),
+        .rd_req_bus (rd_req_bus),
+        .wr_req_bus (wr_req_bus),
+
+        .gnt        (gnt),
+        .rd_gnt_bus (rd_gnt_bus),
+        .wr_gnt_bus (wr_gnt_bus)
+    );
     always_comb begin
         ren = '0;
         wen = '0;
-        rway = '0;
-        wway = '0;
-
-        rd_gnt = '0;
-        wr_gnt = '0;
-        gnt    = '0;
-        for (int s = 0; s < NUM_SETS; ++s) begin
-            for (int who = 0; who < NONE; ++who) begin
-                if (!rd_req[who][s])
-                    continue;
-                rd_gnt[who][s] = 1;
-                break;
-            end
-
-            for (int who = 0; who < NONE; ++who) begin
-                if (!wr_req[who][s])
-                    continue;
-                wr_gnt[who][s] = 1;
-                break;
-            end
+        foreach (rd_gnt_bus[op, s]) begin
+            ren[s] |= rd_gnt_bus[op][s];
+            wen[s] |= wr_gnt_bus[op][s];
         end
 
-        gnt[FILL] = (~rd_req[FILL] | rd_gnt[FILL]) & wr_gnt[FILL];
-        gnt[LOAD] = rd_gnt[LOAD];
-        gnt[STOR] = rd_gnt[STOR] & wr_gnt[STOR];
+        rway = '0;
+        foreach (rd_gnt_bus[op, s]) begin
+            if (!rd_gnt_bus[op][s])
+                continue;
+            case (op)
+                LOAD: begin
+                    rway[s] = ld_way;
+                    ld_dat  = rdat;
+                end
+                FILL: begin
+                    // TODO: handle
+                    rway[s] = fl_way;
+                end
+                STOR: begin
+                    rway[s] = st_way;
+                end
+                default:;
+            endcase
+        end
+
+        wway = '0;
+        wdat = '0;
+        foreach (wr_gnt_bus[op, s]) begin
+            if (!wr_gnt_bus[op][s])
+                continue;
+            case (op)
+                LOAD: begin
+                    wway[s] = ld_way;
+                    ld_dat  = rdat;
+                end
+                FILL: begin
+                    // TODO: handle
+                    wway[s] = fl_way;
+                    wdat[s] = mem_in_data;
+                end
+                STOR: begin
+                    wway[s] = st_way;
+                    wdat[s] = st_dat;
+                end
+                default:;
+            endcase
+        end
 
 
         // foreach (ren[s]) begin
-        //     r_who[s] = 
+        //     r_op[s] = 
         //         (ld_req && (ld_sid == s)) ? LOAD :
         //         (fl_req && (fl_sid == s)) ? FILL :
-        //         (st_req && (st_sid == s)) ? STOR : NONE;
+        //         (st_req && (st_sid == s)) ? STOR : NUM_OPS;
 
-        //     w_who[s] = 
+        //     w_op[s] = 
         //         (fl_req && (fl_sid == s)) ? FILL :
-        //         (st_req && (st_sid == s)) ? STOR : NONE;
+        //         (st_req && (st_sid == s)) ? STOR : NUM_OPS;
 
         // end
 
