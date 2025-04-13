@@ -113,22 +113,29 @@ module dcache_test;
     // Clock generation
     always #5 clock = ~clock;
     always @(negedge clock) begin
+        // #0;
+        // $display("st_vld: %b", dut.st_vld);
+        // $display("st_addr: %x", dut.st_addr);
+        // $display("st_size: %1d", dut.st_size);
+        // $display("st_status: %b", dut.st_status);
+        // $display("st_dat: %x", dut.st_dat);
+        // $display("req: %b", dut.req);
+        // $display("gnt: %b", dut.gnt);
         print_dbg();
-        #0;
+        $display("");
     end
 
     initial begin
         $display("Starting dcache testbench...");
         clock = 0;
         reset = 0;
-        do_reset();
         clr_inputs();
+        do_reset();
 
+        wr(4, 0'hbeeffeed, WORD);
         @(negedge clock);
-        wr(0, 0'hbeeffeed, WORD);
+        @(negedge clock);
 
-        @(negedge clock);
-        @(negedge clock);
         $display("Finished dcache testbench.");
         $finish;
     end
