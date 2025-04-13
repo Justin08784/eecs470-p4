@@ -348,7 +348,7 @@ module dcache #(
         if (gnt[STOR]) begin
             cache_hdr_n.vld[st_sid][st_way]     = 1;
             cache_hdr_n.dirty[st_sid][st_way]   = 1;
-            cache_hdr_n.tag[st_sid][st_way]     = fl_tag;
+            cache_hdr_n.tag[st_sid][st_way]     = st_tag;
             cache_hdr_n.age[st_sid]             = '0;
         end
     end

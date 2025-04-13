@@ -47,7 +47,8 @@ module dcache_test;
         .st_vld,
         .st_addr,
         .st_size,
-        .st_status
+        .st_status,
+        .st_dat
     );
 
     task rd(
