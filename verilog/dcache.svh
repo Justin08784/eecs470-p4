@@ -26,11 +26,24 @@ function automatic OFF get_off(input ADDR addr);
     return addr[OFFSET_BITS-1:0];
 endfunction
 
+/*
+NOTE: The cache op tag doubles as priority value,
+with max priority at lowest tag value! */
 typedef enum logic[1:0] {
-    LOAD = 0,
-    FILL = 1,
+    FILL = 0,
+    LOAD = 1,
     STOR = 2,
     NUM_OPS
-    // MSHR // i.e. fill retry
-} WHO;
+
+    /* Ideally, we prioritize a (hit) load over a fill,
+    but then we need to handle deferred fills.
+    Deferred fills add lots of complexity, including
+    a 'retry' path from the MSRH which should temporarily
+    hold the data of a deferred fill. */
+    // LOAD = 0,
+    // MSHR = 1, // i.e. fill retry
+    // FILL = 2,
+    // STOR = 3,
+    // NUM_OPS
+} CACHE_OP_TAG;
 `endif

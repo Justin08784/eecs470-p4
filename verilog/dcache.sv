@@ -30,8 +30,34 @@ module port_arbiter #(
     output  logic [NUM_OPS-1:0] gnt,
     output  ARB_BUS rd_gnt_bus, wr_gnt_bus
 );
-    logic   [NUM_OPS-1:0][NUM_SETS-1:0] gnt_bus;
+    // `define PER_SET_ARB
 
+`ifndef PER_SET_ARB
+    // Per-cache arbitration [SIMPLIFICATION]
+    // i.e. we accept only 1 of 2 requesting ops even if they have non-conflicting sets or port requests!
+    always_comb begin
+        gnt = '0;
+        for (int op = 0; op < NUM_OPS; ++op) begin
+            if (!req[op])
+                continue;
+            gnt[op] |= 1;
+            break;
+        end
+
+        rd_gnt_bus = '0;
+        wr_gnt_bus = '0;
+        foreach (rd_gnt_bus[op]) begin
+            if (!gnt[op])
+                continue;
+            rd_gnt_bus[op] |= rd_req_bus[op];
+            wr_gnt_bus[op] |= wr_req_bus[op];
+        end
+    end
+`endif
+
+`ifdef PER_SET_ARB
+    // Per-set arbitration
+    logic   [NUM_OPS-1:0][NUM_SETS-1:0] gnt_bus;
     always_comb begin
         rd_gnt_bus = '0;
         wr_gnt_bus = '0;
@@ -63,6 +89,8 @@ module port_arbiter #(
         // gnt[LOAD] = rd_gnt_bus[LOAD];
         // gnt[STOR] = rd_gnt_bus[STOR] & wr_gnt_bus[STOR];
     end
+`endif
+
 endmodule;
 
 
