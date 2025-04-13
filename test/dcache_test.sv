@@ -1,8 +1,14 @@
 `timescale 1ns / 1ps
 `include "sys_defs.svh"
 `include "dcache.svh"
+/*
+WARNING: This must be run in DEBUG mode. (it won't compile otherwise)
+*/
+
 
 module dcache_test;
+    // DBG
+    DBG_cache dbg;
     // Clock and Reset
     logic clock;
     logic reset;
@@ -28,6 +34,7 @@ module dcache_test;
 
     // Instantiate the DUT
     dcache dut (
+        .dbg,
         .clock,
         .reset,
 
@@ -43,27 +50,25 @@ module dcache_test;
         .st_status
     );
 
-    // task wr(
-    //     input int v,
-    //     input int addr
-    // );
-    //     wen     = 1;
-    //     waddr   = addr;
-    //     wdat    = v;
-    // endtask
+    task rd(
+        input ADDR      addr,
+        input MEM_SIZE  sz
+    );
+        st_vld  = 1;
+        st_addr = addr;
+        st_size = sz;
+    endtask
 
-    // task rd(
-    //     input int addr
-    // );
-    //     ren     = 1;
-    //     raddr   = addr;
-    // endtask
-
-    // Clock generation
-    always #5 clock = ~clock;
-    always @(negedge clock) begin
-        #0;
-    end
+    task wr(
+        input ADDR      addr,
+        input MEM_BLOCK v,
+        input MEM_SIZE  sz
+    );
+        st_vld  = 1;
+        st_addr = addr;
+        st_size = sz;
+        st_dat  = v;
+    endtask
 
     task do_reset();
         reset = 1;
@@ -71,13 +76,55 @@ module dcache_test;
         reset = 0;
     endtask
 
+    task clr_inputs();
+        {   
+            mem_in_transaction_tag,
+            mem_in_data,
+            mem_in_data_tag,
+
+            ld_vld,
+            ld_addr,
+            ld_size,
+
+            st_vld,
+            st_addr,
+            st_size,
+            st_dat
+        } = '0;
+    endtask
+
+    task print_dbg();
+        $display("  %3d | >> memDP", $time);
+        for (int s = 0; s < NUM_SETS; ++s) begin
+            $display("Set=%1d. age=%b", s, dbg.hdr.age[s]);
+            for (int w = 0; w < ASSOC; ++w) begin
+                $display("  vld=%b, dirty=%b, tag=%x: data=%x",
+                    dbg.hdr.vld[s][w],
+                    dbg.hdr.dirty[s][w],
+                    dbg.hdr.tag[s][w],
+                    dbg.state[s][w]
+                );
+            end
+        end
+        $display("  %3d | << memDP", $time);
+    endtask
+
+    // Clock generation
+    always #5 clock = ~clock;
+    always @(negedge clock) begin
+        print_dbg();
+        #0;
+    end
+
     initial begin
         $display("Starting dcache testbench...");
         clock = 0;
         reset = 0;
-
         do_reset();
+        clr_inputs();
+
         @(negedge clock);
+        wr(0, 0'hbeeffeed, WORD);
 
         @(negedge clock);
         @(negedge clock);

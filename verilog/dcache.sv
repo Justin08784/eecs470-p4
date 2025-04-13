@@ -1,35 +1,6 @@
 `include "sys_defs.svh"
 `include "dcache.svh"
 
-// Get word address; restricting to only actually used 16 LSB.
-function automatic logic[13:0] waddr(input ADDR addr);
-    return addr[15:2];
-endfunction
-// Double word address
-function automatic logic[12:0] dwaddr(input ADDR addr);
-    return addr[15:3];
-endfunction
-
-function automatic logic idw_word(input ADDR addr);
-    return addr[2];
-endfunction
-function automatic logic [1:0] idw_half(input ADDR addr);
-    return addr[2:1];
-endfunction
-function automatic logic [2:0] idw_byte(input ADDR addr);
-    return addr[2:0];
-endfunction
-
-// In-word byte offset
-function automatic logic[1:0] iw_off(input ADDR addr);
-    return addr[1:0];
-endfunction
-
-// In-double-word byte offset
-function automatic logic[2:0] idw_off(input ADDR addr);
-    return addr[2:0];
-endfunction
-
 
 module port_arbiter #(
     type ARB_BUS = logic [NUM_OPS-1:0][NUM_SETS-1:0]
@@ -135,27 +106,6 @@ module dcache #(
     output logic        st_status,
     input MEM_BLOCK     st_dat
 );
-    localparam NUM_CACHE_LINES  =  `DCACHE_LINES;
-    localparam NUM_SETS         = NUM_CACHE_LINES / ASSOC;
-    localparam SET_INDEX_BITS   = $clog2(NUM_SETS);
-    localparam OFFSET_BITS      = 3;
-    localparam TAG_BITS         = 16 - SET_INDEX_BITS - OFFSET_BITS;
-    typedef logic [SET_INDEX_BITS-1:0]  SID;
-    typedef logic [TAG_BITS-1:0]        TAG;
-    typedef logic [OFFSET_BITS-1:0]     OFF;
-    typedef logic [$clog2(ASSOC)-1:0]   WAY;
-    typedef logic [ASSOC-1:0][ASSOC-1:0]AGE;
-
-    function automatic TAG get_tag(input ADDR addr);
-        return addr[15:16-TAG_BITS];
-    endfunction
-    function automatic SID get_sid(input ADDR addr);
-        return addr[SET_INDEX_BITS+OFFSET_BITS-1 : OFFSET_BITS];
-    endfunction
-    function automatic OFF get_off(input ADDR addr);
-        return addr[OFFSET_BITS-1:0];
-    endfunction
-
     /*
     FIXME: MSHR needs to coalesce reads/loads, and partially
     coalesce writes/stores (maybe have a queue of allocated load/store
@@ -344,6 +294,7 @@ module dcache #(
         .wr_gnt_bus (wr_gnt_bus)
     );
 
+    // Route granted ops to memDP
     always_comb begin
         ren = '0;
         wen = '0;
@@ -384,6 +335,21 @@ module dcache #(
                 end
                 default:;
             endcase
+        end
+    end
+
+    // Update header
+    // TODO: this is also where we should do LRU update
+    always_comb begin
+        cache_hdr_n = cache_hdr;
+        if (gnt[LOAD])
+            cache_hdr_n.age[st_sid]             = '0;
+
+        if (gnt[STOR]) begin
+            cache_hdr_n.vld[st_sid][st_way]     = 1;
+            cache_hdr_n.dirty[st_sid][st_way]   = 1;
+            cache_hdr_n.tag[st_sid][st_way]     = fl_tag;
+            cache_hdr_n.age[st_sid]             = '0;
         end
     end
 

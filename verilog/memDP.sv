@@ -118,15 +118,8 @@ end
     endgenerate
 `endif
 
+`ifdef DEBUG
 assign dbg = memData;
-always_ff @(posedge clock) begin
-    if (!reset) begin
-        $display("  %3d | >> memDP", $time);
-        for (int unsigned i = 0; i < DEPTH; ++i) begin
-            $display("<%x> memDP[%2x]: %x", tags[i], i, memData[i]);
-        end
-        $display("  %3d | << memDP", $time);
-    end
-end
+`endif
 
 endmodule

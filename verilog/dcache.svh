@@ -3,7 +3,7 @@
 `ifndef __DCACHE_SVH__ 
 `define __DCACHE_SVH__ 
 
-localparam ASSOC   = 4;
+localparam ASSOC   = 4; // i.e. NUM_WAYS
 localparam MSHR_SZ = 16;
 localparam NUM_CACHE_LINES  =  `DCACHE_LINES;
 localparam NUM_SETS         = NUM_CACHE_LINES / ASSOC;
@@ -67,4 +67,37 @@ typedef struct packed {
     logic [NUM_SETS-1:0][ASSOC-1:0][$bits(MEM_BLOCK)-1:0]
         state;
 } DBG_cache;
+
+
+
+
+// Get word address; restricting to only actually used 16 LSB.
+function automatic logic[13:0] waddr(input ADDR addr);
+    return addr[15:2];
+endfunction
+// Double word address
+function automatic logic[12:0] dwaddr(input ADDR addr);
+    return addr[15:3];
+endfunction
+
+function automatic logic idw_word(input ADDR addr);
+    return addr[2];
+endfunction
+function automatic logic [1:0] idw_half(input ADDR addr);
+    return addr[2:1];
+endfunction
+function automatic logic [2:0] idw_byte(input ADDR addr);
+    return addr[2:0];
+endfunction
+
+// In-word byte offset
+function automatic logic[1:0] iw_off(input ADDR addr);
+    return addr[1:0];
+endfunction
+
+// In-double-word byte offset
+function automatic logic[2:0] idw_off(input ADDR addr);
+    return addr[2:0];
+endfunction
+
 `endif
