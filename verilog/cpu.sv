@@ -254,7 +254,11 @@ module cpu (
     );
 
     always_ff @(posedge clock) begin
-        if (reset) begin
+        if (reset || flush) begin
+            /* Even the flush must flush itself.
+
+            Pulse flush for 1 cycle. Ensures branches on mispredicted
+            control path cannot retrigger. */
             flush       <= '0;
             retire_2_f  <= '0;
         end else begin
