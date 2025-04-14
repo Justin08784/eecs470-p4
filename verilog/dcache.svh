@@ -33,6 +33,31 @@ typedef struct packed {
     logic       word_off;
 } DW_ACCESS;
 
+`define RQ_SZ 4
+typedef struct packed {
+    logic       is_load;        // store, if not load
+    union packed {
+        struct packed {
+            LSQ_IDX         lq_idx; // only needed for loads (stores only request to dcache post retirement)
+            PHYS_REG_IDX    dst;
+            logic [$bits(DATA_BLOCK)-$bits(LSQ_IDX)-$bits(PHYS_REG_IDX)-1:0]
+                _pad; // ...I'm sorry
+        } ld;
+        DATA_BLOCK  st_dat;
+    } payload;
+    /* ^^ access guarded by size */
+
+    MEM_SIZE    size; // mem size: BYTE, HALF, WORD, DOUBLE-WORD
+    DW_ACCESS   acc;
+    // union packed {
+    //     logic [2:0] byte_off;
+    //     logic [2:0] half_off;   // actually: logic[1:0] (padded 1 bit)
+    //     logic [2:0] word_off;   // actually: logic      (padded 2 bits)
+    // } acc;
+    /* ^^ access guarded by size
+    (NOT to be confused with DW_ACCESS, which is a struct!) */
+} RQ_ENTRY;
+
 /*
 NOTE: The cache op tag doubles as priority value,
 with max priority at lowest tag value! */

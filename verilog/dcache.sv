@@ -75,6 +75,107 @@ module port_arbiter #(
 endmodule;
 
 
+module replay_queue #(
+    parameter int unsigned DEPTH=`RQ_SZ,       // num elements
+    type RQ_STATE = struct packed {
+        logic [$clog2(DEPTH)-1:0] head;
+        logic [$clog2(DEPTH)-1:0] tail;
+        RQ_ENTRY [DEPTH-1:0]      state;
+        logic [$clog2(DEPTH):0]   used;
+    },
+    parameter int INSTANCE_ID=-1
+) (
+    input   clock, 
+    input   reset,
+
+    input   logic       wr_en,
+    input   RQ_ENTRY    wr_data,
+
+    input   logic       rd_en,
+    output  RQ_ENTRY    rd_data,
+    output  logic       prvw_vld,
+
+    output  logic       empty,
+    output  logic       full
+);
+    logic [$clog2(DEPTH)-1:0]       head;
+    logic [$clog2(DEPTH)-1:0]       tail;
+    RQ_ENTRY [DEPTH-1:0]            state;
+    logic [$clog2(DEPTH):0]         used;
+
+    always_comb begin
+        empty    = used == 0;
+        full     = used == DEPTH;
+        prvw_vld = !empty;
+
+        rd_data = prvw_vld
+            ? state[head]
+            : '0;
+    end
+
+    /* Uncomment this if you want to be anal and do some ridiculous micro-optimization. */
+    // st_merge: Merge consecutive stores if they target the *SAME WORD* in the mem block
+    // - consecutive stores -> no loads who need intermediate value -> can merge
+    // logic last_vld;
+    // logic [$clog2(DEPTH)-1:0] last_idx;
+    // RQ_ENTRY last, last_n;
+    // logic st_merge;
+    // always_comb begin
+    //     last_vld = !empty;
+    //     last_idx = tail
+    //         ? tail - 1
+    //         : DEPTH - 1;
+    //     last = state[last_idx];
+
+    //     last_n = last;
+    //     st_merge = last_vld
+    //         && (last.acc.word_off == wr_data.acc.word_off)
+    //         && !last.is_load
+    //         && !wr_data.is_load;
+    //     case (wr_data.size)
+    //         BYTE: last_n.payload.st_dat.byte_level[wr_data.acc.byte_off]
+    //             = wr_data.payload.st_dat.byte_level[0];
+    //         HALF: last_n.payload.st_dat.half_level[wr_data.acc.half_off]
+    //             = wr_data.payload.st_dat.half_level[0];
+    //         WORD: last_n.payload.st_dat = wr_data.payload;
+    //         default:;
+    //     endcase
+    // end
+
+    always_ff @(posedge clock) begin
+        if (reset) begin
+            used    <= '0;
+            head    <= '0;
+            tail    <= '0;
+            state   <= '0;
+        end else begin
+            if (wr_en > DEPTH - used)
+                $error("RQ overflow! instance: %d", INSTANCE_ID);
+            if (rd_en > used)
+                $error("RQ underflow! instance: %d", INSTANCE_ID);
+            used    <= used + wr_en - rd_en;
+            head    <= (head + rd_en) % DEPTH;
+            tail    <= (tail + wr_en) % DEPTH;
+
+            if (wr_en)
+                state[tail] <= wr_data;
+            /* needed for st_merge */
+            // if (wr_en) begin
+            //     if (st_merge)
+            //         state[last_idx] <= last_n;
+            //     else
+            //         state[tail]     <= wr_data;
+            // end
+        end
+    end
+endmodule
+    
+
+
+module mshr;
+endmodule
+
+
 module dcache #(
 ) (
     `ifdef DEBUG
@@ -98,14 +199,14 @@ module dcache #(
     input MEM_SIZE      ld_size,    // only for load, store always write the ople block (might need to change)
     // FIXME: this status needs to be a more complex enum type, I think
     output logic        ld_status,
-    output MEM_BLOCK    ld_dat,
+    output DATA_BLOCK   ld_dat,
 
     input logic         st_vld,
     input ADDR          st_addr,
     input MEM_SIZE      st_size,
     // FIXME: this status needs to be a more complex enum type, I think
     output logic        st_status,
-    input MEM_BLOCK     st_dat
+    input DATA_BLOCK    st_dat
 );
     /*
     FIXME: MSHR needs to coalesce reads/loads, and partially
@@ -207,7 +308,7 @@ module dcache #(
         case (ld_size)
             BYTE  : ld_dat = rdat[ld_sid].byte_level[ld_acc.byte_off];
             HALF  : ld_dat = rdat[ld_sid].half_level[ld_acc.half_off];
-            WORD  : ld_dat = rdat[ld_sid].word_level[ld_acc.word_off];
+            WORD  : ld_dat = rdat[ld_sid].word_level;
             // FIXME: Double-word does not exist in RISC-V, right?
             // DOUBLE: ld_dat = rdat[ld_sid];
             default:;
@@ -259,7 +360,7 @@ module dcache #(
         case (st_size)
             BYTE  : st_posw_dat.byte_level[st_acc.byte_off] = st_dat.byte_level[0]; // lb
             HALF  : st_posw_dat.half_level[st_acc.half_off] = st_dat.half_level[0]; // lh
-            WORD  : st_posw_dat.word_level[st_acc.word_off] = st_dat.word_level[0]; // lw
+            WORD  : st_posw_dat.word_level[st_acc.word_off] = st_dat.word_level; // lw
             // FIXME: Double-word does not exist in RISC-V, right?
             // DOUBLE: st_posw_dat = st_dat;
             default:;

@@ -45,13 +45,13 @@ module dcache_test;
     ADDR        ld_addr;
     MEM_SIZE    ld_size;
     logic       ld_status;
-    MEM_BLOCK   ld_dat;
+    DATA_BLOCK  ld_dat;
 
     logic       st_vld;
     ADDR        st_addr;
     MEM_SIZE    st_size;
     logic       st_status;
-    MEM_BLOCK   st_dat;
+    DATA_BLOCK  st_dat;
 
     // Instantiate the Data Memory
     mem memory (
@@ -239,8 +239,10 @@ module dcache_test;
         wr('h80, 'hbeeffeed, WORD);
         @(negedge clock);
         clr_inputs();
-        for (int i = 0; i < 10; ++i)
+        for (int i = 0; i < 5; ++i)
             @(negedge clock);
+        wr('h80, 'hbeeffeed, WORD);
+        @(negedge clock);
 
         $display("Finished dcache testbench.");
         $finish;

@@ -162,6 +162,12 @@ typedef struct packed {
     logic                          valid;
 } ICACHE_TAG;
 
+typedef union packed {
+    logic [3:0][7:0]  byte_level;
+    logic [1:0][15:0] half_level;
+    logic      [31:0] word_level;
+} DATA_BLOCK;
+
 ///////////////////////////////
 // ---- Exception Codes ---- //
 ///////////////////////////////
