@@ -112,7 +112,7 @@ typedef logic [$clog2(`PHYS_REG_SZ_R10K)-1:0] PHYS_REG_IDX;
 // processor will have to account for this effect on mem.
 // Notably, you can no longer write data without first reading.
 // TODO: uncomment this line once you've implemented your cache
-// `define CACHE_MODE
+`define CACHE_MODE
 
 // you are not allowed to change this definition for your final processor
 // the project 3 processor has a massive boost in performance just from having no mem latency
