@@ -109,33 +109,162 @@ module sq #(parameter
     sq2execute next_sq_2_exec;
     sq2execute uncombined_forward_data;
 
-    always_comb begin
-        next_sq_2_exec = '0;
-        // most_recent_bytes = '0;
+    // always_comb begin
+    //     next_sq_2_exec = '0;
+    //     // most_recent_bytes = '0;
 
-        for (int unsigned i = 0; i < LD_BAY_SZ; i++) begin
+    //     for (int unsigned i = 0; i < LD_BAY_SZ; i++) begin
 
-            if (!ex_frwd_in.forward_req_en[i]) continue;
+    //         if (!ex_frwd_in.forward_req_en[i]) continue;
 
-            for (int unsigned j = 0, int unsigned idx = 0; j < used; ++j) begin
-                idx = (head+j) % LSQ_SZ;
+    //         for (int unsigned j = 0, int unsigned idx = 0; j < used; ++j) begin
+    //             idx = (head+j) % LSQ_SZ;
 
-                if (state[idx].d_vld && (waddr(state[idx].addr) == waddr(ex_frwd_in.forward_addr[i]))) begin
-                    next_sq_2_exec.forward_data[i].byte_level[0] = state[idx].bytewise_addr_mask[0] ? state[idx].data.byte_level[0] : next_sq_2_exec.forward_data[i].byte_level[0];
-                    next_sq_2_exec.forward_data[i].byte_level[1] = state[idx].bytewise_addr_mask[1] ? state[idx].data.byte_level[1] : next_sq_2_exec.forward_data[i].byte_level[1];
-                    next_sq_2_exec.forward_data[i].byte_level[2] = state[idx].bytewise_addr_mask[2] ? state[idx].data.byte_level[2] : next_sq_2_exec.forward_data[i].byte_level[2];
-                    next_sq_2_exec.forward_data[i].byte_level[3] = state[idx].bytewise_addr_mask[3] ? state[idx].data.byte_level[3] : next_sq_2_exec.forward_data[i].byte_level[3];
+    //             if (state[idx].d_vld && (waddr(state[idx].addr) == waddr(ex_frwd_in.forward_addr[i]))) begin
+    //                 next_sq_2_exec.forward_data[i].byte_level[0] = state[idx].bytewise_addr_mask[0] ? state[idx].data.byte_level[0] : next_sq_2_exec.forward_data[i].byte_level[0];
+    //                 next_sq_2_exec.forward_data[i].byte_level[1] = state[idx].bytewise_addr_mask[1] ? state[idx].data.byte_level[1] : next_sq_2_exec.forward_data[i].byte_level[1];
+    //                 next_sq_2_exec.forward_data[i].byte_level[2] = state[idx].bytewise_addr_mask[2] ? state[idx].data.byte_level[2] : next_sq_2_exec.forward_data[i].byte_level[2];
+    //                 next_sq_2_exec.forward_data[i].byte_level[3] = state[idx].bytewise_addr_mask[3] ? state[idx].data.byte_level[3] : next_sq_2_exec.forward_data[i].byte_level[3];
 
-                    next_sq_2_exec.forward_byte_en[i] |= state[idx].bytewise_addr_mask;
+    //                 next_sq_2_exec.forward_byte_en[i] |= state[idx].bytewise_addr_mask;
+    //             end
+
+    //             if (state[idx].sq_idx == ex_frwd_in.forward_sq_idx[i]) break;
+    //         end
+
+    //         next_sq_2_exec.forward_en[i] = (next_sq_2_exec.forward_byte_en[i] != 0);
+
+    //     end
+    // end
+
+    logic [LD_BAY_SZ-1:0] idx_found;
+    LSQ_IDX [LD_BAY_SZ-1:0] matching_idx;
+    logic [LD_BAY_SZ-1:0] [LSQ_SZ-1:0] match_mask;
+    // always_comb begin
+        // idx_found = '0;
+        // matching_idx = '0;
+        // match_mask = '0;
+        // for (int unsigned i = 0; i < LD_BAY_SZ; i++) begin
+        //     for (int unsigned j = 0, LSQ_IDX idx = 0; j < LSQ_SZ; j++) begin
+        //         idx = (head+j) % LSQ_SZ;
+        //         match_mask[i][idx] = 1;
+        //         if (state[idx].d_vld && (state[idx].sq_idx == ex_frwd_in.forward_sq_idx[i])) begin
+        //             matching_idx[i] = idx;
+        //             idx_found[i] = 1;
+        //             break;
+        //         end
+        //     end
+
+        //     if (!idx_found[i]) match_mask[i] = '0;
+        // end
+
+        // for (int unsigned i = 0; i < LD_BAY_SZ; i++) begin //can be turned into a generate
+        //     matching_idx[i] = ex_frwd_in.forward_sq_idx[i] % LSQ_SZ;
+        //     if (state[matching_idx[i]].d_vld && (state[matching_idx[i]].sq_idx == ex_frwd_in.forward_sq_idx[i])) idx_found[i] = 1;
+        //     else idx_found[i] = 0;
+        // end
+
+        // for (int unsigned i = 0; i < LD_BAY_SZ; i++) begin
+        //     for (int unsigned j = 0; j < LSQ_SZ; j++) begin
+        //         if ((matching_idx[i] < head) && ((j <= matching_idx[i]) || (j >= head))) begin
+        //             match_mask[i][j] = 1;
+        //         end
+        //         else if ((j >= head) && (j <= matching_idx[i])) begin
+        //             match_mask[i][j] = 1;
+        //         end
+        //         else match_mask[i][j] = 0;
+        //     end
+        // end
+    // end
+
+    logic [LD_BAY_SZ-1:0] [3:0] [LSQ_SZ-1:0] byte_matches;
+    logic [LD_BAY_SZ-1:0] [3:0] [LSQ_SZ-1:0] shifted_matches;
+    logic [LD_BAY_SZ-1:0] [3:0] [LSQ_SZ-1:0] final_matches;
+
+    genvar i,j,k,l;
+    generate
+        for (i = 0; i < LD_BAY_SZ; i++) begin : find_bay_matches
+
+            assign matching_idx[i] = ex_frwd_in.forward_sq_idx[i] % LSQ_SZ;
+            assign idx_found[i] = (state[matching_idx[i]].d_vld & (state[matching_idx[i]].sq_idx == ex_frwd_in.forward_sq_idx[i])) ? 1 : 0;
+
+            for (l = 0; l < LSQ_SZ; l++) begin : find_match_mask
+                assign match_mask[i][l] = ((matching_idx[i] < head) & ((l <= matching_idx[i]) || (l >= head))) || ((l >= head) && (l <= matching_idx[i])) ? 1 : 0;
+            end
+            
+
+            for (j = 0; j < 4; j++) begin : find_byte_matches
+                for (k = 0; k < LSQ_SZ; k++) begin : find_table_matches
+                    assign byte_matches[i][j][k] = state[k].d_vld & (waddr(state[k].addr) == waddr(ex_frwd_in.forward_addr[i])) ? state[k].bytewise_addr_mask[j] & match_mask[i][k] : '0;
                 end
 
-                if (state[idx].sq_idx == ex_frwd_in.forward_sq_idx[i]) break;
+                psel_gen #(
+                .WIDTH  (LSQ_SZ),
+                .REQS   (1)
+                ) sel (
+                    .req    (byte_matches[i][j]),
+                    .gnt_bus(shifted_matches[i][j])
+                );
+                assign final_matches[i][j] = rotate_right(shifted_matches[i][j],matching_idx[i]);
+                assign next_sq_2_exec.forward_data[i].byte_level[j] = idx_found[i] ? state[encode_idx(final_matches[i][j])].data.byte_level[j] : '0;
+                assign next_sq_2_exec.forward_byte_en[i][j] = idx_found[i] ? state[encode_idx(rotate_right(shifted_matches[i][j],matching_idx[i]))].bytewise_addr_mask[j] : '0;//1;
+                    
             end
 
-            next_sq_2_exec.forward_en[i] = (next_sq_2_exec.forward_byte_en[i] != 0);
-
+            assign next_sq_2_exec.forward_en[i] = (next_sq_2_exec.forward_byte_en[i] != 0);
         end
-    end
+    endgenerate
+
+    // genvar i,j,k;
+    // generate
+    //     for (i = 0; i < LD_BAY_SZ; i++) begin : find_byte_matches_1
+    //         for (j = 0; j < 4; j++) begin : find_byte_matches_2
+    //             for (k = 0; k < LSQ_SZ; k++) begin : find_byte_matches_3
+    //                 assign byte_matches[i][j][k] = state[k].d_vld & (waddr(state[k].addr) == waddr(ex_frwd_in.forward_addr[i])) ? state[k].bytewise_addr_mask[j] & match_mask[i][k] : '0;
+    //             end
+    //         end
+    //     end
+    // endgenerate
+
+    // genvar a,b;
+    // generate
+    //     for (a = 0; a < LD_BAY_SZ; a++) begin : find_most_recent_match_1
+    //         for (b = 0; b < 4; b++) begin : find_most_recent_match_2
+    //             psel_gen #(
+    //             .WIDTH  (LSQ_SZ),
+    //             .REQS   (1)
+    //             ) sel (
+    //                 .req    (rotate_left(byte_matches[a][b],matching_idx[a])),
+    //                 .gnt_bus(shifted_matches[a][b])
+    //             );
+    //         end
+    //     end
+    // endgenerate
+
+    // always_comb begin
+    //     for (int unsigned i = 0; i < LD_BAY_SZ; i++) begin
+    //         for (int unsigned j = 0; j < 4; j++) begin
+    //             final_matches[i][j] = rotate_right(shifted_matches[i][j],matching_idx[i]) & match_mask[i];
+    //             // $display("FINAL_MASK[%0d][%0d], %b", i, j, final_matches[i][j]);
+    //         end
+    //     end
+    // end
+
+    // generate
+    //     // next_sq_2_exec = '0;
+    //     for (i = 0; i < LD_BAY_SZ; i++) begin : assign_next_forward_1
+    //         for (j = 0; j < 4; j++) begin : assign_next_forward_2
+    //                 // assign idx = encode_idx(rotate_right(shifted_matches[i][j],matching_idx[i]));
+    //                 assign next_sq_2_exec.forward_data[i].byte_level[j] = idx_found[i] ? state[encode_idx(rotate_right(shifted_matches[i][j],matching_idx[i]))].data.byte_level[j] : '0;
+    //                 assign next_sq_2_exec.forward_byte_en[i][j] = idx_found[i] ? state[encode_idx(rotate_right(shifted_matches[i][j],matching_idx[i]))].bytewise_addr_mask[j] : '0;//1;
+                    
+    //         end
+    //         assign next_sq_2_exec.forward_en[i] = (next_sq_2_exec.forward_byte_en[i] != 0);
+    //         // $display("FORWARD_DATA[%0d]: %0d, en: %b, mask: %4b", i, next_sq_2_exec.forward_data[i], next_sq_2_exec.forward_en[i], next_sq_2_exec.forward_byte_en[i]);
+    //     end
+    // endgenerate
+
+    //Combine SQ and RET_BUF matches
 
     always_comb begin
         execute_out = '0;
@@ -299,6 +428,47 @@ module sq #(parameter
     };
     `endif
 
+    function automatic logic [LSQ_SZ-1:0] rotate_left;
+        input logic [LSQ_SZ-1:0] data;
+        input int unsigned shift;
+        begin
+            rotate_left = (data << shift) | (data >> shift);
+        end
+    endfunction
+
+    function automatic logic [LSQ_SZ-1:0] rotate_right;
+        input logic [LSQ_SZ-1:0] data;
+        input int unsigned shift;
+        begin
+            rotate_right = (data >> shift) | (data << shift);
+        end
+    endfunction
+
+    function automatic LSQ_IDX encode_idx;
+        input logic [LSQ_SZ-1:0] data;
+        begin
+            case (data)
+                16'b0000000000000001 : encode_idx = 5'd0;
+                16'b0000000000000010 : encode_idx = 5'd1;
+                16'b0000000000000100 : encode_idx = 5'd2;
+                16'b0000000000001000 : encode_idx = 5'd3;
+                16'b0000000000010000 : encode_idx = 5'd4;
+                16'b0000000000100000 : encode_idx = 5'd5;
+                16'b0000000001000000 : encode_idx = 5'd6;
+                16'b0000000010000000 : encode_idx = 5'd7;
+                16'b0000000100000000 : encode_idx = 5'd8;
+                16'b0000001000000000 : encode_idx = 5'd9;
+                16'b0000010000000000 : encode_idx = 5'd10;
+                16'b0000100000000000 : encode_idx = 5'd11;
+                16'b0001000000000000 : encode_idx = 5'd12;
+                16'b0010000000000000 : encode_idx = 5'd13;
+                16'b0100000000000000 : encode_idx = 5'd14;
+                16'b1000000000000000 : encode_idx = 5'd15;
+                default: encode_idx = 5'd0;
+            endcase
+        end
+    endfunction
+
 
 endmodule
 
@@ -390,35 +560,145 @@ module post_ret_buffer #(parameter
         // ret_success = mem2proc_transaction_tag; <--TODO: swap to this line once teh SQ retirement buffer is pointing at the superscalar dcache instead of mem
     end
 
-    always_comb begin
-        next_forward_ret_2_sq = '0;
-        // most_recent_bytes = '0;
+    // always_comb begin
+    //     next_forward_ret_2_sq = '0;
+    //     // most_recent_bytes = '0;
 
-        for (int unsigned i = 0; i < LD_BAY_SZ; i++) begin
-            if (!sq_in.forward_req_en[i]) continue;
+    //     for (int unsigned i = 0; i < LD_BAY_SZ; i++) begin
+    //         if (!sq_in.forward_req_en[i]) continue;
 
-            for (int unsigned j = 0, int unsigned idx = 0; j < used; ++j) begin
-                idx = (head+j) % SQ_RET_BUF_SZ;
+    //         for (int unsigned j = 0, int unsigned idx = 0; j < used; ++j) begin
+    //             idx = (head+j) % SQ_RET_BUF_SZ;
 
-                if (state[idx].sq_idx == sq_in.forward_sq_idx[i]) next_forward_ret_2_sq.sq_idx_found[i] = '1;
+    //             if (state[idx].sq_idx == sq_in.forward_sq_idx[i]) next_forward_ret_2_sq.sq_idx_found[i] = '1;
 
-                if (state[idx].d_vld && (waddr(state[idx].addr) == waddr(sq_in.forward_addr[i]))) begin
-                    next_forward_ret_2_sq.forward_data[i].byte_level[0] = state[idx].bytewise_addr_mask[0] ? state[idx].data.byte_level[0] : next_forward_ret_2_sq.forward_data[i].byte_level[0];
-                    next_forward_ret_2_sq.forward_data[i].byte_level[1] = state[idx].bytewise_addr_mask[1] ? state[idx].data.byte_level[1] : next_forward_ret_2_sq.forward_data[i].byte_level[1];
-                    next_forward_ret_2_sq.forward_data[i].byte_level[2] = state[idx].bytewise_addr_mask[2] ? state[idx].data.byte_level[2] : next_forward_ret_2_sq.forward_data[i].byte_level[2];
-                    next_forward_ret_2_sq.forward_data[i].byte_level[3] = state[idx].bytewise_addr_mask[3] ? state[idx].data.byte_level[3] : next_forward_ret_2_sq.forward_data[i].byte_level[3];
+    //             if (state[idx].d_vld && (waddr(state[idx].addr) == waddr(sq_in.forward_addr[i]))) begin
+    //                 next_forward_ret_2_sq.forward_data[i].byte_level[0] = state[idx].bytewise_addr_mask[0] ? state[idx].data.byte_level[0] : next_forward_ret_2_sq.forward_data[i].byte_level[0];
+    //                 next_forward_ret_2_sq.forward_data[i].byte_level[1] = state[idx].bytewise_addr_mask[1] ? state[idx].data.byte_level[1] : next_forward_ret_2_sq.forward_data[i].byte_level[1];
+    //                 next_forward_ret_2_sq.forward_data[i].byte_level[2] = state[idx].bytewise_addr_mask[2] ? state[idx].data.byte_level[2] : next_forward_ret_2_sq.forward_data[i].byte_level[2];
+    //                 next_forward_ret_2_sq.forward_data[i].byte_level[3] = state[idx].bytewise_addr_mask[3] ? state[idx].data.byte_level[3] : next_forward_ret_2_sq.forward_data[i].byte_level[3];
 
 
-                    next_forward_ret_2_sq.forward_byte_en[i] |= state[idx].bytewise_addr_mask;
-                end
+    //                 next_forward_ret_2_sq.forward_byte_en[i] |= state[idx].bytewise_addr_mask;
+    //             end
 
-                if (state[idx].sq_idx == sq_in.forward_sq_idx[i]) break;
+    //             if (state[idx].sq_idx == sq_in.forward_sq_idx[i]) break;
+    //         end
+
+    //         next_forward_ret_2_sq.forward_en[i] = (next_forward_ret_2_sq.forward_byte_en[i] != 0);
+
+    //     end
+    // end
+
+
+    logic [LD_BAY_SZ-1:0] idx_found;
+    LSQ_IDX [LD_BAY_SZ-1:0] matching_idx;
+    logic [LD_BAY_SZ-1:0] [SQ_RET_BUF_SZ-1:0] match_mask;
+    // always_comb begin
+    //     idx_found = '0;
+    //     matching_idx = '0;
+    //     match_mask = '0;
+    //     for (int unsigned i = 0; i < LD_BAY_SZ; i++) begin
+    //         for (int unsigned j = 0, LSQ_IDX idx = 0; j < SQ_RET_BUF_SZ; j++) begin
+    //             idx = (head+j) % SQ_RET_BUF_SZ;
+    //             match_mask[i][idx] = 1;
+    //             if (state[idx].d_vld && (state[idx].sq_idx == sq_in.forward_sq_idx[i])) begin
+    //                 matching_idx[i] = idx;
+    //                 idx_found[i] = 1;
+    //                 break;
+    //             end
+    //         end
+
+    //         if (!idx_found[i]) match_mask[i] = '1;
+    //     end
+
+    //     // for (int unsigned i = 0; i < LD_BAY_SZ; i++) begin
+    //     //     if (idx_found[i]) begin
+    //     //         for (int unsigned j = 0, LSQ_IDX idx = 0; j < SQ_RET_BUF_SZ; j++) begin
+    //     //             idx = (head+j) % SQ_RET_BUF_SZ;
+    //     //             match_mask[i][idx] = 1;
+    //     //             if (idx == matching_idx[i]) break;
+    //     //         end
+    //     //     end
+    //     //     else match_mask[i] = '1; //if idx isn't here, everything is old enough to take
+    //     // end
+    // end
+
+    logic [LD_BAY_SZ-1:0] [3:0] [SQ_RET_BUF_SZ-1:0] byte_matches;
+    logic [LD_BAY_SZ-1:0] [3:0] [SQ_RET_BUF_SZ-1:0] shifted_matches;
+    logic [LD_BAY_SZ-1:0] [3:0] [SQ_RET_BUF_SZ-1:0] final_matches;
+    genvar i,j,k,l;
+    generate
+        for (i = 0; i < LD_BAY_SZ; i++) begin : find_bay_matches
+
+            assign matching_idx[i] = sq_in.forward_sq_idx[i] % SQ_RET_BUF_SZ;
+            assign idx_found[i] = (state[matching_idx[i]].d_vld & (state[matching_idx[i]].sq_idx == sq_in.forward_sq_idx[i])) ? 1 : 0;
+
+            for (l = 0; l < SQ_RET_BUF_SZ; l++) begin : find_match_mask
+                assign match_mask[i][l] = ((matching_idx[i] < head) & ((l <= matching_idx[i]) || (l >= head))) || ((l >= head) && (l <= matching_idx[i])) ? 1 : 0;
             end
 
-            next_forward_ret_2_sq.forward_en[i] = (next_forward_ret_2_sq.forward_byte_en[i] != 0);
+            for (j = 0; j < 4; j++) begin : find_byte_matches
+                for (k = 0; k < SQ_RET_BUF_SZ; k++) begin : find_table_matches
+                    assign byte_matches[i][j][k] = state[k].d_vld & (waddr(state[k].addr) == waddr(sq_in.forward_addr[i])) ? state[k].bytewise_addr_mask[j] & match_mask[i][k] : '0;
+                end
 
+                psel_gen #(
+                .WIDTH  (SQ_RET_BUF_SZ),
+                .REQS   (1)
+                ) sel (
+                    .req    (byte_matches[i][j]),
+                    .gnt_bus(shifted_matches[i][j])
+                );
+
+                assign final_matches[i][j] = rotate_right(shifted_matches[i][j],matching_idx[i]);
+                assign next_forward_ret_2_sq.forward_data[i].byte_level[j] = idx_found[i] ? state[encode_idx(final_matches[i][j])].data.byte_level[j] : '0;
+                assign next_forward_ret_2_sq.forward_byte_en[i][j] = idx_found[i] ? state[encode_idx(rotate_right(shifted_matches[i][j],matching_idx[i]))].bytewise_addr_mask[j] : '0;//1;
+                    
+            end
+
+            assign next_forward_ret_2_sq.forward_en[i] = (next_forward_ret_2_sq.forward_byte_en[i] != 0);
         end
-    end
+    endgenerate
+
+    // genvar a,b;
+    // generate
+    //     for (a = 0; a < LD_BAY_SZ; a++) begin : find_most_recent_match_1
+    //         for (b = 0; b < 4; b++) begin : find_most_recent_match_2
+    //             psel_gen #(
+    //             .WIDTH  (SQ_RET_BUF_SZ),
+    //             .REQS   (1)
+    //             ) sel (
+    //                 .req    (byte_matches[a][b]),
+    //                 .gnt_bus(shifted_matches[a][b])
+    //             );
+    //         end
+    //     end
+    // endgenerate
+
+    // always_comb begin
+    //     for (int unsigned i = 0; i < LD_BAY_SZ; i++) begin
+    //         for (int unsigned j = 0; j < 4; j++) begin
+    //             final_matches[i][j] = rotate_right(shifted_matches[i][j],matching_idx[i]) & match_mask[i];
+    //             // $display("FINAL_MASK[%0d][%0d], %b", i, j, final_matches[i][j]);
+    //         end
+    //     end
+    // end
+
+    // generate
+    //     // next_forward_ret_2_sq = '0;
+    //     for (i = 0; i < LD_BAY_SZ; i++) begin : assign_next_forward_1
+    //         for (j = 0; j < 4; j++) begin : assign_next_forward_2
+    //                 // assign idx = encode_idx(rotate_right(shifted_matches[i][j],matching_idx[i]));
+    //                 assign next_forward_ret_2_sq.forward_data[i].byte_level[j] = idx_found[i] ? state[encode_idx(rotate_right(shifted_matches[i][j],matching_idx[i]))].data.byte_level[j] : '0;
+    //                 assign next_forward_ret_2_sq.forward_byte_en[i][j] = idx_found[i] ? state[encode_idx(rotate_right(shifted_matches[i][j],matching_idx[i]))].bytewise_addr_mask[j] : '0;//1;
+                    
+    //         end
+    //         assign next_forward_ret_2_sq.forward_en[i] = (next_forward_ret_2_sq.forward_byte_en[i] != 0);
+    //         // $display("FORWARD_DATA[%0d]: %0d, en: %b, mask: %4b", i, next_forward_ret_2_sq.forward_data[i], next_forward_ret_2_sq.forward_en[i], next_forward_ret_2_sq.forward_byte_en[i]);
+    //     end
+    // endgenerate
+    
 
 
     always_ff @(posedge clock) begin
@@ -463,7 +743,50 @@ module post_ret_buffer #(parameter
     };
     `endif
 
+    function automatic logic [SQ_RET_BUF_SZ-1:0] rotate_left;
+    input logic [SQ_RET_BUF_SZ-1:0] data;
+    input int unsigned shift;
+    begin
+        rotate_left = (data << shift) | (data >> shift);
+    end
+    endfunction
+
+    function automatic logic [SQ_RET_BUF_SZ-1:0] rotate_right;
+        input logic [SQ_RET_BUF_SZ-1:0] data;
+        input int unsigned shift;
+        begin
+            rotate_right = (data >> shift) | (data << shift);
+        end
+    endfunction
+
+    function automatic LSQ_IDX encode_idx;
+        input logic [SQ_RET_BUF_SZ-1:0] data;
+        begin
+            case (data)
+                16'b0000000000000001 : encode_idx = 5'd0;
+                16'b0000000000000010 : encode_idx = 5'd1;
+                16'b0000000000000100 : encode_idx = 5'd2;
+                16'b0000000000001000 : encode_idx = 5'd3;
+                16'b0000000000010000 : encode_idx = 5'd4;
+                16'b0000000000100000 : encode_idx = 5'd5;
+                16'b0000000001000000 : encode_idx = 5'd6;
+                16'b0000000010000000 : encode_idx = 5'd7;
+                16'b0000000100000000 : encode_idx = 5'd8;
+                16'b0000001000000000 : encode_idx = 5'd9;
+                16'b0000010000000000 : encode_idx = 5'd10;
+                16'b0000100000000000 : encode_idx = 5'd11;
+                16'b0001000000000000 : encode_idx = 5'd12;
+                16'b0010000000000000 : encode_idx = 5'd13;
+                16'b0100000000000000 : encode_idx = 5'd14;
+                16'b1000000000000000 : encode_idx = 5'd15;
+                default: encode_idx = 5'd0;
+            endcase
+        end
+    endfunction
+
 endmodule
+
+
 
 
 //NOTICE: The below is an attempt at an optimized forwarding method. It ran aground due to incompatibility with circular buffers. Leaving it here at the bottom of the 

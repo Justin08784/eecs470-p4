@@ -273,7 +273,7 @@ build/btq.simv: $(BTB_FILES)
 build/btq.cov: $(BTB_FILES)
 build/btq.vg: $(BTB_FILES)
 
-SQ_FILES = verilog/sys_defs.svh
+SQ_FILES = verilog/sys_defs.svh verilog/psel_gen.sv
 build/sq.simv: $(SQ_FILES)
 build/sq.cov: $(SQ_FILES)
 synth/sq.vg: $(SQ_FILES)
