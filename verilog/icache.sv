@@ -154,20 +154,20 @@ module icache (
 
     // ---- Cache state registers ---- //
 
-    always_comb begin
+    /*always_comb begin
         if(reset) begin
-            MSHR <= '0;
+            MSHR = '0;
         end else begin
             if(Imem2proc_transaction_tag != 0) begin
-                MSHR[Imem2proc_transaction_tag].addr    <= proc2Imem_addr;
-                MSHR[Imem2proc_transaction_tag].valid   <= 1;
+                MSHR[Imem2proc_transaction_tag].addr    = proc2Imem_addr;
+                MSHR[Imem2proc_transaction_tag].valid   = 1;
             end
             if(MSHR[Imem2proc_data_tag].valid) begin
-                MSHR[Imem2proc_data_tag].addr   <= '0;
-                MSHR[Imem2proc_data_tag].valid  <= 0;
+                MSHR[Imem2proc_data_tag].addr   = '0;
+                MSHR[Imem2proc_data_tag].valid  = 0;
             end
         end
-    end
+    end*/
 
     always_ff @(posedge clock) begin
         if (reset) begin
@@ -178,6 +178,7 @@ module icache (
             icache_tags      <= '0; // Set all cache tags and valid bits to 0
             flushed          <=  0;
             PC_prefetch      <= proc2Icache_addr;
+            MSHR <= '0;
             //MSHR_update      <= 1;
             //MSHR_addr        <= '0;
         end else begin
@@ -197,6 +198,14 @@ module icache (
             PC_prefetch      <= (!Icache_valid_out && flushed) ? proc2Icache_addr : (PC_prefetch - proc2Icache_addr == `PREFETCH_CAP ? PC_prefetch : PC_prefetch + 8);
             //MSHR_update      <= !Icache_valid_out;
             //MSHR_addr        <= (proc2Imem_command == MEM_LOAD) ? proc2Imem_addr : '1;
+            if(Imem2proc_transaction_tag != 0) begin
+                MSHR[Imem2proc_transaction_tag].addr    <= proc2Imem_addr;
+                MSHR[Imem2proc_transaction_tag].valid   <= 1;
+            end
+            if(MSHR[Imem2proc_data_tag].valid) begin
+                MSHR[Imem2proc_data_tag].addr   <= '0;
+                MSHR[Imem2proc_data_tag].valid  <= 0;
+            end
         end
     end 
 
