@@ -54,6 +54,12 @@ module lod_ex(
     input  logic    [`NUM_FU_LOAD-1:0]  o_rdy 
         // completion grant
 );
+    /* TODO: Handling partial completes from the SQ
+    If the SQ only supplies a subset of the bytes needed, then we need to get
+    the rest of the bytes from the dcache.
+    */
+
+
     localparam LD_BAY_SZ = `LD_BAY_SZ;//4;
     typedef struct packed {
         logic           [`NUM_FU_LOAD-1:0][LD_BAY_SZ-1:0]  vld;
