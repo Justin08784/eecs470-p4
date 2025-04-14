@@ -98,9 +98,9 @@ module dcache_test;
         input ADDR      addr,
         input MEM_SIZE  sz
     );
-        st_vld  = 1;
-        st_addr = addr;
-        st_size = sz;
+        ld_vld  = 1;
+        ld_addr = addr;
+        ld_size = sz;
     endtask
 
     task wr(
@@ -242,6 +242,8 @@ module dcache_test;
         for (int i = 0; i < 5; ++i)
             @(negedge clock);
         wr('h80, 'hbeeffeed, WORD);
+        @(negedge clock);
+        rd('h80+2, HALF);
         @(negedge clock);
 
         $display("Finished dcache testbench.");
