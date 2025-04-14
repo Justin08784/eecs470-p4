@@ -134,7 +134,7 @@ module icache (
     // logic update_mem_tag;
     // logic unanswered_miss;
 
-    assign got_mem_data = MSHR[Imem2proc_data_tag].valid;
+    assign got_mem_data = MSHR[Imem2proc_data_tag].valid && Imem2proc_data != '0;
 
     assign changed_addr = (current_index != last_index) || (current_tag != last_tag);
 
@@ -154,6 +154,21 @@ module icache (
 
     // ---- Cache state registers ---- //
 
+    always_comb begin
+        if(reset) begin
+            MSHR <= '0;
+        end else begin
+            if(Imem2proc_transaction_tag != 0) begin
+                MSHR[Imem2proc_transaction_tag].addr    <= proc2Imem_addr;
+                MSHR[Imem2proc_transaction_tag].valid   <= 1;
+            end
+            if(MSHR[Imem2proc_data_tag].valid) begin
+                MSHR[Imem2proc_data_tag].addr   <= '0;
+                MSHR[Imem2proc_data_tag].valid  <= 0;
+            end
+        end
+    end
+
     always_ff @(posedge clock) begin
         if (reset) begin
             last_index       <= -1; // These are -1 to get ball rolling when
@@ -163,9 +178,8 @@ module icache (
             icache_tags      <= '0; // Set all cache tags and valid bits to 0
             flushed          <=  0;
             PC_prefetch      <= proc2Icache_addr;
-            MSHR <= '0;
             //MSHR_update      <= 1;
-            MSHR_addr        <= '0;
+            //MSHR_addr        <= '0;
         end else begin
             last_index       <= current_index;
             last_tag         <= current_tag;
@@ -181,16 +195,8 @@ module icache (
             end
             flushed          <= flush;
             PC_prefetch      <= (!Icache_valid_out && flushed) ? proc2Icache_addr : (PC_prefetch - proc2Icache_addr == `PREFETCH_CAP ? PC_prefetch : PC_prefetch + 8);
-            if(Imem2proc_transaction_tag != 0) begin
-                MSHR[Imem2proc_transaction_tag].addr    <= proc2Imem_addr;
-                MSHR[Imem2proc_transaction_tag].valid   <= 1;
-            end
-            if(MSHR[Imem2proc_data_tag].valid) begin
-                MSHR[Imem2proc_data_tag].addr   <= '0;
-                MSHR[Imem2proc_data_tag].valid  <= 0;
-            end
             //MSHR_update      <= !Icache_valid_out;
-            MSHR_addr        <= (proc2Imem_command == MEM_LOAD) ? proc2Imem_addr : '1;
+            //MSHR_addr        <= (proc2Imem_command == MEM_LOAD) ? proc2Imem_addr : '1;
         end
     end 
 
