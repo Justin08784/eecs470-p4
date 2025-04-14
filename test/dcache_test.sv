@@ -131,7 +131,7 @@ module dcache_test;
         $display("  %3d | >> memDP", $time);
         for (int s = 0; s < NUM_SETS; ++s) begin
             $display("Set=%1d. age=%b", s, dbg.hdr.age[s]);
-            for (int w = 0; w == 0; ++w) begin
+            for (int w = 0; w < ASSOC; ++w) begin
                 $display("  vld=%b, dirty=%b, tag=%x: data=%x",
                     dbg.hdr.vld[s][w],
                     dbg.hdr.dirty[s][w],
@@ -195,6 +195,13 @@ module dcache_test;
             // $display("st_dat: %x", dut.st_dat);
             $display("req: %b", dut.req);
             $display("gnt: %b", dut.gnt);
+            foreach (dut.alloc_msk[s])
+                $display("am[%2d]: %b.. evict: %b.. lru: %b",
+                    s,
+                    dut.alloc_msk[s],
+                    dut.evict[s],
+                    dut.lru[s]
+                );
             print_dbg();
             $display("");
         end

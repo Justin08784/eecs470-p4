@@ -47,25 +47,3 @@ for (int w = 0; w < ASSOC; ++w) begin
     cache_hdr_n.age[fl_sid]        = '0;
 end
 
-
-// Victim selection and eviction
-
-/* Eviction */
-logic   [NUM_SETS-1:0] any_free;
-logic   [NUM_SETS-1:0][ASSOC-1:0] victim_msk;
-logic   [NUM_SETS-1:0][ASSOC-1:0] lru;
-always_comb begin
-    /* FIXME: Placeholder LRU. Currently
-    is 'bully 0 way' policy. */
-    foreach(lru[s, i])
-        lru[s][i] = i == 0;
-
-    foreach(any_free[s])
-        any_free[s] = |free_gnt[s];
-
-    foreach(victim_msk[s]) begin
-        victim_msk = any_free
-            ? free_gnt[s]
-            : lru;
-    end
-end

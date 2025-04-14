@@ -262,6 +262,27 @@ module dcache #(
         endcase
     end
 
+    // Victim selection and eviction
+    /* Eviction */
+    logic   [NUM_SETS-1:0] evict; // alloc in set requires evict? i.e. !(any free way in set)
+    logic   [NUM_SETS-1:0][ASSOC-1:0] alloc_msk; // way to alloc
+    logic   [NUM_SETS-1:0][ASSOC-1:0] lru; // lru victim way
+    always_comb begin
+        /* FIXME: Placeholder LRU. Currently
+        is 'bully 0 way' policy. */
+        foreach(lru[s, w])
+            lru[s][w] = w == 0;
+
+        foreach(evict[s])
+            evict[s] = !(|free_gnt[s]);
+
+        foreach(alloc_msk[s]) begin
+            alloc_msk[s] = evict[s]
+                ? lru[s]
+                : free_gnt[s];
+        end
+    end
+
     /* Fill */ // TODO: Fill is stubbed
     // Fill: index decode + port request
     logic   fl_vld;
@@ -272,15 +293,21 @@ module dcache #(
         /* FIXME: But there is only 1 write port to memDP, so you 
         somehow need to arbitrate between STORE and incoming mem block.
         Give priority to the incoming mem block. */
-        fl_vld  = mem_in_data_tag != 0;
+        fl_vld = mem_in_data_tag != 0;
         fl_tag = get_tag(mshr[mem_in_data_tag].addr);
         fl_sid = get_sid(mshr[mem_in_data_tag].addr);
-        // cache_hdr_n = cache_hdr;
+        fl_way = 0;
+        for (int w = 0; w < ASSOC; ++w) begin
+            if (!alloc_msk[fl_sid][w])
+                continue;
+            fl_way = w;
+            break;
+        end
 
         req[FILL] = fl_vld;
         rd_req_bus[FILL] = '0;
         wr_req_bus[FILL] = '0;
-        rd_req_bus[FILL][fl_sid] = 1;
+        rd_req_bus[FILL][fl_sid] = evict[fl_sid]; // read nec. only if evict
         wr_req_bus[FILL][fl_sid] = 1;
     end
 
@@ -310,7 +337,7 @@ module dcache #(
                 continue;
             case (op)
                 LOAD: rway[s] = ld_way;
-                FILL: rway[s] = fl_way; // TODO: handle
+                FILL: rway[s] = fl_way;
                 STOR: rway[s] = st_way;
                 default:;
             endcase
@@ -326,9 +353,9 @@ module dcache #(
                     // TODO: handle for victim cache
                     // wway[s] = ld_way;
                 end
-                FILL: begin // TODO: handle
-                    // wway[s] = fl_way;
-                    // wdat[s] = mem_in_data;
+                FILL: begin
+                    wway[s] = fl_way;
+                    wdat[s] = mem_in_data;
                 end
                 STOR: begin
                     wway[s] = st_way;
@@ -347,6 +374,7 @@ module dcache #(
         mem_out_command = MEM_NONE;
         mem_out_data = '0;
 
+        // TODO: add dirty eviction branch (via FILL or LOAD-to-victim-cache caused eviction)
         if (ld_vld && !ld_hit) begin
             mem_out_command = MEM_LOAD;
             mem_out_addr = dw_align(ld_addr);
