@@ -27,9 +27,8 @@ module dcache_simple (
     output ADDR          Dcache2Dmem_addr,
     output MEM_BLOCK     Dcache2Dmem_wdata,
 
-
-
-    output logic         mem_in_use
+    output logic         mem_in_use,
+    output logic         dcache_ready
 );
 
     localparam CACHE_LINES  =  `DCACHE_LINES;
@@ -55,6 +54,14 @@ module dcache_simple (
     logic [2:0] byte_addr;
     assign byte_addr = proc2Dcache_addr[2:0];
 
+    logic cache_hit;
+
+    ADDR raddr, waddr;
+    assign raddr = cache_hit? current_index : dcache_req.index;
+    assign waddr = cache_hit? current_index : dcache_req.index;
+
+    assign dcache_ready = !mem_in_use;
+
     memDP #(
         .WIDTH     ($bits(MEM_BLOCK)),
         .DEPTH     (`DCACHE_LINES),
@@ -64,10 +71,10 @@ module dcache_simple (
         .clock(clock),
         .reset(reset),
         .re   (1'b1),
-        .raddr(current_index),
+        .raddr(raddr),
         .rdata(rblock),
         .we   (we),
-        .waddr(current_index),
+        .waddr(waddr),
         .wdata(wblock)
     );
 
@@ -111,8 +118,6 @@ module dcache_simple (
     // logic [TAG_WIDTH-1:0] pending_tag, next_pending_tag;
     // logic MEM_COMMAND pending_command, next_pending_command;
     // logic ADDR pending_addr, next_pending_addr;
-
-    logic cache_hit;
 
 
 

@@ -23,6 +23,7 @@ module dcache_simple_test;
     ADDR          Dcache2Dmem_addr;
     MEM_BLOCK     Dcache2Dmem_wdata;
     logic         mem_in_use;
+    logic         dcache_ready;
 
     // Clock generation
 
@@ -52,7 +53,8 @@ module dcache_simple_test;
         .Dcache2Dmem_command(Dcache2Dmem_command),
         .Dcache2Dmem_addr(Dcache2Dmem_addr),
         .Dcache2Dmem_wdata(Dcache2Dmem_wdata),
-        .mem_in_use(mem_in_use)
+        .mem_in_use(mem_in_use),
+        .dcache_ready(dcache_ready)
     );
 
 
@@ -88,6 +90,7 @@ module dcache_simple_test;
         $display("  Dcache2Dmem_addr: 0x%h", Dcache2Dmem_addr);
         $display("  Dcache2Dmem_wdata: 0x%h", Dcache2Dmem_wdata);
         $display("  mem_in_use: %b", mem_in_use);
+        $display("  dcache_ready: %b", dcache_ready);
         $display("Internal Signals:");
         $display("  cache hit: %d", dut.cache_hit);
         $display("  state: %0d   |   next_state: %0d", dut.state, dut.next_state);
@@ -157,7 +160,7 @@ module dcache_simple_test;
         // test 1: store miss
         Dcache_valid_in = 1;
         proc2Dcache_command = MEM_STORE;
-        proc2Dcache_addr = 32'h0000_0004;
+        proc2Dcache_addr = 32'h0000_0008;
         proc2Dcache_size = WORD;
         proc2Dcache_wdata = 64'hDEADBEEF_DEADBEEF;
         #10;
@@ -194,7 +197,7 @@ module dcache_simple_test;
         // test 2: load hit
         Dcache_valid_in = 1;
         proc2Dcache_command = MEM_LOAD;
-        proc2Dcache_addr = 32'h0000_0004;
+        proc2Dcache_addr = 32'h0000_0008;
         proc2Dcache_size = DOUBLE;
 
         // test 3: load miss
