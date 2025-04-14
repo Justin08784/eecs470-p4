@@ -107,7 +107,7 @@ module sq #(parameter
 
     /* >> ======== SECTION: Execute ======== >> */
     sq2execute next_sq_2_exec;
-    sq2execute uncombined_forward_data;
+    // sq2execute uncombined_forward_data;
 
     // always_comb begin
     //     next_sq_2_exec = '0;
@@ -140,46 +140,14 @@ module sq #(parameter
     logic [LD_BAY_SZ-1:0] idx_found;
     LSQ_IDX [LD_BAY_SZ-1:0] matching_idx;
     logic [LD_BAY_SZ-1:0] [LSQ_SZ-1:0] match_mask;
-    // always_comb begin
-        // idx_found = '0;
-        // matching_idx = '0;
-        // match_mask = '0;
-        // for (int unsigned i = 0; i < LD_BAY_SZ; i++) begin
-        //     for (int unsigned j = 0, LSQ_IDX idx = 0; j < LSQ_SZ; j++) begin
-        //         idx = (head+j) % LSQ_SZ;
-        //         match_mask[i][idx] = 1;
-        //         if (state[idx].d_vld && (state[idx].sq_idx == ex_frwd_in.forward_sq_idx[i])) begin
-        //             matching_idx[i] = idx;
-        //             idx_found[i] = 1;
-        //             break;
-        //         end
-        //     end
-
-        //     if (!idx_found[i]) match_mask[i] = '0;
-        // end
-
-        // for (int unsigned i = 0; i < LD_BAY_SZ; i++) begin //can be turned into a generate
-        //     matching_idx[i] = ex_frwd_in.forward_sq_idx[i] % LSQ_SZ;
-        //     if (state[matching_idx[i]].d_vld && (state[matching_idx[i]].sq_idx == ex_frwd_in.forward_sq_idx[i])) idx_found[i] = 1;
-        //     else idx_found[i] = 0;
-        // end
-
-        // for (int unsigned i = 0; i < LD_BAY_SZ; i++) begin
-        //     for (int unsigned j = 0; j < LSQ_SZ; j++) begin
-        //         if ((matching_idx[i] < head) && ((j <= matching_idx[i]) || (j >= head))) begin
-        //             match_mask[i][j] = 1;
-        //         end
-        //         else if ((j >= head) && (j <= matching_idx[i])) begin
-        //             match_mask[i][j] = 1;
-        //         end
-        //         else match_mask[i][j] = 0;
-        //     end
-        // end
-    // end
 
     logic [LD_BAY_SZ-1:0] [3:0] [LSQ_SZ-1:0] byte_matches;
     logic [LD_BAY_SZ-1:0] [3:0] [LSQ_SZ-1:0] shifted_matches;
     logic [LD_BAY_SZ-1:0] [3:0] [LSQ_SZ-1:0] final_matches;
+
+    DATA_BLOCK [LD_BAY_SZ-1:0] temp_combine;
+    logic [LD_BAY_SZ-1:0] [3:0] temp_mask;
+    logic [LD_BAY_SZ-1:0] [3:0] word_off;
 
     genvar i,j,k,l;
     generate
@@ -212,98 +180,84 @@ module sq #(parameter
             end
 
             assign next_sq_2_exec.forward_en[i] = (next_sq_2_exec.forward_byte_en[i] != 0);
+
+            //Combine with ret_buf
+
+            assign execute_out.forward_en[i] = ret_buf_frwd_in.forward_en[i] || next_sq_2_exec.forward_en[i];
+            assign temp_mask[i] = ret_buf_frwd_in.sq_idx_found[i] ? ret_buf_frwd_in.forward_byte_en[i] : ret_buf_frwd_in.forward_byte_en[i] | next_sq_2_exec.forward_byte_en[i];
+
+            for (j = 0; j < 4; j++) begin
+                assign temp_combine[i].byte_level[j] = ret_buf_frwd_in.sq_idx_found[i] ? 
+                    ret_buf_frwd_in.forward_data[i].byte_level[j] : 
+                    (next_sq_2_exec.forward_byte_en[i][j] ? 
+                    next_sq_2_exec.forward_data[i].byte_level[j] : ret_buf_frwd_in.forward_data[i].byte_level[j]);
+            end
+
+            assign word_off[i] = iw_off(ex_frwd_in.forward_addr[i]);
+            assign execute_out.forward_data[i] = shift_data(temp_combine[i], word_off[i], ex_frwd_in.forward_mem_size[i]);
+            assign execute_out.forward_byte_en[i] = shift_byte_mask(temp_mask[i], word_off[i], ex_frwd_in.forward_mem_size[i]);
         end
     endgenerate
 
-    // genvar i,j,k;
-    // generate
-    //     for (i = 0; i < LD_BAY_SZ; i++) begin : find_byte_matches_1
-    //         for (j = 0; j < 4; j++) begin : find_byte_matches_2
-    //             for (k = 0; k < LSQ_SZ; k++) begin : find_byte_matches_3
-    //                 assign byte_matches[i][j][k] = state[k].d_vld & (waddr(state[k].addr) == waddr(ex_frwd_in.forward_addr[i])) ? state[k].bytewise_addr_mask[j] & match_mask[i][k] : '0;
-    //             end
-    //         end
-    //     end
-    // endgenerate
-
-    // genvar a,b;
-    // generate
-    //     for (a = 0; a < LD_BAY_SZ; a++) begin : find_most_recent_match_1
-    //         for (b = 0; b < 4; b++) begin : find_most_recent_match_2
-    //             psel_gen #(
-    //             .WIDTH  (LSQ_SZ),
-    //             .REQS   (1)
-    //             ) sel (
-    //                 .req    (rotate_left(byte_matches[a][b],matching_idx[a])),
-    //                 .gnt_bus(shifted_matches[a][b])
-    //             );
-    //         end
-    //     end
-    // endgenerate
+    //Combine SQ and RET_BUF matches
 
     // always_comb begin
-    //     for (int unsigned i = 0; i < LD_BAY_SZ; i++) begin
-    //         for (int unsigned j = 0; j < 4; j++) begin
-    //             final_matches[i][j] = rotate_right(shifted_matches[i][j],matching_idx[i]) & match_mask[i];
-    //             // $display("FINAL_MASK[%0d][%0d], %b", i, j, final_matches[i][j]);
+    //     execute_out = '0;
+    //     for (int unsigned i = 0, int unsigned word_off = 0; i < LD_BAY_SZ; i++) begin
+    //         execute_out.forward_en[i] |= ret_buf_frwd_in.forward_en[i];
+    //         if (ret_buf_frwd_in.sq_idx_found[i]) begin
+    //             execute_out.forward_data[i] = ret_buf_frwd_in.forward_data[i];
+    //             execute_out.forward_byte_en[i] = ret_buf_frwd_in.forward_byte_en[i];
     //         end
+    //         else begin
+    //             execute_out.forward_data[i].byte_level[0] = uncombined_forward_data.forward_byte_en[i][0] ? uncombined_forward_data.forward_data[i].byte_level[0] : ret_buf_frwd_in.forward_data[i].byte_level[0];
+    //             execute_out.forward_data[i].byte_level[1] = uncombined_forward_data.forward_byte_en[i][1] ? uncombined_forward_data.forward_data[i].byte_level[1] : ret_buf_frwd_in.forward_data[i].byte_level[1];
+    //             execute_out.forward_data[i].byte_level[2] = uncombined_forward_data.forward_byte_en[i][2] ? uncombined_forward_data.forward_data[i].byte_level[2] : ret_buf_frwd_in.forward_data[i].byte_level[2];
+    //             execute_out.forward_data[i].byte_level[3] = uncombined_forward_data.forward_byte_en[i][3] ? uncombined_forward_data.forward_data[i].byte_level[3] : ret_buf_frwd_in.forward_data[i].byte_level[3];
+    //             execute_out.forward_byte_en[i] |= ret_buf_frwd_in.forward_byte_en[i];
+    //         end
+            
+    //         word_off = iw_off(ex_frwd_in.forward_addr[i]);
+    //         execute_out.forward_data[i]       >>= 8 * word_off;
+    //         execute_out.forward_byte_en[i]    >>= word_off; //8 * word_off
+
+    //         //ensure don't accidentally give more data than it wants
+    //         case (ex_frwd_in.forward_mem_size[i])
+    //             BYTE: begin
+    //                 execute_out.forward_data[i]       &= 8'hFF;
+    //                 execute_out.forward_byte_en[i]    &= 1'b1;
+    //             end
+    //             HALF: begin
+    //                 execute_out.forward_data[i]       &= 16'hFFFF;
+    //                 execute_out.forward_byte_en[i]    &= 2'b11;
+    //             end
+    //             default: begin
+    //                 execute_out.forward_data[i]       = execute_out.forward_data[i];//&= 32'hFFFFFFFF; 
+    //                 execute_out.forward_byte_en[i]    = execute_out.forward_byte_en[i];//&= 4'b1111;
+    //             end
+    //         endcase
+
     //     end
     // end
 
+    
     // generate
-    //     // next_sq_2_exec = '0;
-    //     for (i = 0; i < LD_BAY_SZ; i++) begin : assign_next_forward_1
-    //         for (j = 0; j < 4; j++) begin : assign_next_forward_2
-    //                 // assign idx = encode_idx(rotate_right(shifted_matches[i][j],matching_idx[i]));
-    //                 assign next_sq_2_exec.forward_data[i].byte_level[j] = idx_found[i] ? state[encode_idx(rotate_right(shifted_matches[i][j],matching_idx[i]))].data.byte_level[j] : '0;
-    //                 assign next_sq_2_exec.forward_byte_en[i][j] = idx_found[i] ? state[encode_idx(rotate_right(shifted_matches[i][j],matching_idx[i]))].bytewise_addr_mask[j] : '0;//1;
-                    
+    //     for (i = 0; i < LD_BAY_SZ; i++) begin
+    //         assign execute_out.forward_en[i] = ret_buf_frwd_in.forward_en[i] || next_sq_2_exec.forward_en[i];
+    //         assign temp_mask[i] = ret_buf_frwd_in.sq_idx_found[i] ? ret_buf_frwd_in.forward_byte_en[i] : ret_buf_frwd_in.forward_byte_en[i] | next_sq_2_exec.forward_byte_en[i];
+
+    //         for (j = 0; j < 4; j++) begin
+    //             assign temp_combine[i].byte_level[j] = ret_buf_frwd_in.sq_idx_found[i] ? 
+    //                 ret_buf_frwd_in.forward_data[i].byte_level[j] : 
+    //                 (next_sq_2_exec.forward_byte_en[i][j] ? 
+    //                 next_sq_2_exec.forward_data[i].byte_level[j] : ret_buf_frwd_in.forward_data[i].byte_level[j]);
     //         end
-    //         assign next_sq_2_exec.forward_en[i] = (next_sq_2_exec.forward_byte_en[i] != 0);
-    //         // $display("FORWARD_DATA[%0d]: %0d, en: %b, mask: %4b", i, next_sq_2_exec.forward_data[i], next_sq_2_exec.forward_en[i], next_sq_2_exec.forward_byte_en[i]);
+
+    //         assign word_off[i] = iw_off(ex_frwd_in.forward_addr[i]);
+    //         assign execute_out.forward_data[i] = shift_data(temp_combine[i], word_off[i], ex_frwd_in.forward_mem_size[i]);
+    //         assign execute_out.forward_byte_en[i] = shift_byte_mask(temp_mask[i], word_off[i], ex_frwd_in.forward_mem_size[i]);
     //     end
     // endgenerate
-
-    //Combine SQ and RET_BUF matches
-
-    always_comb begin
-        execute_out = '0;
-        for (int unsigned i = 0, int unsigned word_off = 0; i < LD_BAY_SZ; i++) begin
-            execute_out.forward_en[i] |= ret_buf_frwd_in.forward_en[i];
-            if (ret_buf_frwd_in.sq_idx_found[i]) begin
-                execute_out.forward_data[i] = ret_buf_frwd_in.forward_data[i];
-                execute_out.forward_byte_en[i] = ret_buf_frwd_in.forward_byte_en[i];
-            end
-            else begin
-                execute_out.forward_data[i].byte_level[0] = uncombined_forward_data.forward_byte_en[i][0] ? uncombined_forward_data.forward_data[i].byte_level[0] : ret_buf_frwd_in.forward_data[i].byte_level[0];
-                execute_out.forward_data[i].byte_level[1] = uncombined_forward_data.forward_byte_en[i][1] ? uncombined_forward_data.forward_data[i].byte_level[1] : ret_buf_frwd_in.forward_data[i].byte_level[1];
-                execute_out.forward_data[i].byte_level[2] = uncombined_forward_data.forward_byte_en[i][2] ? uncombined_forward_data.forward_data[i].byte_level[2] : ret_buf_frwd_in.forward_data[i].byte_level[2];
-                execute_out.forward_data[i].byte_level[3] = uncombined_forward_data.forward_byte_en[i][3] ? uncombined_forward_data.forward_data[i].byte_level[3] : ret_buf_frwd_in.forward_data[i].byte_level[3];
-                execute_out.forward_byte_en[i] |= ret_buf_frwd_in.forward_byte_en[i];
-            end
-            
-            word_off = iw_off(ex_frwd_in.forward_addr[i]);
-            execute_out.forward_data[i]       >>= 8 * word_off;
-            execute_out.forward_byte_en[i]    >>= 8 * word_off;
-
-            //ensure don't accidentally give more data than it wants
-            case (ex_frwd_in.forward_mem_size[i])
-                BYTE: begin
-                    execute_out.forward_data[i]       &= 8'hFF;
-                    execute_out.forward_byte_en[i]    &= 1'b1;
-                end
-                HALF: begin
-                    execute_out.forward_data[i]       &= 16'hFFFF;
-                    execute_out.forward_byte_en[i]    &= 2'b11;
-                end
-                default: begin
-                    execute_out.forward_data[i]       = execute_out.forward_data[i];//&= 32'hFFFFFFFF; 
-                    execute_out.forward_byte_en[i]    = execute_out.forward_byte_en[i];//&= 4'b1111;
-                end
-            endcase
-
-        end
-    end
 
     logic [`NUM_FU_STORE-1:0] [3:0] bytewise_addr_mask;
     always_comb begin
@@ -354,7 +308,7 @@ module sq #(parameter
             last_used_sq_idx <= LSQ_SZ_DBL - 1; //outside of SQ range so that if a load occurs before the first store we don't flag it falsely
             next_complete <= '0;
             no_store_yet <= '1;
-            uncombined_forward_data <= '0;
+            // uncombined_forward_data <= '0;
         end else begin
             used    <= used + dispatch_in.sq_d_en_cnt - retire_in.r_en;
             free    <= free - dispatch_in.sq_d_en_cnt + retire_in.r_en;
@@ -369,7 +323,7 @@ module sq #(parameter
             // $display("LAST_USED: %0d, %b", last_used_sq_idx, no_store_yet);
 
             next_complete <= execute_in;
-            uncombined_forward_data <= next_sq_2_exec;
+            // uncombined_forward_data <= next_sq_2_exec;
 
             // handle execute updates
             for (int unsigned i = 0, int cur_idx = 0; i < NUM_ST_PORTS; ++i) begin
@@ -469,6 +423,44 @@ module sq #(parameter
         end
     endfunction
 
+    function automatic DATA_BLOCK shift_data;
+        input DATA_BLOCK data_in;
+        input logic [3:0] word_off;
+        input MEM_SIZE mem_size;
+        begin
+            case (mem_size)
+                BYTE: begin
+                    shift_data      = (data_in >> (8 * word_off)) & 8'hFF;
+                end
+                HALF: begin
+                    shift_data       = (data_in >> (8 * word_off)) & 16'hFFFF;
+                end
+                default: begin
+                    shift_data       = (data_in >> (8 * word_off));//&= 32'hFFFFFFFF;
+                end
+            endcase
+        end
+    endfunction
+
+    function automatic logic [3:0] shift_byte_mask;
+        input logic [3:0] mask;
+        input logic [3:0] word_off;
+        input MEM_SIZE mem_size;
+        begin
+            case (mem_size)
+                BYTE: begin
+                    shift_byte_mask    = (mask >> word_off) & 1'b1;
+                end
+                HALF: begin
+                    shift_byte_mask    = (mask >> word_off) & 2'b11;
+                end
+                default: begin
+                    shift_byte_mask    = (mask >> word_off);//&= 4'b1111;
+                end
+            endcase
+        end
+    endfunction
+
 
 endmodule
 
@@ -511,7 +503,7 @@ module post_ret_buffer #(parameter
     logic [NUM_RPORTS-1:0][$clog2(SQ_RET_BUF_SZ)-1:0] r_idxs;
     logic [NUM_DPORTS-1:0][$clog2(SQ_RET_BUF_SZ)-1:0] d_idxs;
 
-    forwardRET2sq next_forward_ret_2_sq;
+    // forwardRET2sq next_forward_ret_2_sq;
 
     assign free                 = SQ_RET_BUF_SZ - used;
     assign free_scnt            = `MIN(free, NUM_DPORTS);
@@ -594,35 +586,6 @@ module post_ret_buffer #(parameter
     logic [LD_BAY_SZ-1:0] idx_found;
     LSQ_IDX [LD_BAY_SZ-1:0] matching_idx;
     logic [LD_BAY_SZ-1:0] [SQ_RET_BUF_SZ-1:0] match_mask;
-    // always_comb begin
-    //     idx_found = '0;
-    //     matching_idx = '0;
-    //     match_mask = '0;
-    //     for (int unsigned i = 0; i < LD_BAY_SZ; i++) begin
-    //         for (int unsigned j = 0, LSQ_IDX idx = 0; j < SQ_RET_BUF_SZ; j++) begin
-    //             idx = (head+j) % SQ_RET_BUF_SZ;
-    //             match_mask[i][idx] = 1;
-    //             if (state[idx].d_vld && (state[idx].sq_idx == sq_in.forward_sq_idx[i])) begin
-    //                 matching_idx[i] = idx;
-    //                 idx_found[i] = 1;
-    //                 break;
-    //             end
-    //         end
-
-    //         if (!idx_found[i]) match_mask[i] = '1;
-    //     end
-
-    //     // for (int unsigned i = 0; i < LD_BAY_SZ; i++) begin
-    //     //     if (idx_found[i]) begin
-    //     //         for (int unsigned j = 0, LSQ_IDX idx = 0; j < SQ_RET_BUF_SZ; j++) begin
-    //     //             idx = (head+j) % SQ_RET_BUF_SZ;
-    //     //             match_mask[i][idx] = 1;
-    //     //             if (idx == matching_idx[i]) break;
-    //     //         end
-    //     //     end
-    //     //     else match_mask[i] = '1; //if idx isn't here, everything is old enough to take
-    //     // end
-    // end
 
     logic [LD_BAY_SZ-1:0] [3:0] [SQ_RET_BUF_SZ-1:0] byte_matches;
     logic [LD_BAY_SZ-1:0] [3:0] [SQ_RET_BUF_SZ-1:0] shifted_matches;
@@ -635,7 +598,8 @@ module post_ret_buffer #(parameter
             assign idx_found[i] = (state[matching_idx[i]].d_vld & (state[matching_idx[i]].sq_idx == sq_in.forward_sq_idx[i])) ? 1 : 0;
 
             for (l = 0; l < SQ_RET_BUF_SZ; l++) begin : find_match_mask
-                assign match_mask[i][l] = ((matching_idx[i] < head) & ((l <= matching_idx[i]) || (l >= head))) || ((l >= head) && (l <= matching_idx[i])) ? 1 : 0;
+                assign match_mask[i][l] = idx_found[i] && ((matching_idx[i] < head) & ((l <= matching_idx[i]) || (l >= head))) || ((l >= head) && (l <= matching_idx[i])) ? 
+                    1 : (idx_found[i]) ? 0 : 1;
             end
 
             for (j = 0; j < 4; j++) begin : find_byte_matches
@@ -652,53 +616,15 @@ module post_ret_buffer #(parameter
                 );
 
                 assign final_matches[i][j] = rotate_right(shifted_matches[i][j],matching_idx[i]);
-                assign next_forward_ret_2_sq.forward_data[i].byte_level[j] = idx_found[i] ? state[encode_idx(final_matches[i][j])].data.byte_level[j] : '0;
-                assign next_forward_ret_2_sq.forward_byte_en[i][j] = idx_found[i] ? state[encode_idx(rotate_right(shifted_matches[i][j],matching_idx[i]))].bytewise_addr_mask[j] : '0;//1;
+                assign sq_frwd_out.forward_data[i].byte_level[j] = idx_found[i] ? state[encode_idx(final_matches[i][j])].data.byte_level[j] : '0;
+                assign sq_frwd_out.forward_byte_en[i][j] = idx_found[i] ? state[encode_idx(rotate_right(shifted_matches[i][j],matching_idx[i]))].bytewise_addr_mask[j] : '0;//1;
                     
             end
 
-            assign next_forward_ret_2_sq.forward_en[i] = (next_forward_ret_2_sq.forward_byte_en[i] != 0);
+            assign sq_frwd_out.forward_en[i] = (sq_frwd_out.forward_byte_en[i] != 0);
+            assign sq_frwd_out.sq_idx_found[i] = idx_found[i];
         end
-    endgenerate
-
-    // genvar a,b;
-    // generate
-    //     for (a = 0; a < LD_BAY_SZ; a++) begin : find_most_recent_match_1
-    //         for (b = 0; b < 4; b++) begin : find_most_recent_match_2
-    //             psel_gen #(
-    //             .WIDTH  (SQ_RET_BUF_SZ),
-    //             .REQS   (1)
-    //             ) sel (
-    //                 .req    (byte_matches[a][b]),
-    //                 .gnt_bus(shifted_matches[a][b])
-    //             );
-    //         end
-    //     end
-    // endgenerate
-
-    // always_comb begin
-    //     for (int unsigned i = 0; i < LD_BAY_SZ; i++) begin
-    //         for (int unsigned j = 0; j < 4; j++) begin
-    //             final_matches[i][j] = rotate_right(shifted_matches[i][j],matching_idx[i]) & match_mask[i];
-    //             // $display("FINAL_MASK[%0d][%0d], %b", i, j, final_matches[i][j]);
-    //         end
-    //     end
-    // end
-
-    // generate
-    //     // next_forward_ret_2_sq = '0;
-    //     for (i = 0; i < LD_BAY_SZ; i++) begin : assign_next_forward_1
-    //         for (j = 0; j < 4; j++) begin : assign_next_forward_2
-    //                 // assign idx = encode_idx(rotate_right(shifted_matches[i][j],matching_idx[i]));
-    //                 assign next_forward_ret_2_sq.forward_data[i].byte_level[j] = idx_found[i] ? state[encode_idx(rotate_right(shifted_matches[i][j],matching_idx[i]))].data.byte_level[j] : '0;
-    //                 assign next_forward_ret_2_sq.forward_byte_en[i][j] = idx_found[i] ? state[encode_idx(rotate_right(shifted_matches[i][j],matching_idx[i]))].bytewise_addr_mask[j] : '0;//1;
-                    
-    //         end
-    //         assign next_forward_ret_2_sq.forward_en[i] = (next_forward_ret_2_sq.forward_byte_en[i] != 0);
-    //         // $display("FORWARD_DATA[%0d]: %0d, en: %b, mask: %4b", i, next_forward_ret_2_sq.forward_data[i], next_forward_ret_2_sq.forward_en[i], next_forward_ret_2_sq.forward_byte_en[i]);
-    //     end
-    // endgenerate
-    
+    endgenerate    
 
 
     always_ff @(posedge clock) begin
@@ -707,13 +633,13 @@ module post_ret_buffer #(parameter
             head    <= 0;
             tail    <= 0;
             state   <= '0;
-            sq_frwd_out <= '0;
+            // sq_frwd_out <= '0;
         end else begin
             used    <= used + sq_in.ret_cnt - ret_success;
             head    <= (head + ret_success) % SQ_RET_BUF_SZ;
             tail    <= (tail + sq_in.ret_cnt) % SQ_RET_BUF_SZ;
 
-            sq_frwd_out <= next_forward_ret_2_sq;
+            // sq_frwd_out <= next_forward_ret_2_sq;
 
             // handle sq to ret buffer (ins)
             for (int unsigned i = 0, int cur_idx = 0; i < NUM_DPORTS; ++i) begin
