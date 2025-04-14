@@ -85,6 +85,14 @@ function automatic logic[12:0] dwaddr(input ADDR addr);
     return addr[15:3];
 endfunction
 
+function automatic ADDR w_align(input ADDR addr);
+    return {addr[31:2], 2'b00};
+endfunction
+// Double word address
+function automatic ADDR dw_align(input ADDR addr);
+    return {addr[31:3], 3'b000};
+endfunction
+
 function automatic logic idw_word(input ADDR addr);
     return addr[2];
 endfunction
