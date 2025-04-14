@@ -400,6 +400,11 @@ module dcache #(
     per MSHR? This is important for stores, since they must be applied
     in-order...)
     */
+
+    /* TODO: The transaction tag returns after the negative edge in the same cycle.
+    It is not desirable to wait a cycle, via miss <= miss_n, to review the
+    transaction tag. We MUST handle it same-cycle.
+    */
     typedef struct packed {
         logic       vld;
         ADDR        addr;
