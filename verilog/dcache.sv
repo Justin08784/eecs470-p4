@@ -172,7 +172,194 @@ endmodule
     
 
 
-module mshr;
+module mshr #(
+    parameter MSHR_SZ = MSHR_SZ
+) (
+    input clock,
+    input reset,
+
+    input  MEM_TAG       mem_in_transaction_tag,
+    input  MEM_BLOCK     mem_in_data,
+    input  MEM_TAG       mem_in_data_tag,
+
+    output MEM_COMMAND   mem_out_command,
+    output ADDR          mem_out_addr,
+    output MEM_BLOCK     mem_out_data,
+
+    input struct packed {
+        logic       vld;
+        ADDR        addr;
+        MEM_SIZE    size;    // only for load, store always write the ople block (might need to change)
+        // FIXME: this status needs to be a more complex enum type, I think
+        logic       status;
+        DATA_BLOCK  dat;
+    } ld, st
+);
+    typedef enum logic[2:0] {
+        FREE=0, // not allocated
+        WAIT=1, // allocated, but could not issue mem request
+        PEND=2, // miss issued; mem response pending
+        RCVD=3, // mem response received // FIXME: necessary? what about just begin draining immediately?
+        POUR=4  // pouring/draining into cache and dcache output
+    } MSHR_STATUS;
+
+    typedef enum logic[1:0] {
+        SUCC, // successfully alloc'd an MSHR or enqueued onto (the RQ of) an existing one
+        FAIL  // could not join an MSHR (either 1. MSHR all allocated or 2. RQ of hit MSHR is full)
+    } REQ_STATUS;
+
+    typedef struct packed {
+        MSHR_STATUS status;
+        ADDR        addr;
+        MEM_BLOCK   mem_data;
+        MEM_SIZE    mem_size;
+    } MSHR_ENTRY;
+    MSHR_ENTRY  [MSHR_SZ-1:0] mshr, mshr_n;
+    typedef logic [$clog2(MSHR_SZ)-1:0] MSHR_IDX;
+
+    struct packed {
+        logic       [MSHR_SZ-1:0] wr_en;
+        RQ_ENTRY    [MSHR_SZ-1:0] wr_data;
+        logic       [MSHR_SZ-1:0] rd_en;
+        RQ_ENTRY    [MSHR_SZ-1:0] rd_data;
+        logic       [MSHR_SZ-1:0] prvw_vld;
+
+        logic       [MSHR_SZ-1:0] empty;
+        logic       [MSHR_SZ-1:0] full;
+    } rq;
+
+    generate
+        for (genvar i = 0; i < MSHR_SZ; ++i) begin : gen_rqs
+            replay_queue #(
+                .DEPTH(`RQ_SZ),
+                .INSTANCE_ID(i)
+            ) rq_i (
+                .clock,
+                .reset,
+
+                .wr_en      (rq.wr_en[i]),
+                .wr_data    (rq.wr_data[i]),
+                .rd_en      (rq.rd_en[i]),
+                .rd_data    (rq.rd_data[i]),
+                .prvw_vld   (rq.prvw_vld[i]),
+
+                .empty      (rq.empty[i]),
+                .full       (rq.full[i])
+            );
+        end
+    endgenerate
+
+    logic [MSHR_SZ-1:0] is_free;
+    logic [1:0][MSHR_SZ-1:0] free_gbus;
+    always_comb begin
+        foreach (is_free[i])
+            is_free[i] = mshr[i].status == FREE;
+    end
+
+    // Pick 2 free MSHR entries
+    psel_gen #(
+        .WIDTH  (MSHR_SZ),
+        .REQS   (2)
+    ) free_mshr (
+        .req    (is_free),
+        .gnt_bus(free_gbus)
+    );
+
+    struct packed {
+        struct packed {
+            logic req;
+            logic gnt;
+            logic [MSHR_SZ-1:0] gbus;
+        } free;
+
+        struct packed {
+            logic req;
+            logic [MSHR_SZ-1:0] rbus;
+            logic gnt;
+            logic [MSHR_SZ-1:0] gbus;
+        } enqu; // i.e. addr-matching MSHR exists; want to enqueue
+    } ld_ctrl, st_ctrl;
+
+    // Arbitration: alloc a new MSHR
+    always_comb begin
+        ld_ctrl.free.gbus = '0;
+        st_ctrl.free.gbus = '0;
+
+        // prioritze load
+        if (ld_ctrl.free.req) begin
+            ld_ctrl.free.gbus = free_gbus[0];
+            st_ctrl.free.gbus = free_gbus[1];
+        end else begin
+            st_ctrl.free.gbus = free_gbus[0];
+        end
+
+        ld_ctrl.free.gnt = ld_ctrl.free.req && |ld_ctrl.free.gbus;
+        st_ctrl.free.gnt = st_ctrl.free.req && |st_ctrl.free.gbus;
+    end
+
+    // Arbitration: enqueue (coalesce) to an existing MSHR
+    // (Why? each RQ has only 1 write port)
+    always_comb begin
+        ld_ctrl.enqu.gbus = '0;
+        st_ctrl.enqu.gbus = '0;
+
+        // prioritze load
+        foreach (mshr[i]) begin
+            if (ld_ctrl.enqu.rbus[i]) begin
+                ld_ctrl.enqu.gbus[i] = !rq.full[i];
+                st_ctrl.enqu.gbus[i] = 0;
+            end else if (st_ctrl.enqu.rbus[i]) begin
+                st_ctrl.enqu.gbus[i] = !rq.full[i];
+            end
+        end
+
+        ld_ctrl.enqu.gnt = |ld_ctrl.enqu.gbus;
+        st_ctrl.enqu.gnt = |st_ctrl.enqu.gbus;
+    end
+
+    // Load...
+    logic       ld_hit;
+    REQ_STATUS  ld_req_stat;
+    MSHR_IDX    ld_idx;
+    always_comb begin
+        ld_hit = 0;
+        ld_idx = 0;
+        ld_ctrl.enqu.rbus = '0;
+        foreach (mshr[i]) begin
+            if (!(mshr[i].status == FREE)
+                && mshr[i].addr == dw_align(ld.addr))
+                continue;
+            ld_hit |= 1;
+            ld_idx |= i;
+            ld_ctrl.enqu.rbus[i] |= ld.vld;
+        end
+
+        ld_req_stat = FAIL;
+        ld_ctrl.free.req = ld.vld && !ld_hit;
+        ld_ctrl.enqu.req = ld.vld && ld_hit;
+        ld_req_stat = (
+            ld_ctrl.free.req ? ld_ctrl.free.gnt :
+            ld_ctrl.enqu.req ? ld_ctrl.enqu.gnt : '0
+        ) ? SUCC : FAIL;
+    end
+
+    // Store...
+    // TODO:
+
+    always_ff @(posedge clock) begin
+        if (reset) begin
+            foreach (mshr[n]) begin
+                mshr[n] <= '{
+                    status      : FREE,
+                    addr        : '0,
+                    mem_data    : '0,
+                    mem_size    : '0
+                };
+            end
+        end else begin
+            mshr <= mshr_n;
+        end
+    end
 endmodule
 
 
