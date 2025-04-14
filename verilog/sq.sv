@@ -109,55 +109,6 @@ module sq #(parameter
     sq2execute next_sq_2_exec;
     sq2execute uncombined_forward_data;
 
-    // logic [LD_BAY_SZ-1:0] [LSQ_SZ-1:0] [3:0] byte_matches;
-    // always_comb begin
-    //     byte_matches = 0;
-    //     next_sq_2_exec = '0;
-
-    //     //find all matches in parallel
-    //     for (int unsigned i = 0; i < LD_BAY_SZ; ++i) begin
-    //         for (int unsigned j = 0, int unsigned idx = 0; j < LSQ_SZ; ++j) begin
-    //             idx = (head + j) % LSQ_SZ;
-
-    //             if (state[idx].d_vld && (waddr(state[idx].addr) == waddr(ex_frwd_in.forward_addr[i]))) begin
-    //                 byte_matches[i][j] = state[idx].bytewise_addr_mask;
-    //                 // $display("FOUND_MATCH[%0d]: %0d, %4b", idx, state[idx].data, byte_matches[i][j]);
-    //             end
-    //         end
-    //     end
-
-    //     //apply the matches bottom-up to catch the most recent matches first
-    //     for (int unsigned i = 0; i < LD_BAY_SZ; ++i) begin
-    //         if (!ex_frwd_in.forward_req_en[i]) continue;
-
-    //         for (int unsigned j = 0, logic [$clog2(LSQ_SZ)-1:0] idx = 0; j < used; ++j) begin
-    //             idx = state[ex_frwd_in.forward_sq_idx[i]%LSQ_SZ].sq_idx == ex_frwd_in.forward_sq_idx[i] ? ex_frwd_in.forward_sq_idx[i]%LSQ_SZ-j : tail - j - 1;
-
-    //             // if (state[idx].sq_idx == ex_frwd_in.forward_sq_idx[i]) begin
-    //             //     next_sq_2_exec.forward_data[i] = '0;
-    //             //     next_sq_2_exec.forward_byte_en[i] = '0;
-    //             //     $display("EXACT");
-    //             // end
-
-    //             next_sq_2_exec.forward_data[i].byte_level[0] = byte_matches[i][idx][0] ? state[idx].data.byte_level[0] : next_sq_2_exec.forward_data[i].byte_level[0];
-    //             next_sq_2_exec.forward_data[i].byte_level[1] = byte_matches[i][idx][1] ? state[idx].data.byte_level[1] : next_sq_2_exec.forward_data[i].byte_level[1];
-    //             next_sq_2_exec.forward_data[i].byte_level[2] = byte_matches[i][idx][2] ? state[idx].data.byte_level[2] : next_sq_2_exec.forward_data[i].byte_level[2];
-    //             next_sq_2_exec.forward_data[i].byte_level[3] = byte_matches[i][idx][3] ? state[idx].data.byte_level[3] : next_sq_2_exec.forward_data[i].byte_level[3];
-
-
-    //             next_sq_2_exec.forward_byte_en[i] |= byte_matches[i][idx];
-
-    //             $display("FINAL_DATA: %0d, %4b, %0d, %0d", next_sq_2_exec.forward_data[i], byte_matches[i][idx], state[idx].data, idx);
-    //             $display("EXACT? %0d, %0d", state[idx].sq_idx,ex_frwd_in.forward_sq_idx[i]);
-
-    //             if (next_sq_2_exec.forward_byte_en[i] == 4'b1111) break;
-
-    //         end
-
-    //         next_sq_2_exec.forward_en[i] = (next_sq_2_exec.forward_byte_en[i] != 0);
-    //     end
-    // end
-
     always_comb begin
         next_sq_2_exec = '0;
         // most_recent_bytes = '0;
@@ -217,7 +168,6 @@ module sq #(parameter
                     execute_out.forward_byte_en[i]    &= 2'b11;
                 end
                 default: begin
-                    // FIXME: what to put for default case?
                     execute_out.forward_data[i]       = execute_out.forward_data[i];//&= 32'hFFFFFFFF; 
                     execute_out.forward_byte_en[i]    = execute_out.forward_byte_en[i];//&= 4'b1111;
                 end
@@ -397,86 +347,48 @@ module post_ret_buffer #(parameter
     assign free_scnt            = `MIN(free, NUM_DPORTS);
     assign used_scnt            = `MIN(used, NUM_RPORTS);
 
-    logic ret_success;
-    logic [1:0] writeMod;
-    logic [4:0] writeOffset;
-    always_comb begin
-        sq_out = '0;
-        writeMod = '0;
-        writeOffset = '0;
+    logic [$clog2(N):0] ret_success;
+    // logic [4:0] writeOffset;
 
+    always_comb begin
         for (int unsigned i = 0; i < NUM_RPORTS; ++i)
             r_idxs[i] = (head + i) % SQ_RET_BUF_SZ;
         for (int unsigned i = 0; i < NUM_DPORTS; ++i)
             d_idxs[i] = (tail + i) % SQ_RET_BUF_SZ;
+    end
 
+    always_comb begin
         // handle sq_out
         sq_out.free_scnt  = free_scnt;
         sq_out.used_scnt  = used_scnt;
-
-        //handle retirement write to mem
-        mem_out = '0;
-        if (head != tail) begin
-            writeOffset = 8 * iw_off(state[head].addr);
-
-            mem_out.Dmem_command      = MEM_STORE;
-            mem_out.Dmem_addr         = state[head].addr;
-            mem_out.Dmem_store_data   = (state[head].data >> writeOffset);
-            mem_out.Dmem_size         = state[head].mem_size;
-        end
-        ret_success = ((mem2proc_transaction_tag != 0) && (mem_out.Dmem_command == MEM_STORE)) ? 1 : 0;
-
     end
 
-    // logic [LD_BAY_SZ-1:0] [SQ_RET_BUF_SZ-1:0] [3:0] byte_matches;
-    // always_comb begin
-    //     byte_matches = 0;
-    //     next_forward_ret_2_sq = '0;
+    always_comb begin
+        //handle retirement write to mem
+        mem_out = '0;
 
-    //     //find all matches in parallel
-    //     for (int unsigned i = 0; i < LD_BAY_SZ; ++i) begin
-    //         for (int unsigned j = 0, int unsigned idx = 0; j < SQ_RET_BUF_SZ; ++j) begin
-    //             idx = (head + j) % SQ_RET_BUF_SZ;
+        // if (used_scnt != 0) begin
+        //     writeOffset = 8 * iw_off(state[head].addr);
 
-    //             if (state[idx].d_vld && (waddr(state[idx].addr) == waddr(sq_in.forward_addr[i]))) begin
-    //                 byte_matches[i][j] = state[idx].bytewise_addr_mask;
-    //                 // $display("FOUND_MATCH[%0d]: %0d, %4b", idx, state[idx].data, byte_matches[i][j]);
-    //             end
-    //         end
-    //     end
+        //     mem_out.Dmem_command      = MEM_STORE;
+        //     mem_out.Dmem_addr         = state[head].addr;
+        //     mem_out.Dmem_store_data   = (state[head].data >> writeOffset);
+        //     mem_out.Dmem_size         = state[head].mem_size;
+        // end
+        // ret_success = ((mem2proc_transaction_tag != 0) && (mem_out.Dmem_command[0] == MEM_STORE)) ? 1 : 0;
 
-    //     //apply the matches bottom-up to catch the most recent matches first
-    //     for (int unsigned i = 0; i < LD_BAY_SZ; ++i) begin
-    //         if (!sq_in.forward_req_en[i]) continue;
-
-    //         for (int unsigned j = 0, logic [$clog2(SQ_RET_BUF_SZ)-1:0] idx = 0; j < used; ++j) begin
-    //             idx = tail - j - 1;
-
-    //             if (state[idx].sq_idx == sq_in.forward_sq_idx[i]) begin
-    //                 next_forward_ret_2_sq.sq_idx_found[i] = 1;
-    //                 next_forward_ret_2_sq.forward_data[i] = '0;
-    //                 next_forward_ret_2_sq.forward_byte_en[i] = '0;
-    //                 // $display("EXACT");
-    //             end
-
-    //             next_forward_ret_2_sq.forward_data[i].byte_level[0] = byte_matches[i][idx][0] ? state[idx].data.byte_level[0] : next_forward_ret_2_sq.forward_data[i].byte_level[0];
-    //             next_forward_ret_2_sq.forward_data[i].byte_level[1] = byte_matches[i][idx][1] ? state[idx].data.byte_level[1] : next_forward_ret_2_sq.forward_data[i].byte_level[1];
-    //             next_forward_ret_2_sq.forward_data[i].byte_level[2] = byte_matches[i][idx][2] ? state[idx].data.byte_level[2] : next_forward_ret_2_sq.forward_data[i].byte_level[2];
-    //             next_forward_ret_2_sq.forward_data[i].byte_level[3] = byte_matches[i][idx][3] ? state[idx].data.byte_level[3] : next_forward_ret_2_sq.forward_data[i].byte_level[3];
-
-
-    //             next_forward_ret_2_sq.forward_byte_en[i] |= byte_matches[i][idx];
-
-    //             // $display("FINAL_DATA: %0d, %4b, %0d, %0d", next_forward_ret_2_sq.forward_data[i], byte_matches[i][idx], state[idx].data, idx);
-    //             // $display("EXACT? %b, %0d, %0d", next_forward_ret_2_sq.sq_idx_found[i], state[idx].sq_idx,sq_in.forward_sq_idx[i]);
-
-    //             if (next_forward_ret_2_sq.forward_byte_en[i] == 4'b1111) break;
-
-    //         end
-
-    //         next_forward_ret_2_sq.forward_en[i] = (next_forward_ret_2_sq.forward_byte_en[i] != 0);
-    //     end
-    // end
+        for (int unsigned i = 0; i < N; ++i) begin
+            if (i >= used_scnt) continue;
+            
+            // writeOffset = 8 * iw_off(state[r_idxs[i]].addr);
+            mem_out.Dmem_command[i]      = MEM_STORE;
+            mem_out.Dmem_addr[i]         = state[r_idxs[i]].addr;
+            mem_out.Dmem_store_data[i]   = (state[r_idxs[i]].data >> (8 * iw_off(state[r_idxs[i]].addr)));
+            mem_out.Dmem_size[i]         = state[r_idxs[i]].mem_size;
+        end
+        ret_success = ((mem2proc_transaction_tag != 0) && (mem_out.Dmem_command[0] == MEM_STORE));
+        // ret_success = mem2proc_transaction_tag; <--TODO: swap to this line once teh SQ retirement buffer is pointing at the superscalar dcache instead of mem
+    end
 
     always_comb begin
         next_forward_ret_2_sq = '0;
@@ -554,3 +466,54 @@ module post_ret_buffer #(parameter
 endmodule
 
 
+//NOTICE: The below is an attempt at an optimized forwarding method. It ran aground due to incompatibility with circular buffers. Leaving it here at the bottom of the 
+//file in case we ever want to come back to it
+    // logic [LD_BAY_SZ-1:0] [SQ_RET_BUF_SZ-1:0] [3:0] byte_matches;
+    // always_comb begin
+    //     byte_matches = 0;
+    //     next_forward_ret_2_sq = '0;
+
+    //     //find all matches in parallel
+    //     for (int unsigned i = 0; i < LD_BAY_SZ; ++i) begin
+    //         for (int unsigned j = 0, int unsigned idx = 0; j < SQ_RET_BUF_SZ; ++j) begin
+    //             idx = (head + j) % SQ_RET_BUF_SZ;
+
+    //             if (state[idx].d_vld && (waddr(state[idx].addr) == waddr(sq_in.forward_addr[i]))) begin
+    //                 byte_matches[i][j] = state[idx].bytewise_addr_mask;
+    //                 // $display("FOUND_MATCH[%0d]: %0d, %4b", idx, state[idx].data, byte_matches[i][j]);
+    //             end
+    //         end
+    //     end
+
+    //     //apply the matches bottom-up to catch the most recent matches first
+    //     for (int unsigned i = 0; i < LD_BAY_SZ; ++i) begin
+    //         if (!sq_in.forward_req_en[i]) continue;
+
+    //         for (int unsigned j = 0, logic [$clog2(SQ_RET_BUF_SZ)-1:0] idx = 0; j < used; ++j) begin
+    //             idx = tail - j - 1;
+
+    //             if (state[idx].sq_idx == sq_in.forward_sq_idx[i]) begin
+    //                 next_forward_ret_2_sq.sq_idx_found[i] = 1;
+    //                 next_forward_ret_2_sq.forward_data[i] = '0;
+    //                 next_forward_ret_2_sq.forward_byte_en[i] = '0;
+    //                 // $display("EXACT");
+    //             end
+
+    //             next_forward_ret_2_sq.forward_data[i].byte_level[0] = byte_matches[i][idx][0] ? state[idx].data.byte_level[0] : next_forward_ret_2_sq.forward_data[i].byte_level[0];
+    //             next_forward_ret_2_sq.forward_data[i].byte_level[1] = byte_matches[i][idx][1] ? state[idx].data.byte_level[1] : next_forward_ret_2_sq.forward_data[i].byte_level[1];
+    //             next_forward_ret_2_sq.forward_data[i].byte_level[2] = byte_matches[i][idx][2] ? state[idx].data.byte_level[2] : next_forward_ret_2_sq.forward_data[i].byte_level[2];
+    //             next_forward_ret_2_sq.forward_data[i].byte_level[3] = byte_matches[i][idx][3] ? state[idx].data.byte_level[3] : next_forward_ret_2_sq.forward_data[i].byte_level[3];
+
+
+    //             next_forward_ret_2_sq.forward_byte_en[i] |= byte_matches[i][idx];
+
+    //             // $display("FINAL_DATA: %0d, %4b, %0d, %0d", next_forward_ret_2_sq.forward_data[i], byte_matches[i][idx], state[idx].data, idx);
+    //             // $display("EXACT? %b, %0d, %0d", next_forward_ret_2_sq.sq_idx_found[i], state[idx].sq_idx,sq_in.forward_sq_idx[i]);
+
+    //             if (next_forward_ret_2_sq.forward_byte_en[i] == 4'b1111) break;
+
+    //         end
+
+    //         next_forward_ret_2_sq.forward_en[i] = (next_forward_ret_2_sq.forward_byte_en[i] != 0);
+    //     end
+    // end

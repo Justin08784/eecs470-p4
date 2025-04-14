@@ -65,7 +65,7 @@
 ///////////////////////////////
 /* How can we implement this in the Makefile? */
 // comment out to enable synth only constructions
-// `define SYNTH
+`define SYNTH
 
 `ifndef SYNTH
 // comment out to disable DEBUG:
@@ -960,10 +960,10 @@ typedef struct packed {
 } retire2sq;
 
 typedef struct packed {
-    MEM_COMMAND   Dmem_command;    // The memory command
-    MEM_SIZE      Dmem_size;       // Size of data to read or write
-    ADDR          Dmem_addr;       // Address sent to Data memory
-    MEM_BLOCK     Dmem_store_data; // Data sent to Data memory
+    MEM_COMMAND [`N-1:0] Dmem_command;    // The memory command
+    MEM_SIZE    [`N-1:0] Dmem_size;       // Size of data to read or write
+    ADDR        [`N-1:0] Dmem_addr;       // Address sent to Data memory
+    MEM_BLOCK   [`N-1:0] Dmem_store_data; // Data sent to Data memory
 } stRET2mem;
 
 typedef struct packed {
