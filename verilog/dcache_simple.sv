@@ -40,6 +40,21 @@ module dcache_simple (
     logic we;
     MEM_BLOCK rblock, wblock;
 
+    typedef struct packed {
+        logic                 valid;
+        logic                 dirty;
+        logic [TAG_WIDTH-1:0] tag;
+    } DCACHE_TAG;
+
+    DCACHE_TAG [`DCACHE_LINES-1:0] dcache_tags, next_dcache_tags;
+
+    logic [TAG_WIDTH-1:0] current_tag;
+    assign current_tag = proc2Dcache_addr[31:32-TAG_WIDTH];
+    logic [INDEX_BITS-1:0] current_index;
+    assign current_index = proc2Dcache_addr[INDEX_BITS+2:3];
+    logic [2:0] byte_addr;
+    assign byte_addr = proc2Dcache_addr[2:0];
+
     memDP #(
         .WIDTH     ($bits(MEM_BLOCK)),
         .DEPTH     (`DCACHE_LINES),
@@ -55,21 +70,6 @@ module dcache_simple (
         .waddr(current_index),
         .wdata(wblock)
     );
-
-    typedef struct packed {
-        logic                 valid;
-        logic                 dirty;
-        logic [TAG_WIDTH-1:0] tag;
-    } DCACHE_TAG;
-
-    DCACHE_TAG [`DCACHE_LINES-1:0] dcache_tags, next_dcache_tags;
-
-    logic [TAG_WIDTH-1:0] current_tag;
-    assign current_tag = proc2Dcache_addr[31:32-TAG_WIDTH];
-    logic [INDEX_BITS-1:0] current_index;
-    assign current_index = proc2Dcache_addr[INDEX_BITS+2:3];
-    logic [2:0] byte_addr;
-    assign byte_addr = proc2Dcache_addr[2:0];
 
     // logic cache_hit;
 
