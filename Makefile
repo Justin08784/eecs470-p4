@@ -338,6 +338,7 @@ CPU_SOURCES = verilog/cpu.sv \
 			  verilog/fifo.sv \
 			  verilog/fetch.sv \
 			  verilog/execute.sv \
+			  verilog/lod_ex.sv \
 			  verilog/btq.sv \
 			  verilog/btb.sv \
 			  verilog/gshare.sv \
