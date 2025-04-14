@@ -199,8 +199,7 @@ module mshr #(
         FREE=0, // not allocated
         WAIT=1, // allocated, but could not issue mem request
         PEND=2, // miss issued; mem response pending
-        RCVD=3, // mem response received // FIXME: necessary? what about just begin draining immediately?
-        POUR=4  // pouring/draining into cache and dcache output
+        RCVD=3  // mem response received
     } MSHR_STATUS;
 
     typedef enum logic[1:0] {
