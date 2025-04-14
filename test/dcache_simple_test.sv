@@ -28,7 +28,7 @@ module dcache_simple_test;
     // Clock generation
 
     always begin
-        #5;
+        #(`CLOCK_PERIOD/2.0);
         clock = ~clock;
     end
 
@@ -53,7 +53,8 @@ module dcache_simple_test;
         .Dcache2Dmem_command(Dcache2Dmem_command),
         .Dcache2Dmem_addr(Dcache2Dmem_addr),
         .Dcache2Dmem_wdata(Dcache2Dmem_wdata),
-        .mem_in_use(mem_in_use),
+        //.mem_in_use(mem_in_use),
+
         .dcache_ready(dcache_ready)
     );
 
@@ -89,7 +90,7 @@ module dcache_simple_test;
         $display("  Dcache2Dmem_command: %0d", Dcache2Dmem_command);
         $display("  Dcache2Dmem_addr: 0x%h", Dcache2Dmem_addr);
         $display("  Dcache2Dmem_wdata: 0x%h", Dcache2Dmem_wdata);
-        $display("  mem_in_use: %b", mem_in_use);
+       // $display("  mem_in_use: %b", mem_in_use);
         $display("  dcache_ready: %b", dcache_ready);
         $display("Internal Signals:");
         $display("  cache hit: %d", dut.cache_hit);
@@ -169,7 +170,7 @@ module dcache_simple_test;
 
         @(negedge clock);
         Dcache_valid_in = 0;
-        proc2Dcache_command = MEM_NONE;
+        proc2Dcache_command = MEM_LOAD;
         proc2Dcache_addr = 32'h0000_0000;
         proc2Dcache_size = WORD;
         proc2Dcache_wdata = 64'd0;

@@ -27,7 +27,7 @@ module dcache_simple (
     output ADDR          Dcache2Dmem_addr,
     output MEM_BLOCK     Dcache2Dmem_wdata,
 
-    output logic         mem_in_use,
+    // output logic         mem_in_use,
     output logic         dcache_ready
 );
 
@@ -56,10 +56,33 @@ module dcache_simple (
 
     logic cache_hit;
 
+        typedef struct packed {
+        ADDR                    addr;
+        logic [TAG_WIDTH-1:0]   tag;
+        logic [INDEX_BITS-1:0]  index;
+        logic [2:0]             byte_addr;
+        MEM_BLOCK               block;
+        MEM_COMMAND             command;
+        MEM_SIZE                size;
+    } dcache_in;
+
+    typedef struct packed {
+        MEM_COMMAND    command;
+    } dcache2mem;
+
+    typedef struct packed {
+        MEM_TAG   transtag;
+    } mem2dcache;
+
+    dcache_in dcache_req, next_dcache_req;
+    dcache2mem mem_req, next_mem_req;
+    mem2dcache mem_resp, next_mem_resp;
+
     ADDR raddr, waddr;
     assign raddr = cache_hit? current_index : dcache_req.index;
     assign waddr = cache_hit? current_index : dcache_req.index;
 
+    logic mem_in_use, next_mem_in_use;
     assign dcache_ready = !mem_in_use;
 
     memDP #(
@@ -93,27 +116,27 @@ module dcache_simple (
     DCACHE_TAG curr_dcache_entry;
     assign curr_dcache_entry = dcache_tags[current_index];
 
-    typedef struct packed {
-        ADDR                    addr;
-        logic [TAG_WIDTH-1:0]   tag;
-        logic [INDEX_BITS-1:0]  index;
-        logic [2:0]             byte_addr;
-        MEM_BLOCK               block;
-        MEM_COMMAND             command;
-        MEM_SIZE                size;
-    } dcache_in;
+    // typedef struct packed {
+    //     ADDR                    addr;
+    //     logic [TAG_WIDTH-1:0]   tag;
+    //     logic [INDEX_BITS-1:0]  index;
+    //     logic [2:0]             byte_addr;
+    //     MEM_BLOCK               block;
+    //     MEM_COMMAND             command;
+    //     MEM_SIZE                size;
+    // } dcache_in;
 
-    typedef struct packed {
-        MEM_COMMAND    command;
-    } dcache2mem;
+    // typedef struct packed {
+    //     MEM_COMMAND    command;
+    // } dcache2mem;
 
-    typedef struct packed {
-        MEM_TAG   transtag;
-    } mem2dcache;
+    // typedef struct packed {
+    //     MEM_TAG   transtag;
+    // } mem2dcache;
 
-    dcache_in dcache_req, next_dcache_req;
-    dcache2mem mem_req, next_mem_req;
-    mem2dcache mem_resp, next_mem_resp;
+    // dcache_in dcache_req, next_dcache_req;
+    // dcache2mem mem_req, next_mem_req;
+    // mem2dcache mem_resp, next_mem_resp;
 
     // logic [TAG_WIDTH-1:0] pending_tag, next_pending_tag;
     // logic MEM_COMMAND pending_command, next_pending_command;
@@ -135,17 +158,29 @@ module dcache_simple (
         case (state)
             IDLE: begin
                 cache_hit = 0;
-                next_dcache_req = '{
-                    addr: proc2Dcache_addr,
-                    tag:  proc2Dcache_addr[31:32-TAG_WIDTH],
-                    index:  proc2Dcache_addr[INDEX_BITS+2:3],
-                    byte_addr: proc2Dcache_addr[2:0],
-                    block: proc2Dcache_wdata,
-                    command: proc2Dcache_command,
-                    size: proc2Dcache_size
-                };
+                if (!dcache_ready) begin
+                    next_dcache_req = '{
+                        addr: 32'h0000_0000,
+                        tag:  '0,
+                        index:  '0,
+                        byte_addr: '0,
+                        block: '0,
+                        command: MEM_NONE,
+                        size: '0
+                    };
+                end else begin
+                    next_dcache_req = '{
+                        addr: proc2Dcache_addr,
+                        tag:  proc2Dcache_addr[31:32-TAG_WIDTH],
+                        index:  proc2Dcache_addr[INDEX_BITS+2:3],
+                        byte_addr: proc2Dcache_addr[2:0],
+                        block: proc2Dcache_wdata,
+                        command: proc2Dcache_command,
+                        size: proc2Dcache_size
+                    };
+                end
                 if (proc2Dcache_command == MEM_NONE) begin
-                    mem_in_use = 0;
+                    next_mem_in_use = 0;
                     Dcache_valid_out = 0;
                     Dcache_data_out = '0;
                     we = 0;
@@ -168,7 +203,7 @@ module dcache_simple (
                     if ((curr_dcache_entry.tag == current_tag) && curr_dcache_entry.valid) begin
                         // cache hit : no memory access
                         cache_hit = 1;
-                        mem_in_use = 0;
+                        next_mem_in_use = 0;
                         Dcache2Dmem_addr = '0;
                         Dcache2Dmem_command = MEM_NONE;
                         Dcache2Dmem_wdata = '0;
@@ -216,7 +251,7 @@ module dcache_simple (
                         end // state IDLE: cache hit ✅
                     end else begin 
                         cache_hit = 0;
-                        mem_in_use = 1;
+                        next_mem_in_use = 1;
                         Dcache_valid_out = 0;
                         Dcache_data_out = '0;
                         we = 0;
@@ -261,7 +296,7 @@ module dcache_simple (
                     command: dcache_req.command,
                     size: dcache_req.size
                 };
-                mem_in_use = 1;
+                next_mem_in_use = 1;
                 Dcache_valid_out = 0;
                 Dcache_data_out = '0;
                 we = 0;
@@ -320,7 +355,7 @@ module dcache_simple (
                     };
                 end
                 next_state = IDLE;
-                mem_in_use = 0;
+                next_mem_in_use = 0;
 
                 if (Dmem2Dcache_data_tag == mem_resp.transtag) begin
                     we = 1;
@@ -356,7 +391,7 @@ module dcache_simple (
                     Dcache_valid_out = 0;
                     Dcache_data_out = '0;
                     next_state = FILL_WAIT;
-                    mem_in_use = 1;
+                    next_mem_in_use = 1;
                     
                 end
             end
@@ -371,7 +406,7 @@ module dcache_simple (
                     command: dcache_req.command,
                     size: dcache_req.size
                 };
-                mem_in_use = 1;
+                next_mem_in_use = 1;
                 Dcache_valid_out = 0;
                 Dcache_data_out = '0;
                 // we = 0;
@@ -435,7 +470,7 @@ module dcache_simple (
                 Dcache2Dmem_wdata = '0;
                 we = 0;
                 wblock = '0;
-                mem_in_use = 0;
+                next_mem_in_use = 0;
             end
         endcase
     end
@@ -445,10 +480,11 @@ module dcache_simple (
         if (reset) begin
             prev_state <= IDLE;
             state <= IDLE;
+            mem_in_use = 0;
             for (int i = 0; i< CACHE_LINES; i++) begin
-                dcache_tags[i].valid = 0;
-                dcache_tags[i].dirty = 0;
-                dcache_tags[i].tag = '0;
+                dcache_tags[i].valid <= 0;
+                dcache_tags[i].dirty <= 0;
+                dcache_tags[i].tag <= '0;
             end
             dcache_req <= '{
                 addr: '0,
@@ -462,6 +498,7 @@ module dcache_simple (
             mem_req <= '{command: MEM_NONE};
             mem_resp <= {transtag : '0};
         end else begin
+            mem_in_use <= next_mem_in_use;
             prev_state <= state;
             state <= next_state;
             for (int i = 0; i< CACHE_LINES; i++) begin
