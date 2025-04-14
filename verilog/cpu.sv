@@ -44,7 +44,7 @@ module cpu (
     output DBG_fetch    dbg_fetch,
     output DBG_decode   dbg_decode,
     output DBG_dispatch dbg_dispatch,
-    // output DBG_lq       dbg_lq,
+    output DBG_lq       dbg_lq,
     // output DBG_icache   dbg_icache, // icache is submodule of fetch; dont need separate line
     output DBG_mt       dbg_mt,
     output DBG_prf      dbg_prf,
@@ -56,6 +56,38 @@ module cpu (
     /* Global controls*/
     logic flush;
 
+
+    //handle assigning the correct priority for memory
+    stRET2mem ret_2_mem;
+    fetch2mem fetch_2_mem;
+    MEM_TAG sq_mem2proc_transaction_tag;
+    MEM_TAG fetch_mem2proc_transaction_tag;
+    always_comb begin
+        proc2mem_command = '0;
+        proc2mem_addr = '0;
+        proc2mem_data = '0;
+        proc2mem_size = '0;
+        sq_mem2proc_transaction_tag = '0;
+        fetch_mem2proc_transaction_tag = '0;
+        
+        if (ret_2_mem.Dmem_command == MEM_STORE) begin
+            proc2mem_command = ret_2_mem.Dmem_command;
+            proc2mem_addr = ret_2_mem.Dmem_addr;
+            proc2mem_data = ret_2_mem.Dmem_store_data;
+            proc2mem_size = ret_2_mem.Dmem_size;
+            sq_mem2proc_transaction_tag = mem2proc_transaction_tag;
+        end
+        // else if (load logic here) begin <-- LOAD REQUESTS COME NEXT (technically this wil probably come from dcache, but will be a load request regardless)
+
+        // end
+        else if (fetch_2_mem.proc2mem_command == MEM_LOAD) begin // <-- FETCH REQUESTS COME LAST (always complete memory operations first to get stuff commited to memory and to keep the processor FUs chugging)
+            proc2mem_command = fetch_2_mem.proc2mem_command;
+            proc2mem_addr = fetch_2_mem.proc2mem_addr;
+            proc2mem_size = DOUBLE;
+            fetch_mem2proc_transaction_tag = mem2proc_transaction_tag;
+        end
+    end
+
     //////////////////////////////////////////////////
     //                                              //
     //                   Fetch                      //
@@ -65,6 +97,7 @@ module cpu (
     fetch2decode f_2_decode;
     decode2fetch decode_2_f;
     retire2fetch retire_2_f;
+    lq2retire lq_2_retire;
 
     stage_if_p4 fetch_0(
         `ifdef DEBUG
@@ -77,11 +110,11 @@ module cpu (
         .d_in   (decode_2_f),
         .r_in   (retire_2_f),
         .Imem_data  (mem2proc_data),      // data coming back from Instruction memory
-        .Imem2proc_transaction_tag(mem2proc_transaction_tag),
+        .Imem2proc_transaction_tag(fetch_mem2proc_transaction_tag),
         .Imem2proc_data_tag(mem2proc_data_tag),
 
-        .Imem_command(proc2mem_command),
-        .Imem_addr(proc2mem_addr),
+        .Imem_command(fetch_2_mem.proc2mem_command),
+        .Imem_addr(fetch_2_mem.proc2mem_addr),
         .d_out  (f_2_decode)
     );
 
@@ -129,6 +162,8 @@ module cpu (
     execute2complete_dat ex_2_cdat;
     dispatch2sq dispatch_2_sq;
     sq2dispatch sq_2_dispatch;
+    dispatch2lq dis_2_lq;
+    lq2dispatch lq_2_dis;
 
     dispatch dispatcher(
         `ifdef DEBUG
@@ -153,6 +188,8 @@ module cpu (
         .btq_out    (dispatch_2_btq),
         .map_in     (map_2_dispatch),
         .map_out    (dispatch_2_map),
+        .lq_in      (lq_2_dis),
+        .lq_out     (dis_2_lq),
 
         .ctag_in    (ex_2_ctag)
     );
@@ -167,10 +204,11 @@ module cpu (
     retire2btq retire_2_btq;
     sq2retire sq_2_retire;
     retire2sq retire_2_sq;
+    retire2lq retire_2_lq;
 
     retire_final    retire_exec;
-    logic           mispred;
-    ADDR            mispred_target;
+    logic           flush_n;
+    ADDR            corrected_PC_n;
 
     retire retire0 (
         `ifdef DEBUG
@@ -184,20 +222,28 @@ module cpu (
         .btq_out(retire_2_btq),
         .sq_in  (sq_2_retire),
         .sq_out (retire_2_sq),
+        .lq_in  (lq_2_retire),
+        .lq_out (retire_2_lq),
 
-        .mispred        (mispred),
-        .mispred_target (mispred_target),
+        .flush          (flush_n),
+        .corrected_PC   (corrected_PC_n),
         .retire_exec    (retire_exec)
     );
 
     always_ff @(posedge clock) begin
-        if (reset) begin
+        if (reset || flush) begin
+            /* Even the flush must flush itself.
+
+            Pulse flush for 1 cycle. Ensures branches on mispredicted
+            control path cannot retrigger. */
             flush       <= '0;
             retire_2_f  <= '0;
         end else begin
 /* ======================================== */
-            flush       <= mispred;
-            retire_2_f  <= '{corrected_PC : mispred_target};
+            flush       <= flush_n;
+            retire_2_f  <= '{
+                corrected_PC : corrected_PC_n
+            };
 /* ======================================== */
         end
     end
@@ -257,6 +303,8 @@ module cpu (
     //                                              //
     //////////////////////////////////////////////////  
 
+    sq2rob sq_2_rob;
+
     rob #(
         .ROB_SZ(`ROB_SZ),
         .N(`N)
@@ -270,6 +318,7 @@ module cpu (
         .r_out      (rob_2_retire),
         .r_in       (retire_exec),
         .cdat_in    (ex_2_cdat),
+        .sq_in      (sq_2_rob),
         .d_out      (rob_2_dispatch),
         .d_in       (dispatch_2_rob)
     );
@@ -281,19 +330,18 @@ module cpu (
     ////////////////////////////////////////////////// 
 
     execute2sq exec_2_sq;
-    // MEM_TAG mem2proc_transaction_tag;
-    MEM_TAG temp_tag;
-
+    executeLD2sq exec_ld_2_sq;
+    // MEM_TAG temp_tag;
     sq2execute sq_2_exec;
-    stRET2mem ret_2_mem;
-    assign temp_tag = (ret_2_mem.Dmem_command == MEM_STORE) ? 1 : 0;
+    // assign temp_tag = (ret_2_mem.Dmem_command == MEM_STORE) ? 1 : 0;
 
     sq #(
         .N(`N),
         .LSQ_SZ(`LSQ_SZ),
         .LSQ_SZ_DBL(`LSQ_SZ_DBL),
         .NUM_FU_STORE(`NUM_FU_STORE),
-        .NUM_FU_LOAD(`NUM_FU_LOAD)
+        .NUM_FU_LOAD(`NUM_FU_LOAD),
+        .LD_BAY_SZ(`LD_BAY_SZ)
     ) sq_0 (
         `ifdef DEBUG
         .dbg        (dbg_sq),
@@ -302,21 +350,47 @@ module cpu (
         .reset      (reset),
         .flush      (flush),
 
-        .dis_2_sq   (dispatch_2_sq),
-        .sq_2_dis   (sq_2_dispatch),
+        .dispatch_in   (dispatch_2_sq),
+        .dispatch_out   (sq_2_dispatch),
 
-        .exec_2_sq  (exec_2_sq),
-        .sq_2_exec  (sq_2_exec),
+        .execute_in  (exec_2_sq),
+        .ex_frwd_in    (exec_ld_2_sq),
+        .execute_out  (sq_2_exec),
+        .rob_out   (sq_2_rob),
 
-        .retire_2_sq(retire_2_sq), //using the retire_2_sq packet here seems to be causing false retirements from the SQ. Will investigate Sunday 4/6. 
-        //As is, can still see packets entering the SQ, and should be able to retire the top 2 entries "properly", they just won't actually write to memory.
-        //But this will still work if you just want to make sure that you can actually make it through a program to the wfi
-        .sq_2_retire(sq_2_retire),
+        .retire_in(retire_2_sq),
+        .retire_out(sq_2_retire),
 
-        .mem2proc_transaction_tag(temp_tag),
-        .ret_2_mem(ret_2_mem)
+        .mem2proc_transaction_tag(sq_mem2proc_transaction_tag), //temp_tag  sq_mem2proc_transaction_tag
+        .mem_out(ret_2_mem)
 );
 
+
+    //////////////////////////////////////////////////
+    //                                              //
+    //                      LQ                      //
+    //                                              //
+    //////////////////////////////////////////////////
+
+    execute2lq exec_2_lq;
+    execeuteST2lq execST_2_lq;
+
+    lq lq_0(
+        `ifdef DEBUG
+        .dbg        (dbg_lq),
+        `endif
+        .clock(clock),
+        .reset(reset),
+        .flush(flush),
+
+        .dispatch_in(dis_2_lq),
+        .retire_in(retire_2_lq),
+        .execute_in(exec_2_lq),
+        .execST_in(execST_2_lq),
+
+        .dispatch_out(lq_2_dis),
+        .retire_out(lq_2_retire)
+    );
 
     //////////////////////////////////////////////////
     //                                              //
@@ -324,8 +398,6 @@ module cpu (
     //                                              //
     ////////////////////////////////////////////////// 
 
-    
-    execute2lq ex_2_lq;
     stage_ex_p4 ex_0 (
         .clock  (clock),
         .reset  (reset),
@@ -337,7 +409,9 @@ module cpu (
         .sq_in  (sq_2_exec),
         .sq_out (exec_2_sq),
 
-        .lq_out (ex_2_lq),
+        .lq_out (exec_2_lq),
+        .st_lq_out (execST_2_lq),
+        .ld_sq_out (exec_ld_2_sq),
 
         .prf_in (prf_2_ex),
         .prf_out(ex_2_prf),

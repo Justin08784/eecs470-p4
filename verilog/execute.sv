@@ -83,6 +83,7 @@ typedef struct packed {
     DATA            opb;
 
     LSQ_IDX         lq_idx;
+    LSQ_IDX         sq_idx;
     ROB_IDX         rob_idx;
     MEM_SIZE        mem_size;
     logic           rd_unsigned;
@@ -312,31 +313,6 @@ module alu_ex(
         end
     end
 
-    `ifdef DEBUG
-    always_ff @(posedge clock) begin
-        if (!reset) begin
-            $display("alu_ex: cdb <%b>[%2d -> %2d], <%b>[%2d -> %2d]",
-                cdat.en[0],
-                cdat.ts[0],
-                cdat.data[0],
-                cdat.en[1],
-                cdat.ts[1],
-                cdat.data[1]
-            );
-
-            for (int unsigned i = 0; i < `NUM_FU_ALU; ++i) begin
-                $display("%2d bytag: (b1:%b, idx1:%b) (b2:%b, idx2:%b)",
-                    i,
-                    i_regs[i].dat.bytag.bypass1,
-                    i_regs[i].dat.bytag.cdb_idx1,
-                    i_regs[i].dat.bytag.bypass2,
-                    i_regs[i].dat.bytag.cdb_idx2,
-                );
-            end
-        end
-    end
-    `endif // DEBUG
-
     // execute
     generate
         CPL_CAND    [`NUM_FU_ALU-1:0] tmp_data;
@@ -362,7 +338,7 @@ module alu_ex(
                 rob_idx : ops[i].rob_idx,
                 data    : tmp_res[i],
                 btq_idx : ops[i].btq_idx,
-                take    : tmp_take[i],
+                take    : tmp_take[i] || ops[i].uncond_branch,
                 is_brch : ops[i].cond_branch || ops[i].uncond_branch
             };
 
@@ -373,6 +349,35 @@ module alu_ex(
     endgenerate
 endmodule
 
+module fake_dcache #(
+    parameter int NUM_RPORTS=1
+) (
+    input  clock,
+    input  reset,
+
+    input  logic    wen,
+    input  ADDR     waddr,
+    input  MEM_SIZE wsize,
+    input  DATA     wdat,
+
+    input  logic    [NUM_RPORTS-1:0] ren,
+    input  ADDR     [NUM_RPORTS-1:0] raddr,
+    input  MEM_SIZE [NUM_RPORTS-1:0] rsize,
+    output DATA     [NUM_RPORTS-1:0] rdat,
+    output logic    [NUM_RPORTS-1:0] rvld
+);
+    always_comb begin
+        rvld = '0;
+        foreach (ren[i]) begin
+            if (!ren[i])
+                continue;
+            rdat[i] = i;
+            rvld[i]  = 1;
+
+        end
+    end
+endmodule
+
 module lod_ex(
     input clock,
     input reset,
@@ -380,13 +385,16 @@ module lod_ex(
 
     /* FRONTEND */
     output logic    [`NUM_FU_LOAD-1:0]  i_rdy,
+        // ready to accept from regs.o_dat.lod?
     input  logic    [`NUM_FU_LOAD-1:0]  i_vld,
+        // insns to accept from regs.o_dat.lod
     input  LOD_REGS [`NUM_FU_LOAD-1:0]  i_regs,
+        // insn metadata/operands
     
     input   sq2execute sq_in,
     output  execute2sq sq_out,
-    // FIXME: Isn't an lq2execute needed?
     output  execute2lq lq_out,
+    output  executeLD2sq ld_sq_out,
 
     /* BACKEND */
     output logic    [`NUM_FU_LOAD-1:0]  o_vld,
@@ -394,26 +402,225 @@ module lod_ex(
     input  logic    [`NUM_FU_LOAD-1:0]  o_rdy 
         // completion grant
 );
+    localparam LD_BAY_SZ = `LD_BAY_SZ;//4;
+    typedef struct packed {
+        logic           [`NUM_FU_LOAD-1:0][LD_BAY_SZ-1:0]  vld;
+        logic           [`NUM_FU_LOAD-1:0][LD_BAY_SZ-1:0]  got; // got data?
+        PHYS_REG_IDX    [`NUM_FU_LOAD-1:0][LD_BAY_SZ-1:0]  t;
+        ROB_IDX         [`NUM_FU_LOAD-1:0][LD_BAY_SZ-1:0]  rob_idx;
+        ADDR            [`NUM_FU_LOAD-1:0][LD_BAY_SZ-1:0]  addr;
+        MEM_SIZE        [`NUM_FU_LOAD-1:0][LD_BAY_SZ-1:0]  mem_size;
+
+        LSQ_IDX         [`NUM_FU_LOAD-1:0][LD_BAY_SZ-1:0]  sq_idx;
+        logic           [3:0]             [LD_BAY_SZ-1:0]  st_frwd_byte_mask;
+        DATA            [`NUM_FU_LOAD-1:0][LD_BAY_SZ-1:0]  dat;
+    } LOAD_BAYS;
+    logic [`NUM_FU_LOAD-1:0][LD_BAY_SZ-1:0] rvld;
+    DATA  [`NUM_FU_LOAD-1:0][LD_BAY_SZ-1:0] rdat;
+
+
     // FIXME: Is this right? 
-    assign i_rdy = '1;
     // FIXME: hardcoded
-    assign o_vld    = '0;
-    assign o_cands  = '0;
+
+    LOAD_BAYS bays; // waiting bays
+    logic     [`NUM_FU_LOAD-1:0][LD_BAY_SZ-1:0] fu2in_gnt;
+    logic     [`NUM_FU_LOAD-1:0][LD_BAY_SZ-1:0] fu2out_gnt;
+    always_comb begin
+        for (int f = 0; f < `NUM_FU_MULT; ++f) begin
+            i_rdy[f] = |(~bays.vld[f]);
+            o_vld[f] = |(bays.vld[f] & bays.got[f]);
+        end
+    end
+
+    fake_dcache #(
+        .NUM_RPORTS(`NUM_FU_LOAD * LD_BAY_SZ)
+    ) cache0 (
+        .clock(clock),
+        .reset(reset),
+
+        .ren    (bays.vld & ~bays.got),
+        .raddr  (bays.addr),
+        .rsize  (bays.mem_size),
+        .rdat   (rdat),
+        .rvld   (rvld)
+    );
+
+    generate
+        for (genvar f = 0; f < `NUM_FU_LOAD; ++f) begin : gen_arb_in
+            psel_gen #(
+                .WIDTH(LD_BAY_SZ),
+                .REQS(1)
+            ) arb_in (
+                .req    (~bays.vld[f]),
+                .gnt    (fu2in_gnt[f])
+            );
+        end
+
+        for (genvar f = 0; f < `NUM_FU_LOAD; ++f) begin : gen_arb_out
+            psel_gen #(
+                .WIDTH(LD_BAY_SZ),
+                .REQS(1)
+            ) arb_out (
+                .req    (bays.vld[f] & bays.got[f]),
+                .gnt    (fu2out_gnt[f])
+            );
+        end
+    endgenerate
+
+    ADDR        [`NUM_FU_LOAD-1:0] tmp_addrs;
+    MEM_SIZE    [`NUM_FU_LOAD-1:0] tmp_sizes;
 
     always_comb begin
-        ADDR  addr;
         foreach(i_vld[i]) begin
             // load address computation
-            addr = i_regs[i].rs1 + i_regs[i].dat.opb;
+            tmp_addrs[i] = i_regs[i].rs1 + i_regs[i].dat.opb;
+            tmp_sizes[i] = i_regs[i].dat.mem_size;
 
             lq_out.ld_ex_en[i]      = i_vld[i];
             lq_out.ld_lq_idx[i]     = i_regs[i].dat.lq_idx;
-            lq_out.ld_addr[i]       = addr;
-            lq_out.ld_mem_size[i]   = i_regs[i].dat.mem_size;
+            lq_out.ld_addr[i]       = tmp_addrs[i];
+            lq_out.ld_mem_size[i]   = tmp_sizes[i];
             /* FIXME: What about rd_unsigned? We are not using this
-            in lq???? */
+            in lq???? */ //ANSWER: This needs to be used in the load FU
+
+        end
+
+        o_cands = '0;
+        foreach (fu2out_gnt[f, i]) begin
+            if (!(fu2out_gnt[f][i] && o_rdy[f]))
+                continue;
+            o_cands[f] |= CPL_CAND'{
+                t       : bays.t[f][i],
+                rob_idx : bays.rob_idx[f][i],
+                data    : bays.dat[f][i],
+                btq_idx : '0,
+                take    : '0,
+                is_brch : '0
+            };
         end
     end
+
+    //ST-LD forwarding request logic
+    always_comb begin
+        ld_sq_out = '0;
+        foreach (bays.vld[f,i]) begin
+            if (!bays.vld[f][i]) continue;
+
+            ld_sq_out.forward_req_en[i] = bays.vld[f][i];
+            ld_sq_out.forward_addr[i] = bays.addr[f][i];
+            ld_sq_out.forward_mem_size[i] = bays.mem_size[f][i];
+            ld_sq_out.forward_sq_idx[i] = bays.sq_idx[f][i];
+        end
+    end
+
+    //ST-LD forwarding parsing logic
+    logic [`NUM_FU_LOAD-1:0][LD_BAY_SZ-1:0] next_got;
+    logic [3:0]             [LD_BAY_SZ-1:0] next_st_frwd_byte_mask;
+    DATA_BLOCK  [`NUM_FU_LOAD-1:0][LD_BAY_SZ-1:0] next_dat;
+    always_comb begin
+        next_got = bays.got;
+        next_st_frwd_byte_mask = '0;
+        next_dat = bays.dat;
+        foreach (rvld[f, i]) begin
+            if (bays.got[f][i])
+                continue;
+            if (!sq_in.forward_en[i])
+                continue;
+
+            // if (rvld[f][i]) begin
+            //     next_got[f][i] = 1;
+            //     next_dat[f][i] = rdat[f][i];
+            // end
+
+            if (sq_in.forward_byte_en[i][0])
+                next_dat[f][i].byte_level[0] = sq_in.forward_data[i].byte_level[0];
+            if (sq_in.forward_byte_en[i][1])
+                next_dat[f][i].byte_level[1] = sq_in.forward_data[i].byte_level[1];
+            if (sq_in.forward_byte_en[i][2])
+                next_dat[f][i].byte_level[2] = sq_in.forward_data[i].byte_level[2];
+            if (sq_in.forward_byte_en[i][3])
+                next_dat[f][i].byte_level[3] = sq_in.forward_data[i].byte_level[3];
+            next_st_frwd_byte_mask = bays.st_frwd_byte_mask[f][i] | sq_in.forward_byte_en[i];
+
+            next_got[f][i] |= ($countones(next_st_frwd_byte_mask) == (2**bays.mem_size[f][i]));
+
+                // $display("FORWARDING_OCCURING: %0d, mask: %4b, final_data: %0d, ones: %0d, size: %0d, next_got:%b", sq_in.forward_data[i], sq_in.forward_byte_en[i], next_dat[f][i],$countones(next_st_frwd_byte_mask),2**bays.mem_size[f][i],next_got[f][i]);
+        end
+    end
+
+    always_ff @(posedge clock) begin
+
+        if (reset || flush) begin
+            bays <= '0;
+        end else begin
+            foreach (fu2in_gnt[f, i]) begin
+                if (!(fu2in_gnt[f][i] && i_vld[f]))
+                    continue;
+
+                bays.vld     [f][i] <= 1;
+                bays.got     [f][i] <= 0;
+                bays.t       [f][i] <= i_regs[f].dat.t;
+                bays.rob_idx [f][i] <= i_regs[f].dat.rob_idx;
+                bays.addr    [f][i] <= tmp_addrs[f];
+                bays.mem_size[f][i] <= tmp_sizes[f];
+                bays.dat     [f][i] <= '0;
+                bays.sq_idx  [f][i] <= i_regs[f].dat.sq_idx;
+                bays.st_frwd_byte_mask[f][i] <= '0;
+            end
+
+            foreach (next_got[f, i]) begin
+                bays.got[f][i] <= next_got[f][i];
+                bays.dat[f][i] <= next_dat[f][i];
+                bays.st_frwd_byte_mask[f][i] <= next_st_frwd_byte_mask[f][i];
+            end
+
+            foreach (fu2out_gnt[f, i]) begin
+                if (!(fu2out_gnt[f][i] && o_rdy[f]))
+                    continue;
+                bays.vld     [f][i] <= 0;
+                bays.got     [f][i] <= 0;
+                bays.t       [f][i] <= '0;
+                bays.rob_idx [f][i] <= '0;
+                bays.addr    [f][i] <= '0;
+                bays.mem_size[f][i] <= '0;
+                bays.dat     [f][i] <= '0;
+                bays.sq_idx  [f][i] <= '0;
+                bays.st_frwd_byte_mask[f][i] <= '0;
+            end
+        end
+    end
+
+    `ifdef DEBUG
+    always_ff @(posedge clock) begin
+        if (!reset) begin
+            $display("  %3d | >> BAYS", $time);
+            $display("i_rdy: %b, i_vld: %b, o_vld: %b, o_rdy: %b", i_rdy, i_vld, o_vld, o_rdy);
+            $display("ocands: t: %2d, rob_idx: %2d, data: %x, btq_idx: %2d, take: %b, is_brch: %b",
+                o_cands[0].t,
+                o_cands[0].rob_idx,
+                o_cands[0].data,
+                o_cands[0].btq_idx,
+                o_cands[0].take,
+                o_cands[0].is_brch,
+            );
+            $display("ren: %b, rvld: %b", bays.vld & ~bays.got, rvld);
+            foreach (fu2in_gnt[f, i]) begin
+                $display("bays[%2d][%2d]: vld=%b, got=%b, t=%2d, rob_idx=%2d, addr=%x, mem_size=%2d, dat=%x",
+                    f,
+                    i,
+                    bays.vld    [f][i],
+                    bays.got    [f][i],
+                    bays.t      [f][i],
+                    bays.rob_idx[f][i],
+                    bays.addr   [f][i],
+                    bays.mem_size[f][i],
+                    bays.dat    [f][i]
+                );
+            end
+            $display("  %3d | << BAYS", $time);
+        end
+    end
+    `endif
 
     /* TODO: CAND generation logic. Also, how do we know when
     a load result is ready without an lq2execute line? */
@@ -429,10 +636,9 @@ module str_ex(
     input  logic    [`NUM_FU_STORE-1:0]  i_vld,
     input  STR_REGS [`NUM_FU_STORE-1:0]  i_regs,
     
-    input   sq2execute sq_in,
     output  execute2sq sq_out,
     // FIXME: Isn't an lq2execute needed? <-- Answer: No, if an issue is found when forwarding the SQ_IDX to LQ, it is flagged in the ROB to restart from that PC
-    output  execute2lq lq_out,
+    output  execeuteST2lq st_lq_out,
 
     /* BACKEND */
     output logic    [`NUM_FU_STORE-1:0]  o_vld,
@@ -457,9 +663,11 @@ module str_ex(
             sq_out.st_addr[i]       = addr;
             sq_out.st_data[i]       = i_regs[i].rs2;
             sq_out.st_mem_size[i]   = i_regs[i].dat.mem_size;
-            /* FIXME: What about rd_unsigned? We are not using this
-            in lq???? */
-            // $display("EX OUT [%0d]: en: %b, sq_idx: %0d, addr: %0d, data: %0d, mem_size: %0d", i, sq_out.st_ex_en[i], sq_out.st_sq_idx[i], sq_out.st_addr[i], sq_out.st_data[i], sq_out.st_mem_size[i]);
+
+            st_lq_out.st_en[i]      = i_vld[i];
+            st_lq_out.st_sq_idx[i]  = i_regs[i].dat.sq_idx;
+
+
         end
     end
 
@@ -503,31 +711,6 @@ module mul_ex(
             };
         end
     end
-
-    `ifdef DEBUG
-    always_ff @(posedge clock) begin
-        if (!reset) begin
-            $display("mul_ex: cdb <%b>[%2d -> %2d], <%b>[%2d -> %2d]",
-                cdat.en[0],
-                cdat.ts[0],
-                cdat.data[0],
-                cdat.en[1],
-                cdat.ts[1],
-                cdat.data[1]
-            );
-
-            for (int unsigned i = 0; i < `NUM_FU_MULT; ++i) begin
-                $display("%2d bytag: (b1:%b, idx1:%b) (b2:%b, idx2:%b)",
-                    i,
-                    i_regs[i].dat.bytag.bypass1,
-                    i_regs[i].dat.bytag.cdb_idx1,
-                    i_regs[i].dat.bytag.bypass2,
-                    i_regs[i].dat.bytag.cdb_idx2,
-                );
-            end
-        end
-    end
-    `endif // DEBUG
 
     // execute
     generate
@@ -588,6 +771,8 @@ module stage_ex_p4 (
     output  execute2sq sq_out,
     // FIXME: Isn't an lq2execute needed?
     output  execute2lq lq_out,
+    output  execeuteST2lq st_lq_out,
+    output  executeLD2sq ld_sq_out,
 
     input   prf2execute prf_in,
     output  execute2prf prf_out,
@@ -705,7 +890,8 @@ module stage_ex_p4 (
                 t1      : rs_in.fu_dat_load[i].t1,
                 opb     : `RV32_signext_Iimm(rs_in.fu_dat_load[i].inst),
 
-                lq_idx  : rs_in.fu_dat_load[i].lsq_idx,
+                lq_idx  : rs_in.fu_dat_load[i].lq_idx,
+                sq_idx  : rs_in.fu_dat_load[i].sq_idx,
                 rob_idx : rs_in.fu_dat_load[i].rob_idx,
                 mem_size: MEM_SIZE'(rs_in.fu_dat_load[i].inst.r.funct3[1:0]),
                 rd_unsigned : rs_in.fu_dat_load[i].inst.r.funct3[2]
@@ -736,7 +922,7 @@ module stage_ex_p4 (
                 t2      : rs_in.fu_dat_store[i].t2,
                 opb     : `RV32_signext_Simm(rs_in.fu_dat_store[i].inst),
 
-                sq_idx  : rs_in.fu_dat_store[i].lsq_idx,
+                sq_idx  : rs_in.fu_dat_store[i].sq_idx,
                 rob_idx : rs_in.fu_dat_store[i].rob_idx,
                 mem_size: MEM_SIZE'(rs_in.fu_dat_store[i].inst.r.funct3[1:0])
             };
@@ -995,9 +1181,12 @@ module stage_ex_p4 (
 
         .o_vld  (ex.o_vld.lod),
         .o_cands(cands.lod),
+        .lq_out(lq_out),
+        .ld_sq_out(ld_sq_out),
+        .sq_in(sq_in),
         /* FIXME: How exactly do we do CDB arbitration for loads/stores?
         And how does it fit in our ETB system? */
-        .o_rdy  (cdb_gnt_shr[0].lod)
+        .o_rdy  (cdb_gnt_shr[1].lod)
     );
 
     str_ex str_ex0 (
@@ -1015,8 +1204,8 @@ module stage_ex_p4 (
         And how does it fit in our ETB system? */
         .o_rdy  (cdb_gnt_shr[0].str),
 
-        .sq_in(sq_in),
-        .sq_out(sq_out)
+        .sq_out(sq_out),
+        .st_lq_out(st_lq_out)
     );
 
     /* >> ======== STAGE 4/?: CDB data/tag broadcast ======== >> */
@@ -1196,8 +1385,8 @@ module stage_ex_p4 (
             );
 
             $display("\ncdb_req: alu:{%b} mul:{%b}", cdb_req.alu, cdb_req.mul);
-            $display("ctag_ts: alu:{%2d, %2d} mul:{%2d, %2d}",
-                ctag_ts.alu[1], ctag_ts.alu[0], ctag_ts.mul[1], ctag_ts.mul[0]);
+            // $display("ctag_ts: alu:{%2d, %2d} mul:{%2d, %2d}",
+            //     ctag_ts.alu[1], ctag_ts.alu[0], ctag_ts.mul[1], ctag_ts.mul[0]);
             $display("cdb_gnt: alu:{%b} mul:{%b}", cdb_gnt.alu, cdb_gnt.mul);
             for (int i = 0; i < 2; ++i) begin
                 $display("cdb_gnt[%0d]: alu:{%b} mul:{%b}", i, cdb_gnt_shr[i].alu, cdb_gnt_shr[i].mul);

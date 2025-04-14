@@ -32,6 +32,8 @@ module dispatch #(parameter
     // LSQ
     input   sq2dispatch sq_in,
     output  dispatch2sq sq_out,
+    input   lq2dispatch lq_in,
+    output  dispatch2lq lq_out,
     
     // BTQ
     input   btq2dispatch btq_in,
@@ -55,6 +57,7 @@ logic [$clog2(N):0] alloc_vld_scnt;
 
 logic [$clog2(N):0] lim_cnt_free;
 logic [$clog2(N):0] lim_cnt_sq;
+logic [$clog2(N):0] lim_cnt_lq;
 
 // Gate by availability
 always_comb begin
@@ -159,12 +162,22 @@ always_comb begin
     end
     rename_en_cnt = `MIN(lim_cnt_sq, rename_en_cnt);
 
+    lim_cnt_lq = 0;
+    for (int unsigned i = 0, int used_cnt = 0; i < `N; ++i) begin
+        if (used_cnt + rename_in[i].rd_mem > lq_in.lq_rdy_scnt)
+            break;
+        used_cnt += rename_in[i].rd_mem;
+        ++lim_cnt_lq;
+    end
+    rename_en_cnt = `MIN(lim_cnt_lq, rename_en_cnt);
+
     rename_en_cnt = `MIN(rename_rdy_scnt, rename_en_cnt);
 end
 
 // handle btq output
 logic [`N-1:0] is_brch;
 logic [`N-1:0] wr_mem;
+logic [`N-1:0] rd_mem;
 always_comb begin
     foreach(rename_en[i])
         rename_en[i] = i < rename_en_cnt;
@@ -173,13 +186,17 @@ always_comb begin
         is_brch[i]  = rename_in[i].is_brch;
     foreach(wr_mem[i])
         wr_mem[i]   = rename_in[i].wr_mem;
+    foreach(rd_mem[i])
+        rd_mem[i]   = rename_in[i].rd_mem;
 
+    sq_out.rename_en_cnt= $countones(rename_en & wr_mem);
+    lq_out.rename_en_cnt= $countones(rename_en & rd_mem);
     btq_out.en_cnt      = $countones(rename_en & is_brch);
-    sq_out.sq_d_en_cnt  = $countones(rename_en & wr_mem);
 end
 
 // handle map table output 
 always_comb begin
+    map_out = '0;
     map_out.en_cnt  = rename_en_cnt;
 
     for (int i = 0; i < rename_en_cnt; i++) begin
@@ -195,12 +212,11 @@ end
 RENAME_COMMIT_PKT [`N-1:0] tmp_alloc2rename;
 logic [`N-1:0] rd_src1s;
 logic [`N-1:0] rd_src2s;
-logic [$clog2(`N):0] sq_wr_idx;
 logic [$clog2(`N):0] btq_wr_idx;
 always_comb begin
     tmp_alloc2rename = '0;
-    sq_wr_idx   = 0;
     btq_wr_idx  = 0;
+    btq_out.NPC = '0;
 
     for (int i = 0; i < `N; ++i) begin
         tmp_alloc2rename[i].dat         = rename_in[i];
@@ -223,12 +239,6 @@ always_comb begin
             tmp_alloc2rename[i].dat.btq_idx = btq_in.btq_idxs[btq_wr_idx];
             btq_out.NPC[btq_wr_idx] = rename_in[i].NPC;
             ++btq_wr_idx;
-        end
-
-        if (rename_in[i].wr_mem) begin
-            tmp_alloc2rename[i].dat.lsq_idx = sq_in.next_ids[sq_wr_idx];
-            sq_out.rob_idx = rob_in.rob_idxs[i];
-            ++sq_wr_idx;
         end
     end
 end
@@ -258,11 +268,19 @@ fifo #(
 
 /* >> ==== 3. Commit Stage ==== >> */
 
+logic [$clog2(`N):0] sq_wr_idx;
+logic [$clog2(`N):0] lq_wr_idx;
 // handle rs output 
 always_comb begin
     commit_en_cnt   = `MIN(rename_vld_scnt, rs_in.rs_rdy_scnt);
     rs_out.d_en_cnt = commit_en_cnt;
     rs_out.d_dat    = '0;
+    sq_wr_idx       = 0;
+    lq_wr_idx       = 0;
+    lq_out.rob_idx = '0; //handling latch prevention
+    lq_out.sq_idx = '0;
+    lq_out.inst_pc = '0;
+    sq_out.rob_idx = '0;
 
     for (int i = 0; i < `N; i++) begin
         rs_out.d_dat[i] = commit_in[i].dat;
@@ -273,7 +291,29 @@ always_comb begin
         end
         rs_out.d_dat[i].t1_rdy |= cpl_lst[commit_in[i].dat.t1];
         rs_out.d_dat[i].t2_rdy |= cpl_lst[commit_in[i].dat.t2];
+
+        if (commit_in[i].dat.wr_mem) begin
+            rs_out.d_dat[i].sq_idx = sq_in.next_ids[sq_wr_idx];
+            sq_out.rob_idx[sq_wr_idx] = rob_in.rob_idxs[i];
+            ++sq_wr_idx;
+        end
+
+        if (commit_in[i].dat.rd_mem) begin
+            rs_out.d_dat[i].sq_idx = (sq_in.no_store_yet && (sq_wr_idx == 0)) ? `LSQ_SZ_DBL : (sq_in.last_used_sq_idx + sq_wr_idx) % `LSQ_SZ_DBL;
+            // lq_out.rob_idx[lq_wr_idx] = rob_in.rob_idxs[i];
+            // lq_out.sq_idx[lq_wr_idx] = sq_in.no_store_yet ? (sq_wr_idx > 0) ? sq_wr_idx-1 : 33 : (sq_in.last_used_sq_idx + sq_wr_idx - 1) % `LSQ_SZ_DBL;
+            // if (sq_in.no_store_yet && (sq_wr_idx > 0)) lq_out.sq_idx[lq_wr_idx] = sq_wr_idx-1;
+            // else if (sq_in.no_store_yet) lq_out.sq_idx[lq_wr_idx] = `LSQ_SZ_DBL + 1;
+            // else lq_out.sq_idx[lq_wr_idx] = (sq_in.last_used_sq_idx + sq_wr_idx - 1) % `LSQ_SZ_DBL;
+            lq_out.sq_idx[lq_wr_idx] = (sq_in.no_store_yet && (sq_wr_idx == 0)) ? `LSQ_SZ_DBL : (sq_in.last_used_sq_idx + sq_wr_idx) % `LSQ_SZ_DBL;
+            lq_out.inst_pc[lq_wr_idx] = commit_in[i].dat.PC;
+            ++lq_wr_idx;
+            // $display("UPDATING: last: %0d, wr_idx: %0d, tag: %0d", sq_in.last_used_sq_idx, sq_wr_idx, lq_out.sq_idx[lq_wr_idx]);
+        end
     end
+
+    sq_out.sq_d_en_cnt = sq_wr_idx;
+    lq_out.lq_d_en_cnt = lq_wr_idx;
 end
 
 // handle rob output 

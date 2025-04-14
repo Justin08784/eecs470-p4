@@ -16,6 +16,7 @@ module rob #(
 
     // complete (write)
     input  execute2complete_dat cdat_in,
+    input sq2rob sq_in,
 
     // dispatch (write)
     output rob2dispatch d_out,
@@ -124,6 +125,12 @@ module rob #(
                 This edge case seems only possible (as far as we can tell) for rob_idx 0,
                 since the CDB defaults to 0 at the start of each cycle.
                 */
+            end
+
+            //handle SQ completes
+            for (int unsigned i = 0; i < `NUM_FU_STORE; ++i) begin
+                if (sq_in.complete_en[i])
+                    state[sq_in.complete_rob_idxs[i]].cpl <= 1;
             end
 
             // handle dispatch (ins)

@@ -20,13 +20,18 @@ module retire (
     input  sq2retire sq_in,
     output retire2sq sq_out,
 
-    output logic mispred,
-    output ADDR  mispred_target,
+    input lq2retire lq_in,
+
+    output retire2lq lq_out,
+
+    output logic flush,
+    output ADDR  corrected_PC,
     output retire_final retire_exec
 );
     logic [$clog2(`N):0] r_en_cnt;
     logic [$clog2(`N):0] btq_rd_cnt;
     logic [$clog2(`N):0] sq_rd_cnt;
+    logic [$clog2(`N):0] lq_rd_cnt;
 
     PHYS_REG_IDX [`N-1:0] tmp_tag;
     PHYS_REG_IDX [`N-1:0] tmp_t_old;
@@ -34,6 +39,11 @@ module retire (
     logic        [`N-1:0] tmp_halt;
     logic        [`N-1:0] tmp_illegal;
     logic        [`N-1:0] tmp_is_brch;
+
+    logic mispred;
+    ADDR  mispred_target;
+    logic ld_ooo;
+    ADDR  ld_PC;
 
     always_comb begin
         // FIXME: >>
@@ -46,20 +56,33 @@ module retire (
 
         mispred = 0;
         mispred_target = '0;
+        ld_ooo = 0;
+        ld_PC = '0;
 
         r_en_cnt = 0;
         btq_rd_cnt = 0;
         sq_rd_cnt  = 0;
+        lq_rd_cnt = 0;
         for (int i = 0; i < rob_in.r_vld_cnt; ++i) begin
             if (!rob_in.entries[i].cpl)
                 break;
             if (rob_in.entries[i].halt && !sq_in.sq_ret_complete)
                 break;
 
+            if (rob_in.entries[i].rd_mem) begin
+                // if (0) begin // TODO: enable when lq_in.err_ld_ooo is actually set
+                if (lq_in.err_ld_ooo[lq_rd_cnt]) begin
+                    ld_ooo  = 1;
+                    ld_PC   = lq_in.PC[lq_rd_cnt];
+                    break;
+                end
+                ++lq_rd_cnt; 
+            end
+            
             ++r_en_cnt;
-            if (rob_in.entries[i].wr_mem && (sq_rd_cnt < sq_in.ret_rdy))
-                ++sq_rd_cnt; // TODO: assign to sq_out.r_en
-            // FIXME: Is checking sq_in.ret_rdy even necessary?
+            if (rob_in.entries[i].wr_mem)
+                ++sq_rd_cnt; 
+                
 
             if (!rob_in.entries[i].is_brch)
                 continue;
@@ -78,6 +101,13 @@ module retire (
         btq_out = '{
             rd_cnt : btq_rd_cnt
         };
+
+        flush = mispred || ld_ooo;
+        corrected_PC = mispred
+            ? mispred_target
+            : ld_ooo
+                ? ld_PC
+                : '0;
 
         for (int i = 0; i < `N; ++i) begin
             tmp_tag[i]     = rob_in.entries[i].tag;
@@ -100,6 +130,19 @@ module retire (
             illegal  : tmp_illegal,
             is_brch  : tmp_is_brch
         };
+
+        sq_out.r_en = sq_rd_cnt;
+        lq_out.r_en = lq_rd_cnt;
+    end
+
+    // Debugging asserts
+    always_ff @(posedge clock) begin
+        if (!reset) begin
+            if (mispred && ld_ooo) begin
+                $error("Retire: both flush conditions set!");
+                $fatal;
+            end
+        end
     end
 
     `ifdef DEBUG
@@ -109,6 +152,7 @@ module retire (
         btq_out,
         sq_in,
         sq_out,
+        lq_in,
         mispred,
         mispred_target,
         retire_exec

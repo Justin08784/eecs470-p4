@@ -100,16 +100,6 @@ typedef struct packed {
 } MISS_PKT; // pre MSHR
 
 
-
-// Get word address; restricting to only actually used 16 LSB.
-function automatic logic[13:0] waddr(input ADDR addr);
-    return addr[15:2];
-endfunction
-// Double word address
-function automatic logic[12:0] dwaddr(input ADDR addr);
-    return addr[15:3];
-endfunction
-
 function automatic ADDR w_align(input ADDR addr);
     return {addr[31:2], 2'b00};
 endfunction
@@ -125,16 +115,6 @@ function automatic logic [1:0] idw_half(input ADDR addr);
     return addr[2:1];
 endfunction
 function automatic logic [2:0] idw_byte(input ADDR addr);
-    return addr[2:0];
-endfunction
-
-// In-word byte offset
-function automatic logic[1:0] iw_off(input ADDR addr);
-    return addr[1:0];
-endfunction
-
-// In-double-word byte offset
-function automatic logic[2:0] idw_off(input ADDR addr);
     return addr[2:0];
 endfunction
 

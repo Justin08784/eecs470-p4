@@ -715,10 +715,12 @@ module dcache #(
         end
     end
 
+    `ifdef DEBUG
     assign dbg = '{
         hdr     : cache_hdr,
         state   : dbg_state
     };
+    `endif
     always_ff @(posedge clock) begin
         if (reset) begin
             cache_hdr   <= '0;

@@ -6,7 +6,8 @@ module sq #(parameter
     LSQ_SZ=`LSQ_SZ,
     LSQ_SZ_DBL=`LSQ_SZ_DBL,
     NUM_FU_STORE=`NUM_FU_STORE,
-    NUM_FU_LOAD=`NUM_FU_LOAD
+    NUM_FU_LOAD=`NUM_FU_LOAD,
+    LD_BAY_SZ=`LD_BAY_SZ
 ) (
     `ifdef DEBUG
     output DBG_sq dbg,
@@ -15,204 +16,228 @@ module sq #(parameter
     input reset,
     input flush,
 
-    input dispatch2sq   dis_2_sq,
-    input execute2sq    exec_2_sq,
-    input retire2sq     retire_2_sq,
+    input dispatch2sq   dispatch_in,
+    input execute2sq    execute_in,
+    input executeLD2sq  ex_frwd_in,
+    input retire2sq     retire_in,
     input MEM_TAG       mem2proc_transaction_tag,
 
-    output sq2dispatch  sq_2_dis,
-    output sq2execute   sq_2_exec,
-    // output sq2rs sq_2_rs,
-    output sq2retire    sq_2_retire,
-    output stRET2mem    ret_2_mem
+    output sq2dispatch  dispatch_out,
+    output sq2execute   execute_out,
+    output sq2rob       rob_out,
+    output sq2retire    retire_out,
+    output stRET2mem    mem_out
 );
 
     localparam NUM_DPORTS = N; // dispatch ports (in-order)
     localparam NUM_RPORTS = N; // retire ports (in-order)
     localparam NUM_ST_PORTS = NUM_FU_STORE; // ex-2-sq ports
     localparam NUM_LD_PORTS = NUM_FU_LOAD;
-    logic [$clog2(NUM_DPORTS):0]    free_scnt;
-    logic [$clog2(NUM_RPORTS):0]    used_scnt;
 
     logic [$clog2(LSQ_SZ)-1:0]      head;
     logic [$clog2(LSQ_SZ)-1:0]      tail;
     logic [$clog2(LSQ_SZ_DBL)-1:0]  tail_dbl;
     LSQ_IDX                         last_used_sq_idx;
+    logic                           no_store_yet;
 
     SQ_ENTRY [LSQ_SZ-1:0]           state;
     logic [$clog2(LSQ_SZ):0]        used, free;
+    logic [$clog2(2*`N):0]          rsvd; // sz(rename_buf) = 2*`N
+
+    logic [$clog2(NUM_DPORTS):0]    free_scnt;
+    logic [$clog2(NUM_RPORTS):0]    used_scnt;
+    assign free_scnt    = `MIN(free - rsvd, NUM_DPORTS);
+    assign used_scnt    = `MIN(used, NUM_RPORTS);
 
     logic [NUM_RPORTS-1:0][$clog2(LSQ_SZ)-1:0] r_idxs;
     logic [NUM_DPORTS-1:0][$clog2(LSQ_SZ)-1:0] d_idxs;
-
-    sq2stRET sq_2_ret;
-    stRET2sq ret_2_sq;
-    forwardRET2sq forward_ret_2_sq;
-
-    `ifdef DEBUG
-    assign state_dbg    = state;
-    `endif 
-    assign free         = LSQ_SZ - used;
-    assign free_scnt    = `MIN(free, NUM_DPORTS);
-    assign used_scnt    = `MIN(used, NUM_RPORTS);
-
-
-    DBG_retbuf dbg_retbuf;
-    post_ret_buffer buf_dut(
-        `ifdef DEBUG
-        .dbg(dbg_retbuf),
-        `endif
-        .clock(clock),
-        .reset(reset),
-        .flush(flush),
-        .sq_2_ret(sq_2_ret),
-        .mem2proc_transaction_tag(mem2proc_transaction_tag),
-        .ret_2_sq(ret_2_sq),
-        .forward_ret_2_sq(forward_ret_2_sq),
-        .ret_2_mem(ret_2_mem)
-    );
-
-
-    LSQ_IDX head_plus_one;
     LSQ_IDX [N-1:0] next_ids;
-    logic sq_ret_complete;
     always_comb begin
-
         for (int unsigned i = 0; i < NUM_RPORTS; ++i)
             r_idxs[i] = (head + i) % LSQ_SZ;
         for (int unsigned i = 0; i < NUM_DPORTS; ++i)
             d_idxs[i] = (tail + i) % LSQ_SZ;
         for (int unsigned i = 0; i < NUM_DPORTS; ++i)
             next_ids[i] = (tail_dbl + i) % LSQ_SZ_DBL;
-
-        // handle dispatch (outs)
-        sq_2_dis <= '{
-            sq_rdy_scnt         : `MIN(free, NUM_DPORTS),
-            last_used_sq_idx    : last_used_sq_idx,
-            next_ids            : next_ids
-        };
-
-        //handle LSQ CDB to RS
-        // sq_2_rs <= '{
-        //     en : exec_2_sq.st_ex_en,
-        //     sq_idx_cdb     : exec_2_sq.st_sq_idx
-        // };
-
-        //handle sq to ROB for retirement
-        sq_ret_complete = (ret_2_sq.empty && (used == 0)) ? '1 : '0;
-        head_plus_one = (head + 1) % LSQ_SZ;
-        if (state[head].d_vld && state[head_plus_one].d_vld)    sq_2_retire.ret_rdy = 2;
-        else if (state[head].d_vld)                             sq_2_retire.ret_rdy = 1;
-        else                                                    sq_2_retire.ret_rdy = 0;
-        // sq_2_retire.ret_rdy = `MIN(sq_2_retire.ret_rdy,ret_2_sq.free_out);
-        sq_2_retire.sq_ret_complete = (ret_2_sq.empty && (used_scnt == 0)) ? '1 : '0;
-
-        // $display("SQ_RET_RDY: %0d", sq_2_retire.ret_rdy);
-
-        //handle retirement write to mem
-        sq_2_ret.ret_cnt   = retire_2_sq.r_en;
-        sq_2_ret.ret_st[0] = state[head];
-        sq_2_ret.ret_st[1] = state[head_plus_one];
-
     end
 
 
+    /* >> ======== SECTION: Retirement ======== >> */
+    execute2sq      next_complete;
+    sq2stRET        ret_buf_out;
+    stRET2sq        ret_buf_in;
+    DBG_retbuf      dbg_retbuf;
+    forwardRET2sq   ret_buf_frwd_in;
+    post_ret_buffer buf_dut(
+        `ifdef DEBUG
+        .dbg(dbg_retbuf),
+        `endif
+        .clock(clock),
+        .reset(reset),
+        .sq_in(ret_buf_out),
+        .mem2proc_transaction_tag(mem2proc_transaction_tag),
+        .sq_out(ret_buf_in),
+        .sq_frwd_out(ret_buf_frwd_in),
+        .mem_out(mem_out)
+    );
+
     always_comb begin
-        sq_2_exec = '0;
+        rob_out = '0;
+        //handle sq to ROB for retirement
+        rob_out.complete_en = next_complete.st_ex_en;
+        for (int i = 0; i < NUM_FU_STORE; i++) begin
+            if (i >= next_complete.st_ex_en)
+                continue;
+
+            rob_out.complete_rob_idxs[i] = state[next_complete.st_sq_idx[i]].rob_idx;
+        end
+        retire_out.sq_ret_complete = (ret_buf_in.used_scnt == 0) && (used_scnt == 0);
+
+        //handle retirement write to mem
+        ret_buf_out.ret_cnt    = retire_in.r_en;
+        foreach (r_idxs[i])
+            ret_buf_out.ret_st[i] = state[r_idxs[i]];
 
         //handle data forwarding
-        sq_2_ret.forward_req_en     = exec_2_sq.forward_req_en;
-        sq_2_ret.forward_sq_idx     = exec_2_sq.forward_sq_idx;
-        sq_2_ret.forward_addr       = exec_2_sq.forward_addr;
-        sq_2_ret.forward_mem_size   = exec_2_sq.forward_mem_size;
+        ret_buf_out.forward_req_en     = ex_frwd_in.forward_req_en;
+        ret_buf_out.forward_sq_idx     = ex_frwd_in.forward_sq_idx;
+        ret_buf_out.forward_addr       = ex_frwd_in.forward_addr;
+        ret_buf_out.forward_mem_size   = ex_frwd_in.forward_mem_size;
+    end
 
-        for (int unsigned i = 0, ADDR start = 0; i < NUM_FU_LOAD; i++) begin
-            if (!exec_2_sq.forward_req_en[i]) continue;
+    /* >> ======== SECTION: Execute ======== >> */
+    sq2execute next_sq_2_exec;
+    sq2execute uncombined_forward_data;
 
-            start = exec_2_sq.forward_addr[i] - (exec_2_sq.forward_addr[i] % 4);
+    // logic [LD_BAY_SZ-1:0] [LSQ_SZ-1:0] [3:0] byte_matches;
+    // always_comb begin
+    //     byte_matches = 0;
+    //     next_sq_2_exec = '0;
+
+    //     //find all matches in parallel
+    //     for (int unsigned i = 0; i < LD_BAY_SZ; ++i) begin
+    //         for (int unsigned j = 0, int unsigned idx = 0; j < LSQ_SZ; ++j) begin
+    //             idx = (head + j) % LSQ_SZ;
+
+    //             if (state[idx].d_vld && (waddr(state[idx].addr) == waddr(ex_frwd_in.forward_addr[i]))) begin
+    //                 byte_matches[i][j] = state[idx].bytewise_addr_mask;
+    //                 // $display("FOUND_MATCH[%0d]: %0d, %4b", idx, state[idx].data, byte_matches[i][j]);
+    //             end
+    //         end
+    //     end
+
+    //     //apply the matches bottom-up to catch the most recent matches first
+    //     for (int unsigned i = 0; i < LD_BAY_SZ; ++i) begin
+    //         if (!ex_frwd_in.forward_req_en[i]) continue;
+
+    //         for (int unsigned j = 0, logic [$clog2(LSQ_SZ)-1:0] idx = 0; j < used; ++j) begin
+    //             idx = state[ex_frwd_in.forward_sq_idx[i]%LSQ_SZ].sq_idx == ex_frwd_in.forward_sq_idx[i] ? ex_frwd_in.forward_sq_idx[i]%LSQ_SZ-j : tail - j - 1;
+
+    //             // if (state[idx].sq_idx == ex_frwd_in.forward_sq_idx[i]) begin
+    //             //     next_sq_2_exec.forward_data[i] = '0;
+    //             //     next_sq_2_exec.forward_byte_en[i] = '0;
+    //             //     $display("EXACT");
+    //             // end
+
+    //             next_sq_2_exec.forward_data[i].byte_level[0] = byte_matches[i][idx][0] ? state[idx].data.byte_level[0] : next_sq_2_exec.forward_data[i].byte_level[0];
+    //             next_sq_2_exec.forward_data[i].byte_level[1] = byte_matches[i][idx][1] ? state[idx].data.byte_level[1] : next_sq_2_exec.forward_data[i].byte_level[1];
+    //             next_sq_2_exec.forward_data[i].byte_level[2] = byte_matches[i][idx][2] ? state[idx].data.byte_level[2] : next_sq_2_exec.forward_data[i].byte_level[2];
+    //             next_sq_2_exec.forward_data[i].byte_level[3] = byte_matches[i][idx][3] ? state[idx].data.byte_level[3] : next_sq_2_exec.forward_data[i].byte_level[3];
+
+
+    //             next_sq_2_exec.forward_byte_en[i] |= byte_matches[i][idx];
+
+    //             $display("FINAL_DATA: %0d, %4b, %0d, %0d", next_sq_2_exec.forward_data[i], byte_matches[i][idx], state[idx].data, idx);
+    //             $display("EXACT? %0d, %0d", state[idx].sq_idx,ex_frwd_in.forward_sq_idx[i]);
+
+    //             if (next_sq_2_exec.forward_byte_en[i] == 4'b1111) break;
+
+    //         end
+
+    //         next_sq_2_exec.forward_en[i] = (next_sq_2_exec.forward_byte_en[i] != 0);
+    //     end
+    // end
+
+    always_comb begin
+        next_sq_2_exec = '0;
+        // most_recent_bytes = '0;
+
+        for (int unsigned i = 0; i < LD_BAY_SZ; i++) begin
+
+            if (!ex_frwd_in.forward_req_en[i]) continue;
+
             for (int unsigned j = 0, int unsigned idx = 0; j < used; ++j) begin
                 idx = (head+j) % LSQ_SZ;
 
-                if (state[idx].d_vld && (state[idx].bytewise_addr[0] == start)) begin
-                    // $display("Mask: %4b", state[idx].bytewise_addr_mask);
-                    // $display("Addr: %0d, Data: %0d, Shifted: %0d, Offset: %0d", state[idx].addr, state[idx].data, shifted_data, offset);
-                    sq_2_exec.forward_data[i][7:0]      = state[idx].bytewise_addr_mask[0] ? state[idx].data[7:0]      : sq_2_exec.forward_data[i][7:0];
-                    sq_2_exec.forward_data[i][15:8]     = state[idx].bytewise_addr_mask[1] ? state[idx].data[15:8]     : sq_2_exec.forward_data[i][15:8];
-                    sq_2_exec.forward_data[i][23:16]    = state[idx].bytewise_addr_mask[2] ? state[idx].data[23:16]    : sq_2_exec.forward_data[i][23:16];
-                    sq_2_exec.forward_data[i][31:24]    = state[idx].bytewise_addr_mask[3] ? state[idx].data[31:24]    : sq_2_exec.forward_data[i][31:24];
+                if (state[idx].d_vld && (waddr(state[idx].addr) == waddr(ex_frwd_in.forward_addr[i]))) begin
+                    next_sq_2_exec.forward_data[i].byte_level[0] = state[idx].bytewise_addr_mask[0] ? state[idx].data.byte_level[0] : next_sq_2_exec.forward_data[i].byte_level[0];
+                    next_sq_2_exec.forward_data[i].byte_level[1] = state[idx].bytewise_addr_mask[1] ? state[idx].data.byte_level[1] : next_sq_2_exec.forward_data[i].byte_level[1];
+                    next_sq_2_exec.forward_data[i].byte_level[2] = state[idx].bytewise_addr_mask[2] ? state[idx].data.byte_level[2] : next_sq_2_exec.forward_data[i].byte_level[2];
+                    next_sq_2_exec.forward_data[i].byte_level[3] = state[idx].bytewise_addr_mask[3] ? state[idx].data.byte_level[3] : next_sq_2_exec.forward_data[i].byte_level[3];
 
-                    sq_2_exec.forward_byte_en[i] |= state[idx].bytewise_addr_mask;
+                    next_sq_2_exec.forward_byte_en[i] |= state[idx].bytewise_addr_mask;
                 end
 
-                if (state[idx].sq_idx == exec_2_sq.forward_sq_idx[i]) break;
+                if (state[idx].sq_idx == ex_frwd_in.forward_sq_idx[i]) break;
             end
 
-            sq_2_exec.forward_en[i] = (sq_2_exec.forward_byte_en[i] != 0) ? '1 : '0;
-            
-            // $display("Forward data[%0d]: %0d", i, sq_2_exec.forward_data[i]);
-        end
+            next_sq_2_exec.forward_en[i] = (next_sq_2_exec.forward_byte_en[i] != 0);
 
-        for (int unsigned i = 0; i < NUM_FU_LOAD; i++) begin
-            sq_2_exec.forward_en[i] |= forward_ret_2_sq.forward_en[i];
-            if (forward_ret_2_sq.sq_idx_found[i]) begin
-                sq_2_exec.forward_data[i] = forward_ret_2_sq.forward_data[i];
-            end
-            else begin
-                sq_2_exec.forward_data[i][7:0]      = ~sq_2_exec.forward_byte_en[i][0] ? forward_ret_2_sq.forward_data[i][7:0]      : sq_2_exec.forward_data[i][7:0];
-                sq_2_exec.forward_data[i][15:8]     = ~sq_2_exec.forward_byte_en[i][1] ? forward_ret_2_sq.forward_data[i][15:8]     : sq_2_exec.forward_data[i][15:8];
-                sq_2_exec.forward_data[i][23:16]    = ~sq_2_exec.forward_byte_en[i][2] ? forward_ret_2_sq.forward_data[i][23:16]    : sq_2_exec.forward_data[i][23:16];
-                sq_2_exec.forward_data[i][31:24]    = ~sq_2_exec.forward_byte_en[i][3] ? forward_ret_2_sq.forward_data[i][31:24]    : sq_2_exec.forward_data[i][31:24];
-            end
-            sq_2_exec.forward_byte_en[i] |= forward_ret_2_sq.forward_byte_en[i];
-
-            if ((exec_2_sq.forward_addr[i] % 4) == 1) begin
-                sq_2_exec.forward_data[i]       = sq_2_exec.forward_data[i] >> 8;
-                sq_2_exec.forward_byte_en[i]    = sq_2_exec.forward_byte_en[i] >> 8;
-            end
-            else if ((exec_2_sq.forward_addr[i] % 4) == 2) begin
-                sq_2_exec.forward_data[i]       = sq_2_exec.forward_data[i] >> 16;
-                sq_2_exec.forward_byte_en[i]    = sq_2_exec.forward_byte_en[i] >> 16;
-            end
-            else if ((exec_2_sq.forward_addr[i] % 4) == 3) begin
-                sq_2_exec.forward_data[i]       = sq_2_exec.forward_data[i] >> 24;
-                sq_2_exec.forward_byte_en[i]    = sq_2_exec.forward_byte_en[i] >> 24;
-            end
-
-            //ensure don't accidentally give more data than it wants
-            if (exec_2_sq.forward_mem_size[i] == BYTE) begin
-                sq_2_exec.forward_data[i] &= 8'hFF;
-                sq_2_exec.forward_byte_en[i] &= 1'b1;
-            end
-            else if (exec_2_sq.forward_mem_size[i] == HALF) begin
-                sq_2_exec.forward_data[i] &= 16'hFFFF;
-                sq_2_exec.forward_byte_en[i] &= 2'b11;
-            end
-
-            // $display("2. Forward_data[%0d]: %0d, %4b", i, sq_2_exec.forward_data[i],sq_2_exec.forward_byte_en[i]);
         end
     end
 
-    ADDR [`NUM_FU_LOAD-1:0] [3:0] bytewise_addr;
-    logic [`NUM_FU_LOAD-1:0] [3:0] bytewise_addr_mask;
-    logic [`NUM_FU_LOAD-1:0] [1:0] modulo4;
     always_comb begin
-        bytewise_addr = '0;
-        bytewise_addr_mask = '0;
-        modulo4 = '0;
-
-        for (int i = 0; i < `NUM_FU_STORE; i++) begin
-            modulo4[i] = exec_2_sq.st_addr[i] % 4;
-            // $display("ADDR: %0d, MOD: %0d, SIZE: %0d", exec_2_sq.st_addr[i], modulo4[i], exec_2_sq.st_mem_size[i]);
-            for (int j = 0; j < 4; j++) begin
-                bytewise_addr[i][j] = exec_2_sq.st_addr[i] - modulo4[i] + j;
+        execute_out = '0;
+        for (int unsigned i = 0, int unsigned word_off = 0; i < LD_BAY_SZ; i++) begin
+            execute_out.forward_en[i] |= ret_buf_frwd_in.forward_en[i];
+            if (ret_buf_frwd_in.sq_idx_found[i]) begin
+                execute_out.forward_data[i] = ret_buf_frwd_in.forward_data[i];
+                execute_out.forward_byte_en[i] = ret_buf_frwd_in.forward_byte_en[i];
             end
+            else begin
+                execute_out.forward_data[i].byte_level[0] = uncombined_forward_data.forward_byte_en[i][0] ? uncombined_forward_data.forward_data[i].byte_level[0] : ret_buf_frwd_in.forward_data[i].byte_level[0];
+                execute_out.forward_data[i].byte_level[1] = uncombined_forward_data.forward_byte_en[i][1] ? uncombined_forward_data.forward_data[i].byte_level[1] : ret_buf_frwd_in.forward_data[i].byte_level[1];
+                execute_out.forward_data[i].byte_level[2] = uncombined_forward_data.forward_byte_en[i][2] ? uncombined_forward_data.forward_data[i].byte_level[2] : ret_buf_frwd_in.forward_data[i].byte_level[2];
+                execute_out.forward_data[i].byte_level[3] = uncombined_forward_data.forward_byte_en[i][3] ? uncombined_forward_data.forward_data[i].byte_level[3] : ret_buf_frwd_in.forward_data[i].byte_level[3];
+                execute_out.forward_byte_en[i] |= ret_buf_frwd_in.forward_byte_en[i];
+            end
+            
+            word_off = iw_off(ex_frwd_in.forward_addr[i]);
+            execute_out.forward_data[i]       >>= 8 * word_off;
+            execute_out.forward_byte_en[i]    >>= 8 * word_off;
 
-            if (exec_2_sq.st_mem_size[i] == BYTE)       bytewise_addr_mask[i][modulo4[i]] = 1;
-            else if (exec_2_sq.st_mem_size[i] == HALF)  bytewise_addr_mask[i][modulo4[i]+:1] = '1;
-            else                                        bytewise_addr_mask[i] = '1;
+            //ensure don't accidentally give more data than it wants
+            case (ex_frwd_in.forward_mem_size[i])
+                BYTE: begin
+                    execute_out.forward_data[i]       &= 8'hFF;
+                    execute_out.forward_byte_en[i]    &= 1'b1;
+                end
+                HALF: begin
+                    execute_out.forward_data[i]       &= 16'hFFFF;
+                    execute_out.forward_byte_en[i]    &= 2'b11;
+                end
+                default: begin
+                    // FIXME: what to put for default case?
+                    execute_out.forward_data[i]       = execute_out.forward_data[i];//&= 32'hFFFFFFFF; 
+                    execute_out.forward_byte_en[i]    = execute_out.forward_byte_en[i];//&= 4'b1111;
+                end
+            endcase
 
-            // $display("bytewise addr[%0d], %0d, %0d, %0d, %0d", exec_2_sq.st_addr[i], bytewise_addr[i][0], bytewise_addr[i][1], bytewise_addr[i][2], bytewise_addr[i][3]);
-            // $display("bytewise mask: %4b", bytewise_addr_mask[i]);
+        end
+    end
+
+    logic [`NUM_FU_STORE-1:0] [3:0] bytewise_addr_mask;
+    always_comb begin
+        bytewise_addr_mask = '0;
+
+        for (int i = 0, int unsigned word_off = 0; i < `NUM_FU_STORE; i++) begin
+            word_off = iw_off(execute_in.st_addr[i]);
+
+            case (execute_in.st_mem_size[i])
+                BYTE:   bytewise_addr_mask[i][word_off]     = 1;
+                HALF:   bytewise_addr_mask[i][word_off+:1]  = '1;
+                default:bytewise_addr_mask[i]               = '1;
+            endcase
         end
 
         
@@ -221,67 +246,75 @@ module sq #(parameter
     logic [`NUM_FU_STORE-1:0] [4:0] updateOffset;
     always_comb begin
         updateOffset = '0;
-
-        for (int i = 0, logic [1:0] modulo4 = 0; i < `NUM_FU_STORE; i++) begin
-            modulo4 = exec_2_sq.st_addr[i] % 4;
-            updateOffset[i] = (modulo4 == 0) ? 0 : (modulo4 == 1) ? 8 : (modulo4 == 2) ? 16 : 24;
-            // shifted_data = state[idx].data << offset;
-        end
+        for (int i = 0; i < `NUM_FU_STORE; i++)
+            updateOffset[i] = 8 * iw_off(execute_in.st_addr[i]);
     end
 
+    /* >> ======== SECTION: Dispatch ======== >> */
+    always_comb begin
+        // handle dispatch (outs)
+        dispatch_out = '{
+            sq_rdy_scnt         : free_scnt,
+            last_used_sq_idx    : last_used_sq_idx,
+            next_ids            : next_ids,
+            no_store_yet        : no_store_yet
+        };
+    end
 
     always_ff @(posedge clock) begin
-
-        // $display("SQ_RET_RDY: %0d, head: %0d, valid: %b", sq_2_retire.ret_rdy, head, state[head].d_vld);
         
         if (reset || flush) begin
             used    <= 0;
+            free    <= LSQ_SZ;
+            rsvd    <= 0;
+
             head    <= 0;
             tail    <= 0;
             tail_dbl <= 0;
             state   <= '0;
-            last_used_sq_idx <= LSQ_SZ_DBL + 1; //outside of SQ range so that if a load occurs before the first store we don't flag it falsely
-            // sq_2_retire <= '0;
+            last_used_sq_idx <= LSQ_SZ_DBL - 1; //outside of SQ range so that if a load occurs before the first store we don't flag it falsely
+            next_complete <= '0;
+            no_store_yet <= '1;
+            uncombined_forward_data <= '0;
         end else begin
-            used    <= used + dis_2_sq.sq_d_en_cnt - retire_2_sq.r_en;
-            head    <= (head + retire_2_sq.r_en) % LSQ_SZ;
-            tail    <= (tail + dis_2_sq.sq_d_en_cnt) % LSQ_SZ;
-            tail_dbl <= (tail_dbl + dis_2_sq.sq_d_en_cnt) % LSQ_SZ_DBL;
-            last_used_sq_idx <= (last_used_sq_idx + dis_2_sq.sq_d_en_cnt) % LSQ_SZ_DBL;
+            used    <= used + dispatch_in.sq_d_en_cnt - retire_in.r_en;
+            free    <= free - dispatch_in.sq_d_en_cnt + retire_in.r_en;
+            rsvd    <= rsvd - dispatch_in.sq_d_en_cnt + dispatch_in.rename_en_cnt;
 
-            //to ROB
-            // if (state[head].d_vld && state[head_plus_one].d_vld)    sq_2_retire.ret_rdy <= 2;
-            // else if (state[head].d_vld)                             sq_2_retire.ret_rdy <= 1;
-            // else                                                    sq_2_retire.ret_rdy <= 0;
-            // // sq_2_retire.ret_rdy = `MIN(sq_2_retire.ret_rdy,ret_2_sq.free_out);
-            // sq_2_retire.sq_ret_complete <= sq_ret_complete;
-            
+            head    <= (head + retire_in.r_en) % LSQ_SZ;
+            tail    <= (tail + dispatch_in.sq_d_en_cnt) % LSQ_SZ;
+            tail_dbl <= (tail_dbl + dispatch_in.sq_d_en_cnt) % LSQ_SZ_DBL;
+            last_used_sq_idx <= dispatch_in.sq_d_en_cnt > 0 ? (last_used_sq_idx + dispatch_in.sq_d_en_cnt) % LSQ_SZ_DBL : last_used_sq_idx;
+            no_store_yet <= (dispatch_in.sq_d_en_cnt > 0) ? 0 : no_store_yet;
+
+            // $display("LAST_USED: %0d, %b", last_used_sq_idx, no_store_yet);
+
+            next_complete <= execute_in;
+            uncombined_forward_data <= next_sq_2_exec;
+
             // handle execute updates
             for (int unsigned i = 0, int cur_idx = 0; i < NUM_ST_PORTS; ++i) begin
-                cur_idx = exec_2_sq.st_sq_idx[i];
-                // $display("EX IN [%0d]: en: %b, sq_idx: %0d, addr: %0d, data: %0d, mem_size: %0d", i, exec_2_sq.st_ex_en[i], exec_2_sq.st_sq_idx[i], exec_2_sq.st_addr[i], exec_2_sq.st_data[i], exec_2_sq.st_mem_size[i]);
-                if (exec_2_sq.st_ex_en[i]) begin
-                    state[cur_idx].addr                 <= exec_2_sq.st_addr[i];
-                    state[cur_idx].bytewise_addr        <= bytewise_addr[i];
+                cur_idx = execute_in.st_sq_idx[i];
+                
+                if (execute_in.st_ex_en[i]) begin
+                    state[cur_idx].addr                 <= execute_in.st_addr[i];
                     state[cur_idx].bytewise_addr_mask   <= bytewise_addr_mask[i];
-                    state[cur_idx].data                 <= (exec_2_sq.st_data[i] << updateOffset[i]);
-                    state[cur_idx].mem_size             <= exec_2_sq.st_mem_size[i];
+                    state[cur_idx].data                 <= (execute_in.st_data[i] << updateOffset[i]);
+                    state[cur_idx].mem_size             <= execute_in.st_mem_size[i];
                     state[cur_idx].d_vld                <= '1;
                 end
 
             end
 
             // handle dispatch (ins)
-            // $display("d_en_cnt: %d", d_in.d_en_cnt);
             for (int unsigned i = 0, int cur_idx = 0; i < NUM_DPORTS; ++i) begin
-                if (i >= dis_2_sq.sq_d_en_cnt)
+                if (i >= dispatch_in.sq_d_en_cnt)
                     continue;
                 cur_idx = d_idxs[i];
                 state[cur_idx] <= '{
                     sq_idx              : next_ids[i],
-                    rob_idx             : dis_2_sq.rob_idx[i],
+                    rob_idx             : dispatch_in.rob_idx[i],
                     addr                : '0,
-                    bytewise_addr       : '0,
                     bytewise_addr_mask  : '0,
                     data                : '0,
                     d_vld               : '0,
@@ -301,16 +334,16 @@ module sq #(parameter
         tail,
         used,
         // I/O
-        dis_2_sq,
-        exec_2_sq,
-        retire_2_sq,
+        dispatch_in,
+        execute_in,
+        retire_in,
         mem2proc_transaction_tag,
 
-        sq_2_dis,
-        sq_2_exec,
+        dispatch_out,
+        execute_out,
         // sq2rs sq_2_rs,
-        sq_2_retire,
-        ret_2_mem,
+        retire_out,
+        mem_out,
 
         dbg_retbuf
     };
@@ -322,24 +355,24 @@ endmodule
 
 module post_ret_buffer #(parameter 
     N=`N,
-    LSQ_SZ=`LSQ_SZ,
+    SQ_RET_BUF_SZ=`SQ_RET_BUF_SZ,
     LSQ_SZ_DBL=`LSQ_SZ_DBL,
     NUM_FU_STORE=`NUM_FU_STORE,
-    NUM_FU_LOAD=`NUM_FU_LOAD
+    NUM_FU_LOAD=`NUM_FU_LOAD,
+    LD_BAY_SZ=`LD_BAY_SZ
 ) (
     `ifdef DEBUG
     output DBG_retbuf dbg,
     `endif
     input clock,
     input reset,
-    input flush,
 
-    input sq2stRET sq_2_ret,
+    input sq2stRET sq_in,
     input MEM_TAG mem2proc_transaction_tag,
 
-    output stRET2sq ret_2_sq,
-    output forwardRET2sq forward_ret_2_sq,
-    output stRET2mem ret_2_mem
+    output stRET2sq sq_out,
+    output forwardRET2sq sq_frwd_out,
+    output stRET2mem mem_out
 );
 
     localparam NUM_DPORTS = N; // dispatch ports (in-order)
@@ -349,106 +382,153 @@ module post_ret_buffer #(parameter
     logic [$clog2(NUM_DPORTS):0]    free_scnt;
     logic [$clog2(NUM_RPORTS):0]    used_scnt;
 
-    logic [$clog2(LSQ_SZ)-1:0]  head;
-    logic [$clog2(LSQ_SZ)-1:0]  tail;
+    logic [$clog2(SQ_RET_BUF_SZ)-1:0]  head;
+    logic [$clog2(SQ_RET_BUF_SZ)-1:0]  tail;
 
-    SQ_ENTRY [LSQ_SZ-1:0]       state;
-    logic [$clog2(LSQ_SZ):0]    used, free;
+    SQ_ENTRY [SQ_RET_BUF_SZ-1:0]       state;
+    logic [$clog2(SQ_RET_BUF_SZ):0]    used, free;
 
-    logic [NUM_RPORTS-1:0][$clog2(LSQ_SZ)-1:0] r_idxs;
-    logic [NUM_DPORTS-1:0][$clog2(LSQ_SZ)-1:0] d_idxs;
+    logic [NUM_RPORTS-1:0][$clog2(SQ_RET_BUF_SZ)-1:0] r_idxs;
+    logic [NUM_DPORTS-1:0][$clog2(SQ_RET_BUF_SZ)-1:0] d_idxs;
 
-    `ifdef DEBUG
-    assign state_dbg            = state;
-    `endif 
-    assign free                 = LSQ_SZ - used;
+    forwardRET2sq next_forward_ret_2_sq;
+
+    assign free                 = SQ_RET_BUF_SZ - used;
     assign free_scnt            = `MIN(free, NUM_DPORTS);
     assign used_scnt            = `MIN(used, NUM_RPORTS);
 
-    logic [$clog2(N):0] ret_success;
+    logic ret_success;
     logic [1:0] writeMod;
     logic [4:0] writeOffset;
     always_comb begin
-        ret_2_sq = '0;
+        sq_out = '0;
         writeMod = '0;
         writeOffset = '0;
 
         for (int unsigned i = 0; i < NUM_RPORTS; ++i)
-            r_idxs[i] = (head + i) % LSQ_SZ;
+            r_idxs[i] = (head + i) % SQ_RET_BUF_SZ;
         for (int unsigned i = 0; i < NUM_DPORTS; ++i)
-            d_idxs[i] = (tail + i) % LSQ_SZ;
+            d_idxs[i] = (tail + i) % SQ_RET_BUF_SZ;
 
-        // handle ret_2_sq
-        ret_2_sq.free_out = free_scnt;//`MIN(free, NUM_DPORTS);
-        ret_2_sq.empty = (used_scnt == 0) ? '1 : '0;
+        // handle sq_out
+        sq_out.free_scnt  = free_scnt;
+        sq_out.used_scnt  = used_scnt;
 
         //handle retirement write to mem
-        ret_2_mem = '0;
+        mem_out = '0;
         if (head != tail) begin
-            writeMod = state[head].addr % 4;
-            writeOffset = (writeMod == 0) ? 0 : (writeMod == 1) ? 8 : (writeMod == 2) ? 16 : 24;
+            writeOffset = 8 * iw_off(state[head].addr);
 
-            ret_2_mem.Dmem_command      = MEM_STORE;
-            ret_2_mem.Dmem_addr         = state[head].addr;
-            ret_2_mem.Dmem_store_data   = (state[head].data >> writeOffset);
-            ret_2_mem.Dmem_size         = state[head].mem_size;
+            mem_out.Dmem_command      = MEM_STORE;
+            mem_out.Dmem_addr         = state[head].addr;
+            mem_out.Dmem_store_data   = (state[head].data >> writeOffset);
+            mem_out.Dmem_size         = state[head].mem_size;
         end
-        ret_success = ((mem2proc_transaction_tag != 0) && (ret_2_mem.Dmem_command == MEM_STORE)) ? 1 : 0;
+        ret_success = ((mem2proc_transaction_tag != 0) && (mem_out.Dmem_command == MEM_STORE)) ? 1 : 0;
 
     end
 
+    // logic [LD_BAY_SZ-1:0] [SQ_RET_BUF_SZ-1:0] [3:0] byte_matches;
+    // always_comb begin
+    //     byte_matches = 0;
+    //     next_forward_ret_2_sq = '0;
+
+    //     //find all matches in parallel
+    //     for (int unsigned i = 0; i < LD_BAY_SZ; ++i) begin
+    //         for (int unsigned j = 0, int unsigned idx = 0; j < SQ_RET_BUF_SZ; ++j) begin
+    //             idx = (head + j) % SQ_RET_BUF_SZ;
+
+    //             if (state[idx].d_vld && (waddr(state[idx].addr) == waddr(sq_in.forward_addr[i]))) begin
+    //                 byte_matches[i][j] = state[idx].bytewise_addr_mask;
+    //                 // $display("FOUND_MATCH[%0d]: %0d, %4b", idx, state[idx].data, byte_matches[i][j]);
+    //             end
+    //         end
+    //     end
+
+    //     //apply the matches bottom-up to catch the most recent matches first
+    //     for (int unsigned i = 0; i < LD_BAY_SZ; ++i) begin
+    //         if (!sq_in.forward_req_en[i]) continue;
+
+    //         for (int unsigned j = 0, logic [$clog2(SQ_RET_BUF_SZ)-1:0] idx = 0; j < used; ++j) begin
+    //             idx = tail - j - 1;
+
+    //             if (state[idx].sq_idx == sq_in.forward_sq_idx[i]) begin
+    //                 next_forward_ret_2_sq.sq_idx_found[i] = 1;
+    //                 next_forward_ret_2_sq.forward_data[i] = '0;
+    //                 next_forward_ret_2_sq.forward_byte_en[i] = '0;
+    //                 // $display("EXACT");
+    //             end
+
+    //             next_forward_ret_2_sq.forward_data[i].byte_level[0] = byte_matches[i][idx][0] ? state[idx].data.byte_level[0] : next_forward_ret_2_sq.forward_data[i].byte_level[0];
+    //             next_forward_ret_2_sq.forward_data[i].byte_level[1] = byte_matches[i][idx][1] ? state[idx].data.byte_level[1] : next_forward_ret_2_sq.forward_data[i].byte_level[1];
+    //             next_forward_ret_2_sq.forward_data[i].byte_level[2] = byte_matches[i][idx][2] ? state[idx].data.byte_level[2] : next_forward_ret_2_sq.forward_data[i].byte_level[2];
+    //             next_forward_ret_2_sq.forward_data[i].byte_level[3] = byte_matches[i][idx][3] ? state[idx].data.byte_level[3] : next_forward_ret_2_sq.forward_data[i].byte_level[3];
+
+
+    //             next_forward_ret_2_sq.forward_byte_en[i] |= byte_matches[i][idx];
+
+    //             // $display("FINAL_DATA: %0d, %4b, %0d, %0d", next_forward_ret_2_sq.forward_data[i], byte_matches[i][idx], state[idx].data, idx);
+    //             // $display("EXACT? %b, %0d, %0d", next_forward_ret_2_sq.sq_idx_found[i], state[idx].sq_idx,sq_in.forward_sq_idx[i]);
+
+    //             if (next_forward_ret_2_sq.forward_byte_en[i] == 4'b1111) break;
+
+    //         end
+
+    //         next_forward_ret_2_sq.forward_en[i] = (next_forward_ret_2_sq.forward_byte_en[i] != 0);
+    //     end
+    // end
 
     always_comb begin
-        forward_ret_2_sq = '0;
+        next_forward_ret_2_sq = '0;
+        // most_recent_bytes = '0;
 
-        for (int unsigned i = 0, ADDR start = 0; i < NUM_FU_LOAD; i++) begin
-            if (!sq_2_ret.forward_req_en[i]) continue;
+        for (int unsigned i = 0; i < LD_BAY_SZ; i++) begin
+            if (!sq_in.forward_req_en[i]) continue;
 
-            start = sq_2_ret.forward_addr[i] - (sq_2_ret.forward_addr[i] % 4);
             for (int unsigned j = 0, int unsigned idx = 0; j < used; ++j) begin
-                idx = (head+j) % LSQ_SZ;
+                idx = (head+j) % SQ_RET_BUF_SZ;
 
-                if (state[idx].sq_idx == sq_2_ret.forward_sq_idx[i]) forward_ret_2_sq.sq_idx_found[i] = '1;
+                if (state[idx].sq_idx == sq_in.forward_sq_idx[i]) next_forward_ret_2_sq.sq_idx_found[i] = '1;
 
-                if (state[idx].d_vld && (state[idx].bytewise_addr[0] == start)) begin
-                    // $display("Mask: %4b", state[idx].bytewise_addr_mask);
-                    // $display("Addr: %0d, Data: %0d, Shifted: %0d, Offset: %0d", state[idx].addr, state[idx].data, shifted_data, offset);
-                    forward_ret_2_sq.forward_data[i][7:0]   = state[idx].bytewise_addr_mask[0] ? state[idx].data[7:0]      : forward_ret_2_sq.forward_data[i][7:0];
-                    forward_ret_2_sq.forward_data[i][15:8]  = state[idx].bytewise_addr_mask[1] ? state[idx].data[15:8]     : forward_ret_2_sq.forward_data[i][15:8];
-                    forward_ret_2_sq.forward_data[i][23:16] = state[idx].bytewise_addr_mask[2] ? state[idx].data[23:16]    : forward_ret_2_sq.forward_data[i][23:16];
-                    forward_ret_2_sq.forward_data[i][31:24] = state[idx].bytewise_addr_mask[3] ? state[idx].data[31:24]    : forward_ret_2_sq.forward_data[i][31:24];
+                if (state[idx].d_vld && (waddr(state[idx].addr) == waddr(sq_in.forward_addr[i]))) begin
+                    next_forward_ret_2_sq.forward_data[i].byte_level[0] = state[idx].bytewise_addr_mask[0] ? state[idx].data.byte_level[0] : next_forward_ret_2_sq.forward_data[i].byte_level[0];
+                    next_forward_ret_2_sq.forward_data[i].byte_level[1] = state[idx].bytewise_addr_mask[1] ? state[idx].data.byte_level[1] : next_forward_ret_2_sq.forward_data[i].byte_level[1];
+                    next_forward_ret_2_sq.forward_data[i].byte_level[2] = state[idx].bytewise_addr_mask[2] ? state[idx].data.byte_level[2] : next_forward_ret_2_sq.forward_data[i].byte_level[2];
+                    next_forward_ret_2_sq.forward_data[i].byte_level[3] = state[idx].bytewise_addr_mask[3] ? state[idx].data.byte_level[3] : next_forward_ret_2_sq.forward_data[i].byte_level[3];
 
 
-                    forward_ret_2_sq.forward_byte_en[i] |= state[idx].bytewise_addr_mask;
+                    next_forward_ret_2_sq.forward_byte_en[i] |= state[idx].bytewise_addr_mask;
                 end
 
-                if (state[idx].sq_idx == sq_2_ret.forward_sq_idx[i]) break;
+                if (state[idx].sq_idx == sq_in.forward_sq_idx[i]) break;
             end
 
-            forward_ret_2_sq.forward_en[i] = (forward_ret_2_sq.forward_byte_en[i] != 0) ? '1 : '0;
+            next_forward_ret_2_sq.forward_en[i] = (next_forward_ret_2_sq.forward_byte_en[i] != 0);
 
-            // $display("RET Forward data[%0d]: %0d, Addr: %0d, Offset: %0d", i, forward_ret_2_sq.forward_data[i], sq_2_ret.forward_addr[i], (8*(2**(sq_2_ret.forward_addr[i] % 4))-8));
         end
     end
 
 
     always_ff @(posedge clock) begin
-        if (reset || flush) begin
+        if (reset) begin
             used    <= 0;
             head    <= 0;
             tail    <= 0;
             state   <= '0;
+            sq_frwd_out <= '0;
         end else begin
-            used    <= used + sq_2_ret.ret_cnt - ret_success;
-            head    <= (head + ret_success) % LSQ_SZ;
-            tail    <= (tail + sq_2_ret.ret_cnt) % LSQ_SZ;
+            used    <= used + sq_in.ret_cnt - ret_success;
+            head    <= (head + ret_success) % SQ_RET_BUF_SZ;
+            tail    <= (tail + sq_in.ret_cnt) % SQ_RET_BUF_SZ;
+
+            sq_frwd_out <= next_forward_ret_2_sq;
 
             // handle sq to ret buffer (ins)
             for (int unsigned i = 0, int cur_idx = 0; i < NUM_DPORTS; ++i) begin
-                if (i >= sq_2_ret.ret_cnt)
+                if (i >= sq_in.ret_cnt)
                     continue;
                 cur_idx = d_idxs[i];
-                state[cur_idx] <= sq_2_ret.ret_st[i];
+                state[cur_idx] <= sq_in.ret_st[i];
             end
 
         end
@@ -462,12 +542,12 @@ module post_ret_buffer #(parameter
         tail,
         used,
         // I/O
-        sq_2_ret,
+        sq_in,
         mem2proc_transaction_tag,
 
-        ret_2_sq,
-        forward_ret_2_sq,
-        ret_2_mem
+        sq_out,
+        sq_frwd_out,
+        mem_out
     };
     `endif
 
