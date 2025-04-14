@@ -208,7 +208,9 @@ module dcache #(
             BYTE  : ld_dat = rdat[ld_sid].byte_level[ld_acc.byte_off];
             HALF  : ld_dat = rdat[ld_sid].half_level[ld_acc.half_off];
             WORD  : ld_dat = rdat[ld_sid].word_level[ld_acc.word_off];
-            DOUBLE: ld_dat = rdat[ld_sid];
+            // FIXME: Double-word does not exist in RISC-V, right?
+            // DOUBLE: ld_dat = rdat[ld_sid];
+            default:;
         endcase
     end
 
@@ -255,10 +257,12 @@ module dcache #(
             word_off : idw_word(st_addr)
         };
         case (st_size)
-            BYTE  : st_posw_dat.byte_level[st_acc.byte_off] = st_dat.byte_level[0];
-            HALF  : st_posw_dat.half_level[st_acc.half_off] = st_dat.half_level[0];
-            WORD  : st_posw_dat.word_level[st_acc.word_off] = st_dat.word_level[0];
-            DOUBLE: st_posw_dat = st_dat;
+            BYTE  : st_posw_dat.byte_level[st_acc.byte_off] = st_dat.byte_level[0]; // lb
+            HALF  : st_posw_dat.half_level[st_acc.half_off] = st_dat.half_level[0]; // lh
+            WORD  : st_posw_dat.word_level[st_acc.word_off] = st_dat.word_level[0]; // lw
+            // FIXME: Double-word does not exist in RISC-V, right?
+            // DOUBLE: st_posw_dat = st_dat;
+            default:;
         endcase
     end
 
