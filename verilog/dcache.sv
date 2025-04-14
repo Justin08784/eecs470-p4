@@ -349,14 +349,14 @@ module dcache #(
 
         if (ld_vld && !ld_hit) begin
             mem_out_command = MEM_LOAD;
-            mem_out_addr = ld_addr;
+            mem_out_addr = dw_align(ld_addr);
             miss_n = '{
                 addr : ld_addr,
                 size : ld_size
             };
         end else if (st_vld && !st_hit) begin
             mem_out_command = MEM_LOAD;
-            mem_out_addr = st_addr;
+            mem_out_addr = dw_align(st_addr);
             miss_n = '{
                 addr : st_addr,
                 size : st_size
