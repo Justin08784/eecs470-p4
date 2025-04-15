@@ -723,15 +723,16 @@ module stage_ex_p4 (
         .reset  (reset),
         .flush  (flush),
 
+        .i_rdy  (ex.i_rdy.lod),
         .i_vld  (regs.o_vld.lod),
         .i_regs (regs.o_dat.lod),
-        .i_rdy  (ex.i_rdy.lod),
 
-        .o_vld  (ex.o_vld.lod),
-        .o_cands(cands.lod),
+        .sq_in(sq_in),
         .lq_out(lq_out),
         .ld_sq_out(ld_sq_out),
-        .sq_in(sq_in),
+        
+        .o_vld  (ex.o_vld.lod),
+        .o_cands(cands.lod),
         /* FIXME: How exactly do we do CDB arbitration for loads/stores?
         And how does it fit in our ETB system? */
         .o_rdy  (cdb_gnt_shr[1].lod)

@@ -44,7 +44,7 @@ module lod_ex(
         // insn metadata/operands
     
     input   sq2execute sq_in,
-    output  execute2sq sq_out,
+    // output  execute2sq sq_out,
     output  execute2lq lq_out,
     output  executeLD2sq ld_sq_out,
 

@@ -65,11 +65,11 @@
 ///////////////////////////////
 /* How can we implement this in the Makefile? */
 // comment out to enable synth only constructions
-`define SYNTH
+// `define SYNTH
 
 `ifndef SYNTH
 // comment out to disable DEBUG:
-// `define DEBUG
+`define DEBUG
 `endif
 
 ///////////////////////////////
@@ -130,6 +130,9 @@ typedef logic [3:0] MEM_TAG;
 // icache definitions
 `define ICACHE_LINES 32
 `define ICACHE_LINE_BITS $clog2(`ICACHE_LINES)
+
+//dcache definitions
+`define DCACHE_LINES 32
 
 `define MEM_SIZE_IN_BYTES (64*1024)
 `define MEM_64BIT_LINES   (`MEM_SIZE_IN_BYTES/8)

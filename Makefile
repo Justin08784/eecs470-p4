@@ -344,7 +344,8 @@ CPU_SOURCES = verilog/cpu.sv \
 			  verilog/retire.sv \
 			  verilog/victim.sv \
 			  verilog/sq.sv \
-			  verilog/lq.sv
+			  verilog/lq.sv \
+			  verilog/dcache_simple.sv
 
 
 build/cpu.simv: $(CPU_SOURCES) $(CPU_HEADERS) $(CPU_TESTBENCH)
