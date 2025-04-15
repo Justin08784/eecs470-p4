@@ -97,52 +97,10 @@ module lod_ex(
     the rest of the bytes from the dcache.
     */
     localparam BAY_SZ = `LD_BAY_SZ;
-    typedef struct packed {
-        logic           vld;
-
-        logic           queried;
-        logic           hit;        // ...in cache (== !miss). Could update each cycle via recheck.
-        // hit, retry 
-        logic [3:0]     need_byte_mask;
-        DATA_BLOCK      raw_dat;    // raw word from SQ/dcache. SHOULD NOT BE SHIFTED!
-                                    // ...actually should we just let SQ, dcache do the shifting?
-                                    // I think no...?
-        // miss, retry
-        MEM_TAG         miss_tag;   // valid iff miss_tag != 0
-
-        // where to look / byte manip.
-        LSQ_IDX         sq_idx;
-        ADDR            addr;
-        MEM_SIZE        mem_size;
-
-        // CDB destination info
-        PHYS_REG_IDX    t;
-        ROB_IDX         rob_idx;
-    } LOAD_BAY_ENTRY;
     LOAD_BAY_ENTRY  [BAY_SZ-1:0] bay, bay_n;
     logic           [BAY_SZ-1:0] bay_vld;
 
-    localparam LDBUF_SZ = 8;// LSQ_SZ/2;
-    typedef struct packed {
-        logic           vld;
-
-        logic           got; // got data?
-        DATA_BLOCK      dat;
-        /*
-        FIXME: Do we need to query SQ from the load buffer? We're waiting
-        for the fill anyways, so no right? If not query SQ, we can get rid of
-        need_byte_mask (since the whole double-word will fill) and sq_idx?
-        */
-        MEM_TAG         miss_tag;
-
-        // byte manip.
-        DW_ACCESS       acc;
-        MEM_SIZE        mem_size;
-
-        // CDB destination info
-        PHYS_REG_IDX    t;
-        ROB_IDX         rob_idx;
-    } LOAD_BUF_ENTRY;
+    localparam LDBUF_SZ = `LDBUF_SZ;
     LOAD_BUF_ENTRY  [LDBUF_SZ-1:0] ldbuf, ldbuf_n;
     logic           [LDBUF_SZ-1:0] ldbuf_vld;
 
