@@ -21,9 +21,19 @@
     li x2, 11
     sw x2, 1072(x0)
     li x2, 12
-    sw x2, 1074(x0)
+    sw x2, 1076(x0)
     li x2, 13
-    sw x2, 1078(x0)
+    sw x2, 1080(x0)
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
     nop
     nop
     nop
