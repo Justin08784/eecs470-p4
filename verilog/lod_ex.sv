@@ -257,8 +257,8 @@ module lod_ex(
         foreach (bay_rdy_gnt[i]) begin
             if (!(i_vld[0] && bay_rdy_gnt[i]))
                 continue;
-            tmp_addr = i_regs[i].rs1 + i_regs[i].dat.opb;
-            tmp_size = i_regs[i].dat.mem_size;
+            tmp_addr = i_regs[0].rs1 + i_regs[0].dat.opb;
+            tmp_size = i_regs[0].dat.mem_size;
             tmp_acc = '{
                 byte_off : idw_byte(tmp_addr),
                 half_off : idw_half(tmp_addr),
