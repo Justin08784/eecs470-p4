@@ -335,6 +335,22 @@ module lod_ex(
             endcase
         end
 
+        /* FIXME: What if a block gets a completion while still in the bay?
+        It will miss the LDB broadcast window if it doesn't make it to the
+        load buffer before the broadcast. */
+        // Handle "completions" from LDB
+        // foreach (bay[i]) begin
+        //     if (!(bay[i].vld && dcache_in.ldb.en))
+        //         continue;
+        //     /* Do we need to consider bay[i].miss_tag == 0 case?
+        //     LDB be enabled iff ldb.tag != 0 yes? */
+        //     if (bay[i].miss_tag == dcache_in.ldb.tag) begin
+        //         bay_n[i].need_byte_mask = '0;
+        //         bay_n[i].raw_dat = dcache_in.ldb.blk
+        //             .word_level[idw_word(bay[i].addr)];
+        //     end
+        // end
+
         // Handle dispatch
         foreach (dispatch_en[i])
             bay_n[i] = '0;
