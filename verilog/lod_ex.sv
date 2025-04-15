@@ -351,8 +351,11 @@ module lod_ex(
         // end
 
         // Handle dispatch
-        foreach (dispatch_en[i])
+        foreach (dispatch_en[i]) begin
+            if (!dispatch_en[i])
+                continue;
             bay_n[i] = '0;
+        end
     end
 
 
