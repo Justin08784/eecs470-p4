@@ -80,7 +80,7 @@ module retire (
             end
 
             if (rob_in.entries[i].wr_mem) begin
-                // if (sq_rd_cnt >= sq_in.sq_ret_en) break;
+                if (sq_rd_cnt >= sq_in.sq_ret_en) break;
                 ++sq_rd_cnt; 
             end
             
