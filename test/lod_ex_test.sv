@@ -52,7 +52,7 @@ module lod_ex_test;
     lod_ex dut (
         .clock,
         .reset,
-        .flush,
+        .flush('0),
 
         .i_rdy,
         .i_vld,
