@@ -99,7 +99,8 @@ module dcache_simple (
         .rdata(rblock),
         .we   (we),
         .waddr(waddr),
-        .wdata(wblock)
+        .wdata(wblock),
+        .tags(dcache_tags)
     );
 
     // logic cache_hit;
@@ -339,7 +340,7 @@ module dcache_simple (
             end
 
             FILL_WAIT: begin
-                $display("WAITING");
+                // $display("WAITING");
                 next_dcache_req = '{
                     addr: dcache_req.addr,
                     tag:  dcache_req.tag,
