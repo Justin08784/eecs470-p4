@@ -147,9 +147,25 @@ module lod_ex(
         logic      [3:0]word_level;
     } tmp_bmask;
 
+
+    function automatic DATA_BLOCK bytewise_override(
+        input DATA_BLOCK  dst,
+        input DATA_BLOCK  src,
+        input logic [3:0] src_bmask
+    );
+        DATA_BLOCK rv;
+        rv = dst;
+        foreach (src.byte_level[b]) begin
+            if (!src_bmask[b])
+                continue;
+            rv.byte_level[b] = src.byte_level[b];
+        end
+        return rv;
+    endfunction
     always_comb begin
         bay_n = bay;
 
+        // Handle incoming
         foreach (reg2bay_gnt[i]) begin
             if (!(i_vld[0] && reg2bay_gnt[i]))
                 continue;
@@ -182,6 +198,59 @@ module lod_ex(
                 t               : i_regs[0].dat.t,
                 rob_idx         : i_regs[0].dat.rob_idx
             };
+        end
+
+        // Handle sq, dcache output
+        ld_sq_out = '0;
+        dcache_out = '0;
+        foreach (bay_gnt_query[i]) begin
+            if (!bay_gnt_query[i])
+                continue;
+
+            ld_sq_out.forward_req_en[0]     = 1;
+            ld_sq_out.forward_addr[0]       = bay[i].addr;
+            ld_sq_out.forward_mem_size[0]   = bay[i].mem_size;
+            ld_sq_out.forward_sq_idx[0]     = bay[i].sq_idx;
+
+            dcache_out = '{
+                vld : 1,
+                addr: bay[i].addr
+            };
+        end
+
+        // Handle SQ + dcache input (combine)
+        foreach (bay_gnt_query[i]) begin
+            if (!bay_gnt_query[i])
+                continue;
+            bay_n[i].queried = 1;
+
+            if (sq_in.forward_en[0]) begin
+                bay_n[i].raw_dat = bytewise_override(
+                    bay_n[i].raw_dat,       // dst
+                    sq_in.forward_data,     // src
+                    sq_in.forward_byte_en   // src_bmask
+                );
+
+                bay_n[i].need_byte_mask &= ~sq_in.forward_byte_en[0];
+            end
+
+            case (dcache_in.status)
+                LD_HIT_READ: begin
+                    bay_n[i].hit = 1;
+                    bay_n[i].need_byte_mask = '1;
+                    bay_n[i].raw_dat = dcache_in.dat;
+                end
+                LD_HIT_WAIT: begin
+                    bay_n[i].hit = 1;
+                end
+                LD_MISS_YTAG: begin
+                    bay_n[i].hit = 0;
+                    bay_n[i].miss_tag = dcache_in.tag;
+                end
+                LD_MISS_NTAG: begin
+                    bay_n[i].hit = 0;
+                end
+            endcase
         end
     end
 
