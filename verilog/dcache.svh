@@ -118,4 +118,26 @@ function automatic logic [2:0] idw_byte(input ADDR addr);
     return addr[2:0];
 endfunction
 
+typedef enum logic [1:0] {
+    LD_HIT_READ,    // Block in dcache and could read. Proceed to CDB buffer.
+    LD_HIT_WAIT,    // Block in dcache and could not read. Must retry.
+    LD_MISS_YTAG,   // Block not in dcache and alloc'd/coalesced into MSHR. Proceed to load buffer.
+    LD_MISS_NTAG    // Block not in dcache and could not alloc/coalesce. Must retry.
+} LD_QUERY_STATUS;
+
+typedef enum logic {
+    /*
+    1. Wrote to dcache, or
+    2. Merged into an MSHR (alloc'd new one, or merged into existing one)
+    Either way, not SQ's concern anymore.
+    */
+    ST_SUCC,
+    ST_FAIL // inverse of above, must retry
+} ST_QUERY_STATUS;
+
+typedef struct packed {
+    MEM_TAG     tag;
+    MEM_BLOCK   blk;
+} LDB; // load data bus
+
 `endif

@@ -1,33 +1,40 @@
 `include "sys_defs.svh"
 `include "execute.svh"
+`include "dcache.svh"
 
 module fake_dcache #(
     parameter int NUM_RPORTS=1
 ) (
-    input  clock,
-    input  reset,
+    input logic clock,
+    input logic reset,
 
-    input  logic    wen,
-    input  ADDR     waddr,
-    input  MEM_SIZE wsize,
-    input  DATA     wdat,
+    // input from memory
+    input  MEM_TAG       mem_in_transaction_tag,
+    input  MEM_BLOCK     mem_in_data,
+    input  MEM_TAG       mem_in_data_tag,
 
-    input  logic    [NUM_RPORTS-1:0] ren,
-    input  ADDR     [NUM_RPORTS-1:0] raddr,
-    input  MEM_SIZE [NUM_RPORTS-1:0] rsize,
-    output DATA     [NUM_RPORTS-1:0] rdat,
-    output logic    [NUM_RPORTS-1:0] rvld
+    output MEM_COMMAND   mem_out_command,
+    output ADDR          mem_out_addr,
+    output MEM_BLOCK     mem_out_data,
+
+    // Load (w/ load FU)
+    input  logic        ld_vld,
+    input  ADDR         ld_addr,
+    // input  MEM_SIZE     ld_size,
+    output MEM_TAG      ld_tag,
+    output DATA_BLOCK   ld_dat,
+    output LD_QUERY_STATUS  ld_status,
+
+    // Store (w/ SQ)
+    input  logic        st_vld,
+    input  ADDR         st_addr,
+    input  MEM_SIZE     st_size,
+    input  DATA_BLOCK   st_dat,
+    output ST_QUERY_STATUS  st_status,
+
+    // LDB
+    output LDB ldb 
 );
-    always_comb begin
-        rvld = '0;
-        foreach (ren[i]) begin
-            if (!ren[i])
-                continue;
-            rdat[i] = i;
-            rvld[i]  = 1;
-
-        end
-    end
 endmodule
 
 module lod_ex(
@@ -93,14 +100,14 @@ module lod_ex(
     fake_dcache #(
         .NUM_RPORTS(`NUM_FU_LOAD * LD_BAY_SZ)
     ) cache0 (
-        .clock(clock),
-        .reset(reset),
+        .clock,
+        .reset
 
-        .ren    (bays.vld & ~bays.got),
-        .raddr  (bays.addr),
-        .rsize  (bays.mem_size),
-        .rdat   (rdat),
-        .rvld   (rvld)
+        // .ren    (bays.vld & ~bays.got),
+        // .raddr  (bays.addr),
+        // .rsize  (bays.mem_size),
+        // .rdat   (rdat),
+        // .rvld   (rvld)
     );
 
     generate
