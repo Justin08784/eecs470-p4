@@ -95,7 +95,7 @@ module lod_ex(
         PHYS_REG_IDX    t;
         ROB_IDX         rob_idx;
     } LOAD_BAY_ENTRY;
-    LOAD_BAY_ENTRY  [BAY_SZ-1:0] bay;
+    LOAD_BAY_ENTRY  [BAY_SZ-1:0] bay, bay_n;
     logic           [BAY_SZ-1:0] bay_vld;
 
     // Arb: Give which free bay entry to entering, if any?
@@ -141,6 +141,53 @@ module lod_ex(
         .req    (~bay_req_query),
         .gnt    (bay_gnt_query)
     );
+
+    ADDR            tmp_addr;
+    MEM_SIZE        tmp_size;
+    DW_ACCESS       tmp_acc;
+    union packed {
+        logic [3:0]     byte_level;
+        logic [1:0][1:0]half_level;
+        logic      [3:0]word_level;
+    } tmp_bmask;
+
+    always_comb begin
+        bay_n = bay;
+
+        foreach (reg2bay_gnt[i]) begin
+            if (!(i_vld[0] && reg2bay_gnt[i]))
+                continue;
+            tmp_addr = i_regs[i].rs1 + i_regs[i].dat.opb;
+            tmp_size = i_regs[i].dat.mem_size;
+            tmp_acc = '{
+                byte_off : idw_byte(tmp_addr),
+                half_off : idw_half(tmp_addr),
+                word_off : idw_word(tmp_addr)
+            };
+
+            tmp_bmask = '0;
+            case (tmp_size)
+                BYTE  : tmp_bmask.byte_level[tmp_acc.byte_off] = '1;
+                HALF  : tmp_bmask.half_level[tmp_acc.half_off] = '1;
+                WORD  : tmp_bmask.word_level                   = '1;
+                default:;
+            endcase
+
+            bay_n[i] = '{
+                vld             : 1,
+                queried         : 0,
+                hit             : 0,
+                need_byte_mask  : tmp_bmask,
+                raw_dat         : '0,
+                miss_tag        : 0,
+                sq_idx          : i_regs[0].dat.sq_idx,
+                addr            : tmp_addr,
+                mem_size        : tmp_size,
+                t               : i_regs[0].dat.t,
+                rob_idx         : i_regs[0].dat.rob_idx
+            };
+        end
+    end
 
 
     /* TODO: CAND generation logic. Also, how do we know when
