@@ -195,7 +195,7 @@ module icache (
                 icache_tags[write_index].valid <= 1'b1;
             end
             flushed          <= flush;
-            PC_prefetch      <= (!Icache_valid_out && flushed) ? proc2Icache_addr : (PC_prefetch - proc2Icache_addr == `PREFETCH_CAP ? PC_prefetch : PC_prefetch + 8);
+            PC_prefetch      <= (!Icache_valid_out && flushed) ? proc2Icache_addr : ((PC_prefetch - proc2Icache_addr == `PREFETCH_CAP) || (Imem2proc_transaction_tag == 0) ? PC_prefetch : PC_prefetch + 8);
             //MSHR_update      <= !Icache_valid_out;
             //MSHR_addr        <= (proc2Imem_command == MEM_LOAD) ? proc2Imem_addr : '1;
             if(Imem2proc_transaction_tag != 0) begin
