@@ -134,7 +134,7 @@ module lod_ex(
         .WIDTH  (BAY_SZ),
         .REQS   (1)
     ) arb_query (
-        .req    (~bay_req_query),
+        .req    (bay_req_query),
         .gnt    (bay_gnt_query)
     );
 
