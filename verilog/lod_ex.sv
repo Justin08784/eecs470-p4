@@ -159,7 +159,7 @@ module lod_ex(
     logic           [BAY_SZ-1:0] ldbuf_vld;
 
     // Arb: Give which free bay entry to entering, if any?
-    logic [BAY_SZ-1:0]   reg2bay_gnt;
+    logic [BAY_SZ-1:0]   bay_rdy_gnt;
     always_comb begin
         foreach (bay_vld[i])
             bay_vld[i] = bay[i].vld;
@@ -169,9 +169,9 @@ module lod_ex(
     psel_gen #(
         .WIDTH  (BAY_SZ),
         .REQS   (1)
-    ) arb_reg2bay (
+    ) arb_bay_rdy (
         .req    (~bay_vld),
-        .gnt    (reg2bay_gnt)
+        .gnt    (bay_rdy_gnt)
     );
 
     // Arb: Who in bay gets to query (both dcache and SQ)?
@@ -215,8 +215,8 @@ module lod_ex(
         bay_n = bay;
 
         // Handle incoming
-        foreach (reg2bay_gnt[i]) begin
-            if (!(i_vld[0] && reg2bay_gnt[i]))
+        foreach (bay_rdy_gnt[i]) begin
+            if (!(i_vld[0] && bay_rdy_gnt[i]))
                 continue;
             tmp_addr = i_regs[i].rs1 + i_regs[i].dat.opb;
             tmp_size = i_regs[i].dat.mem_size;
