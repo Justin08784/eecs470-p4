@@ -18,31 +18,24 @@ module fake_dcache #(
     output MEM_BLOCK     mem_out_data,
 
     // Load (w/ load FU)
-    input  logic        ld_vld,
-    input  ADDR         ld_addr,
-    // input  MEM_SIZE     ld_size,
-    output MEM_TAG      ld_tag,
-    output DATA_BLOCK   ld_dat,
-    output LD_QUERY_STATUS  ld_status,
+    input  ld2dcache ld_in,
+    output dcache2ld ld_out,
 
     // Store (w/ SQ)
-    input  logic        st_vld,
-    input  ADDR         st_addr,
-    input  MEM_SIZE     st_size,
-    input  DATA_BLOCK   st_dat,
-    output ST_QUERY_STATUS  st_status,
+    input  sq2dcache sq_in,
+    output dcache2sq sq_out,
 
     // LDB
-    output LDB ldb 
+    output LDB ldb_out
 );
     always_comb begin
-        ld_tag = '0;
-        ld_dat = '0;
-        ld_status = LD_HIT_WAIT;
+        ld_out = '0;
+        ld_out.status = LD_HIT_WAIT;
 
-        st_status = ST_FAIL;
+        sq_out = '0;
+        sq_out.status = ST_FAIL;
 
-        ldb = '0;
+        ldb_out = '0;
     end
 endmodule
 
@@ -58,6 +51,9 @@ module lod_ex(
         // insns to accept from regs.o_dat.lod
     input  LOD_REGS [`NUM_FU_LOAD-1:0]  i_regs,
         // insn metadata/operands
+
+    input  dcache2ld dcache_in,
+    output ld2dcache dcache_out,
     
     input   sq2execute sq_in,
     output  execute2sq sq_out,
@@ -188,6 +184,9 @@ module lod_ex(
             };
         end
     end
+
+    // FIXME: placeholder
+    assign o_vld = '0;
 
 
     /* TODO: CAND generation logic. Also, how do we know when

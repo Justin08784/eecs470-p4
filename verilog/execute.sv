@@ -723,6 +723,10 @@ module stage_ex_p4 (
         .reset  (reset),
         .flush  (flush),
 
+        // FIXME: hook up to real dcache
+        .dcache_in  ('0),
+        .dcache_out (),
+
         .i_vld  (regs.o_vld.lod),
         .i_regs (regs.o_dat.lod),
         .i_rdy  (ex.i_rdy.lod),

@@ -118,6 +118,7 @@ function automatic logic [2:0] idw_byte(input ADDR addr);
     return addr[2:0];
 endfunction
 
+// I/O types
 typedef enum logic [1:0] {
     LD_HIT_READ,    // Block in dcache and could read. Proceed to CDB buffer.
     LD_HIT_WAIT,    // Block in dcache and could not read. Must retry.
@@ -134,6 +135,27 @@ typedef enum logic {
     ST_SUCC,
     ST_FAIL // inverse of above, must retry
 } ST_QUERY_STATUS;
+
+typedef struct packed {
+    logic   vld;
+    ADDR    addr;
+} ld2dcache;
+typedef struct packed {
+    MEM_TAG         tag;
+    DATA_BLOCK      dat;
+    LD_QUERY_STATUS status;
+} dcache2ld;
+
+typedef struct packed {
+    logic       vld;
+    ADDR        addr;
+    MEM_SIZE    size;
+    DATA_BLOCK  dat;
+} sq2dcache;
+typedef struct packed {
+    ST_QUERY_STATUS status;
+} dcache2sq;
+
 
 typedef struct packed {
     logic       en;
