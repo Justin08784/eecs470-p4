@@ -155,8 +155,8 @@ module lod_ex(
         PHYS_REG_IDX    t;
         ROB_IDX         rob_idx;
     } LOAD_BUF_ENTRY;
-    LOAD_BUF_ENTRY  [BAY_SZ-1:0] ldbuf, ldbuf_n;
-    logic           [BAY_SZ-1:0] ldbuf_vld;
+    LOAD_BUF_ENTRY  [LDBUF_SZ-1:0] ldbuf, ldbuf_n;
+    logic           [LDBUF_SZ-1:0] ldbuf_vld;
 
     // Arb: Give which free bay entry to entering, if any?
     logic [BAY_SZ-1:0]   bay_rdy_gnt;
@@ -172,6 +172,50 @@ module lod_ex(
     ) arb_bay_rdy (
         .req    (~bay_vld),
         .gnt    (bay_rdy_gnt)
+    );
+
+    // Arb: Who "dispatches" from load bay to load buffer?
+    logic [BAY_SZ-1:0] dispatch_vld; // who is eligible to advance?
+    logic [BAY_SZ-1:0][BAY_SZ-1:0]   dispatch_gbus;
+    logic [BAY_SZ-1:0][LDBUF_SZ-1:0] buf_rdy_gbus;
+
+    logic [BAY_SZ-1:0] dispatch_en;  // who will advance?
+    logic [BAY_SZ-1:0][LDBUF_SZ-1:0] bay2buf_gbus;  // who will advance?
+    always_comb begin
+        foreach (ldbuf_vld[i])
+            ldbuf_vld[i] = ldbuf[i].vld;
+
+        foreach (dispatch_vld[i]) begin
+            dispatch_vld[i] = bay[i].vld && (
+                !(|bay[i].need_byte_mask)   // data ready
+              || (bay[i].miss_tag != 0)     // MSHR alloc'd
+            );
+        end
+
+        dispatch_en = '0;
+        bay2buf_gbus = '0;
+        foreach (dispatch_gbus[i, j]) begin
+            if (!dispatch_gbus[i][j])
+                continue;
+            dispatch_en[j]  |= |buf_rdy_gbus[i];
+            bay2buf_gbus[j] |= buf_rdy_gbus[i];
+        end
+    end
+
+    psel_gen #(
+        .WIDTH  (LDBUF_SZ),
+        .REQS   (BAY_SZ)
+    ) arb_ldbuf_rdy (
+        .req    (~ldbuf_vld),
+        .gnt_bus(buf_rdy_gbus)
+    );
+
+    psel_gen #(
+        .WIDTH  (BAY_SZ),
+        .REQS   (BAY_SZ)
+    ) arb_bay2buf (
+        .req    (dispatch_vld),
+        .gnt_bus(dispatch_gbus)
     );
 
     // Arb: Who in bay gets to query (both dcache and SQ)?
@@ -301,7 +345,43 @@ module lod_ex(
                 end
             endcase
         end
+
+        // Handle bay2buf advance
+        ldbuf_n = ldbuf;
+        foreach (dispatch_en[i])
+            bay_n[i] = '0;
+        foreach (bay2buf_gbus[i, j]) begin
+            if (!bay2buf_gbus[i][j])
+                continue;
+            
+            ldbuf_n[j] = '{
+                vld     : 1,
+                got     : !(|bay[i].need_byte_mask),
+                dat     : bay[i].raw_dat,
+                miss_tag: bay[i].miss_tag,
+                acc     : '{
+                    byte_off : idw_byte(bay[i].addr),
+                    half_off : idw_half(bay[i].addr),
+                    word_off : idw_word(bay[i].addr)
+                },
+                mem_size: bay[i].mem_size,
+                t       : bay[i].t,
+                rob_idx : bay[i].rob_idx
+            };
+        end
     end
+
+
+    always_ff @(posedge clock) begin
+        if (reset || flush) begin
+            bay     <= '0;
+            ldbuf   <= '0;
+        end else begin
+            bay     <= bay_n;
+            ldbuf   <= ldbuf_n;
+        end
+    end
+
 
     // FIXME: placeholder
     assign o_vld = '0;
