@@ -17,19 +17,13 @@ function automatic DATA_BLOCK bytewise_override(
     return rv;
 endfunction
 
+// FIXME: UNUSED
 function automatic DATA_BLOCK extract_load(
-    input ADDR        addr,
+    input DW_ACCESS   acc,
     input DATA_BLOCK  raw,
     input MEM_SIZE    size
 );
     DATA_BLOCK rv;
-    DW_ACCESS acc;
-    acc = '{
-        byte_off : idw_byte(addr),
-        half_off : idw_half(addr),
-        word_off : idw_word(addr)
-    };
-
     rv = '0;
     case (size)
         BYTE  : rv = raw.byte_level[acc.byte_off];
@@ -431,7 +425,15 @@ module lod_ex(
                 continue;
             cdb_buf_shr_n[0] = '{
                 vld     : 1,
-                dat     : ldbuf[i].dat >> 8 * ldbuf[i].acc.byte_off,
+                // FIXME:
+                // Option A.
+                // dat     : ldbuf[i].dat >> 8 * ldbuf[i].acc.byte_off,
+                // Option B.
+                dat     : extract_load(
+                            ldbuf[i].acc,
+                            ldbuf[i].dat,
+                            ldbuf[i].mem_size
+                        ),
                 t       : ldbuf[i].t,
                 rob_idx : ldbuf[i].rob_idx
             };
