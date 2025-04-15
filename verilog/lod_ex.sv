@@ -403,7 +403,8 @@ module lod_ex(
                 continue;
             if (ldbuf[i].miss_tag == dcache_in.ldb.tag) begin
                 ldbuf_n[i].got |= 1;
-                ldbuf_n[i].dat |= dcache_in.ldb.blk;
+                ldbuf_n[i].dat |= dcache_in.ldb.blk
+                    .word_level[ldbuf[i].acc.word_off];
             end
         end
 
