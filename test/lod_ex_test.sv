@@ -159,6 +159,11 @@ module lod_ex_test;
 
     always @(negedge clock) begin
         if (enable_prints) begin
+            $display("i_vld:%b bay_rdy_gnt:%b", dut.i_vld, dut.bay_rdy_gnt);
+            $display("bay_gnt_query:%b dispatch_en:%b", dut.bay_gnt_query, dut.dispatch_en);
+            print_bay();
+            print_ldbuf();
+            print_cdb_shr();
         end
     end
 
@@ -178,26 +183,14 @@ module lod_ex_test;
         enable_prints = 1;
 
         // wr('h80, 'hbeeffeed, WORD);
-        @(negedge clock);
         i_vld = 1;
         i_regs[0] = '0;
         i_regs[0].dat.opb = 4;
         i_regs[0].dat.mem_size = WORD;
         #0;
-        $display("i_vld:%b bay_rdy_gnt:%b", dut.i_vld, dut.bay_rdy_gnt);
-        $display("bay_gnt_query:%b dispatch_en:%b", dut.bay_gnt_query, dut.dispatch_en);
         @(negedge clock);
-        $display("i_vld:%b bay_rdy_gnt:%b", dut.i_vld, dut.bay_rdy_gnt);
-        $display("bay_gnt_query:%b dispatch_en:%b", dut.bay_gnt_query, dut.dispatch_en);
-        print_bay();
-        print_ldbuf();
-        print_cdb_shr();
+        clr_inputs();
         @(negedge clock);
-        for (int i = 0; i < 5; ++i)
-            @(negedge clock);
-        // wr('h80, 'hbeeffeed, WORD);
-        @(negedge clock);
-        // rd('h80+2, HALF);
         @(negedge clock);
 
         $display("Finished dcache testbench.");
