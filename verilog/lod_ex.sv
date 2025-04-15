@@ -286,7 +286,7 @@ module lod_ex(
             case (dcache_in.status)
                 LD_HIT_READ: begin
                     bay_n[i].hit = 1;
-                    bay_n[i].need_byte_mask = '1;
+                    bay_n[i].need_byte_mask = '0;
                     bay_n[i].raw_dat = dcache_in.dat;
                 end
                 LD_HIT_WAIT: begin
