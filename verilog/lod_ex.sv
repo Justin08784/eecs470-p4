@@ -407,7 +407,7 @@ module lod_ex(
         foreach (ldbuf[i]) begin
             if (!(ldbuf[i].vld && dcache_in.ldb.en))
                 continue;
-            if (ldbuf[i].vld == dcache_in.ldb.tag) begin
+            if (ldbuf[i].miss_tag == dcache_in.ldb.tag) begin
                 ldbuf_n[i].got |= 1;
                 ldbuf_n[i].dat |= dcache_in.ldb.blk;
             end
