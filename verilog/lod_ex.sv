@@ -341,10 +341,48 @@ module lod_ex(
             endcase
         end
 
-        // Handle bay2buf advance
-        ldbuf_n = ldbuf;
+        // Handle dispatch
         foreach (dispatch_en[i])
             bay_n[i] = '0;
+    end
+
+
+
+    typedef struct packed {
+        logic           vld;
+        DATA_BLOCK      dat;
+        // CDB destination info
+        PHYS_REG_IDX    t;
+        ROB_IDX         rob_idx;
+    } CDB_BUF_ENTRY;
+    CDB_BUF_ENTRY   [1:0] cdb_buf_shr, cdb_buf_shr_n;
+
+    logic [LDBUF_SZ-1:0] ldbuf_got;
+    logic [LDBUF_SZ-1:0] ldbuf_cdb_req;
+    logic [LDBUF_SZ-1:0] ldbuf_cdb_gnt;
+
+    psel_gen #(
+        .WIDTH  (LDBUF_SZ),
+        .REQS   (1)
+    ) arb_cdb_req ( // who may contend for a CDB reservation?
+        .req    (ldbuf_got),
+        .gnt    (ldbuf_cdb_req)
+    );
+
+    always_comb begin
+        foreach(ldbuf_got[i])
+            ldbuf_got[i] = ldbuf[i].vld && ldbuf[i].got;
+
+        o_vld[0] = |ldbuf_got;
+        ldbuf_cdb_gnt = o_rdy[0]
+            ? ldbuf_cdb_req
+            : '0;
+    end
+
+    // ldbuf
+    always_comb begin
+        // Handle dispatch
+        ldbuf_n = ldbuf;
         foreach (bay2buf_gbus[i, j]) begin
             if (!bay2buf_gbus[i][j])
                 continue;
@@ -364,6 +402,50 @@ module lod_ex(
                 rob_idx : bay[i].rob_idx
             };
         end
+
+        // Handle "completions" from LDB
+        foreach (ldbuf[i]) begin
+            if (!(ldbuf[i].vld && dcache_in.ldb.en))
+                continue;
+            if (ldbuf[i].vld == dcache_in.ldb.tag) begin
+                ldbuf_n[i].got |= 1;
+                ldbuf_n[i].dat |= dcache_in.ldb.blk;
+            end
+        end
+
+        // Handle "issue"
+        foreach (ldbuf_cdb_gnt[i]) begin
+            if (!ldbuf_cdb_gnt[i])
+                continue;
+            ldbuf_n[i] = '0;
+        end
+    end
+
+
+    // Cand generation
+    DATA_BLOCK tmp_dat;
+    always_comb begin
+        cdb_buf_shr_n[0] = '0;
+        foreach (ldbuf_cdb_gnt[i]) begin
+            if (!ldbuf_cdb_gnt[i])
+                continue;
+            cdb_buf_shr_n[0] = '{
+                vld     : 1,
+                dat     : ldbuf[i].dat >> 8 * ldbuf[i].acc.byte_off,
+                t       : ldbuf[i].t,
+                rob_idx : ldbuf[i].rob_idx
+            };
+        end
+        cdb_buf_shr_n[1] = cdb_buf_shr[0];
+
+        o_cands[0] = '{
+            t       : cdb_buf_shr[1].t,
+            rob_idx : cdb_buf_shr[1].rob_idx,
+            data    : cdb_buf_shr[1].dat,
+            btq_idx : '0,
+            take    : '0,
+            is_brch : '0
+        };
     end
 
 
@@ -371,16 +453,13 @@ module lod_ex(
         if (reset || flush) begin
             bay     <= '0;
             ldbuf   <= '0;
+            cdb_buf_shr <= '0;
         end else begin
             bay     <= bay_n;
             ldbuf   <= ldbuf_n;
+            cdb_buf_shr <= cdb_buf_shr_n;
         end
     end
-
-
-    // FIXME: placeholder
-    assign o_vld = '0;
-
 
     /* TODO: CAND generation logic. Also, how do we know when
     a load result is ready without an lq2execute line? */
