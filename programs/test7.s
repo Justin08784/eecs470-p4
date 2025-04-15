@@ -20,8 +20,6 @@
     sw x2, 160(x0)
     li x2, 11
     sw x2, 168(x0)
-    li x2, 12
-    sw x2, 172(x0)
     nop
     nop
     nop

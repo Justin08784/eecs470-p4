@@ -41,9 +41,9 @@ module dcache_simple (
     MEM_BLOCK rblock, wblock;
 
     typedef struct packed {
+        logic [TAG_WIDTH-1:0] tag;
         logic                 valid;
         logic                 dirty;
-        logic [TAG_WIDTH-1:0] tag;
     } DCACHE_TAG;
 
     DCACHE_TAG [`DCACHE_LINES-1:0] dcache_tags, next_dcache_tags;
@@ -99,8 +99,8 @@ module dcache_simple (
         .rdata(rblock),
         .we   (we),
         .waddr(waddr),
-        .wdata(wblock),
-        .tags(dcache_tags)
+        .wdata(wblock)
+        // .tags(dcache_tags)
     );
 
     // logic cache_hit;

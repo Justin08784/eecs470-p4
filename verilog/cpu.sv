@@ -295,7 +295,8 @@ module cpu (
 
         .flush          (flush_n),
         .corrected_PC   (corrected_PC_n),
-        .retire_exec    (retire_exec)
+        .retire_exec    (retire_exec),
+        .mem_in_use     (mem_in_use)
     );
 
     always_ff @(posedge clock) begin
