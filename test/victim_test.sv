@@ -14,16 +14,16 @@ module victim_test();
     logic reset;
 
     // evicted block
-    logic   wen;
-    ADDR    waddr;
-    DATA    wdat;
+    logic   	wen;
+    ADDR    	waddr;
+    MEM_BLOCK 	wdat;
 
-    logic   ren;
-    ADDR    raddr;
-    DATA    rdat;
-    logic   rvld;
+    logic   	ren;
+    ADDR    	raddr;
+    MEM_BLOCK 	rdat;
+    logic   	rvld;
 
-    STATE   dbg;
+    STATE   	dbg;
     
     always begin
         #(`CLOCK_PERIOD/2) clock = ~clock;

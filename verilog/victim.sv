@@ -18,16 +18,16 @@ module victim_cache (
     input logic reset,
 
     // evicted block
-    input logic     wen,
-    input ADDR      waddr,
-    input DATA      wdat,
+    input logic      wen,
+    input ADDR       waddr,
+    input MEM_BLOCK  wdat,
 
-    input  logic    ren,
-    input  ADDR     raddr,
-    output DATA     rdat,
-    output logic    rvld,
+    input  logic     ren,
+    input  ADDR      raddr,
+    output MEM_BLOCK rdat,
+    output logic     rvld,
 
-    output STATE    dbg
+    output STATE     dbg
 );
     logic       [sz-1:0]        vld;
     logic       [sz-1:0][15:3]  tag;
@@ -90,7 +90,6 @@ module victim_cache (
                 dat[i] <= '0;
                 age[i] <= '0;
             end
-            // $display("wmsk: %b", wmsk);
 
             if (wen) begin
                 foreach(wmsk[i]) begin
@@ -102,11 +101,10 @@ module victim_cache (
                 end
 
                 foreach(age[i, j]) begin
-                    if (wmsk[i]) begin
+                    if (wmsk[i])
                         age[i][j] <= i == j;
-                    end else if (wmsk[j]) begin
+                    else if (wmsk[j])
                         age[i][j] <= 1;
-                    end
                 end
             end
         end
