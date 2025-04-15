@@ -83,7 +83,7 @@ module dcache_simple (
     assign raddr = cache_hit? current_index : dcache_req.index;
     assign waddr = cache_hit? current_index : dcache_req.index;
 
-    logic mem_in_use, next_mem_in_use;
+    logic next_mem_in_use;
     assign dcache_ready = !mem_in_use;
 
     memDP #(

@@ -322,6 +322,13 @@ module stage_ex_p4 (
     output  execeuteST2lq st_lq_out,
     output  executeLD2sq ld_sq_out,
 
+    input logic dcache_accepted,
+    input logic dcache_data_valid,
+    input MEM_BLOCK dcache_data,
+
+    output MEM_COMMAND mem_command,
+    output ADDR mem_addr,
+
     input   prf2execute prf_in,
     output  execute2prf prf_out,
 
@@ -730,6 +737,13 @@ module stage_ex_p4 (
         .sq_in(sq_in),
         .lq_out(lq_out),
         .ld_sq_out(ld_sq_out),
+
+        .dcache_accepted(dcache_accepted),
+        .dcache_data_valid(dcache_data_valid),
+        .dcache_data(dcache_data),
+
+        .mem_command(mem_command),
+        .mem_addr(mem_addr),
         
         .o_vld  (ex.o_vld.lod),
         .o_cands(cands.lod),

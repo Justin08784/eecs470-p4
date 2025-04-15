@@ -63,8 +63,10 @@ module cpu (
     MEM_TAG sq_mem2proc_transaction_tag;
     MEM_TAG fetch_mem2proc_transaction_tag;
     MEM_TAG Dmem2Dcache_transaction_tag;
+    MEM_TAG execute2Ccache_transaction_tag;
     ADDR Dcache2Dmem_addr;
     MEM_COMMAND Dcache2Dmem_command;
+    MEM_COMMAND execute2Dcache_mem_command;
     MEM_BLOCK Dcache2Dmem_wdata;
     always_comb begin
         proc2mem_command = '0;
@@ -103,6 +105,7 @@ module cpu (
     ////////////////////////////////////////////////// 
 
     logic req_accepted;
+    logic execute_2_dcache_accepted;
 
     logic          Dcache_valid_in;
     MEM_COMMAND    proc2Dcache_command;
@@ -113,15 +116,31 @@ module cpu (
     logic         Dcache_valid_out;
     MEM_BLOCK     Dcache_data_out;
 
+    ADDR            execute_2_dcache_addr;
+
     logic         mem_in_use;
     logic         dcache_ready;
 
     always_comb begin
-        proc2Dcache_command = ret_2_mem.Dmem_command[0];
-        proc2Dcache_addr = ret_2_mem.Dmem_addr[0];
-        proc2Dcache_wdata = ret_2_mem.Dmem_store_data[0];
-        proc2Dcache_size = ret_2_mem.Dmem_size[0];
-        sq_mem2proc_transaction_tag = req_accepted;
+        proc2Dcache_command = '0;
+        proc2Dcache_addr = '0;
+        proc2Dcache_wdata = '0;
+        proc2Dcache_size = '0;
+        sq_mem2proc_transaction_tag = '0;
+        if (execute2Dcache_mem_command != MEM_NONE) begin
+            proc2Dcache_command = execute2Dcache_mem_command;
+            proc2Dcache_addr = execute_2_dcache_addr;
+            proc2Dcache_size = DOUBLE;
+            execute_2_dcache_accepted = req_accepted;
+        end
+        else if (ret_2_mem.Dmem_command[0] != MEM_NONE) begin
+            proc2Dcache_command = ret_2_mem.Dmem_command[0];
+            proc2Dcache_addr = ret_2_mem.Dmem_addr[0];
+            proc2Dcache_wdata = ret_2_mem.Dmem_store_data[0];
+            proc2Dcache_size = ret_2_mem.Dmem_size[0];
+            sq_mem2proc_transaction_tag = req_accepted;
+        end
+        
     end
 
     dcache_simple dut (
@@ -481,6 +500,13 @@ module cpu (
         .lq_out (exec_2_lq),
         .st_lq_out (execST_2_lq),
         .ld_sq_out (exec_ld_2_sq),
+
+        .dcache_accepted(execute_2_dcache_accepted),
+        .dcache_data_valid(Dcache_valid_out),
+        .dcache_data(Dcache_data_out),
+
+        .mem_command(execute2Dcache_mem_command),
+        .mem_addr(execute_2_dcache_addr),
 
         .prf_in (prf_2_ex),
         .prf_out(ex_2_prf),

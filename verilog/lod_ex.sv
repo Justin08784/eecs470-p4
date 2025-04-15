@@ -1,35 +1,6 @@
 `include "sys_defs.svh"
 `include "execute.svh"
 
-module fake_dcache #(
-    parameter int NUM_RPORTS=1
-) (
-    input  clock,
-    input  reset,
-
-    input  logic    wen,
-    input  ADDR     waddr,
-    input  MEM_SIZE wsize,
-    input  DATA     wdat,
-
-    input  logic    [NUM_RPORTS-1:0] ren,
-    input  ADDR     [NUM_RPORTS-1:0] raddr,
-    input  MEM_SIZE [NUM_RPORTS-1:0] rsize,
-    output DATA     [NUM_RPORTS-1:0] rdat,
-    output logic    [NUM_RPORTS-1:0] rvld
-);
-    always_comb begin
-        rvld = '0;
-        foreach (ren[i]) begin
-            if (!ren[i])
-                continue;
-            rdat[i] = i;
-            rvld[i]  = 1;
-
-        end
-    end
-endmodule
-
 module lod_ex(
     input clock,
     input reset,
@@ -47,6 +18,13 @@ module lod_ex(
     // output  execute2sq sq_out,
     output  execute2lq lq_out,
     output  executeLD2sq ld_sq_out,
+
+    input logic dcache_accepted,
+    input logic dcache_data_valid,
+    input MEM_BLOCK dcache_data,
+
+    output MEM_COMMAND mem_command,
+    output ADDR mem_addr,
 
     /* BACKEND */
     output logic    [`NUM_FU_LOAD-1:0]  o_vld,
@@ -67,8 +45,6 @@ module lod_ex(
         logic           [3:0]             [LD_BAY_SZ-1:0]  st_frwd_byte_mask;
         DATA            [`NUM_FU_LOAD-1:0][LD_BAY_SZ-1:0]  dat;
     } LOAD_BAYS;
-    logic [`NUM_FU_LOAD-1:0][LD_BAY_SZ-1:0] rvld;
-    DATA  [`NUM_FU_LOAD-1:0][LD_BAY_SZ-1:0] rdat;
 
 
     // FIXME: Is this right? 
@@ -84,18 +60,6 @@ module lod_ex(
         end
     end
 
-    fake_dcache #(
-        .NUM_RPORTS(`NUM_FU_LOAD * LD_BAY_SZ)
-    ) cache0 (
-        .clock(clock),
-        .reset(reset),
-
-        .ren    (bays.vld & ~bays.got),
-        .raddr  (bays.addr),
-        .rsize  (bays.mem_size),
-        .rdat   (rdat),
-        .rvld   (rvld)
-    );
 
     generate
         for (genvar f = 0; f < `NUM_FU_LOAD; ++f) begin : gen_arb_in
@@ -152,6 +116,71 @@ module lod_ex(
         end
     end
 
+    //mem request logic
+    logic [$clog2(`LD_BAY_SZ):0] curr_frwd, next_frwd;
+    logic [$clog2(`LD_BAY_SZ):0] pending_frwd, next_pending_frwd;
+    logic pending, next_pending;
+    always_comb begin
+        mem_command = MEM_NONE;
+        mem_addr = 0;
+        next_frwd = curr_frwd;
+
+        case (pending)
+            0 : begin
+                if (bays.vld[0][curr_frwd] && !bays.got[0][curr_frwd] && !(reset || flush)) begin
+                    $display("ASKING_MEM");
+                    mem_command = MEM_LOAD;
+                    mem_addr = bays.addr[0][curr_frwd];
+                end
+
+                if (dcache_accepted) begin
+                    $display("MEM_ACCEPTED");
+                    next_pending = 1;
+                    next_pending_frwd = curr_frwd;
+                end
+                else begin
+                    next_pending = 0;
+                    next_pending_frwd = 0;
+
+                    for (int unsigned i = 0; i < LD_BAY_SZ; i++) begin
+                        if (!bays.vld[0][i] || bays.got[0][i]) continue;
+
+                        next_frwd = i;
+                        break;
+                    end
+                end
+            end
+            1 : begin
+                    if (dcache_data_valid) begin
+                        next_pending = 0;
+                        next_pending_frwd = 0;
+                    end
+                    else begin
+                        next_pending = 1;
+                        next_pending_frwd = pending_frwd;
+                    end
+            end
+
+            default : begin
+
+            end 
+        endcase
+
+    end
+
+    always_ff @(posedge clock) begin
+        if (reset || flush) begin
+            curr_frwd <= '0;
+            pending <= '0;
+            pending_frwd <= '0;
+        end
+        else begin
+            curr_frwd <= next_frwd;
+            pending <= next_pending;
+            pending_frwd <= next_pending_frwd;
+        end
+    end
+
     //ST-LD forwarding request logic
     always_comb begin
         ld_sq_out = '0;
@@ -173,16 +202,17 @@ module lod_ex(
         next_got = bays.got;
         next_st_frwd_byte_mask = '0;
         next_dat = bays.dat;
-        foreach (rvld[f, i]) begin
+        foreach (bays.vld[f, i]) begin
             if (bays.got[f][i])
                 continue;
             if (!sq_in.forward_en[i])
                 continue;
 
-            // if (rvld[f][i]) begin
-            //     next_got[f][i] = 1;
-            //     next_dat[f][i] = rdat[f][i];
-            // end
+            if (pending && dcache_data_valid && (i == pending_frwd)) begin
+
+                next_dat[f][i] = (dcache_data.word_level[bays.addr[f][i][3]]) >> bays.addr[f][i][1:0];
+                next_got[f][i] = 1;
+            end
 
             if (sq_in.forward_byte_en[i][0])
                 next_dat[f][i].byte_level[0] = sq_in.forward_data[i].byte_level[0];
@@ -255,7 +285,7 @@ module lod_ex(
                 o_cands[0].take,
                 o_cands[0].is_brch,
             );
-            $display("ren: %b, rvld: %b", bays.vld & ~bays.got, rvld);
+            $display("ren: %b", bays.vld & ~bays.got);
             foreach (fu2in_gnt[f, i]) begin
                 $display("bays[%2d][%2d]: vld=%b, got=%b, t=%2d, rob_idx=%2d, addr=%x, mem_size=%2d, dat=%x",
                     f,

@@ -877,10 +877,10 @@ module sq #(parameter
 
             assign word_off[i] = iw_off(ex_frwd_in.forward_addr[i]);
             
-            assign execute_out.forward_data[i] = idx_found[i] ? 
+            assign execute_out.forward_data[i] = idx_found[i] && ex_frwd_in.forward_req_en[i] ? 
                 shift_data(next_sq_2_exec.forward_data[i], word_off[i], ex_frwd_in.forward_mem_size[i]) : '0; 
             
-            assign execute_out.forward_byte_en[i] = idx_found[i] ? 
+            assign execute_out.forward_byte_en[i] = idx_found[i] && ex_frwd_in.forward_req_en[i] ? 
                 shift_byte_mask(next_sq_2_exec.forward_byte_en[i], word_off[i], ex_frwd_in.forward_mem_size[i]) : '0;
         end
     endgenerate
