@@ -415,7 +415,7 @@ module dcache #(
     MSHR_ENTRY  [MSHR_SZ-1:0] mshr, mshr_n;
 
     CACHE_HEADER cache_hdr, cache_hdr_n;
-    MISS_PKT miss, miss_n;
+    MISS_PKT miss;
 
     logic       [NUM_SETS-1:0]  ren,  wen;
     WAY         [NUM_SETS-1:0]  rway, wway;            
@@ -666,7 +666,7 @@ module dcache #(
     // Mem tag arbiter: who gets to request mem_tag?
     always_comb begin
         mshr_n = mshr;
-        miss_n = '0;
+        miss = '0;
         mem_out_command = MEM_NONE;
         mem_out_data = '0;
 
@@ -674,14 +674,14 @@ module dcache #(
         if (ld_vld && !ld_hit) begin
             mem_out_command = MEM_LOAD;
             mem_out_addr = dw_align(ld_addr);
-            miss_n = '{
+            miss = '{
                 addr : ld_addr,
                 size : ld_size
             };
         end else if (st_vld && !st_hit) begin
             mem_out_command = MEM_LOAD;
             mem_out_addr = dw_align(st_addr);
-            miss_n = '{
+            miss = '{
                 addr : st_addr,
                 size : st_size
             };
@@ -730,11 +730,9 @@ module dcache #(
         if (reset) begin
             cache_hdr   <= '0;
             mshr        <= '0;
-            miss        <= '0;
         end else begin
             cache_hdr   <= cache_hdr_n;
             mshr        <= mshr_n;
-            miss        <= miss_n;
         end
     end
 endmodule;
