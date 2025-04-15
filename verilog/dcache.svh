@@ -136,6 +136,7 @@ typedef enum logic {
 } ST_QUERY_STATUS;
 
 typedef struct packed {
+    logic       en;
     MEM_TAG     tag;
     MEM_BLOCK   blk;
 } LDB; // load data bus

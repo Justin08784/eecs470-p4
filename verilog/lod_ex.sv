@@ -35,6 +35,15 @@ module fake_dcache #(
     // LDB
     output LDB ldb 
 );
+    always_comb begin
+        ld_tag = '0;
+        ld_dat = '0;
+        ld_status = LD_HIT_WAIT;
+
+        st_status = ST_FAIL;
+
+        ldb = '0;
+    end
 endmodule
 
 module lod_ex(
@@ -65,9 +74,27 @@ module lod_ex(
     If the SQ only supplies a subset of the bytes needed, then we need to get
     the rest of the bytes from the dcache.
     */
+    localparam LD_BAY_SZ = `LD_BAY_SZ;
+    typedef struct packed {
+        logic           vld;
 
+        logic           hit;        // ...in cache (== !miss). Could update each cycle via recheck.
+        // hit, retry 
+        logic [3:0]     need_byte_mask;
+        DATA_BLOCK      raw_dat;    // raw word from SQ/dcache. SHOULD NOT BE SHIFTED!
+        // miss, retry
+        MEM_TAG         miss_tag;   // valid iff miss_tag != 0
 
-    localparam LD_BAY_SZ = `LD_BAY_SZ;//4;
+        // where to look / byte manip.
+        LSQ_IDX         sq_idx;
+        ADDR            addr;
+        MEM_SIZE        mem_size;
+
+        // CDB destination info
+        PHYS_REG_IDX    t;
+        ROB_IDX         rob_idx;
+    } LOAD_BAY_ENTRY;
+
     typedef struct packed {
         logic           [`NUM_FU_LOAD-1:0][LD_BAY_SZ-1:0]  vld;
         logic           [`NUM_FU_LOAD-1:0][LD_BAY_SZ-1:0]  got; // got data?
@@ -180,11 +207,11 @@ module lod_ex(
 
     //ST-LD forwarding parsing logic
     logic [`NUM_FU_LOAD-1:0][LD_BAY_SZ-1:0] next_got;
-    logic [3:0]             [LD_BAY_SZ-1:0] next_st_frwd_byte_mask;
+    logic [3:0]             [LD_BAY_SZ-1:0] got_byte_mask;
     DATA_BLOCK  [`NUM_FU_LOAD-1:0][LD_BAY_SZ-1:0] next_dat;
     always_comb begin
         next_got = bays.got;
-        next_st_frwd_byte_mask = '0;
+        got_byte_mask = '0;
         next_dat = bays.dat;
         foreach (rvld[f, i]) begin
             if (bays.got[f][i])
@@ -205,11 +232,11 @@ module lod_ex(
                 next_dat[f][i].byte_level[2] = sq_in.forward_data[i].byte_level[2];
             if (sq_in.forward_byte_en[i][3])
                 next_dat[f][i].byte_level[3] = sq_in.forward_data[i].byte_level[3];
-            next_st_frwd_byte_mask = bays.st_frwd_byte_mask[f][i] | sq_in.forward_byte_en[i];
+            got_byte_mask = bays.got_byte_mask[f][i] | sq_in.forward_byte_en[i];
 
-            next_got[f][i] |= ($countones(next_st_frwd_byte_mask) == (2**bays.mem_size[f][i]));
+            next_got[f][i] |= ($countones(got_byte_mask) == (2**bays.mem_size[f][i]));
 
-                // $display("FORWARDING_OCCURING: %0d, mask: %4b, final_data: %0d, ones: %0d, size: %0d, next_got:%b", sq_in.forward_data[i], sq_in.forward_byte_en[i], next_dat[f][i],$countones(next_st_frwd_byte_mask),2**bays.mem_size[f][i],next_got[f][i]);
+                // $display("FORWARDING_OCCURING: %0d, mask: %4b, final_data: %0d, ones: %0d, size: %0d, next_got:%b", sq_in.forward_data[i], sq_in.forward_byte_en[i], next_dat[f][i],$countones(got_byte_mask),2**bays.mem_size[f][i],next_got[f][i]);
         end
     end
 
@@ -230,13 +257,13 @@ module lod_ex(
                 bays.mem_size[f][i] <= tmp_sizes[f];
                 bays.dat     [f][i] <= '0;
                 bays.sq_idx  [f][i] <= i_regs[f].dat.sq_idx;
-                bays.st_frwd_byte_mask[f][i] <= '0;
+                bays.got_byte_mask[f][i] <= '0;
             end
 
             foreach (next_got[f, i]) begin
                 bays.got[f][i] <= next_got[f][i];
                 bays.dat[f][i] <= next_dat[f][i];
-                bays.st_frwd_byte_mask[f][i] <= next_st_frwd_byte_mask[f][i];
+                bays.got_byte_mask[f][i] <= got_byte_mask[f][i];
             end
 
             foreach (fu2out_gnt[f, i]) begin
@@ -250,7 +277,7 @@ module lod_ex(
                 bays.mem_size[f][i] <= '0;
                 bays.dat     [f][i] <= '0;
                 bays.sq_idx  [f][i] <= '0;
-                bays.st_frwd_byte_mask[f][i] <= '0;
+                bays.got_byte_mask[f][i] <= '0;
             end
         end
     end
