@@ -143,6 +143,21 @@ module dcache_test;
         $display("  %3d | << memDP", $time);
     endtask
 
+    task print_mshr();
+        $display("  %3d | >> mshr", $time);
+        for (int i = 0; i < MSHR_SZ; ++i) begin
+            $display("  mshr[%2d]: vld=%b, addr=%4x, data=%x, size=%s, rdy=%b",
+                i,
+                dut.mshr[i].vld,
+                dut.mshr[i].addr,
+                dut.mshr[i].mem_data,
+                dbg_mem_size(dut.mshr[i].mem_size),
+                dut.mshr[i].ready
+            );
+        end
+        $display("  %3d | << mshr", $time);
+    endtask
+
     // Clock generation
     logic enable_prints = 0;
     localparam DCACHE_CLOCK = 50;
@@ -175,19 +190,6 @@ module dcache_test;
                 st_status
             );
 
-            $display("mem in: {txn_tag: %2d, dat: %x, dat_tag: %2d}",
-                mem_in_transaction_tag,
-                mem_in_data,
-                mem_in_data_tag
-            );
-            $display("vld addres: %b", memory.valid_address);
-
-            $display("mem ot: {cmd: %s, addr: %4x, dat: %x}",
-                dbg_mem_cmd(mem_out_command),
-                mem_out_addr,
-                mem_out_data
-            );
-
             // $display("st_vld: %b", dut.st_vld);
             // $display("st_addr: %x", dut.st_addr);
             // $display("st_size: %1d", dut.st_size);
@@ -203,6 +205,29 @@ module dcache_test;
                     dut.lru[s]
                 );
             print_dbg();
+
+            $display("mem ot: {cmd: %s, addr: %4x, dat: %x}",
+                dbg_mem_cmd(mem_out_command),
+                mem_out_addr,
+                mem_out_data
+            );
+
+            #1;
+            // print AFTER negative edge
+            $display("st: {vld: %b, hit: %b} miss: {addr: %x, size: %x}",
+                dut.st_vld,
+                dut.st_hit,
+                dut.miss.addr,
+                dut.miss.size
+            );
+            $display("vld addres: %b", memory.valid_address);
+            $display("mem in: {txn_tag: %2d, dat: %x, dat_tag: %2d}",
+                mem_in_transaction_tag,
+                mem_in_data,
+                mem_in_data_tag
+            );
+            
+            print_mshr();
             $display("");
         end
     end
