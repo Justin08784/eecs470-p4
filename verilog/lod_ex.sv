@@ -17,7 +17,6 @@ function automatic DATA_BLOCK bytewise_override(
     return rv;
 endfunction
 
-// FIXME: UNUSED
 function automatic DATA_BLOCK extract_load(
     input DW_ACCESS   acc,
     input DATA_BLOCK  raw,
