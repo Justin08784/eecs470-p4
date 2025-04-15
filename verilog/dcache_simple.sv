@@ -79,7 +79,7 @@ module dcache_simple (
     dcache2mem mem_req, next_mem_req;
     mem2dcache mem_resp, next_mem_resp;
 
-    ADDR raddr, waddr;
+    logic [$clog2(`DCACHE_LINES)-1:0] raddr, waddr;
     assign raddr = cache_hit? current_index : dcache_req.index;
     assign waddr = cache_hit? current_index : dcache_req.index;
 
