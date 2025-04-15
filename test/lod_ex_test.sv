@@ -28,6 +28,8 @@ function automatic string dbg_mem_size(input MEM_SIZE size);
 endfunction
 
 module lod_ex_test;
+    DBG_lod_ex dbg;
+
     logic clock;
     logic reset;
     logic flush;
@@ -50,6 +52,8 @@ module lod_ex_test;
 
     // Instantiate the DUT
     lod_ex dut (
+        .dbg,
+
         .clock,
         .reset,
         .flush('0),
@@ -98,18 +102,18 @@ module lod_ex_test;
     task print_bay();
         $display("Load bay");
         for (int i = 0; i < `LD_BAY_SZ; ++i)
-            if (dut.bay[i].vld)
+            if (dbg.bay[i].vld)
                 $display("  bay[%1d]: vld=%b, addr=%x, mem_size=%s, queried=%b, hit=%b, nbmsk=%b, raw_dat=%x, miss_tag=%2d, sq_idx=%1d",
                     i,
-                    dut.bay[i].vld,
-                    dut.bay[i].addr,
-                    dbg_mem_size(dut.bay[i].mem_size),
-                    dut.bay[i].queried,
-                    dut.bay[i].hit,
-                    dut.bay[i].need_byte_mask,
-                    dut.bay[i].raw_dat,
-                    dut.bay[i].miss_tag,
-                    dut.bay[i].sq_idx
+                    dbg.bay[i].vld,
+                    dbg.bay[i].addr,
+                    dbg_mem_size(dbg.bay[i].mem_size),
+                    dbg.bay[i].queried,
+                    dbg.bay[i].hit,
+                    dbg.bay[i].need_byte_mask,
+                    dbg.bay[i].raw_dat,
+                    dbg.bay[i].miss_tag,
+                    dbg.bay[i].sq_idx
                 );
             else
                 $display("  bay[%1d]:", i);
@@ -118,18 +122,18 @@ module lod_ex_test;
     task print_ldbuf();
         $display("Load buffer");
         for (int i = 0; i < `LD_BAY_SZ; ++i)
-            if (dut.ldbuf[i].vld)
+            if (dbg.ldbuf[i].vld)
 
                 $display("  ld_buf[%1d]: vld=%b, got=%b, acc={b:%1d, h:%1d, w:%1d}, mem_size=%s, miss_tag=%2d, dat=%x",
                     i,
-                    dut.ldbuf[i].vld,
-                    dut.ldbuf[i].got,
-                    dut.ldbuf[i].acc.byte_off,
-                    dut.ldbuf[i].acc.half_off,
-                    dut.ldbuf[i].acc.word_off,
-                    dbg_mem_size(dut.ldbuf[i].mem_size),
-                    dut.ldbuf[i].miss_tag,
-                    dut.ldbuf[i].dat
+                    dbg.ldbuf[i].vld,
+                    dbg.ldbuf[i].got,
+                    dbg.ldbuf[i].acc.byte_off,
+                    dbg.ldbuf[i].acc.half_off,
+                    dbg.ldbuf[i].acc.word_off,
+                    dbg_mem_size(dbg.ldbuf[i].mem_size),
+                    dbg.ldbuf[i].miss_tag,
+                    dbg.ldbuf[i].dat
                 );
             else
                 $display("  ld_buf[%1d]:", i);
@@ -138,12 +142,12 @@ module lod_ex_test;
     task print_cdb_shr();
         $display("CDB SHR");
         for (int i = 0; i < 2; ++i)
-            if (dut.cdb_buf_shr[i].vld)
+            if (dbg.cdb_buf_shr[i].vld)
 
                 $display("  cdb_shr[%1d]: vld=%b, dat=%x",
                     i,
-                    dut.cdb_buf_shr[i].vld,
-                    dut.cdb_buf_shr[i].dat
+                    dbg.cdb_buf_shr[i].vld,
+                    dbg.cdb_buf_shr[i].dat
                 );
             else
                 $display("  cdb_shr[%1d]:", i);
@@ -159,8 +163,8 @@ module lod_ex_test;
 
     always @(negedge clock) begin
         if (enable_prints) begin
-            $display("i_vld:%b bay_rdy_gnt:%b", dut.i_vld, dut.bay_rdy_gnt);
-            $display("bay_gnt_query:%b dispatch_en:%b", dut.bay_gnt_query, dut.dispatch_en);
+            // $display("i_vld:%b bay_rdy_gnt:%b", dbg.i_vld, dbg.bay_rdy_gnt);
+            // $display("bay_gnt_query:%b dispatch_en:%b", dbg.bay_gnt_query, dbg.dispatch_en);
             print_bay();
             print_ldbuf();
             print_cdb_shr();

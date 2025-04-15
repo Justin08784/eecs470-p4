@@ -66,6 +66,9 @@ module fake_dcache #(
 endmodule
 
 module lod_ex(
+    `ifdef DEBUG
+    output DBG_lod_ex dbg,
+    `endif
     input clock,
     input reset,
     input flush,
@@ -318,13 +321,6 @@ module lod_ex(
 
 
 
-    typedef struct packed {
-        logic           vld;
-        DATA_BLOCK      dat;
-        // CDB destination info
-        PHYS_REG_IDX    t;
-        ROB_IDX         rob_idx;
-    } CDB_BUF_ENTRY;
     CDB_BUF_ENTRY   [1:0] cdb_buf_shr, cdb_buf_shr_n;
 
     logic [LDBUF_SZ-1:0] ldbuf_got;
@@ -427,6 +423,13 @@ module lod_ex(
         };
     end
 
+    `ifdef DEBUG
+    assign dbg = '{
+        bay,
+        ldbuf,
+        cdb_buf_shr
+    };
+    `endif
 
     always_ff @(posedge clock) begin
         if (reset || flush) begin

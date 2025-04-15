@@ -227,4 +227,18 @@ typedef struct packed {
     ROB_IDX         rob_idx;
 } LOAD_BUF_ENTRY;
 
+typedef struct packed {
+    logic           vld;
+    DATA_BLOCK      dat;
+    // CDB destination info
+    PHYS_REG_IDX    t;
+    ROB_IDX         rob_idx;
+} CDB_BUF_ENTRY;
+
+typedef struct packed {
+    LOAD_BAY_ENTRY [`LD_BAY_SZ-1:0] bay;
+    LOAD_BUF_ENTRY [`LDBUF_SZ-1:0]  ldbuf;
+    CDB_BUF_ENTRY  [1:0]            cdb_buf_shr;
+} DBG_lod_ex;
+
 `endif // __EXECUTE_DEFS_SVH__
