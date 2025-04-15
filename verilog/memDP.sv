@@ -67,13 +67,13 @@ endgenerate
 ////////////////////////// Write Logic ////////////////////////////
 ///////////////////////////////////////////////////////////////////
 
-always_ff @(posedge clock) begin
-    if (reset) begin
-        memData        <= '0;
-    end else if (we) begin
-        memData[waddr] <= wdata;
-    end
-end
+// always_ff @(posedge clock) begin
+//     if (reset) begin
+//         memData        <= '0;
+//     end else if (we) begin
+//         memData[waddr] <= wdata;
+//     end
+// end
 
 ///////////////////////////////////////////////////////////////////
 ////////////////////////// Assertions /////////////////////////////

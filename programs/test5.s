@@ -13,7 +13,4 @@
     sw x4, 124(x0)
     nop
     nop
-    nop
-    nop
-    nop
     wfi

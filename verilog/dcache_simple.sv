@@ -204,7 +204,7 @@ module dcache_simple (
                 end
                 else begin
                     if ((curr_dcache_entry.tag == current_tag) && curr_dcache_entry.valid) begin
-                        $display("CACHE_HIT");
+                        // $display("CACHE_HIT");
                         // cache hit : no memory access
                         cache_hit = 1;
                         next_mem_in_use = 0;
@@ -227,7 +227,7 @@ module dcache_simple (
                                 };
                             end
                         end else if (proc2Dcache_command == MEM_STORE) begin //store and hit
-                        $display("HIT_STORE: %0d",proc2Dcache_size);
+                        // $display("HIT_STORE: %0d",proc2Dcache_size);
                             case (proc2Dcache_size)
                                 BYTE: begin
                                     wblock = rblock;
@@ -244,7 +244,7 @@ module dcache_simple (
                                 DOUBLE: wblock = proc2Dcache_wdata;
                             endcase
                             we = 1;
-                            $display("WRITING: %h, %h, %b, %h, %h", wblock, proc2Dcache_wdata,byte_addr,rblock,wblock.word_level[byte_addr[2]]);
+                            // $display("WRITING: %h, %h, %b, %h, %h", wblock, proc2Dcache_wdata,byte_addr,rblock,wblock.word_level[byte_addr[2]]);
                             Dcache_valid_out = 0;
                             Dcache_data_out = '0;
                             for (int i = 0; i< CACHE_LINES; i++) begin
@@ -287,7 +287,7 @@ module dcache_simple (
                             next_mem_req = '{command: MEM_LOAD};
                             next_mem_resp = '{transtag : 0};
                             next_state = FILL;
-                            $display("HERE");
+                            // $display("HERE");
                         end
                     end
                 end
@@ -366,7 +366,7 @@ module dcache_simple (
                 next_mem_in_use = 0;
 
                 if (Dmem2Dcache_data_tag == mem_resp.transtag) begin
-                    $display("RESPONSE_RECEIVED");
+                    // $display("RESPONSE_RECEIVED");
                     we = 1;
                     next_mem_req = '{command: MEM_NONE};
                     next_mem_resp = '{transtag : '0};
@@ -380,7 +380,7 @@ module dcache_simple (
                         
                     end else if (dcache_req.command == MEM_STORE) begin
                         // wblock = Dmem2Dcache_data;
-                        $display("TO_WRITE: %0d", dcache_req.block);
+                        // $display("TO_WRITE: %0d", dcache_req.block);
                         case(dcache_req.size)
                             BYTE: wblock.byte_level[dcache_req.byte_addr[2:0]] = dcache_req.block[7:0];
                             HALF: wblock.half_level[dcache_req.byte_addr[2:1]] = dcache_req.block[15:0];
@@ -521,9 +521,9 @@ module dcache_simple (
             mem_resp <= next_mem_resp;
         end
 
-        for (int i = 0; i < `DCACHE_LINES; i++) begin
-            $display("Index %0d: Data = 0x%h, Valid = %b, Dirty = %b", i , dcache_mem.memData[i],dcache_tags[i].valid,dcache_tags[i].dirty);
-        end
+        // for (int i = 0; i < `DCACHE_LINES; i++) begin
+        //     $display("Index %0d: Data = 0x%h, Valid = %b, Dirty = %b", i , dcache_mem.memData[i],dcache_tags[i].valid,dcache_tags[i].dirty);
+        // end
     end
     
 
