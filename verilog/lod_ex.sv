@@ -2,6 +2,44 @@
 `include "execute.svh"
 `include "dcache.svh"
 
+function automatic DATA_BLOCK bytewise_override(
+    input DATA_BLOCK  dst,
+    input DATA_BLOCK  src,
+    input logic [3:0] src_bmask
+);
+    DATA_BLOCK rv;
+    rv = dst;
+    foreach (src.byte_level[b]) begin
+        if (!src_bmask[b])
+            continue;
+        rv.byte_level[b] = src.byte_level[b];
+    end
+    return rv;
+endfunction
+
+function automatic DATA_BLOCK extract_load(
+    input ADDR        addr,
+    input DATA_BLOCK  raw,
+    input MEM_SIZE    size
+);
+    DATA_BLOCK rv;
+    DW_ACCESS acc;
+    acc = '{
+        byte_off : idw_byte(addr),
+        half_off : idw_half(addr),
+        word_off : idw_word(addr)
+    };
+
+    rv = '0;
+    case (size)
+        BYTE  : rv = raw.byte_level[acc.byte_off];
+        HALF  : rv = raw.half_level[acc.half_off];
+        WORD  : rv = raw.word_level;
+        default:;
+    endcase
+    return rv;
+endfunction
+
 module fake_dcache #(
     parameter int NUM_RPORTS=1
 ) (
@@ -79,6 +117,8 @@ module lod_ex(
         // hit, retry 
         logic [3:0]     need_byte_mask;
         DATA_BLOCK      raw_dat;    // raw word from SQ/dcache. SHOULD NOT BE SHIFTED!
+                                    // ...actually should we just let SQ, dcache do the shifting?
+                                    // I think no...?
         // miss, retry
         MEM_TAG         miss_tag;   // valid iff miss_tag != 0
 
@@ -93,6 +133,30 @@ module lod_ex(
     } LOAD_BAY_ENTRY;
     LOAD_BAY_ENTRY  [BAY_SZ-1:0] bay, bay_n;
     logic           [BAY_SZ-1:0] bay_vld;
+
+    localparam LDBUF_SZ = 8;// LSQ_SZ/2;
+    typedef struct packed {
+        logic           vld;
+
+        logic           got; // got data?
+        DATA_BLOCK      dat;
+        /*
+        FIXME: Do we need to query SQ from the load buffer? We're waiting
+        for the fill anyways, so no right? If not query SQ, we can get rid of
+        need_byte_mask (since the whole double-word will fill) and sq_idx?
+        */
+        MEM_TAG         miss_tag;
+
+        // byte manip.
+        DW_ACCESS       acc;
+        MEM_SIZE        mem_size;
+
+        // CDB destination info
+        PHYS_REG_IDX    t;
+        ROB_IDX         rob_idx;
+    } LOAD_BUF_ENTRY;
+    LOAD_BUF_ENTRY  [BAY_SZ-1:0] ldbuf, ldbuf_n;
+    logic           [BAY_SZ-1:0] ldbuf_vld;
 
     // Arb: Give which free bay entry to entering, if any?
     logic [BAY_SZ-1:0]   reg2bay_gnt;
@@ -147,21 +211,6 @@ module lod_ex(
         logic      [3:0]word_level;
     } tmp_bmask;
 
-
-    function automatic DATA_BLOCK bytewise_override(
-        input DATA_BLOCK  dst,
-        input DATA_BLOCK  src,
-        input logic [3:0] src_bmask
-    );
-        DATA_BLOCK rv;
-        rv = dst;
-        foreach (src.byte_level[b]) begin
-            if (!src_bmask[b])
-                continue;
-            rv.byte_level[b] = src.byte_level[b];
-        end
-        return rv;
-    endfunction
     always_comb begin
         bay_n = bay;
 
