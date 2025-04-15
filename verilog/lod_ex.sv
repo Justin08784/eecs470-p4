@@ -61,10 +61,7 @@ module fake_dcache #(
 
     // Store (w/ SQ)
     input  sq2dcache sq_in,
-    output dcache2sq sq_out,
-
-    // LDB
-    output LDB ldb_out
+    output dcache2sq sq_out
 );
     always_comb begin
         ld_out = '0;
@@ -72,8 +69,6 @@ module fake_dcache #(
 
         sq_out = '0;
         sq_out.status = ST_FAIL;
-
-        ldb_out = '0;
     end
 endmodule
 

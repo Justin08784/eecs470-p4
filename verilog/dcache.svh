@@ -137,6 +137,12 @@ typedef enum logic {
 } ST_QUERY_STATUS;
 
 typedef struct packed {
+    logic       en;
+    MEM_TAG     tag;
+    MEM_BLOCK   blk;
+} LDB; // load data bus (wakeup insns in load bay/buffer)
+
+typedef struct packed {
     logic   vld;
     ADDR    addr;
 } ld2dcache;
@@ -144,6 +150,7 @@ typedef struct packed {
     MEM_TAG         tag;
     DATA_BLOCK      dat;
     LD_QUERY_STATUS status;
+    LDB             ldb;
 } dcache2ld;
 
 typedef struct packed {
@@ -155,12 +162,5 @@ typedef struct packed {
 typedef struct packed {
     ST_QUERY_STATUS status;
 } dcache2sq;
-
-
-typedef struct packed {
-    logic       en;
-    MEM_TAG     tag;
-    MEM_BLOCK   blk;
-} LDB; // load data bus
 
 `endif
