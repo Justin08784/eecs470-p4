@@ -238,6 +238,7 @@ module dcache_test;
 
         wr('h80, 'hbeeffeed, WORD);
         @(negedge clock);
+        @(posedge clock);
         clr_inputs();
         for (int i = 0; i < 5; ++i)
             @(negedge clock);
