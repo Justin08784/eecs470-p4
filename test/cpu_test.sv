@@ -28,8 +28,8 @@ import "DPI-C" function string decode_inst(int inst);
 //import "DPI-C" function void close_pipeline_output_file();
 
 
-// `define TB_MAX_CYCLES 500
-`define TB_MAX_CYCLES 50000000
+`define TB_MAX_CYCLES 500
+// `define TB_MAX_CYCLES 50000000
 
 
 // Debug cycle limits, both inclusive
@@ -858,6 +858,7 @@ module testbench;
         // internal state
         SQ_ENTRY [`LSQ_SZ-1:0]      state;
         logic [$clog2(`LSQ_SZ)-1:0] head;
+        logic [$clog2(`LSQ_SZ)-1:0] ret_head;
         logic [$clog2(`LSQ_SZ)-1:0] tail;
         logic [$clog2(`LSQ_SZ):0]   used;
         // I/O
@@ -875,6 +876,7 @@ module testbench;
 
         state   = dbg_sq.state;
         head    = dbg_sq.head;
+        ret_head    = dbg_sq.ret_head;
         tail    = dbg_sq.tail;
         used    = dbg_sq.used;
 
@@ -889,6 +891,7 @@ module testbench;
         ret_2_mem   = dbg_sq.ret_2_mem;
 
         $display("  | >> SQ");
+        $display("ret_head: %0d",ret_head);
         for (int i = 0; i < `LSQ_SZ; i++) begin
             $display("Entry [%2d]: sq_idx=%2d, rob_idx=%2d, addr=%4x, data=%x, d_valid=%b, addr mask=%4b%s",
             i,

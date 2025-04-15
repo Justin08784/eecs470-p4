@@ -71,23 +71,23 @@ module cpu (
         proc2mem_addr = '0;
         proc2mem_data = '0;
         proc2mem_size = '0;
-        // sq_mem2proc_transaction_tag = '0;
+        sq_mem2proc_transaction_tag = '0;
         fetch_mem2proc_transaction_tag = '0;
         
-        // if (ret_2_mem.Dmem_command[0] == MEM_STORE) begin
-        //     proc2mem_command = ret_2_mem.Dmem_command[0];
-        //     proc2mem_addr = ret_2_mem.Dmem_addr[0];
-        //     proc2mem_data = ret_2_mem.Dmem_store_data[0];
-        //     proc2mem_size = ret_2_mem.Dmem_size[0];
-        //     sq_mem2proc_transaction_tag = mem2proc_transaction_tag;
-        // end
-        if (Dcache2Dmem_command != MEM_NONE) begin
-            proc2mem_command = Dcache2Dmem_command;
-            proc2mem_addr = Dcache2Dmem_addr;
-            proc2mem_data = Dcache2Dmem_wdata;
-            proc2mem_size = DOUBLE;
-            Dmem2Dcache_transaction_tag = mem2proc_transaction_tag;
+        if (ret_2_mem.Dmem_command[0] == MEM_STORE) begin
+            proc2mem_command = ret_2_mem.Dmem_command[0];
+            proc2mem_addr = ret_2_mem.Dmem_addr[0];
+            proc2mem_data = ret_2_mem.Dmem_store_data[0];
+            proc2mem_size = ret_2_mem.Dmem_size[0];
+            sq_mem2proc_transaction_tag = mem2proc_transaction_tag;
         end
+        // if (Dcache2Dmem_command != MEM_NONE) begin
+        //     proc2mem_command = Dcache2Dmem_command;
+        //     proc2mem_addr = Dcache2Dmem_addr;
+        //     proc2mem_data = Dcache2Dmem_wdata;
+        //     proc2mem_size = DOUBLE;
+        //     Dmem2Dcache_transaction_tag = mem2proc_transaction_tag;
+        // end
         else if (fetch_2_mem.proc2mem_command == MEM_LOAD) begin // <-- FETCH REQUESTS COME LAST (always complete memory operations first to get stuff commited to memory and to keep the processor FUs chugging)
             proc2mem_command = fetch_2_mem.proc2mem_command;
             proc2mem_addr = fetch_2_mem.proc2mem_addr;
@@ -116,45 +116,45 @@ module cpu (
     logic         mem_in_use;
     logic         dcache_ready;
 
-    always_comb begin
-        proc2Dcache_command = ret_2_mem.Dmem_command[0];
-        proc2Dcache_addr = ret_2_mem.Dmem_addr[0];
-        proc2Dcache_wdata = ret_2_mem.Dmem_store_data[0];
-        proc2Dcache_size = ret_2_mem.Dmem_size[0];
-        sq_mem2proc_transaction_tag = req_accepted;
-    end
+    // always_comb begin
+    //     proc2Dcache_command = ret_2_mem.Dmem_command[0];
+    //     proc2Dcache_addr = ret_2_mem.Dmem_addr[0];
+    //     proc2Dcache_wdata = ret_2_mem.Dmem_store_data[0];
+    //     proc2Dcache_size = ret_2_mem.Dmem_size[0];
+    //     sq_mem2proc_transaction_tag = req_accepted;
+    // end
 
-    dcache_simple dut (
-        .clock(clock),
-        .reset(reset),
+    // dcache_simple dut (
+    //     .clock(clock),
+    //     .reset(reset),
 
-        // from mem
-        .Dmem2Dcache_transaction_tag(Dmem2Dcache_transaction_tag), //done
-        .Dmem2Dcache_data(mem2proc_data), //done
-        .Dmem2Dcache_data_tag(mem2proc_data_tag), //done
+    //     // from mem
+    //     .Dmem2Dcache_transaction_tag(Dmem2Dcache_transaction_tag), //done
+    //     .Dmem2Dcache_data(mem2proc_data), //done
+    //     .Dmem2Dcache_data_tag(mem2proc_data_tag), //done
 
-        // .Dcache_valid_in(Dcache_valid_in),
+    //     // .Dcache_valid_in(Dcache_valid_in),
 
-        // from LD/SQ
-        .proc2Dcache_command(proc2Dcache_command), //done
-        .proc2Dcache_addr(proc2Dcache_addr), //done
-        .proc2Dcache_size(proc2Dcache_size), //done
-        .proc2Dcache_wdata(proc2Dcache_wdata), //done
+    //     // from LD/SQ
+    //     .proc2Dcache_command(proc2Dcache_command), //done
+    //     .proc2Dcache_addr(proc2Dcache_addr), //done
+    //     .proc2Dcache_size(proc2Dcache_size), //done
+    //     .proc2Dcache_wdata(proc2Dcache_wdata), //done
 
-        // Output to LD/SQ
-        .req_accepted(req_accepted), //done
-        .Dcache_valid_out(Dcache_valid_out),
-        .Dcache_data_out(Dcache_data_out),
+    //     // Output to LD/SQ
+    //     .req_accepted(req_accepted), //done
+    //     .Dcache_valid_out(Dcache_valid_out),
+    //     .Dcache_data_out(Dcache_data_out),
 
-        // output to mem
-        .Dcache2Dmem_command(Dcache2Dmem_command), //done
-        .Dcache2Dmem_addr(Dcache2Dmem_addr), //done
-        .Dcache2Dmem_wdata(Dcache2Dmem_wdata), //done
+    //     // output to mem
+    //     .Dcache2Dmem_command(Dcache2Dmem_command), //done
+    //     .Dcache2Dmem_addr(Dcache2Dmem_addr), //done
+    //     .Dcache2Dmem_wdata(Dcache2Dmem_wdata), //done
 
-        // Can be used by LD/SQ, not necessary
-        .mem_in_use(mem_in_use),
-        .dcache_ready(dcache_ready)
-    );
+    //     // Can be used by LD/SQ, not necessary
+    //     .mem_in_use(mem_in_use),
+    //     .dcache_ready(dcache_ready)
+    // );
 
     //////////////////////////////////////////////////
     //                                              //
