@@ -37,7 +37,9 @@ module retire (
     output logic [`N-1:0] corr_pred, 
     //output retire2fetch ret_2_fetch,
 
-    output retire_final retire_exec
+    output retire_final retire_exec,
+
+    input logic mem_in_use
 );
     logic [$clog2(`N):0] r_en_cnt;
     logic [$clog2(`N):0] btq_rd_cnt;
@@ -96,7 +98,7 @@ module retire (
         for (int i = 0; i < rob_in.r_vld_cnt; ++i) begin
             if (!rob_in.entries[i].cpl)
                 break;
-            if (rob_in.entries[i].halt && !sq_in.sq_ret_complete)
+            if (rob_in.entries[i].halt && (!sq_in.sq_ret_complete || mem_in_use))
                 break;
 
             if (rob_in.entries[i].rd_mem) begin
@@ -108,10 +110,14 @@ module retire (
                 end
                 ++lq_rd_cnt; 
             end
+
+            if (rob_in.entries[i].wr_mem) begin
+                if (sq_rd_cnt >= sq_in.sq_ret_en) break;
+                ++sq_rd_cnt; 
+            end
             
             ++r_en_cnt;
-            if (rob_in.entries[i].wr_mem)
-                ++sq_rd_cnt; 
+            
                 
             
 

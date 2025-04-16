@@ -37,21 +37,21 @@
 
 // worry about these later
 `define BRANCH_PRED_SZ xx
-`define LSQ_SZ 8
-`define LSQ_SZ_DBL 16
+`define LSQ_SZ 12
+// `define LSQ_SZ_DBL 24
 `define SQ_RET_BUF_SZ 4
 
 // functional units (you should decide if you want more or fewer types of FUs)
 `define NUM_FU_ALU 2
 `define NUM_FU_MULT 1
 `define NUM_FU_LOAD 1
-`define LD_BAY_SZ 4 //num load bays in the FU
+`define LD_BAY_SZ 1 //num load bays in the FU
 `define NUM_FU_STORE 1
 // `define NUM_FU_TOTAL `NUM_FU_ALU + `NUM_FU_MULT + `NUM_FU_LOAD + `NUM_FU_STORE
 `define NUM_FU_TOTAL `NUM_FU_ALU + `NUM_FU_MULT + `NUM_FU_LOAD + `NUM_FU_STORE
 
 // number of mult stages (2, 4) (you likely don't need 8)
-`define MULT_STAGES 16
+`define MULT_STAGES 8
 // Justin: funny enough we need at least 8 or else multiply is on critical path
 
 
@@ -117,7 +117,7 @@ typedef logic [$clog2(`PHYS_REG_SZ_R10K)-1:0] PHYS_REG_IDX;
 // processor will have to account for this effect on mem.
 // Notably, you can no longer write data without first reading.
 // TODO: uncomment this line once you've implemented your cache
-// `define CACHE_MODE
+`define CACHE_MODE
 
 // you are not allowed to change this definition for your final processor
 // the project 3 processor has a massive boost in performance just from having no mem latency
@@ -135,6 +135,9 @@ typedef logic [3:0] MEM_TAG;
 // icache definitions
 `define ICACHE_LINES 32
 `define ICACHE_LINE_BITS $clog2(`ICACHE_LINES)
+
+//dcache definitions
+`define DCACHE_LINES 32
 
 `define MEM_SIZE_IN_BYTES (64*1024)
 `define MEM_64BIT_LINES   (`MEM_SIZE_IN_BYTES/8)
@@ -481,7 +484,7 @@ typedef struct packed {
 //so that we can use values above what we will see 
 //in the LSQ as the initial value for SQ_IDX in 
 //dispatch if a load comes before the first store
-typedef logic [$clog2(`LSQ_SZ_DBL):0] LSQ_IDX; 
+typedef logic [$clog2(`LSQ_SZ)-1:0] LSQ_IDX; 
 typedef struct packed {
     LSQ_IDX sq_idx;
     ROB_IDX rob_idx;
@@ -1032,12 +1035,10 @@ typedef struct packed {
 typedef struct packed {
     logic   [$clog2(`N):0]  complete_en;
     ROB_IDX [`N-1:0]        complete_rob_idxs;
-    logic                   sq_ret_complete;
 } sq2rob;
 
 typedef struct packed {
-    logic   [$clog2(`N):0]  complete_en;
-    ROB_IDX [`N-1:0]        complete_rob_idxs;
+    logic   [$clog2(`N):0]  sq_ret_en;
     logic                   sq_ret_complete;
 } sq2retire;
 
@@ -1047,10 +1048,10 @@ typedef struct packed {
 } retire2sq;
 
 typedef struct packed {
-    MEM_COMMAND   Dmem_command;    // The memory command
-    MEM_SIZE      Dmem_size;       // Size of data to read or write
-    ADDR          Dmem_addr;       // Address sent to Data memory
-    MEM_BLOCK     Dmem_store_data; // Data sent to Data memory
+    MEM_COMMAND [`N-1:0] Dmem_command;    // The memory command
+    MEM_SIZE    [`N-1:0] Dmem_size;       // Size of data to read or write
+    ADDR        [`N-1:0] Dmem_addr;       // Address sent to Data memory
+    MEM_BLOCK   [`N-1:0] Dmem_store_data; // Data sent to Data memory
 } stRET2mem;
 
 typedef struct packed {
@@ -1272,6 +1273,7 @@ typedef struct packed {
     // internal state
     SQ_ENTRY [`LSQ_SZ-1:0]     state;
     logic [$clog2(`LSQ_SZ)-1:0] head;
+    logic [$clog2(`LSQ_SZ)-1:0] ret_head;
     logic [$clog2(`LSQ_SZ)-1:0] tail;
     logic [$clog2(`LSQ_SZ):0]   used;
     // I/O

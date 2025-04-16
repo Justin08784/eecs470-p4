@@ -189,7 +189,7 @@ GREP = grep -E --color=auto
 # ---- Modules to Test ---- #
 
 # TODO: add more modules here
-MODULES = cpu mult rob rs fifo free_list dispatch prf map_table stage_id_p4 execute fetch btb sq post_ret_buffer gshare skid_buffer lq victim correlated_predictor
+MODULES = cpu mult rob rs fifo free_list dispatch prf map_table stage_id_p4 execute fetch btb sq post_ret_buffer gshare skid_buffer lq victim dcache_simple correlated_predictor
 
 # TODO: update this if you add more header files
 ALL_HEADERS = $(CPU_HEADERS)
@@ -273,7 +273,7 @@ build/btq.simv: $(BTB_FILES)
 build/btq.cov: $(BTB_FILES)
 build/btq.vg: $(BTB_FILES)
 
-SQ_FILES = verilog/sys_defs.svh
+SQ_FILES = verilog/sys_defs.svh verilog/psel_gen.sv
 build/sq.simv: $(SQ_FILES)
 build/sq.cov: $(SQ_FILES)
 synth/sq.vg: $(SQ_FILES)
@@ -302,6 +302,11 @@ CORRELATED_FILES = verilog/sys_defs.svh verilog/correlated_predictor.sv verilog/
 build/correlated_predictor.simv: $(CORRELATED_FILES)
 build/correlated_predictor.cov: $(CORRELATED_FILES)
 synth/correlated_predictor.vg: $(CORRELATED_FILES)
+
+DCACHE_SIMPLE_FILES = verilog/sys_defs.svh verilog/memDP.sv verilog/mem.sv
+build/dcache_simple.simv: $(DCACHE_SIMPLE_FILES)
+build/dcache_simple.cov: $(DCACHE_SIMPLE_FILES)
+synth/dcache_simple.vg: $(DCACHE_SIMPLE_FILES)
 
 
 #################################
@@ -338,6 +343,7 @@ CPU_SOURCES = verilog/cpu.sv \
 			  verilog/fifo.sv \
 			  verilog/fetch.sv \
 			  verilog/execute.sv \
+			  verilog/lod_ex.sv \
 			  verilog/btq.sv \
 			  verilog/btb.sv \
 			  verilog/gshare.sv \
@@ -350,7 +356,9 @@ CPU_SOURCES = verilog/cpu.sv \
 			  verilog/sq.sv \
 			  verilog/lq.sv \
 			  verilog/branch_history_table.sv \
-			  verilog/correlated_predictor.sv
+			  verilog/correlated_predictor.sv \
+			  verilog/dcache_basic.sv \
+			  verilog/dcache_simple.sv
 
 
 build/cpu.simv: $(CPU_SOURCES) $(CPU_HEADERS) $(CPU_TESTBENCH)

@@ -11,6 +11,7 @@
 /////////////////////////////////////////////////////////////////////////
 
 `include "sys_defs.svh"
+`include "execute.svh"
 `include "ISA.svh"
 
 /*
@@ -31,183 +32,6 @@ CDB arbitration:
 - For < 4 cycle ops, it occurs *before* [FU] (but we dont support any
 ops in this category, so we wouldn't know)
 */
-
-typedef struct packed {
-    PHYS_REG_IDX t;
-    ROB_IDX rob_idx;
-    DATA data;
-    BTQ_IDX btq_idx;
-    logic take;
-    logic is_brch;
-} CPL_CAND;
-
-/* Slices (or "views") of ID_RESULT needed for each FU type */
-typedef struct packed {
-    BYPASS_TAG      bytag;
-
-    PHYS_REG_IDX    t;
-    PHYS_REG_IDX    t1;
-    PHYS_REG_IDX    t2;
-    ROB_IDX         rob_idx;
-    BTQ_IDX         btq_idx;
-
-    INST inst;
-    ADDR PC;
-    ADDR NPC;
-
-    ALU_OPA_SELECT opa_select;
-    ALU_OPB_SELECT opb_select;
-    ALU_FUNC alu_func;
-    logic    cond_branch;
-    logic    uncond_branch;
-} ID_ALU_VIEW;
-
-typedef struct packed {
-    BYPASS_TAG      bytag;
-
-    PHYS_REG_IDX    t;
-    PHYS_REG_IDX    t1;
-    PHYS_REG_IDX    t2;
-    ROB_IDX         rob_idx;
-    logic[2:0]      func;
-} ID_MUL_VIEW;
-
-typedef struct packed {
-    BYPASS_TAG      bytag;
-    // alu_func   = ALU_ADD;
-    // opa_select = OPA_IS_RS1
-    // opb_select = OPB_IS_I_IMM
-
-    PHYS_REG_IDX    t;
-    PHYS_REG_IDX    t1;
-    DATA            opb;
-
-    LSQ_IDX         lq_idx;
-    LSQ_IDX         sq_idx;
-    ROB_IDX         rob_idx;
-    MEM_SIZE        mem_size;
-    logic           rd_unsigned;
-} ID_LOD_VIEW;
-
-typedef struct packed {
-    BYPASS_TAG      bytag;
-    // alu_func   = ALU_ADD;
-    // opa_select = OPA_IS_RS1
-    // opb_select = OPB_IS_S_IMM
-
-    PHYS_REG_IDX    t1;
-    PHYS_REG_IDX    t2;
-    DATA            opb;
-
-    LSQ_IDX         sq_idx;
-    ROB_IDX         rob_idx;
-    MEM_SIZE        mem_size;
-} ID_STR_VIEW;
-
-typedef struct packed {
-    DATA rs1;
-    DATA rs2;
-    ID_ALU_VIEW dat;
-} ALU_REGS;
-typedef struct packed {
-    DATA rs1;
-    DATA rs2;
-    ID_MUL_VIEW dat;
-} MUL_REGS;
-typedef struct packed {
-    DATA rs1;
-    ID_LOD_VIEW dat;
-} LOD_REGS;
-typedef struct packed {
-    DATA rs1;
-    DATA rs2;
-    ID_STR_VIEW dat;
-} STR_REGS;
-
-/* Operand data needed for each FU type */
-typedef struct packed {
-    DATA            opa, opb;
-    DATA            rs1, rs2;
-    ALU_FUNC        alu_func;
-    logic   [2:0]   branch_func; // Which branch condition to check
-    logic           cond_branch;
-    logic           uncond_branch;
-
-    PHYS_REG_IDX    t;
-    ROB_IDX         rob_idx;
-    BTQ_IDX         btq_idx;
-} ALU_OPS;
-
-typedef struct packed {
-    DATA        rs1, rs2;
-    MULT_FUNC   func;
-
-    PHYS_REG_IDX    t;
-    ROB_IDX         rob_idx;
-} MUL_OPS;
-
-/* CDB snooping/bypassing functions */
-function automatic ALU_REGS alu_snoop(
-    input ALU_REGS v,
-    input execute2complete_dat cdat
-);
-    ALU_REGS rv = v;
-    foreach (cdat.en[n]) begin
-        if (!cdat.en[n] || cdat.ts[n] == '0)
-            continue;
-        if (rv.dat.t1 == cdat.ts[n])
-            rv.rs1 = cdat.data[n];
-        if (rv.dat.t2 == cdat.ts[n])
-            rv.rs2 = cdat.data[n];
-    end
-    return rv;
-endfunction
-
-function automatic MUL_REGS mul_snoop(
-    input MUL_REGS v,
-    input execute2complete_dat cdat
-);
-    MUL_REGS rv = v;
-    foreach (cdat.en[n]) begin
-        if (!cdat.en[n] || cdat.ts[n] == '0)
-            continue;
-        if (rv.dat.t1 == cdat.ts[n])
-            rv.rs1 = cdat.data[n];
-        if (rv.dat.t2 == cdat.ts[n])
-            rv.rs2 = cdat.data[n];
-    end
-    return rv;
-endfunction
-
-function automatic LOD_REGS lod_snoop(
-    input LOD_REGS v,
-    input execute2complete_dat cdat
-);
-    LOD_REGS rv = v;
-    foreach (cdat.en[n]) begin
-        if (!cdat.en[n] || cdat.ts[n] == '0)
-            continue;
-        if (rv.dat.t1 == cdat.ts[n])
-            rv.rs1 = cdat.data[n];
-    end
-    return rv;
-endfunction
-
-function automatic STR_REGS str_snoop(
-    input STR_REGS v,
-    input execute2complete_dat cdat
-);
-    STR_REGS rv = v;
-    foreach (cdat.en[n]) begin
-        if (!cdat.en[n] || cdat.ts[n] == '0)
-            continue;
-        if (rv.dat.t1 == cdat.ts[n])
-            rv.rs1 = cdat.data[n];
-        if (rv.dat.t2 == cdat.ts[n])
-            rv.rs2 = cdat.data[n];
-    end
-    return rv;
-endfunction
 
 // ALU: computes the result of FUNC applied with operands A and B
 // This module is purely combinational
@@ -261,18 +85,11 @@ module alu_ex(
     input flush,
 
     /* FRONTEND */
-    output logic    [`NUM_FU_ALU-1:0]   i_rdy,
-        // ready to accept from regs.o_dat.alu?
-    input  logic    [`NUM_FU_ALU-1:0]   i_vld,
-        // insns to accept from regs.o_dat.alu
     input  ALU_REGS [`NUM_FU_ALU-1:0]   i_regs,
         // insn metadata/operands
 
     /* BACKEND */
-    output logic    [`NUM_FU_ALU-1:0]   o_vld,
-    output CPL_CAND [`NUM_FU_ALU-1:0]   o_cands,
-    input  logic    [`NUM_FU_ALU-1:0]   o_rdy 
-        // completion grant
+    output CPL_CAND [`NUM_FU_ALU-1:0]   o_cands
 );
     ALU_OPS [`NUM_FU_ALU-1:0] ops;
     always_comb begin
@@ -342,289 +159,11 @@ module alu_ex(
                 is_brch : ops[i].cond_branch || ops[i].uncond_branch
             };
 
-            assign o_vld[i] = i_vld[i];
-            assign i_rdy[i] = o_rdy[i];
             assign o_cands[i] = tmp_data[i];
         end
     endgenerate
 endmodule
 
-module fake_dcache #(
-    parameter int NUM_RPORTS=1
-) (
-    input  clock,
-    input  reset,
-
-    input  logic    wen,
-    input  ADDR     waddr,
-    input  MEM_SIZE wsize,
-    input  DATA     wdat,
-
-    input  logic    [NUM_RPORTS-1:0] ren,
-    input  ADDR     [NUM_RPORTS-1:0] raddr,
-    input  MEM_SIZE [NUM_RPORTS-1:0] rsize,
-    output DATA     [NUM_RPORTS-1:0] rdat,
-    output logic    [NUM_RPORTS-1:0] rvld
-);
-    always_comb begin
-        rvld = '0;
-        foreach (ren[i]) begin
-            if (!ren[i])
-                continue;
-            rdat[i] = i;
-            rvld[i]  = 1;
-
-        end
-    end
-endmodule
-
-module lod_ex(
-    input clock,
-    input reset,
-    input flush,
-
-    /* FRONTEND */
-    output logic    [`NUM_FU_LOAD-1:0]  i_rdy,
-        // ready to accept from regs.o_dat.lod?
-    input  logic    [`NUM_FU_LOAD-1:0]  i_vld,
-        // insns to accept from regs.o_dat.lod
-    input  LOD_REGS [`NUM_FU_LOAD-1:0]  i_regs,
-        // insn metadata/operands
-    
-    input   sq2execute sq_in,
-    output  execute2sq sq_out,
-    output  execute2lq lq_out,
-    output  executeLD2sq ld_sq_out,
-
-    /* BACKEND */
-    output logic    [`NUM_FU_LOAD-1:0]  o_vld,
-    output CPL_CAND [`NUM_FU_LOAD-1:0]  o_cands,
-    input  logic    [`NUM_FU_LOAD-1:0]  o_rdy 
-        // completion grant
-);
-    localparam LD_BAY_SZ = `LD_BAY_SZ;//4;
-    typedef struct packed {
-        logic           [`NUM_FU_LOAD-1:0][LD_BAY_SZ-1:0]  vld;
-        logic           [`NUM_FU_LOAD-1:0][LD_BAY_SZ-1:0]  got; // got data?
-        PHYS_REG_IDX    [`NUM_FU_LOAD-1:0][LD_BAY_SZ-1:0]  t;
-        ROB_IDX         [`NUM_FU_LOAD-1:0][LD_BAY_SZ-1:0]  rob_idx;
-        ADDR            [`NUM_FU_LOAD-1:0][LD_BAY_SZ-1:0]  addr;
-        MEM_SIZE        [`NUM_FU_LOAD-1:0][LD_BAY_SZ-1:0]  mem_size;
-
-        LSQ_IDX         [`NUM_FU_LOAD-1:0][LD_BAY_SZ-1:0]  sq_idx;
-        logic           [3:0]             [LD_BAY_SZ-1:0]  st_frwd_byte_mask;
-        DATA            [`NUM_FU_LOAD-1:0][LD_BAY_SZ-1:0]  dat;
-    } LOAD_BAYS;
-    logic [`NUM_FU_LOAD-1:0][LD_BAY_SZ-1:0] rvld;
-    DATA  [`NUM_FU_LOAD-1:0][LD_BAY_SZ-1:0] rdat;
-
-
-    // FIXME: Is this right? 
-    // FIXME: hardcoded
-
-    LOAD_BAYS bays; // waiting bays
-    logic     [`NUM_FU_LOAD-1:0][LD_BAY_SZ-1:0] fu2in_gnt;
-    logic     [`NUM_FU_LOAD-1:0][LD_BAY_SZ-1:0] fu2out_gnt;
-    always_comb begin
-        for (int f = 0; f < `NUM_FU_MULT; ++f) begin
-            i_rdy[f] = |(~bays.vld[f]);
-            o_vld[f] = |(bays.vld[f] & bays.got[f]);
-        end
-    end
-
-    fake_dcache #(
-        .NUM_RPORTS(`NUM_FU_LOAD * LD_BAY_SZ)
-    ) cache0 (
-        .clock(clock),
-        .reset(reset),
-
-        .ren    (bays.vld & ~bays.got),
-        .raddr  (bays.addr),
-        .rsize  (bays.mem_size),
-        .rdat   (rdat),
-        .rvld   (rvld)
-    );
-
-    generate
-        for (genvar f = 0; f < `NUM_FU_LOAD; ++f) begin : gen_arb_in
-            psel_gen #(
-                .WIDTH(LD_BAY_SZ),
-                .REQS(1)
-            ) arb_in (
-                .req    (~bays.vld[f]),
-                .gnt    (fu2in_gnt[f])
-            );
-        end
-
-        for (genvar f = 0; f < `NUM_FU_LOAD; ++f) begin : gen_arb_out
-            psel_gen #(
-                .WIDTH(LD_BAY_SZ),
-                .REQS(1)
-            ) arb_out (
-                .req    (bays.vld[f] & bays.got[f]),
-                .gnt    (fu2out_gnt[f])
-            );
-        end
-    endgenerate
-
-    ADDR        [`NUM_FU_LOAD-1:0] tmp_addrs;
-    MEM_SIZE    [`NUM_FU_LOAD-1:0] tmp_sizes;
-
-    always_comb begin
-        foreach(i_vld[i]) begin
-            // load address computation
-            tmp_addrs[i] = i_regs[i].rs1 + i_regs[i].dat.opb;
-            tmp_sizes[i] = i_regs[i].dat.mem_size;
-
-            lq_out.ld_ex_en[i]      = i_vld[i];
-            lq_out.ld_lq_idx[i]     = i_regs[i].dat.lq_idx;
-            lq_out.ld_addr[i]       = tmp_addrs[i];
-            lq_out.ld_mem_size[i]   = tmp_sizes[i];
-            /* FIXME: What about rd_unsigned? We are not using this
-            in lq???? */ //ANSWER: This needs to be used in the load FU
-
-        end
-
-        o_cands = '0;
-        foreach (fu2out_gnt[f, i]) begin
-            if (!(fu2out_gnt[f][i] && o_rdy[f]))
-                continue;
-            o_cands[f] |= CPL_CAND'{
-                t       : bays.t[f][i],
-                rob_idx : bays.rob_idx[f][i],
-                data    : bays.dat[f][i],
-                btq_idx : '0,
-                take    : '0,
-                is_brch : '0
-            };
-        end
-    end
-
-    //ST-LD forwarding request logic
-    always_comb begin
-        ld_sq_out = '0;
-        foreach (bays.vld[f,i]) begin
-            if (!bays.vld[f][i]) continue;
-
-            ld_sq_out.forward_req_en[i] = bays.vld[f][i];
-            ld_sq_out.forward_addr[i] = bays.addr[f][i];
-            ld_sq_out.forward_mem_size[i] = bays.mem_size[f][i];
-            ld_sq_out.forward_sq_idx[i] = bays.sq_idx[f][i];
-        end
-    end
-
-    //ST-LD forwarding parsing logic
-    logic [`NUM_FU_LOAD-1:0][LD_BAY_SZ-1:0] next_got;
-    logic [3:0]             [LD_BAY_SZ-1:0] next_st_frwd_byte_mask;
-    DATA_BLOCK  [`NUM_FU_LOAD-1:0][LD_BAY_SZ-1:0] next_dat;
-    always_comb begin
-        next_got = bays.got;
-        next_st_frwd_byte_mask = '0;
-        next_dat = bays.dat;
-        foreach (rvld[f, i]) begin
-            if (bays.got[f][i])
-                continue;
-            if (!sq_in.forward_en[i])
-                continue;
-
-            // if (rvld[f][i]) begin
-            //     next_got[f][i] = 1;
-            //     next_dat[f][i] = rdat[f][i];
-            // end
-
-            if (sq_in.forward_byte_en[i][0])
-                next_dat[f][i].byte_level[0] = sq_in.forward_data[i].byte_level[0];
-            if (sq_in.forward_byte_en[i][1])
-                next_dat[f][i].byte_level[1] = sq_in.forward_data[i].byte_level[1];
-            if (sq_in.forward_byte_en[i][2])
-                next_dat[f][i].byte_level[2] = sq_in.forward_data[i].byte_level[2];
-            if (sq_in.forward_byte_en[i][3])
-                next_dat[f][i].byte_level[3] = sq_in.forward_data[i].byte_level[3];
-            next_st_frwd_byte_mask = bays.st_frwd_byte_mask[f][i] | sq_in.forward_byte_en[i];
-
-            next_got[f][i] |= ($countones(next_st_frwd_byte_mask) == (2**bays.mem_size[f][i]));
-
-                // $display("FORWARDING_OCCURING: %0d, mask: %4b, final_data: %0d, ones: %0d, size: %0d, next_got:%b", sq_in.forward_data[i], sq_in.forward_byte_en[i], next_dat[f][i],$countones(next_st_frwd_byte_mask),2**bays.mem_size[f][i],next_got[f][i]);
-        end
-    end
-
-    always_ff @(posedge clock) begin
-
-        if (reset || flush) begin
-            bays <= '0;
-        end else begin
-            foreach (fu2in_gnt[f, i]) begin
-                if (!(fu2in_gnt[f][i] && i_vld[f]))
-                    continue;
-
-                bays.vld     [f][i] <= 1;
-                bays.got     [f][i] <= 0;
-                bays.t       [f][i] <= i_regs[f].dat.t;
-                bays.rob_idx [f][i] <= i_regs[f].dat.rob_idx;
-                bays.addr    [f][i] <= tmp_addrs[f];
-                bays.mem_size[f][i] <= tmp_sizes[f];
-                bays.dat     [f][i] <= '0;
-                bays.sq_idx  [f][i] <= i_regs[f].dat.sq_idx;
-                bays.st_frwd_byte_mask[f][i] <= '0;
-            end
-
-            foreach (next_got[f, i]) begin
-                bays.got[f][i] <= next_got[f][i];
-                bays.dat[f][i] <= next_dat[f][i];
-                bays.st_frwd_byte_mask[f][i] <= next_st_frwd_byte_mask[f][i];
-            end
-
-            foreach (fu2out_gnt[f, i]) begin
-                if (!(fu2out_gnt[f][i] && o_rdy[f]))
-                    continue;
-                bays.vld     [f][i] <= 0;
-                bays.got     [f][i] <= 0;
-                bays.t       [f][i] <= '0;
-                bays.rob_idx [f][i] <= '0;
-                bays.addr    [f][i] <= '0;
-                bays.mem_size[f][i] <= '0;
-                bays.dat     [f][i] <= '0;
-                bays.sq_idx  [f][i] <= '0;
-                bays.st_frwd_byte_mask[f][i] <= '0;
-            end
-        end
-    end
-
-    `ifdef DEBUG
-    always_ff @(posedge clock) begin
-        if (!reset) begin
-            $display("  %3d | >> BAYS", $time);
-            $display("i_rdy: %b, i_vld: %b, o_vld: %b, o_rdy: %b", i_rdy, i_vld, o_vld, o_rdy);
-            $display("ocands: t: %2d, rob_idx: %2d, data: %x, btq_idx: %2d, take: %b, is_brch: %b",
-                o_cands[0].t,
-                o_cands[0].rob_idx,
-                o_cands[0].data,
-                o_cands[0].btq_idx,
-                o_cands[0].take,
-                o_cands[0].is_brch,
-            );
-            $display("ren: %b, rvld: %b", bays.vld & ~bays.got, rvld);
-            foreach (fu2in_gnt[f, i]) begin
-                $display("bays[%2d][%2d]: vld=%b, got=%b, t=%2d, rob_idx=%2d, addr=%x, mem_size=%2d, dat=%x",
-                    f,
-                    i,
-                    bays.vld    [f][i],
-                    bays.got    [f][i],
-                    bays.t      [f][i],
-                    bays.rob_idx[f][i],
-                    bays.addr   [f][i],
-                    bays.mem_size[f][i],
-                    bays.dat    [f][i]
-                );
-            end
-            $display("  %3d | << BAYS", $time);
-        end
-    end
-    `endif
-
-    /* TODO: CAND generation logic. Also, how do we know when
-    a load result is ready without an lq2execute line? */
-endmodule
 
 module str_ex(
     input clock,
@@ -638,19 +177,10 @@ module str_ex(
     
     output  execute2sq sq_out,
     // FIXME: Isn't an lq2execute needed? <-- Answer: No, if an issue is found when forwarding the SQ_IDX to LQ, it is flagged in the ROB to restart from that PC
-    output  execeuteST2lq st_lq_out,
-
-    /* BACKEND */
-    output logic    [`NUM_FU_STORE-1:0]  o_vld,
-    output CPL_CAND [`NUM_FU_STORE-1:0]  o_cands,
-    input  logic    [`NUM_FU_STORE-1:0]  o_rdy 
-        // completion grant
+    output  execeuteST2lq st_lq_out
 );
     // FIXME: Is this right? 
     assign i_rdy = '1;
-    // FIXME: hardcoded
-    assign o_vld    = '0;
-    assign o_cands  = '0;
 
     always_comb begin
         ADDR  addr;
@@ -693,11 +223,7 @@ module mul_ex(
     input  logic [`NUM_FU_MULT-1:0]     cdb_gnt,
 
     /* BACKEND */
-    output logic    [`NUM_FU_MULT-1:0]  o_vld,
-    output CPL_CAND [`NUM_FU_MULT-1:0]  o_cands,
-        // completion requests
-    input  logic    [`NUM_FU_MULT-1:0]  o_rdy
-        // completion grant
+    output CPL_CAND [`NUM_FU_MULT-1:0]  o_cands
 );
     MUL_OPS [`NUM_FU_MULT-1:0] ops;
     always_comb begin
@@ -740,8 +266,6 @@ module mul_ex(
                 .cdb_gnt(cdb_gnt[i]),
 
                 // Output (directly to cdat_out)
-                .o_vld  (o_vld[i]),
-                .o_rdy  (o_rdy[i]),
                 .o_t    (tmp_t[i]),
                 .o_rob_idx(tmp_rob_idx[i]),
                 .result (tmp_res[i])
@@ -773,6 +297,13 @@ module stage_ex_p4 (
     output  execute2lq lq_out,
     output  execeuteST2lq st_lq_out,
     output  executeLD2sq ld_sq_out,
+
+    input logic dcache_accepted,
+    input logic dcache_data_valid,
+    input MEM_BLOCK dcache_data,
+
+    output MEM_COMMAND mem_command,
+    output ADDR mem_addr,
 
     input   prf2execute prf_in,
     output  execute2prf prf_out,
@@ -975,7 +506,6 @@ module stage_ex_p4 (
 
     struct packed {
         `BY_FU(logic) i_rdy;
-        `BY_FU(logic) o_vld;
     } ex;
     always_comb begin
         foreach (iss.o_vld.alu[i]) begin
@@ -1106,6 +636,7 @@ module stage_ex_p4 (
     // Else if a longer-latency insn, this is in the middle of execution.
 
     `BY_FU(CPL_CAND) cands;
+    assign cands.str = '0; // alu, mul, lod set by respective *_ex's
     CPL_CAND [`NUM_FU_TOTAL-1:0] cands_flat;
     assign cands_flat = cands;
     
@@ -1117,11 +648,11 @@ module stage_ex_p4 (
     `BY_FU(logic) [1:0] cdb_gnt_shr;
 
     `BY_FU(logic) cdb_req;
-    assign cdb_req.str = '0;
-    `BY_FU(logic) cdb_gnt;
     assign cdb_req.alu = rs_in.fu_vld_alu;
     // cdb_req.mul set by mul_ex
-    assign cdb_req.lod = ex.o_vld.lod;
+    // cdb_req.lod set by lod_ex
+    assign cdb_req.str = '0;
+    `BY_FU(logic) cdb_gnt;
 
     psel_gen #(
         .WIDTH(`NUM_FU_TOTAL),
@@ -1140,13 +671,9 @@ module stage_ex_p4 (
         .reset  (reset),
         .flush  (flush),
 
-        .i_vld  (regs.o_vld.alu),
         .i_regs (regs.o_dat.alu),
-        .i_rdy  (ex.i_rdy.alu),
 
-        .o_vld  (ex.o_vld.alu),
-        .o_cands(cands.alu),
-        .o_rdy  (cdb_gnt_shr[1].alu)
+        .o_cands(cands.alu)
     );
 
     `BY_FU(PHYS_REG_IDX) ctag_ts;
@@ -1165,9 +692,7 @@ module stage_ex_p4 (
         .ctag_ts(ctag_ts.mul),
         .cdb_gnt(cdb_gnt.mul),
 
-        .o_vld  (ex.o_vld.mul),
-        .o_cands(cands.mul),
-        .o_rdy  (cdb_gnt_shr[1].mul)
+        .o_cands(cands.mul)
     );
 
     lod_ex lod_ex0 (
@@ -1175,18 +700,26 @@ module stage_ex_p4 (
         .reset  (reset),
         .flush  (flush),
 
+        .i_rdy  (ex.i_rdy.lod),
         .i_vld  (regs.o_vld.lod),
         .i_regs (regs.o_dat.lod),
-        .i_rdy  (ex.i_rdy.lod),
 
-        .o_vld  (ex.o_vld.lod),
-        .o_cands(cands.lod),
+        .sq_in(sq_in),
         .lq_out(lq_out),
         .ld_sq_out(ld_sq_out),
-        .sq_in(sq_in),
-        /* FIXME: How exactly do we do CDB arbitration for loads/stores?
-        And how does it fit in our ETB system? */
-        .o_rdy  (cdb_gnt_shr[1].lod)
+
+        .dcache_accepted(dcache_accepted),
+        .dcache_data_valid(dcache_data_valid),
+        .dcache_data(dcache_data),
+
+        .mem_command(mem_command),
+        .mem_addr(mem_addr),
+
+        .cdb_req(cdb_req.lod),
+        .ctag_ts(ctag_ts.lod),
+        .cdb_gnt(cdb_gnt.lod),
+        
+        .o_cands(cands.lod)
     );
 
     str_ex str_ex0 (
@@ -1197,12 +730,6 @@ module stage_ex_p4 (
         .i_vld  (regs.o_vld.str),
         .i_regs (regs.o_dat.str),
         .i_rdy  (ex.i_rdy.str),
-
-        .o_vld  (ex.o_vld.str),
-        .o_cands(cands.str),
-        /* FIXME: How exactly do we do CDB arbitration for loads/stores?
-        And how does it fit in our ETB system? */
-        .o_rdy  (cdb_gnt_shr[0].str),
 
         .sq_out(sq_out),
         .st_lq_out(st_lq_out)
@@ -1236,13 +763,13 @@ module stage_ex_p4 (
             end
 
             if (cdb2fu_gbus_shr[1][c][f]) begin
-                cdat_out_n.en[c]          |= 1;
-                cdat_out_n.ts[c]          |= cands_flat[f].t;
-                cdat_out_n.rob_idxs[c]    |= cands_flat[f].rob_idx;
-                cdat_out_n.data[c]        |= cands_flat[f].data;
-                cdat_out_n.btq_idxs[c]    |= cands_flat[f].btq_idx;
+                cdat_out_n.en[c]        |= 1;
+                cdat_out_n.ts[c]        |= cands_flat[f].t;
+                cdat_out_n.rob_idxs[c]  |= cands_flat[f].rob_idx;
+                cdat_out_n.data[c]      |= cands_flat[f].data;
+                cdat_out_n.btq_idxs[c]  |= cands_flat[f].btq_idx;
                 cdat_out_n.is_brch[c]   |= cands_flat[f].is_brch;
-                cdat_out_n.take[c]        |= cands_flat[f].take;
+                cdat_out_n.take[c]      |= cands_flat[f].take;
             end
 
         end
@@ -1252,8 +779,8 @@ module stage_ex_p4 (
         if (reset || flush) begin
             cdb2fu_gbus_shr <= '0;
             cdb_gnt_shr     <= '0;
-            ctag_out <= '0;
-            cdat_out <= '0;
+            ctag_out        <= '0;
+            cdat_out        <= '0;
         end else begin
             cdb2fu_gbus_shr[0]  <= cdb2fu_gbus;
             cdb_gnt_shr[0]      <= cdb_gnt;
@@ -1384,12 +911,19 @@ module stage_ex_p4 (
                 rs_out.fu_rdy_load,
             );
 
-            $display("\ncdb_req: alu:{%b} mul:{%b}", cdb_req.alu, cdb_req.mul);
+            $display("\ncdb_req: alu:{%b} mul:{%b} lod:{%b} str:{%b}", cdb_req.alu, cdb_req.mul, cdb_req.lod, cdb_req.str);
+            $display("\nctag_ts: alu:{%b} mul:{%b} lod:{%b} str:{%b}", ctag_ts.alu, ctag_ts.mul, ctag_ts.lod, ctag_ts.str);
             // $display("ctag_ts: alu:{%2d, %2d} mul:{%2d, %2d}",
             //     ctag_ts.alu[1], ctag_ts.alu[0], ctag_ts.mul[1], ctag_ts.mul[0]);
             $display("cdb_gnt: alu:{%b} mul:{%b}", cdb_gnt.alu, cdb_gnt.mul);
             for (int i = 0; i < 2; ++i) begin
-                $display("cdb_gnt[%0d]: alu:{%b} mul:{%b}", i, cdb_gnt_shr[i].alu, cdb_gnt_shr[i].mul);
+                $display("cdb_gnt[%0d]: alu:{%b} mul:{%b} lod:{%b} str:{%b}",
+                    i,
+                    cdb_gnt_shr[i].alu,
+                    cdb_gnt_shr[i].mul,
+                    cdb_gnt_shr[i].lod,
+                    cdb_gnt_shr[i].str
+                );
             end
 
             $display("");

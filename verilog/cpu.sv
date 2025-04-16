@@ -60,26 +60,27 @@ module cpu (
     //handle assigning the correct priority for memory
     stRET2mem ret_2_mem;
     fetch2mem fetch_2_mem;
-    MEM_TAG sq_mem2proc_transaction_tag;
     MEM_TAG fetch_mem2proc_transaction_tag;
+    MEM_TAG Dmem2Dcache_transaction_tag;
+    MEM_TAG execute2Ccache_transaction_tag;
+    ADDR Dcache2Dmem_addr;
+    MEM_COMMAND Dcache2Dmem_command;
+    MEM_COMMAND execute2Dcache_mem_command;
+    MEM_BLOCK Dcache2Dmem_wdata;
     always_comb begin
         proc2mem_command = '0;
         proc2mem_addr = '0;
         proc2mem_data = '0;
         proc2mem_size = '0;
-        sq_mem2proc_transaction_tag = '0;
         fetch_mem2proc_transaction_tag = '0;
         
-        if (ret_2_mem.Dmem_command == MEM_STORE) begin
-            proc2mem_command = ret_2_mem.Dmem_command;
-            proc2mem_addr = ret_2_mem.Dmem_addr;
-            proc2mem_data = ret_2_mem.Dmem_store_data;
-            proc2mem_size = ret_2_mem.Dmem_size;
-            sq_mem2proc_transaction_tag = mem2proc_transaction_tag;
+        if (Dcache2Dmem_command != MEM_NONE) begin
+            proc2mem_command = Dcache2Dmem_command;
+            proc2mem_addr = Dcache2Dmem_addr;
+            proc2mem_data = Dcache2Dmem_wdata;
+            proc2mem_size = DOUBLE;
+            Dmem2Dcache_transaction_tag = mem2proc_transaction_tag;
         end
-        // else if (load logic here) begin <-- LOAD REQUESTS COME NEXT (technically this wil probably come from dcache, but will be a load request regardless)
-
-        // end
         else if (fetch_2_mem.proc2mem_command == MEM_LOAD) begin // <-- FETCH REQUESTS COME LAST (always complete memory operations first to get stuff commited to memory and to keep the processor FUs chugging)
             proc2mem_command = fetch_2_mem.proc2mem_command;
             proc2mem_addr = fetch_2_mem.proc2mem_addr;
@@ -87,6 +88,84 @@ module cpu (
             fetch_mem2proc_transaction_tag = mem2proc_transaction_tag;
         end
     end
+
+    //////////////////////////////////////////////////
+    //                                              //
+    //                   Dcache                     //
+    //                                              //
+    ////////////////////////////////////////////////// 
+
+    logic req_accepted;
+    logic dcache_2_execute_accepted;
+    logic sq_mem2proc_transaction_accepted;
+
+    logic          Dcache_valid_in;
+    MEM_COMMAND    proc2Dcache_command;
+    ADDR           proc2Dcache_addr;
+    MEM_SIZE       proc2Dcache_size;
+    MEM_BLOCK      proc2Dcache_wdata;
+
+    logic         Dcache_valid_out;
+    MEM_BLOCK     Dcache_data_out;
+
+    ADDR            execute_2_dcache_addr;
+
+    logic         mem_in_use;
+
+    always_comb begin
+        proc2Dcache_command = '0;
+        proc2Dcache_addr = '0;
+        proc2Dcache_wdata = '0;
+        proc2Dcache_size = '0;
+        sq_mem2proc_transaction_accepted = '0;
+        dcache_2_execute_accepted = '0;
+
+        if (execute2Dcache_mem_command != MEM_NONE) begin
+            proc2Dcache_command = execute2Dcache_mem_command;
+            proc2Dcache_addr = execute_2_dcache_addr;
+            proc2Dcache_size = DOUBLE;
+            dcache_2_execute_accepted = req_accepted;
+        end
+        else if (ret_2_mem.Dmem_command[0] != MEM_NONE) begin
+            proc2Dcache_command = ret_2_mem.Dmem_command[0];
+            proc2Dcache_addr = ret_2_mem.Dmem_addr[0];
+            proc2Dcache_wdata = ret_2_mem.Dmem_store_data[0];
+            proc2Dcache_size = ret_2_mem.Dmem_size[0];
+            sq_mem2proc_transaction_accepted = req_accepted;
+        end
+        
+    end
+
+    dcache_simple dut (
+        .clock(clock),
+        .reset(reset),
+
+        // from mem
+        .Dmem2Dcache_transaction_tag(Dmem2Dcache_transaction_tag), //done
+        .Dmem2Dcache_data(mem2proc_data), //done
+        .Dmem2Dcache_data_tag(mem2proc_data_tag), //done
+
+        // .Dcache_valid_in(Dcache_valid_in),
+
+        // from LD/SQ
+        .proc2Dcache_command(proc2Dcache_command), //done
+        .proc2Dcache_addr(proc2Dcache_addr), //done
+        .proc2Dcache_size(proc2Dcache_size), //done
+        .proc2Dcache_wdata(proc2Dcache_wdata), //done
+
+        // Output to LD/SQ
+        .req_accepted(req_accepted), //done
+        .Dcache_valid_out(Dcache_valid_out),
+        .Dcache_data_out(Dcache_data_out),
+
+        // output to mem
+        .Dcache2Dmem_command(Dcache2Dmem_command), //done
+        .Dcache2Dmem_addr(Dcache2Dmem_addr), //done
+        .Dcache2Dmem_wdata(Dcache2Dmem_wdata), //done
+
+        // Can be used by LD/SQ, not necessary
+        .mem_in_use(mem_in_use)
+    );
 
     //////////////////////////////////////////////////
     //                                              //
@@ -259,7 +338,8 @@ module cpu (
         .gshare_pred    (gshare_pred),
         .corr_pred      (corr_pred), 
         //.ret_2_fetch    (ret_2_fetch),
-        .retire_exec    (retire_exec)
+        .retire_exec    (retire_exec),
+        .mem_in_use     (mem_in_use)
     );
 
     always_ff @(posedge clock) begin
@@ -403,7 +483,7 @@ module cpu (
     sq #(
         .N(`N),
         .LSQ_SZ(`LSQ_SZ),
-        .LSQ_SZ_DBL(`LSQ_SZ_DBL),
+        // .LSQ_SZ_DBL(`LSQ_SZ_DBL),
         .NUM_FU_STORE(`NUM_FU_STORE),
         .NUM_FU_LOAD(`NUM_FU_LOAD),
         .LD_BAY_SZ(`LD_BAY_SZ)
@@ -426,7 +506,7 @@ module cpu (
         .retire_in(retire_2_sq),
         .retire_out(sq_2_retire),
 
-        .mem2proc_transaction_tag(sq_mem2proc_transaction_tag), //temp_tag  sq_mem2proc_transaction_tag
+        .mem2proc_transaction_accepted(sq_mem2proc_transaction_accepted), //temp_tag  sq_mem2proc_transaction_accepted
         .mem_out(ret_2_mem)
 );
 
@@ -477,6 +557,13 @@ module cpu (
         .lq_out (exec_2_lq),
         .st_lq_out (execST_2_lq),
         .ld_sq_out (exec_ld_2_sq),
+
+        .dcache_accepted(dcache_2_execute_accepted),
+        .dcache_data_valid(Dcache_valid_out),
+        .dcache_data(Dcache_data_out),
+
+        .mem_command(execute2Dcache_mem_command),
+        .mem_addr(execute_2_dcache_addr),
 
         .prf_in (prf_2_ex),
         .prf_out(ex_2_prf),

@@ -463,6 +463,16 @@ module testbench;
         endcase
     endfunction
 
+    function automatic string dbg_mem_cmd(input MEM_COMMAND cmd);
+        string rv;
+        case (cmd)
+            MEM_NONE:   rv = "NONE";
+            MEM_STORE:  rv = "STOR";
+            MEM_LOAD:   rv = "LOAD";
+        endcase
+        return rv;
+    endfunction
+
     task print_btq;
         // internal state
         BTQ_ENTRY [`BTQ_SZ-1:0]      state;
@@ -858,6 +868,7 @@ module testbench;
         // internal state
         SQ_ENTRY [`LSQ_SZ-1:0]      state;
         logic [$clog2(`LSQ_SZ)-1:0] head;
+        logic [$clog2(`LSQ_SZ)-1:0] ret_head;
         logic [$clog2(`LSQ_SZ)-1:0] tail;
         logic [$clog2(`LSQ_SZ):0]   used;
         // I/O
@@ -875,6 +886,7 @@ module testbench;
 
         state   = dbg_sq.state;
         head    = dbg_sq.head;
+        ret_head= dbg_sq.ret_head;
         tail    = dbg_sq.tail;
         used    = dbg_sq.used;
 
@@ -889,6 +901,7 @@ module testbench;
         ret_2_mem   = dbg_sq.ret_2_mem;
 
         $display("  | >> SQ");
+        $display("RET_HEAD: %0d", ret_head);
         for (int i = 0; i < `LSQ_SZ; i++) begin
             $display("Entry [%2d]: sq_idx=%2d, rob_idx=%2d, addr=%4x, data=%x, d_valid=%b, addr mask=%4b%s",
             i,
@@ -984,7 +997,7 @@ module testbench;
         ret_2_mem                = dbg_retbuf.ret_2_mem;
 
         $display("  >> RET buffer");
-        for (int i = 0; i < `LSQ_SZ; i++) begin
+        for (int i = 0; i < `SQ_RET_BUF_SZ; i++) begin
             $display("Entry [%2d]: sq_idx=%2d, rob_idx=%2d, addr=%4x, data=%x, d_valid=%b%s",
             i,
             state[i].sq_idx,
@@ -1069,6 +1082,25 @@ module testbench;
         print_map_table();
         print_prf();
         print_rob();
+
+        // $display("---- rob_debug contents ----");
+        // foreach (rob_debug[idx]) begin
+        //     $display("rob_debug[%2d]: halt=%b, illegal=%b, NPC=0x%08x",
+        //             idx,
+        //             rob_debug[idx].halt,
+        //             rob_debug[idx].illegal,
+        //             rob_debug[idx].NPC);
+        // end
+        // $display("----------------------------");
+        $display(
+            "## proc2mem: {cmd: %s, addr: %x, data: %x}\n## mem2proc: {txn_tag: %2d, data: %x, data_tag: %2d}",
+             proc2mem_command,
+             proc2mem_addr,
+             proc2mem_data,
+             mem2proc_transaction_tag,
+             mem2proc_data,
+             mem2proc_data_tag
+        );
         print_rs();
         print_sq();
         print_retbuf();
