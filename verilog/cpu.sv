@@ -178,6 +178,13 @@ module cpu (
     retire2fetch retire_2_f;
     lq2retire lq_2_retire;
 
+    fetch2btb fetch_2_btb;
+    btb2fetch btb_2_fetch;
+
+    fetch2predictor fetch_2_pred;
+    predictor2fetch pred_2_fetch_gshare;
+    predictor2fetch pred_2_fetch_corr;
+
     stage_if_p4 fetch_0(
         `ifdef DEBUG
         .dbg    (dbg_fetch),
@@ -194,7 +201,14 @@ module cpu (
 
         .Imem_command(fetch_2_mem.proc2mem_command),
         .Imem_addr(fetch_2_mem.proc2mem_addr),
-        .d_out  (f_2_decode)
+        .d_out  (f_2_decode),
+        .btb_in(btb_2_fetch),
+        .pred_in_gshare(pred_2_fetch_gshare),
+        .pred_in_corr(pred_2_fetch_corr),
+
+        .btb_out(fetch_2_btb),
+        .pred_out(fetch_2_pred)
+
     );
 
 
@@ -288,6 +302,16 @@ module cpu (
     retire_final    retire_exec;
     logic           flush_n;
     ADDR            corrected_PC_n;
+    logic [`N-1:0] branch_taken;
+    logic [`N-1:0] update_en;
+    ADDR [`N-1:0] PC_original;
+    logic [`N-1:0] [7:0] bhr_from_btq;
+
+    logic [`N-1:0] [7:0] correlated_bhr_d;
+    logic [`N-1:0] gshare_pred;
+    logic [`N-1:0] corr_pred;
+
+    retire2fetch ret_2_fetch;
 
     retire retire0 (
         `ifdef DEBUG
@@ -306,6 +330,14 @@ module cpu (
 
         .flush          (flush_n),
         .corrected_PC   (corrected_PC_n),
+        .branch_taken  (branch_taken),
+        .update_en     (update_en),
+        .PC_original   (PC_original),
+        .bhr_from_btq   (bhr_from_btq),
+        .correlated_bhr_d (correlated_bhr_d),
+        .gshare_pred    (gshare_pred),
+        .corr_pred      (corr_pred), 
+        //.ret_2_fetch    (ret_2_fetch),
         .retire_exec    (retire_exec),
         .mem_in_use     (mem_in_use)
     );
@@ -322,11 +354,44 @@ module cpu (
 /* ======================================== */
             flush       <= flush_n;
             retire_2_f  <= '{
-                corrected_PC : corrected_PC_n
+                corrected_PC : corrected_PC_n, is_taken : branch_taken, update_en : update_en, PC : PC_original, retired_bhr : bhr_from_btq, correlated_bhr : correlated_bhr_d, gshare_pred : gshare_pred, corr_pred : corr_pred
             };
 /* ======================================== */
         end
+        $display("CORRELATED_BHR: %b", correlated_bhr_d);
     end
+
+
+    
+    gshare gshare_0(
+        .clock(clock),
+        .reset(reset),
+        .fetch_2_pred(fetch_2_pred),
+        .pred_2_fetch(pred_2_fetch_gshare)
+    );
+
+
+    correlated_predictor correlated_0(
+        .clock(clock),
+        .reset(reset),
+        .fetch_in(fetch_2_pred),
+        .pred_out(pred_2_fetch_corr)
+    );
+
+
+    //////////////////////////////////////////////////
+    //                                              //
+    //          Branch target buffer (BTB)          //
+    //                                              //
+    //////////////////////////////////////////////////  
+
+    btb btb_0(
+        .clock(clock),
+        .reset(reset),
+        .fetch_in(fetch_2_btb),
+        //.retire_in(ret_2_btb),
+        .fetch_out(btb_2_fetch)
+    );
 
 
     //////////////////////////////////////////////////
