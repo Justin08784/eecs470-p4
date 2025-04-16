@@ -212,6 +212,8 @@ module sq #(parameter
     logic has_retired_something;
 
     always_ff @(posedge clock) begin
+
+        // $display("CUR_STATE: flush: %b, ret_head: %0d, ret_used: %0d, last_used_sq_idx: %0d, has_retired_something: %b", flush, ret_head, ret_buf_used, last_used_sq_idx, has_retired_something);
         
         if (reset) begin
             used    <= 0;
@@ -241,10 +243,9 @@ module sq #(parameter
             tail <= (ret_head + ret_buf_used) % LSQ_SZ;
             // tail_dbl <= (ret_head + ret_buf_used) % LSQ_SZ;
             if (has_retired_something) begin
-                last_used_sq_idx <= ((ret_head == 0) && (ret_buf_used == 0)) ? last_used_sq_idx <= LSQ_SZ - 1 : (ret_head + ret_buf_used - 1) % LSQ_SZ;
+                last_used_sq_idx <= ((ret_head == 0) && (ret_buf_used == 0)) ? (LSQ_SZ - 1) : (ret_head + ret_buf_used - 1) % LSQ_SZ;
             end
             else last_used_sq_idx <= LSQ_SZ;
-            $display("UPDATE: ret_head: %0d, ret_used: %0d, last_used: %0d", ret_head, ret_buf_used, last_used_sq_idx);
             // last_used_sq_idx <= has_retired_something ? (ret_head + ret_buf_used - 1) % LSQ_SZ : LSQ_SZ;
             next_complete <= '0;
             no_store_yet <= ~has_retired_something;
