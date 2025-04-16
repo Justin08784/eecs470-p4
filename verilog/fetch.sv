@@ -339,6 +339,9 @@ module stage_if_p4 (
             $display("RET_CORR BHR: %b", r_in.correlated_bhr);
             $display("PRED_IN_CORR BHR: %b", pred_in_corr.bhr);
 
+            $display("DECODE PC: %x", PC_reg_temp);
+            $display("F_DAT PRED: %x", mux_result_prediction[0]);
+
 
            $display("  %3d | << Fetch <<", $time);  
         end
