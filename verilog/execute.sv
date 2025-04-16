@@ -134,7 +134,7 @@ module alu_ex(
     generate
         CPL_CAND    [`NUM_FU_ALU-1:0] tmp_data;
         DATA        [`NUM_FU_ALU-1:0] tmp_res;
-        logic       [`NUM_FU_ALU-1:0] tmp_take;
+        logic       [`NUM_FU_ALU-1:0] tmp_take, take_branch;
         for (genvar i = 0; i < `NUM_FU_ALU; ++i) begin : gen_alus
             alu alu_0 ( 
                 // Inputs
@@ -150,12 +150,16 @@ module alu_ex(
                 .result(tmp_res[i]) // will return 32'hfacebeec if branch is high
             );
 
+            assign take_branch[i] = ops[i].uncond_branch || (ops[i].cond_branch && tmp_take[i]);
             assign tmp_data[i] = '{
                 t       : ops[i].t,
                 rob_idx : ops[i].rob_idx,
-                data    : tmp_res[i],
+
+                wb_data : take_branch[i] ? i_regs[i].dat.NPC : tmp_res[i],
+                brch_tgt: tmp_res[i],
+
                 btq_idx : ops[i].btq_idx,
-                take    : tmp_take[i] || ops[i].uncond_branch,
+                take    : take_branch[i],
                 is_brch : ops[i].cond_branch || ops[i].uncond_branch
             };
 
@@ -274,7 +278,10 @@ module mul_ex(
             assign o_cands[i] = '{
                 t       : tmp_t[i],
                 rob_idx : tmp_rob_idx[i],
-                data    : tmp_res[i],
+
+                wb_data : tmp_res[i],
+                brch_tgt: '0,
+
                 btq_idx : '0,
                 take    : '0,
                 is_brch : '0
@@ -766,7 +773,8 @@ module stage_ex_p4 (
                 cdat_out_n.en[c]        |= 1;
                 cdat_out_n.ts[c]        |= cands_flat[f].t;
                 cdat_out_n.rob_idxs[c]  |= cands_flat[f].rob_idx;
-                cdat_out_n.data[c]      |= cands_flat[f].data;
+                cdat_out_n.wb_data[c]   |= cands_flat[f].wb_data;
+                cdat_out_n.brch_tgt[c]  |= cands_flat[f].brch_tgt;
                 cdat_out_n.btq_idxs[c]  |= cands_flat[f].btq_idx;
                 cdat_out_n.is_brch[c]   |= cands_flat[f].is_brch;
                 cdat_out_n.take[c]      |= cands_flat[f].take;
@@ -810,8 +818,10 @@ module stage_ex_p4 (
             $display("  %3d | >> EXECUTE", $time);
 
             for (int i = 0; i < `NUM_FU_ALU; ++i) begin
-                $display("alu_iss[%0d]: rdy: %b, vld: %b, t: %2d, t1: %2d, t2: %2d, rob_idx: %2d, btq_idx: %2d, inst: 0x%x, PC: 0x%x, NPC: 0x%x, cond_branch: %b, uncond_branch: %b",
+                $display("alu_iss[%0d]: {PC: %x, inst: %x} rdy: %b, vld: %b, t: %2d, t1: %2d, t2: %2d, rob_idx: %2d, btq_idx: %2d, cond_branch: %b, uncond_branch: %b",
                     i,
+                    iss.o_dat.alu[i].PC,
+                    iss.o_dat.alu[i].inst,
                     iss.i_rdy.alu[i],
                     iss.o_vld.alu[i],
                     iss.o_dat.alu[i].t,
@@ -819,9 +829,6 @@ module stage_ex_p4 (
                     iss.o_dat.alu[i].t2,
                     iss.o_dat.alu[i].rob_idx,
                     iss.o_dat.alu[i].btq_idx,
-                    iss.o_dat.alu[i].inst,
-                    iss.o_dat.alu[i].PC,
-                    iss.o_dat.alu[i].NPC,
                     iss.o_dat.alu[i].cond_branch,
                     iss.o_dat.alu[i].uncond_branch
                 );
@@ -841,8 +848,10 @@ module stage_ex_p4 (
             end
 
             for (int i = 0; i < `NUM_FU_ALU; ++i) begin
-                $display("regs.o_dat.alu[%0d]: bsy: %b, rs1: 0x%x, rs2: 0x%x t: %2d, rob_idx: %2d, btq_idx: %2d",
+                $display("regs.o_dat.alu[%0d]: {PC: %x, inst: %x} bsy: %b, rs1: 0x%x, rs2: 0x%x t: %2d, rob_idx: %2d, btq_idx: %2d",
                     i,
+                    regs.o_dat.alu[i].dat.PC,
+                    regs.o_dat.alu[i].dat.inst,
                     regs.o_vld.alu[i],
                     regs.o_dat.alu[i].rs1,
                     regs.o_dat.alu[i].rs2,
@@ -917,7 +926,7 @@ module stage_ex_p4 (
                     cdat_out.is_brch[i],
                     cdat_out.ts[i],
                     cdat_out.rob_idxs[i],
-                    cdat_out.data[i],
+                    cdat_out.wb_data[i],
                     cdat_out.btq_idxs[i],
                     cdat_out.take[i]
                 );

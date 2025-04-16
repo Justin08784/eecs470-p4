@@ -59,9 +59,9 @@ module prf #(
             if (s_t1s[i] == `ZERO_REG || !s_en1s[i]) begin
                 s_v1s[i] = '0;
             end else if (cdat_in.en[0] && (cdat_in.ts[0] == s_t1s[i])) begin
-                s_v1s[i] = cdat_in.data[0]; // internal forwarding
+                s_v1s[i] = cdat_in.wb_data[0]; // internal forwarding
             end else if (cdat_in.en[1] && (cdat_in.ts[1] == s_t1s[i])) begin
-                s_v1s[i] = cdat_in.data[1]; // internal forwarding
+                s_v1s[i] = cdat_in.wb_data[1]; // internal forwarding
             end else begin
                 s_v1s[i] = file[s_t1s[i]];
             end
@@ -69,9 +69,9 @@ module prf #(
             if (s_t2s[i] == `ZERO_REG || !s_en2s[i]) begin
                 s_v2s[i] = '0;
             end else if (cdat_in.en[0] && (cdat_in.ts[0] == s_t2s[i])) begin
-                s_v2s[i] = cdat_in.data[0]; // internal forwarding
+                s_v2s[i] = cdat_in.wb_data[0]; // internal forwarding
             end else if (cdat_in.en[1] && (cdat_in.ts[1] == s_t2s[i])) begin
-                s_v2s[i] = cdat_in.data[1]; // internal forwarding 
+                s_v2s[i] = cdat_in.wb_data[1]; // internal forwarding 
             end else begin
                 s_v2s[i] = file[s_t2s[i]];
             end
@@ -83,7 +83,7 @@ module prf #(
     always_ff @(posedge clock) begin
         foreach (cdat_in.en[i]) begin
             if (cdat_in.en[i] && (cdat_in.ts[i] != `ZERO_REG))
-                file[cdat_in.ts[i]] <= cdat_in.data[i];
+                file[cdat_in.ts[i]] <= cdat_in.wb_data[i];
         end
     end
 

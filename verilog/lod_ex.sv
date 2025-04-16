@@ -279,7 +279,8 @@ module lod_ex(
                 cands_shr[0][f] <= CPL_CAND'{
                     t       : bays.t[f][i],
                     rob_idx : bays.rob_idx[f][i],
-                    data    : bays.dat[f][i],
+                    wb_data : bays.dat[f][i],
+                    brch_tgt: '0,
                     btq_idx : '0,
                     take    : '0,
                     is_brch : '0
@@ -301,7 +302,7 @@ module lod_ex(
             $display("ocands: t: %2d, rob_idx: %2d, data: %x, btq_idx: %2d, take: %b, is_brch: %b",
                 o_cands[0].t,
                 o_cands[0].rob_idx,
-                o_cands[0].data,
+                o_cands[0].wb_data,
                 o_cands[0].btq_idx,
                 o_cands[0].take,
                 o_cands[0].is_brch,
