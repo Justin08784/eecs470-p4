@@ -242,6 +242,10 @@ always_comb begin
 
             btq_out.bhr[btq_wr_idx] = rename_in[i].bhr;
             btq_out.pred[btq_wr_idx] = rename_in[i].pred;
+
+            btq_out.gshare_pred[btq_wr_idx] = rename_in[i].gshare_pred;
+            btq_out.corr_pred[btq_wr_idx] = rename_in[i].corr_pred;
+            btq_out.correlated_bhr[btq_wr_idx] = rename_in[i].correlated_bhr;
             ++btq_wr_idx;
         end
     end

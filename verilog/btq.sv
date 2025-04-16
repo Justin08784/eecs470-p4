@@ -115,7 +115,11 @@ module btq #(
                     pred    : d_in.pred[i],
                     take    : '0,
                     PC      : d_in.PC[i],
-                    bhr     : d_in.bhr[i]
+                    bhr     : d_in.bhr[i],
+                    correlated_bhr : d_in.correlated_bhr[i],
+
+                    gshare_pred : d_in.gshare_pred[i],
+                    corr_pred   : d_in.corr_pred[i]
                 };
             end
         end

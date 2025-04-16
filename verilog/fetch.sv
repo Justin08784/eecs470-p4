@@ -26,7 +26,8 @@ module stage_if_p4 (
 
 
     input btb2fetch btb_in,
-    input predictor2fetch pred_in,
+    input predictor2fetch pred_in_gshare,
+    input predictor2fetch pred_in_corr,
 
     output fetch2btb btb_out,
     output fetch2predictor pred_out,
@@ -42,6 +43,10 @@ module stage_if_p4 (
     ADDR PC_reg; // PCs we are currently fetching
     MEM_BLOCK icache_out;
     logic  icache_valid;
+
+
+    logic [1:0] corr_pred;
+    logic [1:0] [7:0] corr_bhr;
     // INST [1:0] fifo_insns;
 
     //logic [1:0] valid_out;
@@ -113,7 +118,7 @@ module stage_if_p4 (
     always_comb begin
         d_out.f_en_cnt = `MIN(used_scnt, d_in.d_rdy_cnt);
         off = PC_reg[2]; 
-        f_cnt = !icache_valid  ? 0 : ((off || mux_result_prediction == 2'b10) ? `MIN(1, free_scnt) : free_scnt);
+        f_cnt = !icache_valid  ? 0 : ((off || mux_result_prediction > 0) ? `MIN(1, free_scnt) : free_scnt);
 
         for (int unsigned i = 0, logic vld = 0; i < `N; ++i) begin
             vld = i < f_cnt;
@@ -123,12 +128,18 @@ module stage_if_p4 (
                 PC    : PC_reg_temp,
                 NPC   : PC_reg_temp + 4,
                 valid : vld,
-                bhr   : pred_in.bhr,
+                bhr   : pred_in_gshare.bhr,
 
-                pred  : mux_result_prediction[0]
+                correlated_bhr : pred_in_corr.bhr,
+
+                pred  : mux_result_prediction[0],
+
+                gshare_pred :  pred_in_gshare.prediction[0],
+
+                corr_pred   :  pred_in_corr.prediction[0]
             };
-            $display("DECODE PC: %x", PC_reg[i]);
-            $display("mux_result_prediction[1]: %x", mux_result_prediction[1]);
+           // $display("DECODE PC: %x", PC_reg_temp);
+           // $display("mux_result_prediction[0]: %x", mux_result_prediction[0]);
         end
     end
 
@@ -193,7 +204,7 @@ module stage_if_p4 (
                 $display("PREDICTING TAKEN:");
                 $display("MUX RESULT: %1x", mux_result_prediction[0]);
 
-                $display("FETCHING NEW TARGET: %x", btb_in.target[1]);
+                $display("FETCHING NEW TARGET: %x", btb_in.target[0]);
 
                 if(mux_result_prediction[0]) begin
                     PC_reg <=  {16'b0,btb_in.target[0]};
@@ -228,8 +239,71 @@ module stage_if_p4 (
     assign pred_out.taken = r_in.is_taken;
     assign pred_out.correct_PC =  r_in.PC;
     assign pred_out.retired_bhr = r_in.retired_bhr;
-     
-    assign predict_taken = pred_in.prediction;
+
+
+    assign pred_out.correlated_bhr = r_in.correlated_bhr;
+
+    //assign predict_taken = pred_in_corr.prediction;
+    //assign corr_bhr = pred_in_corr.bhr;
+
+    // Gshare predictor interface
+    logic [1:0] gshare_pred;
+
+    // Chooser table: 2-bit counters per PC[7:0]
+    logic [255:0][1:0] chooser_table;
+    logic [7:0] fetch_index0, fetch_index1;
+    logic [7:0] retire_index0, retire_index1;
+
+    assign fetch_index0  = PC_reg[7:0];//fetch_in.PC[0][7:0];
+    assign fetch_index1  = PC_reg[7:0] + 4;  //fetch_in.PC[1][7:0];
+    assign retire_index0 = /*retire_in*/r_in.PC[0][7:0];
+    assign retire_index1 = /*retire_in*/r_in.PC[1][7:0];
+
+
+    always_comb begin
+
+        if(chooser_table[PC_reg[7:0]] == 2'b00) begin
+            predict_taken = pred_in_gshare.prediction;;
+        end else if (chooser_table[PC_reg[7:0]] == 2'b01) begin
+            predict_taken    = pred_in_gshare.prediction;
+        end else if (chooser_table[PC_reg[7:0]] == 2'b10) begin
+            predict_taken    = pred_in_corr.prediction;
+        end else if (chooser_table[PC_reg[7:0]] == 2'b11) begin
+            predict_taken    = pred_in_corr.prediction;
+        end else begin
+            predict_taken    = predict_taken;
+        end
+        corr_bhr = pred_in_corr.bhr; // optional — if fetch stage needs it
+
+    end
+
+    logic g_correct, c_correct;
+    logic [7:0] idx;
+
+    // === Update chooser table on retirement ===
+    always_ff @(posedge clock) begin
+        if (reset) begin
+            for (int i = 0; i < 256; i++) begin
+                chooser_table[i] <= 2'b10; 
+            end
+        end else begin
+            for (int i = 0; i < 2; i++) begin
+                g_correct = (r_in.gshare_pred[i] == r_in.is_taken[i]);
+                c_correct = (r_in.corr_pred[i] == r_in.is_taken[i]);
+                idx = r_in.PC[i][7:0];
+
+                // Only update chooser if one was right and one was wrong
+                if (g_correct && !c_correct && chooser_table[idx] != 2'b00)
+                    chooser_table[idx] <= chooser_table[idx] - 1;
+                else if (!g_correct && c_correct && chooser_table[idx] != 2'b11)
+                    chooser_table[idx] <= chooser_table[idx] + 1;
+            end
+        end
+    end
+
+
+
+
 
     // debugging
     `ifdef DEBUG
@@ -257,6 +331,13 @@ module stage_if_p4 (
             $display("FETCH2PRED CORRECT_PC: %x", r_in.PC);
             $display("FETCH2PRED RETIRED_BHR0: %b", r_in.retired_bhr[0]);
             $display("FETCH2PRED RETIRED_BHR1: %b", r_in.retired_bhr[1]);
+
+
+            $display("GSHARE PRED: %b", pred_in_gshare.prediction);
+            $display("CORR PRED: %b", pred_in_corr.prediction);
+
+            $display("RET_CORR BHR: %b", r_in.correlated_bhr);
+            $display("PRED_IN_CORR BHR: %b", pred_in_corr.bhr);
 
 
            $display("  %3d | << Fetch <<", $time);  

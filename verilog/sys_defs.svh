@@ -58,6 +58,11 @@
 `define BTB_ENTRIES 256
 `define BTB_TAG_WIDTH 12
 
+`define BHT_ENTRIES 256
+`define HISTORY_BITS 8
+`define PHT_ENTRIES 256
+//`define HISTORY_BITS 8
+
 `define PREFETCH_CAP 24 // <- how far ahead we can prefetch
 
 ///////////////////////////////
@@ -65,11 +70,11 @@
 ///////////////////////////////
 /* How can we implement this in the Makefile? */
 // comment out to enable synth only constructions
-// `define SYNTH
+`define SYNTH
 
 `ifndef SYNTH
 // comment out to disable DEBUG:
-// `define DEBUG
+//`define DEBUG
 `endif
 
 ///////////////////////////////
@@ -366,8 +371,11 @@ typedef struct packed {
     ADDR  NPC; // PC + 4
     logic valid;
     logic [7:0] bhr;
+    logic [7:0] correlated_bhr;
 
     logic pred;
+    logic gshare_pred;
+    logic corr_pred;
 } IF_ID_PACKET;
 
 /**
@@ -503,6 +511,10 @@ typedef struct packed {
     logic   take;
     ADDR    PC;
     logic [7:0] bhr;
+    logic [7:0] correlated_bhr;
+
+    logic gshare_pred;
+    logic corr_pred;
 } BTQ_ENTRY;
 
 typedef struct packed {
@@ -559,6 +571,14 @@ typedef struct packed {
 
     logic [`N-1:0] [7:0] retired_bhr;
 
+    logic [`N-1:0] [7:0] correlated_bhr;
+
+    logic [`N-1:0] gshare_pred;
+
+    logic [`N-1:0] corr_pred;
+
+
+
 } retire2fetch;
 
 typedef struct packed {
@@ -572,7 +592,12 @@ typedef struct packed {
     ADDR    [`N-1:0]       PC;
 
     logic   [`N-1:0] [7:0] bhr;
+
+    logic   [`N-1:0] [7:0] correlated_bhr;
+
     logic   [`N-1:0] pred;
+    logic   [`N-1:0] gshare_pred;
+    logic   [`N-1:0] corr_pred;
 } dispatch2btq;
 
 // Reservation station stuff
@@ -600,8 +625,11 @@ typedef struct packed {
     logic           is_brch; // Is inst a branch?
 
     logic   [7:0]   bhr;
+    logic   [7:0]   correlated_bhr;
 
     logic           pred;
+    logic           gshare_pred;
+    logic           corr_pred;
     
 
     /* from ID_EX_PACKET */
@@ -914,6 +942,7 @@ typedef struct packed {
     ADDR [`N-1:0] correct_PC;
 
     logic [`N-1:0] [7:0] retired_bhr;
+    logic [`N-1:0] [7:0] correlated_bhr;
 
 } fetch2predictor;
 

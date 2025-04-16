@@ -123,11 +123,19 @@ module gshare (
         $display("  fetch_in.PC[0] = %d", fetch_2_pred.correct_PC[0]);
         $display("  fetch_in.PC[1] = %d", fetch_2_pred.correct_PC[1]);
 
+        $display("  GSHARE_INITIAL_PC0 = %d", fetch_2_pred.PC[0]);
+        $display("  GSHARE_INITIAL_PC1 = %d", fetch_2_pred.PC[1]);
+
         $display(" GSHARE update_index0 = %b", update_index[0]);
         $display(" GSHARE update_index1 = %b", update_index[1]);
 
          $display(" GSHARE retired pc0 = %b", fetch_2_pred.correct_PC[0]);
         $display(" GSHARE retired pc1 = %b", fetch_2_pred.correct_PC[1]);
+
+        $display(" GSHARE_PREDICTION2FETCH = %b", pred_2_fetch.prediction);
+
+
+
 
     end
 

@@ -30,6 +30,11 @@ module retire (
     output logic [`N-1:0] update_en,
     output ADDR [`N-1:0] PC_original,
     output logic [`N-1:0] [7:0] bhr_from_btq,
+
+
+    output logic [`N-1:0] [7:0] correlated_bhr_d,
+    output logic [`N-1:0] gshare_pred,
+    output logic [`N-1:0] corr_pred, 
     //output retire2fetch ret_2_fetch,
 
     output retire_final retire_exec
@@ -100,16 +105,23 @@ module retire (
             if (rob_in.entries[i].wr_mem)
                 ++sq_rd_cnt; 
                 
-            update_en[i] = 1;
+            
 
             if (!rob_in.entries[i].is_brch)
                 continue;
 
+            update_en[i] = 1;
+
             PC_original[i] = btq_in.dat[btq_rd_cnt].PC;
 
             bhr_from_btq[i] = btq_in.dat[btq_rd_cnt].bhr;
+            correlated_bhr_d[i] = btq_in.dat[btq_rd_cnt].correlated_bhr;
+
+            gshare_pred[i] = btq_in.dat[btq_rd_cnt].gshare_pred;
+            corr_pred[i] = btq_in.dat[btq_rd_cnt].corr_pred;
             $display("BTQ_IN PC: 0x%x, BTQ_IN TGT: 0x%x} ", btq_in.dat[btq_rd_cnt].PC, btq_in.dat[btq_rd_cnt].tgt);
-            $display("BTQ_IN PRED: %x,  BTQ_IN TAKE: %x", btq_in.dat[btq_rd_cnt].pred, btq_in.dat[btq_rd_cnt].take);                
+            $display("BTQ_IN PRED: %x,  BTQ_IN TAKE: %x", btq_in.dat[btq_rd_cnt].pred, btq_in.dat[btq_rd_cnt].take);     
+            $display("BTQ_IN CORR_BHR: %b", btq_in.dat[btq_rd_cnt].correlated_bhr);           
             if (btq_in.dat[btq_rd_cnt].pred != btq_in.dat[btq_rd_cnt].take) begin
                 $display("PREDICTION != TAKE");
                 // is mispred?
