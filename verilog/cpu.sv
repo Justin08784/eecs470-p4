@@ -426,7 +426,7 @@ module cpu (
     sq #(
         .N(`N),
         .LSQ_SZ(`LSQ_SZ),
-        .LSQ_SZ_DBL(`LSQ_SZ_DBL),
+        // .LSQ_SZ_DBL(`LSQ_SZ_DBL),
         .NUM_FU_STORE(`NUM_FU_STORE),
         .NUM_FU_LOAD(`NUM_FU_LOAD),
         .LD_BAY_SZ(`LD_BAY_SZ)
