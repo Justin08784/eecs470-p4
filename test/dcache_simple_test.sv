@@ -127,10 +127,10 @@ module dcache_simple_test;
                     dut.dcache_tags[i].tag);
         end
 
-        // $display("memDP Contents:");
-        // for (int i = 0; i < `DCACHE_LINES; i++) begin
-        //     $display("Index %0d: Data = 0x%h", i, dut.dcache_mem.memData[i]);
-        // end
+        $display("memDP Contents:");
+        for (int i = 0; i < `DCACHE_LINES; i++) begin
+            $display("Index %0d: Data = 0x%h", i, dut.dcache_mem.memData[i]);
+        end
         
         $display("--------------------------------------------------");
     endtask

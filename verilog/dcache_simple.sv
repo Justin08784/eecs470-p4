@@ -265,10 +265,13 @@ module dcache_simple (
                             for (int i = 0; i< CACHE_LINES; i++) begin
                                 next_dcache_tags[i] = '{
                                     valid : dcache_tags[i].valid,
-                                    dirty : 1'b1,
+                                    dirty : dcache_tags[i].dirty,
                                     tag   : dcache_tags[i].tag
                                 };
                             end
+                            next_dcache_tags[current_index].tag = dcache_tags[current_index].tag;
+                            next_dcache_tags[current_index].valid = dcache_tags[current_index].valid;
+                            next_dcache_tags[current_index].dirty = 1;
                         end // state IDLE: cache hit ✅
                     end else begin 
                         cache_hit = 0;
