@@ -119,7 +119,6 @@ module cpu (
     ADDR            execute_2_dcache_addr;
 
     logic         mem_in_use;
-    logic         dcache_ready;
 
     always_comb begin
         proc2Dcache_command = '0;
@@ -173,8 +172,7 @@ module cpu (
         .Dcache2Dmem_wdata(Dcache2Dmem_wdata), //done
 
         // Can be used by LD/SQ, not necessary
-        .mem_in_use(mem_in_use),
-        .dcache_ready(dcache_ready)
+        .mem_in_use(mem_in_use)
     );
 
     //////////////////////////////////////////////////
