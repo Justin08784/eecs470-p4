@@ -110,13 +110,12 @@ module cpu (
     ADDR            execute_2_dcache_addr;
 
     logic         mem_in_use;
-    logic         dcache_ready;
 
     always_comb begin
-        proc2Dcache_command = '0;
-        proc2Dcache_addr = '0;
-        proc2Dcache_wdata = '0;
-        proc2Dcache_size = '0;
+        proc2Dcache_command = MEM_NONE;
+        proc2Dcache_addr    = '0;
+        proc2Dcache_wdata   = '0;
+        proc2Dcache_size    = '0;
         sq_mem2proc_transaction_tag = '0;
         if (execute2Dcache_mem_command != MEM_NONE) begin
             proc2Dcache_command = execute2Dcache_mem_command;
@@ -129,6 +128,11 @@ module cpu (
             proc2Dcache_addr = ret_2_mem.Dmem_addr[0];
             proc2Dcache_wdata = ret_2_mem.Dmem_store_data[0];
             proc2Dcache_size = ret_2_mem.Dmem_size[0];
+            // FIXME: FIXME: FIXME: FIXME:
+            // FIXME: FIXME: FIXME: FIXME:
+            // FIXME: FIXME: FIXME: FIXME:
+            // FIXME: FIXME: FIXME: FIXME:
+            // FIXME: Bro why are you assigning a logic to a tag?????
             sq_mem2proc_transaction_tag = req_accepted;
         end
         
@@ -162,8 +166,7 @@ module cpu (
         .Dcache2Dmem_wdata(Dcache2Dmem_wdata), //done
 
         // Can be used by LD/SQ, not necessary
-        .mem_in_use(mem_in_use),
-        .dcache_ready(dcache_ready)
+        .mem_in_use(mem_in_use)
     );
 
     //////////////////////////////////////////////////
