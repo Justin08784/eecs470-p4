@@ -37,6 +37,20 @@ module dcache_simple (
     localparam OFFSET_BITS = 3;
     localparam TAG_WIDTH = 32 - INDEX_BITS - OFFSET_BITS;
 
+    logic         next_Dcache_valid_out;
+    MEM_BLOCK     next_Dcache_data_out;
+
+    always_ff @(posedge clock) begin
+        if (reset) begin
+            Dcache_valid_out <= '0;
+            Dcache_data_out <= '0;
+        end
+        else begin
+            Dcache_valid_out <= next_Dcache_valid_out;
+            Dcache_data_out <= next_Dcache_data_out;
+        end
+    end
+
     logic we;
     MEM_BLOCK rblock, wblock;
 
@@ -185,8 +199,8 @@ module dcache_simple (
                 end
                 if (proc2Dcache_command == MEM_NONE) begin
                     next_mem_in_use = 0;
-                    Dcache_valid_out = 0;
-                    Dcache_data_out = '0;
+                    next_Dcache_valid_out = 0;
+                    next_Dcache_data_out = '0;
                     we = 0;
                     wblock = '0;
                     for (int i = 0; i< CACHE_LINES; i++) begin
@@ -216,8 +230,8 @@ module dcache_simple (
                         next_mem_req = '{command: MEM_NONE};
                         next_mem_resp = '{transtag : 0};
                         if (proc2Dcache_command == MEM_LOAD) begin // load and hit
-                            Dcache_valid_out = 1;
-                            Dcache_data_out = rblock;
+                            next_Dcache_valid_out = 1;
+                            next_Dcache_data_out = rblock;
                             we = 0;
                             wblock = '0;
                             for (int i = 0; i< CACHE_LINES; i++) begin
@@ -246,8 +260,8 @@ module dcache_simple (
                             endcase
                             we = 1;
                             // $display("WRITING: %h, %h, %b, %h, %h", wblock, proc2Dcache_wdata,byte_addr,rblock,wblock.word_level[byte_addr[2]]);
-                            Dcache_valid_out = 0;
-                            Dcache_data_out = '0;
+                            next_Dcache_valid_out = 0;
+                            next_Dcache_data_out = '0;
                             for (int i = 0; i< CACHE_LINES; i++) begin
                                 next_dcache_tags[i] = '{
                                     valid : dcache_tags[i].valid,
@@ -259,8 +273,8 @@ module dcache_simple (
                     end else begin 
                         cache_hit = 0;
                         next_mem_in_use = 1;
-                        Dcache_valid_out = 0;
-                        Dcache_data_out = '0;
+                        next_Dcache_valid_out = 0;
+                        next_Dcache_data_out = '0;
                         we = 0;
                         wblock = '0;
                         for (int i = 0; i< CACHE_LINES; i++) begin
@@ -305,8 +319,8 @@ module dcache_simple (
                     size: dcache_req.size
                 };
                 next_mem_in_use = 1;
-                Dcache_valid_out = 0;
-                Dcache_data_out = '0;
+                next_Dcache_valid_out = 0;
+                next_Dcache_data_out = '0;
                 we = 0;
                 wblock = '0;
                 Dcache2Dmem_addr = dcache_req.addr;
@@ -351,8 +365,8 @@ module dcache_simple (
                     size: dcache_req.size
                 };
                 // mem_in_use = 1;
-                // Dcache_valid_out = 0;
-                // Dcache_data_out = '0;
+                // next_Dcache_valid_out = 0;
+                // next_Dcache_data_out = '0;
                 Dcache2Dmem_command = MEM_NONE;
                 Dcache2Dmem_addr = '0;
                 Dcache2Dmem_wdata = '0;
@@ -376,8 +390,8 @@ module dcache_simple (
                         next_dcache_tags[dcache_req.index].tag = dcache_req.tag;
                         next_dcache_tags[dcache_req.index].valid = 1;
                         next_dcache_tags[dcache_req.index].dirty = 0;
-                        Dcache_valid_out = 1;
-                        Dcache_data_out = Dmem2Dcache_data;
+                        next_Dcache_valid_out = 1;
+                        next_Dcache_data_out = Dmem2Dcache_data;
                         
                     end else if (dcache_req.command == MEM_STORE) begin
                         // wblock = Dmem2Dcache_data;
@@ -391,16 +405,16 @@ module dcache_simple (
                         next_dcache_tags[dcache_req.index].tag = dcache_req.tag;
                         next_dcache_tags[dcache_req.index].valid = 1;
                         next_dcache_tags[dcache_req.index].dirty = 1;
-                        Dcache_valid_out = 0;
-                        Dcache_data_out = '0;
+                        next_Dcache_valid_out = 0;
+                        next_Dcache_data_out = '0;
                     end
                 end else begin
                     next_mem_req = '{command: mem_req.command};
                     next_mem_resp = '{transtag : mem_resp.transtag};
                     we = 0;
                     wblock = '0;
-                    Dcache_valid_out = 0;
-                    Dcache_data_out = '0;
+                    next_Dcache_valid_out = 0;
+                    next_Dcache_data_out = '0;
                     next_state = FILL_WAIT;
                     next_mem_in_use = 1;
                     
@@ -418,8 +432,8 @@ module dcache_simple (
                     size: dcache_req.size
                 };
                 next_mem_in_use = 1;
-                Dcache_valid_out = 0;
-                Dcache_data_out = '0;
+                next_Dcache_valid_out = 0;
+                next_Dcache_data_out = '0;
                 // we = 0;
                 // wblock = '0;
                 for (int i = 0; i< CACHE_LINES; i++) begin
@@ -474,8 +488,8 @@ module dcache_simple (
                 next_state = IDLE;
                 next_mem_req = '{command: MEM_NONE};
                 next_mem_resp = '{transtag : '0};
-                Dcache_valid_out = 0;
-                Dcache_data_out = '0;
+                next_Dcache_valid_out = 0;
+                next_Dcache_data_out = '0;
                 Dcache2Dmem_addr = '0;
                 Dcache2Dmem_command = MEM_NONE;
                 Dcache2Dmem_wdata = '0;

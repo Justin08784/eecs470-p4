@@ -42,7 +42,7 @@ module lod_ex(
         MEM_SIZE        [`NUM_FU_LOAD-1:0][LD_BAY_SZ-1:0]  mem_size;
 
         LSQ_IDX         [`NUM_FU_LOAD-1:0][LD_BAY_SZ-1:0]  sq_idx;
-        logic           [3:0]             [LD_BAY_SZ-1:0]  st_frwd_byte_mask;
+        logic           [`NUM_FU_LOAD-1:0][LD_BAY_SZ-1:0][3:0]  st_frwd_byte_mask;
         DATA            [`NUM_FU_LOAD-1:0][LD_BAY_SZ-1:0]  dat;
     } LOAD_BAYS;
 
@@ -115,6 +115,9 @@ module lod_ex(
             };
         end
     end
+    
+    //for forwarding, declared here so that it can be used here
+    logic [`NUM_FU_LOAD-1:0][LD_BAY_SZ-1:0] next_got;
 
     //mem request logic
     logic [$clog2(`LD_BAY_SZ):0] curr_frwd, next_frwd;
@@ -127,14 +130,14 @@ module lod_ex(
 
         case (pending)
             0 : begin
-                if (bays.vld[0][curr_frwd] && !bays.got[0][curr_frwd] && !(reset || flush)) begin
-                    $display("ASKING_MEM");
+                if (bays.vld[0][curr_frwd] && !(bays.got[0][curr_frwd] || next_got[0][curr_frwd]) && !(reset || flush)) begin
+                    // $display("ASKING_MEM");
                     mem_command = MEM_LOAD;
                     mem_addr = bays.addr[0][curr_frwd];
                 end
 
-                if (dcache_accepted) begin
-                    $display("MEM_ACCEPTED");
+                if (dcache_accepted && (mem_command == MEM_LOAD)) begin
+                    // $display("MEM_ACCEPTED");
                     next_pending = 1;
                     next_pending_frwd = curr_frwd;
                 end
@@ -143,7 +146,7 @@ module lod_ex(
                     next_pending_frwd = 0;
 
                     for (int unsigned i = 0; i < LD_BAY_SZ; i++) begin
-                        if (!bays.vld[0][i] || bays.got[0][i]) continue;
+                        if ((!bays.vld[0][i]) || bays.got[0][i]) continue;
 
                         next_frwd = i;
                         break;
@@ -152,23 +155,27 @@ module lod_ex(
             end
             1 : begin
                     if (dcache_data_valid) begin
+                        // $display("DATA_RETURNED[%b]: %h", dcache_data_valid, dcache_data);
                         next_pending = 0;
                         next_pending_frwd = 0;
                     end
                     else begin
-                        next_pending = 1;
+                        next_pending = pending;
                         next_pending_frwd = pending_frwd;
                     end
             end
 
             default : begin
-
+                next_pending = 0;
+                next_pending_frwd = 0;
+                next_frwd = 0;
             end 
         endcase
 
     end
 
     always_ff @(posedge clock) begin
+        // $display("PENDING_STATE: %b",pending);
         if (reset || flush) begin
             curr_frwd <= '0;
             pending <= '0;
@@ -195,36 +202,35 @@ module lod_ex(
     end
 
     //ST-LD forwarding parsing logic
-    logic [`NUM_FU_LOAD-1:0][LD_BAY_SZ-1:0] next_got;
-    logic [3:0]             [LD_BAY_SZ-1:0] next_st_frwd_byte_mask;
+    logic [LD_BAY_SZ-1:0][3:0] next_st_frwd_byte_mask;
     DATA_BLOCK  [`NUM_FU_LOAD-1:0][LD_BAY_SZ-1:0] next_dat;
     always_comb begin
         next_got = bays.got;
         next_st_frwd_byte_mask = '0;
         next_dat = bays.dat;
-        foreach (bays.vld[f, i]) begin
-            if (bays.got[f][i])
+        for (int unsigned i = 0; i < LD_BAY_SZ; i++) begin
+            if (bays.got[0][i])
                 continue;
-            if (!sq_in.forward_en[i])
-                continue;
-
+            // if (!sq_in.forward_en[i])
+            //     continue;
+            // $display("BAY_STATE: %b, %d, %0d, %0d, %0d", pending, dcache_data_valid, i, pending_frwd, dcache_data);
             if (pending && dcache_data_valid && (i == pending_frwd)) begin
 
-                next_dat[f][i] = (dcache_data.word_level[bays.addr[f][i][3]]) >> bays.addr[f][i][1:0];
-                next_got[f][i] = 1;
+                next_dat[0][i] = (dcache_data.word_level[bays.addr[0][i][3]]) >> bays.addr[0][i][1:0];
+                next_got[0][i] = 1;
             end
 
             if (sq_in.forward_byte_en[i][0])
-                next_dat[f][i].byte_level[0] = sq_in.forward_data[i].byte_level[0];
+                next_dat[0][i].byte_level[0] = sq_in.forward_data[i].byte_level[0];
             if (sq_in.forward_byte_en[i][1])
-                next_dat[f][i].byte_level[1] = sq_in.forward_data[i].byte_level[1];
+                next_dat[0][i].byte_level[1] = sq_in.forward_data[i].byte_level[1];
             if (sq_in.forward_byte_en[i][2])
-                next_dat[f][i].byte_level[2] = sq_in.forward_data[i].byte_level[2];
+                next_dat[0][i].byte_level[2] = sq_in.forward_data[i].byte_level[2];
             if (sq_in.forward_byte_en[i][3])
-                next_dat[f][i].byte_level[3] = sq_in.forward_data[i].byte_level[3];
-            next_st_frwd_byte_mask = bays.st_frwd_byte_mask[f][i] | sq_in.forward_byte_en[i];
+                next_dat[0][i].byte_level[3] = sq_in.forward_data[i].byte_level[3];
+            next_st_frwd_byte_mask[i] = bays.st_frwd_byte_mask[0][i] | sq_in.forward_byte_en[i];
 
-            next_got[f][i] |= ($countones(next_st_frwd_byte_mask) == (2**bays.mem_size[f][i]));
+            next_got[0][i] |= ($countones(next_st_frwd_byte_mask[i]) == (2**bays.mem_size[0][i]));
 
                 // $display("FORWARDING_OCCURING: %0d, mask: %4b, final_data: %0d, ones: %0d, size: %0d, next_got:%b", sq_in.forward_data[i], sq_in.forward_byte_en[i], next_dat[f][i],$countones(next_st_frwd_byte_mask),2**bays.mem_size[f][i],next_got[f][i]);
         end
@@ -253,7 +259,7 @@ module lod_ex(
             foreach (next_got[f, i]) begin
                 bays.got[f][i] <= next_got[f][i];
                 bays.dat[f][i] <= next_dat[f][i];
-                bays.st_frwd_byte_mask[f][i] <= next_st_frwd_byte_mask[f][i];
+                bays.st_frwd_byte_mask[f][i] <= next_st_frwd_byte_mask[i];
             end
 
             foreach (fu2out_gnt[f, i]) begin

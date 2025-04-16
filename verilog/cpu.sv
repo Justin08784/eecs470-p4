@@ -105,7 +105,7 @@ module cpu (
     ////////////////////////////////////////////////// 
 
     logic req_accepted;
-    logic execute_2_dcache_accepted;
+    logic dcache_2_execute_accepted;
 
     logic          Dcache_valid_in;
     MEM_COMMAND    proc2Dcache_command;
@@ -131,7 +131,7 @@ module cpu (
             proc2Dcache_command = execute2Dcache_mem_command;
             proc2Dcache_addr = execute_2_dcache_addr;
             proc2Dcache_size = DOUBLE;
-            execute_2_dcache_accepted = req_accepted;
+            dcache_2_execute_accepted = req_accepted;
         end
         else if (ret_2_mem.Dmem_command[0] != MEM_NONE) begin
             proc2Dcache_command = ret_2_mem.Dmem_command[0];
@@ -501,7 +501,7 @@ module cpu (
         .st_lq_out (execST_2_lq),
         .ld_sq_out (exec_ld_2_sq),
 
-        .dcache_accepted(execute_2_dcache_accepted),
+        .dcache_accepted(dcache_2_execute_accepted),
         .dcache_data_valid(Dcache_valid_out),
         .dcache_data(Dcache_data_out),
 
