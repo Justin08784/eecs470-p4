@@ -350,6 +350,7 @@ CPU_SOURCES = verilog/cpu.sv \
 			  verilog/victim.sv \
 			  verilog/sq.sv \
 			  verilog/lq.sv \
+			  verilog/dcache_basic.sv \
 			  verilog/dcache_simple.sv
 
 
