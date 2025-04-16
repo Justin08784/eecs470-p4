@@ -46,6 +46,7 @@ module lod_ex(
         LSQ_IDX         [`NUM_FU_LOAD-1:0][LD_BAY_SZ-1:0]  sq_idx;
         logic           [`NUM_FU_LOAD-1:0][LD_BAY_SZ-1:0][3:0]  st_frwd_byte_mask;
         DATA            [`NUM_FU_LOAD-1:0][LD_BAY_SZ-1:0]  dat;
+        logic           [`NUM_FU_LOAD-1:0][LD_BAY_SZ-1:0] rd_unsigned;
     } LOAD_BAYS;
 
 
@@ -232,6 +233,23 @@ module lod_ex(
 
             next_got[0][i] |= ($countones(next_st_frwd_byte_mask[i]) == (2**bays.mem_size[0][i]));
 
+            if (next_got[0][i]) begin
+                if (bays.rd_unsigned[0][i]) begin
+                    if (bays.mem_size[0][i] == BYTE) begin
+                        next_dat[0][i][31:8] = 0;
+                    end else if (bays.mem_size[0][i] == HALF) begin
+                        next_dat[0][i][31:16] = 0;
+                    end
+                end
+                else begin
+                    if (bays.mem_size[0][i] == BYTE) begin
+                        next_dat[0][i][31:8] = {(24){next_dat[0][i][7]}};
+                    end else if (bays.mem_size[0][i] == HALF) begin
+                        next_dat[0][i][31:16] = {(16){next_dat[0][i][15]}};
+                    end
+                end
+            end
+
                 // $display("FORWARDING_OCCURING: %0d, mask: %4b, final_data: %0d, ones: %0d, size: %0d, next_got:%b", sq_in.forward_data[i], sq_in.forward_byte_en[i], next_dat[f][i],$countones(next_st_frwd_byte_mask),2**bays.mem_size[f][i],next_got[f][i]);
         end
     end
@@ -255,6 +273,7 @@ module lod_ex(
                 bays.dat     [f][i] <= '0;
                 bays.sq_idx  [f][i] <= i_regs[f].dat.sq_idx;
                 bays.st_frwd_byte_mask[f][i] <= '0;
+                bays.rd_unsigned[f][i] <= i_regs[f].dat.rd_unsigned;
             end
 
             foreach (next_got[f, i]) begin

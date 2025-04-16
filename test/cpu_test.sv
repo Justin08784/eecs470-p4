@@ -1103,7 +1103,7 @@ module testbench;
         );
         print_rs();
         print_sq();
-        print_retbuf();
+        // print_retbuf();
         print_lq();
         print_retire();
         $display("  | << CYCLE: %3d (t: %3d)", clock_count-1, $time);

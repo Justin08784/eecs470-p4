@@ -170,8 +170,19 @@ module sq #(parameter
             
             assign execute_out.forward_byte_en[i] = idx_found[i] && ex_frwd_in.forward_req_en[i] ? 
                 shift_byte_mask(next_sq_2_exec.forward_byte_en[i], word_off[i], ex_frwd_in.forward_mem_size[i]) : '0;
+
+            assign execute_out.forward_mem_size[i] = idx_found[i] && ex_frwd_in.forward_req_en[i] ? 
+                ex_frwd_in.forward_mem_size[i] : 0;
         end
     endgenerate
+
+    // always_ff @(posedge clock) begin
+    //     for (int unsigned i = 0; i < LD_BAY_SZ; i++) begin
+    //         if (execute_out.forward_en[i]) begin
+    //             $display("FORWARDING: addr: %h, data: %h, size: %0d, mask: %4b", ex_frwd_in.forward_addr[i], execute_out.forward_data[i], execute_out.forward_mem_size[i], execute_out.forward_byte_en[i]);
+    //         end
+    //     end
+    // end
 
 
     logic [`NUM_FU_STORE-1:0] [3:0] bytewise_addr_mask;
