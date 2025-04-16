@@ -99,7 +99,7 @@ module btq #(
                     continue;
                 cur_idx = cdat_in.btq_idxs[i];
 
-                state[cur_idx].tgt  <= cdat_in.brch_tgt[i];
+                state[cur_idx].tgt  <= cdat_in.data[i];
                 state[cur_idx].take <= cdat_in.take[i];
             end
 
