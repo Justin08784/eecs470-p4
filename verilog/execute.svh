@@ -6,11 +6,7 @@
 typedef struct packed {
     PHYS_REG_IDX t;
     ROB_IDX rob_idx;
-    DATA wb_data;
-    ADDR brch_tgt;
-    BTQ_IDX btq_idx;
-    logic take;
-    logic is_brch;
+    DATA data;
 } CPL_CAND;
 
 /* Slices (or "views") of ID_RESULT needed for each FU type */
@@ -128,9 +124,9 @@ function automatic ALU_REGS alu_snoop(
         if (!cdat.en[n] || cdat.ts[n] == '0)
             continue;
         if (rv.dat.t1 == cdat.ts[n])
-            rv.rs1 = cdat.wb_data[n];
+            rv.rs1 = cdat.data[n];
         if (rv.dat.t2 == cdat.ts[n])
-            rv.rs2 = cdat.wb_data[n];
+            rv.rs2 = cdat.data[n];
     end
     return rv;
 endfunction
@@ -144,9 +140,9 @@ function automatic MUL_REGS mul_snoop(
         if (!cdat.en[n] || cdat.ts[n] == '0)
             continue;
         if (rv.dat.t1 == cdat.ts[n])
-            rv.rs1 = cdat.wb_data[n];
+            rv.rs1 = cdat.data[n];
         if (rv.dat.t2 == cdat.ts[n])
-            rv.rs2 = cdat.wb_data[n];
+            rv.rs2 = cdat.data[n];
     end
     return rv;
 endfunction
@@ -160,7 +156,7 @@ function automatic LOD_REGS lod_snoop(
         if (!cdat.en[n] || cdat.ts[n] == '0)
             continue;
         if (rv.dat.t1 == cdat.ts[n])
-            rv.rs1 = cdat.wb_data[n];
+            rv.rs1 = cdat.data[n];
     end
     return rv;
 endfunction
@@ -174,9 +170,9 @@ function automatic STR_REGS str_snoop(
         if (!cdat.en[n] || cdat.ts[n] == '0)
             continue;
         if (rv.dat.t1 == cdat.ts[n])
-            rv.rs1 = cdat.wb_data[n];
+            rv.rs1 = cdat.data[n];
         if (rv.dat.t2 == cdat.ts[n])
-            rv.rs2 = cdat.wb_data[n];
+            rv.rs2 = cdat.data[n];
     end
     return rv;
 endfunction
