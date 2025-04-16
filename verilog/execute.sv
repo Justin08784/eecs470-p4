@@ -825,12 +825,6 @@ module stage_ex_p4 (
                     iss.o_dat.alu[i].cond_branch,
                     iss.o_dat.alu[i].uncond_branch
                 );
-                $display("  bytag: (b1:%b, idx1:%b) (b2:%b, idx2:%b)",
-                    iss.o_dat.alu[i].bytag.bypass1,
-                    iss.o_dat.alu[i].bytag.cdb_idx1,
-                    iss.o_dat.alu[i].bytag.bypass2,
-                    iss.o_dat.alu[i].bytag.cdb_idx2,
-                );
             end
 
             for (int i = 0; i < `NUM_FU_MULT; ++i) begin
@@ -844,64 +838,29 @@ module stage_ex_p4 (
                     iss.o_dat.mul[i].rob_idx,
                     iss.o_dat.mul[i].func
                 );
-                $display("  bytag: (b1:%b, idx1: %b) (b2: %b, idx2:%b)",
-                    iss.o_dat.mul[i].bytag.bypass1,
-                    iss.o_dat.mul[i].bytag.cdb_idx1,
-                    iss.o_dat.mul[i].bytag.bypass2,
-                    iss.o_dat.mul[i].bytag.cdb_idx2,
-                );
             end
 
             for (int i = 0; i < `NUM_FU_ALU; ++i) begin
-                $display("regs.o_dat.alu[%0d]: bsy: %b, rs1: 0x%x, rs2: 0x%x",
+                $display("regs.o_dat.alu[%0d]: bsy: %b, rs1: 0x%x, rs2: 0x%x t: %2d, rob_idx: %2d, btq_idx: %2d",
                     i,
                     regs.o_vld.alu[i],
                     regs.o_dat.alu[i].rs1,
-                    regs.o_dat.alu[i].rs2
+                    regs.o_dat.alu[i].rs2,
+                    regs.o_dat.alu[i].dat.t,
+                    regs.o_dat.alu[i].dat.rob_idx,
+                    regs.o_dat.alu[i].dat.btq_idx
                 );
-                $display("  bytag: (b1:%b, idx1:%b) (b2:%b, idx2:%b)",
-                    regs.o_dat.alu[i].dat.bytag.bypass1,
-                    regs.o_dat.alu[i].dat.bytag.cdb_idx1,
-                    regs.o_dat.alu[i].dat.bytag.bypass2,
-                    regs.o_dat.alu[i].dat.bytag.cdb_idx2,
-                );
-                // $display("regs.o_dat.alu[%0d]: bsy: %b, opa: 0x%x, opb: 0x%x, alu_func: %b, branch_func: %b, cond_branch: %b, uncond_branch: %b, t: %2d, rob_idx: %2d, btq_idx: %2d",
-                //     i,
-                //     regs.o_vld.alu[i],
-                //     regs.o_dat.alu[i].opa,
-                //     regs.o_dat.alu[i].opb,
-                //     regs.o_dat.alu[i].alu_func,
-                //     regs.o_dat.alu[i].branch_func,
-                //     regs.o_dat.alu[i].cond_branch,
-                //     regs.o_dat.alu[i].uncond_branch,
-                //     regs.o_dat.alu[i].t,
-                //     regs.o_dat.alu[i].rob_idx,
-                //     regs.o_dat.alu[i].btq_idx
-                // );
             end
 
             for (int i = 0; i < `NUM_FU_MULT; ++i) begin
-                $display("regs.o_dat.mul[%0d]: bsy: %b, rs1: 0x%x, rs2: 0x%x",
+                $display("regs.o_dat.mul[%0d]: bsy: %b, rs1: 0x%x, rs2: 0x%x t: %2d, rob_idx: %2d",
                     i,
                     regs.o_vld.mul[i],
                     regs.o_dat.mul[i].rs1,
-                    regs.o_dat.mul[i].rs2
+                    regs.o_dat.mul[i].rs2,
+                    regs.o_dat.mul[i].dat.t,
+                    regs.o_dat.mul[i].dat.rob_idx
                 );
-                $display("  bytag: (b1:%b, idx1:%b) (b2:%b, idx2:%b)",
-                    regs.o_dat.mul[i].dat.bytag.bypass1,
-                    regs.o_dat.mul[i].dat.bytag.cdb_idx1,
-                    regs.o_dat.mul[i].dat.bytag.bypass2,
-                    regs.o_dat.mul[i].dat.bytag.cdb_idx2,
-                );
-                // $display("regs.o_dat.mul[%0d]: bsy: %b, rs1: 0x%x, rs2: 0x%x, func: %b, t: %2d, rob_idx: %2d",
-                //     i,
-                //     regs.o_vld.mul[i],
-                //     regs.o_dat.mul[i].rs1,
-                //     regs.o_dat.mul[i].rs2,
-                //     regs.o_dat.mul[i].func,
-                //     regs.o_dat.mul[i].dst.tag,
-                //     regs.o_dat.mul[i].dst.rob_idx
-                // );
             end
 
             $display("c_out: rdy_alu:{%b} rdy_mult:{%b} rdy_store:{%b} rdy_load:{%b}",
