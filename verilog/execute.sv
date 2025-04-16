@@ -676,7 +676,6 @@ module stage_ex_p4 (
     `BY_FU(logic) cdb_gnt;
     assign cdb_req.alu = rs_in.fu_vld_alu;
     // cdb_req.mul set by mul_ex
-    assign cdb_req.lod = ex.o_vld.lod;
 
     psel_gen #(
         .WIDTH(`NUM_FU_TOTAL),
@@ -744,6 +743,10 @@ module stage_ex_p4 (
 
         .mem_command(mem_command),
         .mem_addr(mem_addr),
+
+        .cdb_req(cdb_req.lod),
+        .ctag_ts(ctag_ts.lod),
+        .cdb_gnt(cdb_gnt.lod),
         
         .o_vld  (ex.o_vld.lod),
         .o_cands(cands.lod),
@@ -947,12 +950,19 @@ module stage_ex_p4 (
                 rs_out.fu_rdy_load,
             );
 
-            $display("\ncdb_req: alu:{%b} mul:{%b}", cdb_req.alu, cdb_req.mul);
+            $display("\ncdb_req: alu:{%b} mul:{%b} lod:{%b} str:{%b}", cdb_req.alu, cdb_req.mul, cdb_req.lod, cdb_req.str);
+            $display("\nctag_ts: alu:{%b} mul:{%b} lod:{%b} str:{%b}", ctag_ts.alu, ctag_ts.mul, ctag_ts.lod, ctag_ts.str);
             // $display("ctag_ts: alu:{%2d, %2d} mul:{%2d, %2d}",
             //     ctag_ts.alu[1], ctag_ts.alu[0], ctag_ts.mul[1], ctag_ts.mul[0]);
             $display("cdb_gnt: alu:{%b} mul:{%b}", cdb_gnt.alu, cdb_gnt.mul);
             for (int i = 0; i < 2; ++i) begin
-                $display("cdb_gnt[%0d]: alu:{%b} mul:{%b}", i, cdb_gnt_shr[i].alu, cdb_gnt_shr[i].mul);
+                $display("cdb_gnt[%0d]: alu:{%b} mul:{%b} lod:{%b} str:{%b}",
+                    i,
+                    cdb_gnt_shr[i].alu,
+                    cdb_gnt_shr[i].mul,
+                    cdb_gnt_shr[i].lod,
+                    cdb_gnt_shr[i].str
+                );
             end
 
             $display("");

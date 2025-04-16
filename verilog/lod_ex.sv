@@ -26,6 +26,11 @@ module lod_ex(
     output MEM_COMMAND mem_command,
     output ADDR mem_addr,
 
+    /* Early CDB arbitration */
+    output logic [`NUM_FU_LOAD-1:0]     cdb_req,
+    output PHYS_REG_IDX [`NUM_FU_LOAD-1:0] ctag_ts,
+    input  logic [`NUM_FU_LOAD-1:0]     cdb_gnt,
+
     /* BACKEND */
     output logic    [`NUM_FU_LOAD-1:0]  o_vld,
     output CPL_CAND [`NUM_FU_LOAD-1:0]  o_cands,
@@ -54,9 +59,16 @@ module lod_ex(
     logic     [`NUM_FU_LOAD-1:0][LD_BAY_SZ-1:0] fu2in_gnt;
     logic     [`NUM_FU_LOAD-1:0][LD_BAY_SZ-1:0] fu2out_gnt;
     always_comb begin
-        for (int f = 0; f < `NUM_FU_MULT; ++f) begin
+        for (int f = 0; f < `NUM_FU_LOAD; ++f) begin
             i_rdy[f] = |(~bays.vld[f]);
-            o_vld[f] = |(bays.vld[f] & bays.got[f]);
+            cdb_req[f] = |(bays.vld[f] & bays.got[f]);
+        end
+
+        ctag_ts = '0;
+        foreach (fu2out_gnt[f, i]) begin
+            if (!fu2out_gnt[f][i])
+                continue;
+            ctag_ts[f] |= bays.t[f][i];
         end
     end
 
@@ -100,20 +112,12 @@ module lod_ex(
             in lq???? */ //ANSWER: This needs to be used in the load FU
 
         end
+    end
 
-        o_cands = '0;
-        foreach (fu2out_gnt[f, i]) begin
-            if (!(fu2out_gnt[f][i] && o_rdy[f]))
-                continue;
-            o_cands[f] |= CPL_CAND'{
-                t       : bays.t[f][i],
-                rob_idx : bays.rob_idx[f][i],
-                data    : bays.dat[f][i],
-                btq_idx : '0,
-                take    : '0,
-                is_brch : '0
-            };
-        end
+    CPL_CAND [1:0][`NUM_FU_LOAD-1:0] cands_shr;
+    always_comb begin
+        foreach (cands_shr[f])
+            o_cands[f] = cands_shr[1][f];
     end
     
     //for forwarding, declared here so that it can be used here
@@ -239,6 +243,7 @@ module lod_ex(
 
         if (reset || flush) begin
             bays <= '0;
+            cands_shr <= '0;
         end else begin
             foreach (fu2in_gnt[f, i]) begin
                 if (!(fu2in_gnt[f][i] && i_vld[f]))
@@ -262,7 +267,7 @@ module lod_ex(
             end
 
             foreach (fu2out_gnt[f, i]) begin
-                if (!(fu2out_gnt[f][i] && o_rdy[f]))
+                if (!(fu2out_gnt[f][i] && cdb_gnt[f]))
                     continue;
                 bays.vld     [f][i] <= 0;
                 bays.got     [f][i] <= 0;
@@ -273,7 +278,19 @@ module lod_ex(
                 bays.dat     [f][i] <= '0;
                 bays.sq_idx  [f][i] <= '0;
                 bays.st_frwd_byte_mask[f][i] <= '0;
+
+                cands_shr[0][f] <= CPL_CAND'{
+                    t       : bays.t[f][i],
+                    rob_idx : bays.rob_idx[f][i],
+                    data    : bays.dat[f][i],
+                    btq_idx : '0,
+                    take    : '0,
+                    is_brch : '0
+                }; 
             end
+
+            for (int f = 0; f < `NUM_FU_LOAD; ++f)
+                cands_shr[1][f] <= cands_shr[0][f];
         end
     end
 
