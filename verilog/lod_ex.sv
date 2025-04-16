@@ -295,13 +295,10 @@ module lod_ex(
             $display("MEM_LOAD: %b, %d, %0d, %d", pending, dcache_data_valid, pending_frwd, dcache_data);
             $display("FRWD_EN: %b, %b", sq_in.forward_en, sq_in.forward_byte_en);
             $display("i_rdy: %b, i_vld: %b ", i_rdy, i_vld);
-            $display("ocands: t: %2d, rob_idx: %2d, data: %x, btq_idx: %2d, take: %b, is_brch: %b",
+            $display("ocands: t: %2d, rob_idx: %2d, data: %x",
                 o_cands[0].t,
                 o_cands[0].rob_idx,
-                o_cands[0].data,
-                o_cands[0].btq_idx,
-                o_cands[0].take,
-                o_cands[0].is_brch,
+                o_cands[0].data
             );
             $display("ren: %b", bays.vld & ~bays.got);
             foreach (fu2in_gnt[f, i]) begin

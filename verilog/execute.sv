@@ -922,15 +922,12 @@ module stage_ex_p4 (
                 );
             end
             for (int i = 0; i < `N; ++i) begin
-                $display("cdat_out[%0d]: en: %b, is_brch: %b, ts: %2d, rob_idxs: %2d, data: %x, btq_idxs: %d, take: %b",
+                $display("cdat_out[%0d]: en: %b,  ts: %2d, rob_idxs: %2d, data: %x",
                     i,
                     cdat_out.en[i],
-                    cdat_out.is_brch[i],
                     cdat_out.ts[i],
                     cdat_out.rob_idxs[i],
-                    cdat_out.data[i],
-                    cdat_out.btq_idxs[i],
-                    cdat_out.take[i]
+                    cdat_out.data[i]
                 );
             end
 
