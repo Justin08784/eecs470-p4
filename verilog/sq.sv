@@ -37,7 +37,7 @@ module sq #(parameter
     logic [$clog2(LSQ_SZ)-1:0]      head;
     logic [$clog2(LSQ_SZ)-1:0]      ret_head;
     logic [$clog2(LSQ_SZ)-1:0]      tail;
-    logic [$clog2(LSQ_SZ)-1:0]  tail_dbl;
+    // logic [$clog2(LSQ_SZ)-1:0]      tail_dbl;
     LSQ_IDX                         last_used_sq_idx;
     logic                           no_store_yet;
 
@@ -60,7 +60,7 @@ module sq #(parameter
         for (int unsigned i = 0; i < NUM_DPORTS; ++i)
             d_idxs[i] = (tail + i) % LSQ_SZ;
         for (int unsigned i = 0; i < NUM_DPORTS; ++i)
-            next_ids[i] = (tail_dbl + i) % LSQ_SZ;
+            next_ids[i] = (tail + i) % LSQ_SZ;
         for (int unsigned i = 0; i < NUM_RPORTS; ++i)
             m_idxs[i] = (ret_head + i) % LSQ_SZ;
     end
@@ -223,9 +223,9 @@ module sq #(parameter
             head    <= 0;
             ret_head<= 0;
             tail    <= 0;
-            tail_dbl <= 0;
+            // tail_dbl <= 0;
             state   <= '0;
-            last_used_sq_idx <= LSQ_SZ - 1; //outside of SQ range so that if a load occurs before the first store we don't flag it falsely
+            last_used_sq_idx <= LSQ_SZ; //outside of SQ range so that if a load occurs before the first store we don't flag it falsely
             next_complete <= '0;
             no_store_yet <= '1;
             has_retired_something <= 0;
@@ -239,8 +239,13 @@ module sq #(parameter
 
             head <= (ret_head + ret_buf_used) % LSQ_SZ;
             tail <= (ret_head + ret_buf_used) % LSQ_SZ;
-            tail_dbl <= (ret_head + ret_buf_used) % LSQ_SZ;
-            last_used_sq_idx <= last_used_sq_idx;
+            // tail_dbl <= (ret_head + ret_buf_used) % LSQ_SZ;
+            if (has_retired_something) begin
+                last_used_sq_idx <= ((ret_head == 0) && (ret_buf_used == 0)) ? last_used_sq_idx <= LSQ_SZ - 1 : (ret_head + ret_buf_used - 1) % LSQ_SZ;
+            end
+            else last_used_sq_idx <= LSQ_SZ;
+            $display("UPDATE: ret_head: %0d, ret_used: %0d, last_used: %0d", ret_head, ret_buf_used, last_used_sq_idx);
+            // last_used_sq_idx <= has_retired_something ? (ret_head + ret_buf_used - 1) % LSQ_SZ : LSQ_SZ;
             next_complete <= '0;
             no_store_yet <= ~has_retired_something;
             has_retired_something <= has_retired_something;
@@ -263,8 +268,8 @@ module sq #(parameter
             head    <= (head + retire_in.r_en) % LSQ_SZ;
             ret_head<= (ret_head + ret_success) % LSQ_SZ;
             tail    <= (tail + dispatch_in.sq_d_en_cnt) % LSQ_SZ;
-            tail_dbl <= (tail_dbl + dispatch_in.sq_d_en_cnt) % LSQ_SZ;
-            last_used_sq_idx <= dispatch_in.sq_d_en_cnt > 0 ? (last_used_sq_idx + dispatch_in.sq_d_en_cnt) % LSQ_SZ : last_used_sq_idx;
+            // tail_dbl <= (tail_dbl + dispatch_in.sq_d_en_cnt) % LSQ_SZ;
+            last_used_sq_idx <= (dispatch_in.sq_d_en_cnt > 0) ? (last_used_sq_idx + dispatch_in.sq_d_en_cnt) % LSQ_SZ : last_used_sq_idx;
             no_store_yet <= (dispatch_in.sq_d_en_cnt > 0) ? 0 : no_store_yet;
             has_retired_something <= has_retired_something | (retire_in.r_en > 0);
 

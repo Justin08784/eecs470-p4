@@ -38,7 +38,7 @@
 // worry about these later
 `define BRANCH_PRED_SZ xx
 `define LSQ_SZ 12
-`define LSQ_SZ_DBL 24
+// `define LSQ_SZ_DBL 24
 `define SQ_RET_BUF_SZ 4
 
 // functional units (you should decide if you want more or fewer types of FUs)
@@ -473,7 +473,7 @@ typedef struct packed {
 //so that we can use values above what we will see 
 //in the LSQ as the initial value for SQ_IDX in 
 //dispatch if a load comes before the first store
-typedef logic [$clog2(`LSQ_SZ_DBL):0] LSQ_IDX; 
+typedef logic [$clog2(`LSQ_SZ)-1:0] LSQ_IDX; 
 typedef struct packed {
     LSQ_IDX sq_idx;
     ROB_IDX rob_idx;

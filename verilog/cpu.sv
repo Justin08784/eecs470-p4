@@ -72,16 +72,8 @@ module cpu (
         proc2mem_addr = '0;
         proc2mem_data = '0;
         proc2mem_size = '0;
-        // sq_mem2proc_transaction_accepted = '0;
         fetch_mem2proc_transaction_tag = '0;
         
-        // if (ret_2_mem.Dmem_command[0] == MEM_STORE) begin
-        //     proc2mem_command = ret_2_mem.Dmem_command[0];
-        //     proc2mem_addr = ret_2_mem.Dmem_addr[0];
-        //     proc2mem_data = ret_2_mem.Dmem_store_data[0];
-        //     proc2mem_size = ret_2_mem.Dmem_size[0];
-        //     sq_mem2proc_transaction_accepted = mem2proc_transaction_tag;
-        // end
         if (Dcache2Dmem_command != MEM_NONE) begin
             proc2mem_command = Dcache2Dmem_command;
             proc2mem_addr = Dcache2Dmem_addr;

@@ -4,7 +4,7 @@
 module lq #(parameter 
     N=`N,
     LSQ_SZ=`LSQ_SZ,
-    LSQ_SZ_DBL=`LSQ_SZ_DBL,
+    // LSQ_SZ_DBL=`LSQ_SZ_DBL,
     NUM_FU_STORE=`NUM_FU_STORE,
     NUM_FU_LOAD=`NUM_FU_LOAD
 ) (

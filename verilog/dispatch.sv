@@ -299,13 +299,27 @@ always_comb begin
         end
 
         if (commit_in[i].dat.rd_mem) begin
-            rs_out.d_dat[i].sq_idx = (sq_in.no_store_yet && (sq_wr_idx == 0)) ? `LSQ_SZ : (sq_in.last_used_sq_idx + sq_wr_idx) % `LSQ_SZ;
-            // lq_out.rob_idx[lq_wr_idx] = rob_in.rob_idxs[i];
-            // lq_out.sq_idx[lq_wr_idx] = sq_in.no_store_yet ? (sq_wr_idx > 0) ? sq_wr_idx-1 : 33 : (sq_in.last_used_sq_idx + sq_wr_idx - 1) % `LSQ_SZ;
-            // if (sq_in.no_store_yet && (sq_wr_idx > 0)) lq_out.sq_idx[lq_wr_idx] = sq_wr_idx-1;
-            // else if (sq_in.no_store_yet) lq_out.sq_idx[lq_wr_idx] = `LSQ_SZ + 1;
-            // else lq_out.sq_idx[lq_wr_idx] = (sq_in.last_used_sq_idx + sq_wr_idx - 1) % `LSQ_SZ;
-            lq_out.sq_idx[lq_wr_idx] = (sq_in.no_store_yet && (sq_wr_idx == 0)) ? `LSQ_SZ : (sq_in.last_used_sq_idx + sq_wr_idx) % `LSQ_SZ;
+            // rs_out.d_dat[i].sq_idx = (sq_in.no_store_yet && (sq_wr_idx == 0)) ? `LSQ_SZ : (sq_in.last_used_sq_idx + sq_wr_idx) % `LSQ_SZ;
+            // lq_out.sq_idx[lq_wr_idx] = (sq_in.no_store_yet && (sq_wr_idx == 0)) ? `LSQ_SZ : (sq_in.last_used_sq_idx + sq_wr_idx) % `LSQ_SZ;
+            $display("ASSIGNING: last_used: %0d, sq_wr_idx: %0d, no_store_yet: %b, assignment: %0d", sq_in.last_used_sq_idx, sq_wr_idx, sq_in.no_store_yet, rs_out.d_dat[i].sq_idx);
+            
+            if (sq_in.no_store_yet && (sq_wr_idx == 0)) begin
+                lq_out.sq_idx[lq_wr_idx] = `LSQ_SZ;
+                rs_out.d_dat[i].sq_idx = `LSQ_SZ;
+            end
+            // else if (sq_in.no_store_yet) begin
+            //     lq_out.sq_idx[lq_wr_idx] = sq_in.next_ids[sq_wr_idx-1];
+            // end 
+            else if (sq_wr_idx == 0) begin
+                lq_out.sq_idx[lq_wr_idx] = sq_in.last_used_sq_idx;
+                rs_out.d_dat[i].sq_idx = sq_in.last_used_sq_idx;
+            end 
+            else begin
+                lq_out.sq_idx[lq_wr_idx] = sq_in.next_ids[sq_wr_idx-1];
+                rs_out.d_dat[i].sq_idx = sq_in.next_ids[sq_wr_idx-1];
+            end
+
+            // lq_out.sq_idx[lq_wr_idx] = (sq_in.no_store_yet && (sq_wr_idx == 0)) ? `LSQ_SZ : 
             lq_out.inst_pc[lq_wr_idx] = commit_in[i].dat.PC;
             ++lq_wr_idx;
             // $display("UPDATING: last: %0d, wr_idx: %0d, tag: %0d", sq_in.last_used_sq_idx, sq_wr_idx, lq_out.sq_idx[lq_wr_idx]);
