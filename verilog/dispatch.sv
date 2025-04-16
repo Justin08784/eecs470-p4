@@ -218,6 +218,13 @@ always_comb begin
     btq_wr_idx  = 0;
     btq_out.NPC = '0;
 
+    btq_out.PC = '0;
+    btq_out.bhr = '0;
+    btq_out.pred = '0;
+    btq_out.gshare_pred = '0;
+    btq_out.corr_pred = '0;
+    btq_out.correlated_bhr = '0;
+
     for (int i = 0; i < `N; ++i) begin
         tmp_alloc2rename[i].dat         = rename_in[i];
 

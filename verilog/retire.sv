@@ -85,6 +85,14 @@ module retire (
         PC_original = '0;
         bhr_from_btq = '0;
 
+        correlated_bhr_d = '0;
+        gshare_pred = '0;
+        corr_pred = '0;
+
+        btq_out = '0;
+
+
+
         for (int i = 0; i < rob_in.r_vld_cnt; ++i) begin
             if (!rob_in.entries[i].cpl)
                 break;

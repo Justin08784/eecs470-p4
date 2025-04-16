@@ -271,7 +271,7 @@ module stage_if_p4 (
         end else if (chooser_table[PC_reg[7:0]] == 2'b11) begin
             predict_taken    = pred_in_corr.prediction;
         end else begin
-            predict_taken    = predict_taken;
+            predict_taken    = 0;
         end
         corr_bhr = pred_in_corr.bhr; // optional — if fetch stage needs it
 
