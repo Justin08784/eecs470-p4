@@ -69,7 +69,7 @@
 
 `ifndef SYNTH
 // comment out to disable DEBUG:
-// `define DEBUG
+`define DEBUG
 `endif
 
 ///////////////////////////////
@@ -816,8 +816,8 @@ typedef struct packed {
         // - From: EX
     ROB_IDX         [`N-1:0] rob_idxs;
         // - From: EX
-    DATA            [`N-1:0] data;
-        // doubles as branch target if is_brch true
+    DATA            [`N-1:0] wb_data;
+    ADDR            [`N-1:0] brch_tgt;
 
     // BTQ-specific completion stuff
     BTQ_IDX [`N-1:0] btq_idxs; 
