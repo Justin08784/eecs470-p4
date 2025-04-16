@@ -6,7 +6,7 @@ module lq #(parameter
     LSQ_SZ=`LSQ_SZ,
     // LSQ_SZ_DBL=`LSQ_SZ_DBL,
     NUM_FU_STORE=`NUM_FU_STORE,
-    NUM_FU_LOAD=`NUM_FU_LOAD
+    NUM_FU_LOAD=`LD_BAY_SZ
 ) (
     `ifdef DEBUG
     output DBG_lq dbg,
@@ -118,7 +118,7 @@ module lq #(parameter
             tail    <= (tail + dispatch_in.lq_d_en_cnt) % LSQ_SZ;
             
             // handle execute updates
-            for (int unsigned i = 0, int cur_idx = 0; i < NUM_ST_PORTS; ++i) begin
+            for (int unsigned i = 0, int cur_idx = 0; i < NUM_FU_LOAD; ++i) begin
                 cur_idx = execute_in.ld_lq_idx[i];
 
                 if (execute_in.ld_ex_en[i]) begin
