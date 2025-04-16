@@ -505,7 +505,7 @@ module dcache_simple (
         if (reset) begin
             prev_state <= IDLE;
             state <= IDLE;
-            mem_in_use = 0;
+            mem_in_use <= 0;
             for (int i = 0; i< CACHE_LINES; i++) begin
                 dcache_tags[i].valid <= 0;
                 dcache_tags[i].dirty <= 0;
