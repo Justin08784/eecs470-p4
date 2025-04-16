@@ -69,23 +69,27 @@ module cpu (
     MEM_COMMAND execute2Dcache_mem_command;
     MEM_BLOCK Dcache2Dmem_wdata;
     always_comb begin
-        Dmem2Dcache_transaction_tag     = mem2proc_transaction_tag;
-        fetch_mem2proc_transaction_tag  = mem2proc_transaction_tag;
-
         proc2mem_size = DOUBLE;
         proc2mem_command = MEM_NONE;
         proc2mem_addr = '0;
         proc2mem_data = '0;
+
+        Dmem2Dcache_transaction_tag     = '0;
+        fetch_mem2proc_transaction_tag  = '0;
         
         if (Dcache2Dmem_command != MEM_NONE) begin
             // If Dcache requesting, prioritize dcache...
             proc2mem_command = Dcache2Dmem_command;
             proc2mem_addr = Dcache2Dmem_addr;
             proc2mem_data = Dcache2Dmem_wdata;
+
+            Dmem2Dcache_transaction_tag     = mem2proc_transaction_tag;
         end else begin // <-- FETCH REQUESTS COME LAST (always complete memory operations first to get stuff commited to memory and to keep the processor FUs chugging)
             // ...else allow fetch to request
             proc2mem_command = fetch_2_mem.proc2mem_command;
             proc2mem_addr = fetch_2_mem.proc2mem_addr;
+
+            fetch_mem2proc_transaction_tag  = mem2proc_transaction_tag;
         end
     end
 
