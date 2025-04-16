@@ -85,18 +85,11 @@ module alu_ex(
     input flush,
 
     /* FRONTEND */
-    output logic    [`NUM_FU_ALU-1:0]   i_rdy,
-        // ready to accept from regs.o_dat.alu?
-    input  logic    [`NUM_FU_ALU-1:0]   i_vld,
-        // insns to accept from regs.o_dat.alu
     input  ALU_REGS [`NUM_FU_ALU-1:0]   i_regs,
         // insn metadata/operands
 
     /* BACKEND */
-    output logic    [`NUM_FU_ALU-1:0]   o_vld,
-    output CPL_CAND [`NUM_FU_ALU-1:0]   o_cands,
-    input  logic    [`NUM_FU_ALU-1:0]   o_rdy 
-        // completion grant
+    output CPL_CAND [`NUM_FU_ALU-1:0]   o_cands
 );
     ALU_OPS [`NUM_FU_ALU-1:0] ops;
     always_comb begin
@@ -166,8 +159,6 @@ module alu_ex(
                 is_brch : ops[i].cond_branch || ops[i].uncond_branch
             };
 
-            assign o_vld[i] = i_vld[i];
-            assign i_rdy[i] = o_rdy[i];
             assign o_cands[i] = tmp_data[i];
         end
     endgenerate
@@ -186,19 +177,10 @@ module str_ex(
     
     output  execute2sq sq_out,
     // FIXME: Isn't an lq2execute needed? <-- Answer: No, if an issue is found when forwarding the SQ_IDX to LQ, it is flagged in the ROB to restart from that PC
-    output  execeuteST2lq st_lq_out,
-
-    /* BACKEND */
-    output logic    [`NUM_FU_STORE-1:0]  o_vld,
-    output CPL_CAND [`NUM_FU_STORE-1:0]  o_cands,
-    input  logic    [`NUM_FU_STORE-1:0]  o_rdy 
-        // completion grant
+    output  execeuteST2lq st_lq_out
 );
     // FIXME: Is this right? 
     assign i_rdy = '1;
-    // FIXME: hardcoded
-    assign o_vld    = '0;
-    assign o_cands  = '0;
 
     always_comb begin
         ADDR  addr;
@@ -241,11 +223,7 @@ module mul_ex(
     input  logic [`NUM_FU_MULT-1:0]     cdb_gnt,
 
     /* BACKEND */
-    output logic    [`NUM_FU_MULT-1:0]  o_vld,
-    output CPL_CAND [`NUM_FU_MULT-1:0]  o_cands,
-        // completion requests
-    input  logic    [`NUM_FU_MULT-1:0]  o_rdy
-        // completion grant
+    output CPL_CAND [`NUM_FU_MULT-1:0]  o_cands
 );
     MUL_OPS [`NUM_FU_MULT-1:0] ops;
     always_comb begin
@@ -288,8 +266,6 @@ module mul_ex(
                 .cdb_gnt(cdb_gnt[i]),
 
                 // Output (directly to cdat_out)
-                .o_vld  (o_vld[i]),
-                .o_rdy  (o_rdy[i]),
                 .o_t    (tmp_t[i]),
                 .o_rob_idx(tmp_rob_idx[i]),
                 .result (tmp_res[i])
@@ -530,7 +506,6 @@ module stage_ex_p4 (
 
     struct packed {
         `BY_FU(logic) i_rdy;
-        `BY_FU(logic) o_vld;
     } ex;
     always_comb begin
         foreach (iss.o_vld.alu[i]) begin
@@ -661,6 +636,7 @@ module stage_ex_p4 (
     // Else if a longer-latency insn, this is in the middle of execution.
 
     `BY_FU(CPL_CAND) cands;
+    assign cands.str = '0; // alu, mul, lod set by respective *_ex's
     CPL_CAND [`NUM_FU_TOTAL-1:0] cands_flat;
     assign cands_flat = cands;
     
@@ -672,10 +648,11 @@ module stage_ex_p4 (
     `BY_FU(logic) [1:0] cdb_gnt_shr;
 
     `BY_FU(logic) cdb_req;
-    assign cdb_req.str = '0;
-    `BY_FU(logic) cdb_gnt;
     assign cdb_req.alu = rs_in.fu_vld_alu;
     // cdb_req.mul set by mul_ex
+    // cdb_req.lod set by lod_ex
+    assign cdb_req.str = '0;
+    `BY_FU(logic) cdb_gnt;
 
     psel_gen #(
         .WIDTH(`NUM_FU_TOTAL),
@@ -694,13 +671,9 @@ module stage_ex_p4 (
         .reset  (reset),
         .flush  (flush),
 
-        .i_vld  (regs.o_vld.alu),
         .i_regs (regs.o_dat.alu),
-        .i_rdy  (ex.i_rdy.alu),
 
-        .o_vld  (ex.o_vld.alu),
-        .o_cands(cands.alu),
-        .o_rdy  (cdb_gnt_shr[1].alu)
+        .o_cands(cands.alu)
     );
 
     `BY_FU(PHYS_REG_IDX) ctag_ts;
@@ -719,9 +692,7 @@ module stage_ex_p4 (
         .ctag_ts(ctag_ts.mul),
         .cdb_gnt(cdb_gnt.mul),
 
-        .o_vld  (ex.o_vld.mul),
-        .o_cands(cands.mul),
-        .o_rdy  (cdb_gnt_shr[1].mul)
+        .o_cands(cands.mul)
     );
 
     lod_ex lod_ex0 (
@@ -748,11 +719,7 @@ module stage_ex_p4 (
         .ctag_ts(ctag_ts.lod),
         .cdb_gnt(cdb_gnt.lod),
         
-        .o_vld  (ex.o_vld.lod),
-        .o_cands(cands.lod),
-        /* FIXME: How exactly do we do CDB arbitration for loads/stores?
-        And how does it fit in our ETB system? */
-        .o_rdy  (cdb_gnt_shr[1].lod)
+        .o_cands(cands.lod)
     );
 
     str_ex str_ex0 (
@@ -763,12 +730,6 @@ module stage_ex_p4 (
         .i_vld  (regs.o_vld.str),
         .i_regs (regs.o_dat.str),
         .i_rdy  (ex.i_rdy.str),
-
-        .o_vld  (ex.o_vld.str),
-        .o_cands(cands.str),
-        /* FIXME: How exactly do we do CDB arbitration for loads/stores?
-        And how does it fit in our ETB system? */
-        .o_rdy  (cdb_gnt_shr[0].str),
 
         .sq_out(sq_out),
         .st_lq_out(st_lq_out)
@@ -802,13 +763,13 @@ module stage_ex_p4 (
             end
 
             if (cdb2fu_gbus_shr[1][c][f]) begin
-                cdat_out_n.en[c]          |= 1;
-                cdat_out_n.ts[c]          |= cands_flat[f].t;
-                cdat_out_n.rob_idxs[c]    |= cands_flat[f].rob_idx;
-                cdat_out_n.data[c]        |= cands_flat[f].data;
-                cdat_out_n.btq_idxs[c]    |= cands_flat[f].btq_idx;
+                cdat_out_n.en[c]        |= 1;
+                cdat_out_n.ts[c]        |= cands_flat[f].t;
+                cdat_out_n.rob_idxs[c]  |= cands_flat[f].rob_idx;
+                cdat_out_n.data[c]      |= cands_flat[f].data;
+                cdat_out_n.btq_idxs[c]  |= cands_flat[f].btq_idx;
                 cdat_out_n.is_brch[c]   |= cands_flat[f].is_brch;
-                cdat_out_n.take[c]        |= cands_flat[f].take;
+                cdat_out_n.take[c]      |= cands_flat[f].take;
             end
 
         end
@@ -818,8 +779,8 @@ module stage_ex_p4 (
         if (reset || flush) begin
             cdb2fu_gbus_shr <= '0;
             cdb_gnt_shr     <= '0;
-            ctag_out <= '0;
-            cdat_out <= '0;
+            ctag_out        <= '0;
+            cdat_out        <= '0;
         end else begin
             cdb2fu_gbus_shr[0]  <= cdb2fu_gbus;
             cdb_gnt_shr[0]      <= cdb_gnt;

@@ -32,10 +32,7 @@ module lod_ex(
     input  logic [`NUM_FU_LOAD-1:0]     cdb_gnt,
 
     /* BACKEND */
-    output logic    [`NUM_FU_LOAD-1:0]  o_vld,
-    output CPL_CAND [`NUM_FU_LOAD-1:0]  o_cands,
-    input  logic    [`NUM_FU_LOAD-1:0]  o_rdy 
-        // completion grant
+    output CPL_CAND [`NUM_FU_LOAD-1:0]  o_cands
 );
     localparam LD_BAY_SZ = `LD_BAY_SZ;//4;
     typedef struct packed {
@@ -300,7 +297,7 @@ module lod_ex(
             $display("  %3d | >> BAYS", $time);
             $display("MEM_LOAD: %b, %d, %0d, %d", pending, dcache_data_valid, pending_frwd, dcache_data);
             $display("FRWD_EN: %b, %b", sq_in.forward_en, sq_in.forward_byte_en);
-            $display("i_rdy: %b, i_vld: %b, o_vld: %b, o_rdy: %b", i_rdy, i_vld, o_vld, o_rdy);
+            $display("i_rdy: %b, i_vld: %b ", i_rdy, i_vld);
             $display("ocands: t: %2d, rob_idx: %2d, data: %x, btq_idx: %2d, take: %b, is_brch: %b",
                 o_cands[0].t,
                 o_cands[0].rob_idx,
