@@ -85,10 +85,12 @@ module alu_ex(
     input flush,
 
     /* FRONTEND */
+    logic [`NUM_FU_ALU-1:0]             i_vld,
     input  ALU_REGS [`NUM_FU_ALU-1:0]   i_regs,
         // insn metadata/operands
 
     /* BACKEND */
+    output execute2btq                  o_btq_out,
     output CPL_CAND [`NUM_FU_ALU-1:0]   o_cands
 );
     ALU_OPS [`NUM_FU_ALU-1:0] ops;
@@ -134,7 +136,7 @@ module alu_ex(
     generate
         CPL_CAND    [`NUM_FU_ALU-1:0] tmp_data;
         DATA        [`NUM_FU_ALU-1:0] tmp_res;
-        logic       [`NUM_FU_ALU-1:0] tmp_take;
+        logic       [`NUM_FU_ALU-1:0] cond_take, tmp_take;
         for (genvar i = 0; i < `NUM_FU_ALU; ++i) begin : gen_alus
             alu alu_0 ( 
                 // Inputs
@@ -146,20 +148,28 @@ module alu_ex(
                 .branch_func(ops[i].branch_func), // Which branch condition to check
 
                 // Output (directly to cdat_out)
-                .take(tmp_take[i]), // True/False condition result (will return FALSE if branch is low)
+                .take(cond_take[i]), // True/False condition result (will return FALSE if branch is low)
                 .result(tmp_res[i]) // will return 32'hfacebeec if branch is high
             );
+
+            assign tmp_take[i] = ops[i].uncond_branch
+                || (ops[i].cond_branch && cond_take[i]);
 
             assign tmp_data[i] = '{
                 t       : ops[i].t,
                 rob_idx : ops[i].rob_idx,
-                data    : tmp_res[i],
-                btq_idx : ops[i].btq_idx,
-                take    : tmp_take[i] || ops[i].uncond_branch,
-                is_brch : ops[i].cond_branch || ops[i].uncond_branch
+                data    : tmp_take[i] ? i_regs[i].dat.NPC : tmp_res[i]
             };
 
             assign o_cands[i] = tmp_data[i];
+
+            assign o_btq_out.dat[i] = '{
+                en      : i_vld[i] && (ops[i].cond_branch || ops[i].uncond_branch),
+                btq_idx : ops[i].btq_idx,
+                take    : tmp_take[i],
+                tgt     : tmp_res[i]
+            };
+
         end
     endgenerate
 endmodule
@@ -274,10 +284,7 @@ module mul_ex(
             assign o_cands[i] = '{
                 t       : tmp_t[i],
                 rob_idx : tmp_rob_idx[i],
-                data    : tmp_res[i],
-                btq_idx : '0,
-                take    : '0,
-                is_brch : '0
+                data    : tmp_res[i]
             };
         end
     endgenerate
@@ -307,6 +314,8 @@ module stage_ex_p4 (
 
     input   prf2execute prf_in,
     output  execute2prf prf_out,
+
+    output  execute2btq btq_out,
 
     output  execute2complete_tag ctag_out,
     output  execute2complete_dat cdat_out
@@ -666,13 +675,16 @@ module stage_ex_p4 (
     /* >> ======== STAGE 3: Execution ======== >> */
     // Includes operand decode/CDB bypass just before 1st cycle of execution.
 
+    execute2btq btq_out_n;
     alu_ex alu_ex0 (
         .clock  (clock),
         .reset  (reset),
         .flush  (flush),
 
+        .i_vld  (regs.o_vld.alu),
         .i_regs (regs.o_dat.alu),
 
+        .o_btq_out(btq_out_n),
         .o_cands(cands.alu)
     );
 
@@ -767,9 +779,6 @@ module stage_ex_p4 (
                 cdat_out_n.ts[c]        |= cands_flat[f].t;
                 cdat_out_n.rob_idxs[c]  |= cands_flat[f].rob_idx;
                 cdat_out_n.data[c]      |= cands_flat[f].data;
-                cdat_out_n.btq_idxs[c]  |= cands_flat[f].btq_idx;
-                cdat_out_n.is_brch[c]   |= cands_flat[f].is_brch;
-                cdat_out_n.take[c]      |= cands_flat[f].take;
             end
 
         end
@@ -781,6 +790,7 @@ module stage_ex_p4 (
             cdb_gnt_shr     <= '0;
             ctag_out        <= '0;
             cdat_out        <= '0;
+            btq_out         <= '0;
         end else begin
             cdb2fu_gbus_shr[0]  <= cdb2fu_gbus;
             cdb_gnt_shr[0]      <= cdb_gnt;
@@ -790,6 +800,7 @@ module stage_ex_p4 (
             end
             ctag_out <= ctag_out_n;
             cdat_out <= cdat_out_n;
+            btq_out  <= btq_out_n;
 
             if (ctag_out.en[0] && ctag_out.en[1]
                 && ctag_out.ts[0] == ctag_out.ts[1]

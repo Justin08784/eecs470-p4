@@ -334,6 +334,7 @@ module cpu (
     //           Branch target queue (BTQ)          //
     //                                              //
     //////////////////////////////////////////////////  
+    execute2btq ex_2_btq;
     btq btq_0(
         `ifdef DEBUG
         .dbg    (dbg_btq),
@@ -343,12 +344,12 @@ module cpu (
         .reset  (reset),
         .flush  (flush),
 
+        .ex_in  (ex_2_btq),
+
         .r_in   (retire_2_btq),
         .r_out  (btq_2_retire),
         .d_in   (dispatch_2_btq),
-        .d_out  (btq_2_dispatch),
-
-        .cdat_in(ex_2_cdat)
+        .d_out  (btq_2_dispatch)
     );
 
     //////////////////////////////////////////////////
@@ -502,6 +503,8 @@ module cpu (
 
         .prf_in (prf_2_ex),
         .prf_out(ex_2_prf),
+
+        .btq_out(ex_2_btq),
 
         .ctag_out   (ex_2_ctag),
         .cdat_out   (ex_2_cdat)

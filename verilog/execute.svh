@@ -7,9 +7,6 @@ typedef struct packed {
     PHYS_REG_IDX t;
     ROB_IDX rob_idx;
     DATA data;
-    BTQ_IDX btq_idx;
-    logic take;
-    logic is_brch;
 } CPL_CAND;
 
 /* Slices (or "views") of ID_RESULT needed for each FU type */

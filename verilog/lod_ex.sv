@@ -279,10 +279,7 @@ module lod_ex(
                 cands_shr[0][f] <= CPL_CAND'{
                     t       : bays.t[f][i],
                     rob_idx : bays.rob_idx[f][i],
-                    data    : bays.dat[f][i],
-                    btq_idx : '0,
-                    take    : '0,
-                    is_brch : '0
+                    data    : bays.dat[f][i]
                 }; 
             end
 
