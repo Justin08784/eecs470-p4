@@ -463,6 +463,16 @@ module testbench;
         endcase
     endfunction
 
+    function automatic string dbg_mem_cmd(input MEM_COMMAND cmd);
+        string rv;
+        case (cmd)
+            MEM_NONE:   rv = "NONE";
+            MEM_STORE:  rv = "STOR";
+            MEM_LOAD:   rv = "LOAD";
+        endcase
+        return rv;
+    endfunction
+
     task print_btq;
         // internal state
         BTQ_ENTRY [`BTQ_SZ-1:0]      state;
@@ -1072,6 +1082,25 @@ module testbench;
         print_map_table();
         print_prf();
         print_rob();
+
+        // $display("---- rob_debug contents ----");
+        // foreach (rob_debug[idx]) begin
+        //     $display("rob_debug[%2d]: halt=%b, illegal=%b, NPC=0x%08x",
+        //             idx,
+        //             rob_debug[idx].halt,
+        //             rob_debug[idx].illegal,
+        //             rob_debug[idx].NPC);
+        // end
+        // $display("----------------------------");
+        $display(
+            "## proc2mem: {cmd: %s, addr: %x, data: %x}\n## mem2proc: {txn_tag: %2d, data: %x, data_tag: %2d}",
+             proc2mem_command,
+             proc2mem_addr,
+             proc2mem_data,
+             mem2proc_transaction_tag,
+             mem2proc_data,
+             mem2proc_data_tag
+        );
         print_rs();
         print_sq();
         print_retbuf();
