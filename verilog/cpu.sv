@@ -60,7 +60,6 @@ module cpu (
     //handle assigning the correct priority for memory
     stRET2mem ret_2_mem;
     fetch2mem fetch_2_mem;
-    MEM_TAG sq_mem2proc_transaction_tag;
     MEM_TAG fetch_mem2proc_transaction_tag;
     MEM_TAG Dmem2Dcache_transaction_tag;
     MEM_TAG execute2Ccache_transaction_tag;
@@ -73,7 +72,7 @@ module cpu (
         proc2mem_addr = '0;
         proc2mem_data = '0;
         proc2mem_size = '0;
-        // sq_mem2proc_transaction_tag = '0;
+        // sq_mem2proc_transaction_accepted = '0;
         fetch_mem2proc_transaction_tag = '0;
         
         // if (ret_2_mem.Dmem_command[0] == MEM_STORE) begin
@@ -81,7 +80,7 @@ module cpu (
         //     proc2mem_addr = ret_2_mem.Dmem_addr[0];
         //     proc2mem_data = ret_2_mem.Dmem_store_data[0];
         //     proc2mem_size = ret_2_mem.Dmem_size[0];
-        //     sq_mem2proc_transaction_tag = mem2proc_transaction_tag;
+        //     sq_mem2proc_transaction_accepted = mem2proc_transaction_tag;
         // end
         if (Dcache2Dmem_command != MEM_NONE) begin
             proc2mem_command = Dcache2Dmem_command;
@@ -106,6 +105,7 @@ module cpu (
 
     logic req_accepted;
     logic dcache_2_execute_accepted;
+    logic sq_mem2proc_transaction_accepted;
 
     logic          Dcache_valid_in;
     MEM_COMMAND    proc2Dcache_command;
@@ -126,7 +126,9 @@ module cpu (
         proc2Dcache_addr = '0;
         proc2Dcache_wdata = '0;
         proc2Dcache_size = '0;
-        sq_mem2proc_transaction_tag = '0;
+        sq_mem2proc_transaction_accepted = '0;
+        dcache_2_execute_accepted = '0;
+
         if (execute2Dcache_mem_command != MEM_NONE) begin
             proc2Dcache_command = execute2Dcache_mem_command;
             proc2Dcache_addr = execute_2_dcache_addr;
@@ -138,7 +140,7 @@ module cpu (
             proc2Dcache_addr = ret_2_mem.Dmem_addr[0];
             proc2Dcache_wdata = ret_2_mem.Dmem_store_data[0];
             proc2Dcache_size = ret_2_mem.Dmem_size[0];
-            sq_mem2proc_transaction_tag = req_accepted;
+            sq_mem2proc_transaction_accepted = req_accepted;
         end
         
     end
@@ -449,7 +451,7 @@ module cpu (
         .retire_in(retire_2_sq),
         .retire_out(sq_2_retire),
 
-        .mem2proc_transaction_tag(sq_mem2proc_transaction_tag), //temp_tag  sq_mem2proc_transaction_tag
+        .mem2proc_transaction_accepted(sq_mem2proc_transaction_accepted), //temp_tag  sq_mem2proc_transaction_accepted
         .mem_out(ret_2_mem)
 );
 

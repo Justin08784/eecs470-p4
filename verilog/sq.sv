@@ -20,7 +20,7 @@ module sq #(parameter
     input execute2sq    execute_in,
     input executeLD2sq  ex_frwd_in,
     input retire2sq     retire_in,
-    input MEM_TAG       mem2proc_transaction_tag,
+    input logic         mem2proc_transaction_accepted,
 
     output sq2dispatch  dispatch_out,
     output sq2execute   execute_out,
@@ -82,8 +82,8 @@ module sq #(parameter
             mem_out.Dmem_store_data[0]   = (state[ret_head].data >> (8 * iw_off(state[ret_head].addr)));
             mem_out.Dmem_size[0]         = state[ret_head].mem_size;
         end
-        ret_success = ((mem2proc_transaction_tag != 0) && (mem_out.Dmem_command[0] == MEM_STORE));
-        // ret_success = mem2proc_transaction_tag; <--TODO: swap to this line once teh SQ retirement buffer is pointing at the superscalar dcache instead of mem
+        ret_success = ((mem2proc_transaction_accepted != 0) && (mem_out.Dmem_command[0] == MEM_STORE));
+        // ret_success = mem2proc_transaction_accepted; <--TODO: swap to this line once teh SQ retirement buffer is pointing at the superscalar dcache instead of mem
     end
     
 
@@ -327,7 +327,7 @@ module sq #(parameter
         dispatch_in,
         execute_in,
         retire_in,
-        mem2proc_transaction_tag,
+        mem2proc_transaction_accepted,
 
         dispatch_out,
         execute_out,
