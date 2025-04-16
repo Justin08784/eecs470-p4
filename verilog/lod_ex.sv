@@ -213,10 +213,9 @@ module lod_ex(
                 continue;
             // if (!sq_in.forward_en[i])
             //     continue;
-            // $display("BAY_STATE: %b, %d, %0d, %0d, %0d", pending, dcache_data_valid, i, pending_frwd, dcache_data);
             if (pending && dcache_data_valid && (i == pending_frwd)) begin
 
-                next_dat[0][i] = (dcache_data.word_level[bays.addr[0][i][3]]) >> bays.addr[0][i][1:0];
+                next_dat[0][i] = (dcache_data.word_level[bays.addr[0][i][2]]) >> bays.addr[0][i][1:0];
                 next_got[0][i] = 1;
             end
 
@@ -282,6 +281,8 @@ module lod_ex(
     always_ff @(posedge clock) begin
         if (!reset) begin
             $display("  %3d | >> BAYS", $time);
+            $display("MEM_LOAD: %b, %d, %0d, %d", pending, dcache_data_valid, pending_frwd, dcache_data);
+            $display("FRWD_EN: %b, %b", sq_in.forward_en, sq_in.forward_byte_en);
             $display("i_rdy: %b, i_vld: %b, o_vld: %b, o_rdy: %b", i_rdy, i_vld, o_vld, o_rdy);
             $display("ocands: t: %2d, rob_idx: %2d, data: %x, btq_idx: %2d, take: %b, is_brch: %b",
                 o_cands[0].t,
