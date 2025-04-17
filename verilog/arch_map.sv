@@ -8,7 +8,7 @@ Architectural Map
 module arch_map #(parameter 
     N=`N
 ) (
-    input clock, reset,
+    input clock, reset, flush,
 
     // flush
     output arch_map2map_table mt_out,
@@ -46,7 +46,7 @@ module arch_map #(parameter
             for (int r = 1; r < `NUM_ARCH_REG; ++r) begin
                 entries[r] <= '{t : r}; // ✅ Map PRx = Rx (Arch Reg x → PRx)
             end
-        end else begin
+        end else if (!flush) begin
             entries <= entries_n;
         end
     end

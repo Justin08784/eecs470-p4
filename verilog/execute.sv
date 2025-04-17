@@ -815,135 +815,135 @@ module stage_ex_p4 (
         end
     end
 
-    `ifdef DEBUG
-    always_ff @(posedge clock) begin
-        if (!reset) begin
-            $display("  %3d | >> EXECUTE", $time);
+    // `ifdef DEBUG
+    // always_ff @(posedge clock) begin
+    //     if (!reset) begin
+    //         $display("  %3d | >> EXECUTE", $time);
 
-            for (int i = 0; i < `NUM_FU_ALU; ++i) begin
-                $display("alu_iss[%0d]: rdy: %b, vld: %b, t: %2d, t1: %2d, t2: %2d, rob_idx: %2d, btq_idx: %2d, inst: 0x%x, PC: 0x%x, NPC: 0x%x, cond_branch: %b, uncond_branch: %b",
-                    i,
-                    iss.i_rdy.alu[i],
-                    iss.o_vld.alu[i],
-                    iss.o_dat.alu[i].t,
-                    iss.o_dat.alu[i].t1,
-                    iss.o_dat.alu[i].t2,
-                    iss.o_dat.alu[i].rob_idx,
-                    iss.o_dat.alu[i].btq_idx,
-                    iss.o_dat.alu[i].inst,
-                    iss.o_dat.alu[i].PC,
-                    iss.o_dat.alu[i].NPC,
-                    iss.o_dat.alu[i].cond_branch,
-                    iss.o_dat.alu[i].uncond_branch
-                );
-            end
+    //         for (int i = 0; i < `NUM_FU_ALU; ++i) begin
+    //             $display("alu_iss[%0d]: rdy: %b, vld: %b, t: %2d, t1: %2d, t2: %2d, rob_idx: %2d, btq_idx: %2d, inst: 0x%x, PC: 0x%x, NPC: 0x%x, cond_branch: %b, uncond_branch: %b",
+    //                 i,
+    //                 iss.i_rdy.alu[i],
+    //                 iss.o_vld.alu[i],
+    //                 iss.o_dat.alu[i].t,
+    //                 iss.o_dat.alu[i].t1,
+    //                 iss.o_dat.alu[i].t2,
+    //                 iss.o_dat.alu[i].rob_idx,
+    //                 iss.o_dat.alu[i].btq_idx,
+    //                 iss.o_dat.alu[i].inst,
+    //                 iss.o_dat.alu[i].PC,
+    //                 iss.o_dat.alu[i].NPC,
+    //                 iss.o_dat.alu[i].cond_branch,
+    //                 iss.o_dat.alu[i].uncond_branch
+    //             );
+    //         end
 
-            for (int i = 0; i < `NUM_FU_MULT; ++i) begin
-                $display("mul_iss[%0d]: rdy: %b, vld: %b, t: %2d, t1: %2d, t2: %2d, rob_idx: %2d, func: 0x%x",
-                    i,
-                    iss.i_rdy.mul[i],
-                    iss.o_vld.mul[i],
-                    iss.o_dat.mul[i].t,
-                    iss.o_dat.mul[i].t1,
-                    iss.o_dat.mul[i].t2,
-                    iss.o_dat.mul[i].rob_idx,
-                    iss.o_dat.mul[i].func
-                );
-            end
+    //         for (int i = 0; i < `NUM_FU_MULT; ++i) begin
+    //             $display("mul_iss[%0d]: rdy: %b, vld: %b, t: %2d, t1: %2d, t2: %2d, rob_idx: %2d, func: 0x%x",
+    //                 i,
+    //                 iss.i_rdy.mul[i],
+    //                 iss.o_vld.mul[i],
+    //                 iss.o_dat.mul[i].t,
+    //                 iss.o_dat.mul[i].t1,
+    //                 iss.o_dat.mul[i].t2,
+    //                 iss.o_dat.mul[i].rob_idx,
+    //                 iss.o_dat.mul[i].func
+    //             );
+    //         end
 
-            for (int i = 0; i < `NUM_FU_ALU; ++i) begin
-                $display("regs.o_dat.alu[%0d]: bsy: %b, rs1: 0x%x, rs2: 0x%x t: %2d, rob_idx: %2d, btq_idx: %2d",
-                    i,
-                    regs.o_vld.alu[i],
-                    regs.o_dat.alu[i].rs1,
-                    regs.o_dat.alu[i].rs2,
-                    regs.o_dat.alu[i].dat.t,
-                    regs.o_dat.alu[i].dat.rob_idx,
-                    regs.o_dat.alu[i].dat.btq_idx
-                );
-            end
+    //         for (int i = 0; i < `NUM_FU_ALU; ++i) begin
+    //             $display("regs.o_dat.alu[%0d]: bsy: %b, rs1: 0x%x, rs2: 0x%x t: %2d, rob_idx: %2d, btq_idx: %2d",
+    //                 i,
+    //                 regs.o_vld.alu[i],
+    //                 regs.o_dat.alu[i].rs1,
+    //                 regs.o_dat.alu[i].rs2,
+    //                 regs.o_dat.alu[i].dat.t,
+    //                 regs.o_dat.alu[i].dat.rob_idx,
+    //                 regs.o_dat.alu[i].dat.btq_idx
+    //             );
+    //         end
 
-            for (int i = 0; i < `NUM_FU_MULT; ++i) begin
-                $display("regs.o_dat.mul[%0d]: bsy: %b, rs1: 0x%x, rs2: 0x%x t: %2d, rob_idx: %2d",
-                    i,
-                    regs.o_vld.mul[i],
-                    regs.o_dat.mul[i].rs1,
-                    regs.o_dat.mul[i].rs2,
-                    regs.o_dat.mul[i].dat.t,
-                    regs.o_dat.mul[i].dat.rob_idx
-                );
-            end
+    //         for (int i = 0; i < `NUM_FU_MULT; ++i) begin
+    //             $display("regs.o_dat.mul[%0d]: bsy: %b, rs1: 0x%x, rs2: 0x%x t: %2d, rob_idx: %2d",
+    //                 i,
+    //                 regs.o_vld.mul[i],
+    //                 regs.o_dat.mul[i].rs1,
+    //                 regs.o_dat.mul[i].rs2,
+    //                 regs.o_dat.mul[i].dat.t,
+    //                 regs.o_dat.mul[i].dat.rob_idx
+    //             );
+    //         end
 
-            $display("c_out: rdy_alu:{%b} rdy_mult:{%b} rdy_store:{%b} rdy_load:{%b}",
-                rs_out.fu_rdy_alu,
-                rs_out.fu_rdy_mult,
-                rs_out.fu_rdy_store,
-                rs_out.fu_rdy_load,
-            );
+    //         $display("c_out: rdy_alu:{%b} rdy_mult:{%b} rdy_store:{%b} rdy_load:{%b}",
+    //             rs_out.fu_rdy_alu,
+    //             rs_out.fu_rdy_mult,
+    //             rs_out.fu_rdy_store,
+    //             rs_out.fu_rdy_load,
+    //         );
 
-            $display("\ncdb_req: alu:{%b} mul:{%b} lod:{%b} str:{%b}", cdb_req.alu, cdb_req.mul, cdb_req.lod, cdb_req.str);
-            $display("\nctag_ts: alu:{%b} mul:{%b} lod:{%b} str:{%b}", ctag_ts.alu, ctag_ts.mul, ctag_ts.lod, ctag_ts.str);
-            // $display("ctag_ts: alu:{%2d, %2d} mul:{%2d, %2d}",
-            //     ctag_ts.alu[1], ctag_ts.alu[0], ctag_ts.mul[1], ctag_ts.mul[0]);
-            $display("cdb_gnt: alu:{%b} mul:{%b}", cdb_gnt.alu, cdb_gnt.mul);
-            for (int i = 0; i < 2; ++i) begin
-                $display("cdb_gnt[%0d]: alu:{%b} mul:{%b} lod:{%b} str:{%b}",
-                    i,
-                    cdb_gnt_shr[i].alu,
-                    cdb_gnt_shr[i].mul,
-                    cdb_gnt_shr[i].lod,
-                    cdb_gnt_shr[i].str
-                );
-            end
+    //         $display("\ncdb_req: alu:{%b} mul:{%b} lod:{%b} str:{%b}", cdb_req.alu, cdb_req.mul, cdb_req.lod, cdb_req.str);
+    //         $display("\nctag_ts: alu:{%b} mul:{%b} lod:{%b} str:{%b}", ctag_ts.alu, ctag_ts.mul, ctag_ts.lod, ctag_ts.str);
+    //         // $display("ctag_ts: alu:{%2d, %2d} mul:{%2d, %2d}",
+    //         //     ctag_ts.alu[1], ctag_ts.alu[0], ctag_ts.mul[1], ctag_ts.mul[0]);
+    //         $display("cdb_gnt: alu:{%b} mul:{%b}", cdb_gnt.alu, cdb_gnt.mul);
+    //         for (int i = 0; i < 2; ++i) begin
+    //             $display("cdb_gnt[%0d]: alu:{%b} mul:{%b} lod:{%b} str:{%b}",
+    //                 i,
+    //                 cdb_gnt_shr[i].alu,
+    //                 cdb_gnt_shr[i].mul,
+    //                 cdb_gnt_shr[i].lod,
+    //                 cdb_gnt_shr[i].str
+    //             );
+    //         end
 
-            $display("");
-            for (int n = 0; n < `N; ++n) begin
-                $display("cdb2fu_gbus[%0d]: %b", n, cdb2fu_gbus[n]);
-            end
-            for (int s = 0; s < 2; ++s) begin
-                for (int n = 0; n < `N; ++n) begin
-                    $display("cdb2fu_gbus[%0d][%0d]: %b", s, n, cdb2fu_gbus_shr[s][n]);
-                end
-            end
+    //         $display("");
+    //         for (int n = 0; n < `N; ++n) begin
+    //             $display("cdb2fu_gbus[%0d]: %b", n, cdb2fu_gbus[n]);
+    //         end
+    //         for (int s = 0; s < 2; ++s) begin
+    //             for (int n = 0; n < `N; ++n) begin
+    //                 $display("cdb2fu_gbus[%0d][%0d]: %b", s, n, cdb2fu_gbus_shr[s][n]);
+    //             end
+    //         end
 
 
-            for (int i = 0; i < `N; ++i) begin
-                $display("ctag_out_n[%0d]: en: %b, ts: %2d",
-                    i,
-                    ctag_out_n.en[i],
-                    ctag_out_n.ts[i],
-                );
-            end
-            for (int i = 0; i < `N; ++i) begin
-                $display("ctag_out[%0d]: en: %b, ts: %2d",
-                    i,
-                    ctag_out.en[i],
-                    ctag_out.ts[i],
-                );
-            end
-            for (int i = 0; i < `N; ++i) begin
-                $display("cdat_out[%0d]: en: %b,  ts: %2d, rob_idxs: %2d, data: %x",
-                    i,
-                    cdat_out.en[i],
-                    cdat_out.ts[i],
-                    cdat_out.rob_idxs[i],
-                    cdat_out.data[i]
-                );
-            end
+    //         for (int i = 0; i < `N; ++i) begin
+    //             $display("ctag_out_n[%0d]: en: %b, ts: %2d",
+    //                 i,
+    //                 ctag_out_n.en[i],
+    //                 ctag_out_n.ts[i],
+    //             );
+    //         end
+    //         for (int i = 0; i < `N; ++i) begin
+    //             $display("ctag_out[%0d]: en: %b, ts: %2d",
+    //                 i,
+    //                 ctag_out.en[i],
+    //                 ctag_out.ts[i],
+    //             );
+    //         end
+    //         for (int i = 0; i < `N; ++i) begin
+    //             $display("cdat_out[%0d]: en: %b,  ts: %2d, rob_idxs: %2d, data: %x",
+    //                 i,
+    //                 cdat_out.en[i],
+    //                 cdat_out.ts[i],
+    //                 cdat_out.rob_idxs[i],
+    //                 cdat_out.data[i]
+    //             );
+    //         end
 
-            $display("<prf_in >        v1s: [%0d, %0d, %0d, %0d] v2s: [%0d, %0d, %0d, %0d]",
-                prf_in.v1s[0],
-                prf_in.v1s[1],
-                prf_in.v1s[2],
-                prf_in.v1s[3],
-                prf_in.v2s[0],
-                prf_in.v2s[1],
-                prf_in.v2s[2],
-                prf_in.v2s[3]
-            );
-            $display("  %3d | << EXECUTE", $time);
-        end
-    end
-    `endif // DEBUG
+    //         $display("<prf_in >        v1s: [%0d, %0d, %0d, %0d] v2s: [%0d, %0d, %0d, %0d]",
+    //             prf_in.v1s[0],
+    //             prf_in.v1s[1],
+    //             prf_in.v1s[2],
+    //             prf_in.v1s[3],
+    //             prf_in.v2s[0],
+    //             prf_in.v2s[1],
+    //             prf_in.v2s[2],
+    //             prf_in.v2s[3]
+    //         );
+    //         $display("  %3d | << EXECUTE", $time);
+    //     end
+    // end
+    // `endif // DEBUG
 
 endmodule // stage_ex
