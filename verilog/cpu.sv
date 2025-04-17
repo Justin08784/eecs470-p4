@@ -545,6 +545,7 @@ module cpu (
     ) arch_map_0 (
         .clock  (clock),
         .reset  (reset),
+        .flush  (flush),
 
         .mt_out (am_2_mt),
         .r_in   (retire_exec)
