@@ -122,6 +122,7 @@ module decode_fill (
                     mem_size : DOUBLE
                 };
             end
+
             OP_FILL_NO_EVICT: begin
                 w_snd = '{
                     vld : 0,
@@ -146,10 +147,58 @@ module decode_load (
     input  CACHE_HEADER hdr,
     // TODO: add victim cache (some way to consult metadata; victim cache needs header?)
 
+    /* orders */
     output logic        req,
-    input  logic        gnt
+    output READ_SND     r_snd,
+    output MSHR_SND     mshr_snd,
+
+    /* receipts */
+    input  logic        gnt,
+    output READ_RCV     r_rcv
 
 );
+    OP_TAG op;
+    CACHE_LOC loc;
+
+    always_comb begin
+        req = ld_in.vld;
+
+        loc = cache_locate(hdr, ld_in.addr);
+
+        op = OP_NONE;
+        if (req) begin
+            op = loc.hit
+                ? OP_LOAD_HIT
+                : OP_LOAD_MISS;
+        end
+
+        {
+            r_snd,
+            mshr_snd
+        } = '0;
+
+        case (op)
+            OP_LOAD_HIT: begin
+                r_snd = '{
+                    vld : 1,
+                    way : loc.way
+                };
+            end
+
+            OP_LOAD_MISS: begin
+                mshr_snd = '{
+                    op     : op,
+                    vld    : 1,
+                    wr_mem : 0,
+                    addr   : ld_in.addr, // FIXME::: reconstruct the address of the tobeevicted block
+                    mem_data : '0,
+                    mem_size : DOUBLE
+                };
+            end
+            default:;
+        endcase
+    end
+
 endmodule;
 
 module decode_stor (
@@ -159,10 +208,65 @@ module decode_stor (
     input  CACHE_HEADER hdr,
     // TODO: add victim cache (some way to consult metadata; victim cache needs header?)
 
+    /* orders */
     output logic        req,
-    input  logic        gnt
+    output READ_SND     r_snd,
+    output WRIT_SND     w_snd,
+    output MSHR_SND     mshr_snd,
+
+    /* receipts */
+    input  logic        gnt,
+    output READ_RCV     r_rcv
 
 );
+   OP_TAG op;
+   CACHE_LOC loc;
+
+    always_comb begin
+        loc = cache_locate(hdr, sq_in.addr);
+        req = sq_in.vld;
+
+        op = OP_NONE;
+        if (req) begin
+            op = loc.hit
+                ? OP_STOR_HIT
+                : OP_STOR_MISS;
+        end
+
+        {
+            r_snd,
+            w_snd,
+            mshr_snd
+        } = '0;
+        case (op)
+            OP_FILL_EVICT: begin
+                r_snd = '{
+                    vld : 1,
+                    way : loc.way
+                };
+
+                w_snd = '{
+                    vld : 1,
+                    way : loc.way,
+                    dat : r_rcv.dat // FIXME!!!: You need to apply store correctly here!
+                };
+
+            end
+
+            OP_FILL_NO_EVICT: begin
+                mshr_snd = '{
+                    op     : op,
+                    vld    : 1,
+                    wr_mem : 0,
+                    addr   : sq_in.addr, // FIXME::: reconstruct the address of the tobeevicted block
+                    mem_data : '0,
+                    mem_size : DOUBLE
+                };
+            end
+            default:;
+        endcase
+    end
+
 endmodule;
 
 
