@@ -1118,9 +1118,9 @@ module testbench;
         //      mem2proc_data_tag
         // );
         print_rs();
-        // print_sq();
+        print_sq();
         // print_retbuf();
-        // print_lq();
+        print_lq();
         print_retire();
         $display("  | << CYCLE: %3d (t: %3d)", clock_count-1, $time);
     endtask

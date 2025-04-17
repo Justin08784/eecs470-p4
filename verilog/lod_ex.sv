@@ -193,7 +193,7 @@ module lod_ex(
         ld_sq_out = '0;
         foreach (bays.vld[f,i]) begin
             if (!bays.vld[f][i] || bays.got[f][i]) continue;
-            $display("CURRENT: addr: %h, size: %0d", bays.addr[f][i], bays.mem_size[f][i]);
+            
             ld_sq_out.forward_req_en[i] = bays.vld[f][i];
             ld_sq_out.forward_addr[i] = bays.addr[f][i];
             ld_sq_out.forward_mem_size[i] = bays.mem_size[f][i];

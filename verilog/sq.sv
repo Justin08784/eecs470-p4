@@ -136,13 +136,27 @@ module sq #(parameter
                 //     end 
                 // endcase
 
+                // if (!state[l].in_range) assign match_mask[i][l] = 0;
+                // else if (tail > head) assign match_mask[i][l] = (l >= ret_head) && (l <= matching_idx[i]);
+                // else if (matching_idx[i] < tail) assign match_mask[i][l] = (l <= matching_idx[i]) || (l >= ret_head);
+                // else assign match_mask[i][l] = (l >= ret_head) && (l <= matching_idx[i]);
+
+                assign match_mask[i][l] = !state[l].in_range ?
+                    0 :
+                    tail > head ?
+                        (l >= ret_head) && (l <= matching_idx[i]) :
+                        matching_idx[i] < tail ?
+                            (l <= matching_idx[i]) || (l >= ret_head) :
+                            (l >= ret_head) && (l <= matching_idx[i]);
+
+
                 // assign match_mask[i][l] = (matching_idx[i] < ret_head) ? 
                 //     ((l < tail) && (l <= matching_idx[i])) || (l >= ret_head) : 
                 //     (l >= ret_head) & ((l - ret_head) < used) & (l <= matching_idx[i]);
 
-                assign match_mask[i][l] = (matching_idx[i] < ret_head) ?
-                    ((l <= matching_idx[i]) || (l >= ret_head)) && state[l].in_range :
-                    ((l >= ret_head) && (l <= matching_idx[i])) && state[i].in_range;
+                // assign match_mask[i][l] = state[l].in_range;//(matching_idx[i] < ret_head) ?
+                    // ((l <= matching_idx[i]) || (l >= ret_head)) && state[l].in_range :
+                    // ((l >= ret_head) && (l <= matching_idx[i])) && state[i].in_range;
             end
             
 
@@ -152,7 +166,7 @@ module sq #(parameter
                         state[k].bytewise_addr_mask[j] & match_mask[i][k] : '0;
                 end
 
-                assign shifted_left_matches[i][j] = rotate_left(byte_matches[i][j],matching_idx[i]);
+                assign shifted_left_matches[i][j] = rotate_left(byte_matches[i][j],11-matching_idx[i]);
 
                 psel_gen #(
                 .WIDTH  (LSQ_SZ),
@@ -161,7 +175,7 @@ module sq #(parameter
                     .req    (shifted_left_matches[i][j]),
                     .gnt    (shifted_right_matches[i][j])
                 );
-                assign final_matches[i][j] = rotate_right(shifted_right_matches[i][j],matching_idx[i]);
+                assign final_matches[i][j] = rotate_right(shifted_right_matches[i][j],11-matching_idx[i]);
                 assign next_sq_2_exec.forward_data[i].byte_level[j] = state[encode_idx(final_matches[i][j])].data.byte_level[j];
                 assign next_sq_2_exec.forward_byte_en[i][j] = state[encode_idx(final_matches[i][j])].bytewise_addr_mask[j] && idx_found[i];//1;
                     
@@ -190,43 +204,6 @@ module sq #(parameter
             // assign execute_out.forward_mem_size[i] = ex_frwd_in.forward_mem_size[i];
         end
     endgenerate
-
-    
-
-    always_comb begin
-        for (int unsigned i = 0; i < LD_BAY_SZ; i++) begin
-            if (ex_frwd_in.forward_req_en[i]) begin
-                $display("REQUESTED: addr: %h, size: %h, sq_idx: %0d", ex_frwd_in.forward_addr[i], ex_frwd_in.forward_mem_size[i], ex_frwd_in.forward_sq_idx[i]);
-            end
-
-            if (execute_out.forward_en[i]) begin
-                $display("FORWARDING: addr: %h, data: %h, size: %0d, mask: %4b", ex_frwd_in.forward_addr[i], execute_out.forward_data[i], execute_out.forward_mem_size[i], execute_out.forward_byte_en[i]);
-            end
-        end
-
-        for (int i = 0; i < LD_BAY_SZ; i++) $display("Match Mask[%0d]: %b", i, match_mask[i]);
-
-        for (int i = 0; i < `LSQ_SZ; i++) begin
-            $display("Entry [%2d]: sq_idx=%2d, rob_idx=%2d, addr=%4x, data=%x, d_valid=%b, in_range=%b, mem_size: %0d, addr mask=%4b%s",
-            i,
-            state[i].sq_idx,
-            state[i].rob_idx,
-            state[i].addr,
-            state[i].data,
-            state[i].d_vld,
-            state[i].in_range,
-            state[i].mem_size,
-            state[i].bytewise_addr_mask,
-                (i == head && head == tail) 
-                    ? " << h/t"
-                    : (i == head) 
-                        ? " << h" 
-                        : (i == tail)
-                            ? " << t"
-                            : ""
-            );
-        end
-    end
 
 
     logic [`NUM_FU_STORE-1:0] [3:0] bytewise_addr_mask;
