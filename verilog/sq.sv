@@ -120,8 +120,8 @@ module sq #(parameter
     generate
         for (i = 0; i < LD_BAY_SZ; i++) begin : find_bay_matches
 
-            assign matching_idx[i] = ex_frwd_in.forward_sq_idx[i] % LSQ_SZ;
-            assign idx_found[i] = state[matching_idx[i]].d_vld;
+            assign matching_idx[i] = ex_frwd_in.forward_sq_idx[i];// % LSQ_SZ;
+            assign idx_found[i] = state[matching_idx[i]].in_range;
 
             for (l = 0; l < LSQ_SZ; l++) begin : find_match_mask
                 // assign match_mask[i][l] = ((matching_idx[i] < ret_head) & ((l <= matching_idx[i]) || (l >= ret_head))) || ((l >= ret_head) && (l <= matching_idx[i])) ? 1 : 0;
@@ -135,7 +135,13 @@ module sq #(parameter
                 //     end 
                 // endcase
 
-                assign match_mask[i][l] = (matching_idx[i] < ret_head) ? ((l < tail) && (l <= matching_idx[i])) || (l >= ret_head) : (l >= ret_head) & ((l - ret_head) < used) & (l <= matching_idx[i]);
+                // assign match_mask[i][l] = (matching_idx[i] < ret_head) ? 
+                //     ((l < tail) && (l <= matching_idx[i])) || (l >= ret_head) : 
+                //     (l >= ret_head) & ((l - ret_head) < used) & (l <= matching_idx[i]);
+
+                assign match_mask[i][l] = state[l].in_range;//(matching_idx[i] < ret_head) ?
+                    // ((l <= matching_idx[i]) || (l >= ret_head)) && state[l].in_range :
+                    // ((l >= ret_head) && (l <= matching_idx[i])) && state[i].in_range;
             end
             
 
@@ -149,18 +155,18 @@ module sq #(parameter
                 .WIDTH  (LSQ_SZ),
                 .REQS   (1)
                 ) sel (
-                    .req    (byte_matches[i][j]),
+                    .req    (rotate_left(byte_matches[i][j],matching_idx[i])),
                     .gnt_bus(shifted_matches[i][j])
                 );
                 assign final_matches[i][j] = rotate_right(shifted_matches[i][j],matching_idx[i]);
                 assign next_sq_2_exec.forward_data[i].byte_level[j] = state[encode_idx(final_matches[i][j])].data.byte_level[j];
-                assign next_sq_2_exec.forward_byte_en[i][j] = state[encode_idx(rotate_right(shifted_matches[i][j],matching_idx[i]))].bytewise_addr_mask[j] && idx_found[i];//1;
+                assign next_sq_2_exec.forward_byte_en[i][j] = state[encode_idx(final_matches[i][j])].bytewise_addr_mask[j] && idx_found[i];//1;
                     
             end
 
             // assign next_sq_2_exec.forward_en[i] = (next_sq_2_exec.forward_byte_en[i] != 0);
 
-            assign execute_out.forward_en[i] = (next_sq_2_exec.forward_byte_en[i] != 0) && idx_found[i];
+            assign execute_out.forward_en[i] = (next_sq_2_exec.forward_byte_en[i] != 0) && idx_found[i] && ex_frwd_in.forward_req_en[i];
 
 
             assign word_off[i] = iw_off(ex_frwd_in.forward_addr[i]);
@@ -176,13 +182,42 @@ module sq #(parameter
         end
     endgenerate
 
-    // always_ff @(posedge clock) begin
-    //     for (int unsigned i = 0; i < LD_BAY_SZ; i++) begin
-    //         if (execute_out.forward_en[i]) begin
-    //             $display("FORWARDING: addr: %h, data: %h, size: %0d, mask: %4b", ex_frwd_in.forward_addr[i], execute_out.forward_data[i], execute_out.forward_mem_size[i], execute_out.forward_byte_en[i]);
-    //         end
-    //     end
-    // end
+    
+
+    always_comb begin
+        for (int unsigned i = 0; i < LD_BAY_SZ; i++) begin
+            if (ex_frwd_in.forward_req_en[i]) begin
+                $display("REQUESTED: addr: %h, size: %h, sq_idx: %0d", ex_frwd_in.forward_addr[i], ex_frwd_in.forward_mem_size[i], ex_frwd_in.forward_sq_idx[i]);
+            end
+
+            if (execute_out.forward_en[i]) begin
+                $display("FORWARDING: addr: %h, data: %h, size: %0d, mask: %4b", ex_frwd_in.forward_addr[i], execute_out.forward_data[i], execute_out.forward_mem_size[i], execute_out.forward_byte_en[i]);
+            end
+        end
+
+        for (int i = 0; i < LD_BAY_SZ; i++) $display("Match Mask[%0d]: %b", i, match_mask[i]);
+
+        for (int i = 0; i < `LSQ_SZ; i++) begin
+            $display("Entry [%2d]: sq_idx=%2d, rob_idx=%2d, addr=%4x, data=%x, d_valid=%b, in_range=%b, mem_size: %0d, addr mask=%4b%s",
+            i,
+            state[i].sq_idx,
+            state[i].rob_idx,
+            state[i].addr,
+            state[i].data,
+            state[i].d_vld,
+            state[i].in_range,
+            state[i].mem_size,
+            state[i].bytewise_addr_mask,
+                (i == head && head == tail) 
+                    ? " << h/t"
+                    : (i == head) 
+                        ? " << h" 
+                        : (i == tail)
+                            ? " << t"
+                            : ""
+            );
+        end
+    end
 
 
     logic [`NUM_FU_STORE-1:0] [3:0] bytewise_addr_mask;
@@ -194,7 +229,7 @@ module sq #(parameter
 
             case (execute_in.st_mem_size[i])
                 BYTE:   bytewise_addr_mask[i][word_off]     = 1;
-                HALF:   bytewise_addr_mask[i][word_off+:1]  = '1;
+                HALF:   bytewise_addr_mask[i][word_off+:2]  = '1;
                 default:bytewise_addr_mask[i]               = '1;
             endcase
         end
@@ -316,6 +351,7 @@ module sq #(parameter
                     bytewise_addr_mask  : '0,
                     data                : '0,
                     d_vld               : '0,
+                    in_range            : '1,
                     mem_size            : '0
                 };
             end
@@ -326,6 +362,7 @@ module sq #(parameter
 
                 cur_idx = m_idxs[i];
                 state[cur_idx].d_vld <= 0;
+                state[cur_idx].in_range <= 0;
             end
 
         end
@@ -438,3 +475,52 @@ module sq #(parameter
 
 
 endmodule
+
+
+
+// always_comb begin
+    //     execute_out = '0;
+
+    //     for (int unsigned i = 0; i < LD_BAY_SZ; i++) begin
+
+    //         if (!ex_frwd_in.forward_req_en[i]) continue;
+
+    //         for (int unsigned j = 0, int unsigned idx = 0; j < used; ++j) begin
+    //             idx = (ret_head+j) % LSQ_SZ;
+
+    //             if (state[idx].d_vld && (waddr(state[idx].addr) == waddr(ex_frwd_in.forward_addr[i]))) begin
+    //                 execute_out.forward_data[i].byte_level[0] = state[idx].bytewise_addr_mask[0] ? state[idx].data.byte_level[0] : execute_out.forward_data[i].byte_level[0];
+    //                 execute_out.forward_data[i].byte_level[1] = state[idx].bytewise_addr_mask[1] ? state[idx].data.byte_level[1] : execute_out.forward_data[i].byte_level[1];
+    //                 execute_out.forward_data[i].byte_level[2] = state[idx].bytewise_addr_mask[2] ? state[idx].data.byte_level[2] : execute_out.forward_data[i].byte_level[2];
+    //                 execute_out.forward_data[i].byte_level[3] = state[idx].bytewise_addr_mask[3] ? state[idx].data.byte_level[3] : execute_out.forward_data[i].byte_level[3];
+
+    //                 execute_out.forward_byte_en[i] |= state[idx].bytewise_addr_mask;
+    //             end
+
+    //             if (state[idx].sq_idx == ex_frwd_in.forward_sq_idx[i]) break;
+    //         end
+
+    //         execute_out.forward_en[i] = (execute_out.forward_byte_en[i] != 0);
+
+    //         word_off = iw_off(ex_frwd_in.forward_addr[i]);
+    //         execute_out.forward_data[i]       >>= 8 * word_off;
+    //         execute_out.forward_byte_en[i]    >>= word_off; //8 * word_off
+
+    //         //ensure don't accidentally give more data than it wants
+    //         case (ex_frwd_in.forward_mem_size[i])
+    //             BYTE: begin
+    //                 execute_out.forward_data[i]       &= 32'h000000FF;
+    //                 execute_out.forward_byte_en[i]    &= 4'b0001;
+    //             end
+    //             HALF: begin
+    //                 execute_out.forward_data[i]       &= 32'h0000FFFF;
+    //                 execute_out.forward_byte_en[i]    &= 4'b0011;
+    //             end
+    //             default: begin
+    //                 execute_out.forward_data[i]       = execute_out.forward_data[i];//&= 32'hFFFFFFFF; 
+    //                 execute_out.forward_byte_en[i]    = execute_out.forward_byte_en[i];//&= 4'b1111;
+    //             end
+    //         endcase
+
+    //     end
+    // end

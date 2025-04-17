@@ -106,8 +106,6 @@ module lod_ex(
             lq_out.ld_lq_idx[i]     = i_regs[i].dat.lq_idx;
             lq_out.ld_addr[i]       = tmp_addrs[i];
             lq_out.ld_mem_size[i]   = tmp_sizes[i];
-            /* FIXME: What about rd_unsigned? We are not using this
-            in lq???? */ //ANSWER: This needs to be used in the load FU
 
         end
     end
@@ -194,8 +192,8 @@ module lod_ex(
     always_comb begin
         ld_sq_out = '0;
         foreach (bays.vld[f,i]) begin
-            if (!bays.vld[f][i]) continue;
-
+            if (!bays.vld[f][i] || bays.got[f][i]) continue;
+            $display("CURRENT: addr: %h, size: %0d", bays.addr[f][i], bays.mem_size[f][i]);
             ld_sq_out.forward_req_en[i] = bays.vld[f][i];
             ld_sq_out.forward_addr[i] = bays.addr[f][i];
             ld_sq_out.forward_mem_size[i] = bays.mem_size[f][i];
@@ -236,9 +234,9 @@ module lod_ex(
             if (next_got[0][i]) begin
                 if (bays.rd_unsigned[0][i]) begin
                     if (bays.mem_size[0][i] == BYTE) begin
-                        next_dat[0][i][31:8] = 0;
+                        next_dat[0][i][31:8] = '0;
                     end else if (bays.mem_size[0][i] == HALF) begin
-                        next_dat[0][i][31:16] = 0;
+                        next_dat[0][i][31:16] = '0;
                     end
                 end
                 else begin

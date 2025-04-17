@@ -69,7 +69,7 @@
 
 `ifndef SYNTH
 // comment out to disable DEBUG:
-// `define DEBUG
+`define DEBUG
 `endif
 
 ///////////////////////////////
@@ -481,6 +481,7 @@ typedef struct packed {
     logic [3:0] bytewise_addr_mask;
     DATA_BLOCK data;
     logic d_vld;
+    logic in_range;
     MEM_SIZE mem_size; //MEM_SIZE'(id_ex_reg.inst.r.funct3[1:0]); <-- HOW TO FIND THIS. DO THIS WHEN PUTTING ENTRY IN FROM DISPATCH OR FROM EXECUTE
 } SQ_ENTRY;
 
@@ -994,6 +995,7 @@ typedef struct packed {
 typedef struct packed {
     logic   [$clog2(`N):0]      lq_rdy_scnt;
     logic   [$clog2(`LSQ_SZ):0] lq_tail;
+    LSQ_IDX [`N-1:0]            next_ids;
 } lq2dispatch;
 
 typedef struct packed {

@@ -903,14 +903,15 @@ module testbench;
         $display("  | >> SQ");
         $display("RET_HEAD: %0d", ret_head);
         for (int i = 0; i < `LSQ_SZ; i++) begin
-            $display("Entry [%2d]: sq_idx=%2d, rob_idx=%2d, addr=%4x, data=%x, d_valid=%b, addr mask=%4b%s",
+            $display("Entry [%2d]: sq_idx=%2d, rob_idx=%2d, addr=%4x, data=%x, d_valid=%b, in_range=%b, mem_size: %0d, addr mask=%4b%s",
             i,
             state[i].sq_idx,
             state[i].rob_idx,
             state[i].addr,
             state[i].data,
             state[i].d_vld,
-            // state[i].bytewise_addr,
+            state[i].in_range,
+            state[i].mem_size,
             state[i].bytewise_addr_mask,
                 (i == head && head == tail) 
                     ? " << h/t"
