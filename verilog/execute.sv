@@ -359,8 +359,6 @@ module stage_ex_p4 (
         */
         for (genvar i = 0; i < `NUM_FU_ALU; ++i) begin : gen_alu_sbufs
             assign iss.i_dat.alu[i] = '{
-                bytag   : rs_in.bytag_alu[i],
-
                 t       : rs_in.fu_dat_alu[i].t,
                 t1      : rs_in.fu_dat_alu[i].t1,
                 t2      : rs_in.fu_dat_alu[i].t2,
@@ -396,8 +394,6 @@ module stage_ex_p4 (
         
         for (genvar i = 0; i < `NUM_FU_MULT; ++i) begin : gen_mul_sbufs
             assign iss.i_dat.mul[i] = '{
-                bytag   : rs_in.bytag_mul[i],
-
                 t       : rs_in.fu_dat_mult[i].t,
                 t1      : rs_in.fu_dat_mult[i].t1,
                 t2      : rs_in.fu_dat_mult[i].t2,
@@ -424,8 +420,6 @@ module stage_ex_p4 (
 
         for (genvar i = 0; i < `NUM_FU_LOAD; ++i) begin : gen_lod_sbufs
             assign iss.i_dat.lod[i] = '{
-                bytag   : rs_in.bytag_ldr[i],
-
                 t       : rs_in.fu_dat_load[i].t,
                 t1      : rs_in.fu_dat_load[i].t1,
                 opb     : `RV32_signext_Iimm(rs_in.fu_dat_load[i].inst),
@@ -456,8 +450,6 @@ module stage_ex_p4 (
 
         for (genvar i = 0; i < `NUM_FU_STORE; ++i) begin : gen_str_sbufs
             assign iss.i_dat.str[i] = '{
-                bytag   : rs_in.bytag_str[i],
-
                 t1      : rs_in.fu_dat_store[i].t1,
                 t2      : rs_in.fu_dat_store[i].t2,
                 opb     : `RV32_signext_Simm(rs_in.fu_dat_store[i].inst),

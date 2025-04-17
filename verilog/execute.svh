@@ -11,8 +11,6 @@ typedef struct packed {
 
 /* Slices (or "views") of ID_RESULT needed for each FU type */
 typedef struct packed {
-    BYPASS_TAG      bytag;
-
     PHYS_REG_IDX    t;
     PHYS_REG_IDX    t1;
     PHYS_REG_IDX    t2;
@@ -31,8 +29,6 @@ typedef struct packed {
 } ID_ALU_VIEW;
 
 typedef struct packed {
-    BYPASS_TAG      bytag;
-
     PHYS_REG_IDX    t;
     PHYS_REG_IDX    t1;
     PHYS_REG_IDX    t2;
@@ -41,7 +37,6 @@ typedef struct packed {
 } ID_MUL_VIEW;
 
 typedef struct packed {
-    BYPASS_TAG      bytag;
     // alu_func   = ALU_ADD;
     // opa_select = OPA_IS_RS1
     // opb_select = OPB_IS_I_IMM
@@ -58,7 +53,6 @@ typedef struct packed {
 } ID_LOD_VIEW;
 
 typedef struct packed {
-    BYPASS_TAG      bytag;
     // alu_func   = ALU_ADD;
     // opa_select = OPA_IS_RS1
     // opb_select = OPB_IS_S_IMM
