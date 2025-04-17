@@ -307,36 +307,36 @@ module lod_ex(
         end
     end
 
-    `ifdef DEBUG
-    always_ff @(posedge clock) begin
-        if (!reset) begin
-            $display("  %3d | >> BAYS", $time);
-            $display("MEM_LOAD: %b, %d, %0d, %d", pending, dcache_data_valid, pending_frwd, dcache_data);
-            $display("FRWD_EN: %b, %b", sq_in.forward_en, sq_in.forward_byte_en);
-            $display("i_rdy: %b, i_vld: %b ", i_rdy, i_vld);
-            $display("ocands: t: %2d, rob_idx: %2d, data: %x",
-                o_cands[0].t,
-                o_cands[0].rob_idx,
-                o_cands[0].data
-            );
-            $display("ren: %b", bays.vld & ~bays.got);
-            foreach (fu2in_gnt[f, i]) begin
-                $display("bays[%2d][%2d]: vld=%b, got=%b, t=%2d, rob_idx=%2d, addr=%x, mem_size=%2d, dat=%x",
-                    f,
-                    i,
-                    bays.vld    [f][i],
-                    bays.got    [f][i],
-                    bays.t      [f][i],
-                    bays.rob_idx[f][i],
-                    bays.addr   [f][i],
-                    bays.mem_size[f][i],
-                    bays.dat    [f][i]
-                );
-            end
-            $display("  %3d | << BAYS", $time);
-        end
-    end
-    `endif
+    // `ifdef DEBUG
+    // always_ff @(posedge clock) begin
+    //     if (!reset) begin
+    //         $display("  %3d | >> BAYS", $time);
+    //         $display("MEM_LOAD: %b, %d, %0d, %d", pending, dcache_data_valid, pending_frwd, dcache_data);
+    //         $display("FRWD_EN: %b, %b", sq_in.forward_en, sq_in.forward_byte_en);
+    //         $display("i_rdy: %b, i_vld: %b ", i_rdy, i_vld);
+    //         $display("ocands: t: %2d, rob_idx: %2d, data: %x",
+    //             o_cands[0].t,
+    //             o_cands[0].rob_idx,
+    //             o_cands[0].data
+    //         );
+    //         $display("ren: %b", bays.vld & ~bays.got);
+    //         foreach (fu2in_gnt[f, i]) begin
+    //             $display("bays[%2d][%2d]: vld=%b, got=%b, t=%2d, rob_idx=%2d, addr=%x, mem_size=%2d, dat=%x",
+    //                 f,
+    //                 i,
+    //                 bays.vld    [f][i],
+    //                 bays.got    [f][i],
+    //                 bays.t      [f][i],
+    //                 bays.rob_idx[f][i],
+    //                 bays.addr   [f][i],
+    //                 bays.mem_size[f][i],
+    //                 bays.dat    [f][i]
+    //             );
+    //         end
+    //         $display("  %3d | << BAYS", $time);
+    //     end
+    // end
+    // `endif
 
     /* TODO: CAND generation logic. Also, how do we know when
     a load result is ready without an lq2execute line? */

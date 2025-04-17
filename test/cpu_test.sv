@@ -28,7 +28,7 @@ import "DPI-C" function string decode_inst(int inst);
 //import "DPI-C" function void close_pipeline_output_file();
 
 
-// `define TB_MAX_CYCLES 10000
+// `define TB_MAX_CYCLES 100
 `define TB_MAX_CYCLES 50000000
 
 
@@ -311,13 +311,14 @@ module testbench;
             end
             rob_debug.delete(cur_idx);
             `ifdef DEBUG
-            $display("commit[%0d]: (pc: 0x%x, inst: 0x%x) vld: %b, halt: %b, illegal: %b",
+            $display("commit[%0d]: (pc: 0x%x, inst: 0x%x) vld: %b, halt: %b, illegal: %b, data: %x",
                 n,
                 pc,
                 inst,
                 committed_insts[n].valid,
                 committed_insts[n].halt,
-                committed_insts[n].illegal
+                committed_insts[n].illegal,
+                data
             );
             `endif // DEBUG
 
@@ -728,6 +729,20 @@ module testbench;
             d_out.t1s[1],
             d_out.t2s[1]
         );
+        for (int r = 0; r < `NUM_ARCH_REG; ++r) begin
+            $display("mt[%2d]: t=%3d, v=%x :::: am[%2d]: t=%3d, v=%x",
+                r,
+                entries[r],
+                verisimpleV.prf_0.file[
+                    entries[r]
+                ],
+                r, 
+                am_in.state[r],
+                verisimpleV.prf_0.file[
+                    am_in.state[r]
+                ]
+            );
+        end
         $display("<< MT <<", $time);
 
     endtask
@@ -1074,13 +1089,13 @@ module testbench;
             return;
 
         $display("  | >> CYCLE: %3d (t: %3d)", clock_count-1, $time);
-        print_btq();
-        print_fetch();
-        print_icache();
-        print_decode();
-        print_dispatch();
+        // print_fetch();
+        // print_icache();
+        // print_decode();
+        // print_dispatch();
         print_map_table();
-        print_prf();
+        // print_prf();
+        print_btq();
         print_rob();
 
         // $display("---- rob_debug contents ----");
@@ -1092,19 +1107,19 @@ module testbench;
         //             rob_debug[idx].NPC);
         // end
         // $display("----------------------------");
-        $display(
-            "## proc2mem: {cmd: %s, addr: %x, data: %x}\n## mem2proc: {txn_tag: %2d, data: %x, data_tag: %2d}",
-             proc2mem_command,
-             proc2mem_addr,
-             proc2mem_data,
-             mem2proc_transaction_tag,
-             mem2proc_data,
-             mem2proc_data_tag
-        );
+        // $display(
+        //     "## proc2mem: {cmd: %s, addr: %x, data: %x}\n## mem2proc: {txn_tag: %2d, data: %x, data_tag: %2d}",
+        //      proc2mem_command,
+        //      proc2mem_addr,
+        //      proc2mem_data,
+        //      mem2proc_transaction_tag,
+        //      mem2proc_data,
+        //      mem2proc_data_tag
+        // );
         print_rs();
-        print_sq();
+        // print_sq();
         // print_retbuf();
-        print_lq();
+        // print_lq();
         print_retire();
         $display("  | << CYCLE: %3d (t: %3d)", clock_count-1, $time);
     endtask
