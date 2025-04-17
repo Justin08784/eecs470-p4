@@ -111,8 +111,8 @@ module lq #(parameter
             tail    <= 0;
             state   <= '0;
         end else begin
-            used    <= used + dispatch_in.rename_en_cnt - retire_in.r_en;
-            free    <= free - dispatch_in.rename_en_cnt + retire_in.r_en;
+            used    <= used + dispatch_in.lq_d_en_cnt - retire_in.r_en;
+            free    <= free - dispatch_in.lq_d_en_cnt + retire_in.r_en;
             rsvd    <= rsvd + dispatch_in.rename_en_cnt - dispatch_in.lq_d_en_cnt;
 
             head    <= (head + retire_in.r_en) % LSQ_SZ;
