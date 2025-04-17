@@ -600,21 +600,6 @@ typedef struct packed {
 } ID_RESULT;
 
 typedef struct packed {
-    /* ETB bypass control */
-    logic bypass1;  // set iff 1) awaken by a complete to its src1 AND 2) issued same cycle
-        /* Q: How to implement?
-        A: Set if a complete readies our src1. Clear if we do not issue same cycle.
-        If an insn issues 1 or more cycles *after* all of its source operands
-        have been readied, then they will be ready in the PRF, and thus bypass
-        is needed. */
-    logic bypass2;
-
-    /* This is a ridiculous optimization. Try impl a simple CAM first. */
-    logic [$clog2(`N)-1:0]  cdb_idx1;   // which cdb slot to bypass for src1 (valid iff bypass1 set)
-    logic [$clog2(`N)-1:0]  cdb_idx2;
-} BYPASS_TAG;
-
-typedef struct packed {
     logic           busy;
     logic           issued;
     ID_RESULT       dat;
@@ -766,11 +751,6 @@ typedef struct packed {
     logic       [`NUM_FU_MULT-1:0]   fu_en_mult;
     logic       [`NUM_FU_STORE-1:0]  fu_en_store;
     logic       [`NUM_FU_LOAD-1:0]   fu_en_load;
-
-    BYPASS_TAG  [`NUM_FU_ALU-1:0]    bytag_alu;
-    BYPASS_TAG  [`NUM_FU_MULT-1:0]   bytag_mul;
-    BYPASS_TAG  [`NUM_FU_LOAD-1:0]   bytag_ldr;
-    BYPASS_TAG  [`NUM_FU_STORE-1:0]  bytag_str;
 
     ID_RESULT   [`NUM_FU_ALU-1:0]    fu_dat_alu;
     ID_RESULT   [`NUM_FU_MULT-1:0]   fu_dat_mult;

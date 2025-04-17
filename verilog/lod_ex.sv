@@ -7,11 +7,11 @@ module lod_ex(
     input flush,
 
     /* FRONTEND */
-    output logic    [`NUM_FU_LOAD-1:0]  i_rdy,
+    output logic    i_rdy,
         // ready to accept from regs.o_dat.lod?
-    input  logic    [`NUM_FU_LOAD-1:0]  i_vld,
+    input  logic    i_vld,
         // insns to accept from regs.o_dat.lod
-    input  LOD_REGS [`NUM_FU_LOAD-1:0]  i_regs,
+    input  LOD_REGS i_regs,
         // insn metadata/operands
     
     input   sq2execute sq_in,
@@ -27,26 +27,26 @@ module lod_ex(
     output ADDR mem_addr,
 
     /* Early CDB arbitration */
-    output logic [`NUM_FU_LOAD-1:0]     cdb_req,
-    output PHYS_REG_IDX [`NUM_FU_LOAD-1:0] ctag_ts,
-    input  logic [`NUM_FU_LOAD-1:0]     cdb_gnt,
+    output logic cdb_req,
+    output PHYS_REG_IDX ctag_ts,
+    input  logic cdb_gnt,
 
     /* BACKEND */
-    output CPL_CAND [`NUM_FU_LOAD-1:0]  o_cands
+    output CPL_CAND o_cands
 );
     localparam LD_BAY_SZ = `LD_BAY_SZ;//4;
     typedef struct packed {
-        logic           [`NUM_FU_LOAD-1:0][LD_BAY_SZ-1:0]  vld;
-        logic           [`NUM_FU_LOAD-1:0][LD_BAY_SZ-1:0]  got; // got data?
-        PHYS_REG_IDX    [`NUM_FU_LOAD-1:0][LD_BAY_SZ-1:0]  t;
-        ROB_IDX         [`NUM_FU_LOAD-1:0][LD_BAY_SZ-1:0]  rob_idx;
-        ADDR            [`NUM_FU_LOAD-1:0][LD_BAY_SZ-1:0]  addr;
-        MEM_SIZE        [`NUM_FU_LOAD-1:0][LD_BAY_SZ-1:0]  mem_size;
+        logic           [LD_BAY_SZ-1:0]  vld;
+        logic           [LD_BAY_SZ-1:0]  got; // got data?
+        PHYS_REG_IDX    [LD_BAY_SZ-1:0]  t;
+        ROB_IDX         [LD_BAY_SZ-1:0]  rob_idx;
+        ADDR            [LD_BAY_SZ-1:0]  addr;
+        MEM_SIZE        [LD_BAY_SZ-1:0]  mem_size;
 
-        LSQ_IDX         [`NUM_FU_LOAD-1:0][LD_BAY_SZ-1:0]  sq_idx;
-        logic           [`NUM_FU_LOAD-1:0][LD_BAY_SZ-1:0][3:0]  st_frwd_byte_mask;
-        DATA            [`NUM_FU_LOAD-1:0][LD_BAY_SZ-1:0]  dat;
-        logic           [`NUM_FU_LOAD-1:0][LD_BAY_SZ-1:0] rd_unsigned;
+        LSQ_IDX         [LD_BAY_SZ-1:0]  sq_idx;
+        logic           [LD_BAY_SZ-1:0][3:0]  st_frwd_byte_mask;
+        DATA            [LD_BAY_SZ-1:0]  dat;
+        logic           [LD_BAY_SZ-1:0] rd_unsigned;
     } LOAD_BAYS;
 
 
@@ -54,70 +54,60 @@ module lod_ex(
     // FIXME: hardcoded
 
     LOAD_BAYS bays; // waiting bays
-    logic     [`NUM_FU_LOAD-1:0][LD_BAY_SZ-1:0] fu2in_gnt;
-    logic     [`NUM_FU_LOAD-1:0][LD_BAY_SZ-1:0] fu2out_gnt;
+    logic [LD_BAY_SZ-1:0] fu2in_gnt;
+    logic [LD_BAY_SZ-1:0] fu2out_gnt;
     always_comb begin
-        for (int f = 0; f < `NUM_FU_LOAD; ++f) begin
-            i_rdy[f] = |(~bays.vld[f]);
-            cdb_req[f] = |(bays.vld[f] & bays.got[f]);
-        end
+        i_rdy = |(~bays.vld);
+        cdb_req = |(bays.vld & bays.got);
 
         ctag_ts = '0;
-        foreach (fu2out_gnt[f, i]) begin
-            if (!fu2out_gnt[f][i])
+        foreach (fu2out_gnt[i]) begin
+            if (!fu2out_gnt[i])
                 continue;
-            ctag_ts[f] |= bays.t[f][i];
+            ctag_ts |= bays.t[i];
         end
     end
 
 
     generate
-        for (genvar f = 0; f < `NUM_FU_LOAD; ++f) begin : gen_arb_in
-            psel_gen #(
-                .WIDTH(LD_BAY_SZ),
-                .REQS(1)
-            ) arb_in (
-                .req    (~bays.vld[f]),
-                .gnt    (fu2in_gnt[f])
-            );
-        end
+        psel_gen #(
+            .WIDTH(LD_BAY_SZ),
+            .REQS(1)
+        ) arb_in (
+            .req    (~bays.vld),
+            .gnt    (fu2in_gnt)
+        );
 
-        for (genvar f = 0; f < `NUM_FU_LOAD; ++f) begin : gen_arb_out
-            psel_gen #(
-                .WIDTH(LD_BAY_SZ),
-                .REQS(1)
-            ) arb_out (
-                .req    (bays.vld[f] & bays.got[f]),
-                .gnt    (fu2out_gnt[f])
-            );
-        end
+        psel_gen #(
+            .WIDTH(LD_BAY_SZ),
+            .REQS(1)
+        ) arb_out (
+            .req    (bays.vld & bays.got),
+            .gnt    (fu2out_gnt)
+        );
     endgenerate
 
-    ADDR        [`NUM_FU_LOAD-1:0] tmp_addrs;
-    MEM_SIZE    [`NUM_FU_LOAD-1:0] tmp_sizes;
+    ADDR        tmp_addrs;
+    MEM_SIZE    tmp_sizes;
 
     always_comb begin
-        foreach(i_vld[i]) begin
-            // load address computation
-            tmp_addrs[i] = i_regs[i].rs1 + i_regs[i].dat.opb;
-            tmp_sizes[i] = i_regs[i].dat.mem_size;
+        // load address computation
+        tmp_addrs = i_regs.rs1 + i_regs.dat.opb;
+        tmp_sizes = i_regs.dat.mem_size;
 
-            lq_out.ld_ex_en[i]      = i_vld[i];
-            lq_out.ld_lq_idx[i]     = i_regs[i].dat.lq_idx;
-            lq_out.ld_addr[i]       = tmp_addrs[i];
-            lq_out.ld_mem_size[i]   = tmp_sizes[i];
-
-        end
+        lq_out.ld_ex_en     = i_vld;
+        lq_out.ld_lq_idx    = i_regs.dat.lq_idx;
+        lq_out.ld_addr      = tmp_addrs;
+        lq_out.ld_mem_size  = tmp_sizes;
     end
 
-    CPL_CAND [1:0][`NUM_FU_LOAD-1:0] cands_shr;
+    CPL_CAND [1:0] cands_shr;
     always_comb begin
-        foreach (cands_shr[f])
-            o_cands[f] = cands_shr[1][f];
+        o_cands = cands_shr[1];
     end
     
     //for forwarding, declared here so that it can be used here
-    logic [`NUM_FU_LOAD-1:0][LD_BAY_SZ-1:0] next_got;
+    logic [LD_BAY_SZ-1:0] next_got;
 
     //mem request logic
     logic [$clog2(`LD_BAY_SZ):0] curr_frwd, next_frwd;
@@ -130,10 +120,10 @@ module lod_ex(
 
         case (pending)
             0 : begin
-                if (bays.vld[0][curr_frwd] && !(bays.got[0][curr_frwd] || next_got[0][curr_frwd]) && !(reset || flush)) begin
+                if (bays.vld[curr_frwd] && !(bays.got[curr_frwd] || next_got[curr_frwd]) && !(reset || flush)) begin
                     // $display("ASKING_MEM");
                     mem_command = MEM_LOAD;
-                    mem_addr = bays.addr[0][curr_frwd];
+                    mem_addr = bays.addr[curr_frwd];
                 end
 
                 if (dcache_accepted && (mem_command == MEM_LOAD)) begin
@@ -146,7 +136,7 @@ module lod_ex(
                     next_pending_frwd = 0;
 
                     for (int unsigned i = 0; i < LD_BAY_SZ; i++) begin
-                        if ((!bays.vld[0][i]) || bays.got[0][i]) continue;
+                        if ((!bays.vld[i]) || bays.got[i]) continue;
 
                         next_frwd = i;
                         break;
@@ -191,64 +181,64 @@ module lod_ex(
     //ST-LD forwarding request logic
     always_comb begin
         ld_sq_out = '0;
-        foreach (bays.vld[f,i]) begin
-            if (!bays.vld[f][i] || bays.got[f][i]) continue;
+        foreach (bays.vld[i]) begin
+            if (!bays.vld[i] || bays.got[i]) continue;
             
-            ld_sq_out.forward_req_en[i] = bays.vld[f][i];
-            ld_sq_out.forward_addr[i] = bays.addr[f][i];
-            ld_sq_out.forward_mem_size[i] = bays.mem_size[f][i];
-            ld_sq_out.forward_sq_idx[i] = bays.sq_idx[f][i];
+            ld_sq_out.forward_req_en[i] = bays.vld[i];
+            ld_sq_out.forward_addr[i] = bays.addr[i];
+            ld_sq_out.forward_mem_size[i] = bays.mem_size[i];
+            ld_sq_out.forward_sq_idx[i] = bays.sq_idx[i];
         end
     end
 
     //ST-LD forwarding parsing logic
     logic [LD_BAY_SZ-1:0][3:0] next_st_frwd_byte_mask;
-    DATA_BLOCK  [`NUM_FU_LOAD-1:0][LD_BAY_SZ-1:0] next_dat;
+    DATA_BLOCK [LD_BAY_SZ-1:0] next_dat;
     always_comb begin
         next_got = bays.got;
         next_st_frwd_byte_mask = '0;
         next_dat = bays.dat;
         for (int unsigned i = 0; i < LD_BAY_SZ; i++) begin
-            if (bays.got[0][i])
+            if (bays.got[i])
                 continue;
             // if (!sq_in.forward_en[i])
             //     continue;
             if (pending && dcache_data_valid && (i == pending_frwd)) begin
 
-                next_dat[0][i] = (dcache_data.word_level[bays.addr[0][i][2]]) >> bays.addr[0][i][1:0];
-                next_got[0][i] = 1;
+                next_dat[i] = (dcache_data.word_level[bays.addr[i][2]]) >> bays.addr[i][1:0];
+                next_got[i] = 1;
             end
 
             if (sq_in.forward_byte_en[i][0])
-                next_dat[0][i].byte_level[0] = sq_in.forward_data[i].byte_level[0];
+                next_dat[i].byte_level[0] = sq_in.forward_data[i].byte_level[0];
             if (sq_in.forward_byte_en[i][1])
-                next_dat[0][i].byte_level[1] = sq_in.forward_data[i].byte_level[1];
+                next_dat[i].byte_level[1] = sq_in.forward_data[i].byte_level[1];
             if (sq_in.forward_byte_en[i][2])
-                next_dat[0][i].byte_level[2] = sq_in.forward_data[i].byte_level[2];
+                next_dat[i].byte_level[2] = sq_in.forward_data[i].byte_level[2];
             if (sq_in.forward_byte_en[i][3])
-                next_dat[0][i].byte_level[3] = sq_in.forward_data[i].byte_level[3];
-            next_st_frwd_byte_mask[i] = bays.st_frwd_byte_mask[0][i] | sq_in.forward_byte_en[i];
+                next_dat[i].byte_level[3] = sq_in.forward_data[i].byte_level[3];
+            next_st_frwd_byte_mask[i] = bays.st_frwd_byte_mask[i] | sq_in.forward_byte_en[i];
 
-            next_got[0][i] |= ($countones(next_st_frwd_byte_mask[i]) == (2**bays.mem_size[0][i]));
+            next_got[i] |= ($countones(next_st_frwd_byte_mask[i]) == (2**bays.mem_size[i]));
 
-            if (next_got[0][i]) begin
-                if (bays.rd_unsigned[0][i]) begin
-                    if (bays.mem_size[0][i] == BYTE) begin
-                        next_dat[0][i][31:8] = '0;
-                    end else if (bays.mem_size[0][i] == HALF) begin
-                        next_dat[0][i][31:16] = '0;
+            if (next_got[i]) begin
+                if (bays.rd_unsigned[i]) begin
+                    if (bays.mem_size[i] == BYTE) begin
+                        next_dat[i][31:8] = '0;
+                    end else if (bays.mem_size[i] == HALF) begin
+                        next_dat[i][31:16] = '0;
                     end
                 end
                 else begin
-                    if (bays.mem_size[0][i] == BYTE) begin
-                        next_dat[0][i][31:8] = {(24){next_dat[0][i][7]}};
-                    end else if (bays.mem_size[0][i] == HALF) begin
-                        next_dat[0][i][31:16] = {(16){next_dat[0][i][15]}};
+                    if (bays.mem_size[i] == BYTE) begin
+                        next_dat[i][31:8] = {(24){next_dat[i][7]}};
+                    end else if (bays.mem_size[i] == HALF) begin
+                        next_dat[i][31:16] = {(16){next_dat[i][15]}};
                     end
                 end
             end
 
-                // $display("FORWARDING_OCCURING: %0d, mask: %4b, final_data: %0d, ones: %0d, size: %0d, next_got:%b", sq_in.forward_data[i], sq_in.forward_byte_en[i], next_dat[f][i],$countones(next_st_frwd_byte_mask),2**bays.mem_size[f][i],next_got[f][i]);
+                // $display("FORWARDING_OCCURING: %0d, mask: %4b, final_data: %0d, ones: %0d, size: %0d, next_got:%b", sq_in.forward_data[i], sq_in.forward_byte_en[i], next_dat[i],$countones(next_st_frwd_byte_mask),2**bays.mem_size[i],next_got[i]);
         end
     end
 
@@ -258,50 +248,49 @@ module lod_ex(
             bays <= '0;
             cands_shr <= '0;
         end else begin
-            foreach (fu2in_gnt[f, i]) begin
-                if (!(fu2in_gnt[f][i] && i_vld[f]))
+            foreach (fu2in_gnt[i]) begin
+                if (!(fu2in_gnt[i] && i_vld))
                     continue;
 
-                bays.vld     [f][i] <= 1;
-                bays.got     [f][i] <= 0;
-                bays.t       [f][i] <= i_regs[f].dat.t;
-                bays.rob_idx [f][i] <= i_regs[f].dat.rob_idx;
-                bays.addr    [f][i] <= tmp_addrs[f];
-                bays.mem_size[f][i] <= tmp_sizes[f];
-                bays.dat     [f][i] <= '0;
-                bays.sq_idx  [f][i] <= i_regs[f].dat.sq_idx;
-                bays.st_frwd_byte_mask[f][i] <= '0;
-                bays.rd_unsigned[f][i] <= i_regs[f].dat.rd_unsigned;
+                bays.vld     [i] <= 1;
+                bays.got     [i] <= 0;
+                bays.t       [i] <= i_regs.dat.t;
+                bays.rob_idx [i] <= i_regs.dat.rob_idx;
+                bays.addr    [i] <= tmp_addrs;
+                bays.mem_size[i] <= tmp_sizes;
+                bays.dat     [i] <= '0;
+                bays.sq_idx  [i] <= i_regs.dat.sq_idx;
+                bays.st_frwd_byte_mask[i] <= '0;
+                bays.rd_unsigned[i] <= i_regs.dat.rd_unsigned;
             end
 
-            foreach (next_got[f, i]) begin
-                bays.got[f][i] <= next_got[f][i];
-                bays.dat[f][i] <= next_dat[f][i];
-                bays.st_frwd_byte_mask[f][i] <= next_st_frwd_byte_mask[i];
+            foreach (next_got[i]) begin
+                bays.got[i] <= next_got[i];
+                bays.dat[i] <= next_dat[i];
+                bays.st_frwd_byte_mask[i] <= next_st_frwd_byte_mask[i];
             end
 
-            foreach (fu2out_gnt[f, i]) begin
-                if (!(fu2out_gnt[f][i] && cdb_gnt[f]))
+            foreach (fu2out_gnt[i]) begin
+                if (!(fu2out_gnt[i] && cdb_gnt))
                     continue;
-                bays.vld     [f][i] <= 0;
-                bays.got     [f][i] <= 0;
-                bays.t       [f][i] <= '0;
-                bays.rob_idx [f][i] <= '0;
-                bays.addr    [f][i] <= '0;
-                bays.mem_size[f][i] <= '0;
-                bays.dat     [f][i] <= '0;
-                bays.sq_idx  [f][i] <= '0;
-                bays.st_frwd_byte_mask[f][i] <= '0;
+                bays.vld     [i] <= 0;
+                bays.got     [i] <= 0;
+                bays.t       [i] <= '0;
+                bays.rob_idx [i] <= '0;
+                bays.addr    [i] <= '0;
+                bays.mem_size[i] <= '0;
+                bays.dat     [i] <= '0;
+                bays.sq_idx  [i] <= '0;
+                bays.st_frwd_byte_mask[i] <= '0;
 
-                cands_shr[0][f] <= CPL_CAND'{
-                    t       : bays.t[f][i],
-                    rob_idx : bays.rob_idx[f][i],
-                    data    : bays.dat[f][i]
+                cands_shr[0] <= CPL_CAND'{
+                    t       : bays.t[i],
+                    rob_idx : bays.rob_idx[i],
+                    data    : bays.dat[i]
                 }; 
             end
 
-            for (int f = 0; f < `NUM_FU_LOAD; ++f)
-                cands_shr[1][f] <= cands_shr[0][f];
+            cands_shr[1] <= cands_shr[0];
         end
     end
 
@@ -322,13 +311,13 @@ module lod_ex(
     //             $display("bays[%2d][%2d]: vld=%b, got=%b, t=%2d, rob_idx=%2d, addr=%x, mem_size=%2d, dat=%x",
     //                 f,
     //                 i,
-    //                 bays.vld    [f][i],
-    //                 bays.got    [f][i],
-    //                 bays.t      [f][i],
-    //                 bays.rob_idx[f][i],
-    //                 bays.addr   [f][i],
-    //                 bays.mem_size[f][i],
-    //                 bays.dat    [f][i]
+    //                 bays.vld    [i],
+    //                 bays.got    [i],
+    //                 bays.t      [i],
+    //                 bays.rob_idx[i],
+    //                 bays.addr   [i],
+    //                 bays.mem_size[i],
+    //                 bays.dat    [i]
     //             );
     //         end
     //         $display("  %3d | << BAYS", $time);
