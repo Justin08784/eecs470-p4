@@ -535,6 +535,17 @@ typedef struct packed {
 } retire2btq;
 
 typedef struct packed {
+    struct packed {
+        logic   en;
+        // BTQ-specific completion stuff
+        BTQ_IDX btq_idx; 
+            // Entries to which we are completing
+        logic   take;
+        ADDR    tgt;
+    } [`NUM_FU_ALU-1:0] dat;
+} execute2btq;
+
+typedef struct packed {
     logic [$clog2(`N):0]        r_en_cnt; // final final
     PHYS_REG_IDX [`N-1:0]       tag;
     PHYS_REG_IDX [`N-1:0]       t_old;
@@ -879,19 +890,11 @@ typedef struct packed {
     /* TODO: Better to make this a union, with shared c_en and is_brch
     at the top, and union over non-branch and branch-specific stuff? */
     logic           [`N-1:0] en;
-    logic           [`N-1:0] is_brch;
-        // - From: EX
     PHYS_REG_IDX    [`N-1:0] ts;
         // - From: EX
     ROB_IDX         [`N-1:0] rob_idxs;
         // - From: EX
     DATA            [`N-1:0] data;
-        // doubles as branch target if is_brch true
-
-    // BTQ-specific completion stuff
-    BTQ_IDX [`N-1:0] btq_idxs; 
-        // Entries to which we are completing
-    logic   [`N-1:0] take;
 } execute2complete_dat;
 
 // By Free List
@@ -1186,7 +1189,7 @@ typedef struct packed {
     // I/O
     retire2btq           r_in;
     btq2retire           r_out;
-    execute2complete_dat cdat_in;
+    execute2btq          ex_in;
     dispatch2btq         d_in;
     btq2dispatch         d_out;
 } DBG_btq;

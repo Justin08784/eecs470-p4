@@ -23,7 +23,7 @@ module btq #(
     output btq2retire       r_out,
 
     // complete (write)
-    input  execute2complete_dat cdat_in,
+    input  execute2btq      ex_in,
 
     // dispatch (write)
     input  dispatch2btq d_in,
@@ -31,7 +31,7 @@ module btq #(
 );
     localparam NUM_DPORTS = N; // dispatch ports (in-order)
     localparam NUM_RPORTS = N; // retire ports (in-order)
-    localparam NUM_CPORTS = N; // complete ports (*OUT-OF-ORDER*)
+    localparam NUM_CPORTS = `NUM_FU_ALU; // complete ports (*OUT-OF-ORDER*)
 
     BTQ_ENTRY [BTQ_SZ-1:0]      state;
     logic [$clog2(BTQ_SZ)-1:0]  head;
@@ -95,12 +95,12 @@ module btq #(
 
             // handle complete (ins)
             for (int unsigned i = 0, int cur_idx = 0; i < NUM_CPORTS; ++i) begin
-                if (!cdat_in.en[i] || !cdat_in.is_brch[i])
+                if (!ex_in.dat[i].en)
                     continue;
-                cur_idx = cdat_in.btq_idxs[i];
+                cur_idx = ex_in.dat[i].btq_idx;
 
-                state[cur_idx].tgt  <= cdat_in.data[i];
-                state[cur_idx].take <= cdat_in.take[i];
+                state[cur_idx].tgt  <= ex_in.dat[i].tgt;
+                state[cur_idx].take <= ex_in.dat[i].take;
             end
 
             // handle dispatch (ins)
@@ -133,7 +133,7 @@ module btq #(
         used,
         r_in,
         r_out,
-        cdat_in,
+        ex_in,
         d_in,
         d_out
     };

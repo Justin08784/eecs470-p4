@@ -482,7 +482,7 @@ module testbench;
         // I/O
         retire2btq           r_in;
         btq2retire           r_out;
-        execute2complete_dat cdat_in;
+        execute2btq          ex_in;
         dispatch2btq         d_in;
         btq2dispatch         d_out;
 
@@ -492,7 +492,7 @@ module testbench;
         used    = dbg_btq.used;
         r_in    = dbg_btq.r_in;
         r_out   = dbg_btq.r_out;
-        cdat_in = dbg_btq.cdat_in;
+        ex_in   = dbg_btq.ex_in;
         d_in    = dbg_btq.d_in;
         d_out   = dbg_btq.d_out;
 
@@ -517,12 +517,12 @@ module testbench;
         end
 
         for (int i = 0; i < `N; ++i) begin
-            $display("cdat_in[%0d]: c_en: %b, is_brch: %b, c_btq_idxs: %d, take: %b", 
+            $display("ex_in[%0d]: en: %b, btq_idx: %d, take: %b, tgt: %x", 
                 i,
-                cdat_in.en[i],
-                cdat_in.is_brch[i],
-                cdat_in.btq_idxs[i],
-                cdat_in.take[i]
+                ex_in.dat[i].en,
+                ex_in.dat[i].btq_idx,
+                ex_in.dat[i].take,
+                ex_in.dat[i].tgt
             );
         end
         $display("r_in: rd_cnt %d", r_in.rd_cnt);
@@ -1103,7 +1103,7 @@ module testbench;
         );
         print_rs();
         print_sq();
-        print_retbuf();
+        // print_retbuf();
         print_lq();
         print_retire();
         $display("  | << CYCLE: %3d (t: %3d)", clock_count-1, $time);

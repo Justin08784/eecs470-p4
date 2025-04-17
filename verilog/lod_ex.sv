@@ -46,6 +46,7 @@ module lod_ex(
         LSQ_IDX         [`NUM_FU_LOAD-1:0][LD_BAY_SZ-1:0]  sq_idx;
         logic           [`NUM_FU_LOAD-1:0][LD_BAY_SZ-1:0][3:0]  st_frwd_byte_mask;
         DATA            [`NUM_FU_LOAD-1:0][LD_BAY_SZ-1:0]  dat;
+        logic           [`NUM_FU_LOAD-1:0][LD_BAY_SZ-1:0] rd_unsigned;
     } LOAD_BAYS;
 
 
@@ -232,6 +233,23 @@ module lod_ex(
 
             next_got[0][i] |= ($countones(next_st_frwd_byte_mask[i]) == (2**bays.mem_size[0][i]));
 
+            if (next_got[0][i]) begin
+                if (bays.rd_unsigned[0][i]) begin
+                    if (bays.mem_size[0][i] == BYTE) begin
+                        next_dat[0][i][31:8] = 0;
+                    end else if (bays.mem_size[0][i] == HALF) begin
+                        next_dat[0][i][31:16] = 0;
+                    end
+                end
+                else begin
+                    if (bays.mem_size[0][i] == BYTE) begin
+                        next_dat[0][i][31:8] = {(24){next_dat[0][i][7]}};
+                    end else if (bays.mem_size[0][i] == HALF) begin
+                        next_dat[0][i][31:16] = {(16){next_dat[0][i][15]}};
+                    end
+                end
+            end
+
                 // $display("FORWARDING_OCCURING: %0d, mask: %4b, final_data: %0d, ones: %0d, size: %0d, next_got:%b", sq_in.forward_data[i], sq_in.forward_byte_en[i], next_dat[f][i],$countones(next_st_frwd_byte_mask),2**bays.mem_size[f][i],next_got[f][i]);
         end
     end
@@ -255,6 +273,7 @@ module lod_ex(
                 bays.dat     [f][i] <= '0;
                 bays.sq_idx  [f][i] <= i_regs[f].dat.sq_idx;
                 bays.st_frwd_byte_mask[f][i] <= '0;
+                bays.rd_unsigned[f][i] <= i_regs[f].dat.rd_unsigned;
             end
 
             foreach (next_got[f, i]) begin
@@ -279,10 +298,7 @@ module lod_ex(
                 cands_shr[0][f] <= CPL_CAND'{
                     t       : bays.t[f][i],
                     rob_idx : bays.rob_idx[f][i],
-                    data    : bays.dat[f][i],
-                    btq_idx : '0,
-                    take    : '0,
-                    is_brch : '0
+                    data    : bays.dat[f][i]
                 }; 
             end
 
@@ -298,13 +314,10 @@ module lod_ex(
             $display("MEM_LOAD: %b, %d, %0d, %d", pending, dcache_data_valid, pending_frwd, dcache_data);
             $display("FRWD_EN: %b, %b", sq_in.forward_en, sq_in.forward_byte_en);
             $display("i_rdy: %b, i_vld: %b ", i_rdy, i_vld);
-            $display("ocands: t: %2d, rob_idx: %2d, data: %x, btq_idx: %2d, take: %b, is_brch: %b",
+            $display("ocands: t: %2d, rob_idx: %2d, data: %x",
                 o_cands[0].t,
                 o_cands[0].rob_idx,
-                o_cands[0].data,
-                o_cands[0].btq_idx,
-                o_cands[0].take,
-                o_cands[0].is_brch,
+                o_cands[0].data
             );
             $display("ren: %b", bays.vld & ~bays.got);
             foreach (fu2in_gnt[f, i]) begin

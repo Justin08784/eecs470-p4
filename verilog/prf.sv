@@ -82,7 +82,7 @@ module prf #(
     // Write port
     always_ff @(posedge clock) begin
         foreach (cdat_in.en[i]) begin
-            if (cdat_in.en[i] && !cdat_in.is_brch[i] && (cdat_in.ts[i] != `ZERO_REG))
+            if (cdat_in.en[i] && (cdat_in.ts[i] != `ZERO_REG))
                 file[cdat_in.ts[i]] <= cdat_in.data[i];
         end
     end

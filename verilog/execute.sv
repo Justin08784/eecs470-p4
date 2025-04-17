@@ -85,10 +85,12 @@ module alu_ex(
     input flush,
 
     /* FRONTEND */
+    logic [`NUM_FU_ALU-1:0]             i_vld,
     input  ALU_REGS [`NUM_FU_ALU-1:0]   i_regs,
         // insn metadata/operands
 
     /* BACKEND */
+    output execute2btq                  o_btq_out,
     output CPL_CAND [`NUM_FU_ALU-1:0]   o_cands
 );
     ALU_OPS [`NUM_FU_ALU-1:0] ops;
@@ -134,7 +136,7 @@ module alu_ex(
     generate
         CPL_CAND    [`NUM_FU_ALU-1:0] tmp_data;
         DATA        [`NUM_FU_ALU-1:0] tmp_res;
-        logic       [`NUM_FU_ALU-1:0] tmp_take;
+        logic       [`NUM_FU_ALU-1:0] cond_take, tmp_take;
         for (genvar i = 0; i < `NUM_FU_ALU; ++i) begin : gen_alus
             alu alu_0 ( 
                 // Inputs
@@ -146,20 +148,28 @@ module alu_ex(
                 .branch_func(ops[i].branch_func), // Which branch condition to check
 
                 // Output (directly to cdat_out)
-                .take(tmp_take[i]), // True/False condition result (will return FALSE if branch is low)
+                .take(cond_take[i]), // True/False condition result (will return FALSE if branch is low)
                 .result(tmp_res[i]) // will return 32'hfacebeec if branch is high
             );
+
+            assign tmp_take[i] = ops[i].uncond_branch
+                || (ops[i].cond_branch && cond_take[i]);
 
             assign tmp_data[i] = '{
                 t       : ops[i].t,
                 rob_idx : ops[i].rob_idx,
-                data    : tmp_res[i],
-                btq_idx : ops[i].btq_idx,
-                take    : tmp_take[i] || ops[i].uncond_branch,
-                is_brch : ops[i].cond_branch || ops[i].uncond_branch
+                data    : tmp_take[i] ? i_regs[i].dat.NPC : tmp_res[i]
             };
 
             assign o_cands[i] = tmp_data[i];
+
+            assign o_btq_out.dat[i] = '{
+                en      : i_vld[i] && (ops[i].cond_branch || ops[i].uncond_branch),
+                btq_idx : ops[i].btq_idx,
+                take    : tmp_take[i],
+                tgt     : tmp_res[i]
+            };
+
         end
     endgenerate
 endmodule
@@ -274,10 +284,7 @@ module mul_ex(
             assign o_cands[i] = '{
                 t       : tmp_t[i],
                 rob_idx : tmp_rob_idx[i],
-                data    : tmp_res[i],
-                btq_idx : '0,
-                take    : '0,
-                is_brch : '0
+                data    : tmp_res[i]
             };
         end
     endgenerate
@@ -307,6 +314,8 @@ module stage_ex_p4 (
 
     input   prf2execute prf_in,
     output  execute2prf prf_out,
+
+    output  execute2btq btq_out,
 
     output  execute2complete_tag ctag_out,
     output  execute2complete_dat cdat_out
@@ -666,13 +675,16 @@ module stage_ex_p4 (
     /* >> ======== STAGE 3: Execution ======== >> */
     // Includes operand decode/CDB bypass just before 1st cycle of execution.
 
+    execute2btq btq_out_n;
     alu_ex alu_ex0 (
         .clock  (clock),
         .reset  (reset),
         .flush  (flush),
 
+        .i_vld  (regs.o_vld.alu),
         .i_regs (regs.o_dat.alu),
 
+        .o_btq_out(btq_out_n),
         .o_cands(cands.alu)
     );
 
@@ -767,9 +779,6 @@ module stage_ex_p4 (
                 cdat_out_n.ts[c]        |= cands_flat[f].t;
                 cdat_out_n.rob_idxs[c]  |= cands_flat[f].rob_idx;
                 cdat_out_n.data[c]      |= cands_flat[f].data;
-                cdat_out_n.btq_idxs[c]  |= cands_flat[f].btq_idx;
-                cdat_out_n.is_brch[c]   |= cands_flat[f].is_brch;
-                cdat_out_n.take[c]      |= cands_flat[f].take;
             end
 
         end
@@ -781,6 +790,7 @@ module stage_ex_p4 (
             cdb_gnt_shr     <= '0;
             ctag_out        <= '0;
             cdat_out        <= '0;
+            btq_out         <= '0;
         end else begin
             cdb2fu_gbus_shr[0]  <= cdb2fu_gbus;
             cdb_gnt_shr[0]      <= cdb_gnt;
@@ -790,6 +800,7 @@ module stage_ex_p4 (
             end
             ctag_out <= ctag_out_n;
             cdat_out <= cdat_out_n;
+            btq_out  <= btq_out_n;
 
             if (ctag_out.en[0] && ctag_out.en[1]
                 && ctag_out.ts[0] == ctag_out.ts[1]
@@ -825,12 +836,6 @@ module stage_ex_p4 (
                     iss.o_dat.alu[i].cond_branch,
                     iss.o_dat.alu[i].uncond_branch
                 );
-                $display("  bytag: (b1:%b, idx1:%b) (b2:%b, idx2:%b)",
-                    iss.o_dat.alu[i].bytag.bypass1,
-                    iss.o_dat.alu[i].bytag.cdb_idx1,
-                    iss.o_dat.alu[i].bytag.bypass2,
-                    iss.o_dat.alu[i].bytag.cdb_idx2,
-                );
             end
 
             for (int i = 0; i < `NUM_FU_MULT; ++i) begin
@@ -844,64 +849,29 @@ module stage_ex_p4 (
                     iss.o_dat.mul[i].rob_idx,
                     iss.o_dat.mul[i].func
                 );
-                $display("  bytag: (b1:%b, idx1: %b) (b2: %b, idx2:%b)",
-                    iss.o_dat.mul[i].bytag.bypass1,
-                    iss.o_dat.mul[i].bytag.cdb_idx1,
-                    iss.o_dat.mul[i].bytag.bypass2,
-                    iss.o_dat.mul[i].bytag.cdb_idx2,
-                );
             end
 
             for (int i = 0; i < `NUM_FU_ALU; ++i) begin
-                $display("regs.o_dat.alu[%0d]: bsy: %b, rs1: 0x%x, rs2: 0x%x",
+                $display("regs.o_dat.alu[%0d]: bsy: %b, rs1: 0x%x, rs2: 0x%x t: %2d, rob_idx: %2d, btq_idx: %2d",
                     i,
                     regs.o_vld.alu[i],
                     regs.o_dat.alu[i].rs1,
-                    regs.o_dat.alu[i].rs2
+                    regs.o_dat.alu[i].rs2,
+                    regs.o_dat.alu[i].dat.t,
+                    regs.o_dat.alu[i].dat.rob_idx,
+                    regs.o_dat.alu[i].dat.btq_idx
                 );
-                $display("  bytag: (b1:%b, idx1:%b) (b2:%b, idx2:%b)",
-                    regs.o_dat.alu[i].dat.bytag.bypass1,
-                    regs.o_dat.alu[i].dat.bytag.cdb_idx1,
-                    regs.o_dat.alu[i].dat.bytag.bypass2,
-                    regs.o_dat.alu[i].dat.bytag.cdb_idx2,
-                );
-                // $display("regs.o_dat.alu[%0d]: bsy: %b, opa: 0x%x, opb: 0x%x, alu_func: %b, branch_func: %b, cond_branch: %b, uncond_branch: %b, t: %2d, rob_idx: %2d, btq_idx: %2d",
-                //     i,
-                //     regs.o_vld.alu[i],
-                //     regs.o_dat.alu[i].opa,
-                //     regs.o_dat.alu[i].opb,
-                //     regs.o_dat.alu[i].alu_func,
-                //     regs.o_dat.alu[i].branch_func,
-                //     regs.o_dat.alu[i].cond_branch,
-                //     regs.o_dat.alu[i].uncond_branch,
-                //     regs.o_dat.alu[i].t,
-                //     regs.o_dat.alu[i].rob_idx,
-                //     regs.o_dat.alu[i].btq_idx
-                // );
             end
 
             for (int i = 0; i < `NUM_FU_MULT; ++i) begin
-                $display("regs.o_dat.mul[%0d]: bsy: %b, rs1: 0x%x, rs2: 0x%x",
+                $display("regs.o_dat.mul[%0d]: bsy: %b, rs1: 0x%x, rs2: 0x%x t: %2d, rob_idx: %2d",
                     i,
                     regs.o_vld.mul[i],
                     regs.o_dat.mul[i].rs1,
-                    regs.o_dat.mul[i].rs2
+                    regs.o_dat.mul[i].rs2,
+                    regs.o_dat.mul[i].dat.t,
+                    regs.o_dat.mul[i].dat.rob_idx
                 );
-                $display("  bytag: (b1:%b, idx1:%b) (b2:%b, idx2:%b)",
-                    regs.o_dat.mul[i].dat.bytag.bypass1,
-                    regs.o_dat.mul[i].dat.bytag.cdb_idx1,
-                    regs.o_dat.mul[i].dat.bytag.bypass2,
-                    regs.o_dat.mul[i].dat.bytag.cdb_idx2,
-                );
-                // $display("regs.o_dat.mul[%0d]: bsy: %b, rs1: 0x%x, rs2: 0x%x, func: %b, t: %2d, rob_idx: %2d",
-                //     i,
-                //     regs.o_vld.mul[i],
-                //     regs.o_dat.mul[i].rs1,
-                //     regs.o_dat.mul[i].rs2,
-                //     regs.o_dat.mul[i].func,
-                //     regs.o_dat.mul[i].dst.tag,
-                //     regs.o_dat.mul[i].dst.rob_idx
-                // );
             end
 
             $display("c_out: rdy_alu:{%b} rdy_mult:{%b} rdy_store:{%b} rdy_load:{%b}",
@@ -952,15 +922,12 @@ module stage_ex_p4 (
                 );
             end
             for (int i = 0; i < `N; ++i) begin
-                $display("cdat_out[%0d]: en: %b, is_brch: %b, ts: %2d, rob_idxs: %2d, data: %x, btq_idxs: %d, take: %b",
+                $display("cdat_out[%0d]: en: %b,  ts: %2d, rob_idxs: %2d, data: %x",
                     i,
                     cdat_out.en[i],
-                    cdat_out.is_brch[i],
                     cdat_out.ts[i],
                     cdat_out.rob_idxs[i],
-                    cdat_out.data[i],
-                    cdat_out.btq_idxs[i],
-                    cdat_out.take[i]
+                    cdat_out.data[i]
                 );
             end
 
