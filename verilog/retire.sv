@@ -47,24 +47,20 @@ module retire (
     logic ld_ooo;
     ADDR  ld_PC;
 
+    logic flush_n;
+    ADDR  corrected_PC_n;
     always_comb begin
-        // FIXME: >>
-        // sq_out logic migrated from rob (when it still had rob2sq)
         sq_out = '0;
-        //tell SQ to retire entries
-        // if (state[rtre_idxs[i]].wr_mem)
-        //     ++sq_out.r_en;
-        // FIXME: <<
 
         mispred = 0;
         mispred_target = '0;
         ld_ooo = 0;
         ld_PC = '0;
 
-        r_en_cnt = 0;
-        btq_rd_cnt = 0;
-        sq_rd_cnt  = 0;
-        lq_rd_cnt = 0;
+        r_en_cnt    = 0;
+        btq_rd_cnt  = 0;
+        sq_rd_cnt   = 0;
+        lq_rd_cnt   = 0;
         for (int i = 0; i < rob_in.r_vld_cnt; ++i) begin
             if (!rob_in.entries[i].cpl)
                 break;
@@ -88,8 +84,6 @@ module retire (
             
             ++r_en_cnt;
             
-                
-
             if (!rob_in.entries[i].is_brch)
                 continue;
             if (btq_in.dat[btq_rd_cnt].pred != btq_in.dat[btq_rd_cnt].take) begin
@@ -104,12 +98,8 @@ module retire (
             ++btq_rd_cnt;
         end
 
-        btq_out = '{
-            rd_cnt : btq_rd_cnt
-        };
-
-        flush = mispred || ld_ooo;
-        corrected_PC = mispred
+        flush_n = mispred || ld_ooo;
+        corrected_PC_n = mispred
             ? mispred_target
             : ld_ooo
                 ? ld_PC
@@ -123,8 +113,13 @@ module retire (
             tmp_illegal[i] = rob_in.entries[i].illegal;
             tmp_is_brch[i] = rob_in.entries[i].is_brch;
         end
+
+        /* Retire should not act while flush is high */
+        btq_out = flush ? '0 : '{
+            rd_cnt : btq_rd_cnt
+        };
         
-        retire_exec = '{
+        retire_exec = flush ? '0 : '{
             // only the count *may* be adjusted
             r_en_cnt : r_en_cnt,
 
@@ -137,8 +132,30 @@ module retire (
             is_brch  : tmp_is_brch
         };
 
-        sq_out.r_en = sq_rd_cnt;
-        lq_out.r_en = lq_rd_cnt;
+        sq_out = flush ? '0 : '{
+            r_en : sq_rd_cnt
+        };
+
+        lq_out = flush ? '0 : '{
+            r_en : lq_rd_cnt,
+            r_pos: '0 // FIXME: What is this even used for?
+        };
+    end
+
+    always_ff @(posedge clock) begin
+        if (reset || flush) begin
+            /* Even the flush must flush itself.
+
+            Pulse flush for 1 cycle. Ensures branches on mispredicted
+            control path cannot retrigger. */
+            flush        <= '0;
+            corrected_PC <= '0;
+        end else begin
+/* ======================================== */
+            flush        <= flush_n;
+            corrected_PC <= corrected_PC_n;
+/* ======================================== */
+        end
     end
 
     // Debugging asserts
