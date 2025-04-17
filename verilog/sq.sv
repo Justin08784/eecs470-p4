@@ -111,7 +111,8 @@ module sq #(parameter
     logic [LD_BAY_SZ-1:0] [LSQ_SZ-1:0] match_mask;
 
     logic [LD_BAY_SZ-1:0] [3:0] [LSQ_SZ-1:0] byte_matches;
-    logic [LD_BAY_SZ-1:0] [3:0] [LSQ_SZ-1:0] shifted_matches;
+    logic [LD_BAY_SZ-1:0] [3:0] [LSQ_SZ-1:0] shifted_left_matches;
+    logic [LD_BAY_SZ-1:0] [3:0] [LSQ_SZ-1:0] shifted_right_matches;
     logic [LD_BAY_SZ-1:0] [3:0] [LSQ_SZ-1:0] final_matches;
 
     logic [LD_BAY_SZ-1:0] [3:0] word_off;
@@ -120,47 +121,50 @@ module sq #(parameter
     generate
         for (i = 0; i < LD_BAY_SZ; i++) begin : find_bay_matches
 
-            assign matching_idx[i] = ex_frwd_in.forward_sq_idx[i] % LSQ_SZ;
-            assign idx_found[i] = state[matching_idx[i]].d_vld;
+            assign matching_idx[i] = ex_frwd_in.forward_sq_idx[i];// % LSQ_SZ;
+            assign idx_found[i] = state[matching_idx[i]].in_range;
 
             for (l = 0; l < LSQ_SZ; l++) begin : find_match_mask
-                // assign match_mask[i][l] = ((matching_idx[i] < ret_head) & ((l <= matching_idx[i]) || (l >= ret_head))) || ((l >= ret_head) && (l <= matching_idx[i])) ? 1 : 0;
 
-                // case (matching_idx[i] < ret_head)
-                //     0 : begin
-                //         assign match_mask[i][j] = (l >= ret_head) & ((l - ret_head) < used) & (l <= matching_idx[i]) ? 1 : 0;
-                //     end 
-                //     1 : begin
-                //         assign match_mask[i][j] = ((l < tail) && (l <= matching_idx[i])) || (l >= ret_head) ? 1 : 0;
-                //     end 
-                // endcase
+                // if (!state[l].in_range) assign match_mask[i][l] = 0;
+                // else if (tail > head) assign match_mask[i][l] = (l >= ret_head) && (l <= matching_idx[i]);
+                // else if (matching_idx[i] < tail) assign match_mask[i][l] = (l <= matching_idx[i]) || (l >= ret_head);
+                // else assign match_mask[i][l] = (l >= ret_head) && (l <= matching_idx[i]);
 
-                assign match_mask[i][l] = (matching_idx[i] < ret_head) ? ((l < tail) && (l <= matching_idx[i])) || (l >= ret_head) : (l >= ret_head) & ((l - ret_head) < used) & (l <= matching_idx[i]);
+                assign match_mask[i][l] = !state[l].in_range ?
+                    0 :
+                    tail > head ?
+                        (l >= ret_head) && (l <= matching_idx[i]) :
+                        matching_idx[i] < tail ?
+                            (l <= matching_idx[i]) || (l >= ret_head) :
+                            (l >= ret_head) && (l <= matching_idx[i]);
             end
             
 
             for (j = 0; j < 4; j++) begin : find_byte_matches
                 for (k = 0; k < LSQ_SZ; k++) begin : find_table_matches
-                    assign byte_matches[i][j][k] = state[k].d_vld & (waddr(state[k].addr) == waddr(ex_frwd_in.forward_addr[i])) ? 
+                    assign byte_matches[i][j][k] = state[k].d_vld && (waddr(state[k].addr) == waddr(ex_frwd_in.forward_addr[i])) ? 
                         state[k].bytewise_addr_mask[j] & match_mask[i][k] : '0;
                 end
+
+                assign shifted_left_matches[i][j] = rotate_left(byte_matches[i][j],(LSQ_SZ-1)-matching_idx[i]);
 
                 psel_gen #(
                 .WIDTH  (LSQ_SZ),
                 .REQS   (1)
                 ) sel (
-                    .req    (byte_matches[i][j]),
-                    .gnt_bus(shifted_matches[i][j])
+                    .req    (shifted_left_matches[i][j]),
+                    .gnt    (shifted_right_matches[i][j])
                 );
-                assign final_matches[i][j] = rotate_right(shifted_matches[i][j],matching_idx[i]);
+                assign final_matches[i][j] = rotate_right(shifted_right_matches[i][j],(LSQ_SZ-1)-matching_idx[i]);
                 assign next_sq_2_exec.forward_data[i].byte_level[j] = state[encode_idx(final_matches[i][j])].data.byte_level[j];
-                assign next_sq_2_exec.forward_byte_en[i][j] = state[encode_idx(rotate_right(shifted_matches[i][j],matching_idx[i]))].bytewise_addr_mask[j] && idx_found[i];//1;
+                assign next_sq_2_exec.forward_byte_en[i][j] = state[encode_idx(final_matches[i][j])].bytewise_addr_mask[j] && idx_found[i];//1;
                     
             end
 
-            // assign next_sq_2_exec.forward_en[i] = (next_sq_2_exec.forward_byte_en[i] != 0);
+            assign next_sq_2_exec.forward_en[i] = (next_sq_2_exec.forward_byte_en[i] != 0);
 
-            assign execute_out.forward_en[i] = (next_sq_2_exec.forward_byte_en[i] != 0) && idx_found[i];
+            assign execute_out.forward_en[i] = idx_found[i] && ex_frwd_in.forward_req_en[i] && next_sq_2_exec.forward_en[i];
 
 
             assign word_off[i] = iw_off(ex_frwd_in.forward_addr[i]);
@@ -173,16 +177,9 @@ module sq #(parameter
 
             assign execute_out.forward_mem_size[i] = idx_found[i] && ex_frwd_in.forward_req_en[i] ? 
                 ex_frwd_in.forward_mem_size[i] : 0;
+
         end
     endgenerate
-
-    // always_ff @(posedge clock) begin
-    //     for (int unsigned i = 0; i < LD_BAY_SZ; i++) begin
-    //         if (execute_out.forward_en[i]) begin
-    //             $display("FORWARDING: addr: %h, data: %h, size: %0d, mask: %4b", ex_frwd_in.forward_addr[i], execute_out.forward_data[i], execute_out.forward_mem_size[i], execute_out.forward_byte_en[i]);
-    //         end
-    //     end
-    // end
 
 
     logic [`NUM_FU_STORE-1:0] [3:0] bytewise_addr_mask;
@@ -194,7 +191,7 @@ module sq #(parameter
 
             case (execute_in.st_mem_size[i])
                 BYTE:   bytewise_addr_mask[i][word_off]     = 1;
-                HALF:   bytewise_addr_mask[i][word_off+:1]  = '1;
+                HALF:   bytewise_addr_mask[i][word_off+:2]  = '1;
                 default:bytewise_addr_mask[i]               = '1;
             endcase
         end
@@ -316,6 +313,7 @@ module sq #(parameter
                     bytewise_addr_mask  : '0,
                     data                : '0,
                     d_vld               : '0,
+                    in_range            : '1,
                     mem_size            : '0
                 };
             end
@@ -326,6 +324,7 @@ module sq #(parameter
 
                 cur_idx = m_idxs[i];
                 state[cur_idx].d_vld <= 0;
+                state[cur_idx].in_range <= 0;
             end
 
         end
@@ -400,15 +399,15 @@ module sq #(parameter
 
     function automatic DATA_BLOCK shift_data;
         input DATA_BLOCK data_in;
-        input logic [3:0] word_off;
+        input logic [1:0] word_off;
         input MEM_SIZE mem_size;
         begin
             case (mem_size)
                 BYTE: begin
-                    shift_data      = (data_in >> (8 * word_off)) & 8'hFF;
+                    shift_data      = (data_in >> (8 * word_off)) & 32'h000000FF;
                 end
                 HALF: begin
-                    shift_data       = (data_in >> (8 * word_off)) & 16'hFFFF;
+                    shift_data       = (data_in >> (8 * word_off)) & 32'h0000FFFF;
                 end
                 default: begin
                     shift_data       = (data_in >> (8 * word_off));//&= 32'hFFFFFFFF;
@@ -419,15 +418,15 @@ module sq #(parameter
 
     function automatic logic [3:0] shift_byte_mask;
         input logic [3:0] mask;
-        input logic [3:0] word_off;
+        input logic [1:0] word_off;
         input MEM_SIZE mem_size;
         begin
             case (mem_size)
                 BYTE: begin
-                    shift_byte_mask    = (mask >> word_off) & 1'b1;
+                    shift_byte_mask    = (mask >> word_off) & 4'b0001;
                 end
                 HALF: begin
-                    shift_byte_mask    = (mask >> word_off) & 2'b11;
+                    shift_byte_mask    = (mask >> word_off) & 4'b0011;
                 end
                 default: begin
                     shift_byte_mask    = (mask >> word_off);//&= 4'b1111;
@@ -438,3 +437,4 @@ module sq #(parameter
 
 
 endmodule
+

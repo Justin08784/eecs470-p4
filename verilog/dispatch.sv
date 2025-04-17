@@ -316,6 +316,8 @@ always_comb begin
                 rs_out.d_dat[i].sq_idx = sq_in.next_ids[sq_wr_idx-1];
             end 
             lq_out.inst_pc[lq_wr_idx] = commit_in[i].dat.PC;
+            rs_out.d_dat[i].lq_idx = lq_in.next_ids[lq_wr_idx];
+
             ++lq_wr_idx;
         end
     end

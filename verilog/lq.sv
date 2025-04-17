@@ -60,7 +60,8 @@ module lq #(parameter
         // handle dispatch (outs)
         dispatch_out = '{
             lq_rdy_scnt : free_scnt,
-            lq_tail     : tail
+            lq_tail     : tail,
+            next_ids    : d_idxs
         }; 
     end
 

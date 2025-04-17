@@ -38,14 +38,13 @@
 // worry about these later
 `define BRANCH_PRED_SZ xx
 `define LSQ_SZ 12
-// `define LSQ_SZ_DBL 24
 `define SQ_RET_BUF_SZ 4
 
 // functional units (you should decide if you want more or fewer types of FUs)
 `define NUM_FU_ALU 2
 `define NUM_FU_MULT 1
 `define NUM_FU_LOAD 1
-`define LD_BAY_SZ 1 //num load bays in the FU
+`define LD_BAY_SZ 4 //num load bays in the FU
 `define NUM_FU_STORE 1
 // `define NUM_FU_TOTAL `NUM_FU_ALU + `NUM_FU_MULT + `NUM_FU_LOAD + `NUM_FU_STORE
 `define NUM_FU_TOTAL `NUM_FU_ALU + `NUM_FU_MULT + `NUM_FU_LOAD + `NUM_FU_STORE
@@ -481,6 +480,7 @@ typedef struct packed {
     logic [3:0] bytewise_addr_mask;
     DATA_BLOCK data;
     logic d_vld;
+    logic in_range;
     MEM_SIZE mem_size; //MEM_SIZE'(id_ex_reg.inst.r.funct3[1:0]); <-- HOW TO FIND THIS. DO THIS WHEN PUTTING ENTRY IN FROM DISPATCH OR FROM EXECUTE
 } SQ_ENTRY;
 
@@ -598,21 +598,6 @@ typedef struct packed {
 
     // logic    valid;
 } ID_RESULT;
-
-typedef struct packed {
-    /* ETB bypass control */
-    logic bypass1;  // set iff 1) awaken by a complete to its src1 AND 2) issued same cycle
-        /* Q: How to implement?
-        A: Set if a complete readies our src1. Clear if we do not issue same cycle.
-        If an insn issues 1 or more cycles *after* all of its source operands
-        have been readied, then they will be ready in the PRF, and thus bypass
-        is needed. */
-    logic bypass2;
-
-    /* This is a ridiculous optimization. Try impl a simple CAM first. */
-    logic [$clog2(`N)-1:0]  cdb_idx1;   // which cdb slot to bypass for src1 (valid iff bypass1 set)
-    logic [$clog2(`N)-1:0]  cdb_idx2;
-} BYPASS_TAG;
 
 typedef struct packed {
     logic           busy;
@@ -766,11 +751,6 @@ typedef struct packed {
     logic       [`NUM_FU_MULT-1:0]   fu_en_mult;
     logic       [`NUM_FU_STORE-1:0]  fu_en_store;
     logic       [`NUM_FU_LOAD-1:0]   fu_en_load;
-
-    BYPASS_TAG  [`NUM_FU_ALU-1:0]    bytag_alu;
-    BYPASS_TAG  [`NUM_FU_MULT-1:0]   bytag_mul;
-    BYPASS_TAG  [`NUM_FU_LOAD-1:0]   bytag_ldr;
-    BYPASS_TAG  [`NUM_FU_STORE-1:0]  bytag_str;
 
     ID_RESULT   [`NUM_FU_ALU-1:0]    fu_dat_alu;
     ID_RESULT   [`NUM_FU_MULT-1:0]   fu_dat_mult;
@@ -994,6 +974,7 @@ typedef struct packed {
 typedef struct packed {
     logic   [$clog2(`N):0]      lq_rdy_scnt;
     logic   [$clog2(`LSQ_SZ):0] lq_tail;
+    LSQ_IDX [`N-1:0]            next_ids;
 } lq2dispatch;
 
 typedef struct packed {

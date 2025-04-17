@@ -136,7 +136,7 @@ module cpu (
         
     end
 
-    dcache_simple dut (
+    dcache_simple dcache (
         .clock(clock),
         .reset(reset),
 
@@ -286,8 +286,7 @@ module cpu (
     retire2lq retire_2_lq;
 
     retire_final    retire_exec;
-    logic           flush_n;
-    ADDR            corrected_PC_n;
+    ADDR            corrected_PC;
 
     retire retire0 (
         `ifdef DEBUG
@@ -304,29 +303,15 @@ module cpu (
         .lq_in  (lq_2_retire),
         .lq_out (retire_2_lq),
 
-        .flush          (flush_n),
-        .corrected_PC   (corrected_PC_n),
+        .flush          (flush),
+        .corrected_PC   (corrected_PC),
         .retire_exec    (retire_exec),
         .mem_in_use     (mem_in_use)
     );
 
-    always_ff @(posedge clock) begin
-        if (reset || flush) begin
-            /* Even the flush must flush itself.
-
-            Pulse flush for 1 cycle. Ensures branches on mispredicted
-            control path cannot retrigger. */
-            flush       <= '0;
-            retire_2_f  <= '0;
-        end else begin
-/* ======================================== */
-            flush       <= flush_n;
-            retire_2_f  <= '{
-                corrected_PC : corrected_PC_n
-            };
-/* ======================================== */
-        end
-    end
+    assign retire_2_f = '{
+        corrected_PC
+    };
 
 
     //////////////////////////////////////////////////
@@ -545,6 +530,7 @@ module cpu (
     ) arch_map_0 (
         .clock  (clock),
         .reset  (reset),
+        .flush  (flush),
 
         .mt_out (am_2_mt),
         .r_in   (retire_exec)
