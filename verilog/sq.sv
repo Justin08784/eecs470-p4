@@ -147,7 +147,7 @@ module sq #(parameter
                         state[k].bytewise_addr_mask[j] & match_mask[i][k] : '0;
                 end
 
-                assign shifted_left_matches[i][j] = rotate_left(byte_matches[i][j],11-matching_idx[i]);
+                assign shifted_left_matches[i][j] = rotate_left(byte_matches[i][j],(LSQ_SZ-1)-matching_idx[i]);
 
                 psel_gen #(
                 .WIDTH  (LSQ_SZ),
@@ -156,7 +156,7 @@ module sq #(parameter
                     .req    (shifted_left_matches[i][j]),
                     .gnt    (shifted_right_matches[i][j])
                 );
-                assign final_matches[i][j] = rotate_right(shifted_right_matches[i][j],11-matching_idx[i]);
+                assign final_matches[i][j] = rotate_right(shifted_right_matches[i][j],(LSQ_SZ-1)-matching_idx[i]);
                 assign next_sq_2_exec.forward_data[i].byte_level[j] = state[encode_idx(final_matches[i][j])].data.byte_level[j];
                 assign next_sq_2_exec.forward_byte_en[i][j] = state[encode_idx(final_matches[i][j])].bytewise_addr_mask[j] && idx_found[i];//1;
                     

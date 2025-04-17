@@ -38,14 +38,13 @@
 // worry about these later
 `define BRANCH_PRED_SZ xx
 `define LSQ_SZ 12
-// `define LSQ_SZ_DBL 24
 `define SQ_RET_BUF_SZ 4
 
 // functional units (you should decide if you want more or fewer types of FUs)
 `define NUM_FU_ALU 2
 `define NUM_FU_MULT 1
 `define NUM_FU_LOAD 1
-`define LD_BAY_SZ 1 //num load bays in the FU
+`define LD_BAY_SZ 4 //num load bays in the FU
 `define NUM_FU_STORE 1
 // `define NUM_FU_TOTAL `NUM_FU_ALU + `NUM_FU_MULT + `NUM_FU_LOAD + `NUM_FU_STORE
 `define NUM_FU_TOTAL `NUM_FU_ALU + `NUM_FU_MULT + `NUM_FU_LOAD + `NUM_FU_STORE
