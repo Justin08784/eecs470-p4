@@ -384,6 +384,31 @@ module testbench;
         end
     endtask // task output_cpi_file
 
+    function automatic MEM_BLOCK query_cache(input int double_idx);
+        MEM_BLOCK rv;
+        ADDR addr;
+        localparam CACHE_LINES  = `DCACHE_LINES;
+        localparam INDEX_BITS   = $clog2(CACHE_LINES);
+        localparam OFFSET_BITS  = 3;
+        localparam TAG_WIDTH    = 32 - INDEX_BITS - OFFSET_BITS;
+        
+        logic [INDEX_BITS-1:0] way;
+        logic [TAG_WIDTH-1:0]tag;
+        logic vld;
+        logic match;
+
+        addr = 8*double_idx;
+        way = addr[INDEX_BITS+2:3];
+        tag = addr[31:32-TAG_WIDTH];
+
+        vld = verisimpleV.dcache.dcache_tags[way].valid;
+        match = tag == verisimpleV.dcache.dcache_tags[way].tag;
+
+        rv = (vld && match)
+            ? verisimpleV.dcache.dcache_mem.memData[way]
+            : '0;
+        return rv;
+    endfunction
 
     // Show contents of Unified Memory in both hex and decimal
     // Also output the final processor status
@@ -391,14 +416,26 @@ module testbench;
         input EXCEPTION_CODE final_status;
         int showing_data;
         begin
+            MEM_BLOCK blk, cache_blk, mem_blk;
+            for (int i = 0; i < `DCACHE_LINES; ++i) begin
+                $display("cache[%2d]: vld=%b tag=%x, idx=%x, dat=%x",
+                    i,
+                    verisimpleV.dcache.dcache_tags[i].valid,
+                    verisimpleV.dcache.dcache_tags[i].tag,
+                    i,
+                    verisimpleV.dcache.dcache_mem.memData[i]
+                );
+            end
             $fdisplay(out_fileno, "\nFinal memory state and exit status:\n");
             $fdisplay(out_fileno, "@@@ Unified Memory contents hex on left, decimal on right: ");
             $fdisplay(out_fileno, "@@@");
             showing_data = 0;
             for (int k = 0; k <= `MEM_64BIT_LINES - 1; k = k+1) begin
-                if (memory.unified_memory[k] != 0) begin
-                    $fdisplay(out_fileno, "@@@ mem[%5d] = %x : %0d", k*8, memory.unified_memory[k],
-                                                             memory.unified_memory[k]);
+                cache_blk   = query_cache(k);
+                mem_blk     = memory.unified_memory[k];
+                blk         = cache_blk != '0 ? cache_blk : mem_blk;
+                if (blk != 0) begin
+                    $fdisplay(out_fileno, "@@@ mem[%5d] = %x : %0d", k*8, blk, blk);
                     showing_data = 1;
                 end else if (showing_data != 0) begin
                     $fdisplay(out_fileno, "@@@");
