@@ -268,8 +268,8 @@ module sq #(parameter
 
         end 
         else begin
-            used    <= used + dispatch_in.sq_d_en_cnt - ret_success;//retire_in.r_en;
-            free    <= free - dispatch_in.sq_d_en_cnt + ret_success;//retire_in.r_en;
+            used    <= used + dispatch_in.rename_en_cnt - ret_success;//retire_in.r_en;
+            free    <= free - dispatch_in.rename_en_cnt + ret_success;//retire_in.r_en;
             ret_buf_used <= ret_buf_used - ret_success + retire_in.r_en;
             ret_buf_free <= ret_buf_free + ret_success - retire_in.r_en;
             rsvd    <= rsvd - dispatch_in.sq_d_en_cnt + dispatch_in.rename_en_cnt;
