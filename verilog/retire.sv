@@ -64,10 +64,10 @@ module retire (
     logic [`N-1:0] branch_taken_n;
     logic [`N-1:0] update_en_n;
     ADDR [`N-1:0] PC_original_n;
-    logic [`N-1:0] [7:0] bhr_from_btq_n
+    logic [`N-1:0] [7:0] bhr_from_btq_n;
 
 
-    logic [`N-1:0] [7:0] correlated_bhr_d_n
+    logic [`N-1:0] [7:0] correlated_bhr_d_n;
     logic [`N-1:0] gshare_pred_n;
     logic [`N-1:0] corr_pred_n;
     
@@ -84,14 +84,14 @@ module retire (
         sq_rd_cnt   = 0;
         lq_rd_cnt   = 0;
 
-        branch_taken = '0;
-        update_en = '0;
-        PC_original = '0;
-        bhr_from_btq = '0;
+        branch_taken_n = '0;
+        update_en_n = '0;
+        PC_original_n = '0;
+        bhr_from_btq_n = '0;
 
-        correlated_bhr_d = '0;
-        gshare_pred = '0;
-        corr_pred = '0;
+        correlated_bhr_d_n = '0;
+        gshare_pred_n = '0;
+        corr_pred_n = '0;
 
         btq_out = '0;
 
