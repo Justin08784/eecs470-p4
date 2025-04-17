@@ -1,48 +1,92 @@
 `include "sys_defs.svh"
 `include "dcache_block_direct.svh"
 
+typedef struct packed {
+    logic   hit;
+    TAG     tag;
+    WAY     way;
+} CACHE_LOC;
+
+function automatic CACHE_LOC cache_locate(
+    input CACHE_HEADER hdr,
+    input ADDR addr
+);
+    logic   hit;
+    TAG     tag;
+    WAY     way;
+    tag = get_tag(addr);
+    hit = 0;
+    way = '0;
+    for (int w = 0; w < NUM_CACHE_LINES; ++w) begin
+        if (!(hdr.vld[w] && tag == hdr.tag[w]))
+            continue;
+        way = w;
+        hit = 1;
+    end
+    return '{hit, tag, way};
+endfunction
+
+module decode_fill (
+    // Metadata to consult
+    input  CACHE_HEADER hdr,
+    input  MSHR_ENTRY   mshr,
+    input  logic evict,
+    input  logic [NUM_CACHE_LINES-1:0] alloc_msk,
+
+    output logic        req
+);
+endmodule;
+
+module decode_load (
+    // Load (w/ load FU)
+    input  ld2dcache    ld_in,
+
+    // Metadata to consult
+    input  CACHE_HEADER hdr,
+    // TODO: add victim cache (some way to consult metadata; victim cache needs header?)
+
+    output logic        req
+);
+endmodule;
+
+module decode_stor (
+    input  sq2dcache    sq_in,
+
+    // Metadata to consult
+    input  CACHE_HEADER hdr,
+    // TODO: add victim cache (some way to consult metadata; victim cache needs header?)
+
+    output logic        req
+);
+endmodule;
+
 
 module dcache_block (
     input logic clock,
     input logic reset,
 
     // input from memory
-    input  MEM_TAG       Dmem2Dcache_transaction_tag,
-    input  MEM_BLOCK     Dmem2Dcache_data,
-    input  MEM_TAG       Dmem2Dcache_data_tag,
+    input  MEM_TAG       mem_in_transaction_tag,
+    input  MEM_BLOCK     mem_in_data,
+    input  MEM_TAG       mem_in_data_tag,
 
-    // input from lsq
-    input logic          Dcache_valid_in, 
-    // load (executing) store (retired)
-    input MEM_COMMAND    proc2Dcache_command, // ✅ Bradley: only one command to dcache, so the load will see the effect of store
-    input ADDR           proc2Dcache_addr,
-    input MEM_SIZE       proc2Dcache_size,
-    input MEM_BLOCK      proc2Dcache_wdata,
+    output MEM_COMMAND   mem_out_command,
+    output ADDR          mem_out_addr,
+    output MEM_BLOCK     mem_out_data,
 
-    // output to lsq
-    output logic         req_accepted,
-    output logic         Dcache_valid_out, // load cache hit
-    output MEM_BLOCK     Dcache_data_out,
-    // output info for load instruction that has the cache miss
+    // Load (w/ load FU)
+    input  ld2dcache ld_in,
+    output dcache2ld ld_out,
 
-    // output to memory 
-    output MEM_COMMAND   Dcache2Dmem_command, // ✅ Bradley: IF Dcache and SQ have conflict on memory LET LOAD GO FIRST!!!!!
-    output ADDR          Dcache2Dmem_addr,
-    output MEM_BLOCK     Dcache2Dmem_wdata,
-
-    output logic         mem_in_use,
-    output logic         dcache_ready
+    // Store (w/ SQ)
+    input  sq2dcache sq_in,
+    output dcache2sq sq_out
 );
-    struct packed {
-        logic   [NUM_CACHE_LINES-1:0] vld;
-        logic   [NUM_CACHE_LINES-1:0] dirty;
-        TAG     [NUM_CACHE_LINES-1:0] tag;
-        logic   [$clog2(NUM_CACHE_LINES)-1:0] victim;
-    } hdr, hdr_n;
+    CACHE_HEADER hdr, hdr_n;
+    MSHR_ENTRY   mshr, mshr_n;
 
     logic   ren,  wen;
-    logic [$clog2(NUM_CACHE_LINES)-1:0]
-            rway, wway;
+    WAY     rway, wway;
     MEM_BLOCK rdat, wdat;
     logic [NUM_CACHE_LINES-1:0] free_gnt;
     memDP #(
@@ -67,6 +111,55 @@ module dcache_block (
     ) free_way (
         .req (~hdr.vld),
         .gnt (free_gnt)
+    );
+
+    typedef enum logic[1:0] {
+        REQR_STOR, // lowest priority
+        REQR_LOAD, // ...
+        REQR_FILL, // highest priority
+        NUM_REQR
+    } REQR;
+    logic [NUM_REQR-1:0] req, gnt;
+
+
+    logic   evict; // alloc in set requires evict? i.e. !(any free way in set)
+    logic   [NUM_CACHE_LINES-1:0] alloc_msk; // alloc in set requires evict? i.e. !(any free way in set)
+    logic   [NUM_CACHE_LINES-1:0] lru; // lru victim way
+    always_comb begin
+        evict = !(|free_gnt);
+
+        foreach(lru[w])
+            lru[w] = w == 0;
+
+        foreach(alloc_msk[w]) begin
+            alloc_msk[w] = evict
+                ? lru[w]
+                : free_gnt[w];
+        end
+    end
+
+    // microp decoders (for resource use intent)
+    decode_fill dec_fill0 (
+        .hdr,
+        .mshr,
+        .evict,
+        .alloc_msk,
+
+        .req(req[REQR_FILL])
+    );
+
+    decode_load dec_load0 (
+        .ld_in,
+        .hdr,
+
+        .req(req[REQR_LOAD])
+    );
+
+    decode_stor dec_stor0 (
+        .sq_in,
+        .hdr,
+
+        .req(req[REQR_STOR])
     );
 
 endmodule

@@ -3,28 +3,16 @@
 
 `include "sys_defs.svh"
 
-
-localparam ASSOC   = 4; // i.e. NUM_WAYS
-localparam MSHR_SZ = 16;
 localparam NUM_CACHE_LINES  =  `DCACHE_LINES;
-localparam NUM_SETS         = NUM_CACHE_LINES / ASSOC;
-localparam SET_INDEX_BITS   = $clog2(NUM_SETS);
 localparam OFFSET_BITS      = 3;
-localparam TAG_BITS         = 16 - SET_INDEX_BITS - OFFSET_BITS;
-typedef logic [SET_INDEX_BITS-1:0]  SID;
-typedef logic [TAG_BITS-1:0]        TAG;
-typedef logic [OFFSET_BITS-1:0]     OFF;
-typedef logic [$clog2(ASSOC)-1:0]   WAY;
-typedef logic [ASSOC-1:0][ASSOC-1:0]AGE;
+localparam TAG_BITS         = 16 - OFFSET_BITS;
+typedef logic [TAG_BITS-1:0]    TAG;
+typedef logic [OFFSET_BITS-1:0] OFF;
+typedef logic [$clog2(NUM_CACHE_LINES)-1:0] WAY;
+// typedef logic [ASSOC-1:0][ASSOC-1:0]AGE;
 
 function automatic TAG get_tag(input ADDR addr);
     return addr[15:16-TAG_BITS];
-endfunction
-function automatic SID get_sid(input ADDR addr);
-    return addr[SET_INDEX_BITS+OFFSET_BITS-1 : OFFSET_BITS];
-endfunction
-function automatic OFF get_off(input ADDR addr);
-    return addr[OFFSET_BITS-1:0];
 endfunction
 
 typedef struct packed {
@@ -53,97 +41,6 @@ typedef enum logic [3:0] {
     NUM_CACHE_OPS       =12
 } OP_TAG;
 
-localparam int NUM_RES = 6;
-typedef enum logic [$clog2(NUM_RES)-1:0] {
-    RES_MEM   = 5,  // external memory cmd port
-    RES_MSHR  = 4,  // MSHR allocator
-    RES_VW    = 3,  // victim cache write port
-    RES_VR    = 2,  // victim cache read  port
-    RES_MW    = 1,  // main datapath write port
-    RES_MR    = 0   // main datapath read  port
-} RES_IDX;
-
-typedef logic [NUM_RES-1:0] RES_MASK;
-localparam RES_MASK
-    M_MEM   = 6'b1_00000,
-    M_MSHR  = 6'b0_10000,
-    M_VW    = 6'b0_01000,
-    M_VR    = 6'b0_00100,
-    M_MW    = 6'b0_00010,
-    M_MR    = 6'b0_00001;
-
-function automatic logic [NUM_CACHE_OPS-1:0][NUM_RES-1:0] init_op_res_mask();
-    logic [NUM_CACHE_OPS-1:0][NUM_RES-1:0] rv;
-    rv = '0;
-
-    rv[OP_FILL_EVICT_BOTH] = (        M_MSHR | M_VW | M_VR | M_MW | M_MR);
-    rv[OP_FILL_EVICT_MAIN] = (                 M_VW        | M_MW | M_MR);
-    rv[OP_FILL_NO_EVICT]   = (                               M_MW       );
-
-    rv[OP_LOAD_MHIT]       = (                                      M_MR);
-    rv[OP_LOAD_VHIT_PULL]  = (                        M_VR | M_MW       );
-    rv[OP_LOAD_VHIT_SWAP]  = (                 M_VW | M_VR | M_MW | M_MR);
-    rv[OP_LOAD_MISS]       = (        M_MSHR                            );
-
-    rv[OP_STOR_MHIT]       = (                               M_MW | M_MR);
-    rv[OP_STOR_VHIT_PULL]  = (                        M_VR | M_MW       );
-    rv[OP_STOR_VHIT_SWAP]  = (                 M_VW | M_VR | M_MW | M_MR);
-    rv[OP_STOR_MISS]       = (        M_MSHR                            );
-
-    return rv;
-endfunction
-
-
-typedef struct packed {
-    OP_TAG op;
-
-    struct packed {
-        struct packed {
-            logic   req;
-            SID     sid;
-            WAY     way;
-        } r, w;
-    } main;
-
-    struct packed {
-        struct packed {
-            logic   req;
-        } r, w;
-    } vcache;
-
-    struct packed {
-        logic   allc_req;
-    } mshr;
-
-    struct packed {
-        logic   talk_req; // want to talk to MEM
-    } mem_out;
-
-} OP_REQ;
-
-typedef struct packed {
-    struct packed {
-        struct packed {
-            logic   gnt;
-        } r, w;
-    } main;
-
-    struct packed {
-        struct packed {
-            logic   gnt;
-        } r, w;
-    } vcache;
-
-    struct packed {
-        logic   allc_gnt;
-    } mshr;
-
-    struct packed {
-        logic   talk_gnt; // want to talk to MEM
-    } mem_out;
-
-} OP_GNT;
-
 typedef enum logic [1:0] {
     S_IDLE,
     S_NTAG,
@@ -160,25 +57,19 @@ typedef struct packed {
 } MSHR_ENTRY;
 
 typedef struct packed {
-    logic   [NUM_SETS-1:0][ASSOC-1:0] vld;
-    /* FIXME: dirty bit is currently unused */
-    logic   [NUM_SETS-1:0][ASSOC-1:0] dirty;
-    TAG     [NUM_SETS-1:0][ASSOC-1:0] tag;
-    AGE     [NUM_SETS-1:0]            age;
+    logic   [NUM_CACHE_LINES-1:0] vld;
+    logic   [NUM_CACHE_LINES-1:0] dirty;
+    TAG     [NUM_CACHE_LINES-1:0] tag;
+    logic   [$clog2(NUM_CACHE_LINES)-1:0] vict_way;
+    // AGE     [NUM_CACHE_LINES-1:0] age;
 } CACHE_HEADER;
 
 
 typedef struct packed {
     CACHE_HEADER hdr;
-    logic [NUM_SETS-1:0][ASSOC-1:0][$bits(MEM_BLOCK)-1:0]
+    logic [NUM_CACHE_LINES-1:0][$bits(MEM_BLOCK)-1:0]
         state;
 } DBG_cache;
-
-typedef struct packed {
-    ADDR     addr; // delay addr and memsize for one cycle to keep track of info to store to mshr
-    MEM_SIZE size; // (bc the transaction_tag comes back from memory in the next cycle after receving request)
-} MISS_PKT; // pre MSHR
-
 
 function automatic ADDR w_align(input ADDR addr);
     return {addr[31:2], 2'b00};
