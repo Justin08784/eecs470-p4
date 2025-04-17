@@ -1,5 +1,5 @@
-`ifndef __DCACHE_SVH__ 
-`define __DCACHE_SVH__ 
+`ifndef __DCACHE_BLOCK_DIRECT_SVH__ 
+`define __DCACHE_BLOCK_DIRECT_SVH__ 
 
 `include "sys_defs.svh"
 
