@@ -131,6 +131,14 @@ typedef enum logic [1:0] {
 } MSHR_STATUS;
 
 typedef struct packed {
+    MSHR_STATUS status;
+    logic       wr_mem;
+    ADDR        addr;
+    MEM_BLOCK   mem_data;
+    MEM_SIZE    mem_size;
+} MSHR_ENTRY;
+
+typedef struct packed {
     logic   [NUM_SETS-1:0][ASSOC-1:0] vld;
     /* FIXME: dirty bit is currently unused */
     logic   [NUM_SETS-1:0][ASSOC-1:0] dirty;

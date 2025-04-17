@@ -1,33 +1,33 @@
 // `include "sys_defs.svh"
 `include "dcache.svh"
 
-// typedef struct packed {
-//     logic   hit;
-//     SID     sid;
-//     TAG     tag;
-//     WAY     way;
-// } CACHE_LOC;
+typedef struct packed {
+    logic   hit;
+    SID     sid;
+    TAG     tag;
+    WAY     way;
+} CACHE_LOC;
 
-// function automatic CACHE_LOC cache_locate(
-//     input CACHE_HEADER hdr,
-//     input ADDR addr
-// );
-//     logic   hit;
-//     SID     sid;
-//     TAG     tag;
-//     WAY     way;
-//     tag = get_tag(addr);
-//     sid = get_sid(addr);
-//     hit = 0;
-//     way = '0;
-//     for (int w = 0; w < ASSOC; ++w) begin
-//         if (!(hdr.vld[sid][w] && tag == hdr.tag[sid][w]))
-//             continue;
-//         way = w;
-//         hit = 1;
-//     end
-//     return '{hit, sid, tag, way};
-// endfunction
+function automatic CACHE_LOC cache_locate(
+    input CACHE_HEADER hdr,
+    input ADDR addr
+);
+    logic   hit;
+    SID     sid;
+    TAG     tag;
+    WAY     way;
+    tag = get_tag(addr);
+    sid = get_sid(addr);
+    hit = 0;
+    way = '0;
+    for (int w = 0; w < ASSOC; ++w) begin
+        if (!(hdr.vld[sid][w] && tag == hdr.tag[sid][w]))
+            continue;
+        way = w;
+        hit = 1;
+    end
+    return '{hit, sid, tag, way};
+endfunction
 
 // function automatic DATA_BLOCK extract_load(
 //     input MEM_SIZE    size,
@@ -100,6 +100,96 @@ function automatic logic [NUM_CACHE_OPS-1:0][NUM_RES-1:0] init_op_res_mask();
     return rv;
 endfunction
 
+// Globals
+logic [NUM_CACHE_OPS-1:0][NUM_RES-1:0] OP_RES_MASK;
+
+module decode_fill (
+    // Metadata to consult
+    input  CACHE_HEADER hdr,
+    input  MSHR_ENTRY   mshr,
+    input  logic [NUM_SETS-1:0] evict,
+    input  logic [NUM_SETS-1:0][ASSOC-1:0] alloc_msk,
+
+    output logic        req,
+    output RES_MASK     req_mask
+);
+    OP_TAG op;
+
+    SID     sid;
+    WAY     way;
+    ADDR    way_addr;
+    logic   way_dirty;
+
+    always_comb begin
+        sid = get_sid(mshr.addr);
+
+        way = '0;
+        for (int w = 0; w < ASSOC; ++w) begin
+            if (!alloc_msk[sid][w])
+                continue;
+            way |= w;
+        end
+        way_dirty = hdr.dirty[sid][way];
+
+        op = (evict[sid] && way_dirty)
+            ? OP_FILL_EVICT_MAIN 
+            : OP_FILL_NO_EVICT;
+        req = mshr.status == S_FILL;
+        req_mask = OP_RES_MASK[op];
+    end
+endmodule;
+
+module decode_load (
+    // Load (w/ load FU)
+    input  ld2dcache    ld_in,
+
+    // Metadata to consult
+    input  CACHE_HEADER hdr,
+    // TODO: add victim cache (some way to consult metadata; victim cache needs header?)
+
+    output logic        req,
+    output RES_MASK     req_mask
+);
+    CACHE_LOC loc;
+    logic hit;
+    OP_TAG op;
+
+    always_comb begin
+        loc = cache_locate(hdr, ld_in.addr);
+        hit = loc.hit;
+
+        op = hit ? OP_LOAD_MHIT : OP_LOAD_MISS;
+        req = ld_in.vld;
+        req_mask = OP_RES_MASK[op];
+    end
+endmodule;
+
+module decode_stor (
+    input  sq2dcache    sq_in,
+
+    // Metadata to consult
+    input  CACHE_HEADER hdr,
+    // TODO: add victim cache (some way to consult metadata; victim cache needs header?)
+
+    output logic        req,
+    output RES_MASK     req_mask
+);
+    CACHE_LOC loc;
+    logic hit;
+    OP_TAG op;
+
+    always_comb begin
+        loc = cache_locate(hdr, sq_in.addr);
+        hit = loc.hit;
+
+        op = hit ? OP_STOR_MHIT : OP_STOR_MISS;
+        req = sq_in.vld;
+        req_mask = OP_RES_MASK[op];
+    end
+endmodule;
+
+
+
 module dcache_basic (
     input logic clock,
     input logic reset,
@@ -122,7 +212,6 @@ module dcache_basic (
     output dcache2sq sq_out
 );
 
-    logic [NUM_CACHE_OPS-1:0][NUM_RES-1:0] OP_RES_MASK;
     initial begin
         OP_RES_MASK = init_op_res_mask();
         // for (int i = 0; i < NUM_CACHE_OPS; ++i) begin
@@ -130,6 +219,120 @@ module dcache_basic (
         // end
         // $finish;
     end
+
+    MSHR_ENTRY      mshr, mshr_n;
+    CACHE_HEADER    hdr, hdr_n;
+
+    typedef enum logic[1:0] {
+        REQR_STOR, // lowest priority
+        REQR_LOAD, // ...
+        REQR_FILL, // highest priority
+        NUM_REQR
+    } REQR;
+
+    logic       [NUM_SETS-1:0]  ren,  wen;
+    WAY         [NUM_SETS-1:0]  rway, wway;            
+    MEM_BLOCK   [NUM_SETS-1:0]  rdat, wdat;
+    logic       [NUM_SETS-1:0][ASSOC-1:0] free_gnt;
+    // logic       [NUM_SETS-1:0][ASSOC-1:0][$bits(MEM_BLOCK)-1:0] dbg_state;
+    generate
+        for (genvar s = 0; s < NUM_SETS; ++s) begin : gen_sets
+            memDP #(
+                .WIDTH     ($bits(MEM_BLOCK)),
+                .DEPTH     (ASSOC),
+                .READ_PORTS(1),
+                .BYPASS_EN (0)
+            ) set_i (
+                // `ifdef DEBUG
+                // .dbg(dbg_state[s]),
+                // `endif
+                .clock(clock),
+                .reset(reset),
+                .re   (ren [s]),
+                .raddr(rway[s]),
+                .rdata(rdat[s]),
+                .we   (wen [s]),
+                .waddr(wway[s]),
+                .wdata(wdat[s])
+            );
+
+            psel_gen #(
+                .WIDTH(ASSOC),
+                .REQS(1)
+            ) free_way (
+                .req (~hdr.vld[s]),
+                .gnt (free_gnt[s])
+            );
+        end
+    endgenerate
+
+    // Victim selection and eviction
+    /* Eviction */
+    logic   [NUM_SETS-1:0] evict; // alloc in set requires evict? i.e. !(any free way in set)
+    logic   [NUM_SETS-1:0][ASSOC-1:0] alloc_msk; // way to alloc
+    logic   [NUM_SETS-1:0][ASSOC-1:0] lru; // lru victim way
+    always_comb begin
+        /* FIXME: Placeholder LRU. Currently
+        is 'bully 0 way' policy. */
+        foreach(lru[s, w])
+            lru[s][w] = w == 0;
+
+        foreach(evict[s])
+            evict[s] = !(|free_gnt[s]);
+
+        foreach(alloc_msk[s]) begin
+            alloc_msk[s] = evict[s]
+                ? lru[s]
+                : free_gnt[s];
+        end
+    end
+    
+    /* resource arbiter (greedy) */
+    RES_MASK avail;
+    RES_MASK [NUM_REQR-1:0] req_mask;
+    logic    [NUM_REQR-1:0] req, gnt;
+    always_comb begin
+        avail = '0;
+        avail[RES_MSHR] = mshr.status == S_IDLE;
+
+        gnt = '0;
+
+        foreach (req[i]) begin
+            if (!req[i] || ((req_mask[i] & avail) != req_mask[i]))
+                continue;
+            gnt[i] = 1;
+            avail &= ~req_mask[i];
+        end
+    end
+
+    // microp decoders (for resource use intent)
+    decode_fill dec_fill0 (
+        .hdr,
+        .mshr,
+        .evict,
+        .alloc_msk,
+
+        .req(req[REQR_FILL]),
+        .req_mask(req_mask[REQR_FILL])
+    );
+
+    decode_load dec_load0 (
+        .ld_in,
+        .hdr,
+
+        .req(req[REQR_LOAD]),
+        .req_mask(req_mask[REQR_LOAD])
+    );
+
+    decode_stor dec_stor0 (
+        .sq_in,
+        .hdr,
+
+        .req(req[REQR_STOR]),
+        .req_mask(req_mask[REQR_STOR])
+    );
+
+
 
 
 endmodule;
@@ -218,26 +421,26 @@ endmodule;
 //         };
 //     end
 
-//     // Victim selection and eviction
-//     /* Eviction */
-//     logic   [NUM_SETS-1:0] evict; // alloc in set requires evict? i.e. !(any free way in set)
-//     logic   [NUM_SETS-1:0][ASSOC-1:0] alloc_msk; // way to alloc
-//     logic   [NUM_SETS-1:0][ASSOC-1:0] lru; // lru victim way
-//     always_comb begin
-//         /* FIXME: Placeholder LRU. Currently
-//         is 'bully 0 way' policy. */
-//         foreach(lru[s, w])
-//             lru[s][w] = w == 0;
+    // // Victim selection and eviction
+    // /* Eviction */
+    // logic   [NUM_SETS-1:0] evict; // alloc in set requires evict? i.e. !(any free way in set)
+    // logic   [NUM_SETS-1:0][ASSOC-1:0] alloc_msk; // way to alloc
+    // logic   [NUM_SETS-1:0][ASSOC-1:0] lru; // lru victim way
+    // always_comb begin
+    //     /* FIXME: Placeholder LRU. Currently
+    //     is 'bully 0 way' policy. */
+    //     foreach(lru[s, w])
+    //         lru[s][w] = w == 0;
 
-//         foreach(evict[s])
-//             evict[s] = !(|free_gnt[s]);
+    //     foreach(evict[s])
+    //         evict[s] = !(|free_gnt[s]);
 
-//         foreach(alloc_msk[s]) begin
-//             alloc_msk[s] = evict[s]
-//                 ? lru[s]
-//                 : free_gnt[s];
-//         end
-//     end
+    //     foreach(alloc_msk[s]) begin
+    //         alloc_msk[s] = evict[s]
+    //             ? lru[s]
+    //             : free_gnt[s];
+    //     end
+    // end
 
 //     // /* Fill */ // TODO: Fill is stubbed
 //     // Fill: index decode + port request
