@@ -111,7 +111,8 @@ module sq #(parameter
     logic [LD_BAY_SZ-1:0] [LSQ_SZ-1:0] match_mask;
 
     logic [LD_BAY_SZ-1:0] [3:0] [LSQ_SZ-1:0] byte_matches;
-    logic [LD_BAY_SZ-1:0] [3:0] [LSQ_SZ-1:0] shifted_matches;
+    logic [LD_BAY_SZ-1:0] [3:0] [LSQ_SZ-1:0] shifted_left_matches;
+    logic [LD_BAY_SZ-1:0] [3:0] [LSQ_SZ-1:0] shifted_right_matches;
     logic [LD_BAY_SZ-1:0] [3:0] [LSQ_SZ-1:0] final_matches;
 
     logic [LD_BAY_SZ-1:0] [3:0] word_off;
@@ -139,26 +140,28 @@ module sq #(parameter
                 //     ((l < tail) && (l <= matching_idx[i])) || (l >= ret_head) : 
                 //     (l >= ret_head) & ((l - ret_head) < used) & (l <= matching_idx[i]);
 
-                assign match_mask[i][l] = state[l].in_range;//(matching_idx[i] < ret_head) ?
-                    // ((l <= matching_idx[i]) || (l >= ret_head)) && state[l].in_range :
-                    // ((l >= ret_head) && (l <= matching_idx[i])) && state[i].in_range;
+                assign match_mask[i][l] = (matching_idx[i] < ret_head) ?
+                    ((l <= matching_idx[i]) || (l >= ret_head)) && state[l].in_range :
+                    ((l >= ret_head) && (l <= matching_idx[i])) && state[i].in_range;
             end
             
 
             for (j = 0; j < 4; j++) begin : find_byte_matches
                 for (k = 0; k < LSQ_SZ; k++) begin : find_table_matches
-                    assign byte_matches[i][j][k] = state[k].d_vld & (waddr(state[k].addr) == waddr(ex_frwd_in.forward_addr[i])) ? 
+                    assign byte_matches[i][j][k] = state[k].d_vld && (waddr(state[k].addr) == waddr(ex_frwd_in.forward_addr[i])) ? 
                         state[k].bytewise_addr_mask[j] & match_mask[i][k] : '0;
                 end
+
+                assign shifted_left_matches[i][j] = rotate_left(byte_matches[i][j],matching_idx[i]);
 
                 psel_gen #(
                 .WIDTH  (LSQ_SZ),
                 .REQS   (1)
                 ) sel (
-                    .req    (rotate_left(byte_matches[i][j],matching_idx[i])),
-                    .gnt_bus(shifted_matches[i][j])
+                    .req    (shifted_left_matches[i][j]),
+                    .gnt    (shifted_right_matches[i][j])
                 );
-                assign final_matches[i][j] = rotate_right(shifted_matches[i][j],matching_idx[i]);
+                assign final_matches[i][j] = rotate_right(shifted_right_matches[i][j],matching_idx[i]);
                 assign next_sq_2_exec.forward_data[i].byte_level[j] = state[encode_idx(final_matches[i][j])].data.byte_level[j];
                 assign next_sq_2_exec.forward_byte_en[i][j] = state[encode_idx(final_matches[i][j])].bytewise_addr_mask[j] && idx_found[i];//1;
                     
@@ -166,7 +169,7 @@ module sq #(parameter
 
             // assign next_sq_2_exec.forward_en[i] = (next_sq_2_exec.forward_byte_en[i] != 0);
 
-            assign execute_out.forward_en[i] = (next_sq_2_exec.forward_byte_en[i] != 0) && idx_found[i] && ex_frwd_in.forward_req_en[i];
+            assign execute_out.forward_en[i] = idx_found[i] && ex_frwd_in.forward_req_en[i];
 
 
             assign word_off[i] = iw_off(ex_frwd_in.forward_addr[i]);
@@ -179,6 +182,12 @@ module sq #(parameter
 
             assign execute_out.forward_mem_size[i] = idx_found[i] && ex_frwd_in.forward_req_en[i] ? 
                 ex_frwd_in.forward_mem_size[i] : 0;
+
+            // assign execute_out.forward_data[i] = shift_data(next_sq_2_exec.forward_data[i], word_off[i], ex_frwd_in.forward_mem_size[i]); 
+            
+            // assign execute_out.forward_byte_en[i] = shift_byte_mask(next_sq_2_exec.forward_byte_en[i], word_off[i], ex_frwd_in.forward_mem_size[i]);
+
+            // assign execute_out.forward_mem_size[i] = ex_frwd_in.forward_mem_size[i];
         end
     endgenerate
 
@@ -437,15 +446,15 @@ module sq #(parameter
 
     function automatic DATA_BLOCK shift_data;
         input DATA_BLOCK data_in;
-        input logic [3:0] word_off;
+        input logic [1:0] word_off;
         input MEM_SIZE mem_size;
         begin
             case (mem_size)
                 BYTE: begin
-                    shift_data      = (data_in >> (8 * word_off)) & 8'hFF;
+                    shift_data      = (data_in >> (8 * word_off)) & 32'h000000FF;
                 end
                 HALF: begin
-                    shift_data       = (data_in >> (8 * word_off)) & 16'hFFFF;
+                    shift_data       = (data_in >> (8 * word_off)) & 32'h0000FFFF;
                 end
                 default: begin
                     shift_data       = (data_in >> (8 * word_off));//&= 32'hFFFFFFFF;
@@ -456,15 +465,15 @@ module sq #(parameter
 
     function automatic logic [3:0] shift_byte_mask;
         input logic [3:0] mask;
-        input logic [3:0] word_off;
+        input logic [1:0] word_off;
         input MEM_SIZE mem_size;
         begin
             case (mem_size)
                 BYTE: begin
-                    shift_byte_mask    = (mask >> word_off) & 1'b1;
+                    shift_byte_mask    = (mask >> word_off) & 4'b0001;
                 end
                 HALF: begin
-                    shift_byte_mask    = (mask >> word_off) & 2'b11;
+                    shift_byte_mask    = (mask >> word_off) & 4'b0011;
                 end
                 default: begin
                     shift_byte_mask    = (mask >> word_off);//&= 4'b1111;
