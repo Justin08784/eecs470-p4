@@ -46,7 +46,6 @@ module stage_if_p4 (
 
 
     logic [1:0] corr_pred;
-    logic [1:0] [7:0] corr_bhr;
     // INST [1:0] fifo_insns;
 
     //logic [1:0] valid_out;
@@ -67,37 +66,6 @@ module stage_if_p4 (
         .Icache_valid_out           (icache_valid) // When valid is high
     );
 
-    // logic [$clog2(`N):0] if_valid_q;
-
-    // fifo #(
-    //     .DEPTH(16),
-    //     .WIDTH($bits(INST)),
-    //     .NUM_RPORTS(`N),
-    //     .NUM_WPORTS(`N),
-    //     .MAX_SCNT(`N)
-    // ) dut (
-    //     .clock      (clock),
-    //     .reset      (reset),
-    //     .wr_en_cnt  (free_scnt),
-    //     .wr_data    (Imem_data),
-    //     .rd_en_cnt  (d_in.d_rdy_cnt),
-    //     .rd_data    (fifo_insns),
-    //     .free_scnt  (free_scnt),
-    //     .used_scnt  (used_scnt)
-    // );
-
-    // genvar i;
-    // generate
-    //     for (i = 0; i < N; i++) begin
-
-    // Keep if valid until it gets valid data out
-    // always_ff @(posedge clock) begin
-    //     if (reset) begin
-    //         if_valid_q <= '0;
-    //     end else begin
-    //         if_valid_q <= d_in.d_rdy_cnt || (if_valid_q && d_out.f_en_cnt == 0);
-    //     end
-    // end
 
     logic [$clog2(`N):0]    free_scnt, used_scnt, f_cnt;
     IF_ID_PACKET [`N-1:0]   f_dat;
@@ -138,8 +106,6 @@ module stage_if_p4 (
 
                 corr_pred   :  pred_in_corr.prediction[0]
             };
-           // $display("DECODE PC: %x", PC_reg_temp);
-           // $display("mux_result_prediction[0]: %x", mux_result_prediction[0]);
         end
     end
 
@@ -174,49 +140,26 @@ module stage_if_p4 (
    // assign pred_out = mux_result
     assign mux_result_prediction[1] = predict_taken[1] && btb_hit[1];
 
-    //assign prediction_prop = mux_result_prediction[0] | mux_result_prediction[1];
-
-    //if btb
-
-    logic [4:0] taken_count;
-
     assign btb_hit = btb_in.hit;
-
-   /* always_comb begin
-     $display("btb_hit: %2b", btb_hit);
-    end
-
-    always_comb begin
-        $display("PC REG COMB: %x", PC_reg);
-    end*/
 
     always_ff @(posedge clock) begin
         if (reset) begin
-            //foreach(PC_reg[i])
                 PC_reg <= 0; // initial PC value is 0 (the memory address where our program starts)
-                //taken_count = 5'b0;
-                //mux_result_prediction <= 2'b00;
-              //  prediction_prop <= 0;
         end else if (flush) begin
                 PC_reg <= r_in.corrected_PC;
-                //prediction_prop <=0;  // initial PC value is 0 (the memory address where our program starts)
         end else if(mux_result_prediction) begin
+             `ifdef DEBUG
                 $display("PREDICTING TAKEN:");
                 $display("MUX RESULT: %1x", mux_result_prediction[0]);
-
                 $display("FETCHING NEW TARGET: %x", btb_in.target[0]);
+             `endif
 
                 if(mux_result_prediction[0]) begin
                     PC_reg <=  {16'b0,btb_in.target[0]};
                 end else if(mux_result_prediction[1])
-                    PC_reg <= PC_reg + 4*f_cnt;
-
-
-                //prediction_prop <= 1;       
+                    PC_reg <= PC_reg + 4*f_cnt;   
         end else begin
-            //foreach(PC_reg[i])
-                PC_reg <= PC_reg + 4*f_cnt; // ...or transition to next PC if valid
-                //prediction_prop <= 0;
+                PC_reg <= PC_reg + 4*f_cnt; 
         end 
     end
 
@@ -225,14 +168,14 @@ module stage_if_p4 (
     assign btb_out.is_taken = r_in.is_taken;
     assign btb_out.correct_PC =  r_in.PC;
 
-    assign btb_out.PC[0] =  /*r_in.update_enable ? r_in.PC :*/ PC_reg;
+    assign btb_out.PC[0] =  PC_reg;
     assign btb_out.PC[1] = PC_reg + 4; 
 
 
     assign btb_target = btb_in.target;
 
 
-    assign pred_out.PC[0] = /*r_in.update_enable ? r_in.PC :*/ PC_reg;
+    assign pred_out.PC[0] =  PC_reg;
     assign pred_out.PC[1] = PC_reg + 4;
 
     assign pred_out.update_enable = r_in.update_en;
@@ -243,21 +186,11 @@ module stage_if_p4 (
 
     assign pred_out.correlated_bhr = r_in.correlated_bhr;
 
-    //assign predict_taken = pred_in_corr.prediction;
-    //assign corr_bhr = pred_in_corr.bhr;
-
-    // Gshare predictor interface
     logic [1:0] gshare_pred;
 
-    // Chooser table: 2-bit counters per PC[7:0]
-    logic [255:0][1:0] chooser_table;
-    logic [7:0] fetch_index0, fetch_index1;
-    logic [7:0] retire_index0, retire_index1;
 
-    assign fetch_index0  = PC_reg[7:0];//fetch_in.PC[0][7:0];
-    assign fetch_index1  = PC_reg[7:0] + 4;  //fetch_in.PC[1][7:0];
-    assign retire_index0 = /*retire_in*/r_in.PC[0][7:0];
-    assign retire_index1 = /*retire_in*/r_in.PC[1][7:0];
+    logic [255:0][1:0] chooser_table;
+   
 
 
     always_comb begin
@@ -273,14 +206,13 @@ module stage_if_p4 (
         end else begin
             predict_taken    = 0;
         end
-        corr_bhr = pred_in_corr.bhr; // optional — if fetch stage needs it
-
+    
     end
 
     logic g_correct, c_correct;
     logic [7:0] idx;
 
-    // === Update chooser table on retirement ===
+   //Update chooser table on retirement
     always_ff @(posedge clock) begin
         if (reset) begin
             for (int i = 0; i < 256; i++) begin

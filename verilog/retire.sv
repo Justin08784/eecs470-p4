@@ -135,11 +135,15 @@ module retire (
 
             gshare_pred_n[i] = btq_in.dat[btq_rd_cnt].gshare_pred;
             corr_pred_n[i] = btq_in.dat[btq_rd_cnt].corr_pred;
-            $display("BTQ_IN PC: 0x%x, BTQ_IN TGT: 0x%x} ", btq_in.dat[btq_rd_cnt].PC, btq_in.dat[btq_rd_cnt].tgt);
-            $display("BTQ_IN PRED: %x,  BTQ_IN TAKE: %x", btq_in.dat[btq_rd_cnt].pred, btq_in.dat[btq_rd_cnt].take);     
-            $display("BTQ_IN CORR_BHR: %b", btq_in.dat[btq_rd_cnt].correlated_bhr);           
+            `ifdef DEBUG
+                $display("BTQ_IN PC: 0x%x, BTQ_IN TGT: 0x%x} ", btq_in.dat[btq_rd_cnt].PC, btq_in.dat[btq_rd_cnt].tgt);
+                $display("BTQ_IN PRED: %x,  BTQ_IN TAKE: %x", btq_in.dat[btq_rd_cnt].pred, btq_in.dat[btq_rd_cnt].take);     
+                $display("BTQ_IN CORR_BHR: %b", btq_in.dat[btq_rd_cnt].correlated_bhr);  
+            `endif         
             if (btq_in.dat[btq_rd_cnt].pred != btq_in.dat[btq_rd_cnt].take) begin
-                $display("PREDICTION != TAKE");
+                `ifdef DEBUG
+                    $display("PREDICTION != TAKE");
+                `endif      
                 // is mispred?
                 mispred = 1;
                 mispred_target = btq_in.dat[btq_rd_cnt].take
