@@ -26,15 +26,55 @@ function automatic CACHE_LOC cache_locate(
     return '{hit, tag, way};
 endfunction
 
+typedef struct packed {
+    logic       req;
+    WAY         way;
+} READ_SND;
+typedef struct packed {
+    logic       gnt;
+    MEM_BLOCK   dat;
+} READ_RCV;
+
+typedef struct packed {
+    logic       req;
+    WAY         way;
+    MEM_BLOCK   dat;
+} WRIT_SND;
+typedef struct packed {
+    logic       gnt;
+} WRIT_RCV;
+
+typedef struct packed {
+    logic       wr_mem;
+    ADDR        addr;
+    MEM_BLOCK   mem_data;
+    MEM_SIZE    mem_size;
+} MSHR_SND;
+typedef struct packed {
+    logic       vld;
+} MSHR_RCV;
+
 module decode_fill (
     // Metadata to consult
     input  CACHE_HEADER hdr,
     input  MSHR_ENTRY   mshr,
-    input  logic evict,
-    input  logic [NUM_CACHE_LINES-1:0] alloc_msk,
+    input  logic        evict,
+    input  logic        [NUM_CACHE_LINES-1:0] alloc_msk,
 
-    output logic        req
+    /* orders */
+    output logic        req,
+    output READ_SND     r_snd,
+    output WRIT_SND     w_snd,
+    output MSHR_SND     mshr_snd,
+
+    /* receipts */
+    input  logic        gnt,
+    output READ_RCV     r_rcv,
+    output WRIT_RCV     w_rcv,
+    output MSHR_RCV     mshr_rcv
 );
+    assign req = mshr.status == S_FILL;
+
 endmodule;
 
 module decode_load (
@@ -45,7 +85,9 @@ module decode_load (
     input  CACHE_HEADER hdr,
     // TODO: add victim cache (some way to consult metadata; victim cache needs header?)
 
-    output logic        req
+    output logic        req,
+    input  logic        gnt
+
 );
 endmodule;
 
@@ -56,7 +98,9 @@ module decode_stor (
     input  CACHE_HEADER hdr,
     // TODO: add victim cache (some way to consult metadata; victim cache needs header?)
 
-    output logic        req
+    output logic        req,
+    input  logic        gnt
+
 );
 endmodule;
 

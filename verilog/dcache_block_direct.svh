@@ -24,21 +24,16 @@ typedef struct packed {
 typedef enum logic [3:0] {
     OP_NONE             =0,
 
-    OP_FILL_EVICT_BOTH  =1,
-    OP_FILL_EVICT_MAIN  =2,
-    OP_FILL_NO_EVICT    =3,
+    OP_FILL_EVICT       =1,
+    OP_FILL_NO_EVICT    =2,
 
-    OP_LOAD_MHIT        =4,
-    OP_LOAD_VHIT_PULL   =5,
-    OP_LOAD_VHIT_SWAP   =6,
-    OP_LOAD_MISS        =7,
+    OP_LOAD_HIT         =3,
+    OP_LOAD_MISS        =4,
 
-    OP_STOR_MHIT        =8,
-    OP_STOR_VHIT_PULL   =9,
-    OP_STOR_VHIT_SWAP   =10,
-    OP_STOR_MISS        =11,
+    OP_STOR_HIT         =5,
+    OP_STOR_MISS        =6,
 
-    NUM_CACHE_OPS       =12
+    NUM_CACHE_OPS       =7
 } OP_TAG;
 
 typedef enum logic [1:0] {
