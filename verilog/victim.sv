@@ -13,6 +13,12 @@ typedef struct packed {
     logic       [sz-1:0][sz-1:0]age;
 } STATE;
 
+/*
+TODO: Split lookup from read.
+In dcache, the requesters need to lookup in the victim cache–– hit status
+determines resource use intent and what ops they decode to.
+*/
+
 module victim_cache (
     input logic clock,
     input logic reset,

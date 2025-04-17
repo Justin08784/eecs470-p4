@@ -33,51 +33,131 @@ typedef struct packed {
     logic       word_off;
 } DW_ACCESS;
 
-`define RQ_SZ 4
+typedef enum logic [3:0] {
+    OP_NONE             =0,
+
+    OP_FILL_EVICT_BOTH  =1,
+    OP_FILL_EVICT_MAIN  =2,
+    OP_FILL_NO_EVICT    =3,
+
+    OP_LOAD_MHIT        =4,
+    OP_LOAD_VHIT_PULL   =5,
+    OP_LOAD_VHIT_SWAP   =6,
+    OP_LOAD_MISS        =7,
+
+    OP_STOR_MHIT        =8,
+    OP_STOR_VHIT_PULL   =9,
+    OP_STOR_VHIT_SWAP   =10,
+    OP_STOR_MISS        =11,
+
+    NUM_CACHE_OPS       =12
+} OP_TAG;
+
+localparam int NUM_RES = 6;
+typedef enum logic [$clog2(NUM_RES)-1:0] {
+    RES_MEM   = 5,  // external memory cmd port
+    RES_MSHR  = 4,  // MSHR allocator
+    RES_VW    = 3,  // victim cache write port
+    RES_VR    = 2,  // victim cache read  port
+    RES_MW    = 1,  // main datapath write port
+    RES_MR    = 0   // main datapath read  port
+} RES_IDX;
+
+typedef logic [NUM_RES-1:0] RES_MASK;
+localparam RES_MASK
+    M_MEM   = 6'b1_00000,
+    M_MSHR  = 6'b0_10000,
+    M_VW    = 6'b0_01000,
+    M_VR    = 6'b0_00100,
+    M_MW    = 6'b0_00010,
+    M_MR    = 6'b0_00001;
+
+function automatic logic [NUM_CACHE_OPS-1:0][NUM_RES-1:0] init_op_res_mask();
+    logic [NUM_CACHE_OPS-1:0][NUM_RES-1:0] rv;
+    rv = '0;
+
+    rv[OP_FILL_EVICT_BOTH] = (        M_MSHR | M_VW | M_VR | M_MW | M_MR);
+    rv[OP_FILL_EVICT_MAIN] = (                 M_VW        | M_MW | M_MR);
+    rv[OP_FILL_NO_EVICT]   = (                               M_MW       );
+
+    rv[OP_LOAD_MHIT]       = (                                      M_MR);
+    rv[OP_LOAD_VHIT_PULL]  = (                        M_VR | M_MW       );
+    rv[OP_LOAD_VHIT_SWAP]  = (                 M_VW | M_VR | M_MW | M_MR);
+    rv[OP_LOAD_MISS]       = (        M_MSHR                            );
+
+    rv[OP_STOR_MHIT]       = (                               M_MW | M_MR);
+    rv[OP_STOR_VHIT_PULL]  = (                        M_VR | M_MW       );
+    rv[OP_STOR_VHIT_SWAP]  = (                 M_VW | M_VR | M_MW | M_MR);
+    rv[OP_STOR_MISS]       = (        M_MSHR                            );
+
+    return rv;
+endfunction
+
+
 typedef struct packed {
-    logic       is_load;        // store, if not load
-    union packed {
+    OP_TAG op;
+
+    struct packed {
         struct packed {
-            LSQ_IDX         lq_idx; // only needed for loads (stores only request to dcache post retirement)
-            PHYS_REG_IDX    dst;
-            logic [$bits(DATA_BLOCK)-$bits(LSQ_IDX)-$bits(PHYS_REG_IDX)-1:0]
-                _pad; // ...I'm sorry
-        } ld;
-        DATA_BLOCK  st_dat;
-    } payload;
-    /* ^^ access guarded by size */
+            logic   req;
+            SID     sid;
+            WAY     way;
+        } r, w;
+    } main;
 
-    MEM_SIZE    size; // mem size: BYTE, HALF, WORD, DOUBLE-WORD
-    DW_ACCESS   acc;
-    // union packed {
-    //     logic [2:0] byte_off;
-    //     logic [2:0] half_off;   // actually: logic[1:0] (padded 1 bit)
-    //     logic [2:0] word_off;   // actually: logic      (padded 2 bits)
-    // } acc;
-    /* ^^ access guarded by size
-    (NOT to be confused with DW_ACCESS, which is a struct!) */
-} RQ_ENTRY;
+    struct packed {
+        struct packed {
+            logic   req;
+        } r, w;
+    } vcache;
 
-/*
-NOTE: The cache op tag doubles as priority value,
-with max priority at lowest tag value! */
-typedef enum logic[1:0] {
-    FILL = 0,
-    LOAD = 1,
-    STOR = 2,
-    NUM_OPS
+    struct packed {
+        logic   allc_req;
+    } mshr;
 
-    /* Ideally, we prioritize a (hit) load over a fill,
-    but then we need to handle deferred fills.
-    Deferred fills add lots of complexity, including
-    a 'retry' path from the MSRH which should temporarily
-    hold the data of a deferred fill. */
-    // LOAD = 0,
-    // MSHR = 1, // i.e. fill retry
-    // FILL = 2,
-    // STOR = 3,
-    // NUM_OPS
-} CACHE_OP_TAG;
+    struct packed {
+        logic   talk_req; // want to talk to MEM
+    } mem_out;
+
+} OP_REQ;
+
+typedef struct packed {
+    struct packed {
+        struct packed {
+            logic   gnt;
+        } r, w;
+    } main;
+
+    struct packed {
+        struct packed {
+            logic   gnt;
+        } r, w;
+    } vcache;
+
+    struct packed {
+        logic   allc_gnt;
+    } mshr;
+
+    struct packed {
+        logic   talk_gnt; // want to talk to MEM
+    } mem_out;
+
+} OP_GNT;
+
+typedef enum logic [1:0] {
+    S_IDLE,
+    S_NTAG,
+    S_WAIT,
+    S_FILL
+} MSHR_STATUS;
+
+typedef struct packed {
+    MSHR_STATUS status;
+    logic       wr_mem;
+    ADDR        addr;
+    MEM_BLOCK   mem_data;
+    MEM_SIZE    mem_size;
+} MSHR_ENTRY;
 
 typedef struct packed {
     logic   [NUM_SETS-1:0][ASSOC-1:0] vld;
