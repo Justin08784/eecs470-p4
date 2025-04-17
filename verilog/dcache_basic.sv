@@ -79,23 +79,23 @@
 // endfunction
 
 
-function automatic init_op_res_mask();
+function automatic logic [NUM_CACHE_OPS-1:0][NUM_RES-1:0] init_op_res_mask();
     logic [NUM_CACHE_OPS-1:0][NUM_RES-1:0] rv;
     rv = '0;
 
-    rv[OP_FILL_EVICT_BOTH] |= (        M_MSHR | M_VW | M_VR | M_MW | M_MR);
-    rv[OP_FILL_EVICT_MAIN] |= (                 M_VW        | M_MW | M_MR);
-    rv[OP_FILL_NO_EVICT]   |= (                               M_MW       );
+    rv[OP_FILL_EVICT_BOTH] = (        M_MSHR | M_VW | M_VR | M_MW | M_MR);
+    rv[OP_FILL_EVICT_MAIN] = (                 M_VW        | M_MW | M_MR);
+    rv[OP_FILL_NO_EVICT]   = (                               M_MW       );
 
-    rv[OP_LOAD_MHIT]       |= (                                      M_MR);
-    rv[OP_LOAD_VHIT_PULL]  |= (                        M_VR | M_MW       );
-    rv[OP_LOAD_VHIT_SWAP]  |= (                 M_VW | M_VR | M_MW | M_MR);
-    rv[OP_LOAD_MISS]       |= (        M_MSHR                            );
+    rv[OP_LOAD_MHIT]       = (                                      M_MR);
+    rv[OP_LOAD_VHIT_PULL]  = (                        M_VR | M_MW       );
+    rv[OP_LOAD_VHIT_SWAP]  = (                 M_VW | M_VR | M_MW | M_MR);
+    rv[OP_LOAD_MISS]       = (        M_MSHR                            );
 
-    rv[OP_STOR_MHIT]       |= (                               M_MW | M_MR);
-    rv[OP_STOR_VHIT_PULL]  |= (                        M_VR | M_MW       );
-    rv[OP_STOR_VHIT_SWAP]  |= (                 M_VW | M_VR | M_MW | M_MR);
-    rv[OP_STOR_MISS]       |= (        M_MSHR                            );
+    rv[OP_STOR_MHIT]       = (                               M_MW | M_MR);
+    rv[OP_STOR_VHIT_PULL]  = (                        M_VR | M_MW       );
+    rv[OP_STOR_VHIT_SWAP]  = (                 M_VW | M_VR | M_MW | M_MR);
+    rv[OP_STOR_MISS]       = (        M_MSHR                            );
 
     return rv;
 endfunction
@@ -125,6 +125,10 @@ module dcache_basic (
     logic [NUM_CACHE_OPS-1:0][NUM_RES-1:0] OP_RES_MASK;
     initial begin
         OP_RES_MASK = init_op_res_mask();
+        // for (int i = 0; i < NUM_CACHE_OPS; ++i) begin
+        //     $display("res_mask[%2d]: %b", i, OP_RES_MASK[i]);
+        // end
+        // $finish;
     end
 
 
