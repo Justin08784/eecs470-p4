@@ -27,31 +27,33 @@ function automatic CACHE_LOC cache_locate(
 endfunction
 
 typedef struct packed {
-    logic       req;
+    logic       vld;
     WAY         way;
 } READ_SND;
 typedef struct packed {
-    logic       gnt;
     MEM_BLOCK   dat;
 } READ_RCV;
 
 typedef struct packed {
-    logic       req;
+    logic       vld;
     WAY         way;
     MEM_BLOCK   dat;
 } WRIT_SND;
 typedef struct packed {
-    logic       gnt;
+    logic _placeholder;
 } WRIT_RCV;
 
 typedef struct packed {
+    logic       vld;
+    OP_TAG      op;
+
     logic       wr_mem;
     ADDR        addr;
     MEM_BLOCK   mem_data;
     MEM_SIZE    mem_size;
 } MSHR_SND;
 typedef struct packed {
-    logic       vld;
+    logic _placeholder;
 } MSHR_RCV;
 
 module decode_fill (
@@ -73,7 +75,66 @@ module decode_fill (
     output WRIT_RCV     w_rcv,
     output MSHR_RCV     mshr_rcv
 );
-    assign req = mshr.status == S_FILL;
+    OP_TAG op;
+    WAY    way;
+
+    always_comb begin
+        req = mshr.status == S_FILL;
+
+        op = OP_NONE;
+        if (req) begin
+            op = evict
+                ? OP_FILL_EVICT
+                : OP_FILL_NO_EVICT;
+        end
+
+        way = '0;
+        foreach (alloc_msk[w]) begin
+            if (!alloc_msk[w])
+                continue;
+            way = w;
+        end
+
+        {
+            r_snd,
+            w_snd,
+            mshr_snd
+        } = '0;
+        case (op)
+            OP_FILL_EVICT: begin
+                r_snd = '{
+                    vld : 1,
+                    way : way
+                };
+
+                w_snd = '{
+                    vld : 1,
+                    way : way,
+                    dat : mshr.mem_data// FIXME!!!: You need to apply store correctly here!
+                };
+
+                mshr_snd = '{
+                    op     : op,
+                    vld    : 1,
+                    wr_mem : 1,
+                    addr   : 32'hdeadbeef, // FIXME::: reconstruct the address of the tobeevicted block
+                    mem_data : r_rcv.dat,
+                    mem_size : DOUBLE
+                };
+            end
+            OP_FILL_NO_EVICT: begin
+                w_snd = '{
+                    vld : 0,
+                    way : way,
+                    dat : mshr.mem_data// FIXME!!!: You need to apply store correctly here!
+                };
+
+                mshr_snd.op = op;
+                mshr_snd.vld= 1;
+            end
+            default:;
+        endcase
+    end
 
 endmodule;
 
