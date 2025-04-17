@@ -384,13 +384,25 @@ module testbench;
         end
     endtask // task output_cpi_file
 
+
+    localparam CACHE_LINES  = `DCACHE_LINES;
+    localparam INDEX_BITS   = $clog2(CACHE_LINES);
+    localparam OFFSET_BITS  = 3;
+    localparam TAG_WIDTH    = 32 - INDEX_BITS - OFFSET_BITS;
+    function automatic ADDR recons_addr(
+        input logic [INDEX_BITS-1:0] way,
+        input logic [TAG_WIDTH-1:0]  tag
+    );
+        return {
+            tag,
+            way,
+            3'b000
+        };
+    endfunction
+
     function automatic MEM_BLOCK query_cache(input int double_idx);
         MEM_BLOCK rv;
         ADDR addr;
-        localparam CACHE_LINES  = `DCACHE_LINES;
-        localparam INDEX_BITS   = $clog2(CACHE_LINES);
-        localparam OFFSET_BITS  = 3;
-        localparam TAG_WIDTH    = 32 - INDEX_BITS - OFFSET_BITS;
         
         logic [INDEX_BITS-1:0] way;
         logic [TAG_WIDTH-1:0]tag;
@@ -418,12 +430,13 @@ module testbench;
         begin
             MEM_BLOCK blk, cache_blk, mem_blk;
             for (int i = 0; i < `DCACHE_LINES; ++i) begin
-                $display("cache[%2d]: vld=%b tag=%x, idx=%x, dat=%x",
+                $display("cache[%2d]: vld=%b tag=%x, idx=%x, dat=%x {addr: %x}",
                     i,
                     verisimpleV.dcache.dcache_tags[i].valid,
                     verisimpleV.dcache.dcache_tags[i].tag,
                     i,
-                    verisimpleV.dcache.dcache_mem.memData[i]
+                    verisimpleV.dcache.dcache_mem.memData[i],
+                    recons_addr(i, verisimpleV.dcache.dcache_tags[i].tag)
                 );
             end
             $fdisplay(out_fileno, "\nFinal memory state and exit status:\n");
