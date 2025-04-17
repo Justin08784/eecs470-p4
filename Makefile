@@ -96,7 +96,7 @@
 # there should be no need to change anything for project 3
 
 # this is a global clock period variable used in the tcl script and referenced in testbenches
-export CLOCK_PERIOD = 30.0
+export CLOCK_PERIOD = 8.0
 
 # the Verilog Compiler command and arguments
 VCS =  vcs -sverilog -xprop=tmerge +vc -Mupdate -Mdir=build/csrc -line -full64 -kdb -lca -nc \
@@ -189,7 +189,7 @@ GREP = grep -E --color=auto
 # ---- Modules to Test ---- #
 
 # TODO: add more modules here
-MODULES = cpu mult rob rs fifo free_list dispatch prf map_table stage_id_p4 execute fetch btb sq post_ret_buffer gshare skid_buffer lq victim dcache_simple
+MODULES = cpu mult rob rs fifo free_list dispatch prf map_table stage_id_p4 execute fetch btb sq post_ret_buffer gshare skid_buffer lq victim dcache_simple correlated_predictor
 
 # TODO: update this if you add more header files
 ALL_HEADERS = $(CPU_HEADERS)
@@ -298,6 +298,11 @@ build/gshare.simv: $(GSHARE_FILES)
 build/gshare.cov: $(GSHARE_FILES)
 synth/gshare.vg: $(GSHARE_FILES)
 
+CORRELATED_FILES = verilog/sys_defs.svh verilog/correlated_predictor.sv verilog/branch_history_table.sv verilog/pht.sv
+build/correlated_predictor.simv: $(CORRELATED_FILES)
+build/correlated_predictor.cov: $(CORRELATED_FILES)
+synth/correlated_predictor.vg: $(CORRELATED_FILES)
+
 DCACHE_SIMPLE_FILES = verilog/sys_defs.svh verilog/memDP.sv verilog/mem.sv
 build/dcache_simple.simv: $(DCACHE_SIMPLE_FILES)
 build/dcache_simple.cov: $(DCACHE_SIMPLE_FILES)
@@ -350,6 +355,8 @@ CPU_SOURCES = verilog/cpu.sv \
 			  verilog/victim.sv \
 			  verilog/sq.sv \
 			  verilog/lq.sv \
+			  verilog/branch_history_table.sv \
+			  verilog/correlated_predictor.sv \
 			  verilog/dcache_basic.sv \
 			  verilog/dcache_simple.sv
 

@@ -26,6 +26,17 @@ module retire (
 
     output logic flush,
     output ADDR  corrected_PC,
+    output logic [`N-1:0] branch_taken,
+    output logic [`N-1:0] update_en,
+    output ADDR [`N-1:0] PC_original,
+    output logic [`N-1:0] [7:0] bhr_from_btq,
+
+
+    output logic [`N-1:0] [7:0] correlated_bhr_d,
+    output logic [`N-1:0] gshare_pred,
+    output logic [`N-1:0] corr_pred, 
+    //output retire2fetch ret_2_fetch,
+
     output retire_final retire_exec,
 
     input logic mem_in_use
@@ -49,6 +60,17 @@ module retire (
 
     logic flush_n;
     ADDR  corrected_PC_n;
+
+    logic [`N-1:0] branch_taken_n;
+    logic [`N-1:0] update_en_n;
+    ADDR [`N-1:0] PC_original_n;
+    logic [`N-1:0] [7:0] bhr_from_btq_n
+
+
+    logic [`N-1:0] [7:0] correlated_bhr_d_n
+    logic [`N-1:0] gshare_pred_n;
+    logic [`N-1:0] corr_pred_n;
+    
     always_comb begin
         sq_out = '0;
 
@@ -61,6 +83,20 @@ module retire (
         btq_rd_cnt  = 0;
         sq_rd_cnt   = 0;
         lq_rd_cnt   = 0;
+
+        branch_taken = '0;
+        update_en = '0;
+        PC_original = '0;
+        bhr_from_btq = '0;
+
+        correlated_bhr_d = '0;
+        gshare_pred = '0;
+        corr_pred = '0;
+
+        btq_out = '0;
+
+
+
         for (int i = 0; i < rob_in.r_vld_cnt; ++i) begin
             if (!rob_in.entries[i].cpl)
                 break;
@@ -84,14 +120,34 @@ module retire (
             
             ++r_en_cnt;
             
+                
+            
+
             if (!rob_in.entries[i].is_brch)
                 continue;
+
+            update_en_n[i] = 1;
+
+            PC_original_n[i] = btq_in.dat[btq_rd_cnt].PC;
+
+            bhr_from_btq_n[i] = btq_in.dat[btq_rd_cnt].bhr;
+            correlated_bhr_d_n[i] = btq_in.dat[btq_rd_cnt].correlated_bhr;
+
+            gshare_pred_n[i] = btq_in.dat[btq_rd_cnt].gshare_pred;
+            corr_pred_n[i] = btq_in.dat[btq_rd_cnt].corr_pred;
+            $display("BTQ_IN PC: 0x%x, BTQ_IN TGT: 0x%x} ", btq_in.dat[btq_rd_cnt].PC, btq_in.dat[btq_rd_cnt].tgt);
+            $display("BTQ_IN PRED: %x,  BTQ_IN TAKE: %x", btq_in.dat[btq_rd_cnt].pred, btq_in.dat[btq_rd_cnt].take);     
+            $display("BTQ_IN CORR_BHR: %b", btq_in.dat[btq_rd_cnt].correlated_bhr);           
             if (btq_in.dat[btq_rd_cnt].pred != btq_in.dat[btq_rd_cnt].take) begin
+                $display("PREDICTION != TAKE");
                 // is mispred?
                 mispred = 1;
                 mispred_target = btq_in.dat[btq_rd_cnt].take
                     ? btq_in.dat[btq_rd_cnt].tgt
                     : btq_in.dat[btq_rd_cnt].NPC;
+
+                branch_taken_n[i] = btq_in.dat[btq_rd_cnt].take ? 1'b1 : 1'b0;
+
                 ++btq_rd_cnt;
                 break;
             end 
@@ -150,10 +206,34 @@ module retire (
             control path cannot retrigger. */
             flush        <= '0;
             corrected_PC <= '0;
+
+
+            branch_taken <= '0;
+            update_en    <= '0;
+            PC_original  <= '0;
+            bhr_from_btq <= '0;
+
+
+            correlated_bhr_d <= '0;
+            gshare_pred      <= '0;
+            corr_pred        <= '0;
+
         end else begin
 /* ======================================== */
             flush        <= flush_n;
             corrected_PC <= corrected_PC_n;
+
+            branch_taken <= branch_taken_n;
+            update_en    <= update_en_n;
+            PC_original  <= PC_original_n;
+            bhr_from_btq <= bhr_from_btq_n;
+
+
+            correlated_bhr_d <= correlated_bhr_d_n;
+            gshare_pred      <= gshare_pred_n;
+            corr_pred        <= corr_pred_n;
+
+
 /* ======================================== */
         end
     end

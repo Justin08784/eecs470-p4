@@ -7,14 +7,14 @@ module gshare_predictor_tb;
   logic clock, reset;
 
   fetch2predictor    fetch_2_pred;
-  retire2predictor   ret_2_pred;
+  //retire2predictor   ret_2_pred;
   logic [N-1:0]      predict_taken;
 
   gshare dut (
     .clock(clock),
     .reset(reset),
     .fetch_2_pred(fetch_2_pred),
-    .ret_2_pred(ret_2_pred),
+    //.ret_2_pred(ret_2_pred),
     .predict_taken(predict_taken)
   );
 
@@ -30,8 +30,9 @@ module gshare_predictor_tb;
   initial begin
     clock = 0;
     reset = 1;
-    fetch_2_pred = '{default:32'h0};
-    ret_2_pred = '{default:'0};
+    //fetch_2_pred = '{default:32'h0};
+    fetch_2_pred = '{PC: '{32'h00,32'h200}, update_enable: 2'b00, taken: 2'b00, correct_PC: '{32'h0, 32'h0}};
+    //ret_2_pred = '{default:'0};
 
     @(negedge clock);
     reset = 0;
@@ -41,63 +42,63 @@ module gshare_predictor_tb;
     // Always taken, so predictor should eventually learn
 
     // Cycle 0
-    fetch_2_pred.PC[0] = 32'h10;
-    fetch_2_pred.PC[1] = 32'h20;
-    ret_2_pred = '{update_enable: 2'b00, taken: 2'b00, PC: '{32'h0, 32'h0}};
+    //fetch_2_pred.PC[0] = 32'h10;
+    //fetch_2_pred.PC[1] = 32'h20;
+    fetch_2_pred = '{PC: '{32'h10,32'h20}, update_enable: 2'b00, taken: 2'b00, correct_PC: '{32'h0, 32'h0}};
     @(negedge clock); show_predictions("0");
 
     // Cycle 1
-    fetch_2_pred.PC[0] = 32'h10;
-    fetch_2_pred.PC[1] = 32'h20;
-    ret_2_pred = '{update_enable: 2'b00, taken: 2'b00, PC: '{32'h0, 32'h0}};
+    //fetch_2_pred.PC[0] = 32'h10;
+    //fetch_2_pred.PC[1] = 32'h20;
+    fetch_2_pred = '{PC: '{32'h10,32'h20}, update_enable: 2'b00, taken: 2'b00, correct_PC: '{32'h0, 32'h0}};
     @(negedge clock); show_predictions("1");
 
     // Cycle 2
-    fetch_2_pred.PC[0] = 32'h10;
-    fetch_2_pred.PC[1] = 32'h20;
-    ret_2_pred = '{update_enable: 2'b11, taken: 2'b11, PC: '{32'h10, 32'h20}};
+    //fetch_2_pred.PC[0] = 32'h10;
+    //fetch_2_pred.PC[1] = 32'h20;
+    fetch_2_pred = '{PC: '{32'h10,32'h20}, update_enable: 2'b11, taken: 2'b11, correct_PC: '{32'h10, 32'h20}};
     @(negedge clock); show_predictions("2");
 
     // Cycle 3
-    fetch_2_pred.PC[0] = 32'h10;
-    fetch_2_pred.PC[1] = 32'h20;
-    ret_2_pred = '{update_enable: 2'b11, taken: 2'b11, PC: '{32'h10, 32'h20}};
+    //fetch_2_pred.PC[0] = 32'h10;
+    //fetch_2_pred.PC[1] = 32'h20;
+    fetch_2_pred = '{PC: '{32'h10,32'h20}, update_enable: 2'b11, taken: 2'b11, correct_PC: '{32'h10, 32'h20}};
     @(negedge clock); show_predictions("3");
 
     // Cycle 4
-    fetch_2_pred.PC[0] = 32'h10;
-    fetch_2_pred.PC[1] = 32'h20;
-    ret_2_pred = '{update_enable: 2'b11, taken: 2'b11, PC: '{32'h10, 32'h20}};
+    //fetch_2_pred.PC[0] = 32'h10;
+    //fetch_2_pred.PC[1] = 32'h20;
+    fetch_2_pred = '{PC: '{32'h10,32'h20}, update_enable: 2'b11, taken: 2'b11, correct_PC: '{32'h10, 32'h20}};
     @(negedge clock); show_predictions("4");
 
     // Cycle 5
-    fetch_2_pred.PC[0] = 32'h10;
-    fetch_2_pred.PC[1] = 32'h20;
-    ret_2_pred = '{update_enable: 2'b11, taken: 2'b11, PC: '{32'h10, 32'h20}};
+    //fetch_2_pred.PC[0] = 32'h10;
+    //fetch_2_pred.PC[1] = 32'h20;
+    fetch_2_pred = '{PC: '{32'h10,32'h20}, update_enable: 2'b11, taken: 2'b11, correct_PC: '{32'h10, 32'h20}};
     @(negedge clock); show_predictions("5");
 
     // Cycle 6
-    fetch_2_pred.PC[0] = 32'h10;
-    fetch_2_pred.PC[1] = 32'h20;
-    ret_2_pred = '{update_enable: 2'b11, taken: 2'b11, PC: '{32'h10, 32'h20}};
+    //fetch_2_pred.PC[0] = 32'h10;
+    //fetch_2_pred.PC[1] = 32'h20;
+    fetch_2_pred = '{PC: '{32'h10,32'h20}, update_enable: 2'b11, taken: 2'b11, correct_PC: '{32'h10, 32'h20}};
     @(negedge clock); show_predictions("6");
 
     // Cycle 7
-    fetch_2_pred.PC[0] = 32'h10;
-    fetch_2_pred.PC[1] = 32'h20;
-    ret_2_pred = '{update_enable: 2'b11, taken: 2'b11, PC: '{32'h10, 32'h20}};
+    //fetch_2_pred.PC[0] = 32'h10;
+    //fetch_2_pred.PC[1] = 32'h20;
+    fetch_2_pred = '{PC: '{32'h10,32'h20}, update_enable: 2'b11, taken: 2'b11, correct_PC: '{32'h10, 32'h20}};
     @(negedge clock); show_predictions("7");
 
     // Cycle 8
-    fetch_2_pred.PC[0] = 32'h10;
-    fetch_2_pred.PC[1] = 32'h20;
-    ret_2_pred = '{update_enable: 2'b11, taken: 2'b11, PC: '{32'h10, 32'h20}};
+    //fetch_2_pred.PC[0] = 32'h10;
+    //fetch_2_pred.PC[1] = 32'h20;
+    fetch_2_pred = '{PC: '{32'h10,32'h20}, update_enable: 2'b11, taken: 2'b11, correct_PC: '{32'h10, 32'h20}};
     @(negedge clock); show_predictions("8");
 
     // Cycle 9
-    fetch_2_pred.PC[0] = 32'h10;
-    fetch_2_pred.PC[1] = 32'h20;
-    ret_2_pred = '{update_enable: 2'b11, taken: 2'b11, PC: '{32'h10, 32'h20}};
+    //fetch_2_pred.PC[0] = 32'h10;
+    //fetch_2_pred.PC[1] = 32'h20;
+    fetch_2_pred = '{PC: '{32'h10,32'h20}, update_enable: 2'b11, taken: 2'b11, correct_PC: '{32'h10, 32'h20}};
     @(negedge clock); show_predictions("9");
 
     // Final cycle — check both predictions are taken
@@ -108,63 +109,63 @@ module gshare_predictor_tb;
 
 
      // Cycle 10
-    fetch_2_pred.PC[0] = 32'h10;
-    fetch_2_pred.PC[1] = 32'h20;
-    ret_2_pred = '{update_enable: 2'b11, taken: 2'b00, PC: '{32'h10, 32'h20}};
+    //fetch_2_pred.PC[0] = 32'h10;
+    //fetch_2_pred.PC[1] = 32'h20;
+    fetch_2_pred = '{PC: '{32'h10,32'h20}, update_enable: 2'b11, taken: 2'b00, correct_PC: '{32'h10, 32'h20}};
     @(negedge clock); show_predictions("10");
 
      // Cycle 11
-    fetch_2_pred.PC[0] = 32'h10;
-    fetch_2_pred.PC[1] = 32'h20;
-    ret_2_pred = '{update_enable: 2'b11, taken: 2'b00, PC: '{32'h10, 32'h20}};
+    //fetch_2_pred.PC[0] = 32'h10;
+    //fetch_2_pred.PC[1] = 32'h20;
+    fetch_2_pred = '{PC: '{32'h10,32'h20}, update_enable: 2'b11, taken: 2'b00, correct_PC: '{32'h10, 32'h20}};
     @(negedge clock); show_predictions("11");
 
      // Cycle 12
-    fetch_2_pred.PC[0] = 32'h10;
-    fetch_2_pred.PC[1] = 32'h20;
-    ret_2_pred = '{update_enable: 2'b11, taken: 2'b00, PC: '{32'h10, 32'h20}};
+    //fetch_2_pred.PC[0] = 32'h10;
+    //fetch_2_pred.PC[1] = 32'h20;
+    fetch_2_pred = '{PC: '{32'h10,32'h20}, update_enable: 2'b11, taken: 2'b00, correct_PC: '{32'h10, 32'h20}};
     @(negedge clock); show_predictions("12");
 
      // Cycle 13
-    fetch_2_pred.PC[0] = 32'h10;
-    fetch_2_pred.PC[1] = 32'h20;
-    ret_2_pred = '{update_enable: 2'b11, taken: 2'b00, PC: '{32'h10, 32'h20}};
+    //fetch_2_pred.PC[0] = 32'h10;
+    //fetch_2_pred.PC[1] = 32'h20;
+    fetch_2_pred = '{PC: '{32'h10,32'h20}, update_enable: 2'b11, taken: 2'b00, correct_PC: '{32'h10, 32'h20}};
     @(negedge clock); show_predictions("13");
 
      // Cycle 14
-    fetch_2_pred.PC[0] = 32'h10;
-    fetch_2_pred.PC[1] = 32'h20;
-    ret_2_pred = '{update_enable: 2'b11, taken: 2'b00, PC: '{32'h10, 32'h20}};
+    //fetch_2_pred.PC[0] = 32'h10;
+    //fetch_2_pred.PC[1] = 32'h20;
+    fetch_2_pred = '{PC: '{32'h10,32'h20}, update_enable: 2'b11, taken: 2'b00, correct_PC: '{32'h10, 32'h20}};
     @(negedge clock); show_predictions("14");
 
      // Cycle 15
-    fetch_2_pred.PC[0] = 32'h10;
-    fetch_2_pred.PC[1] = 32'h20;
-    ret_2_pred = '{update_enable: 2'b11, taken: 2'b00, PC: '{32'h10, 32'h20}};
+   // fetch_2_pred.PC[0] = 32'h10;
+   // fetch_2_pred.PC[1] = 32'h20;
+    fetch_2_pred = '{PC: '{32'h10,32'h20}, update_enable: 2'b11, taken: 2'b00, correct_PC: '{32'h10, 32'h20}};
     @(negedge clock); show_predictions("15");
 
      // Cycle 16
-    fetch_2_pred.PC[0] = 32'h10;
-    fetch_2_pred.PC[1] = 32'h20;
-    ret_2_pred = '{update_enable: 2'b11, taken: 2'b00, PC: '{32'h10, 32'h20}};
+    //fetch_2_pred.PC[0] = 32'h10;
+    //fetch_2_pred.PC[1] = 32'h20;
+    fetch_2_pred = '{PC: '{32'h10,32'h20}, update_enable: 2'b11, taken: 2'b00, correct_PC: '{32'h10, 32'h20}};
     @(negedge clock); show_predictions("16");
 
      // Cycle 17
-    fetch_2_pred.PC[0] = 32'h10;
-    fetch_2_pred.PC[1] = 32'h20;
-    ret_2_pred = '{update_enable: 2'b11, taken: 2'b00, PC: '{32'h10, 32'h20}};
+    //fetch_2_pred.PC[0] = 32'h10;
+    //fetch_2_pred.PC[1] = 32'h20;
+    fetch_2_pred = '{PC: '{32'h10,32'h20}, update_enable: 2'b11, taken: 2'b00, correct_PC: '{32'h10, 32'h20}};
     @(negedge clock); show_predictions("17");
 
      // Cycle 18
-    fetch_2_pred.PC[0] = 32'h10;
-    fetch_2_pred.PC[1] = 32'h20;
-    ret_2_pred = '{update_enable: 2'b11, taken: 2'b00, PC: '{32'h10, 32'h20}};
+    //fetch_2_pred.PC[0] = 32'h10;
+    //fetch_2_pred.PC[1] = 32'h20;
+    fetch_2_pred = '{PC: '{32'h10,32'h20}, update_enable: 2'b11, taken: 2'b00, correct_PC: '{32'h10, 32'h20}};
     @(negedge clock); show_predictions("18");
 
      // Cycle 19
-    fetch_2_pred.PC[0] = 32'h10;
-    fetch_2_pred.PC[1] = 32'h20;
-    ret_2_pred = '{update_enable: 2'b11, taken: 2'b00, PC: '{32'h10, 32'h20}};
+    //fetch_2_pred.PC[0] = 32'h10;
+    //fetch_2_pred.PC[1] = 32'h20;
+    fetch_2_pred = '{PC: '{32'h10,32'h20}, update_enable: 2'b11, taken: 2'b00, correct_PC: '{32'h10, 32'h20}};
     @(negedge clock); show_predictions("19");
     
 
