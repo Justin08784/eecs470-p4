@@ -72,6 +72,27 @@ localparam RES_MASK
     M_MW    = 6'b0_00010,
     M_MR    = 6'b0_00001;
 
+function automatic logic [NUM_CACHE_OPS-1:0][NUM_RES-1:0] init_op_res_mask();
+    logic [NUM_CACHE_OPS-1:0][NUM_RES-1:0] rv;
+    rv = '0;
+
+    rv[OP_FILL_EVICT_BOTH] = (        M_MSHR | M_VW | M_VR | M_MW | M_MR);
+    rv[OP_FILL_EVICT_MAIN] = (                 M_VW        | M_MW | M_MR);
+    rv[OP_FILL_NO_EVICT]   = (                               M_MW       );
+
+    rv[OP_LOAD_MHIT]       = (                                      M_MR);
+    rv[OP_LOAD_VHIT_PULL]  = (                        M_VR | M_MW       );
+    rv[OP_LOAD_VHIT_SWAP]  = (                 M_VW | M_VR | M_MW | M_MR);
+    rv[OP_LOAD_MISS]       = (        M_MSHR                            );
+
+    rv[OP_STOR_MHIT]       = (                               M_MW | M_MR);
+    rv[OP_STOR_VHIT_PULL]  = (                        M_VR | M_MW       );
+    rv[OP_STOR_VHIT_SWAP]  = (                 M_VW | M_VR | M_MW | M_MR);
+    rv[OP_STOR_MISS]       = (        M_MSHR                            );
+
+    return rv;
+endfunction
+
 
 typedef struct packed {
     OP_TAG op;
