@@ -295,6 +295,7 @@ module stage_id_p4 (
 
                 bhr         : f_in.f_dat[i].bhr, 
                 pred        : f_in.f_dat[i].pred,
+                pred_tgt    : f_in.f_dat[i].pred_tgt,
 
                 correlated_bhr : f_in.f_dat[i].correlated_bhr,
 

@@ -143,7 +143,16 @@ module retire (
 
                 ++btq_rd_cnt;
                 break;
-            end 
+            end
+            else if (btq_in.dat[btq_rd_cnt].take && (btq_in.dat[btq_rd_cnt].pred_tgt != btq_in.dat[btq_rd_cnt].tgt)) begin
+                mispred = 1;
+                mispred_target = btq_in.dat[btq_rd_cnt].tgt;
+
+                branch_taken_n[i] = 1'b1;
+
+                ++btq_rd_cnt;
+                break;
+            end
             ++btq_rd_cnt;
         end
 
@@ -186,8 +195,7 @@ module retire (
         };
 
         lq_out = flush ? '0 : '{
-            r_en : lq_rd_cnt,
-            r_pos: '0 // FIXME: What is this even used for?
+            r_en : lq_rd_cnt
         };
     end
 
