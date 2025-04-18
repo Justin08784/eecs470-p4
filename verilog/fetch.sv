@@ -125,7 +125,7 @@ module stage_if_p4 (
 
     assign btb_hit = btb_in.hit;
 
-    ADDR [`N:0] PC_n; // PC_n[m] := PC if we fetch "m" this cycle (inaccurate past the 1st branch)
+    ADDR [`N:0] PC_n; // PC_n[m] := next PC if we fetch "m" this cycle (inaccurate past the 1st branch)
     always_comb begin
         PC_n[0] = PC_reg;
         for (int i = 0; i < `N; ++i) begin
@@ -172,23 +172,14 @@ module stage_if_p4 (
 
 
     logic [255:0][1:0] chooser_table;
-   
-
-
     always_comb begin
-
-        if(chooser_table[PC_reg[7:0]] == 2'b00) begin
-            predict_taken = pred_in_gshare.prediction;;
-        end else if (chooser_table[PC_reg[7:0]] == 2'b01) begin
-            predict_taken    = pred_in_gshare.prediction;
-        end else if (chooser_table[PC_reg[7:0]] == 2'b10) begin
-            predict_taken    = pred_in_corr.prediction;
-        end else if (chooser_table[PC_reg[7:0]] == 2'b11) begin
-            predict_taken    = pred_in_corr.prediction;
-        end else begin
-            predict_taken    = 0;
-        end
-    
+        case (chooser_table[PC_reg[7:0]])
+            2'b00: predict_taken = pred_in_gshare.prediction;
+            2'b01: predict_taken = pred_in_gshare.prediction;
+            2'b10: predict_taken = pred_in_corr.prediction;
+            2'b11: predict_taken = pred_in_corr.prediction;
+            default: predict_taken = '0;
+        endcase
     end
 
     logic g_correct, c_correct;
