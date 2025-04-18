@@ -369,6 +369,7 @@ module refill_engine (
             end
             endcase
         end
+
         S_NTAG: begin
             if (mshr.wr_mem  && mem_in_transaction_tag != 0) begin
                 mshr_n.miss_tag = mem_in_transaction_tag;
@@ -379,7 +380,16 @@ module refill_engine (
                 mshr_n.status   = S_WAIT;
             end
         end
+
         S_WAIT: begin
+            if (mem_in_data_tag != 0
+                && mem_in_data_tag == mshr.miss_tag) begin
+                mshr_n.status   = S_FILL;
+                mshr_n.mem_data = mem_in_data;
+            end
+        end
+
+        S_FILL: begin
             case (snd_in.op)
             OP_FILL_EVICT: begin
                 mshr_n = '{
@@ -395,13 +405,6 @@ module refill_engine (
                 mshr_n        = '0;
                 mshr_n.status = S_IDLE;
             end
-            default:;
-            endcase
-        end
-        S_FILL: begin
-            case (snd_in.op)
-            OP_FILL_EVICT:    mshr_n.status = S_NTAG;
-            OP_FILL_NO_EVICT: mshr_n.status = S_IDLE;
             default:;
             endcase
         end
