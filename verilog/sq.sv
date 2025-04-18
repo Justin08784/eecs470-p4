@@ -340,6 +340,8 @@ module sq #(parameter
         ret_head,
         tail,
         used,
+        free,
+        rsvd,
         // I/O
         dispatch_in,
         execute_in,

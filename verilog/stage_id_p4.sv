@@ -254,7 +254,7 @@ module stage_id_p4 (
         decoder_p4 decoder_i (
             // Inputs
             .inst  (f_in.f_dat[i].inst),
-            .valid (f_in.f_dat[i].valid),
+            .valid (`TRUE),
 
             // Outputs
             .fu_idx        (tmp[i].fu_idx),
@@ -292,6 +292,14 @@ module stage_id_p4 (
                 sq_idx      : '0,
                 lq_idx      : '0,
                 is_brch   : tmp[i].cond_branch || tmp[i].uncond_branch,
+
+                bhr         : f_in.f_dat[i].bhr, 
+                pred        : f_in.f_dat[i].pred,
+
+                correlated_bhr : f_in.f_dat[i].correlated_bhr,
+
+                gshare_pred : f_in.f_dat[i].gshare_pred,
+                corr_pred   : f_in.f_dat[i].corr_pred,
 
                 inst        : f_in.f_dat[i].inst,
                 PC          : f_in.f_dat[i].PC,

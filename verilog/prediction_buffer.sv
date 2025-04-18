@@ -91,6 +91,18 @@ module prediction_buffer #(
             tail  <= new_tail;
             count <= new_count;
         end
+
+
+        $display("DEQ_PC0 = 0x%h  DEQ_PC1 = 0x%h", deq_PC0, deq_PC1);
+        $display("deq_valid0 = %b  deq_valid1 = %b", deq_valid0, deq_valid1);
+       /* $display("update_index0 = %b  update_index1 = %b", update_index[0], update_index[1]);
+        $display("buffer_ready0 = %b  buffer_ready1 = %b", buffer_ready0, buffer_ready1);
+        $display("  prediction[0] = %1b", prediction[0]);
+        $display("  prediction[1] = %1b", prediction[1]);
+
+        $display("  globalBHR = %b", globalBHR);
+        $display("  fetch_in.PC[0] = %d", fetch_2_pred.correct_PC[0]);
+        $display("  fetch_in.PC[1] = %d", fetch_2_pred.correct_PC[1]);*/
     end
 
 endmodule
