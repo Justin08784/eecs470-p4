@@ -97,7 +97,7 @@ module sq #(parameter
 
             rob_out.complete_rob_idxs[i] = state[next_complete.st_sq_idx[i] % LSQ_SZ].rob_idx;
         end
-        retire_out.sq_ret_complete = ret_head == head;//(ret_buf_in.used_scnt == 0) && (used_scnt == 0);
+        retire_out.sq_ret_complete = used == 0;//ret_head == head;//(ret_buf_in.used_scnt == 0) && (used_scnt == 0);
         retire_out.sq_ret_en = `MIN(N,ret_buf_free);
 
     end
