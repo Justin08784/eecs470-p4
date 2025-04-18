@@ -77,26 +77,7 @@ module cpu (
         mem2fetch_transaction_tag   = '0;
 
         // FIXME: Ignoring requests from dcache for now
-        if (fetch2mem_command == MEM_LOAD) begin
-            /*
-            FETCH REQUESTS COME LAST (always complete memory operations first to
-            get stuff commited to memory and to keep the processor FUs chugging)
-            */
-            proc2mem_command    = fetch2mem_command;
-            proc2mem_addr       = fetch2mem_addr;
-
-            mem2fetch_transaction_tag   = mem2proc_transaction_tag;
-        end
-
-        // CORRECT:
-        // if (dcache2mem_command != MEM_NONE) begin
-        //     proc2mem_command    = dcache2mem_command;
-        //     proc2mem_addr       = dcache2mem_addr;
-        //     proc2mem_data       = dcache2mem_data;
-
-        //     mem2dcache_transaction_tag  = mem2proc_transaction_tag;
-
-        // end else if (fetch2mem_command == MEM_LOAD) begin
+        // if (fetch2mem_command == MEM_LOAD) begin
         //     /*
         //     FETCH REQUESTS COME LAST (always complete memory operations first to
         //     get stuff commited to memory and to keep the processor FUs chugging)
@@ -106,7 +87,36 @@ module cpu (
 
         //     mem2fetch_transaction_tag   = mem2proc_transaction_tag;
         // end
+
+        // CORRECT:
+        if (dcache2mem_command != MEM_NONE) begin
+            proc2mem_command    = dcache2mem_command;
+            proc2mem_addr       = dcache2mem_addr;
+            proc2mem_data       = dcache2mem_data;
+
+            mem2dcache_transaction_tag  = mem2proc_transaction_tag;
+
+        end else if (fetch2mem_command == MEM_LOAD) begin
+            /*
+            FETCH REQUESTS COME LAST (always complete memory operations first to
+            get stuff commited to memory and to keep the processor FUs chugging)
+            */
+            proc2mem_command    = fetch2mem_command;
+            proc2mem_addr       = fetch2mem_addr;
+
+            mem2fetch_transaction_tag   = mem2proc_transaction_tag;
+        end
     end
+
+    // always_ff @(posedge clock) begin
+    //     if (!reset) begin
+    //         $display("dcache2mem: {cmd: %1d, addr: %x, data: %x}",
+    //             dcache2mem_command,
+    //             dcache2mem_addr,
+    //             dcache2mem_data
+    //         );
+    //     end
+    // end
 
     //////////////////////////////////////////////////
     //                                              //
@@ -140,11 +150,11 @@ module cpu (
         .mem_out_data           (dcache2mem_data),
 
         // Load (w/ load FU)
-        .ld_in  (ld_2_dcache),
+        .ld_in  ('0), //(ld_2_dcache), // FIXME: reenable
         .ld_out (dcache_2_ld),
 
         // Store (w/ SQ)
-        .sq_in  (sq_2_dcache),
+        .sq_in  ('0), // (sq_2_dcache), // FIXME: reenable
         .sq_out (dcache_2_sq)
     );
 

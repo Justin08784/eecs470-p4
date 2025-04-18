@@ -335,6 +335,9 @@ module refill_engine (
 
     always_comb begin
         mshr_n = mshr;
+        mem_out_command = '0;
+        mem_out_addr    = '0;
+        mem_out_data    = '0;
 
         case(mshr.status)
         S_IDLE: begin
