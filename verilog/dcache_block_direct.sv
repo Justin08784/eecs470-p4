@@ -15,15 +15,8 @@ function automatic CACHE_LOC cache_locate(
     TAG     tag;
     WAY     way;
     tag = get_tag(addr);
-    hit = 0;
-    way = '0;
-    for (int w = 0; w < NUM_CACHE_LINES; ++w) begin
-        if (!(hdr.vld[w] && tag == hdr.tag[w]))
-            continue;
-        way = w;
-        hit = 1;
-        break; 
-    end
+    way = get_way(addr);
+    hit = hdr.vld[way] && (tag == hdr.tag[way]);
     return '{hit, tag, way};
 endfunction
 
