@@ -58,14 +58,14 @@ module cpu (
     logic flush;
 
 
-    MEM_TAG dcache2mem_command;
-    DATA    dcache2mem_addr;
-    DATA    dcache2mem_data;
-    MEM_TAG mem2dcache_transaction_tag;
+    MEM_COMMAND dcache2mem_command;
+    DATA        dcache2mem_addr;
+    MEM_BLOCK   dcache2mem_data;
+    MEM_TAG     mem2dcache_transaction_tag;
 
-    MEM_TAG fetch2mem_command;
-    DATA    fetch2mem_addr;
-    MEM_TAG mem2fetch_transaction_tag;
+    MEM_COMMAND fetch2mem_command;
+    DATA        fetch2mem_addr;
+    MEM_TAG     mem2fetch_transaction_tag;
 
     always_comb begin
         proc2mem_command    = MEM_NONE;
@@ -163,19 +163,20 @@ module cpu (
         .flush  (flush),
         .d_in   (decode_2_f),
         .r_in   (retire_2_f),
-        .Imem_data  (mem2proc_data),      // data coming back from Instruction memory
-        .Imem2proc_transaction_tag(fetch_mem2proc_transaction_tag),
-        .Imem2proc_data_tag(mem2proc_data_tag),
 
-        .Imem_command(fetch2mem_command),
-        .Imem_addr   (fetch2mem_addr),
-        .d_out  (f_2_decode),
-        .btb_in(btb_2_fetch),
-        .pred_in_gshare(pred_2_fetch_gshare),
-        .pred_in_corr(pred_2_fetch_corr),
+        .Imem2proc_transaction_tag  (mem2fetch_transaction_tag),
+        .Imem2proc_data_tag         (mem2proc_data_tag),
+        .Imem_data                  (mem2proc_data),      // data coming back from Instruction memory
+        .Imem_command               (fetch2mem_command),
+        .Imem_addr                  (fetch2mem_addr),
 
-        .btb_out(fetch_2_btb),
-        .pred_out(fetch_2_pred)
+        .d_out          (f_2_decode),
+        .btb_in         (btb_2_fetch),
+        .pred_in_gshare (pred_2_fetch_gshare),
+        .pred_in_corr   (pred_2_fetch_corr),
+
+        .btb_out    (fetch_2_btb),
+        .pred_out   (fetch_2_pred)
 
     );
 
@@ -315,7 +316,14 @@ module cpu (
     );
 
     assign retire_2_f = '{
-        corrected_PC : corrected_PC, is_taken : branch_taken, update_en : update_en, PC : PC_original, retired_bhr : bhr_from_btq, correlated_bhr : correlated_bhr_d, gshare_pred : gshare_pred, corr_pred : corr_pred
+        corrected_PC    : corrected_PC,
+        is_taken        : branch_taken,
+        update_en       : update_en,
+        PC              : PC_original,
+        retired_bhr     : bhr_from_btq,
+        correlated_bhr  : correlated_bhr_d,
+        gshare_pred     : gshare_pred,
+        corr_pred       : corr_pred
     };
 
 
@@ -464,7 +472,7 @@ module cpu (
         .retire_in      (retire_2_sq),
         .retire_out     (sq_2_retire),
 
-        .dcache_in      (dcache_2_sq),
+        .dcache_in      ('0),//(dcache_2_sq), // FIXME FIXME FIXME FIXME
         .dcache_out     (sq_2_dcache)
 );
 
