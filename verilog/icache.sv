@@ -211,6 +211,10 @@ module icache (
     end 
 
     `ifdef DEBUG
+    /* WARNING: THIS IS POSITIONAL ASSIGNMENT. We are essentially constructing
+    a raw bit vector. This is not a Rust-like feature where a value is being
+    assigned ot the same-name field. That is, if you get the order wrong the
+    value will be completely fucked. */
     assign dbg = '{
         changed_addr,
         current_tag,   last_tag,   write_tag,
