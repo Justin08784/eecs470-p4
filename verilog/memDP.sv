@@ -14,7 +14,9 @@ module memDP
                                // 1: Read data will update combinationally if
                                //    write to same address
    )
-   (// ------------------------------------------------------------ //
+   (
+    output logic [DEPTH-1:0][WIDTH-1:0] dbg,
+    // ------------------------------------------------------------ //
     //                      Clock and Reset                         //
     // ------------------------------------------------------------ //
     input                                            clock,
@@ -39,6 +41,7 @@ module memDP
 
 logic [DEPTH-1:0][WIDTH-1:0]  memData;
 genvar i;
+assign dbg = memData;
 
 ///////////////////////////////////////////////////////////////////
 ////////////////////////// Read Logic /////////////////////////////

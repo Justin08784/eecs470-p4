@@ -445,12 +445,14 @@ module dcache_block (
     WAY     rway, wway;
     MEM_BLOCK rdat, wdat;
     logic [NUM_CACHE_LINES-1:0] free_gnt;
+    logic [NUM_CACHE_LINES-1:0][$bits(MEM_BLOCK)-1:0] dbg_memDP;
     memDP #(
         .WIDTH     ($bits(MEM_BLOCK)),
         .DEPTH     (NUM_CACHE_LINES),
         .READ_PORTS(1),
         .BYPASS_EN (0)
     ) state (
+        .dbg  (dbg_memDP),
         .clock(clock),
         .reset(reset),
         .re   (ren ),
@@ -657,11 +659,12 @@ module dcache_block (
                     $display("header[%2d]:", i);
                     continue;
                 end
-                $display("header[%2d]: {vld: %b, dirty: %b, tag: 0x%x} (addr: 0x%x)",
+                $display("header[%2d]: {vld: %b, dirty: %b, tag: 0x%x} data: %x, (addr: 0x%x)",
                     i,
                     hdr.vld[i],
                     hdr.dirty[i],
                     hdr.tag[i],
+                    dbg_memDP[i],
                     {hdr.tag[i], WAY'(i), 3'b000}
                 );
             end
