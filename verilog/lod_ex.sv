@@ -104,6 +104,7 @@ module lod_ex(
     //LD memory request logic
     logic req_en, next_req_en;
     logic [$clog2(`LD_BAY_SZ):0] curr_frwd, next_frwd;
+    logic [LD_BAY_SZ-1:0] next_got;
     always_comb begin
         next_req_en = req_en;
         next_frwd = curr_frwd;
@@ -112,7 +113,7 @@ module lod_ex(
             next_req_en = 0;
             next_frwd = '0;
             for (int unsigned i = 0; i < `LD_BAY_SZ; i++) begin
-                if ((!bays.vld[i]) || bays.got[i]) continue;
+                if ((!bays.vld[i]) || bays.got[i] || next_got[i]) continue;
 
                 next_req_en = 1;
                 next_frwd = i;
@@ -158,7 +159,6 @@ module lod_ex(
     //ST-LD forwarding parsing logic
     logic [LD_BAY_SZ-1:0][3:0] next_st_frwd_byte_mask;
     DATA_BLOCK [LD_BAY_SZ-1:0] next_dat;
-    logic [LD_BAY_SZ-1:0] next_got;
     always_comb begin
         next_got = bays.got;
         next_st_frwd_byte_mask = '0;
