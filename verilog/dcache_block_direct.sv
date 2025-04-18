@@ -22,6 +22,7 @@ function automatic CACHE_LOC cache_locate(
             continue;
         way = w;
         hit = 1;
+        break; 
     end
     return '{hit, tag, way};
 endfunction
@@ -113,7 +114,7 @@ module fill_handler (
 
     /* receipts */
     input  logic        gnt,
-    output READ_RCV     r_rcv
+    input  READ_RCV     r_rcv
 );
     OP_TAG op;
     WAY    way;
@@ -133,6 +134,7 @@ module fill_handler (
             if (!alloc_msk[w])
                 continue;
             way = w;
+            break;
         end
 
         {
@@ -191,15 +193,17 @@ module load_handler (
     /* orders */
     output logic        req,
     output READ_SND     r_snd,
+    output WRIT_SND     w_snd,
     output MSHR_SND     mshr_snd,
 
     /* receipts */
     input  logic        gnt,
-    output READ_RCV     r_rcv
+    input  READ_RCV     r_rcv
 
 );
     OP_TAG op;
     CACHE_LOC loc;
+    assign w_snd = '0;
 
     always_comb begin
         req = ld_in.vld;
@@ -267,7 +271,7 @@ module stor_handler (
 
     /* receipts */
     input  logic        gnt,
-    output READ_RCV     r_rcv
+    input  READ_RCV     r_rcv
 
 );
    OP_TAG op;
@@ -418,7 +422,7 @@ module refill_engine (
     always_ff @(posedge clock) begin
         if (reset) begin
             mshr <= '0;
-        end else if (snd_in.en) begin
+        end else begin
             mshr <= mshr_n;
         end
     end
@@ -484,8 +488,6 @@ module dcache_block (
         REQR_FILL, // highest priority
         NUM_REQR
     } REQR;
-    logic [NUM_REQR-1:0] req, gnt;
-
 
     logic   evict; // alloc in set requires evict? i.e. !(any free way in set)
     logic   [NUM_CACHE_LINES-1:0] alloc_msk; // alloc in set requires evict? i.e. !(any free way in set)
@@ -503,35 +505,97 @@ module dcache_block (
         end
     end
 
+    logic    [NUM_REQR-1:0] req, gnt;
+    READ_SND [NUM_REQR-1:0] r_snds;
+    WRIT_SND [NUM_REQR-1:0] w_snds;
+    MSHR_SND [NUM_REQR-1:0] mshr_snds;
+
+    READ_RCV [NUM_REQR-1:0] r_rcvs;
+
+    REQR     gnt_reqr;
+    always_comb begin
+        gnt      = '0;
+        gnt_reqr = '0;
+
+        foreach (req[op]) begin
+            if (!req[op])
+                continue;
+            gnt[op]  = 1;
+            gnt_reqr = op;
+            break;
+        end
+
+        r_rcvs = '0;
+        ren  = 1;
+        rway = r_snds[gnt_reqr];
+        r_rcvs[gnt_reqr] = rdat;
+
+        wen  = w_snds[gnt_reqr].vld;
+        wway = w_snds[gnt_reqr].way;
+        wdat = w_snds[gnt_reqr].dat;
+    end
+
+
+
     // microp decoders (for resource use intent)
     MSHR_ENTRY mshr;
     refill_engine dec_refill (
         .reset,
         .clock,
 
-        .mshr_out(mshr)
+        .mshr_out(mshr),
+        .snd_in  (mshr_snds[gnt_reqr]), // FIXME
+
+        .mem_in_transaction_tag,
+        .mem_in_data,
+        .mem_in_data_tag,
+
+        .mem_out_command,
+        .mem_out_addr,
+        .mem_out_data
     );
+
     fill_handler dec_fill0 (
         .hdr,
         .mshr,
         .evict,
         .alloc_msk,
 
-        .req(req[REQR_FILL])
+        .req        (req[REQR_FILL]),
+        .r_snd      (r_snds[REQR_FILL]),
+        .w_snd      (w_snds[REQR_FILL]),
+        .mshr_snd   (mshr_snds[REQR_FILL]),
+
+        .gnt        (gnt[REQR_FILL]),
+        .r_rcv      (r_rcvs[REQR_FILL])
     );
 
     load_handler dec_load0 (
         .ld_in,
+        .ld_out,
         .hdr,
 
-        .req(req[REQR_LOAD])
+        .req        (req[REQR_LOAD]),
+        .r_snd      (r_snds[REQR_LOAD]),
+        .w_snd      (w_snds[REQR_LOAD]),
+        .mshr_snd   (mshr_snds[REQR_LOAD]),
+
+        .gnt        (gnt[REQR_LOAD]),
+        .r_rcv      (r_rcvs[REQR_LOAD])
     );
 
     stor_handler dec_stor0 (
         .sq_in,
+        .sq_out,
         .hdr,
 
-        .req(req[REQR_STOR])
+        .req        (req[REQR_STOR]),
+        .r_snd      (r_snds[REQR_STOR]),
+        .w_snd      (w_snds[REQR_STOR]),
+        .mshr_snd   (mshr_snds[REQR_STOR]),
+
+        .gnt        (gnt[REQR_STOR]),
+        .r_rcv      (r_rcvs[REQR_STOR])
     );
 
 endmodule
