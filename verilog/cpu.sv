@@ -154,7 +154,7 @@ module cpu (
         .ld_out (dcache_2_ld),
 
         // Store (w/ SQ)
-        .sq_in  ('0), // (sq_2_dcache), // FIXME: reenable
+        .sq_in  (sq_2_dcache), // FIXME: reenable
         .sq_out (dcache_2_sq)
     );
 
@@ -495,7 +495,7 @@ module cpu (
         .retire_in      (retire_2_sq),
         .retire_out     (sq_2_retire),
 
-        .dcache_in      ('0),//(dcache_2_sq), // FIXME FIXME FIXME FIXME
+        .dcache_in      (dcache_2_sq), // FIXME FIXME FIXME FIXME
         .dcache_out     (sq_2_dcache)
 );
 
