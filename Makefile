@@ -312,7 +312,6 @@ synth/dcache_simple.vg: $(DCACHE_SIMPLE_FILES)
 # You should still run programs in the same way as project 3
 
 CPU_HEADERS = verilog/sys_defs.svh \
-              verilog/dcache.svh \
               verilog/ISA.svh
 
 # test/cpu_test.sv is implicit
@@ -351,7 +350,7 @@ CPU_SOURCES = verilog/cpu.sv \
 			  verilog/victim.sv \
 			  verilog/sq.sv \
 			  verilog/lq.sv \
-			  verilog/dcache_basic.sv \
+			  verilog/dcache_block_direct.sv \
 			  verilog/dcache_simple.sv
 
 
