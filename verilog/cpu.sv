@@ -58,35 +58,40 @@ module cpu (
     logic flush;
 
 
-    //handle assigning the correct priority for memory
-    stRET2mem ret_2_mem;
-    fetch2mem fetch_2_mem;
-    MEM_TAG fetch_mem2proc_transaction_tag;
-    MEM_TAG Dmem2Dcache_transaction_tag;
-    MEM_TAG execute2Ccache_transaction_tag;
-    ADDR Dcache2Dmem_addr;
-    MEM_COMMAND Dcache2Dmem_command;
-    MEM_COMMAND execute2Dcache_mem_command;
-    MEM_BLOCK Dcache2Dmem_wdata;
+    MEM_TAG dcache2mem_command;
+    DATA    dcache2mem_addr;
+    DATA    dcache2mem_data;
+    MEM_TAG mem2dcache_transaction_tag;
+
+    MEM_TAG fetch2mem_command;
+    DATA    fetch2mem_addr;
+    MEM_TAG mem2fetch_transaction_tag;
+
     always_comb begin
-        proc2mem_command = '0;
-        proc2mem_addr = '0;
-        proc2mem_data = '0;
-        proc2mem_size = '0;
-        fetch_mem2proc_transaction_tag = '0;
-        
-        if (Dcache2Dmem_command != MEM_NONE) begin
-            proc2mem_command = Dcache2Dmem_command;
-            proc2mem_addr = Dcache2Dmem_addr;
-            proc2mem_data = Dcache2Dmem_wdata;
-            proc2mem_size = DOUBLE;
-            Dmem2Dcache_transaction_tag = mem2proc_transaction_tag;
-        end
-        else if (fetch_2_mem.proc2mem_command == MEM_LOAD) begin // <-- FETCH REQUESTS COME LAST (always complete memory operations first to get stuff commited to memory and to keep the processor FUs chugging)
-            proc2mem_command = fetch_2_mem.proc2mem_command;
-            proc2mem_addr = fetch_2_mem.proc2mem_addr;
-            proc2mem_size = DOUBLE;
-            fetch_mem2proc_transaction_tag = mem2proc_transaction_tag;
+        proc2mem_command    = MEM_NONE;
+        proc2mem_addr       = '0;
+        proc2mem_data       = '0;
+        proc2mem_size       = DOUBLE;
+
+        mem2dcache_transaction_tag  = '0;
+        mem2fetch_transaction_tag   = '0;
+
+        if (dcache2mem_command != MEM_NONE) begin
+            proc2mem_command    = dcache2mem_command;
+            proc2mem_addr       = dcache2mem_addr;
+            proc2mem_data       = dcache2mem_data;
+
+            mem2dcache_transaction_tag  = mem2proc_transaction_tag;
+
+        end else if (fetch2mem_command == MEM_LOAD) begin
+            /*
+            FETCH REQUESTS COME LAST (always complete memory operations first to
+            get stuff commited to memory and to keep the processor FUs chugging)
+            */
+            proc2mem_command    = fetch2mem_command;
+            proc2mem_addr       = fetch2mem_addr;
+
+            mem2fetch_transaction_tag   = mem2proc_transaction_tag;
         end
     end
 
@@ -95,25 +100,10 @@ module cpu (
     //                   Dcache                     //
     //                                              //
     ////////////////////////////////////////////////// 
-    logic         Dcache_valid_out;
-    MEM_BLOCK     Dcache_data_out;
-
-    ADDR          execute_2_dcache_addr;
-
-    logic         mem_in_use;
-    assign        mem_in_use = '0;
-
-    // input from memory
-    MEM_TAG       mem_in_transaction_tag;
-    MEM_BLOCK     mem_in_data;
-    MEM_TAG       mem_in_data_tag;
-    assign mem_in_transaction_tag = '0;
-    assign mem_in_data  = '0;
-    assign mem_in_data_tag = '0;
-
-    MEM_COMMAND   dcache2mem_command;
-    ADDR          dcache2mem_addr;
-    MEM_BLOCK     dcache2mem_data;
+    logic   mem_in_use;
+    // >> FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME 
+    assign  mem_in_use = '0; // FIXME
+    // << FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME 
 
     // Load (w/ load FU)
     ld2dcache ld_2_dcache;
@@ -128,7 +118,7 @@ module cpu (
         .reset,
 
         // input from memory
-        .mem_in_transaction_tag (Dmem2Dcache_transaction_tag),
+        .mem_in_transaction_tag (mem2dcache_transaction_tag),
         .mem_in_data            (mem2proc_data),
         .mem_in_data_tag        (mem2proc_data_tag),
 
@@ -177,8 +167,8 @@ module cpu (
         .Imem2proc_transaction_tag(fetch_mem2proc_transaction_tag),
         .Imem2proc_data_tag(mem2proc_data_tag),
 
-        .Imem_command(fetch_2_mem.proc2mem_command),
-        .Imem_addr(fetch_2_mem.proc2mem_addr),
+        .Imem_command(fetch2mem_command),
+        .Imem_addr   (fetch2mem_addr),
         .d_out  (f_2_decode),
         .btb_in(btb_2_fetch),
         .pred_in_gshare(pred_2_fetch_gshare),
@@ -463,19 +453,19 @@ module cpu (
         .reset      (reset),
         .flush      (flush),
 
-        .dispatch_in   (dispatch_2_sq),
+        .dispatch_in    (dispatch_2_sq),
         .dispatch_out   (sq_2_dispatch),
 
-        .execute_in  (exec_2_sq),
-        .ex_frwd_in    (exec_ld_2_sq),
-        .execute_out  (sq_2_exec),
-        .rob_out   (sq_2_rob),
+        .execute_in     (exec_2_sq),
+        .ex_frwd_in     (exec_ld_2_sq),
+        .execute_out    (sq_2_exec),
+        .rob_out        (sq_2_rob),
 
-        .retire_in(retire_2_sq),
-        .retire_out(sq_2_retire),
+        .retire_in      (retire_2_sq),
+        .retire_out     (sq_2_retire),
 
-        .dcache_in (dcache_2_sq),
-        .dcache_out(sq_2_dcache)
+        .dcache_in      (dcache_2_sq),
+        .dcache_out     (sq_2_dcache)
 );
 
 
@@ -522,18 +512,17 @@ module cpu (
         .sq_in  (sq_2_exec),
         .sq_out (exec_2_sq),
 
-        .lq_out (exec_2_lq),
-        .st_lq_out (execST_2_lq),
-        .ld_sq_out (exec_ld_2_sq),
+        .lq_out     (exec_2_lq),
+        .st_lq_out  (execST_2_lq),
+        .ld_sq_out  (exec_ld_2_sq),
 
         .dcache_in  (dcache_2_ld),
         .dcache_out (ld_2_dcache),
 
+        .prf_in     (prf_2_ex),
+        .prf_out    (ex_2_prf),
 
-        .prf_in (prf_2_ex),
-        .prf_out(ex_2_prf),
-
-        .btq_out(ex_2_btq),
+        .btq_out    (ex_2_btq),
 
         .ctag_out   (ex_2_ctag),
         .cdat_out   (ex_2_cdat)
