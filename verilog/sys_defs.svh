@@ -1266,13 +1266,11 @@ typedef struct packed {
     dispatch2sq   dis_2_sq;
     execute2sq    exec_2_sq;
     retire2sq     retire_2_sq;
-    MEM_TAG       mem2proc_transaction_tag;
 
     sq2dispatch  sq_2_dis;
     sq2execute   sq_2_exec;
     // sq2rs sq_2_rs,
     sq2retire    sq_2_retire;
-    stRET2mem    ret_2_mem;
 
     DBG_retbuf   dbg_retbuf;
 } DBG_sq;

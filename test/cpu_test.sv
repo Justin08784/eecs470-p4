@@ -418,25 +418,27 @@ module testbench;
     endfunction
 
     function automatic MEM_BLOCK query_cache(input int double_idx);
-        MEM_BLOCK rv;
-        ADDR addr;
+        // MEM_BLOCK rv;
+        // ADDR addr;
         
-        logic [INDEX_BITS-1:0] way;
-        logic [TAG_WIDTH-1:0]tag;
-        logic vld;
-        logic match;
+        // logic [INDEX_BITS-1:0] way;
+        // logic [TAG_WIDTH-1:0]tag;
+        // logic vld;
+        // logic match;
 
-        addr = 8*double_idx;
-        way = addr[INDEX_BITS+2:3];
-        tag = addr[31:32-TAG_WIDTH];
+        // addr = 8*double_idx;
+        // way = addr[INDEX_BITS+2:3];
+        // tag = addr[31:32-TAG_WIDTH];
 
-        vld = verisimpleV.dcache.dcache_tags[way].valid;
-        match = tag == verisimpleV.dcache.dcache_tags[way].tag;
+        // vld = verisimpleV.dcache.dcache_tags[way].valid;
+        // match = tag == verisimpleV.dcache.dcache_tags[way].tag;
 
-        rv = (vld && match)
-            ? verisimpleV.dcache.dcache_mem.memData[way]
-            : '0;
-        return rv;
+        // rv = (vld && match)
+        //     ? verisimpleV.dcache.dcache_mem.memData[way]
+        //     : '0;
+        // return rv;
+
+        return '0;
     endfunction
 
     // Show contents of Unified Memory in both hex and decimal
@@ -446,16 +448,16 @@ module testbench;
         int showing_data;
         begin
             MEM_BLOCK blk, cache_blk, mem_blk;
-            for (int i = 0; i < `DCACHE_LINES; ++i) begin
-                $display("cache[%2d]: vld=%b tag=%x, idx=%x, dat=%x {addr: %x}",
-                    i,
-                    verisimpleV.dcache.dcache_tags[i].valid,
-                    verisimpleV.dcache.dcache_tags[i].tag,
-                    i,
-                    verisimpleV.dcache.dcache_mem.memData[i],
-                    recons_addr(i, verisimpleV.dcache.dcache_tags[i].tag)
-                );
-            end
+            // for (int i = 0; i < `DCACHE_LINES; ++i) begin
+            //     $display("cache[%2d]: vld=%b tag=%x, idx=%x, dat=%x {addr: %x}",
+            //         i,
+            //         verisimpleV.dcache.dcache_tags[i].valid,
+            //         verisimpleV.dcache.dcache_tags[i].tag,
+            //         i,
+            //         verisimpleV.dcache.dcache_mem.memData[i],
+            //         recons_addr(i, verisimpleV.dcache.dcache_tags[i].tag)
+            //     );
+            // end
             $fdisplay(out_fileno, "\nFinal memory state and exit status:\n");
             $fdisplay(out_fileno, "@@@ Unified Memory contents hex on left, decimal on right: ");
             $fdisplay(out_fileno, "@@@");
@@ -958,7 +960,6 @@ module testbench;
         dispatch2sq   dis_2_sq;
         execute2sq    exec_2_sq;
         retire2sq     retire_2_sq;
-        MEM_TAG       mem2proc_transaction_tag;
 
         sq2dispatch  sq_2_dis;
         sq2execute   sq_2_exec;
@@ -977,12 +978,10 @@ module testbench;
         dis_2_sq    = dbg_sq.dis_2_sq;
         exec_2_sq   = dbg_sq.exec_2_sq;
         retire_2_sq = dbg_sq.retire_2_sq;
-        mem2proc_transaction_tag = dbg_sq.mem2proc_transaction_tag;
 
         sq_2_dis    = dbg_sq.sq_2_dis;
         sq_2_exec   = dbg_sq.sq_2_exec;
         sq_2_retire = dbg_sq.sq_2_retire;
-        ret_2_mem   = dbg_sq.ret_2_mem;
 
         $display("  | >> SQ");
         $display("RET_HEAD: %0d", ret_head);

@@ -9,6 +9,7 @@
 /////////////////////////////////////////////////////////////////////////
 
 `include "sys_defs.svh"
+`include "dcache_block_direct.svh"
 
 module cpu (
     input clock, // System clock
@@ -94,77 +95,54 @@ module cpu (
     //                   Dcache                     //
     //                                              //
     ////////////////////////////////////////////////// 
-
-    logic req_accepted;
-    logic dcache_2_execute_accepted;
-    logic sq_mem2proc_transaction_accepted;
-
-    logic          Dcache_valid_in;
-    MEM_COMMAND    proc2Dcache_command;
-    ADDR           proc2Dcache_addr;
-    MEM_SIZE       proc2Dcache_size;
-    MEM_BLOCK      proc2Dcache_wdata;
-
     logic         Dcache_valid_out;
     MEM_BLOCK     Dcache_data_out;
 
-    ADDR            execute_2_dcache_addr;
+    ADDR          execute_2_dcache_addr;
 
     logic         mem_in_use;
+    assign        mem_in_use = '0;
 
-    always_comb begin
-        proc2Dcache_command = '0;
-        proc2Dcache_addr = '0;
-        proc2Dcache_wdata = '0;
-        proc2Dcache_size = '0;
-        sq_mem2proc_transaction_accepted = '0;
-        dcache_2_execute_accepted = '0;
+    // input from memory
+    MEM_TAG       mem_in_transaction_tag;
+    MEM_BLOCK     mem_in_data;
+    MEM_TAG       mem_in_data_tag;
+    assign mem_in_transaction_tag = '0;
+    assign mem_in_data  = '0;
+    assign mem_in_data_tag = '0;
 
-        if (execute2Dcache_mem_command != MEM_NONE) begin
-            proc2Dcache_command = execute2Dcache_mem_command;
-            proc2Dcache_addr = execute_2_dcache_addr;
-            proc2Dcache_size = DOUBLE;
-            dcache_2_execute_accepted = req_accepted;
-        end
-        else if (ret_2_mem.Dmem_command[0] != MEM_NONE) begin
-            proc2Dcache_command = ret_2_mem.Dmem_command[0];
-            proc2Dcache_addr = ret_2_mem.Dmem_addr[0];
-            proc2Dcache_wdata = ret_2_mem.Dmem_store_data[0];
-            proc2Dcache_size = ret_2_mem.Dmem_size[0];
-            sq_mem2proc_transaction_accepted = req_accepted;
-        end
-        
-    end
+    MEM_COMMAND   dcache2mem_command;
+    ADDR          dcache2mem_addr;
+    MEM_BLOCK     dcache2mem_data;
 
-    dcache_simple dcache (
-        .clock(clock),
-        .reset(reset),
+    // Load (w/ load FU)
+    ld2dcache ld_2_dcache;
+    dcache2ld dcache_2_ld;
 
-        // from mem
-        .Dmem2Dcache_transaction_tag(Dmem2Dcache_transaction_tag), //done
-        .Dmem2Dcache_data(mem2proc_data), //done
-        .Dmem2Dcache_data_tag(mem2proc_data_tag), //done
+    // Store (w/ SQ)
+    sq2dcache sq_2_dcache;
+    dcache2sq dcache_2_sq;
 
-        // .Dcache_valid_in(Dcache_valid_in),
+    dcache_block dcache0 (
+        .clock,
+        .reset,
 
-        // from LD/SQ
-        .proc2Dcache_command(proc2Dcache_command), //done
-        .proc2Dcache_addr(proc2Dcache_addr), //done
-        .proc2Dcache_size(proc2Dcache_size), //done
-        .proc2Dcache_wdata(proc2Dcache_wdata), //done
+        // input from memory
+        .mem_in_transaction_tag (Dmem2Dcache_transaction_tag),
+        .mem_in_data            (mem2proc_data),
+        .mem_in_data_tag        (mem2proc_data_tag),
 
-        // Output to LD/SQ
-        .req_accepted(req_accepted), //done
-        .Dcache_valid_out(Dcache_valid_out),
-        .Dcache_data_out(Dcache_data_out),
+        .mem_out_command        (dcache2mem_command),
+        .mem_out_addr           (dcache2mem_addr),
+        .mem_out_data           (dcache2mem_data),
 
-        // output to mem
-        .Dcache2Dmem_command(Dcache2Dmem_command), //done
-        .Dcache2Dmem_addr(Dcache2Dmem_addr), //done
-        .Dcache2Dmem_wdata(Dcache2Dmem_wdata), //done
+        // Load (w/ load FU)
+        .ld_in  (ld_2_dcache),
+        .ld_out (dcache_2_ld),
 
-        // Can be used by LD/SQ, not necessary
-        .mem_in_use(mem_in_use)
+        // Store (w/ SQ)
+        .sq_in  (sq_2_dcache),
+        .sq_out (dcache_2_sq)
     );
 
     //////////////////////////////////////////////////
@@ -496,8 +474,8 @@ module cpu (
         .retire_in(retire_2_sq),
         .retire_out(sq_2_retire),
 
-        .mem2proc_transaction_accepted(sq_mem2proc_transaction_accepted), //temp_tag  sq_mem2proc_transaction_accepted
-        .mem_out(ret_2_mem)
+        .dcache_in (dcache_2_sq),
+        .dcache_out(sq_2_dcache)
 );
 
 
@@ -548,12 +526,9 @@ module cpu (
         .st_lq_out (execST_2_lq),
         .ld_sq_out (exec_ld_2_sq),
 
-        .dcache_accepted(dcache_2_execute_accepted),
-        .dcache_data_valid(Dcache_valid_out),
-        .dcache_data(Dcache_data_out),
+        .dcache_in  (dcache_2_ld),
+        .dcache_out (ld_2_dcache),
 
-        .mem_command(execute2Dcache_mem_command),
-        .mem_addr(execute_2_dcache_addr),
 
         .prf_in (prf_2_ex),
         .prf_out(ex_2_prf),

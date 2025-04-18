@@ -1,4 +1,5 @@
 `include "sys_defs.svh"
+`include "dcache_block_direct.svh"
 
 
 module sq #(parameter 
@@ -20,13 +21,13 @@ module sq #(parameter
     input execute2sq    execute_in,
     input executeLD2sq  ex_frwd_in,
     input retire2sq     retire_in,
-    input logic         mem2proc_transaction_accepted,
+    input dcache2sq     dcache_in,
 
     output sq2dispatch  dispatch_out,
     output sq2execute   execute_out,
     output sq2rob       rob_out,
     output sq2retire    retire_out,
-    output stRET2mem    mem_out
+    output sq2dcache    dcache_out
 );
 
     localparam NUM_DPORTS = N; // dispatch ports (in-order)
@@ -72,18 +73,17 @@ module sq #(parameter
 
     always_comb begin
         //handle retirement write to mem
-        mem_out = '0;
+        dcache_out = '0;
 
         if (ret_head != head) begin
-            
-            // writeOffset = 8 * iw_off(state[r_idxs[i]].addr);
-            mem_out.Dmem_command[0]      = MEM_STORE;
-            mem_out.Dmem_addr[0]         = state[ret_head].addr;
-            mem_out.Dmem_store_data[0]   = (state[ret_head].data >> (8 * iw_off(state[ret_head].addr)));
-            mem_out.Dmem_size[0]         = state[ret_head].mem_size;
+            dcache_out = '{
+                vld     : 1,
+                addr    : state[ret_head].addr,
+                size    : state[ret_head].mem_size,
+                dat     : (state[ret_head].data >> (8 * iw_off(state[ret_head].addr)))
+            };
         end
-        ret_success = ((mem2proc_transaction_accepted != 0) && (mem_out.Dmem_command[0] == MEM_STORE));
-        // ret_success = mem2proc_transaction_accepted; <--TODO: swap to this line once teh SQ retirement buffer is pointing at the superscalar dcache instead of mem
+        ret_success = dcache_in.status == ST_SUCC;
     end
     
 
@@ -346,13 +346,11 @@ module sq #(parameter
         dispatch_in,
         execute_in,
         retire_in,
-        mem2proc_transaction_accepted,
 
         dispatch_out,
         execute_out,
         // sq2rs sq_2_rs,
         retire_out,
-        mem_out,
         '0
 
         // dbg_retbuf

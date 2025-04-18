@@ -19,12 +19,8 @@ module lod_ex(
     output  execute2lq lq_out,
     output  executeLD2sq ld_sq_out,
 
-    input logic dcache_accepted,
-    input logic dcache_data_valid,
-    input MEM_BLOCK dcache_data,
-
-    output MEM_COMMAND mem_command,
-    output ADDR mem_addr,
+    input  dcache2ld dcache_in,
+    input  ld2dcache dcache_out,
 
     /* Early CDB arbitration */
     output logic cdb_req,
@@ -114,53 +110,51 @@ module lod_ex(
     logic [$clog2(`LD_BAY_SZ):0] pending_frwd, next_pending_frwd;
     logic pending, next_pending;
     always_comb begin
-        mem_command = MEM_NONE;
-        mem_addr = 0;
         next_frwd = curr_frwd;
 
-        case (pending)
-            0 : begin
-                if (bays.vld[curr_frwd] && !(bays.got[curr_frwd] || next_got[curr_frwd]) && !(reset || flush)) begin
-                    // $display("ASKING_MEM");
-                    mem_command = MEM_LOAD;
-                    mem_addr = bays.addr[curr_frwd];
-                end
+        // case (pending)
+        //     0 : begin
+        //         if (bays.vld[curr_frwd] && !(bays.got[curr_frwd] || next_got[curr_frwd]) && !(reset || flush)) begin
+        //             // $display("ASKING_MEM");
+        //             // mem_command = MEM_LOAD;
+        //             mem_addr = bays.addr[curr_frwd];
+        //         end
 
-                if (dcache_accepted && (mem_command == MEM_LOAD)) begin
-                    // $display("MEM_ACCEPTED");
-                    next_pending = 1;
-                    next_pending_frwd = curr_frwd;
-                end
-                else begin
-                    next_pending = 0;
-                    next_pending_frwd = 0;
+        //         if (dcache_accepted && (mem_command == MEM_LOAD)) begin
+        //             // $display("MEM_ACCEPTED");
+        //             next_pending = 1;
+        //             next_pending_frwd = curr_frwd;
+        //         end
+        //         else begin
+        //             next_pending = 0;
+        //             next_pending_frwd = 0;
 
-                    for (int unsigned i = 0; i < LD_BAY_SZ; i++) begin
-                        if ((!bays.vld[i]) || bays.got[i]) continue;
+        //             for (int unsigned i = 0; i < LD_BAY_SZ; i++) begin
+        //                 if ((!bays.vld[i]) || bays.got[i]) continue;
 
-                        next_frwd = i;
-                        break;
-                    end
-                end
-            end
-            1 : begin
-                    if (dcache_data_valid) begin
-                        // $display("DATA_RETURNED[%b]: %h", dcache_data_valid, dcache_data);
-                        next_pending = 0;
-                        next_pending_frwd = 0;
-                    end
-                    else begin
-                        next_pending = pending;
-                        next_pending_frwd = pending_frwd;
-                    end
-            end
+        //                 next_frwd = i;
+        //                 break;
+        //             end
+        //         end
+        //     end
+        //     1 : begin
+        //             if (dcache_data_valid) begin
+        //                 // $display("DATA_RETURNED[%b]: %h", dcache_data_valid, dcache_data);
+        //                 next_pending = 0;
+        //                 next_pending_frwd = 0;
+        //             end
+        //             else begin
+        //                 next_pending = pending;
+        //                 next_pending_frwd = pending_frwd;
+        //             end
+        //     end
 
-            default : begin
-                next_pending = 0;
-                next_pending_frwd = 0;
-                next_frwd = 0;
-            end 
-        endcase
+        //     default : begin
+        //         next_pending = 0;
+        //         next_pending_frwd = 0;
+        //         next_frwd = 0;
+        //     end 
+        // endcase
 
     end
 
@@ -201,13 +195,12 @@ module lod_ex(
         for (int unsigned i = 0; i < LD_BAY_SZ; i++) begin
             if (bays.got[i])
                 continue;
-            // if (!sq_in.forward_en[i])
-            //     continue;
-            if (pending && dcache_data_valid && (i == pending_frwd)) begin
 
-                next_dat[i] = (dcache_data.word_level[bays.addr[i][2]]) >> bays.addr[i][1:0];
-                next_got[i] = 1;
-            end
+            // if (pending && dcache_data_valid && (i == pending_frwd)) begin
+
+            //     next_dat[i] = (dcache_data.word_level[bays.addr[i][2]]) >> bays.addr[i][1:0];
+            //     next_got[i] = 1;
+            // end
 
             if (sq_in.forward_byte_en[i][0])
                 next_dat[i].byte_level[0] = sq_in.forward_data[i].byte_level[0];
