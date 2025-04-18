@@ -187,6 +187,7 @@ module testbench;
 
     // shadow ROB containing only debug info
     typedef struct packed {
+        int   id;
         logic halt;
         logic illegal;
         ADDR NPC;
@@ -233,6 +234,7 @@ module testbench;
                     break;
                 cur_idx = verisimpleV.rob_0.comm_idxs[i];
                 rob_debug[cur_idx] = '{
+                    id      : verisimpleV.rs_0.d_in.d_dat[i].id,
                     halt    : verisimpleV.rob_0.d_in.halt[i],
                     illegal : verisimpleV.rob_0.d_in.illegal[i],
                     NPC     : verisimpleV.rs_0.d_in.d_dat[i].NPC
@@ -267,6 +269,7 @@ module testbench;
     // Task to output register writeback data and potentially halt the processor.
     task output_reg_writeback_and_maybe_halt;
         ADDR pc;
+        int id;
         DATA inst;
         MEM_BLOCK block;
         logic illegal;
@@ -292,6 +295,7 @@ module testbench;
 
             `ifndef SYNTH
             cur_idx = verisimpleV.rob_0.rtre_idxs[n];
+            id      = rob_debug[cur_idx].id;
             pc      = rob_debug[cur_idx].NPC - 4;
             block   = memory.unified_memory[pc[31:3]];
             inst    = block.word_level[pc[2]];
@@ -309,10 +313,23 @@ module testbench;
                           reg_idx,
                           data);
             end
-            rob_debug.delete(cur_idx);
+
+            // if (reg_idx == `ZERO_REG) begin
+            //     $fdisplay(wb_fileno, "(%4d) PC %4x:%-8s| ---", id, pc, decode_inst(inst));
+            // end else begin
+            //     $fdisplay(wb_fileno, "(%4d) PC %4x:%-8s| r%02d=%-8x",
+            //               id,
+            //               pc,
+            //               decode_inst(inst),
+            //               reg_idx,
+            //               data);
+            // rob_debug.delete(cur_idx);
+            // end
+
             `ifdef DEBUG
-            $display("commit[%0d]: (pc: 0x%x, inst: 0x%x) vld: %b, halt: %b, illegal: %b, data: %x",
+            $display("commit[%0d]: (id: %4d, pc: 0x%x, inst: 0x%x) vld: %b, halt: %b, illegal: %b, data: %x",
                 n,
+                id,
                 pc,
                 inst,
                 committed_insts[n].valid,
