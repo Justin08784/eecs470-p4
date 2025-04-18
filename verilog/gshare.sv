@@ -111,34 +111,4 @@ module gshare (
     assign pred_2_fetch.prediction[0] = prediction[0];
     assign pred_2_fetch.prediction[1] = prediction[1];
 
-    always_ff @(posedge clock) begin
-        $display("RETIRED BHR0 = 8b%0b  RETIRED BHR1 = 8b%0b", fetch_2_pred.retired_bhr[0], fetch_2_pred.retired_bhr[1]);
-      
-        $display("update_index0 = %b  update_index1 = %b", update_index[0], update_index[1]);
-        $display("buffer_ready0 = %b  buffer_ready1 = %b", buffer_ready0, buffer_ready1);
-        $display("  prediction[0] = %1b", prediction[0]);
-        $display("  prediction[1] = %1b", prediction[1]);
-
-        $display("  globalBHR = %b", globalBHR);
-        $display("  fetch_in.PC[0] = %d", fetch_2_pred.correct_PC[0]);
-        $display("  fetch_in.PC[1] = %d", fetch_2_pred.correct_PC[1]);
-
-        $display("  GSHARE_INITIAL_PC0 = %d", fetch_2_pred.PC[0]);
-        $display("  GSHARE_INITIAL_PC1 = %d", fetch_2_pred.PC[1]);
-
-        $display(" GSHARE update_index0 = %b", update_index[0]);
-        $display(" GSHARE update_index1 = %b", update_index[1]);
-
-         $display(" GSHARE retired pc0 = %b", fetch_2_pred.correct_PC[0]);
-        $display(" GSHARE retired pc1 = %b", fetch_2_pred.correct_PC[1]);
-
-        $display(" GSHARE_PREDICTION2FETCH = %b", pred_2_fetch.prediction);
-
-
-
-
-    end
-
-
-
 endmodule

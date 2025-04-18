@@ -34,18 +34,12 @@ always_comb begin
         index = fetch_in.PC[i][9:2];
         tag = fetch_in.PC[i][21:10];
 
-        $display("INPUT PC BTB: %x", fetch_in.PC);
-
         if(valid_array[index] && tag_array[index] == tag) begin
             fetch_out.hit[i] = 1'b1;
             fetch_out.target[i] = target_array[index];
-           // $display("valid_array[index] is ", valid_array);
-           // $display("index ", index);
-           $display("BTB HIT!!");
         end else begin
             fetch_out.hit[i] = 1'b0;
             fetch_out.target[i] = '0;
-           $display("BTB MISS!!");
         end
 
     end
@@ -62,7 +56,6 @@ always_ff @(posedge clock) begin
             tag_array[i] <= '0;
             target_array[i] <= '0;
         end
-        // $display("VALID ARRAY ON RESET", valid_array);
     end else begin
         for(int i = 0; i < `N; i++) begin
             if(fetch_in.is_taken[i]) begin
@@ -70,13 +63,9 @@ always_ff @(posedge clock) begin
                 tag_array[reg_index] <= fetch_in.correct_PC[i][21:10];
                 target_array[reg_index] <= fetch_in.target[0]; //[13:2]
                 valid_array[reg_index] <= 1'b1;
-                $display("UPDATING_BTB_TARGET!: %x", fetch_in.target[0]);
             end
         end
     end
-    $display("INCOMING_PC: %x", fetch_in.correct_PC);
-    $display("INCOMiNG_TAKEN: %2b", fetch_in.is_taken);
-    $display("TARGET: %2b", fetch_in.target);
 end
 
 

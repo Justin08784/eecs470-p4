@@ -119,9 +119,6 @@ module retire (
             end
             
             ++r_en_cnt;
-            
-                
-            
 
             if (!rob_in.entries[i].is_brch)
                 continue;
@@ -135,15 +132,7 @@ module retire (
 
             gshare_pred_n[i] = btq_in.dat[btq_rd_cnt].gshare_pred;
             corr_pred_n[i] = btq_in.dat[btq_rd_cnt].corr_pred;
-            `ifdef DEBUG
-                $display("BTQ_IN PC: 0x%x, BTQ_IN TGT: 0x%x} ", btq_in.dat[btq_rd_cnt].PC, btq_in.dat[btq_rd_cnt].tgt);
-                $display("BTQ_IN PRED: %x,  BTQ_IN TAKE: %x", btq_in.dat[btq_rd_cnt].pred, btq_in.dat[btq_rd_cnt].take);     
-                $display("BTQ_IN CORR_BHR: %b", btq_in.dat[btq_rd_cnt].correlated_bhr);  
-            `endif         
             if (btq_in.dat[btq_rd_cnt].pred != btq_in.dat[btq_rd_cnt].take) begin
-                `ifdef DEBUG
-                    $display("PREDICTION != TAKE");
-                `endif      
                 // is mispred?
                 mispred = 1;
                 mispred_target = btq_in.dat[btq_rd_cnt].take
@@ -157,8 +146,6 @@ module retire (
             end 
             ++btq_rd_cnt;
         end
-
-        if (btq_rd_cnt > 0) $display("RETIRING_BRANCH_RET_CNT: %0d", r_en_cnt);
 
         flush_n = mispred || ld_ooo;
         corrected_PC_n = mispred
@@ -238,8 +225,6 @@ module retire (
             correlated_bhr_d <= correlated_bhr_d_n;
             gshare_pred      <= gshare_pred_n;
             corr_pred        <= corr_pred_n;
-
-
 /* ======================================== */
         end
     end
