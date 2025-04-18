@@ -124,10 +124,6 @@ module cpu (
     //                                              //
     ////////////////////////////////////////////////// 
     logic   mem_in_use;
-    // >> FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME 
-    assign  mem_in_use = '0; // FIXME
-    // << FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME FIXME 
-
     // Load (w/ load FU)
     ld2dcache ld_2_dcache;
     dcache2ld dcache_2_ld;
@@ -155,7 +151,9 @@ module cpu (
 
         // Store (w/ SQ)
         .sq_in  (sq_2_dcache), // FIXME: reenable
-        .sq_out (dcache_2_sq)
+        .sq_out (dcache_2_sq),
+
+        .mem_in_use
     );
 
     //////////////////////////////////////////////////

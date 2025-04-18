@@ -371,8 +371,9 @@ module refill_engine (
 
         S_NTAG: begin
             if (mshr.miss_tag == 0) begin
-                mem_out_command = MEM_LOAD;
                 mem_out_addr    = dw_align(mshr.addr);
+                mem_out_data    = mshr.mem_data;
+                mem_out_command = mshr.wr_mem ? MEM_STORE : MEM_LOAD;
             end
 
             if (mshr.wr_mem  && mem_in_transaction_tag != 0) begin
@@ -446,7 +447,9 @@ module dcache_block (
 
     // Store (w/ SQ)
     input  sq2dcache sq_in,
-    output dcache2sq sq_out
+    output dcache2sq sq_out,
+
+    output logic mem_in_use
 );
     CACHE_HEADER hdr, hdr_n;
 
@@ -523,6 +526,7 @@ module dcache_block (
     // Resource managers
     MSHR_ENTRY mshr;
     // mshr manager
+    assign mem_in_use = mshr.status != S_IDLE;
     refill_engine dec_refill (
         .reset,
         .clock,
