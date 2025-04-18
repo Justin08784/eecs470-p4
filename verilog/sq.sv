@@ -248,6 +248,7 @@ module sq #(parameter
             rsvd <= 0;
 
             head <= (ret_head + ret_buf_used) % LSQ_SZ;
+            ret_head <= ret_head;
             tail <= (ret_head + ret_buf_used) % LSQ_SZ;
             // tail_dbl <= (ret_head + ret_buf_used) % LSQ_SZ;
             if (has_retired_something) begin
@@ -339,6 +340,8 @@ module sq #(parameter
         ret_head,
         tail,
         used,
+        free,
+        rsvd,
         // I/O
         dispatch_in,
         execute_in,

@@ -800,7 +800,8 @@ module testbench;
             );
         end
 
-        for (int i = 0; i < `ROB_SZ; ++i) begin
+        for (int i = 0, int idx; i < `ROB_SZ; ++i) begin
+            // idx = ()
             $display("Rob[%2d]: cpl %b, t: %2d, t_old: %2d, dst: %2d, is_brch: %b, wr_mem: %b, rd_mem: %b, halt: %0b, illegal: %0b%s",
                 i,
                 state[i].cpl,
@@ -886,6 +887,8 @@ module testbench;
         logic [$clog2(`LSQ_SZ)-1:0] ret_head;
         logic [$clog2(`LSQ_SZ)-1:0] tail;
         logic [$clog2(`LSQ_SZ):0]   used;
+        logic [$clog2(`LSQ_SZ):0]   free;
+        logic [$clog2(`LSQ_SZ):0]   rsvd;
         // I/O
 
         dispatch2sq   dis_2_sq;
@@ -904,6 +907,8 @@ module testbench;
         ret_head= dbg_sq.ret_head;
         tail    = dbg_sq.tail;
         used    = dbg_sq.used;
+        free    = dbg_sq.free;
+        rsvd    = dbg_sq.rsvd;
 
         dis_2_sq    = dbg_sq.dis_2_sq;
         exec_2_sq   = dbg_sq.exec_2_sq;
@@ -917,6 +922,9 @@ module testbench;
 
         $display("  | >> SQ");
         $display("RET_HEAD: %0d", ret_head);
+        $display("USED: %0d", used);
+        $display("FREE: %0d", free);
+        $display("RSVD: %0d", rsvd);
         for (int i = 0; i < `LSQ_SZ; i++) begin
             $display("Entry [%2d]: sq_idx=%2d, rob_idx=%2d, addr=%4x, data=%x, d_valid=%b, in_range=%b, mem_size: %0d, addr mask=%4b%s",
             i,

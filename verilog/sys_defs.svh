@@ -1260,6 +1260,8 @@ typedef struct packed {
     logic [$clog2(`LSQ_SZ)-1:0] ret_head;
     logic [$clog2(`LSQ_SZ)-1:0] tail;
     logic [$clog2(`LSQ_SZ):0]   used;
+    logic [$clog2(`LSQ_SZ):0]   free;
+    logic [$clog2(`LSQ_SZ):0]   rsvd;
     // I/O
 
     dispatch2sq   dis_2_sq;
