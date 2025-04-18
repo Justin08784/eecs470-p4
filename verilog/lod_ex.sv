@@ -20,7 +20,7 @@ module lod_ex(
     output  executeLD2sq ld_sq_out,
 
     input  dcache2ld dcache_in,
-    input  ld2dcache dcache_out,
+    output  ld2dcache dcache_out,
 
     /* Early CDB arbitration */
     output logic cdb_req,
@@ -50,15 +50,10 @@ module lod_ex(
     logic [LD_BAY_SZ-1:0] fu2in_gnt;
     logic [LD_BAY_SZ-1:0] fu2out_gnt;
     always_comb begin
-        /* >> FIXME 
-        Load FU is effectively disabled
-        << FIXME */
-        i_rdy   = '0;
-        cdb_req = '0;
         
         /* Correct version */
-        // i_rdy = |(~bays.vld);
-        // cdb_req = |(bays.vld & bays.got);
+        i_rdy = |(~bays.vld);
+        cdb_req = |(bays.vld & bays.got);
 
         ctag_ts = '0;
         foreach (fu2out_gnt[i]) begin
@@ -104,75 +99,46 @@ module lod_ex(
     CPL_CAND [1:0] cands_shr;
     always_comb begin
         o_cands = cands_shr[1];
-    end
-    
-    //for forwarding, declared here so that it can be used here
-    logic [LD_BAY_SZ-1:0] next_got;
+    end    
 
-    //mem request logic
+    //LD memory request logic
+    logic req_en, next_req_en;
     logic [$clog2(`LD_BAY_SZ):0] curr_frwd, next_frwd;
-    logic [$clog2(`LD_BAY_SZ):0] pending_frwd, next_pending_frwd;
-    logic pending, next_pending;
     always_comb begin
+        next_req_en = req_en;
         next_frwd = curr_frwd;
 
-        // case (pending)
-        //     0 : begin
-        //         if (bays.vld[curr_frwd] && !(bays.got[curr_frwd] || next_got[curr_frwd]) && !(reset || flush)) begin
-        //             // $display("ASKING_MEM");
-        //             // mem_command = MEM_LOAD;
-        //             mem_addr = bays.addr[curr_frwd];
-        //         end
+        if (!req_en || (req_en && (dcache_in.status == LD_SUCC))) begin
+            next_req_en = 0;
+            next_frwd = '0;
+            for (int unsigned i = 0; i < `LD_BAY_SZ; i++) begin
+                if ((!bays.vld[i]) || bays.got[i]) continue;
 
-        //         if (dcache_accepted && (mem_command == MEM_LOAD)) begin
-        //             // $display("MEM_ACCEPTED");
-        //             next_pending = 1;
-        //             next_pending_frwd = curr_frwd;
-        //         end
-        //         else begin
-        //             next_pending = 0;
-        //             next_pending_frwd = 0;
+                next_req_en = 1;
+                next_frwd = i;
+                break;
+            end
+        end
+    end
 
-        //             for (int unsigned i = 0; i < LD_BAY_SZ; i++) begin
-        //                 if ((!bays.vld[i]) || bays.got[i]) continue;
+    always_comb begin
+        dcache_out = '0;
 
-        //                 next_frwd = i;
-        //                 break;
-        //             end
-        //         end
-        //     end
-        //     1 : begin
-        //             if (dcache_data_valid) begin
-        //                 // $display("DATA_RETURNED[%b]: %h", dcache_data_valid, dcache_data);
-        //                 next_pending = 0;
-        //                 next_pending_frwd = 0;
-        //             end
-        //             else begin
-        //                 next_pending = pending;
-        //                 next_pending_frwd = pending_frwd;
-        //             end
-        //     end
-
-        //     default : begin
-        //         next_pending = 0;
-        //         next_pending_frwd = 0;
-        //         next_frwd = 0;
-        //     end 
-        // endcase
-
+        if (req_en) begin
+            dcache_out.vld = 1;
+            dcache_out.addr = bays.addr[curr_frwd];
+        end
     end
 
     always_ff @(posedge clock) begin
-        // $display("PENDING_STATE: %b",pending);
+        $display("DCACHE_IN: status: %0d, data: %h", dcache_in.status, dcache_in.dat);
         if (reset || flush) begin
+            req_en <= 0;
             curr_frwd <= '0;
-            pending <= '0;
-            pending_frwd <= '0;
         end
         else begin
+            req_en <= next_req_en;
             curr_frwd <= next_frwd;
-            pending <= next_pending;
-            pending_frwd <= next_pending_frwd;
         end
     end
 
@@ -192,6 +158,7 @@ module lod_ex(
     //ST-LD forwarding parsing logic
     logic [LD_BAY_SZ-1:0][3:0] next_st_frwd_byte_mask;
     DATA_BLOCK [LD_BAY_SZ-1:0] next_dat;
+    logic [LD_BAY_SZ-1:0] next_got;
     always_comb begin
         next_got = bays.got;
         next_st_frwd_byte_mask = '0;
@@ -205,6 +172,11 @@ module lod_ex(
             //     next_dat[i] = (dcache_data.word_level[bays.addr[i][2]]) >> bays.addr[i][1:0];
             //     next_got[i] = 1;
             // end
+
+            if (req_en && (dcache_in.status == LD_SUCC) && (i == curr_frwd)) begin
+                next_dat[i] = (dcache_in.dat.word_level[bays.addr[i][2]]) >> bays.addr[i][1:0];
+                next_got[i] = 1;
+            end
 
             if (sq_in.forward_byte_en[i][0])
                 next_dat[i].byte_level[0] = sq_in.forward_data[i].byte_level[0];
@@ -291,36 +263,35 @@ module lod_ex(
         end
     end
 
-    // `ifdef DEBUG
-    // always_ff @(posedge clock) begin
-    //     if (!reset) begin
-    //         $display("  %3d | >> BAYS", $time);
-    //         $display("MEM_LOAD: %b, %d, %0d, %d", pending, dcache_data_valid, pending_frwd, dcache_data);
-    //         $display("FRWD_EN: %b, %b", sq_in.forward_en, sq_in.forward_byte_en);
-    //         $display("i_rdy: %b, i_vld: %b ", i_rdy, i_vld);
-    //         $display("ocands: t: %2d, rob_idx: %2d, data: %x",
-    //             o_cands[0].t,
-    //             o_cands[0].rob_idx,
-    //             o_cands[0].data
-    //         );
-    //         $display("ren: %b", bays.vld & ~bays.got);
-    //         foreach (fu2in_gnt[f, i]) begin
-    //             $display("bays[%2d][%2d]: vld=%b, got=%b, t=%2d, rob_idx=%2d, addr=%x, mem_size=%2d, dat=%x",
-    //                 f,
-    //                 i,
-    //                 bays.vld    [i],
-    //                 bays.got    [i],
-    //                 bays.t      [i],
-    //                 bays.rob_idx[i],
-    //                 bays.addr   [i],
-    //                 bays.mem_size[i],
-    //                 bays.dat    [i]
-    //             );
-    //         end
-    //         $display("  %3d | << BAYS", $time);
-    //     end
-    // end
-    // `endif
+    `ifdef DEBUG
+    always_ff @(posedge clock) begin
+        if (!reset) begin
+            $display("  %3d | >> BAYS", $time);
+            // $display("MEM_LOAD: %b, %d, %0d, %d", pending, dcache_data_valid, pending_frwd, dcache_data);
+            // $display("FRWD_EN: %b, %b", sq_in.forward_en, sq_in.forward_byte_en);
+            // $display("i_rdy: %b, i_vld: %b ", i_rdy, i_vld);
+            // $display("ocands: t: %2d, rob_idx: %2d, data: %x",
+            //     o_cands[0].t,
+            //     o_cands[0].rob_idx,
+            //     o_cands[0].data
+            // );
+            $display("ren: %b", bays.vld & ~bays.got);
+            foreach (fu2in_gnt[i]) begin
+                $display("bays[%2d]: vld=%b, got=%b, t=%2d, rob_idx=%2d, addr=%x, mem_size=%2d, dat=%x",
+                    i,
+                    bays.vld    [i],
+                    bays.got    [i],
+                    bays.t      [i],
+                    bays.rob_idx[i],
+                    bays.addr   [i],
+                    bays.mem_size[i],
+                    bays.dat    [i]
+                );
+            end
+            $display("  %3d | << BAYS", $time);
+        end
+    end
+    `endif
 
     /* TODO: CAND generation logic. Also, how do we know when
     a load result is ready without an lq2execute line? */

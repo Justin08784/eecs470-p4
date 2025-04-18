@@ -146,7 +146,7 @@ module cpu (
         .mem_out_data           (dcache2mem_data),
 
         // Load (w/ load FU)
-        .ld_in  ('0), //(ld_2_dcache), // FIXME: reenable
+        .ld_in  (ld_2_dcache), // FIXME: reenable
         .ld_out (dcache_2_ld),
 
         // Store (w/ SQ)
@@ -545,7 +545,7 @@ module cpu (
         .st_lq_out  (execST_2_lq),
         .ld_sq_out  (exec_ld_2_sq),
 
-        .dcache_in  ('0), // (dcache_2_ld), // FIXME FIXME FIXME FIXME
+        .dcache_in  (dcache_2_ld), // FIXME FIXME FIXME FIXME
         .dcache_out (ld_2_dcache),
 
         .prf_in     (prf_2_ex),
