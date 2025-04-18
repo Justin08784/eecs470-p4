@@ -478,6 +478,7 @@ module testbench;
                 LOAD_ACCESS_FAULT: $fdisplay(out_fileno, "@@@ System halted on memory error");
                 HALTED_ON_WFI:     $fdisplay(out_fileno, "@@@ System halted on WFI instruction");
                 ILLEGAL_INST:      $fdisplay(out_fileno, "@@@ System halted on illegal instruction");
+                NO_ERROR:          $fdisplay(out_fileno, "@@@ System halted. But no error");
                 default:           $fdisplay(out_fileno, "@@@ System halted on unknown error code %x", final_status);
             endcase
             $fdisplay(out_fileno, "@@@");
