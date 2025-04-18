@@ -115,7 +115,7 @@ typedef struct packed {
 } ld2dcache;
 typedef struct packed {
     MEM_TAG         tag; //not currently in use
-    DATA_BLOCK      dat;
+    MEM_BLOCK       dat;
     LD_QUERY_STATUS status;
     LDB             ldb; //not currently in use
 } dcache2ld;
