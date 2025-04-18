@@ -371,7 +371,6 @@ typedef struct packed {
     INST  inst;
     ADDR  PC;
     ADDR  NPC; // PC + 4
-    logic valid;
     logic [7:0] bhr;
     logic [7:0] correlated_bhr;
 

@@ -98,14 +98,12 @@ module stage_if_p4 (
 
         // f_cnt = !icache_valid  ? 0 : ((off || mux_result_prediction > 0) ? `MIN(1, free_scnt) : free_scnt);
 
-        for (int unsigned i = 0, logic vld = 0; i < `N; ++i) begin
-            vld = i < f_cnt;
+        for (int unsigned i = 0; i < `N; ++i) begin
             PC_reg_temp = PC_reg + 4*i;
             f_dat[i] = '{
-                inst  : vld ? icache_out.word_level[PC_reg_temp[2]] : `NOP,
+                inst  : icache_out.word_level[PC_reg_temp[2]],
                 PC    : PC_reg_temp,
                 NPC   : PC_reg_temp + 4,
-                valid : vld,
                 bhr   : pred_in_gshare.bhr,
 
                 correlated_bhr : pred_in_corr.bhr,

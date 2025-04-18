@@ -254,7 +254,7 @@ module stage_id_p4 (
         decoder_p4 decoder_i (
             // Inputs
             .inst  (f_in.f_dat[i].inst),
-            .valid (f_in.f_dat[i].valid),
+            .valid (`TRUE),
 
             // Outputs
             .fu_idx        (tmp[i].fu_idx),
