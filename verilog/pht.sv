@@ -51,7 +51,7 @@ module pht (
                     pht[update_index1] <= pht[update_index1] - 1;
             end
         end
-      /*  $display("  pht[update_index0] = %2b", pht[update_index0]);
+       $display("  pht[update_index0] = %2b", pht[update_index0]);
         $display("  pht[update_index1] = %2b", pht[update_index1]);
 
         $display("  update_index0 = %8b", update_index0);
@@ -61,7 +61,7 @@ module pht (
         $display("  pht[predict_index1] = %2b", pht[predict_index1]);
 
         $display("  predict_index0 = %8b", predict_index0);
-        $display("  predict_index1 = %8b", predict_index1);*/
+        $display("  predict_index1 = %8b", predict_index1);
     end
 
 endmodule

@@ -76,7 +76,7 @@ module correlated_predictor_tb;
     //fetch_2_pred.PC[1] = 32'h20;
     fetch_2_pred = '{PC: '{32'h10,32'h20}, update_enable: 2'b11, taken: 2'b11, correct_PC: '{32'h10, 32'h20}, retired_bhr: '{8'b00011111, 8'b00011111}, correlated_bhr: '{8'b00011111, 8'b00011111}};
     @(negedge clock); show_predictions("5");
-
+ 
     // Cycle 6
     //fetch_2_pred.PC[0] = 32'h10;
     //fetch_2_pred.PC[1] = 32'h20;

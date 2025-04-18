@@ -248,6 +248,13 @@ module stage_if_p4 (
 
             $display("FETCH2BTB: PC: %x", PC_reg);
             $display("FETCH2BTB: PC: %x", PC_reg+4);
+
+
+            $display("BTB2FETCH: HIT: %x", btb_in.hit[0]);
+            $display("BTB2FETCH: HIT: %x", btb_in.hit[1]);
+  
+            $display("BTB2FETCH: TARGET0: %x", btb_in.target[0]);
+            $display("BTB2FETCH: TARGET1: %x", btb_in.target[1]);
             //btb_out.target <= r_in.corrected_PC[15:0];
 
             $display("FETCH RECEIVED CORRECT PC: %x", r_in.corrected_PC);
@@ -273,6 +280,9 @@ module stage_if_p4 (
 
             $display("DECODE PC: %x", PC_reg_temp);
             $display("F_DAT PRED: %x", mux_result_prediction[0]);
+
+            $display("F_COUNT: %x", f_cnt);
+            //$display(": %x", mux_result_prediction[0]);
 
 
            $display("  %3d | << Fetch <<", $time);  

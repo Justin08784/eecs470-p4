@@ -357,7 +357,6 @@ CPU_SOURCES = verilog/cpu.sv \
 			  verilog/lq.sv \
 			  verilog/branch_history_table.sv \
 			  verilog/correlated_predictor.sv \
-			  verilog/dcache_basic.sv \
 			  verilog/dcache_simple.sv
 
 

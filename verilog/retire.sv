@@ -158,6 +158,8 @@ module retire (
             ++btq_rd_cnt;
         end
 
+        if (btq_rd_cnt > 0) $display("RETIRING_BRANCH_RET_CNT: %0d", r_en_cnt);
+
         flush_n = mispred || ld_ooo;
         corrected_PC_n = mispred
             ? mispred_target
