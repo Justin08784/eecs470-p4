@@ -1289,5 +1289,29 @@ typedef struct packed {
     retire_final retire_exec;
 } DBG_retire;
 
+`ifdef DEBUG
+function automatic string dbg_mem_cmd(input MEM_COMMAND cmd);
+    string rv;
+    case (cmd)
+        MEM_NONE:   rv = "NONE";
+        MEM_STORE:  rv = "STOR";
+        MEM_LOAD:   rv = "LOAD";
+    endcase
+    return rv;
+endfunction
+
+function automatic string dbg_mem_size(input MEM_SIZE size);
+    string rv;
+    rv = "unknown mem size";
+    case (size)
+        BYTE:   rv = "BYTE";
+        HALF:   rv = "HALF";
+        WORD:   rv = "WORD";
+        DOUBLE: rv = "DOUBLE";
+    endcase
+    return rv;
+endfunction;
+`endif
+
 
 `endif // __SYS_DEFS_SVH__

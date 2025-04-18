@@ -534,16 +534,6 @@ module testbench;
         endcase
     endfunction
 
-    function automatic string dbg_mem_cmd(input MEM_COMMAND cmd);
-        string rv;
-        case (cmd)
-            MEM_NONE:   rv = "NONE";
-            MEM_STORE:  rv = "STOR";
-            MEM_LOAD:   rv = "LOAD";
-        endcase
-        return rv;
-    endfunction
-
     task print_btq;
         // internal state
         BTQ_ENTRY [`BTQ_SZ-1:0]      state;

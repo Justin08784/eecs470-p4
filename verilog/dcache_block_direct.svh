@@ -60,8 +60,6 @@ typedef struct packed {
     logic   [NUM_CACHE_LINES-1:0] vld;
     logic   [NUM_CACHE_LINES-1:0] dirty;
     TAG     [NUM_CACHE_LINES-1:0] tag;
-    logic   [$clog2(NUM_CACHE_LINES)-1:0] vict_way;
-    // AGE     [NUM_CACHE_LINES-1:0] age;
 } CACHE_HEADER;
 
 
@@ -131,5 +129,39 @@ typedef struct packed {
 typedef struct packed {
     ST_QUERY_STATUS status;
 } dcache2sq;
+
+`ifdef DEBUG
+function automatic string dbg_ld_status(input LD_QUERY_STATUS s);
+    string rv;
+    rv = "unknown ld query status";
+    case (s)
+        LD_SUCC: rv = "LD_SUCC";
+        LD_FAIL: rv = "LD_FAIL";
+    endcase
+    return rv;
+endfunction;
+
+function automatic string dbg_st_status(input ST_QUERY_STATUS s);
+    string rv;
+    rv = "unknown st query status";
+    case (s)
+        ST_SUCC: rv = "ST_SUCC";
+        ST_FAIL: rv = "ST_FAIL";
+    endcase
+    return rv;
+endfunction;
+
+function automatic string dbg_mshr_status(input MSHR_STATUS s);
+    string rv;
+    rv = "unknown mshr status";
+    case (s)
+        S_IDLE: rv = "S_IDLE";
+        S_NTAG: rv = "S_NTAG";
+        S_WAIT: rv = "S_WAIT";
+        S_FILL: rv = "S_FILL";
+    endcase
+    return rv;
+endfunction;
+`endif
 
 `endif
