@@ -26,6 +26,55 @@ function automatic CACHE_LOC cache_locate(
     return '{hit, tag, way};
 endfunction
 
+function automatic DATA_BLOCK extract_load(
+    input MEM_SIZE    size,
+    input ADDR        addr,
+    input MEM_BLOCK   raw
+);
+    DATA_BLOCK rv;
+    DW_ACCESS acc;
+
+    rv = '0;
+    acc = '{
+        byte_off : idw_byte(addr),
+        half_off : idw_half(addr),
+        word_off : idw_word(addr)
+    };
+
+    case (size)
+        BYTE  : rv = raw.byte_level[acc.byte_off];
+        HALF  : rv = raw.half_level[acc.half_off];
+        WORD  : rv = raw.word_level[acc.word_off];
+        default:;
+    endcase
+    return rv;
+endfunction
+
+function automatic MEM_BLOCK apply_store(
+    input MEM_SIZE      size,
+    input ADDR          addr,
+    input DATA_BLOCK    wdat,
+    input MEM_BLOCK     prew
+);
+    MEM_BLOCK posw;
+    DW_ACCESS acc;
+    acc = '{
+        byte_off : idw_byte(addr),
+        half_off : idw_half(addr),
+        word_off : idw_word(addr)
+    };
+
+    posw = prew;
+    case (size)
+        BYTE  : posw.byte_level[acc.byte_off] = wdat.byte_level[0];
+        HALF  : posw.half_level[acc.half_off] = wdat.half_level[0];
+        WORD  : posw.word_level[acc.word_off] = wdat.word_level;
+        default:;
+    endcase
+
+    return posw;
+endfunction
+
 typedef struct packed {
     logic       vld;
     WAY         way;
@@ -39,9 +88,8 @@ typedef struct packed {
     WAY         way;
     MEM_BLOCK   dat;
 } WRIT_SND;
-
 typedef struct packed {
-    logic       vld;
+    logic       en;
     OP_TAG      op;
 
     logic       wr_mem;
@@ -102,14 +150,14 @@ module fill_handler (
                 w_snd = '{
                     vld : 1,
                     way : way,
-                    dat : mshr.mem_data// FIXME!!!: You need to apply store correctly here!
+                    dat : mshr.mem_data
                 };
 
                 mshr_snd = '{
                     op     : op,
-                    vld    : 1,
+                    en     : 1,
                     wr_mem : 1,
-                    addr   : 32'hdeadbeef, // FIXME::: reconstruct the address of the tobeevicted block
+                    addr   : {hdr.tag[way], way, 3'b000},
                     mem_data : r_rcv.dat,
                     mem_size : DOUBLE
                 };
@@ -119,11 +167,11 @@ module fill_handler (
                 w_snd = '{
                     vld : 0,
                     way : way,
-                    dat : mshr.mem_data// FIXME!!!: You need to apply store correctly here!
+                    dat : mshr.mem_data
                 };
 
                 mshr_snd.op = op;
-                mshr_snd.vld= 1;
+                mshr_snd.en = 1;
             end
             default:;
         endcase
@@ -181,7 +229,7 @@ module load_handler (
             OP_LOAD_MISS: begin
                 mshr_snd = '{
                     op     : op,
-                    vld    : 1,
+                    en     : 1,
                     wr_mem : 0,
                     addr   : dw_align(ld_in.addr),
                     mem_data : '0,
@@ -195,7 +243,7 @@ module load_handler (
     always_comb begin
         ld_out = '{
             tag     : '0,
-            dat     : r_rcv.dat,
+            dat     : r_rcv.dat, // FIXME: load FU will need to do the byte manip on the load!
             status  : gnt ? LD_SUCC : LD_FAIL,
             ldb     : '0
         };
@@ -251,7 +299,12 @@ module stor_handler (
                 w_snd = '{
                     vld : 1,
                     way : loc.way,
-                    dat : r_rcv.dat // FIXME!!!: You need to apply store correctly here!
+                    dat : apply_store(
+                        sq_in.size, // size
+                        sq_in.addr, // addr
+                        sq_in.dat,  // wdat
+                        r_rcv.dat   // prew
+                    )
                 };
 
             end
@@ -259,7 +312,7 @@ module stor_handler (
             OP_STOR_MISS: begin
                 mshr_snd = '{
                     op     : op,
-                    vld    : 1,
+                    en     : 1,
                     wr_mem : 0,
                     addr   : dw_align(sq_in.addr),
                     mem_data : '0,
@@ -277,20 +330,100 @@ endmodule;
 
 
 module refill_engine (
+    input reset,
+    input clock,
     // expose mshr state
-    output MSHR_ENTRY   mshr,
+    output MSHR_ENTRY   mshr_out,
 
-    input  logic        en,
     input  MSHR_SND     snd_in,
 
-    input  MEM_TAG       mem_in_transaction_tag,
-    input  MEM_BLOCK     mem_in_data,
-    input  MEM_TAG       mem_in_data_tag,
+    input  MEM_TAG      mem_in_transaction_tag,
+    input  MEM_BLOCK    mem_in_data,
+    input  MEM_TAG      mem_in_data_tag,
 
-    output MEM_COMMAND   mem_out_command,
-    output ADDR          mem_out_addr,
-    output MEM_BLOCK     mem_out_data
+    output MEM_COMMAND  mem_out_command,
+    output ADDR         mem_out_addr,
+    output MEM_BLOCK    mem_out_data
 );
+    MSHR_ENTRY mshr, mshr_n;
+    assign mshr_out = mshr;
+
+    always_comb begin
+        mshr_n = mshr;
+
+        case(mshr.status)
+        S_IDLE: begin
+            case (snd_in.op)
+            OP_LOAD_MISS: begin
+                mshr_n = '{
+                    status   : S_NTAG,
+                    wr_mem   : snd_in.wr_mem,
+                    miss_tag : '0,
+                    addr     : snd_in.addr,
+                    mem_data : snd_in.mem_data,
+                    mem_size : snd_in.mem_size
+                };
+            end
+            OP_STOR_MISS: begin
+                mshr_n = '{
+                    status   : S_NTAG,
+                    wr_mem   : snd_in.wr_mem,
+                    miss_tag : '0,
+                    addr     : snd_in.addr,
+                    mem_data : snd_in.mem_data,
+                    mem_size : snd_in.mem_size
+                };
+            end
+            endcase
+        end
+        S_NTAG: begin
+            if (mshr.wr_mem  && mem_in_transaction_tag != 0) begin
+                mshr_n.miss_tag = mem_in_transaction_tag;
+                mshr_n.status   = S_IDLE;
+            end else if 
+               (!mshr.wr_mem && mem_in_transaction_tag != 0) begin
+                mshr_n.miss_tag = mem_in_transaction_tag;
+                mshr_n.status   = S_WAIT;
+            end
+        end
+        S_WAIT: begin
+            case (snd_in.op)
+            OP_FILL_EVICT: begin
+                mshr_n = '{
+                    status   : S_NTAG,
+                    wr_mem   : snd_in.wr_mem,
+                    miss_tag : '0,
+                    addr     : snd_in.addr,
+                    mem_data : snd_in.mem_data,
+                    mem_size : snd_in.mem_size
+                };
+            end
+            OP_FILL_NO_EVICT: begin
+                mshr_n        = '0;
+                mshr_n.status = S_IDLE;
+            end
+            default:;
+            endcase
+        end
+        S_FILL: begin
+            case (snd_in.op)
+            OP_FILL_EVICT:    mshr_n.status = S_NTAG;
+            OP_FILL_NO_EVICT: mshr_n.status = S_IDLE;
+            default:;
+            endcase
+        end
+        endcase
+    end
+
+    always_ff @(posedge clock) begin
+        if (reset) begin
+            mshr <= '0;
+        end else if (snd_in.en) begin
+            mshr <= mshr_n;
+        end
+    end
+
+
 endmodule
 
 
@@ -316,7 +449,6 @@ module dcache_block (
     output dcache2sq sq_out
 );
     CACHE_HEADER hdr, hdr_n;
-    MSHR_ENTRY   mshr, mshr_n;
 
     logic   ren,  wen;
     WAY     rway, wway;
@@ -372,6 +504,13 @@ module dcache_block (
     end
 
     // microp decoders (for resource use intent)
+    MSHR_ENTRY mshr;
+    refill_engine dec_refill (
+        .reset,
+        .clock,
+
+        .mshr_out(mshr)
+    );
     fill_handler dec_fill0 (
         .hdr,
         .mshr,

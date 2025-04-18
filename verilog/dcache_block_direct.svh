@@ -46,6 +46,7 @@ typedef enum logic [1:0] {
 typedef struct packed {
     MSHR_STATUS status;
     logic       wr_mem;
+    MEM_TAG     miss_tag;
     ADDR        addr;
     MEM_BLOCK   mem_data;
     MEM_SIZE    mem_size;
