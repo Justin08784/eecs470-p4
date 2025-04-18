@@ -137,11 +137,7 @@ module fill_handler (
             break;
         end
 
-        {
-            r_snd,
-            w_snd,
-            mshr_snd
-        } = '0;
+        {r_snd, w_snd, mshr_snd} = '0;
         case (op)
             OP_FILL_EVICT: begin
                 r_snd = '{
@@ -217,10 +213,7 @@ module load_handler (
                 : OP_LOAD_MISS;
         end
 
-        {
-            r_snd,
-            mshr_snd
-        } = '0;
+        {r_snd, mshr_snd} = '0;
 
         case (op)
             OP_LOAD_HIT: begin
@@ -288,11 +281,7 @@ module stor_handler (
                 : OP_STOR_MISS;
         end
 
-        {
-            r_snd,
-            w_snd,
-            mshr_snd
-        } = '0;
+        {r_snd, w_snd, mshr_snd} = '0;
         case (op)
             OP_STOR_HIT: begin
                 r_snd = '{
