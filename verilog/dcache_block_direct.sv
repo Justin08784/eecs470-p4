@@ -517,11 +517,11 @@ module dcache_block (
         gnt      = '0;
         gnt_reqr = '0;
 
-        foreach (req[op]) begin
-            if (!req[op])
+        foreach (req[reqr]) begin
+            if (!req[reqr])
                 continue;
-            gnt[op]  = 1;
-            gnt_reqr = op;
+            gnt[reqr] = 1;
+            gnt_reqr  = reqr;
             break;
         end
 
@@ -537,8 +537,10 @@ module dcache_block (
 
 
 
-    // microp decoders (for resource use intent)
+
+    // Resource managers
     MSHR_ENTRY mshr;
+    // mshr manager
     refill_engine dec_refill (
         .reset,
         .clock,
@@ -555,6 +557,36 @@ module dcache_block (
         .mem_out_data
     );
 
+    // header manager
+    WAY tmp_way;
+    always_comb begin
+        hdr_n = hdr;
+        foreach (gnt[reqr]) begin
+            if (!gnt[reqr])
+                continue;
+
+            case (reqr)
+            REQR_FILL: begin
+                tmp_way = w_snds[REQR_FILL].way;
+                hdr_n.vld[tmp_way]      = 1;
+                hdr_n.dirty[tmp_way]    = mshr.wr_mem;
+                hdr_n.tag[tmp_way]      = get_tag(mshr.addr);
+            end
+            REQR_LOAD: begin
+                // TODO: LRU update (and victim update)
+            end
+            REQR_STOR: begin
+                // TODO: LRU update
+            end
+            default:;
+            endcase
+
+            break;
+        end
+
+    end
+
+    // Request managers (for resource use intent)
     fill_handler dec_fill0 (
         .hdr,
         .mshr,
@@ -597,5 +629,12 @@ module dcache_block (
         .gnt        (gnt[REQR_STOR]),
         .r_rcv      (r_rcvs[REQR_STOR])
     );
+
+    always_ff @(posedge clock) begin
+        if (reset)
+            hdr <= '0;
+        else
+            hdr <= hdr_n;
+    end
 
 endmodule

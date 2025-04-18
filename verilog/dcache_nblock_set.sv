@@ -570,27 +570,27 @@ endmodule;
 //     end
 
 
-//     // Header update
-//     always_comb begin
-//         cache_hdr_n = cache_hdr;
-//         if (acc_en) begin
-//             case (acc_gnt_op)
-//             FILL: begin
-//                 cache_hdr_n.vld[fl_sid][fl_way]     = 1;
-//                 cache_hdr_n.dirty[fl_sid][fl_way]   = 0;
-//                 cache_hdr_n.tag[fl_sid][fl_way]     = get_tag(fill_md.addr);
-//                 // cache_hdr_n.age[fl_sid]          = TODO
-//             end
-//             LOAD: begin
-//                 // TODO: LRU update (and victim update)
-//             end
-//             STOR: begin
-//                 // TODO: LRU update
-//             end
-//             default:;
-//             endcase
-//         end
-//     end
+    // Header update
+    always_comb begin
+        cache_hdr_n = cache_hdr;
+        if (acc_en) begin
+            case (acc_gnt_op)
+            FILL: begin
+                cache_hdr_n.vld[fl_sid][fl_way]     = 1;
+                cache_hdr_n.dirty[fl_sid][fl_way]   = 0;
+                cache_hdr_n.tag[fl_sid][fl_way]     = get_tag(fill_md.addr);
+                // cache_hdr_n.age[fl_sid]          = TODO
+            end
+            LOAD: begin
+                // TODO: LRU update (and victim update)
+            end
+            STOR: begin
+                // TODO: LRU update
+            end
+            default:;
+            endcase
+        end
+    end
 
 //     always_ff @(posedge clock) begin
 //         if (reset) begin
