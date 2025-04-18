@@ -370,6 +370,11 @@ module refill_engine (
         end
 
         S_NTAG: begin
+            if (mshr.miss_tag == 0) begin
+                mem_out_command = MEM_LOAD;
+                mem_out_addr    = dw_align(mshr.addr);
+            end
+
             if (mshr.wr_mem  && mem_in_transaction_tag != 0) begin
                 mshr_n.miss_tag = mem_in_transaction_tag;
                 mshr_n.status   = S_IDLE;
@@ -554,6 +559,8 @@ module dcache_block (
             end
             REQR_STOR: begin
                 // TODO: LRU update
+                tmp_way                 = w_snds[REQR_STOR].way;
+                hdr_n.dirty[tmp_way]    = 1;
             end
             default:;
             endcase
