@@ -1,0 +1,4 @@
+Register writeback output (hexadecimal)
+PC 0000:addi    | r02=2       
+PC 0004:sw      | ---
+PC 0008:wfi     | ---
