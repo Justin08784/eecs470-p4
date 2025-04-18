@@ -322,8 +322,31 @@ always_comb begin
         end
     end
 
-    sq_out.sq_d_en_cnt = sq_wr_idx;
-    lq_out.lq_d_en_cnt = lq_wr_idx;
+    // sq_out.sq_d_en_cnt = sq_wr_idx;
+    // lq_out.lq_d_en_cnt = lq_wr_idx;
+end
+
+
+logic [$clog2(`N):0] sq_wr_cnt;
+logic [$clog2(`N):0] lq_wr_cnt;
+always_comb begin
+    sq_wr_cnt = 0;
+    lq_wr_cnt = 0;
+
+    for (int i = 0; i < `N; i++) begin
+        if (i >= commit_en_cnt) continue;
+        
+        if (commit_in[i].dat.wr_mem) begin
+            ++sq_wr_cnt;
+        end
+
+        if (commit_in[i].dat.rd_mem) begin
+            ++lq_wr_cnt;
+        end
+    end
+
+    sq_out.sq_d_en_cnt = sq_wr_cnt;
+    lq_out.lq_d_en_cnt = lq_wr_cnt;
 end
 
 // handle rob output 
