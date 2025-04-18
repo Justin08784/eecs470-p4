@@ -103,8 +103,6 @@ module fill_handler (
     // Metadata to consult
     input  CACHE_HEADER hdr,
     input  MSHR_ENTRY   mshr,
-    input  logic        evict,
-    input  logic        [NUM_CACHE_LINES-1:0] alloc_msk,
 
     /* orders */
     output logic        req,
@@ -122,19 +120,13 @@ module fill_handler (
     always_comb begin
         req = mshr.status == S_FILL;
 
+        way = get_way(mshr.addr);
+
         op = OP_NONE;
         if (req) begin
-            op = evict
+            op = hdr.vld[way]
                 ? OP_FILL_EVICT
                 : OP_FILL_NO_EVICT;
-        end
-
-        way = '0;
-        foreach (alloc_msk[w]) begin
-            if (!alloc_msk[w])
-                continue;
-            way = w;
-            break;
         end
 
         {r_snd, w_snd, mshr_snd} = '0;
@@ -163,7 +155,7 @@ module fill_handler (
 
             OP_FILL_NO_EVICT: begin
                 w_snd = '{
-                    vld : 0,
+                    vld : 1,
                     way : way,
                     dat : mshr.mem_data
                 };
@@ -481,22 +473,6 @@ module dcache_block (
         NUM_REQR
     } REQR;
 
-    logic   evict; // alloc in set requires evict? i.e. !(any free way in set)
-    logic   [NUM_CACHE_LINES-1:0] alloc_msk; // alloc in set requires evict? i.e. !(any free way in set)
-    logic   [NUM_CACHE_LINES-1:0] lru; // lru victim way
-    always_comb begin
-        evict = !(|free_gnt);
-
-        foreach(lru[w])
-            lru[w] = w == 0;
-
-        foreach(alloc_msk[w]) begin
-            alloc_msk[w] = evict
-                ? lru[w]
-                : free_gnt[w];
-        end
-    end
-
     logic    [NUM_REQR-1:0] req, gnt;
     READ_SND [NUM_REQR-1:0] r_snds;
     WRIT_SND [NUM_REQR-1:0] w_snds;
@@ -538,7 +514,7 @@ module dcache_block (
         .clock,
 
         .mshr_out(mshr),
-        .snd_in  (mshr_snds[gnt_reqr]), // FIXME
+        .snd_in  (mshr_snds[gnt_reqr]),
 
         .mem_in_transaction_tag,
         .mem_in_data,
@@ -582,8 +558,6 @@ module dcache_block (
     fill_handler dec_fill0 (
         .hdr,
         .mshr,
-        .evict,
-        .alloc_msk,
 
         .req        (req[REQR_FILL]),
         .r_snd      (r_snds[REQR_FILL]),

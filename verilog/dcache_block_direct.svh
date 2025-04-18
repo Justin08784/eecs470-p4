@@ -5,6 +5,7 @@
 
 localparam NUM_CACHE_LINES  =  `DCACHE_LINES;
 localparam OFFSET_BITS      = 3;
+localparam WAY_BITS         = $clog2(NUM_CACHE_LINES);
 localparam TAG_BITS         = 16 - OFFSET_BITS;
 typedef logic [TAG_BITS-1:0]    TAG;
 typedef logic [OFFSET_BITS-1:0] OFF;
@@ -13,6 +14,9 @@ typedef logic [$clog2(NUM_CACHE_LINES)-1:0] WAY;
 
 function automatic TAG get_tag(input ADDR addr);
     return addr[15:16-TAG_BITS];
+endfunction
+function automatic TAG get_way(input ADDR addr);
+    return addr[WAY_BITS+2:3];
 endfunction
 
 typedef struct packed {
