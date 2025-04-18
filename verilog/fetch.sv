@@ -39,16 +39,11 @@ module stage_if_p4 (
     output ADDR         Imem_addr, // address sent to Instruction memory
     output  fetch2decode d_out
 );
-
     ADDR PC_reg; // PCs we are currently fetching
-    MEM_BLOCK icache_out;
-    logic  icache_valid;
 
 
-    logic [1:0] corr_pred;
-    // INST [1:0] fifo_insns;
-
-    //logic [1:0] valid_out;
+    MEM_BLOCK   icache_out;
+    logic       icache_valid;
 
     icache icache_0 (
         // inputs
@@ -73,30 +68,19 @@ module stage_if_p4 (
 
     logic [1:0] mux_result_prediction; 
 
-    logic vld;
-
-    logic off; // 1 if PC is dw-misaligned (i.e. starts at 2nd word of double word)
-
-    logic prediction_prop;
-
-    logic pred_stall;
-
-    
-
+    logic base_woff; // 1 if PC is dw-misaligned (i.e. starts at 2nd word of double word)
     always_comb begin
         d_out.f_en_cnt = `MIN(used_scnt, d_in.d_rdy_cnt);
-        off = PC_reg[2]; 
+        base_woff = PC_reg[2]; 
+
         f_cnt = 0;
-        if (!icache_valid) begin
-            f_cnt = 0;
-        end else if (off || |mux_result_prediction) begin
-            f_cnt = 1;
-        end else begin
-            f_cnt = 2;
+        for (int i = 0; i < `N; ++i) begin
+            f_cnt += (i >= base_woff);
+            if (mux_result_prediction[i]) // stop fetch at first pred-taken branch
+                break;
         end
         f_cnt = `MIN(f_cnt, free_scnt);
-
-        // f_cnt = !icache_valid  ? 0 : ((off || mux_result_prediction > 0) ? `MIN(1, free_scnt) : free_scnt);
+        f_cnt = icache_valid ? f_cnt : 0;
 
         for (int unsigned i = 0; i < `N; ++i) begin
             PC_reg_temp = PC_reg + 4*i;
@@ -106,13 +90,10 @@ module stage_if_p4 (
                 NPC   : PC_reg_temp + 4,
                 bhr   : pred_in_gshare.bhr,
 
-                correlated_bhr : pred_in_corr.bhr,
-
-                pred  : mux_result_prediction[0],
-
-                gshare_pred :  pred_in_gshare.prediction[0],
-
-                corr_pred   :  pred_in_corr.prediction[0]
+                correlated_bhr  : pred_in_corr.bhr,
+                pred            : mux_result_prediction[i],
+                gshare_pred     : pred_in_gshare.prediction[i],
+                corr_pred       : pred_in_corr.prediction[i]
             };
         end
     end
@@ -136,42 +117,31 @@ module stage_if_p4 (
         .used_scnt  (used_scnt)
     );
 
-    logic [1:0] predict_taken;
+    logic [`N:0] predict_taken;
+    logic [`N:0] btb_hit;
+    logic [`N:0][15:0] btb_target;
 
-
-    logic [1:0] btb_hit;
-
-    logic [1:0] [15:0] btb_target;
-
-    assign mux_result_prediction[0] = predict_taken[0] && btb_hit[0];
-
-   // assign pred_out = mux_result
-    assign mux_result_prediction[1] = predict_taken[1] && btb_hit[1];
+    assign mux_result_prediction = predict_taken & btb_hit;
 
     assign btb_hit = btb_in.hit;
 
+    ADDR [`N:0] PC_n; // PC_n[m] := PC if we fetch "m" this cycle (inaccurate past the 1st branch)
+    always_comb begin
+        PC_n[0] = PC_reg;
+        for (int i = 0; i < `N; ++i) begin
+            PC_n[i + 1] = mux_result_prediction[i]
+                ? {16'b0, btb_in.target[i]}
+                : PC_reg + 4*(i + 1);
+        end
+    end
+
     always_ff @(posedge clock) begin
         if (reset) begin
-                PC_reg <= 0; // initial PC value is 0 (the memory address where our program starts)
+            PC_reg <= 0; // initial PC value is 0 (the memory address where our program starts)
         end else if (flush) begin
-                PC_reg <= r_in.corrected_PC;
-        end else if(mux_result_prediction) begin
-             `ifdef DEBUG
-                $display("PREDICTING TAKEN:");
-                $display("MUX RESULT: %1x", mux_result_prediction[0]);
-                $display("FETCHING NEW TARGET: %x", btb_in.target[0]);
-             `endif
-            if(mux_result_prediction[0]) begin
-                if (f_cnt > 0) begin
-                    PC_reg <= {16'b0, btb_in.target[0]};
-                end else begin
-                    PC_reg <= PC_reg;
-                end
-            end else if(mux_result_prediction[1]) begin
-                PC_reg <= PC_reg + 4*f_cnt;
-            end
+            PC_reg <= r_in.corrected_PC;
         end else begin
-                PC_reg <= PC_reg + 4*f_cnt; 
+            PC_reg <= PC_n[f_cnt];
         end 
     end
 
@@ -180,14 +150,14 @@ module stage_if_p4 (
     assign btb_out.is_taken = r_in.is_taken;
     assign btb_out.correct_PC =  r_in.PC;
 
-    assign btb_out.PC[0] =  PC_reg;
+    assign btb_out.PC[0] = PC_reg;
     assign btb_out.PC[1] = PC_reg + 4; 
 
 
     assign btb_target = btb_in.target;
 
 
-    assign pred_out.PC[0] =  PC_reg;
+    assign pred_out.PC[0] = PC_reg;
     assign pred_out.PC[1] = PC_reg + 4;
 
     assign pred_out.update_enable = r_in.update_en;
