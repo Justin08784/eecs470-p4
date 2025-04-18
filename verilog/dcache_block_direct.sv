@@ -233,7 +233,9 @@ module load_handler (
         ld_out = '{
             tag     : '0,
             dat     : r_rcv.dat, // FIXME: load FU will need to do the byte manip on the load!
-            status  : gnt ? LD_SUCC : LD_FAIL,
+            status  : (gnt && op == OP_LOAD_HIT)
+                ? LD_SUCC
+                : LD_FAIL,
             ldb     : '0
         };
     end
@@ -309,7 +311,9 @@ module stor_handler (
     end
 
     assign sq_out = '{
-        status : gnt ? ST_SUCC : ST_FAIL
+        status : (gnt && op == OP_STOR_HIT)
+            ? ST_SUCC
+            : ST_FAIL
     };
 endmodule;
 
