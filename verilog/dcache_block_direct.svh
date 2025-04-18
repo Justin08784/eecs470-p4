@@ -114,10 +114,10 @@ typedef struct packed {
     ADDR    addr;
 } ld2dcache;
 typedef struct packed {
-    MEM_TAG         tag;
+    MEM_TAG         tag; //not currently in use
     DATA_BLOCK      dat;
     LD_QUERY_STATUS status;
-    LDB             ldb;
+    LDB             ldb; //not currently in use
 } dcache2ld;
 
 typedef struct packed {

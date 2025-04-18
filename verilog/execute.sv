@@ -306,7 +306,7 @@ module stage_ex_p4 (
     output  executeLD2sq ld_sq_out,
 
     input   dcache2ld   dcache_in,
-    input   ld2dcache   dcache_out,
+    output   ld2dcache   dcache_out,
 
     input   prf2execute prf_in,
     output  execute2prf prf_out,
