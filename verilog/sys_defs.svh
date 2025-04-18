@@ -73,7 +73,7 @@
 
 `ifndef SYNTH
 // comment out to disable DEBUG:
-`define DEBUG
+// `define DEBUG
 `endif
 
 ///////////////////////////////
@@ -1121,10 +1121,21 @@ typedef struct packed {
     logic     Icache_valid_out;
 } DBG_icache;
 
+localparam INSN_BUF_DEPTH = 4*`N;
+localparam INSN_BUF_WIDTH = $bits(IF_ID_PACKET);
+typedef struct packed {
+    logic [$clog2(4*`N)-1:0] head;
+    logic [$clog2(4*`N)-1:0] tail;
+    logic [4*`N-1:0][$bits(IF_ID_PACKET)-1:0] state;
+    logic [$clog2(4*`N):0]   used;
+} DBG_insn_buf;
+
 typedef struct packed {
     // internal state
     // I/O
     logic           flush;
+    logic [$clog2(`N):0] f_cnt;
+    DBG_insn_buf    dbg_insn_buf;
     decode2fetch    d_in;
     fetch2decode    d_out;
     retire2fetch    r_in;

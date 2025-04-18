@@ -99,6 +99,13 @@ module stage_if_p4 (
         end
     end
 
+    struct packed {
+        logic [$clog2(INSN_BUF_DEPTH)-1:0] head;
+        logic [$clog2(INSN_BUF_DEPTH)-1:0] tail;
+        logic [INSN_BUF_DEPTH-1:0][INSN_BUF_WIDTH-1:0] state;
+        logic [$clog2(INSN_BUF_DEPTH):0]   used;
+    } dbg_insn_buf;
+
     fifo #(
         .DEPTH(4*`N),
         .WIDTH($bits(IF_ID_PACKET)),
@@ -107,6 +114,7 @@ module stage_if_p4 (
         .ENABLE_INTR_FWD(`FALSE),
         .INSTANCE_ID(2)
     ) dut (
+        .dbg        (dbg_insn_buf),
         .clock      (clock),
         .reset      (reset),
         .flush      (flush),
@@ -214,13 +222,15 @@ module stage_if_p4 (
 
     `ifdef DEBUG
     assign dbg = '{
-        flush,
-        d_in,
-        d_out,
-        r_in,
-        Imem_data,
-        PC_reg,
-        dbg_icache
+        flush   : flush,
+        f_cnt   : f_cnt,
+        dbg_insn_buf : dbg_insn_buf,
+        d_in    : d_in,
+        d_out   : d_out,
+        r_in    : r_in,
+        Imem_data   : Imem_data,
+        PC_reg      : PC_reg,
+        dbg_icache  : dbg_icache
     };
     `endif
 

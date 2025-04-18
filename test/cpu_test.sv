@@ -28,7 +28,7 @@ import "DPI-C" function string decode_inst(int inst);
 //import "DPI-C" function void close_pipeline_output_file();
 
 
-// `define TB_MAX_CYCLES 10000
+// `define TB_MAX_CYCLES 350
 `define TB_MAX_CYCLES 50000000
 
 
@@ -304,27 +304,27 @@ module testbench;
                 verisimpleV.rob_0.r_out.entries[n].tag
             ];
             // print the committed instructions to the writeback output file
-            if (reg_idx == `ZERO_REG) begin
-                $fdisplay(wb_fileno, "PC %4x:%-8s| ---", pc, decode_inst(inst));
-            end else begin
-                $fdisplay(wb_fileno, "PC %4x:%-8s| r%02d=%-8x",
-                          pc,
-                          decode_inst(inst),
-                          reg_idx,
-                          data);
-            end
-
             // if (reg_idx == `ZERO_REG) begin
-            //     $fdisplay(wb_fileno, "(%4d) PC %4x:%-8s| ---", id, pc, decode_inst(inst));
+            //     $fdisplay(wb_fileno, "PC %4x:%-8s| ---", pc, decode_inst(inst));
             // end else begin
-            //     $fdisplay(wb_fileno, "(%4d) PC %4x:%-8s| r%02d=%-8x",
-            //               id,
+            //     $fdisplay(wb_fileno, "PC %4x:%-8s| r%02d=%-8x",
             //               pc,
             //               decode_inst(inst),
             //               reg_idx,
             //               data);
-            // rob_debug.delete(cur_idx);
             // end
+
+            if (reg_idx == `ZERO_REG) begin
+                $fdisplay(wb_fileno, "(%4d) PC %4x:%-8s| ---", id, pc, decode_inst(inst));
+            end else begin
+                $fdisplay(wb_fileno, "(%4d) PC %4x:%-8s| r%02d=%-8x",
+                          id,
+                          pc,
+                          decode_inst(inst),
+                          reg_idx,
+                          data);
+            rob_debug.delete(cur_idx);
+            end
 
             `ifdef DEBUG
             $display("commit[%0d]: (id: %4d, pc: 0x%x, inst: 0x%x) vld: %b, halt: %b, illegal: %b, data: %x",
@@ -660,21 +660,45 @@ module testbench;
 
     task print_fetch;
         logic           flush;
+        logic [$clog2(`N):0] f_cnt;
+        DBG_insn_buf dbg_insn_buf;
         decode2fetch    d_in;
         fetch2decode    d_out;
         retire2fetch    r_in;
         MEM_BLOCK [1:0] Imem_data;
         ADDR [`N-1:0]   PC_reg;
+        logic [$clog2(INSN_BUF_DEPTH)-1:0]   head, tail;
+        logic [$clog2(INSN_BUF_DEPTH):0]     used;
+        IF_ID_PACKET [INSN_BUF_DEPTH-1:0]    state;
+
 
         flush       = dbg_fetch.flush;
+        f_cnt       = dbg_fetch.f_cnt;
+        dbg_insn_buf = dbg_fetch.dbg_insn_buf;
         d_in        = dbg_fetch.d_in;
         d_out       = dbg_fetch.d_out;
         r_in        = dbg_fetch.r_in;
         Imem_data   = dbg_fetch.Imem_data;
         PC_reg      = dbg_fetch.PC_reg;
+        
+
+        state = dbg_fetch.dbg_insn_buf.state;
+        head = dbg_fetch.dbg_insn_buf.head;
+        tail = dbg_fetch.dbg_insn_buf.tail;
+        used = dbg_fetch.dbg_insn_buf.used;
+
 
         $display(">> Fetch >>");
         $display("r_in: {flush: %b, corrected_PC: 0x%x}", flush, r_in.corrected_PC);
+        $display("f_cnt:    %1d", f_cnt);
+        $display("f_en_cnt: %1d, [%x, %x]", d_out.f_en_cnt, d_out.f_dat[0].inst, d_out.f_dat[1].inst);
+        for (int i = head, int cnt = 0; cnt < used; i = (i + 1) % INSN_BUF_DEPTH, ++cnt) begin
+            $display("insn_buf[%2d]: inst: 0x%x, PC: 0x%x",
+                i,
+                state[i].inst,
+                state[i].PC
+            );
+        end
         $display("PC_reg:  %x", PC_reg);
         $display("Imem_data: %x", Imem_data);
         $display("<< Fetch <<");
@@ -1163,14 +1187,14 @@ module testbench;
             return;
 
         $display("  | >> CYCLE: %3d (t: %3d)", clock_count-1, $time);
-        // print_fetch();
+        print_fetch();
         // print_icache();
         // print_decode();
         // print_dispatch();
-        print_map_table();
+        // print_map_table();
         // print_prf();
-        print_btq();
-        print_rob();
+        // print_btq();
+        // print_rob();
 
         // $display("---- rob_debug contents ----");
         // foreach (rob_debug[idx]) begin
@@ -1190,10 +1214,10 @@ module testbench;
         //      mem2proc_data,
         //      mem2proc_data_tag
         // );
-        print_rs();
-        print_sq();
+        // print_rs();
+        // print_sq();
         // print_retbuf();
-        print_lq();
+        // print_lq();
         print_retire();
         $display("  | << CYCLE: %3d (t: %3d)", clock_count-1, $time);
     endtask
