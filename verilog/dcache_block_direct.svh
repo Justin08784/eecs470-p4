@@ -86,10 +86,8 @@ endfunction
 
 // I/O types
 typedef enum logic [1:0] {
-    LD_HIT_READ,    // Block in dcache and could read. Proceed to CDB buffer.
-    LD_HIT_WAIT,    // Block in dcache and could not read. Must retry.
-    LD_MISS_YTAG,   // Block not in dcache and alloc'd/coalesced into MSHR. Proceed to load buffer.
-    LD_MISS_NTAG    // Block not in dcache and could not alloc/coalesce. Must retry.
+    LD_SUCC,
+    LD_FAIL
 } LD_QUERY_STATUS;
 
 typedef enum logic {

@@ -39,9 +39,6 @@ typedef struct packed {
     WAY         way;
     MEM_BLOCK   dat;
 } WRIT_SND;
-typedef struct packed {
-    logic _placeholder;
-} WRIT_RCV;
 
 typedef struct packed {
     logic       vld;
@@ -52,11 +49,8 @@ typedef struct packed {
     MEM_BLOCK   mem_data;
     MEM_SIZE    mem_size;
 } MSHR_SND;
-typedef struct packed {
-    logic _placeholder;
-} MSHR_RCV;
 
-module decode_fill (
+module fill_handler (
     // Metadata to consult
     input  CACHE_HEADER hdr,
     input  MSHR_ENTRY   mshr,
@@ -71,9 +65,7 @@ module decode_fill (
 
     /* receipts */
     input  logic        gnt,
-    output READ_RCV     r_rcv,
-    output WRIT_RCV     w_rcv,
-    output MSHR_RCV     mshr_rcv
+    output READ_RCV     r_rcv
 );
     OP_TAG op;
     WAY    way;
@@ -139,9 +131,10 @@ module decode_fill (
 
 endmodule;
 
-module decode_load (
+module load_handler (
     // Load (w/ load FU)
     input  ld2dcache    ld_in,
+    output dcache2ld    ld_out,
 
     // Metadata to consult
     input  CACHE_HEADER hdr,
@@ -190,7 +183,7 @@ module decode_load (
                     op     : op,
                     vld    : 1,
                     wr_mem : 0,
-                    addr   : ld_in.addr, // FIXME::: reconstruct the address of the tobeevicted block
+                    addr   : dw_align(ld_in.addr),
                     mem_data : '0,
                     mem_size : DOUBLE
                 };
@@ -199,10 +192,20 @@ module decode_load (
         endcase
     end
 
+    always_comb begin
+        ld_out = '{
+            tag     : '0,
+            dat     : r_rcv.dat,
+            status  : gnt ? LD_SUCC : LD_FAIL,
+            ldb     : '0
+        };
+    end
+
 endmodule;
 
-module decode_stor (
+module stor_handler (
     input  sq2dcache    sq_in,
+    output dcache2sq    sq_out,
 
     // Metadata to consult
     input  CACHE_HEADER hdr,
@@ -239,7 +242,7 @@ module decode_stor (
             mshr_snd
         } = '0;
         case (op)
-            OP_FILL_EVICT: begin
+            OP_STOR_HIT: begin
                 r_snd = '{
                     vld : 1,
                     way : loc.way
@@ -253,12 +256,12 @@ module decode_stor (
 
             end
 
-            OP_FILL_NO_EVICT: begin
+            OP_STOR_MISS: begin
                 mshr_snd = '{
                     op     : op,
                     vld    : 1,
                     wr_mem : 0,
-                    addr   : sq_in.addr, // FIXME::: reconstruct the address of the tobeevicted block
+                    addr   : dw_align(sq_in.addr),
                     mem_data : '0,
                     mem_size : DOUBLE
                 };
@@ -267,7 +270,28 @@ module decode_stor (
         endcase
     end
 
+    assign sq_out = '{
+        status : gnt ? ST_SUCC : ST_FAIL
+    };
 endmodule;
+
+
+module refill_engine (
+    // expose mshr state
+    output MSHR_ENTRY   mshr,
+
+    input  logic        en,
+    input  MSHR_SND     snd_in,
+
+    input  MEM_TAG       mem_in_transaction_tag,
+    input  MEM_BLOCK     mem_in_data,
+    input  MEM_TAG       mem_in_data_tag,
+
+    output MEM_COMMAND   mem_out_command,
+    output ADDR          mem_out_addr,
+    output MEM_BLOCK     mem_out_data
+);
+endmodule
 
 
 module dcache_block (
@@ -348,7 +372,7 @@ module dcache_block (
     end
 
     // microp decoders (for resource use intent)
-    decode_fill dec_fill0 (
+    fill_handler dec_fill0 (
         .hdr,
         .mshr,
         .evict,
@@ -357,14 +381,14 @@ module dcache_block (
         .req(req[REQR_FILL])
     );
 
-    decode_load dec_load0 (
+    load_handler dec_load0 (
         .ld_in,
         .hdr,
 
         .req(req[REQR_LOAD])
     );
 
-    decode_stor dec_stor0 (
+    stor_handler dec_stor0 (
         .sq_in,
         .hdr,
 
