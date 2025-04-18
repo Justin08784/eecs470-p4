@@ -76,14 +76,8 @@ module cpu (
         mem2dcache_transaction_tag  = '0;
         mem2fetch_transaction_tag   = '0;
 
-        if (dcache2mem_command != MEM_NONE) begin
-            proc2mem_command    = dcache2mem_command;
-            proc2mem_addr       = dcache2mem_addr;
-            proc2mem_data       = dcache2mem_data;
-
-            mem2dcache_transaction_tag  = mem2proc_transaction_tag;
-
-        end else if (fetch2mem_command == MEM_LOAD) begin
+        // FIXME: Ignoring requests from dcache for now
+        if (fetch2mem_command == MEM_LOAD) begin
             /*
             FETCH REQUESTS COME LAST (always complete memory operations first to
             get stuff commited to memory and to keep the processor FUs chugging)
@@ -93,6 +87,25 @@ module cpu (
 
             mem2fetch_transaction_tag   = mem2proc_transaction_tag;
         end
+
+        // CORRECT:
+        // if (dcache2mem_command != MEM_NONE) begin
+        //     proc2mem_command    = dcache2mem_command;
+        //     proc2mem_addr       = dcache2mem_addr;
+        //     proc2mem_data       = dcache2mem_data;
+
+        //     mem2dcache_transaction_tag  = mem2proc_transaction_tag;
+
+        // end else if (fetch2mem_command == MEM_LOAD) begin
+        //     /*
+        //     FETCH REQUESTS COME LAST (always complete memory operations first to
+        //     get stuff commited to memory and to keep the processor FUs chugging)
+        //     */
+        //     proc2mem_command    = fetch2mem_command;
+        //     proc2mem_addr       = fetch2mem_addr;
+
+        //     mem2fetch_transaction_tag   = mem2proc_transaction_tag;
+        // end
     end
 
     //////////////////////////////////////////////////
