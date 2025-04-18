@@ -606,4 +606,45 @@ module dcache_block (
             hdr <= hdr_n;
     end
 
+    always_ff @(posedge clock) begin
+        if (!reset) begin
+            $display("  | >> DCACHE >>");
+            $display("mem_in: {txn_tag: %2d, data_tag: %2d, data: %x}",
+                mem_in_transaction_tag,
+                mem_in_data_tag,
+                mem_in_data
+            );
+
+            $display("mem_ot: {cmd: %1d, addr: %x, data: %x}",
+                mem_out_command,
+                mem_out_addr,
+                mem_out_data
+            );
+
+            $display("");
+            for (int i = 0; i < NUM_CACHE_LINES; ++i) begin
+                $display("header[%2d]: {vld: %b, dirty: %b, tag: 0x%x} (addr: 0x%x)",
+                    i,
+                    hdr.vld[i],
+                    hdr.dirty[i],
+                    hdr.tag[i],
+                    {hdr.tag[i], WAY'(i), 3'b000}
+                );
+            end
+
+            $display("");
+            $display("mshr: {");
+            $display("  status: %1d\n  wr_mem: %b\n  miss_tag: %2d\n  addr: 0x%x\n  mem_data: 0x%x\n  mem_size: 0x%x",
+                mshr.status,
+                mshr.wr_mem,
+                mshr.miss_tag,
+                mshr.addr,
+                mshr.mem_data,
+                mshr.mem_size
+            );
+            $display("}");
+            $display("  | << DCACHE <<");
+        end
+    end
+
 endmodule
