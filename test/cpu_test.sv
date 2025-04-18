@@ -800,14 +800,10 @@ module testbench;
             $display("mt[%2d]: t=%3d, v=%x :::: am[%2d]: t=%3d, v=%x",
                 r,
                 entries[r],
-                verisimpleV.prf_0.file[
-                    entries[r]
-                ],
+                dbg_prf.file[entries[r]],
                 r, 
                 am_in.state[r],
-                verisimpleV.prf_0.file[
-                    am_in.state[r]
-                ]
+                dbg_prf.file[am_in.state[r]]
             );
         end
         $display("<< MT <<", $time);
