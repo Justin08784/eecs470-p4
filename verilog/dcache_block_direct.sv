@@ -521,19 +521,19 @@ module dcache_block (
     // mshr manager
     assign mem_in_use = mshr.status != S_IDLE;
     refill_engine dec_refill (
-        .reset,
-        .clock,
+        .reset  (reset),
+        .clock  (clock),
 
         .mshr_out(mshr),
         .snd_in  (mshr_snds[gnt_reqr]),
 
-        .mem_in_transaction_tag,
-        .mem_in_data,
-        .mem_in_data_tag,
+        .mem_in_transaction_tag (mem_in_transaction_tag),
+        .mem_in_data            (mem_in_data),
+        .mem_in_data_tag        (mem_in_data_tag),
 
-        .mem_out_command,
-        .mem_out_addr,
-        .mem_out_data
+        .mem_out_command(mem_out_command),
+        .mem_out_addr   (mem_out_addr),
+        .mem_out_data   (mem_out_data)
     );
 
     // header manager
@@ -569,8 +569,8 @@ module dcache_block (
 
     // Request managers (for resource use intent)
     fill_handler dec_fill0 (
-        .hdr,
-        .mshr,
+        .hdr    (hdr),
+        .mshr   (mshr),
 
         .req        (req[REQR_FILL]),
         .r_snd      (r_snds[REQR_FILL]),
@@ -582,9 +582,9 @@ module dcache_block (
     );
 
     load_handler dec_load0 (
-        .ld_in,
-        .ld_out,
-        .hdr,
+        .ld_in  (ld_in),
+        .ld_out (ld_out),
+        .hdr    (hdr),
 
         .req        (req[REQR_LOAD]),
         .r_snd      (r_snds[REQR_LOAD]),
@@ -596,9 +596,9 @@ module dcache_block (
     );
 
     stor_handler dec_stor0 (
-        .sq_in,
-        .sq_out,
-        .hdr,
+        .sq_in  (sq_in),
+        .sq_out (sq_out),
+        .hdr    (hdr),
 
         .req        (req[REQR_STOR]),
         .r_snd      (r_snds[REQR_STOR]),

@@ -133,8 +133,8 @@ module cpu (
     dcache2sq dcache_2_sq;
 
     dcache_block dcache0 (
-        .clock,
-        .reset,
+        .clock(clock),
+        .reset(reset),
 
         // input from memory
         .mem_in_transaction_tag (mem2dcache_transaction_tag),
@@ -153,7 +153,7 @@ module cpu (
         .sq_in  (sq_2_dcache), // FIXME: reenable
         .sq_out (dcache_2_sq),
 
-        .mem_in_use
+        .mem_in_use(mem_in_use)
     );
 
     //////////////////////////////////////////////////
