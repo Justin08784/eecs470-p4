@@ -524,7 +524,7 @@ module cpu (
         .st_lq_out  (execST_2_lq),
         .ld_sq_out  (exec_ld_2_sq),
 
-        .dcache_in  (dcache_2_ld),
+        .dcache_in  ('0), // (dcache_2_ld), // FIXME FIXME FIXME FIXME
         .dcache_out (ld_2_dcache),
 
         .prf_in     (prf_2_ex),

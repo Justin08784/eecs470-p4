@@ -46,15 +46,19 @@ module lod_ex(
     } LOAD_BAYS;
 
 
-    // FIXME: Is this right? 
-    // FIXME: hardcoded
-
     LOAD_BAYS bays; // waiting bays
     logic [LD_BAY_SZ-1:0] fu2in_gnt;
     logic [LD_BAY_SZ-1:0] fu2out_gnt;
     always_comb begin
-        i_rdy = |(~bays.vld);
-        cdb_req = |(bays.vld & bays.got);
+        /* >> FIXME 
+        Load FU is effectively disabled
+        << FIXME */
+        i_rdy   = '0;
+        cdb_req = '0;
+        
+        /* Correct version */
+        // i_rdy = |(~bays.vld);
+        // cdb_req = |(bays.vld & bays.got);
 
         ctag_ts = '0;
         foreach (fu2out_gnt[i]) begin
