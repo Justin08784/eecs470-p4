@@ -136,7 +136,7 @@ module cpu (
         
     end
 
-    dcache_simple dut (
+    dcache_simple dcache (
         .clock(clock),
         .reset(reset),
 

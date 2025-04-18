@@ -1,5 +1,5 @@
 // `include "sys_defs.svh"
-`include "dcache.svh"
+`include "dcache_nblock_set.svh"
 
 typedef struct packed {
     logic   hit;

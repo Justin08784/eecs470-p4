@@ -247,8 +247,8 @@ module sq #(parameter
             ret_buf_free <= ret_buf_free;
             rsvd <= 0;
 
-            head <= (ret_head + ret_buf_used) % LSQ_SZ;
             ret_head <= ret_head;
+            head <= (ret_head + ret_buf_used) % LSQ_SZ;
             tail <= (ret_head + ret_buf_used) % LSQ_SZ;
             // tail_dbl <= (ret_head + ret_buf_used) % LSQ_SZ;
             if (has_retired_something) begin

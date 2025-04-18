@@ -317,7 +317,6 @@ synth/dcache_simple.vg: $(DCACHE_SIMPLE_FILES)
 # You should still run programs in the same way as project 3
 
 CPU_HEADERS = verilog/sys_defs.svh \
-              verilog/dcache.svh \
               verilog/ISA.svh
 
 # test/cpu_test.sv is implicit
