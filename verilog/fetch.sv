@@ -86,7 +86,17 @@ module stage_if_p4 (
     always_comb begin
         d_out.f_en_cnt = `MIN(used_scnt, d_in.d_rdy_cnt);
         off = PC_reg[2]; 
-        f_cnt = !icache_valid  ? 0 : ((off || mux_result_prediction > 0) ? `MIN(1, free_scnt) : free_scnt);
+        f_cnt = 0;
+        if (!icache_valid) begin
+            f_cnt = 0;
+        end else if (off || |mux_result_prediction) begin
+            f_cnt = 1;
+        end else begin
+            f_cnt = 2;
+        end
+        f_cnt = `MIN(f_cnt, free_scnt);
+
+        // f_cnt = !icache_valid  ? 0 : ((off || mux_result_prediction > 0) ? `MIN(1, free_scnt) : free_scnt);
 
         for (int unsigned i = 0, logic vld = 0; i < `N; ++i) begin
             vld = i < f_cnt;
@@ -153,11 +163,15 @@ module stage_if_p4 (
                 $display("MUX RESULT: %1x", mux_result_prediction[0]);
                 $display("FETCHING NEW TARGET: %x", btb_in.target[0]);
              `endif
-
-                if(mux_result_prediction[0]) begin
-                    PC_reg <=  {16'b0,btb_in.target[0]};
-                end else if(mux_result_prediction[1])
-                    PC_reg <= PC_reg + 4*f_cnt;   
+            if(mux_result_prediction[0]) begin
+                if (f_cnt > 0) begin
+                    PC_reg <= {16'b0, btb_in.target[0]};
+                end else begin
+                    PC_reg <= PC_reg;
+                end
+            end else if(mux_result_prediction[1]) begin
+                PC_reg <= PC_reg + 4*f_cnt;
+            end
         end else begin
                 PC_reg <= PC_reg + 4*f_cnt; 
         end 
