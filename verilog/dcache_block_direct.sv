@@ -346,8 +346,8 @@ module refill_engine (
 
         case(mshr.status)
         S_IDLE: begin
-            case (snd_in.op)
-            OP_LOAD_MISS: begin
+            case ({snd_in.op, snd_in.en})
+            {OP_LOAD_MISS, `TRUE}: begin
                 mshr_n = '{
                     status   : S_NTAG,
                     wr_mem   : snd_in.wr_mem,
@@ -357,7 +357,7 @@ module refill_engine (
                     mem_size : snd_in.mem_size
                 };
             end
-            OP_STOR_MISS: begin
+            {OP_STOR_MISS, `TRUE}: begin
                 mshr_n = '{
                     status   : S_NTAG,
                     wr_mem   : snd_in.wr_mem,
@@ -390,8 +390,8 @@ module refill_engine (
         end
 
         S_FILL: begin
-            case (snd_in.op)
-            OP_FILL_EVICT: begin
+            case ({snd_in.op, snd_in.en})
+            {OP_FILL_EVICT, `TRUE}: begin
                 mshr_n = '{
                     status   : S_NTAG,
                     wr_mem   : snd_in.wr_mem,
@@ -401,7 +401,7 @@ module refill_engine (
                     mem_size : snd_in.mem_size
                 };
             end
-            OP_FILL_NO_EVICT: begin
+            {OP_FILL_NO_EVICT, `TRUE}: begin
                 mshr_n        = '0;
                 mshr_n.status = S_IDLE;
             end
