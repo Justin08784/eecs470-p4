@@ -863,8 +863,9 @@ module testbench;
             );
         end
 
-        for (int i = 0, int idx; i < `ROB_SZ; ++i) begin
-            // idx = ()
+        // FIXME: This print is wrong. Consider if head-tail span wraps around. Then we break too early.
+        // Also fix for any circular FIFO, including BTQ.
+        for (int i = 0; i < `ROB_SZ; ++i) begin
             $display("Rob[%2d]: cpl %b, t: %2d, t_old: %2d, dst: %2d, is_brch: %b, wr_mem: %b, rd_mem: %b, halt: %0b, illegal: %0b%s",
                 i,
                 state[i].cpl,
