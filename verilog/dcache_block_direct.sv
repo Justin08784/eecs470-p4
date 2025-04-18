@@ -616,6 +616,7 @@ module dcache_block (
             hdr <= hdr_n;
     end
 
+    `ifdef DEBUG
     always_ff @(posedge clock) begin
         if (!reset) begin
             $display("  | >> DCACHE >>");
@@ -680,5 +681,6 @@ module dcache_block (
             $display("  | << DCACHE <<");
         end
     end
+    `endif
 
 endmodule
