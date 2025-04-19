@@ -67,9 +67,9 @@ module lq #(parameter
 
     always_comb begin
         //handle telling fetch the top 2 PC's
-        retire_out.PC[0] = state[head].inst_pc;
-        retire_out.PC[1] = state[r_idxs[0]].inst_pc;
-        retire_out.err_ld_ooo[0] = state[head].err_ld_ooo;
+        retire_out.PC[0] = state[r_idxs[0]].inst_pc;
+        retire_out.PC[1] = state[r_idxs[1]].inst_pc;
+        retire_out.err_ld_ooo[0] = state[r_idxs[0]].err_ld_ooo;
         retire_out.err_ld_ooo[1] = state[r_idxs[1]].err_ld_ooo;
     end
 
