@@ -70,9 +70,11 @@ module retire (
     logic [`N-1:0] [7:0] correlated_bhr_d_n;
     logic [`N-1:0] gshare_pred_n;
     logic [`N-1:0] corr_pred_n;
+    logic store_retire;
     
     always_comb begin
         sq_out = '0;
+        store_retire = 0;
 
         mispred = 0;
         mispred_target = '0;
@@ -100,8 +102,10 @@ module retire (
         for (int i = 0; i < rob_in.r_vld_cnt; ++i) begin
             if (!rob_in.entries[i].cpl)
                 break;
-            if (rob_in.entries[i].halt && (!sq_in.sq_ret_complete || mem_in_use))
+            if (rob_in.entries[i].halt && (!sq_in.sq_ret_complete || mem_in_use || store_retire)) begin
+                $display("STATE: mem_in_use: %b, sq_ret_complete: %b", mem_in_use, sq_in.sq_ret_complete);
                 break;
+            end
 
             if (rob_in.entries[i].rd_mem) begin
                 // if (0) begin // TODO: enable when lq_in.err_ld_ooo is actually set
@@ -114,6 +118,7 @@ module retire (
             end
 
             if (rob_in.entries[i].wr_mem) begin
+                store_retire = 1;
                 if (sq_rd_cnt >= sq_in.sq_ret_en) break;
                 ++sq_rd_cnt; 
             end
