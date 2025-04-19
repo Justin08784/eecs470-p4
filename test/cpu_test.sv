@@ -827,6 +827,7 @@ module testbench;
         dispatch2rob d_in;
 
         logic [`ROB_SZ-1:0] rob_vld;
+        logic t_dup, told_dup;
 
         state   = dbg_rob.state;
         head    = dbg_rob.head;
@@ -862,11 +863,21 @@ module testbench;
         // FIXME: This print is wrong. Consider if head-tail span wraps around. Then we break too early.
         // Also fix for any circular FIFO, including BTQ.
         for (int i = 0; i < `ROB_SZ; ++i) begin
+            t_dup = 0;
+            told_dup = 0;
             if (!rob_vld[i]) begin
                 $display("Rob[%2d]: ", i);
                 continue;
             end
-            $display("Rob[%2d]: cpl %b, t: %2d, t_old: %2d, dst: %2d, is_brch: %b, wr_mem: %b, rd_mem: %b, halt: %0b, illegal: %0b%s",
+            for (int j = 0; j < `ROB_SZ; ++j) begin
+                if (!rob_vld[j] || i == j)
+                    continue;
+                if (state[i].tag == state[j].tag && state[i].tag != '0)
+                    t_dup |= 1;
+                if (state[i].t_old == state[j].t_old && state[i].t_old != '0)
+                    told_dup |= 1;
+            end
+            $display("Rob[%2d]: cpl %b, t: %2d, t_old: %2d, dst: %2d, is_brch: %b, wr_mem: %b, rd_mem: %b, halt: %0b, illegal: %0b <t_dup:%b, told_dup:%b> %s",
                 i,
                 state[i].cpl,
                 state[i].tag,
@@ -877,6 +888,8 @@ module testbench;
                 state[i].rd_mem,
                 state[i].halt,
                 state[i].illegal,
+                t_dup,
+                told_dup,
                 (i == head && head == tail) 
                     ? " << h/t"
                     : (i == head) 
