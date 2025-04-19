@@ -305,13 +305,28 @@ module testbench;
             ];
             // print the committed instructions to the writeback output file
             if (reg_idx == `ZERO_REG) begin
-                $fdisplay(wb_fileno, "PC %4x:%-8s| ---", pc, decode_inst(inst));
+                `ifdef CYCLE_PRINT
+                    $fdisplay(wb_fileno, "PC %4x:%-8s| ---          | CYCLE=%0d", pc, decode_inst(inst), clock_count);
+                `endif
+                `ifndef CYCLE_PRINT
+                    $fdisplay(wb_fileno, "PC %4x:%-8s| ---", pc, decode_inst(inst));
+                `endif
             end else begin
+                `ifdef CYCLE_PRINT
+                $fdisplay(wb_fileno, "PC %4x:%-8s| r%02d=%-8x | CYCLE=%0d",
+                          pc,
+                          decode_inst(inst),
+                          reg_idx,
+                          data,
+                          clock_count);
+                `endif 
+                `ifndef CYCLE_PRINT
                 $fdisplay(wb_fileno, "PC %4x:%-8s| r%02d=%-8x",
                           pc,
                           decode_inst(inst),
                           reg_idx,
                           data);
+                `endif
             end
 
             // if (reg_idx == `ZERO_REG) begin
