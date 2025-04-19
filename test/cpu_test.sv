@@ -210,6 +210,9 @@ module testbench;
             clock_count = 0;
             instr_count = 0;
         end else begin
+            /* Provided delay <revert if necessary> */
+            // #2; // wait a short time to avoid a clock edge
+            /* Our delay */
             #0; // wait a short time to avoid a clock edge
 
             clock_count = clock_count + 1;
@@ -285,6 +288,7 @@ module testbench;
         logic illegal;
         logic halt;
         REG_IDX reg_idx;
+        PHYS_REG_IDX tag, t_old;
         DATA data;
 
         /* V2: get retire data via hierarchial references
@@ -307,6 +311,8 @@ module testbench;
             block   = memory.unified_memory[pc[31:3]];
             inst    = block.word_level[pc[2]];
             reg_idx = verisimpleV.rob_0.r_out.entries[n].dst;
+            tag     = verisimpleV.retire_exec.tag[n];
+            t_old   = verisimpleV.retire_exec.t_old[n];
             data    = verisimpleV.prf_0.file[
                 verisimpleV.rob_0.r_out.entries[n].tag
             ];
@@ -320,13 +326,16 @@ module testbench;
                 `endif
             end else begin
                 `ifdef CYCLE_PRINT
-                $fdisplay(wb_fileno, "(%4d) PC %4x:%-8s| r%02d=%-8x | CYCLE=%0d",
+                $fdisplay(wb_fileno, "(%4d) PC %4x:%-8s| r%02d=%-8x | CYCLE=%0d (t_old: %2d -> t: %2d)",
                           id,
                           pc,
                           decode_inst(inst),
                           reg_idx,
                           data,
-                          clock_count);
+                          clock_count,
+                          t_old,
+                          tag
+                );
                 `endif 
                 `ifndef CYCLE_PRINT
                 $fdisplay(wb_fileno, "PC %4x:%-8s| r%02d=%-8x",
