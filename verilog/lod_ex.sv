@@ -132,7 +132,6 @@ module lod_ex(
     end
 
     always_ff @(posedge clock) begin
-        $display("DCACHE_IN: status: %0d, data: %h", dcache_in.status, dcache_in.dat);
         if (reset || flush) begin
             req_en <= 0;
             curr_frwd <= '0;
