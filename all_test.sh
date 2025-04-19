@@ -9,7 +9,8 @@ make test1.out \
     sampler.out \
     copy.out \
     mult_orig.out \
-    insertion.out
+    insertion.out \
+    fib_long.out
 
 ./ck.sh test1 wb
 ./ck.sh test2 wb
@@ -23,3 +24,4 @@ make test1.out \
 ./ck.sh copy wb
 ./ck.sh mult_orig wb
 ./ck.sh insertion wb
+./ck.sh fib_long wb
