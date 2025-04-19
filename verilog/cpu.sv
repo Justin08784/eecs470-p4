@@ -123,7 +123,6 @@ module cpu (
     //                   Dcache                     //
     //                                              //
     ////////////////////////////////////////////////// 
-    logic   mem_in_use;
     // Load (w/ load FU)
     ld2dcache ld_2_dcache;
     dcache2ld dcache_2_ld;
@@ -151,9 +150,7 @@ module cpu (
 
         // Store (w/ SQ)
         .sq_in  (sq_2_dcache), // FIXME: reenable
-        .sq_out (dcache_2_sq),
-
-        .mem_in_use(mem_in_use)
+        .sq_out (dcache_2_sq)
     );
 
     //////////////////////////////////////////////////
@@ -332,8 +329,7 @@ module cpu (
         .gshare_pred    (gshare_pred),
         .corr_pred      (corr_pred), 
         //.ret_2_fetch    (ret_2_fetch),
-        .retire_exec    (retire_exec),
-        .mem_in_use     (mem_in_use)
+        .retire_exec    (retire_exec)
     );
 
     assign retire_2_f = '{
