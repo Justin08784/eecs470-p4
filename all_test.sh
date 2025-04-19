@@ -12,6 +12,7 @@ TESTS=(
     mult_orig
     insertion
     fib_long
+    saxpy
 )
 
 EXTS=(
