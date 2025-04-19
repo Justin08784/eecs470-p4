@@ -37,8 +37,10 @@ import "DPI-C" function string decode_inst(int inst);
 // Debug cycle limits, both inclusive
 localparam DBG_CYCLE_MIN = 0;
 localparam DBG_CYCLE_MAX = `TB_MAX_CYCLES;
-// localparam DBG_CYCLE_MIN = 1490;
-// localparam DBG_CYCLE_MAX = 1630;
+// localparam DBG_CYCLE_MIN = 1480;
+// localparam DBG_CYCLE_MAX = 1510;
+// localparam DBG_CYCLE_MIN = 1300;
+// localparam DBG_CYCLE_MAX = 1500;
 
 module testbench;
     // string inputs for loading memory and output files
@@ -1504,10 +1506,11 @@ module testbench;
 
         $display("  | >> CYCLE: %3d (t: %3d)", clock_count-1, $time);
         print_fetch();
-        print_icache();
-        print_decode();
+        // print_icache();
+        // print_decode();
+        // print_rob();
         // print_fl();
-        print_dispatch();
+        // print_dispatch();
         // print_map_table();
         // print_prf();
         // print_btq();
