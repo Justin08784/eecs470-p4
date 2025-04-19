@@ -8,7 +8,8 @@ make test1.out \
     evens.out \
     sampler.out \
     copy.out \
-    mult_orig.out
+    mult_orig.out \
+    insertion.out
 
 ./ck.sh test1 wb
 ./ck.sh test2 wb
@@ -21,3 +22,4 @@ make test1.out \
 ./ck.sh sampler wb
 ./ck.sh copy wb
 ./ck.sh mult_orig wb
+./ck.sh insertion wb
