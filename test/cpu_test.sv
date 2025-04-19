@@ -30,14 +30,14 @@ import "DPI-C" function string decode_inst(int inst);
 
 
 // `define TB_MAX_CYCLES 500000
-`define TB_MAX_CYCLES 1700
+`define TB_MAX_CYCLES 50000000
 
 
 // Debug cycle limits, both inclusive
-// localparam DBG_CYCLE_MIN = 0;
-// localparam DBG_CYCLE_MAX = `TB_MAX_CYCLES;
-localparam DBG_CYCLE_MIN = 1640;
-localparam DBG_CYCLE_MAX = 1650;
+localparam DBG_CYCLE_MIN = 0;
+localparam DBG_CYCLE_MAX = `TB_MAX_CYCLES;
+// localparam DBG_CYCLE_MIN = 1640;
+// localparam DBG_CYCLE_MAX = 1650;
 
 module testbench;
     // string inputs for loading memory and output files
