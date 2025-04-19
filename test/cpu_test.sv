@@ -1457,7 +1457,7 @@ module testbench;
         $display("  | >> FL >>");
 
         fl_vld = '0;
-        for (int cnt = 0; cnt <= used; ++cnt)
+        for (int cnt = 0; cnt < used; ++cnt)
             fl_vld[(head + cnt) % FL_DEPTH] = 1;
 
         for (int i = 0; i < FL_DEPTH; ++i) begin
