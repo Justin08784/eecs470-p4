@@ -43,6 +43,7 @@ module cpu (
     // You should definitely change these for project 4
     output DBG_dcache   dbg_dcache,
 
+    output DBG_execute  dbg_execute,
     output DBG_btq      dbg_btq,
     output DBG_fetch    dbg_fetch,
     output DBG_decode   dbg_decode,
@@ -531,6 +532,9 @@ module cpu (
     ////////////////////////////////////////////////// 
 
     stage_ex_p4 ex_0 (
+        `ifdef DEBUG
+        .dbg    (dbg_execute),
+        `endif
         .clock  (clock),
         .reset  (reset),
         .flush  (flush),
@@ -673,6 +677,18 @@ module cpu (
             committed_insts[i].illegal    = retire_exec.illegal[i];
         end
     end
+
+    // logic [$clog2(16):0] mem_rsvd, mem_rsvd_n;
+    // always_ff @(posedge clock) begin
+    //     if (reset) begin
+    //         mem_rsvd <= '0;
+    //     end else begin
+    //         mem_rsvd <= mem_rsvd
+    //             + ((proc2mem_command == MEM_LOAD) && mem2proc_transaction_tag != 0)
+    //             - (mem2proc_data_tag != 0);
+    //         $display("mem_rsvd: %2d", mem_rsvd);
+    //     end
+    // end
 
 
 endmodule // pipeline

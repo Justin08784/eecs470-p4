@@ -9,6 +9,7 @@
 
 `include "sys_defs.svh"
 `include "dcache_block_direct.svh"
+`include "execute.svh"
 
 // P4 TODO: Add your own debugging framework. Basic printing of data structures
 //          is an absolute necessity for the project. You can use C functions 
@@ -29,15 +30,15 @@ import "DPI-C" function string decode_inst(int inst);
 //import "DPI-C" function void close_pipeline_output_file();
 
 
-// `define TB_MAX_CYCLES 500000
 `define TB_MAX_CYCLES 50000000
+// `define TB_MAX_CYCLES 1700
 
 
 // Debug cycle limits, both inclusive
 localparam DBG_CYCLE_MIN = 0;
 localparam DBG_CYCLE_MAX = `TB_MAX_CYCLES;
-// localparam DBG_CYCLE_MIN = 1640;
-// localparam DBG_CYCLE_MAX = 1650;
+// localparam DBG_CYCLE_MIN = 1490;
+// localparam DBG_CYCLE_MAX = 1630;
 
 module testbench;
     // string inputs for loading memory and output files
@@ -78,6 +79,7 @@ module testbench;
     DBG_rs          dbg_rs;
     DBG_sq          dbg_sq;
     DBG_retire      dbg_retire;
+    DBG_execute     dbg_execute;
 
     // Instantiate the Pipeline
     cpu verisimpleV (
@@ -98,6 +100,7 @@ module testbench;
 
         .committed_insts (committed_insts),
 
+        .dbg_execute    (dbg_execute),
         .dbg_dcache     (dbg_dcache),
         .dbg_btq        (dbg_btq),
         .dbg_fetch      (dbg_fetch),
@@ -308,14 +311,15 @@ module testbench;
             // print the committed instructions to the writeback output file
             if (reg_idx == `ZERO_REG) begin
                 `ifdef CYCLE_PRINT
-                    $fdisplay(wb_fileno, "PC %4x:%-8s| ---          | CYCLE=%0d", pc, decode_inst(inst), clock_count);
+                    $fdisplay(wb_fileno, "(%4d) PC %4x:%-8s| ---          | CYCLE=%0d", id, pc, decode_inst(inst), clock_count);
                 `endif
                 `ifndef CYCLE_PRINT
                     $fdisplay(wb_fileno, "PC %4x:%-8s| ---", pc, decode_inst(inst));
                 `endif
             end else begin
                 `ifdef CYCLE_PRINT
-                $fdisplay(wb_fileno, "PC %4x:%-8s| r%02d=%-8x | CYCLE=%0d",
+                $fdisplay(wb_fileno, "(%4d) PC %4x:%-8s| r%02d=%-8x | CYCLE=%0d",
+                          id,
                           pc,
                           decode_inst(inst),
                           reg_idx,
@@ -745,6 +749,7 @@ module testbench;
         arch_map2map_table am_in;
         dispatch2map_table d_in;
         map_table2dispatch d_out;
+        logic duplicate;
 
         entries = dbg_mt.entries;
         am_in   = dbg_mt.am_in;
@@ -774,13 +779,21 @@ module testbench;
             d_out.t2s[1]
         );
         for (int r = 0; r < `NUM_ARCH_REG; ++r) begin
-            $display("mt[%2d]: t=%3d, v=%x :::: am[%2d]: t=%3d, v=%x",
+            duplicate = 0;
+            for (int rp = 0; rp < `NUM_ARCH_REG; ++rp) begin
+                if (rp != r && entries[rp] == entries[r]) begin
+                    duplicate = 1;
+                    break;
+                end
+            end
+            $display("mt[%2d]: t=%3d, v=%x :::: am[%2d]: t=%3d, v=%x  (has_dup: %b)",
                 r,
                 entries[r],
                 dbg_prf.file[entries[r]],
                 r, 
                 am_in.state[r],
-                dbg_prf.file[am_in.state[r]]
+                dbg_prf.file[am_in.state[r]],
+                duplicate
             );
         end
         $display("<< MT <<", $time);
@@ -813,6 +826,8 @@ module testbench;
         rob2dispatch d_out;
         dispatch2rob d_in;
 
+        logic [`ROB_SZ-1:0] rob_vld;
+
         state   = dbg_rob.state;
         head    = dbg_rob.head;
         tail    = dbg_rob.tail;
@@ -840,9 +855,17 @@ module testbench;
             );
         end
 
+        rob_vld = '0;
+        for (int cnt = 0; cnt <= used; ++cnt)
+            rob_vld[(head + cnt) % `ROB_SZ] = 1;
+
         // FIXME: This print is wrong. Consider if head-tail span wraps around. Then we break too early.
         // Also fix for any circular FIFO, including BTQ.
         for (int i = 0; i < `ROB_SZ; ++i) begin
+            if (!rob_vld[i]) begin
+                $display("Rob[%2d]: ", i);
+                continue;
+            end
             $display("Rob[%2d]: cpl %b, t: %2d, t_old: %2d, dst: %2d, is_brch: %b, wr_mem: %b, rd_mem: %b, halt: %0b, illegal: %0b%s",
                 i,
                 state[i].cpl,
@@ -862,9 +885,6 @@ module testbench;
                             ? " << t"
                             : ""
             );
-
-            if (i == tail)
-                break;
         end
         $display("  | << ROB <<");
 
@@ -1227,6 +1247,169 @@ module testbench;
         $display("  | << DCACHE <<");
     endtask
 
+    task print_execute();
+        execute2btq btq_out;
+        execute2complete_tag ctag_out;
+        execute2complete_dat cdat_out;
+
+        `BY_FU(CPL_CAND) cands;
+        CPL_CAND [`NUM_FU_TOTAL-1:0] cands_flat;
+
+        `BY_FU(PHYS_REG_IDX) ctag_ts;
+        PHYS_REG_IDX [`NUM_FU_TOTAL-1:0] ctag_ts_flat;
+
+        logic [1:0][`N-1:0][`NUM_FU_TOTAL-1:0]  cdb2fu_gbus_shr;
+        logic [`N-1:0][`NUM_FU_TOTAL-1:0]       cdb2fu_gbus;
+        `BY_FU(logic) [1:0] cdb_gnt_shr;
+
+        `BY_FU(logic) cdb_req;
+        `BY_FU(logic) cdb_gnt;
+
+        btq_out = dbg_execute.btq_out;
+        ctag_out= dbg_execute.ctag_out;
+        cdat_out= dbg_execute.cdat_out;
+
+        cands     = dbg_execute.cands;
+        cands_flat= dbg_execute.cands_flat;
+
+        ctag_ts     = dbg_execute.ctag_ts;
+        ctag_ts_flat= dbg_execute.ctag_ts_flat;
+
+        cdb2fu_gbus_shr = dbg_execute.cdb2fu_gbus_shr;
+        cdb2fu_gbus     = dbg_execute.cdb2fu_gbus;
+
+        cdb_gnt_shr = dbg_execute.cdb_gnt_shr;
+        cdb_req     = dbg_execute.cdb_req;
+        cdb_gnt     = dbg_execute.cdb_gnt;
+
+        $display("  %3d | >> EXECUTE", $time);
+
+        for (int i = 0; i < `NUM_FU_ALU; ++i) begin
+            $display("alu_iss[%0d]: rdy: %b, vld: %b, t: %2d, t1: %2d, t2: %2d, rob_idx: %2d, btq_idx: %2d, inst: 0x%x, PC: 0x%x, NPC: 0x%x, cond_branch: %b, uncond_branch: %b",
+                i,
+                dbg_execute.iss.i_rdy.alu[i],
+                dbg_execute.iss.o_vld.alu[i],
+                dbg_execute.iss.o_dat.alu[i].t,
+                dbg_execute.iss.o_dat.alu[i].t1,
+                dbg_execute.iss.o_dat.alu[i].t2,
+                dbg_execute.iss.o_dat.alu[i].rob_idx,
+                dbg_execute.iss.o_dat.alu[i].btq_idx,
+                dbg_execute.iss.o_dat.alu[i].inst,
+                dbg_execute.iss.o_dat.alu[i].PC,
+                dbg_execute.iss.o_dat.alu[i].NPC,
+                dbg_execute.iss.o_dat.alu[i].cond_branch,
+                dbg_execute.iss.o_dat.alu[i].uncond_branch
+            );
+        end
+
+        for (int i = 0; i < `NUM_FU_MULT; ++i) begin
+            $display("mul_iss[%0d]: rdy: %b, vld: %b, t: %2d, t1: %2d, t2: %2d, rob_idx: %2d, func: 0x%x",
+                i,
+                dbg_execute.iss.i_rdy.mul[i],
+                dbg_execute.iss.o_vld.mul[i],
+                dbg_execute.iss.o_dat.mul[i].t,
+                dbg_execute.iss.o_dat.mul[i].t1,
+                dbg_execute.iss.o_dat.mul[i].t2,
+                dbg_execute.iss.o_dat.mul[i].rob_idx,
+                dbg_execute.iss.o_dat.mul[i].func
+            );
+        end
+
+        for (int i = 0; i < `NUM_FU_ALU; ++i) begin
+            $display("regs.o_dat.alu[%0d]: bsy: %b, rs1: 0x%x, rs2: 0x%x t: %2d, rob_idx: %2d, btq_idx: %2d",
+                i,
+                dbg_execute.regs.o_vld.alu[i],
+                dbg_execute.regs.o_dat.alu[i].rs1,
+                dbg_execute.regs.o_dat.alu[i].rs2,
+                dbg_execute.regs.o_dat.alu[i].dat.t,
+                dbg_execute.regs.o_dat.alu[i].dat.rob_idx,
+                dbg_execute.regs.o_dat.alu[i].dat.btq_idx
+            );
+        end
+
+        for (int i = 0; i < `NUM_FU_MULT; ++i) begin
+            $display("regs.o_dat.mul[%0d]: bsy: %b, rs1: 0x%x, rs2: 0x%x t: %2d, rob_idx: %2d",
+                i,
+                dbg_execute.regs.o_vld.mul[i],
+                dbg_execute.regs.o_dat.mul[i].rs1,
+                dbg_execute.regs.o_dat.mul[i].rs2,
+                dbg_execute.regs.o_dat.mul[i].dat.t,
+                dbg_execute.regs.o_dat.mul[i].dat.rob_idx
+            );
+        end
+
+        // $display("c_out: rdy_alu:{%b} rdy_mult:{%b} rdy_store:{%b} rdy_load:{%b}",
+        //     rs_out.fu_rdy_alu,
+        //     rs_out.fu_rdy_mult,
+        //     rs_out.fu_rdy_store,
+        //     rs_out.fu_rdy_load,
+        // );
+
+        $display("\ncdb_req: alu:{%b} mul:{%b} lod:{%b} str:{%b}", cdb_req.alu, cdb_req.mul, cdb_req.lod, cdb_req.str);
+        $display("\nctag_ts: alu:{%b} mul:{%b} lod:{%b} str:{%b}", ctag_ts.alu, ctag_ts.mul, ctag_ts.lod, ctag_ts.str);
+        // $display("ctag_ts: alu:{%2d, %2d} mul:{%2d, %2d}",
+        //     ctag_ts.alu[1], ctag_ts.alu[0], ctag_ts.mul[1], ctag_ts.mul[0]);
+        $display("cdb_gnt: alu:{%b} mul:{%b}", cdb_gnt.alu, cdb_gnt.mul);
+        for (int i = 0; i < 2; ++i) begin
+            $display("cdb_gnt[%0d]: alu:{%b} mul:{%b} lod:{%b} str:{%b}",
+                i,
+                cdb_gnt_shr[i].alu,
+                cdb_gnt_shr[i].mul,
+                cdb_gnt_shr[i].lod,
+                cdb_gnt_shr[i].str
+            );
+        end
+
+        $display("");
+        for (int n = 0; n < `N; ++n) begin
+            $display("cdb2fu_gbus[%0d]: %b", n, cdb2fu_gbus[n]);
+        end
+        for (int s = 0; s < 2; ++s) begin
+            for (int n = 0; n < `N; ++n) begin
+                $display("cdb2fu_gbus[%0d][%0d]: %b", s, n, cdb2fu_gbus_shr[s][n]);
+            end
+        end
+
+
+        // for (int i = 0; i < `N; ++i) begin
+        //     $display("ctag_out_n[%0d]: en: %b, ts: %2d",
+        //         i,
+        //         ctag_out_n.en[i],
+        //         ctag_out_n.ts[i],
+        //     );
+        // end
+        for (int i = 0; i < `N; ++i) begin
+            $display("ctag_out[%0d]: en: %b, ts: %2d",
+                i,
+                ctag_out.en[i],
+                ctag_out.ts[i],
+            );
+        end
+        for (int i = 0; i < `N; ++i) begin
+            $display("cdat_out[%0d]: en: %b,  ts: %2d, rob_idxs: %2d, data: %x",
+                i,
+                cdat_out.en[i],
+                cdat_out.ts[i],
+                cdat_out.rob_idxs[i],
+                cdat_out.data[i]
+            );
+        end
+
+        // $display("<prf_in >        v1s: [%0d, %0d, %0d, %0d] v2s: [%0d, %0d, %0d, %0d]",
+        //     prf_in.v1s[0],
+        //     prf_in.v1s[1],
+        //     prf_in.v1s[2],
+        //     prf_in.v1s[3],
+        //     prf_in.v2s[0],
+        //     prf_in.v2s[1],
+        //     prf_in.v2s[2],
+        //     prf_in.v2s[3]
+        // );
+        $display("  %3d | << EXECUTE", $time);
+
+    endtask
+
+
 
     task print_custom_data;
         int cycle_no;
@@ -1241,8 +1424,8 @@ module testbench;
         // print_fetch();
         // print_icache();
         // print_decode();
-        // print_dispatch();
-        // print_map_table();
+        print_dispatch();
+        print_map_table();
         // print_prf();
         // print_btq();
         print_rob();
@@ -1266,7 +1449,8 @@ module testbench;
         //      mem2proc_data_tag
         // );
         print_rs();
-        print_dcache();
+        print_execute();
+        // print_dcache();
         // print_sq();
         // print_retbuf();
         // print_lq();

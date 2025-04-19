@@ -291,6 +291,9 @@ module mul_ex(
 endmodule
 
 module stage_ex_p4 (
+    `ifdef DEBUG
+    output DBG_execute dbg,
+    `endif
     input clock,
     input reset,
     input flush,
@@ -929,5 +932,27 @@ module stage_ex_p4 (
     //     end
     // end
     // `endif // DEBUG
+    `ifdef DEBUG
+    assign dbg = '{
+        btq_out : btq_out,
+        ctag_out: ctag_out,
+        cdat_out: cdat_out,
+        iss     : iss,
+        regs    : regs,
+
+        cands   : cands,
+        cands_flat      : cands_flat,
+
+        ctag_ts : ctag_ts,
+        ctag_ts_flat : ctag_ts_flat,
+
+        cdb2fu_gbus_shr : cdb2fu_gbus_shr,
+        cdb2fu_gbus : cdb2fu_gbus,
+        cdb_gnt_shr : cdb_gnt_shr,
+
+        cdb_req : cdb_req,
+        cdb_gnt : cdb_gnt
+    };
+    `endif
 
 endmodule // stage_ex
