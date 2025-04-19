@@ -210,7 +210,7 @@ module testbench;
             clock_count = 0;
             instr_count = 0;
         end else begin
-            #2; // wait a short time to avoid a clock edge
+            #0; // wait a short time to avoid a clock edge
 
             clock_count = clock_count + 1;
 
