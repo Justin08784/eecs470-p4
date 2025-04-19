@@ -13,6 +13,8 @@ TESTS=(
     insertion
     fib_long
     saxpy
+    copy_long
+    evens_long
 )
 
 EXTS=(
