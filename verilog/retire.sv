@@ -102,8 +102,15 @@ module retire (
         for (int i = 0; i < rob_in.r_vld_cnt; ++i) begin
             if (!rob_in.entries[i].cpl)
                 break;
-            if (rob_in.entries[i].halt && (!sq_in.sq_ret_complete || mem_in_use || store_retire)) begin
-                $display("STATE: mem_in_use: %b, sq_ret_complete: %b", mem_in_use, sq_in.sq_ret_complete);
+            if (rob_in.entries[i].halt && (!sq_in.sq_ret_complete || i != 0)) begin
+                /* A halt may retire IFF 
+                a) The ret buffer is empty (i.e. retired to memory) 
+                b) The halt is at the head of the ROB (i.e. i == 0). 
+                
+                (b. addresses the edge case where instructions in the same retire
+                batch, before the halt, are stores. Next cycle the ret buffer
+                will not be empty.)
+                */
                 break;
             end
 
