@@ -121,6 +121,7 @@ module free_list #(parameter
         .used_scnt(d_out.free_rdy_scnt)
     );
 
+    `ifdef DEBUG
     assign dbg = '{
         r_in:r_in,
         d_in:d_in,
@@ -132,6 +133,7 @@ module free_list #(parameter
             used:   dbg_fifo.used
         }
     };
+    `endif
 
     // debugging
     // always_ff @(posedge clock) begin
