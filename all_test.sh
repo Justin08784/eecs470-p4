@@ -1,27 +1,31 @@
-make test1.out \
-    test2.out \
-    test3.out \
-    test8.out \
-    mult_no_lsq.out \
-    btest1.out \
-    btest2.out \
-    evens.out \
-    sampler.out \
-    copy.out \
-    mult_orig.out \
-    insertion.out \
-    fib_long.out
+TESTS=(
+    test1
+    test2
+    test3
+    test8
+    mult_no_lsq
+    btest1
+    btest2
+    evens
+    sampler
+    copy
+    mult_orig
+    insertion
+    fib_long
+)
 
-./ck.sh test1 wb
-./ck.sh test2 wb
-./ck.sh test3 wb
-./ck.sh test8 wb
-./ck.sh mult_no_lsq wb
-./ck.sh btest1 wb
-./ck.sh btest2 wb
-./ck.sh evens wb
-./ck.sh sampler wb
-./ck.sh copy wb
-./ck.sh mult_orig wb
-./ck.sh insertion wb
-./ck.sh fib_long wb
+EXTS=(
+    wb
+    out
+)
+
+# Build all tests
+make ${TESTS[@]/%/.out}
+
+# Diff
+for t in "${TESTS[@]}"; do
+    for ext in "${EXTS[@]}"; do
+        echo "Diffing $t.$ext..."
+        diff "correct_out/${t}.${ext}" "output/${t}.${ext}"
+    done
+done
