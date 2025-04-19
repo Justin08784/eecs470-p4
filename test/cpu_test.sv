@@ -31,7 +31,7 @@ import "DPI-C" function string decode_inst(int inst);
 
 
 `define TB_MAX_CYCLES 50000000
-// `define TB_MAX_CYCLES 1700
+// `define TB_MAX_CYCLES 10000
 
 
 // Debug cycle limits, both inclusive
@@ -1503,15 +1503,15 @@ module testbench;
             return;
 
         $display("  | >> CYCLE: %3d (t: %3d)", clock_count-1, $time);
-        // print_fetch();
-        // print_icache();
-        // print_decode();
-        print_fl();
+        print_fetch();
+        print_icache();
+        print_decode();
+        // print_fl();
         print_dispatch();
-        print_map_table();
+        // print_map_table();
         // print_prf();
         // print_btq();
-        print_rob();
+        // print_rob();
 
         // $display("---- rob_debug contents ----");
         // foreach (rob_debug[idx]) begin
@@ -1534,9 +1534,9 @@ module testbench;
         print_rs();
         // print_execute();
         // print_dcache();
-        // print_sq();
+        print_sq();
         // print_retbuf();
-        // print_lq();
+        print_lq();
         // print_retire();
         $display("  | << CYCLE: %3d (t: %3d)", clock_count-1, $time);
     endtask
