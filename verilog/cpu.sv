@@ -44,6 +44,7 @@ module cpu (
     output DBG_dcache   dbg_dcache,
 
     output DBG_execute  dbg_execute,
+    output DBG_fl       dbg_fl,
     output DBG_btq      dbg_btq,
     output DBG_fetch    dbg_fetch,
     output DBG_decode   dbg_decode,
@@ -611,6 +612,9 @@ module cpu (
     free_list #(
         .N(`N)
     ) free_list_0 (
+        `ifdef DEBUG
+        .dbg    (dbg_fl),
+        `endif
         .clock  (clock),
         .reset  (reset),
         .flush  (flush),

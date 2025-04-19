@@ -80,6 +80,7 @@ module testbench;
     DBG_sq          dbg_sq;
     DBG_retire      dbg_retire;
     DBG_execute     dbg_execute;
+    DBG_fl          dbg_fl;
 
     // Instantiate the Pipeline
     cpu verisimpleV (
@@ -101,6 +102,7 @@ module testbench;
         .committed_insts (committed_insts),
 
         .dbg_execute    (dbg_execute),
+        .dbg_fl         (dbg_fl),
         .dbg_dcache     (dbg_dcache),
         .dbg_btq        (dbg_btq),
         .dbg_fetch      (dbg_fetch),
@@ -737,7 +739,7 @@ module testbench;
         $display("btq_in.btq_rdy_scnt: %d",   btq_in.btq_rdy_scnt);
         $display("rob_in.rob_rdy_scnt: %d",  rob_in.rob_rdy_scnt);
         $display("decode_in.d_vld_scnt: %d",  decode_in.d_vld_scnt);
-        $display("free_in.free_rdy_scnt: %d",  free_in.free_rdy_scnt);
+        $display("free_in.free_rdy_scnt: %d [%d, %d]",  free_in.free_rdy_scnt, free_in.d_ts[0], free_in.d_ts[1]);
         $display("decode_in.prvw_has_dests: %b", decode_in.prvw_has_dests);
         $display("  %3d | << Dispatch <<", $time);
     endtask
@@ -843,7 +845,15 @@ module testbench;
         d_in    = dbg_rob.d_in;
 
         $display("  | >> ROB >>");
-        $display("r_out: en_cnt: %d", r_out.r_vld_cnt);
+        $display("fl: en_cnt: %d, [%2d, %2d] fldup: %b",
+            verisimpleV.free_list_0.free_cnt,
+            verisimpleV.free_list_0.told_packed[0],
+            verisimpleV.free_list_0.told_packed[1],
+            verisimpleV.free_list_0.told_packed[0]
+            ==verisimpleV.free_list_0.told_packed[1]
+            &&verisimpleV.free_list_0.told_packed[0]!=0
+        );
+        $display("r_out: vld_cnt: %d", r_out.r_vld_cnt);
         for (int i = 0; i < `N; ++i) begin
             $display("r_out[%d]: tag: %d, t_old: %d, dst: %d, halt: %d, illegal: %d, is_brch: %d",
                 i,
@@ -1423,6 +1433,56 @@ module testbench;
     endtask
 
 
+    task print_fl();
+        retire_final r_in;
+        dispatch2free_list d_in;
+        free_list2dispatch d_out;
+        logic [$clog2(FL_DEPTH)-1:0]    head;
+        logic [$clog2(FL_DEPTH)-1:0]    tail;
+        PHYS_REG_IDX [FL_DEPTH-1:0]     state;
+        logic [$clog2(FL_DEPTH):0]      used;
+
+        logic [`ROB_SZ-1:0] fl_vld;
+        logic dup;
+
+        r_in = dbg_fl.r_in;
+        d_in = dbg_fl.d_in;
+        d_out= dbg_fl.d_out;
+
+        head =  dbg_fl.fifo.head;
+        tail =  dbg_fl.fifo.tail;
+        state=  dbg_fl.fifo.state;
+        used =  dbg_fl.fifo.used;
+
+        $display("  | >> FL >>");
+
+        fl_vld = '0;
+        for (int cnt = 0; cnt <= used; ++cnt)
+            fl_vld[(head + cnt) % FL_DEPTH] = 1;
+
+        for (int i = 0; i < FL_DEPTH; ++i) begin
+            if (!fl_vld[i]) begin
+                $display("Fl[%2d]: ", i);
+                continue;
+            end
+
+            $display("Fl[%2d]: %2d %s",
+                i,
+                state[i],
+                (i == head && head == tail) 
+                    ? " << h/t"
+                    : (i == head) 
+                        ? " << h" 
+                        : (i == tail)
+                            ? " << t"
+                            : ""
+            );
+        end
+        $display("  | << FL <<");
+
+    endtask
+
+
 
     task print_custom_data;
         int cycle_no;
@@ -1437,6 +1497,7 @@ module testbench;
         // print_fetch();
         // print_icache();
         // print_decode();
+        print_fl();
         print_dispatch();
         print_map_table();
         // print_prf();
@@ -1462,7 +1523,7 @@ module testbench;
         //      mem2proc_data_tag
         // );
         print_rs();
-        print_execute();
+        // print_execute();
         // print_dcache();
         // print_sq();
         // print_retbuf();

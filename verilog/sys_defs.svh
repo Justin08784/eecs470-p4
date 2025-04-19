@@ -69,13 +69,13 @@
 ///////////////////////////////
 /* How can we implement this in the Makefile? */
 // comment out to enable synth only constructions
-//`define SYNTH
+// `define SYNTH
 
 `ifndef SYNTH
 // comment out to disable DEBUG:
-// `define DEBUG
+`define DEBUG
 // comment to disable clock cycle print
-// `define CYCLE_PRINT
+`define CYCLE_PRINT
 `endif
 
 ///////////////////////////////
@@ -1293,6 +1293,21 @@ typedef struct packed {
     ADDR  mispred_target;
     retire_final retire_exec;
 } DBG_retire;
+
+
+localparam FL_DEPTH = `ROB_SZ;
+localparam FL_WIDTH = $bits(PHYS_REG_IDX);
+typedef struct packed {
+    retire_final r_in;
+    dispatch2free_list d_in;
+    free_list2dispatch d_out;
+    struct packed {
+        logic [$clog2(FL_DEPTH)-1:0]       head;
+        logic [$clog2(FL_DEPTH)-1:0]       tail;
+        logic [FL_DEPTH-1:0][FL_WIDTH-1:0] state;
+        logic [$clog2(FL_DEPTH):0]         used;
+    } fifo;
+} DBG_fl;
 
 `ifdef DEBUG
 function automatic string dbg_mem_cmd(input MEM_COMMAND cmd);

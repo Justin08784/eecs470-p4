@@ -42,6 +42,7 @@ module fifo #(
     parameter int INSTANCE_ID=-1,
     parameter FIFO_STATE RESET_STATE='{default:0}
 ) (
+    output FIFO_STATE dbg,
     input                                           clock, 
     input                                           reset,
     input                                           flush,
@@ -68,6 +69,13 @@ module fifo #(
 
     logic [NUM_RPORTS-1:0][$clog2(DEPTH)-1:0] rd_idxs;
     logic [NUM_WPORTS-1:0][$clog2(DEPTH)-1:0] wr_idxs;
+
+    assign dbg = '{
+        head:head,
+        tail:tail,
+        state:state,
+        used:used
+    };
 
     assign free         = DEPTH - used;
     assign free_scnt    = `MIN(free, NUM_WPORTS);
