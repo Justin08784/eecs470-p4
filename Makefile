@@ -576,7 +576,7 @@ compile_all: $(PROGRAMS:programs/%=programs/mem/%=.mem)
 # these are useful for the C sources because the debug flag makes the assembly more understandable
 # because it includes some of the original C operations and function/variable names
 
-DUMP_PROGRAMS = $(ASSEMBLY:.s=) $(C_CODE:.c=.debug)
+DUMP_PROGRAMS = $(ASSEMBLY:.s=) $(C_CODE:.c=)
 
 # 'make <my_program>.dump' will create both files at once!
 ./%.dump: programs/%.dump_x programs/%.dump_abi ;
