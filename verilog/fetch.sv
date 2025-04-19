@@ -155,11 +155,11 @@ module stage_if_p4 (
         end else if (flush) begin
                 PC_reg <= r_in.corrected_PC;
         end else if(mux_result_prediction) begin
-             `ifdef DEBUG
-                $display("PREDICTING TAKEN:");
-                $display("MUX RESULT: %1x", mux_result_prediction[0]);
-                $display("FETCHING NEW TARGET: %x", btb_in.target[0]);
-             `endif
+            //  `ifdef DEBUG
+            //     $display("PREDICTING TAKEN:");
+            //     $display("MUX RESULT: %1x", mux_result_prediction[0]);
+            //     $display("FETCHING NEW TARGET: %x", btb_in.target[0]);
+            //  `endif
             if(mux_result_prediction[0]) begin
                 if (f_cnt > 0) begin
                     PC_reg <= {16'b0, btb_in.target[0]};
@@ -249,57 +249,57 @@ module stage_if_p4 (
 
 
     // debugging
-    `ifdef DEBUG
-    always_ff @(posedge clock) begin
-        if (!reset) begin
-            $display("  %3d | >> Fetch >>", $time);
-            $display("r_in: {flush: %b, corrected_PC: 0x%x}", flush, r_in.corrected_PC);
-            $display("PC_reg:  %x", PC_reg);
-            $display("Imem_data: %x", Imem_data);
+    // `ifdef DEBUG
+    // always_ff @(posedge clock) begin
+    //     if (!reset) begin
+    //         $display("  %3d | >> Fetch >>", $time);
+    //         $display("r_in: {flush: %b, corrected_PC: 0x%x}", flush, r_in.corrected_PC);
+    //         $display("PC_reg:  %x", PC_reg);
+    //         $display("Imem_data: %x", Imem_data);
 
-            $display("FETCH2BTB: PC: %x", PC_reg);
-            $display("FETCH2BTB: PC: %x", PC_reg+4);
+    //         $display("FETCH2BTB: PC: %x", PC_reg);
+    //         $display("FETCH2BTB: PC: %x", PC_reg+4);
 
 
-            $display("BTB2FETCH: HIT: %x", btb_in.hit[0]);
-            $display("BTB2FETCH: HIT: %x", btb_in.hit[1]);
+    //         $display("BTB2FETCH: HIT: %x", btb_in.hit[0]);
+    //         $display("BTB2FETCH: HIT: %x", btb_in.hit[1]);
   
-            $display("BTB2FETCH: TARGET0: %x", btb_in.target[0]);
-            $display("BTB2FETCH: TARGET1: %x", btb_in.target[1]);
-            //btb_out.target <= r_in.corrected_PC[15:0];
+    //         $display("BTB2FETCH: TARGET0: %x", btb_in.target[0]);
+    //         $display("BTB2FETCH: TARGET1: %x", btb_in.target[1]);
+    //         //btb_out.target <= r_in.corrected_PC[15:0];
 
-            $display("FETCH RECEIVED CORRECT PC: %x", r_in.corrected_PC);
-           // $display("SEND_TAKEN_TO_BTB: %2b", r_in.is_taken);
-           // $display("FETCH RECEIVED ORIGINAL PC: %x", r_in.PC);
-           // $display("BTB TARGET: %x", r_in.corrected_PC[15:0]);
-
-
-            $display("FETCH2PRED: PC0: %x", PC_reg);
-            $display("FETCH2PRED: PC1: %x", PC_reg+4);
-            $display("FETCH2PRED UPDATE ENABLE: %x", r_in.update_en);
-            $display("FETCH2PRED TAKEN: %x", r_in.is_taken);
-            $display("FETCH2PRED CORRECT_PC: %x", r_in.PC);
-            $display("FETCH2PRED RETIRED_BHR0: %b", r_in.retired_bhr[0]);
-            $display("FETCH2PRED RETIRED_BHR1: %b", r_in.retired_bhr[1]);
+    //         $display("FETCH RECEIVED CORRECT PC: %x", r_in.corrected_PC);
+    //        // $display("SEND_TAKEN_TO_BTB: %2b", r_in.is_taken);
+    //        // $display("FETCH RECEIVED ORIGINAL PC: %x", r_in.PC);
+    //        // $display("BTB TARGET: %x", r_in.corrected_PC[15:0]);
 
 
-            $display("GSHARE PRED: %b", pred_in_gshare.prediction);
-            $display("CORR PRED: %b", pred_in_corr.prediction);
-
-            $display("RET_CORR BHR: %b", r_in.correlated_bhr);
-            $display("PRED_IN_CORR BHR: %b", pred_in_corr.bhr);
-
-            $display("DECODE PC: %x", PC_reg_temp);
-            $display("F_DAT PRED: %x", mux_result_prediction[0]);
-
-            $display("F_COUNT: %x", f_cnt);
-            //$display(": %x", mux_result_prediction[0]);
+    //         $display("FETCH2PRED: PC0: %x", PC_reg);
+    //         $display("FETCH2PRED: PC1: %x", PC_reg+4);
+    //         $display("FETCH2PRED UPDATE ENABLE: %x", r_in.update_en);
+    //         $display("FETCH2PRED TAKEN: %x", r_in.is_taken);
+    //         $display("FETCH2PRED CORRECT_PC: %x", r_in.PC);
+    //         $display("FETCH2PRED RETIRED_BHR0: %b", r_in.retired_bhr[0]);
+    //         $display("FETCH2PRED RETIRED_BHR1: %b", r_in.retired_bhr[1]);
 
 
-           $display("  %3d | << Fetch <<", $time);  
-        end
-    end
-    `endif // DEBUG
+    //         $display("GSHARE PRED: %b", pred_in_gshare.prediction);
+    //         $display("CORR PRED: %b", pred_in_corr.prediction);
+
+    //         $display("RET_CORR BHR: %b", r_in.correlated_bhr);
+    //         $display("PRED_IN_CORR BHR: %b", pred_in_corr.bhr);
+
+    //         $display("DECODE PC: %x", PC_reg_temp);
+    //         $display("F_DAT PRED: %x", mux_result_prediction[0]);
+
+    //         $display("F_COUNT: %x", f_cnt);
+    //         //$display(": %x", mux_result_prediction[0]);
+
+
+    //        $display("  %3d | << Fetch <<", $time);  
+    //     end
+    // end
+    // `endif // DEBUG
 
     // //RE-EVALUATE
     // // assign valid_out = icache_valid ? (if_valid_q) : '0 && (if_valid_q[0] || if_valid_q[1]);

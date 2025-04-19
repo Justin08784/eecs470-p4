@@ -623,71 +623,71 @@ module dcache_block (
             hdr <= hdr_n;
     end
 
-    `ifdef DEBUG
-    always_ff @(posedge clock) begin
-        if (!reset) begin
-            $display("  | >> DCACHE >>");
-            $display("mem_in: {txn_tag: %2d, data_tag: %2d, data: %x}",
-                mem_in_transaction_tag,
-                mem_in_data_tag,
-                mem_in_data
-            );
+    // `ifdef DEBUG
+    // always_ff @(posedge clock) begin
+    //     if (!reset) begin
+    //         $display("  | >> DCACHE >>");
+    //         $display("mem_in: {txn_tag: %2d, data_tag: %2d, data: %x}",
+    //             mem_in_transaction_tag,
+    //             mem_in_data_tag,
+    //             mem_in_data
+    //         );
 
-            $display("mem_ot: {cmd: %s, addr: %x, data: %x}",
-                dbg_mem_cmd(mem_out_command),
-                mem_out_addr,
-                mem_out_data
-            );
+    //         $display("mem_ot: {cmd: %s, addr: %x, data: %x}",
+    //             dbg_mem_cmd(mem_out_command),
+    //             mem_out_addr,
+    //             mem_out_data
+    //         );
 
-            $display("ld_in: vld: %b, addr: 0x%x", ld_in.vld, ld_in.addr);
-            $display("ld_ot: status: %s, tag: %2d, dat: 0x%x, ldb: %x",
-                dbg_ld_status(ld_out.status),
-                ld_out.tag,
-                ld_out.dat,
-                ld_out.ldb
-            );
+    //         $display("ld_in: vld: %b, addr: 0x%x", ld_in.vld, ld_in.addr);
+    //         $display("ld_ot: status: %s, tag: %2d, dat: 0x%x, ldb: %x",
+    //             dbg_ld_status(ld_out.status),
+    //             ld_out.tag,
+    //             ld_out.dat,
+    //             ld_out.ldb
+    //         );
 
-            $display("sq_in: vld: %b, addr: 0x%x, size: %s, dat: %1d",
-                sq_in.vld,
-                sq_in.addr,
-                dbg_mem_size(sq_in.size),
-                sq_in.dat
-            );
-            $display("sq_ot: status: %s",
-                dbg_st_status(sq_out.status)
-            );
+    //         $display("sq_in: vld: %b, addr: 0x%x, size: %s, dat: %1d",
+    //             sq_in.vld,
+    //             sq_in.addr,
+    //             dbg_mem_size(sq_in.size),
+    //             sq_in.dat
+    //         );
+    //         $display("sq_ot: status: %s",
+    //             dbg_st_status(sq_out.status)
+    //         );
 
-            $display("");
-            $display("mshr: {");
-            $display("  status: %s\n  wr_mem: %b\n  miss_tag: %2d\n  addr: 0x%x\n  mem_data: 0x%x\n  mem_size: %s",
-                dbg_mshr_status(mshr.status),
-                mshr.wr_mem,
-                mshr.miss_tag,
-                mshr.addr,
-                mshr.mem_data,
-                dbg_mem_size(mshr.mem_size)
-            );
-            $display("}");
+    //         $display("");
+    //         $display("mshr: {");
+    //         $display("  status: %s\n  wr_mem: %b\n  miss_tag: %2d\n  addr: 0x%x\n  mem_data: 0x%x\n  mem_size: %s",
+    //             dbg_mshr_status(mshr.status),
+    //             mshr.wr_mem,
+    //             mshr.miss_tag,
+    //             mshr.addr,
+    //             mshr.mem_data,
+    //             dbg_mem_size(mshr.mem_size)
+    //         );
+    //         $display("}");
 
-            $display("");
-            for (int i = 0; i < NUM_CACHE_LINES; ++i) begin
-                if (!hdr.vld[i]) begin
-                    $display("header[%2d]:", i);
-                    continue;
-                end
-                $display("header[%2d]: {vld: %b, dirty: %b, tag: 0x%x} data: %x, (addr: 0x%x)",
-                    i,
-                    hdr.vld[i],
-                    hdr.dirty[i],
-                    hdr.tag[i],
-                    dbg_memDP[i],
-                    {hdr.tag[i], WAY'(i), 3'b000}
-                );
-            end
+    //         $display("");
+    //         for (int i = 0; i < NUM_CACHE_LINES; ++i) begin
+    //             if (!hdr.vld[i]) begin
+    //                 $display("header[%2d]:", i);
+    //                 continue;
+    //             end
+    //             $display("header[%2d]: {vld: %b, dirty: %b, tag: 0x%x} data: %x, (addr: 0x%x)",
+    //                 i,
+    //                 hdr.vld[i],
+    //                 hdr.dirty[i],
+    //                 hdr.tag[i],
+    //                 dbg_memDP[i],
+    //                 {hdr.tag[i], WAY'(i), 3'b000}
+    //             );
+    //         end
 
-            $display("  | << DCACHE <<");
-        end
-    end
-    `endif
+    //         $display("  | << DCACHE <<");
+    //     end
+    // end
+    // `endif
 
 endmodule
