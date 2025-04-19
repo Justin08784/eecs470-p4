@@ -133,6 +133,24 @@ typedef struct packed {
 /* NOTE: This is also used to generate .out, so cannot debug guard
 it as is typical for dbg structs. */
 typedef struct packed {
+    // input from memory
+    MEM_TAG       mem_in_transaction_tag;
+    MEM_BLOCK     mem_in_data;
+    MEM_TAG       mem_in_data_tag;
+
+    MEM_COMMAND   mem_out_command;
+    ADDR          mem_out_addr;
+    MEM_BLOCK     mem_out_data;
+
+    // Load (w/ load FU)
+    ld2dcache ld_in;
+    dcache2ld ld_out;
+
+    // Store (w/ SQ)
+    sq2dcache sq_in;
+    dcache2sq sq_out;
+
+    MSHR_ENTRY mshr;
     CACHE_HEADER hdr;
     logic [NUM_CACHE_LINES-1:0][$bits(MEM_BLOCK)-1:0] memDP;
 } DBG_dcache;

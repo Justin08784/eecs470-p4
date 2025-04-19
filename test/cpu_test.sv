@@ -30,12 +30,14 @@ import "DPI-C" function string decode_inst(int inst);
 
 
 // `define TB_MAX_CYCLES 500000
-`define TB_MAX_CYCLES 50000000
+`define TB_MAX_CYCLES 1700
 
 
 // Debug cycle limits, both inclusive
-localparam DBG_CYCLE_MIN = 0;
-localparam DBG_CYCLE_MAX = `TB_MAX_CYCLES;
+// localparam DBG_CYCLE_MIN = 0;
+// localparam DBG_CYCLE_MAX = `TB_MAX_CYCLES;
+localparam DBG_CYCLE_MIN = 1640;
+localparam DBG_CYCLE_MAX = 1650;
 
 module testbench;
     // string inputs for loading memory and output files
@@ -285,9 +287,6 @@ module testbench;
         (only *.out is graded after all), since hierarchical references
         do not work in synthesis
         */
-        `ifdef DEBUG
-        $display("  %3d | >> cpu_test >>", $time);
-        `endif // DEBUG
         for (int n = 0, int cur_idx = 0; n < `N; ++n) begin
             if (!committed_insts[n].valid)
                 continue;
@@ -368,9 +367,6 @@ module testbench;
                 break;
             end
         end
-        `ifdef DEBUG
-        $display("  %3d | << cpu_test <<", $time);
-        `endif // SYNTH
 
         // V1: original
         // for (int n = 0; n < `N; ++n) begin
@@ -477,7 +473,7 @@ module testbench;
     endtask // task show_final_mem_and_status
 
 
-
+`ifdef DEBUG
     // OPTIONAL: Print our your data here
     // It will go to the $program.log file
     function print_id_result(input ID_RESULT x);
@@ -1129,6 +1125,108 @@ module testbench;
         $display("  | << retire <<");
     endtask
 
+    task print_dcache;
+        // input from memory
+        MEM_TAG       mem_in_transaction_tag;
+        MEM_BLOCK     mem_in_data;
+        MEM_TAG       mem_in_data_tag;
+
+        MEM_COMMAND   mem_out_command;
+        ADDR          mem_out_addr;
+        MEM_BLOCK     mem_out_data;
+
+        // Load (w/ load FU)
+        ld2dcache ld_in;
+        dcache2ld ld_out;
+
+        // Store (w/ SQ)
+        sq2dcache sq_in;
+        dcache2sq sq_out;
+
+        MSHR_ENTRY mshr;
+        CACHE_HEADER hdr;
+        logic [NUM_CACHE_LINES-1:0][$bits(MEM_BLOCK)-1:0] dbg_memDP;
+
+        mem_in_transaction_tag = dbg_dcache.mem_in_transaction_tag;
+        mem_in_data     = dbg_dcache.mem_in_data;
+        mem_in_data_tag = dbg_dcache.mem_in_data_tag;
+
+        mem_out_command = dbg_dcache.mem_out_command;
+        mem_out_addr = dbg_dcache.mem_out_addr;
+        mem_out_data = dbg_dcache.mem_out_data;
+
+        ld_in   = dbg_dcache.ld_in;
+        ld_out  = dbg_dcache.ld_out;
+        sq_in   = dbg_dcache.sq_in;
+        sq_out  = dbg_dcache.sq_out;
+
+        hdr         = dbg_dcache.hdr;
+        mshr        = dbg_dcache.mshr;
+        dbg_memDP   = dbg_dcache.memDP;
+
+
+        $display("  | >> DCACHE >>");
+        $display("mem_in: {txn_tag: %2d, data_tag: %2d, data: %x}",
+            mem_in_transaction_tag,
+            mem_in_data_tag,
+            mem_in_data
+        );
+
+        $display("mem_ot: {cmd: %s, addr: %x, data: %x}",
+            dbg_mem_cmd(mem_out_command),
+            mem_out_addr,
+            mem_out_data
+        );
+
+        $display("ld_in: vld: %b, addr: 0x%x", ld_in.vld, ld_in.addr);
+        $display("ld_ot: status: %s, tag: %2d, dat: 0x%x, ldb: %x",
+            dbg_ld_status(ld_out.status),
+            ld_out.tag,
+            ld_out.dat,
+            ld_out.ldb
+        );
+
+        $display("sq_in: vld: %b, addr: 0x%x, size: %s, dat: %1d",
+            sq_in.vld,
+            sq_in.addr,
+            dbg_mem_size(sq_in.size),
+            sq_in.dat
+        );
+        $display("sq_ot: status: %s",
+            dbg_st_status(sq_out.status)
+        );
+
+        $display("");
+        $display("mshr: {");
+        $display("  status: %s\n  wr_mem: %b\n  miss_tag: %2d\n  addr: 0x%x\n  mem_data: 0x%x\n  mem_size: %s",
+            dbg_mshr_status(mshr.status),
+            mshr.wr_mem,
+            mshr.miss_tag,
+            mshr.addr,
+            mshr.mem_data,
+            dbg_mem_size(mshr.mem_size)
+        );
+        $display("}");
+
+        $display("");
+        for (int i = 0; i < NUM_CACHE_LINES; ++i) begin
+            if (!hdr.vld[i]) begin
+                $display("header[%2d]:", i);
+                continue;
+            end
+            $display("header[%2d]: {vld: %b, dirty: %b, tag: 0x%x} data: %x, (addr: 0x%x)",
+                i,
+                hdr.vld[i],
+                hdr.dirty[i],
+                hdr.tag[i],
+                dbg_memDP[i],
+                {hdr.tag[i], WAY'(i), 3'b000}
+            );
+        end
+
+        $display("  | << DCACHE <<");
+    endtask
+
 
     task print_custom_data;
         int cycle_no;
@@ -1144,9 +1242,9 @@ module testbench;
         // print_icache();
         // print_decode();
         // print_dispatch();
-        print_map_table();
+        // print_map_table();
         // print_prf();
-        print_btq();
+        // print_btq();
         print_rob();
 
         // $display("---- rob_debug contents ----");
@@ -1168,12 +1266,14 @@ module testbench;
         //      mem2proc_data_tag
         // );
         print_rs();
-        print_sq();
+        print_dcache();
+        // print_sq();
         // print_retbuf();
-        print_lq();
-        print_retire();
+        // print_lq();
+        // print_retire();
         $display("  | << CYCLE: %3d (t: %3d)", clock_count-1, $time);
     endtask
+`endif // DEBUG
 
 
 endmodule // module testbench
