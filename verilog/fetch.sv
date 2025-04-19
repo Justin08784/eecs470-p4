@@ -89,6 +89,7 @@ module stage_if_p4 (
                 PC    : PC_reg_temp,
                 NPC   : PC_reg_temp + 4,
                 bhr   : pred_in_gshare.bhr,
+                pred_tgt : btb_in.hit[i] ? btb_in.target[i] : 0,
 
                 correlated_bhr  : pred_in_corr.bhr,
                 pred            : mux_result_prediction[i],

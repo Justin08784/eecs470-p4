@@ -371,6 +371,7 @@ typedef struct packed {
     INST  inst;
     ADDR  PC;
     ADDR  NPC; // PC + 4
+    ADDR pred_tgt;
     logic [7:0] bhr;
     logic [7:0] correlated_bhr;
 
@@ -507,6 +508,7 @@ typedef struct packed {
 // By btq
 typedef logic [$clog2(`BTQ_SZ)-1:0] BTQ_IDX;
 typedef struct packed {
+    ADDR    pred_tgt;
     ADDR    tgt;   // can we actually store [29:0], since bottom bits of address are 0s anyways?
     ADDR    NPC;   // PC + 4 (i.e. address if we dont take the branch)
     logic   pred;
@@ -603,6 +605,7 @@ typedef struct packed {
         // Sender must ensure branch insns packed to lowest indices.
     ADDR    [`N-1:0]       NPC;
     ADDR    [`N-1:0]       PC;
+    ADDR    [`N-1:0]       pred_tgt;
 
     logic   [`N-1:0] [7:0] bhr;
 
@@ -641,6 +644,7 @@ typedef struct packed {
     logic   [7:0]   correlated_bhr;
 
     logic           pred;
+    ADDR            pred_tgt;
     logic           gshare_pred;
     logic           corr_pred;
     
@@ -1072,7 +1076,6 @@ typedef struct packed {
 
 typedef struct packed {
     logic   [$clog2(`N):0] r_en;
-    ROB_IDX [`N-1:0] r_pos;
 } retire2lq;
 
 typedef struct packed {

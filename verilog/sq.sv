@@ -121,7 +121,7 @@ module sq #(parameter
     generate
         for (i = 0; i < LD_BAY_SZ; i++) begin : find_bay_matches
 
-            assign matching_idx[i] = ex_frwd_in.forward_sq_idx[i];// % LSQ_SZ;
+            assign matching_idx[i] = ex_frwd_in.forward_sq_idx[i];
             assign idx_found[i] = state[matching_idx[i]].in_range;
 
             for (l = 0; l < LSQ_SZ; l++) begin : find_match_mask
@@ -165,7 +165,6 @@ module sq #(parameter
             assign next_sq_2_exec.forward_en[i] = (next_sq_2_exec.forward_byte_en[i] != 0);
 
             assign execute_out.forward_en[i] = idx_found[i] && ex_frwd_in.forward_req_en[i] && next_sq_2_exec.forward_en[i];
-
 
             assign word_off[i] = iw_off(ex_frwd_in.forward_addr[i]);
             
