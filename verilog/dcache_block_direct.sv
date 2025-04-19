@@ -422,6 +422,8 @@ endmodule
 
 
 module dcache_block (
+    output DBG_dcache dbg,
+
     input logic clock,
     input logic reset,
 
@@ -467,6 +469,11 @@ module dcache_block (
         .waddr(wway),
         .wdata(wdat)
     );
+
+    assign dbg = '{
+        hdr     : hdr,
+        memDP   : dbg_memDP
+    };
 
     psel_gen #(
         .WIDTH(NUM_CACHE_LINES),

@@ -41,6 +41,8 @@ module cpu (
     // Debug outputs: these signals are solely used for debugging in testbenches
     // Do not change for project 3
     // You should definitely change these for project 4
+    output DBG_dcache   dbg_dcache,
+
     output DBG_btq      dbg_btq,
     output DBG_fetch    dbg_fetch,
     output DBG_decode   dbg_decode,
@@ -132,6 +134,8 @@ module cpu (
     dcache2sq dcache_2_sq;
 
     dcache_block dcache0 (
+        .dbg(dbg_dcache),
+
         .clock(clock),
         .reset(reset),
 

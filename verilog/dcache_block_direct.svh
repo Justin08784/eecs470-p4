@@ -130,6 +130,39 @@ typedef struct packed {
     ST_QUERY_STATUS status;
 } dcache2sq;
 
+/* NOTE: This is also used to generate .out, so cannot debug guard
+it as is typical for dbg structs. */
+typedef struct packed {
+    CACHE_HEADER hdr;
+    logic [NUM_CACHE_LINES-1:0][$bits(MEM_BLOCK)-1:0] memDP;
+} DBG_dcache;
+
+function automatic MEM_BLOCK _query_cache(
+    input CACHE_HEADER hdr,
+    input logic [NUM_CACHE_LINES-1:0][$bits(MEM_BLOCK)-1:0] state,
+    input int double_idx
+);
+    MEM_BLOCK   rv;
+    ADDR        addr;
+    WAY         way;
+    TAG         tag;
+    logic       vld;
+    logic       match;
+
+    addr = 8 * double_idx;
+    way = get_way(addr);
+    tag = get_tag(addr);
+
+    vld = hdr.vld[way];
+    match = tag == hdr.tag[way];
+
+    rv = (vld && match)
+        ? state[way]
+        : '0;
+    return rv;
+endfunction
+
+
 `ifdef DEBUG
 function automatic string dbg_ld_status(input LD_QUERY_STATUS s);
     string rv;

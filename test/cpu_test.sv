@@ -8,6 +8,7 @@
 /////////////////////////////////////////////////////////////////////////
 
 `include "sys_defs.svh"
+`include "dcache_block_direct.svh"
 
 // P4 TODO: Add your own debugging framework. Basic printing of data structures
 //          is an absolute necessity for the project. You can use C functions 
@@ -63,6 +64,7 @@ module testbench;
     ADDR [`N-1:0] PC_reg;
     EXCEPTION_CODE error_status = NO_ERROR;
 
+    DBG_dcache      dbg_dcache;
     DBG_btq         dbg_btq;
     DBG_fetch       dbg_fetch;
     DBG_decode      dbg_decode;
@@ -94,6 +96,7 @@ module testbench;
 
         .committed_insts (committed_insts),
 
+        .dbg_dcache     (dbg_dcache),
         .dbg_btq        (dbg_btq),
         .dbg_fetch      (dbg_fetch),
         .dbg_decode     (dbg_decode),
@@ -432,30 +435,6 @@ module testbench;
         };
     endfunction
 
-    function automatic MEM_BLOCK query_cache(input int double_idx);
-        // MEM_BLOCK rv;
-        // ADDR addr;
-        
-        // logic [INDEX_BITS-1:0] way;
-        // logic [TAG_WIDTH-1:0]tag;
-        // logic vld;
-        // logic match;
-
-        // addr = 8*double_idx;
-        // way = addr[INDEX_BITS+2:3];
-        // tag = addr[31:32-TAG_WIDTH];
-
-        // vld = verisimpleV.dcache.dcache_tags[way].valid;
-        // match = tag == verisimpleV.dcache.dcache_tags[way].tag;
-
-        // rv = (vld && match)
-        //     ? verisimpleV.dcache.dcache_mem.memData[way]
-        //     : '0;
-        // return rv;
-
-        return '0;
-    endfunction
-
     // Show contents of Unified Memory in both hex and decimal
     // Also output the final processor status
     task show_final_mem_and_status;
@@ -463,22 +442,16 @@ module testbench;
         int showing_data;
         begin
             MEM_BLOCK blk, cache_blk, mem_blk;
-            // for (int i = 0; i < `DCACHE_LINES; ++i) begin
-            //     $display("cache[%2d]: vld=%b tag=%x, idx=%x, dat=%x {addr: %x}",
-            //         i,
-            //         verisimpleV.dcache.dcache_tags[i].valid,
-            //         verisimpleV.dcache.dcache_tags[i].tag,
-            //         i,
-            //         verisimpleV.dcache.dcache_mem.memData[i],
-            //         recons_addr(i, verisimpleV.dcache.dcache_tags[i].tag)
-            //     );
-            // end
             $fdisplay(out_fileno, "\nFinal memory state and exit status:\n");
             $fdisplay(out_fileno, "@@@ Unified Memory contents hex on left, decimal on right: ");
             $fdisplay(out_fileno, "@@@");
             showing_data = 0;
             for (int k = 0; k <= `MEM_64BIT_LINES - 1; k = k+1) begin
-                cache_blk   = query_cache(k);
+                cache_blk   = _query_cache(
+                    dbg_dcache.hdr,
+                    dbg_dcache.memDP,
+                    k
+                );
                 mem_blk     = memory.unified_memory[k];
                 blk         = cache_blk != '0 ? cache_blk : mem_blk;
                 if (blk != 0) begin
