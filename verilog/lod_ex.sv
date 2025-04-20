@@ -135,7 +135,7 @@ module lod_ex(
         tmp_bmask = '0;
         case (i_regs.dat.mem_size)
         BYTE: tmp_bmask[tmp_addr[1:0]]  = '1;
-        HALF: tmp_bmask[tmp_addr[2]]    = '1;
+        HALF: tmp_bmask[tmp_addr[1]]    = '1;
         WORD: tmp_bmask = '1;
         endcase
 
@@ -270,7 +270,7 @@ module lod_ex(
         // merge dcache result
         if (dcache_in.status == LD_SUCC) begin
             bay_n[qry].need_byte_mask &= '0;
-            bay_n[qry].raw            = dcache_in.dat[idw_word(qry_entry.addr)];
+            bay_n[qry].raw            = dcache_in.dat.word_level[qry_entry.addr[2]];
         end
 
         foreach (bay_n[i]) begin
@@ -278,7 +278,7 @@ module lod_ex(
                 // merge store forwards
 
                 bay_n[i].need_byte_mask &= ~sq_in.forward_byte_en[i];
-                bay_n[qry].raw = bytewise_override(
+                bay_n[i].raw = bytewise_override(
                     bay_n[i].raw,               // dst
                     sq_in.forward_data[i],      // src
                     sq_in.forward_byte_en[i]    // src_bmask
@@ -333,7 +333,7 @@ module lod_ex(
             iw_off = 0;
             case (cur.mem_size)
             BYTE: iw_off = cur.addr[1:0];
-            HALF: iw_off = cur.addr[2];
+            HALF: iw_off = cur.addr[1];
             default:;
             endcase
 
@@ -374,7 +374,7 @@ module lod_ex(
             case (tmp.mem_size)
             BYTE: o_dat.byte_level[0] = tmp.raw.byte_level[tmp.iw_off];
             HALF: o_dat.half_level[0] = tmp.raw.half_level[tmp.iw_off];
-            default:;
+            default: o_dat.word_level = tmp.raw.word_level;
             endcase
 
             cands_shr_n[0] = CPL_CAND'{
