@@ -176,7 +176,7 @@ module mult #(
         result = (o_pkt.func == M_MUL) ?
             o_pkt.sum[31:0] : 
             o_pkt.sum[63:32];
-        $display("MULT: FUNC=%0d, dataL=%h, dataH=%h", o_pkt.func, o_pkt.sum[31:0], o_pkt.sum[63:32]);
+        // $display("MULT: FUNC=%0d, dataL=%h, dataH=%h", o_pkt.func, o_pkt.sum[31:0], o_pkt.sum[63:32]);
         o_t         = o_pkt.t;
         o_rob_idx   = o_pkt.rob_idx;
     end
