@@ -43,6 +43,13 @@ module stage_if_p4 (
     MEM_BLOCK icache_out;
     logic  icache_valid;
     logic [1:0] corr_pred;
+    logic [1:0] mux_result_prediction; 
+    logic [1:0] predict_taken;
+    logic [1:0] btb_hit;
+    logic [1:0] [15:0] btb_target;
+
+    assign btb_hit = btb_in.hit;
+    assign mux_result_prediction = predict_taken & btb_hit;
 
     DBG_icache dbg_icache;
     icache icache_0 (
@@ -53,6 +60,7 @@ module stage_if_p4 (
         .clock                      (clock),
         .reset                      (reset),
         .flush                      (flush),
+        .branch_pred                (mux_result_prediction[0]),
         .Imem2proc_transaction_tag  (Imem2proc_transaction_tag),
         .Imem2proc_data             (Imem_data),
         .Imem2proc_data_tag         (Imem2proc_data_tag),
@@ -68,7 +76,6 @@ module stage_if_p4 (
     logic [$clog2(`N):0]    free_scnt, used_scnt, f_cnt;
     IF_ID_PACKET [`N-1:0]   f_dat;
     ADDR PC_reg_temp;
-    logic [1:0] mux_result_prediction; 
 
     logic base_woff; // 1 if PC is dw-misaligned (i.e. starts at 2nd word of double word)
     always_comb begin
@@ -119,13 +126,6 @@ module stage_if_p4 (
         .free_scnt  (free_scnt),
         .used_scnt  (used_scnt)
     );
-
-    logic [1:0] predict_taken;
-    logic [1:0] btb_hit;
-    logic [1:0] [15:0] btb_target;
-
-    assign mux_result_prediction = predict_taken & btb_hit;
-    assign btb_hit = btb_in.hit;
 
     always_ff @(posedge clock) begin
         if (reset) begin
