@@ -22,12 +22,12 @@ package icache_svh;
         MSHR_STATUS  status;
         TAG          tag;
         WAY          way;
-    } MSHR;
+    } MSHR_ENTRY;
 
     typedef struct packed {
         logic   [`ICACHE_LINES-1:0] vld;
         TAG     [`ICACHE_LINES-1:0] tag;
-    } HEADER;
+    } CACHE_HEADER;
 endpackage
 
 `endif

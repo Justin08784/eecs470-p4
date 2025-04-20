@@ -1,8 +1,17 @@
 `include "icache.svh"
-
-module icache2();
 import icache_svh::*;
-WAY esv;
+
+module icache2(
+    input logic reset,
+    input logic clock
+);
+    CACHE_HEADER hdr;
+
+    always_ff @(posedge clock) begin
+        if (!reset) begin
+            $display("%b", hdr.vld);
+        end
+    end
 endmodule
 
 
