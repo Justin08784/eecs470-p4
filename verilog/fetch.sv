@@ -42,12 +42,7 @@ module stage_if_p4 (
     ADDR PC_reg; // PCs we are currently fetching
     MEM_BLOCK icache_out;
     logic  icache_valid;
-
-
     logic [1:0] corr_pred;
-    // INST [1:0] fifo_insns;
-
-    //logic [1:0] valid_out;
 
     DBG_icache dbg_icache;
     icache icache_0 (
@@ -73,36 +68,23 @@ module stage_if_p4 (
     logic [$clog2(`N):0]    free_scnt, used_scnt, f_cnt;
     IF_ID_PACKET [`N-1:0]   f_dat;
     ADDR PC_reg_temp;
-
     logic [1:0] mux_result_prediction; 
 
-    logic vld;
-
-    logic off; // 1 if PC is dw-misaligned (i.e. starts at 2nd word of double word)
-
-    logic prediction_prop;
-
-    logic pred_stall;
-
-    
-
+    logic base_woff; // 1 if PC is dw-misaligned (i.e. starts at 2nd word of double word)
     always_comb begin
         d_out.f_en_cnt = `MIN(used_scnt, d_in.d_rdy_cnt);
-        off = PC_reg[2]; 
+        base_woff = PC_reg[2]; 
         f_cnt = 0;
         if (!icache_valid) begin
             f_cnt = 0;
-        end else if (off || |mux_result_prediction) begin
+        end else if (base_woff || |mux_result_prediction) begin
             f_cnt = 1;
         end else begin
             f_cnt = 2;
         end
         f_cnt = `MIN(f_cnt, free_scnt);
 
-        // f_cnt = !icache_valid  ? 0 : ((off || mux_result_prediction > 0) ? `MIN(1, free_scnt) : free_scnt);
-
-        for (int unsigned i = 0, logic vld = 0; i < `N; ++i) begin
-            vld = i < f_cnt;
+        for (int unsigned i = 0; i < `N; ++i) begin
             PC_reg_temp = PC_reg + 4*i;
             f_dat[i] = '{
                 inst  : icache_out.word_level[PC_reg_temp[2]],
@@ -139,17 +121,10 @@ module stage_if_p4 (
     );
 
     logic [1:0] predict_taken;
-
-
     logic [1:0] btb_hit;
-
     logic [1:0] [15:0] btb_target;
 
-    assign mux_result_prediction[0] = predict_taken[0] && btb_hit[0];
-
-   // assign pred_out = mux_result
-    assign mux_result_prediction[1] = predict_taken[1] && btb_hit[1];
-
+    assign mux_result_prediction = predict_taken & btb_hit;
     assign btb_hit = btb_in.hit;
 
     always_ff @(posedge clock) begin
@@ -158,11 +133,6 @@ module stage_if_p4 (
         end else if (flush) begin
                 PC_reg <= r_in.corrected_PC;
         end else if(mux_result_prediction) begin
-            //  `ifdef DEBUG
-            //     $display("PREDICTING TAKEN:");
-            //     $display("MUX RESULT: %1x", mux_result_prediction[0]);
-            //     $display("FETCHING NEW TARGET: %x", btb_in.target[0]);
-            //  `endif
             if(mux_result_prediction[0]) begin
                 if (f_cnt > 0) begin
                     PC_reg <= {16'b0, btb_in.target[0]};
@@ -181,46 +151,31 @@ module stage_if_p4 (
     assign btb_out.target = r_in.corrected_PC;
     assign btb_out.is_taken = r_in.is_taken;
     assign btb_out.correct_PC =  r_in.PC;
-
     assign btb_out.PC[0] =  PC_reg;
     assign btb_out.PC[1] = PC_reg + 4; 
-
 
     assign btb_target = btb_in.target;
 
 
     assign pred_out.PC[0] =  PC_reg;
     assign pred_out.PC[1] = PC_reg + 4;
-
     assign pred_out.update_enable = r_in.update_en;
     assign pred_out.taken = r_in.is_taken;
     assign pred_out.correct_PC =  r_in.PC;
     assign pred_out.retired_bhr = r_in.retired_bhr;
-
-
     assign pred_out.correlated_bhr = r_in.correlated_bhr;
 
     logic [1:0] gshare_pred;
-
-
     logic [255:0][1:0] chooser_table;
-   
-
 
     always_comb begin
-
-        if(chooser_table[PC_reg[7:0]] == 2'b00) begin
-            predict_taken = pred_in_gshare.prediction;;
-        end else if (chooser_table[PC_reg[7:0]] == 2'b01) begin
-            predict_taken    = pred_in_gshare.prediction;
-        end else if (chooser_table[PC_reg[7:0]] == 2'b10) begin
-            predict_taken    = pred_in_corr.prediction;
-        end else if (chooser_table[PC_reg[7:0]] == 2'b11) begin
-            predict_taken    = pred_in_corr.prediction;
-        end else begin
-            predict_taken    = 0;
-        end
-    
+        case (chooser_table[PC_reg[7:0]])
+            2'b00: predict_taken = pred_in_gshare.prediction;
+            2'b01: predict_taken = pred_in_gshare.prediction;
+            2'b10: predict_taken = pred_in_corr.prediction;
+            2'b11: predict_taken = pred_in_corr.prediction;
+            default: predict_taken = '0;
+        endcase
     end
 
     logic g_correct, c_correct;

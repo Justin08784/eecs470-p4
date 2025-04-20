@@ -14,6 +14,8 @@ TESTS=(
     fib_long
     saxpy
     fib_rec
+    copy_long
+    evens_long
 )
 
 EXTS=(
