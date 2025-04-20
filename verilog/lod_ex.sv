@@ -85,7 +85,7 @@ module lod_ex(
 
         // byte access information
         logic           rd_unsigned;
-        ADDR            addr;
+        logic [1:0]     iw_off;
         MEM_SIZE        mem_size;
         DATA_BLOCK      raw;
     } LOAD_BUFFER_ENTRY;
@@ -132,7 +132,7 @@ module lod_ex(
     // FIXME: Change lbuf to a compressible ring buffer to avoid crossbar
     logic [BAY_SZ-1:0]  dis_vld_req, dis_vld_gnt;
     logic [LBUF_SZ-1:0] dis_rdy_req, dis_rdy_gnt;
-    localparam DIS_BUS_SZ = 1;
+    localparam DIS_BUS_SZ = 2;
     logic [DIS_BUS_SZ-1:0][BAY_SZ-1:0]  dis_vld_gbus;
     logic [DIS_BUS_SZ-1:0][LBUF_SZ-1:0] dis_rdy_gbus;
 
@@ -154,13 +154,25 @@ module lod_ex(
         .gnt_bus(dis_rdy_gbus)
     );
 
-    logic [DIS_BUS_SZ-1:0] dis_en;
-    logic [BAY_SZ-1:0]  dis_en_bay;
-    logic [LBUF_SZ-1:0] dis_en_buf;
+    logic [DIS_BUS_SZ-1:0]  dis_en;
+    logic [BAY_SZ-1:0]      dis_en_bay;
+    // logic [LBUF_SZ-1:0] dis_en_buf;
+    logic [BAY_SZ-1:0][LBUF_SZ-1:0] dis_en_bay2buf;
     always_comb begin
+        foreach (dis_en[i])
+            dis_en[i] = |dis_vld_gbus[i] && |dis_rdy_gbus[i];
+
         dis_en_bay = '0;
-        foreach (dis_vld_gbus[i, j])
-            dis_en_bay[j] |= dis_vld_gbus[i][j] && |dis_rdy_gbus[i];
+        foreach (dis_vld_gbus[i, j]) begin
+            if (!dis_en[i])
+                continue;
+            dis_en_bay[j] |= dis_vld_gbus[i][j];
+        end
+
+        for (int bus = 0; bus < DIS_BUS_SZ; ++bus) begin
+            foreach (dis_en_bay2buf[i, j])
+                dis_en_bay2buf[i][j] = dis_vld_gbus[bus][i] && dis_rdy_gbus[bus][j];
+        end
     end
 
 
@@ -196,13 +208,7 @@ module lod_ex(
 
     always_comb begin
         qry_req = bay_vld & bay_need;
-        nex_qry = 0;
-        foreach (qry_gnt[i]) begin
-            if (!qry_gnt[i])
-                continue;
-            nex_qry = i; // should be 1-hot
-            break;
-        end
+        nex_qry = $clog2(qry_gnt);
 
         qry = qry_req[prv_qry]
             ? prv_qry
@@ -276,10 +282,88 @@ module lod_ex(
 
 
             // bay->lbuf logic
+            if (dis_en_bay[i])
+                bay_n[i].vld = 0;
 
         end
+    end
 
 
+
+    QUERY_BAY_ENTRY cur;
+    logic [1:0] iw_off;
+    always_comb begin
+        lbuf_n = lbuf;
+
+        foreach (lbuf_n[i]) begin
+            if (!lbuf2cdb_gnt[i])
+                continue;
+            lbuf_n[i].vld = 0;
+        end
+
+        foreach (dis_en_bay2buf[i, j]) begin
+            if (!dis_en_bay2buf[i][j])
+                continue;
+            cur = bay[i];
+
+            iw_off = 0;
+            case (cur.mem_size)
+            BYTE: iw_off = cur.addr[1:0];
+            HALF: iw_off = cur.addr[2];
+            default:;
+            endcase
+
+            lbuf_n[j] = '{
+                vld         : 1,
+                t           : cur.t,
+                rob_idx     : cur.rob_idx,
+                rd_unsigned : cur.rd_unsigned,
+                iw_off      : iw_off,
+                mem_size    : cur.mem_size,
+                raw         : cur.raw
+            };
+        end
+    end
+
+
+    CPL_CAND [1:0] cands_shr, cands_shr_n;
+    DW_ACCESS acc;
+    DATA_BLOCK o_dat;
+    always_comb begin
+        cands_shr_n[0] = '0;
+        foreach (lbuf2cdb_gnt[i]) begin
+            if (!(lbuf2cdb_gnt[i] && cdb_gnt))
+                continue;
+
+            o_dat = '0;
+            case (lbuf[i].mem_size)
+            BYTE: o_dat.byte_level[0] = lbuf[i].raw.byte_level[lbuf[i].iw_off];
+            HALF: o_dat.half_level[0] = lbuf[i].raw.half_level[lbuf[i].iw_off];
+            default:;
+            endcase
+
+            cands_shr_n[0] = CPL_CAND'{
+                t       : lbuf[i].t,
+                rob_idx : lbuf[i].rob_idx,
+                data    : o_dat
+            }; 
+        end
+
+        o_cands = cands_shr[1];
+        cands_shr_n[1] = cands_shr[0];
+    end
+
+
+    always_ff @(posedge clock) begin
+        if (reset || flush) begin
+            bay         <= '0;
+            lbuf        <= '0;
+            cands_shr   <= '0;
+        end else begin
+            bay         <= bay_n;
+            lbuf        <= lbuf_n;
+            cands_shr   <= cands_shr_n;
+        end
     end
 
 
