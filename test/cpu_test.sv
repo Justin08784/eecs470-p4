@@ -101,10 +101,11 @@ module testbench;
         .proc2mem_size    (proc2mem_size),
 `endif
 
+        // EXCEPTION: The only debug which should not be debug guarded. Needed for .out.
+        .dbg_dcache     (dbg_dcache),
 `ifdef DEBUG
         .dbg_execute    (dbg_execute),
         .dbg_fl         (dbg_fl),
-        .dbg_dcache     (dbg_dcache),
         .dbg_btq        (dbg_btq),
         .dbg_fetch      (dbg_fetch),
         .dbg_decode     (dbg_decode),
