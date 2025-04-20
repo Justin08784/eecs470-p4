@@ -172,7 +172,7 @@ module lod_ex(
             // end
 
             if (req_en && (dcache_in.status == LD_SUCC) && (i == curr_frwd)) begin
-                next_dat[i] = (dcache_in.dat.word_level[bays.addr[i][2]]) >> bays.addr[i][1:0];
+                next_dat[i] = (dcache_in.dat.word_level[bays.addr[i][2]]) >> 8*bays.addr[i][1:0];
                 next_got[i] = 1;
             end
 

@@ -46,8 +46,8 @@ module lq #(parameter
     assign used_scnt            = `MIN(used, NUM_RPORTS);
 
 
-    logic [NUM_FU_STORE+NUM_FU_LOAD+NUM_FU_LOAD-1:0] set_err;
-    LSQ_IDX [NUM_FU_STORE+NUM_FU_LOAD+NUM_FU_LOAD-1:0] err_idx;
+    logic [LSQ_SZ-1:0] set_err;
+    LSQ_IDX [LSQ_SZ-1:0] err_idx;
 
     always_comb begin
         for (int unsigned i = 0; i < NUM_RPORTS; ++i)
@@ -73,18 +73,22 @@ module lq #(parameter
         retire_out.err_ld_ooo[1] = state[r_idxs[1]].err_ld_ooo;
     end
 
+    LSQ_IDX err_cnt;
     always_comb begin
         //handle checking if LQ got ahead of SQ and needs to flag it in ROB
         set_err = '0;
         err_idx = '0;
+        err_cnt = '0;
+
         for (int i = 0; i < NUM_FU_STORE; i++) begin
             if (!execST_in.st_en[i]) continue;
 
             for (int j = 0, int idx = 0; j < used; j++) begin
                 idx = (head + j) % LSQ_SZ;
                 if ((state[idx].sq_idx == execST_in.st_sq_idx[i]) && state[idx].d_vld) begin
-                    set_err[i+j] = '1;
-                    err_idx[i+j] = idx;
+                    set_err[err_cnt] = '1;
+                    err_idx[err_cnt] = idx;
+                    err_cnt++;
                 end
             end
         end
@@ -93,9 +97,11 @@ module lq #(parameter
             for (int j = 0; j < NUM_FU_STORE; j++) begin
                 if (!execST_in.st_en[j]) continue;
 
-                if ((execST_in.st_sq_idx[j] == state[execute_in.ld_lq_idx[i]].sq_idx) && execute_in.ld_ex_en[i])
-                    set_err[i+NUM_FU_STORE+NUM_FU_LOAD] = 1;
-                    err_idx[i+NUM_FU_STORE+NUM_FU_LOAD] = execute_in.ld_lq_idx[i];
+                if ((execST_in.st_sq_idx[j] == state[execute_in.ld_lq_idx[i]].sq_idx) && execute_in.ld_ex_en[i]) begin
+                    set_err[err_cnt] = 1;
+                    err_idx[err_cnt] = execute_in.ld_lq_idx[i];
+                    err_cnt++;
+                end
             end
         end
     end
@@ -131,7 +137,12 @@ module lq #(parameter
             end
 
             //handle error flags
-            for (int unsigned i = 0; i < NUM_FU_STORE+NUM_FU_LOAD; ++i) begin
+            // for (int unsigned i = 0; i < NUM_FU_STORE+NUM_FU_LOAD; ++i) begin
+            //     if (set_err[i])
+            //         state[err_idx[i]].err_ld_ooo <= 1;
+            // end
+
+            foreach(set_err[i]) begin
                 if (set_err[i])
                     state[err_idx[i]].err_ld_ooo <= 1;
             end
