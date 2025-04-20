@@ -47,9 +47,9 @@ module lod_ex(
         // readiness
         LSQ_IDX         sq_idx;
         logic [3:0]     need_byte_mask;
-    } LOAD_BAY_ENTRY;
+    } QUERY_BAY_ENTRY;
 
-    LOAD_BAY_ENTRY  [BAY_SZ-1:0] bay, bay_n1, bay_n2;
+    QUERY_BAY_ENTRY [BAY_SZ-1:0] bay, bay_n1, bay_n2;
     logic           [BAY_SZ-1:0] bay_vld;
     logic           [BAY_SZ-1:0] bay_need;
 
@@ -60,7 +60,30 @@ module lod_ex(
         end
     end
 
-    /* Query selection */
+    localparam LBUF_SZ = 3;
+    typedef struct packed {
+        logic           vld;
+
+        PHYS_REG_IDX    t;
+        ROB_IDX         rob_idx;
+
+        // byte access information
+        logic           rd_unsigned;
+        ADDR            addr;
+        MEM_SIZE        mem_size;
+        DATA_BLOCK      raw;
+    } LOAD_BUFFER_ENTRY;
+
+    LOAD_BUFFER_ENTRY [LBUF_SZ-1:0] lbuf, lbuf_n;
+    logic             [LBUF_SZ-1:0] lbuf_vld;
+
+    always_comb begin
+        foreach (lbuf_vld[i])
+            lbuf_vld[i] = lbuf[i].vld;
+    end
+
+
+    /* Dcache query selection */
     logic [$clog2(BAY_SZ)-1:0]
         prv_qry,
         nex_qry,
@@ -110,7 +133,7 @@ module lod_ex(
         in_size = i_regs.dat.mem_size;
 
         lq_out = '{
-            ld_ex_en     : i_vld,
+            ld_ex_en     : i_vld && i_rdy, // FIXME: or is just i_vld fine?
             ld_lq_idx    : i_regs.dat.lq_idx,
             ld_addr      : in_addr,
             ld_mem_size  : in_size
@@ -119,29 +142,29 @@ module lod_ex(
 
 
     /* Bay -> CDB shr */
-    logic [BAY_SZ-1:0] bay2cdb_gnt;
+    logic [LBUF_SZ-1:0] lbuf2cdb_gnt;
     psel_gen #(
-        .WIDTH  (BAY_SZ),
+        .WIDTH  (LBUF_SZ),
         .REQS   (1)
     ) arb_out (
-        .req    (bay_vld),
-        .gnt    (bay2cdb_gnt)
+        .req    (lbuf_vld),
+        .gnt    (lbuf2cdb_gnt)
     );
 
     always_comb begin
         cdb_req = |bay_vld;
 
         ctag_ts = '0;
-        foreach (bay2cdb_gnt[i]) begin
-            if (!bay2cdb_gnt[i])
+        foreach (lbuf2cdb_gnt[i]) begin
+            if (!lbuf2cdb_gnt[i])
                 continue;
             ctag_ts |= bay[i].t;
         end
     end
 
     /* Query handling */
-    logic           qry_vld;
-    LOAD_BAY_ENTRY  qry_entry;
+    logic            qry_vld;
+    QUERY_BAY_ENTRY  qry_entry;
     always_comb begin
         // only let the query ask dcache
         qry_vld = qry_req[qry];
@@ -157,20 +180,26 @@ module lod_ex(
             ld_sq_out.forward_req_en  [i] = qry_req[i];
             ld_sq_out.forward_addr    [i] = bay[i].addr;
             ld_sq_out.forward_mem_size[i] = bay[i].mem_size; // TODO: REMOVE
-            ld_sq_out.forward_sq_idx  [i] = bay[i].sq_idxc;
+            ld_sq_out.forward_sq_idx  [i] = bay[i].sq_idx;
         end
 
 
         bay_n1 = bay;
-        if (dcache_in.vld) begin
+        if (dcache_in.status == LD_SUCC) begin
+            bay_n1[qry].need_byte_mask &= '0;
             bay_n1[qry].raw = dcache_in.dat[idw_word(qry_entry.addr)];
-            bay_n1[qry].need_byte_mask  = '1;
         end
-        // bay_n1[qry].need_byte_mask = 
 
         bay_n2 = bay_n1;
-        
+        foreach (bay_n2[i]) begin
+            bay_n2[i].need_byte_mask &= ~sq_in.forward_byte_en[i];
 
+            for (int unsigned b = 0; b < 4; ++b) begin
+                if (!sq_in.forward_byte_en[i][b])
+                    continue;
+                bay_n2[i].raw.byte_level[b] = sq_in.forward_data[i].byte_level[b];
+            end
+        end
     end
 
 
@@ -337,8 +366,8 @@ module lod_ex(
     //             bays.st_frwd_byte_mask[i] <= next_st_frwd_byte_mask[i];
     //         end
 
-    //         foreach (bay2cdb_gnt[i]) begin
-    //             if (!(bay2cdb_gnt[i] && cdb_gnt))
+    //         foreach (lbuf2cdb_gnt[i]) begin
+    //             if (!(lbuf2cdb_gnt[i] && cdb_gnt))
     //                 continue;
     //             bays.vld     [i] <= 0;
     //             bays.got     [i] <= 0;
