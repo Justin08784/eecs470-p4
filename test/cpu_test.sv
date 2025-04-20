@@ -35,8 +35,10 @@ import "DPI-C" function string decode_inst(int inst);
 
 
 // Debug cycle limits, both inclusive
-localparam DBG_CYCLE_MIN = 15000;
-localparam DBG_CYCLE_MAX = 16900;//`TB_MAX_CYCLES;
+localparam DBG_CYCLE_MIN = 0;
+localparam DBG_CYCLE_MAX = `TB_MAX_CYCLES;
+// localparam DBG_CYCLE_MIN = 150;
+// localparam DBG_CYCLE_MAX = 210;//`TB_MAX_CYCLES;
 // localparam DBG_CYCLE_MIN = 1480;
 // localparam DBG_CYCLE_MAX = 1510;
 // localparam DBG_CYCLE_MIN = 1300;
@@ -1286,6 +1288,18 @@ module testbench;
         $display("  | << DCACHE <<");
     endtask
 
+    function automatic string dbg_mult_func(MULT_FUNC func);
+        string rv = "";
+        case (func)
+        M_MUL:      rv="M_MUL";
+        M_MULH:     rv="M_MULH";
+        M_MULHSU:   rv="M_MULHSU";
+        M_MULHU:    rv="M_MULHU";
+        default:;
+        endcase
+        return rv;
+    endfunction;
+
     task print_execute();
         execute2btq btq_out;
         execute2complete_tag ctag_out;
@@ -1342,7 +1356,7 @@ module testbench;
         end
 
         for (int i = 0; i < `NUM_FU_MULT; ++i) begin
-            $display("mul_iss[%0d]: rdy: %b, vld: %b, t: %2d, t1: %2d, t2: %2d, rob_idx: %2d, func: 0x%x",
+            $display("mul_iss[%0d]: rdy: %b, vld: %b, t: %2d, t1: %2d, t2: %2d, rob_idx: %2d, func: %s",
                 i,
                 dbg_execute.iss.i_rdy.mul[i],
                 dbg_execute.iss.o_vld.mul[i],
@@ -1350,7 +1364,7 @@ module testbench;
                 dbg_execute.iss.o_dat.mul[i].t1,
                 dbg_execute.iss.o_dat.mul[i].t2,
                 dbg_execute.iss.o_dat.mul[i].rob_idx,
-                dbg_execute.iss.o_dat.mul[i].func
+                dbg_mult_func(dbg_execute.iss.o_dat.mul[i].func)
             );
         end
 
@@ -1519,7 +1533,7 @@ module testbench;
         // print_map_table();
         // print_prf();
         // print_btq();
-        // print_rob();
+        print_rob();
 
         // $display("---- rob_debug contents ----");
         // foreach (rob_debug[idx]) begin
@@ -1539,12 +1553,12 @@ module testbench;
         //      mem2proc_data,
         //      mem2proc_data_tag
         // );
-        // print_rs();
+        print_rs();
         // print_execute();
         // print_dcache();
-        print_sq();
+        // print_sq();
         // print_retbuf();
-        print_lq();
+        // print_lq();
         // print_retire();
         $display("  | << CYCLE: %3d (t: %3d)", clock_count-1, $time);
     endtask
