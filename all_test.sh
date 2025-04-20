@@ -15,6 +15,7 @@ TESTS=(
     saxpy
     fib_rec
     evens_long
+    basic_malloc
 )
 
 EXTS=(
