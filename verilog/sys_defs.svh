@@ -991,6 +991,15 @@ typedef struct packed {
 } sq2rs;
 
 typedef struct packed {
+    logic   [`NUM_FU_LOAD-1:0] ck_en;
+    LSQ_IDX [`NUM_FU_LOAD-1:0] idxs;
+} lq2sq;
+
+typedef struct packed {
+    logic   [`NUM_FU_LOAD-1:0] err_en;
+} sq2lq;
+
+typedef struct packed {
     logic       [`NUM_FU_STORE-1:0] st_ex_en; //tells SQ that a valid store is coming in on that line (bus, not count)
     LSQ_IDX     [`NUM_FU_STORE-1:0] st_sq_idx; //the SQ IDXs of the incoming stores, found in the ID_RESULT packet
     ADDR        [`NUM_FU_STORE-1:0] st_addr; //address that the stores are pointing to
