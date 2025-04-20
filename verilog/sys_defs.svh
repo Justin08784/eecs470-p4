@@ -661,6 +661,7 @@ typedef struct packed {
 
     REG_IDX  dest_reg_idx;  // destination (writeback) register index
     ALU_FUNC alu_func;      // ALU function select (ALU_xxx *)
+    MULT_FUNC mult_func;
     logic    mult;          // Is inst a multiply instruction?
     logic    rd_mem;        // Does inst read memory?
     logic    wr_mem;        // Does inst write memory?

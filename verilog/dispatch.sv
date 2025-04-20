@@ -215,6 +215,7 @@ always_comb begin
     btq_out.PC = '0;
     btq_out.bhr = '0;
     btq_out.pred = '0;
+    btq_out.pred_tgt = '0;
     btq_out.gshare_pred = '0;
     btq_out.corr_pred = '0;
     btq_out.correlated_bhr = '0;

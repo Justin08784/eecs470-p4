@@ -34,14 +34,15 @@ module cpu (
     output ADDR        proc2mem_addr,    // Address sent to memory
     output MEM_BLOCK   proc2mem_data,    // Data sent to memory
     output MEM_SIZE    proc2mem_size,    // Data size sent to memory
+    output DBG_dcache   dbg_dcache,
 
+    `ifdef DEBUG
     // Note: these are assigned at the very bottom of the module
     output COMMIT_PACKET [`N-1:0] committed_insts,
 
     // Debug outputs: these signals are solely used for debugging in testbenches
     // Do not change for project 3
     // You should definitely change these for project 4
-    output DBG_dcache   dbg_dcache,
 
     output DBG_execute  dbg_execute,
     output DBG_fl       dbg_fl,
@@ -57,6 +58,11 @@ module cpu (
     output DBG_rs       dbg_rs,
     output DBG_sq       dbg_sq,
     output DBG_retire   dbg_retire
+    `endif 
+    
+    `ifndef DEBUG
+    output COMMIT_PACKET [`N-1:0] committed_insts
+    `endif
 );
     /* Global controls*/
     logic flush;
@@ -136,7 +142,9 @@ module cpu (
     dcache2sq dcache_2_sq;
 
     dcache_block dcache0 (
+        // `ifdef DEBUG
         .dbg(dbg_dcache),
+        // `endif
 
         .clock(clock),
         .reset(reset),

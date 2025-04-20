@@ -33,7 +33,7 @@ typedef struct packed {
     PHYS_REG_IDX    t1;
     PHYS_REG_IDX    t2;
     ROB_IDX         rob_idx;
-    logic[2:0]      func;
+    MULT_FUNC       func;
 } ID_MUL_VIEW;
 
 typedef struct packed {
