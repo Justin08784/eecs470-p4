@@ -31,14 +31,16 @@ import "DPI-C" function string decode_inst(int inst);
 
 
 `define TB_MAX_CYCLES 50000000
-// `define TB_MAX_CYCLES 1700
+// `define TB_MAX_CYCLES 10000
 
 
 // Debug cycle limits, both inclusive
 localparam DBG_CYCLE_MIN = 0;
 localparam DBG_CYCLE_MAX = `TB_MAX_CYCLES;
-// localparam DBG_CYCLE_MIN = 1490;
-// localparam DBG_CYCLE_MAX = 1630;
+// localparam DBG_CYCLE_MIN = 1480;
+// localparam DBG_CYCLE_MAX = 1510;
+// localparam DBG_CYCLE_MIN = 1300;
+// localparam DBG_CYCLE_MAX = 1500;
 
 module testbench;
     // string inputs for loading memory and output files
@@ -210,7 +212,10 @@ module testbench;
             clock_count = 0;
             instr_count = 0;
         end else begin
-            #2; // wait a short time to avoid a clock edge
+            /* Provided delay <revert if necessary> */
+            // #2; // wait a short time to avoid a clock edge
+            /* Our delay */
+            #0; // wait a short time to avoid a clock edge
 
             clock_count = clock_count + 1;
 
@@ -285,6 +290,7 @@ module testbench;
         logic illegal;
         logic halt;
         REG_IDX reg_idx;
+        PHYS_REG_IDX tag, t_old;
         DATA data;
 
         /* V2: get retire data via hierarchial references
@@ -307,6 +313,8 @@ module testbench;
             block   = memory.unified_memory[pc[31:3]];
             inst    = block.word_level[pc[2]];
             reg_idx = verisimpleV.rob_0.r_out.entries[n].dst;
+            tag     = verisimpleV.retire_exec.tag[n];
+            t_old   = verisimpleV.retire_exec.t_old[n];
             data    = verisimpleV.prf_0.file[
                 verisimpleV.rob_0.r_out.entries[n].tag
             ];
@@ -320,13 +328,16 @@ module testbench;
                 `endif
             end else begin
                 `ifdef CYCLE_PRINT
-                $fdisplay(wb_fileno, "(%4d) PC %4x:%-8s| r%02d=%-8x | CYCLE=%0d",
+                $fdisplay(wb_fileno, "(%4d) PC %4x:%-8s| r%02d=%-8x | CYCLE=%0d (t_old: %2d -> t: %2d)",
                           id,
                           pc,
                           decode_inst(inst),
                           reg_idx,
                           data,
-                          clock_count);
+                          clock_count,
+                          t_old,
+                          tag
+                );
                 `endif 
                 `ifndef CYCLE_PRINT
                 $fdisplay(wb_fileno, "PC %4x:%-8s| r%02d=%-8x",
@@ -1494,15 +1505,16 @@ module testbench;
             return;
 
         $display("  | >> CYCLE: %3d (t: %3d)", clock_count-1, $time);
-        // print_fetch();
+        print_fetch();
         // print_icache();
         // print_decode();
-        print_fl();
-        print_dispatch();
-        print_map_table();
+        // print_rob();
+        // print_fl();
+        // print_dispatch();
+        // print_map_table();
         // print_prf();
         // print_btq();
-        print_rob();
+        // print_rob();
 
         // $display("---- rob_debug contents ----");
         // foreach (rob_debug[idx]) begin
@@ -1525,9 +1537,9 @@ module testbench;
         print_rs();
         // print_execute();
         // print_dcache();
-        // print_sq();
+        print_sq();
         // print_retbuf();
-        // print_lq();
+        print_lq();
         // print_retire();
         $display("  | << CYCLE: %3d (t: %3d)", clock_count-1, $time);
     endtask
