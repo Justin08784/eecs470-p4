@@ -46,8 +46,8 @@ module lq #(parameter
     assign used_scnt            = `MIN(used, NUM_RPORTS);
 
 
-    logic [NUM_FU_STORE+NUM_FU_LOAD-1:0] set_err;
-    LSQ_IDX [NUM_FU_STORE+NUM_FU_LOAD-1:0] err_idx;
+    logic [NUM_FU_STORE+NUM_FU_LOAD+NUM_FU_LOAD-1:0] set_err;
+    LSQ_IDX [NUM_FU_STORE+NUM_FU_LOAD+NUM_FU_LOAD-1:0] err_idx;
 
     always_comb begin
         for (int unsigned i = 0; i < NUM_RPORTS; ++i)
@@ -83,8 +83,8 @@ module lq #(parameter
             for (int j = 0, int idx = 0; j < used; j++) begin
                 idx = (head + j) % LSQ_SZ;
                 if ((state[idx].sq_idx == execST_in.st_sq_idx[i]) && state[idx].d_vld) begin
-                    set_err[i] = '1;
-                    err_idx[i] = idx;
+                    set_err[i+j] = '1;
+                    err_idx[i+j] = idx;
                 end
             end
         end
@@ -94,8 +94,8 @@ module lq #(parameter
                 if (!execST_in.st_en[j]) continue;
 
                 if ((execST_in.st_sq_idx[j] == state[execute_in.ld_lq_idx[i]].sq_idx) && execute_in.ld_ex_en[i])
-                    set_err[i+NUM_FU_STORE] = 1;
-                    err_idx[i+NUM_FU_STORE] = execute_in.ld_lq_idx[i];
+                    set_err[i+NUM_FU_STORE+NUM_FU_LOAD] = 1;
+                    err_idx[i+NUM_FU_STORE+NUM_FU_LOAD] = execute_in.ld_lq_idx[i];
             end
         end
     end
