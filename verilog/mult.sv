@@ -183,7 +183,7 @@ module mult #(
 
     // `ifdef DEBUG
     // always_ff @(posedge clock) begin
-    //     if (!reset && ID == 1) begin
+    //     if (!reset && ID == 0) begin
     //         $display("  %3d | >> mul%0d >>", $time, ID);
     //         for (int unsigned i = 0; i < `MULT_STAGES+1; ++i) begin
     //             $display("– sum: %x, mplier: %x, mcand: %x, func: %0d, tag: %2d, rob_idx: %2d",
@@ -241,7 +241,7 @@ module mult_stage #(
         O_NONE: begin
             assign i_rdy = o_rdy;
             assign o_vld = i_vld;
-            assign o_dat = i_dat;
+            assign o_dat = tmp_dat;
         end
 
         O_SKID: begin
