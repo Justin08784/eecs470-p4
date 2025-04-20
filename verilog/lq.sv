@@ -18,7 +18,6 @@ module lq #(parameter
 
     input dispatch2lq dispatch_in,
     input execute2lq execute_in,
-    input execeuteST2lq execST_in,
     input retire2lq retire_in,
     input sq2lq sq_in,
 

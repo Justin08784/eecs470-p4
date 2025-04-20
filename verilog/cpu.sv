@@ -520,7 +520,6 @@ module cpu (
     //////////////////////////////////////////////////
 
     execute2lq exec_2_lq;
-    execeuteST2lq execST_2_lq;
 
     lq lq_0(
         `ifdef DEBUG
@@ -533,7 +532,6 @@ module cpu (
         .dispatch_in(dis_2_lq),
         .retire_in(retire_2_lq),
         .execute_in(exec_2_lq),
-        .execST_in(execST_2_lq),
 
         .dispatch_out(lq_2_dis),
         .retire_out(lq_2_retire),
@@ -563,7 +561,6 @@ module cpu (
         .sq_out (exec_2_sq),
 
         .lq_out     (exec_2_lq),
-        .st_lq_out  (execST_2_lq),
         .ld_sq_out  (exec_ld_2_sq),
 
         .dcache_in  (dcache_2_ld), // FIXME FIXME FIXME FIXME
