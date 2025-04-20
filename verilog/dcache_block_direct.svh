@@ -15,7 +15,7 @@ typedef logic [$clog2(NUM_CACHE_LINES)-1:0] WAY;
 function automatic TAG get_tag(input ADDR addr);
     return addr[15:16-TAG_BITS];
 endfunction
-function automatic TAG get_way(input ADDR addr);
+function automatic WAY get_way(input ADDR addr);
     return addr[WAY_BITS+2:3];
 endfunction
 
