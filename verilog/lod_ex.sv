@@ -42,86 +42,31 @@ module lod_ex(
         logic           rd_unsigned;
         ADDR            addr;
         MEM_SIZE        mem_size;
-        MEM_BLOCK       raw;
+        DATA_BLOCK      raw;
 
         // readiness
         LSQ_IDX         sq_idx;
         logic [3:0]     need_byte_mask;
     } LOAD_BAY_ENTRY;
 
-    typedef struct packed {
-        logic           vld;
+    LOAD_BAY_ENTRY  [BAY_SZ-1:0] bay, bay_n;
+    logic           [BAY_SZ-1:0] bay_vld;
+    logic           [BAY_SZ-1:0] bay_need;
 
-        PHYS_REG_IDX    t;
-        ROB_IDX         rob_idx;
-
-        // byte access information
-        logic           rd_unsigned;
-        MEM_SIZE        mem_size;
-
-        DATA            dat;
-    } LOAD_BUF_ENTRY;
-
-
-    LOAD_BAY_ENTRY [BAY_SZ-1:0] bay, bay_n;
-    LOAD_BUF_ENTRY [BUF_SZ-1:0] lbuf, lbuf_n;
-
-    logic [BAY_SZ-1:0] bay_vld;
-    logic [BAY_SZ-1:0] bay_need;
-
-    logic [BUF_SZ-1:0] lbuf_vld;
     always_comb begin
         foreach (bay[i]) begin
             bay_vld[i]  = bay[i].vld;
             bay_need[i] = |(bay[i].need_byte_mask);
         end
-
-        foreach (lbuf[i]) begin
-            lbuf_vld[i] = lbuf[i].vld;
-        end
     end
 
-
-    logic [BAY_SZ-1:0] in2bay_gnt;
-    logic [BUF_SZ-1:0] lbuf2cdb_gnt;
-    generate
-        psel_gen #(
-            .WIDTH(BAY_SZ),
-            .REQS(1)
-        ) arb_in (
-            .req    (~bay_vld),
-            .gnt    (in2bay_gnt)
-        );
-
-        psel_gen #(
-            .WIDTH  (BUF_SZ),
-            .REQS   (1)
-        ) arb_out (
-            .req    (lbuf_vld),
-            .gnt    (lbuf2cdb_gnt)
-        );
-    endgenerate
-
-
-
-    always_comb begin
-        i_rdy   = |in2bay_gnt;
-        cdb_req = |lbuf_vld;
-
-        ctag_ts = '0;
-        foreach (lbuf2cdb_gnt[i]) begin
-            if (!lbuf2cdb_gnt[i])
-                continue;
-            ctag_ts |= lbuf[i].t;
-        end
-    end
-
+    /* Query selection */
     logic [$clog2(BAY_SZ)-1:0]
         prv_qry,
         nex_qry,
         qry;
-
     logic [BAY_SZ-1:0] nex_qry_req, nex_qry_gnt;
+
     always_comb begin
         foreach (nex_qry_req[i])
             nex_qry_req = bay_vld[i] && bay_need[i];
@@ -146,9 +91,21 @@ module lod_ex(
         .gnt    (nex_qry_gnt)
     );
 
+    /* In -> Bay */
+    logic [BAY_SZ-1:0] in2bay_gnt;
+    psel_gen #(
+        .WIDTH(BAY_SZ),
+        .REQS(1)
+    ) arb_in (
+        .req    (~bay_vld),
+        .gnt    (in2bay_gnt)
+    );
     ADDR        in_addr;
     MEM_SIZE    in_size;
+
     always_comb begin
+        i_rdy   = |in2bay_gnt;
+
         // load address computation
         in_addr = i_regs.rs1 + i_regs.dat.opb;
         in_size = i_regs.dat.mem_size;
@@ -161,6 +118,27 @@ module lod_ex(
         };
     end
 
+
+    /* Bay -> CDB shr */
+    logic [BAY_SZ-1:0] bay2cdb_gnt;
+    psel_gen #(
+        .WIDTH  (BAY_SZ),
+        .REQS   (1)
+    ) arb_out (
+        .req    (bay_vld),
+        .gnt    (bay2cdb_gnt)
+    );
+
+    always_comb begin
+        cdb_req = |bay_vld;
+
+        ctag_ts = '0;
+        foreach (bay2cdb_gnt[i]) begin
+            if (!bay2cdb_gnt[i])
+                continue;
+            ctag_ts |= bay[i].t;
+        end
+    end
 
     // ADDR        tmp_addrs;
     // MEM_SIZE    tmp_sizes;
@@ -324,8 +302,8 @@ module lod_ex(
     //             bays.st_frwd_byte_mask[i] <= next_st_frwd_byte_mask[i];
     //         end
 
-    //         foreach (lbuf2cdb_gnt[i]) begin
-    //             if (!(lbuf2cdb_gnt[i] && cdb_gnt))
+    //         foreach (bay2cdb_gnt[i]) begin
+    //             if (!(bay2cdb_gnt[i] && cdb_gnt))
     //                 continue;
     //             bays.vld     [i] <= 0;
     //             bays.got     [i] <= 0;
