@@ -67,6 +67,7 @@ module icache (
     input clock,
     input reset,
     input flush,
+    input branch_pred,
 
     // From memory
     input MEM_TAG   Imem2proc_transaction_tag, // Should be zero unless there is a response
@@ -194,9 +195,22 @@ module icache (
                 icache_tags[write_index].tags  <= write_tag;
                 icache_tags[write_index].valid <= 1'b1;
             end
-            flushed          <= flush;
-            PC_prefetch      <= flushed ? (Icache_valid_out ? proc2Icache_addr + 8 : proc2Icache_addr) : 
-            ((PC_prefetch - proc2Icache_addr == `PREFETCH_CAP) || (Imem2proc_transaction_tag == 0) ? PC_prefetch : PC_prefetch + 8);
+            flushed          <= flush || branch_pred; //delay flush by a cycle so you can actually grab new PC from proc2Icache_addr
+            if(flushed) begin //if we are branching
+                if(Icache_valid_out) begin 
+                    PC_prefetch <= proc2Icache_addr + 8; //if we branch to a cache hit, start prefetching a block later so PC_prefetch - PC doesn't go negative and overflow, because PC will be incrementing on the next clock cycle
+                end else begin
+                    PC_prefetch <= proc2Icache_addr;
+                end
+            end else begin
+                if(proc2Icache_addr > PC_prefetch) begin
+                    PC_prefetch <= proc2Icache_addr; //Honestly just make sure PC_prefetch is never less than PC because the overflow from their difference WILL cause problems
+                end else if((PC_prefetch - proc2Icache_addr == `PREFETCH_CAP) || (Imem2proc_transaction_tag == 0)) begin
+                    PC_prefetch <= PC_prefetch; //don't prefetch too far ahead or you will lose its benefits. Also don't increment when the trans_tag is 0, because the request will not have gone through
+                end else begin
+                    PC_prefetch <= PC_prefetch + 8;
+                end
+            end
             //MSHR_update      <= !Icache_valid_out;
             //MSHR_addr        <= (proc2Imem_command == MEM_LOAD) ? proc2Imem_addr : '1;
             if(Imem2proc_transaction_tag != 0) begin

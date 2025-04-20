@@ -407,10 +407,12 @@ module lod_ex(
     always_ff @(posedge clock) begin
         if (!reset) begin
             $display("\n[%0t] <<< lod_ex DEBUG >>>", $time);
+            $display("  flush: %b", flush);
             $display("  in2bay_gnt  = %b | i_vld = %b | i_rdy = %b", in2bay_gnt, i_vld, i_rdy);
             $display("  dis_en_bay  = %b", dis_en_bay);
-            $display("  lbuf2cdb_gnt= %b | cdb_gnt = %b", lbuf2cdb_gnt, cdb_gnt);
-            $display("  cdb_req     = %b | ctag_ts = %0d", cdb_req, ctag_ts);
+            $display("  cdb_req = %b | cdb_gnt = %b", cdb_req, cdb_gnt);
+            $display("  lbuf2cdb_gnt= %b", lbuf2cdb_gnt);
+            $display("  ctag_ts     = %2d", ctag_ts);
 
             $display("  -- BAY STATE --");
             for (int i = 0; i < BAY_SZ; ++i) begin
@@ -430,6 +432,26 @@ module lod_ex(
                     bay[i].raw
                 );
             end
+            $display("dcache_out: qry=%1d {vld=%b, addr=%x}",
+                qry,
+                dcache_out.vld,
+                dcache_out.addr
+            );
+
+            $display("dcache_in : {status=%1d, dat=%x}",
+                dcache_in.status,
+                dcache_in.dat,
+            );
+
+            for (int i = 0; i < BAY_SZ; ++i) begin
+                $display("sq_in[%1d]: qry_req=%b, byte_en=%b, raw=%x",
+                    i,
+                    qry_req[i],
+                    sq_in.forward_byte_en[i],
+                    sq_in.forward_data[i],
+                );
+            end
+
 
             for (int i = 0; i < BAY_SZ; ++i)
                 $display("dis_en_bay2buf[%1d]: %b", i, dis_en_bay2buf[i]);
@@ -460,6 +482,25 @@ module lod_ex(
                 o_cands.rob_idx,
                 o_cands.data
             );
+
+            for (int i = 0; i < 2; ++i) begin
+                $display("cands_shr_n[%1d]: t=%2d, rob_idx=%2d, dat=%x",
+                    i,
+                    cands_shr_n[i].t,
+                    cands_shr_n[i].rob_idx,
+                    cands_shr_n[i].data
+                );
+            end
+            
+            for (int i = 0; i < 2; ++i) begin
+                $display("cands_shr[%1d]: t=%2d, rob_idx=%2d, dat=%x",
+                    i,
+                    cands_shr[i].t,
+                    cands_shr[i].rob_idx,
+                    cands_shr[i].data
+                );
+            end
+
             $display(">>> END DEBUG <<<\n");
         end
     end
