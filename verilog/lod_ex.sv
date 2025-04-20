@@ -330,12 +330,24 @@ module lod_ex(
     DW_ACCESS acc;
     DATA_BLOCK o_dat;
     always_comb begin
+        LOAD_BUFFER_ENTRY tmp;
+        logic sign;
+
         cands_shr_n[0] = '0;
+        cands_shr_n[1] = cands_shr[0];
         foreach (lbuf2cdb_gnt[i]) begin
             if (!(lbuf2cdb_gnt[i] && cdb_gnt))
                 continue;
 
-            o_dat = '0;
+            tmp = lbuf[i];
+            sign = 0;
+            case (lbuf[i].mem_size)
+            BYTE: sign = tmp.raw[7];
+            HALF: sign = tmp.raw[15];
+            default:;
+            endcase
+
+            o_dat = tmp.rd_unsigned ? '0 : {(32){sign}};
             case (lbuf[i].mem_size)
             BYTE: o_dat.byte_level[0] = lbuf[i].raw.byte_level[lbuf[i].iw_off];
             HALF: o_dat.half_level[0] = lbuf[i].raw.half_level[lbuf[i].iw_off];
@@ -350,7 +362,6 @@ module lod_ex(
         end
 
         o_cands = cands_shr[1];
-        cands_shr_n[1] = cands_shr[0];
     end
 
 
