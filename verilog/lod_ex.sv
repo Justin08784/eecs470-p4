@@ -29,243 +29,276 @@ module lod_ex(
     /* BACKEND */
     output CPL_CAND o_cands
 );
-    localparam LD_BAY_SZ = `LD_BAY_SZ;//4;
+    localparam BAY_SZ = `LD_BAY_SZ;
+    localparam BUF_SZ = 4;
+
     typedef struct packed {
-        logic           [LD_BAY_SZ-1:0]  vld;
-        logic           [LD_BAY_SZ-1:0]  got; // got data?
-        PHYS_REG_IDX    [LD_BAY_SZ-1:0]  t;
-        ROB_IDX         [LD_BAY_SZ-1:0]  rob_idx;
-        ADDR            [LD_BAY_SZ-1:0]  addr;
-        MEM_SIZE        [LD_BAY_SZ-1:0]  mem_size;
+        logic           vld;
 
-        LSQ_IDX         [LD_BAY_SZ-1:0]  sq_idx;
-        logic           [LD_BAY_SZ-1:0][3:0]  st_frwd_byte_mask;
-        DATA            [LD_BAY_SZ-1:0]  dat;
-        logic           [LD_BAY_SZ-1:0] rd_unsigned;
-    } LOAD_BAYS;
+        PHYS_REG_IDX    t;
+        ROB_IDX         rob_idx;
+
+        // byte access information
+        logic           rd_unsigned;
+        ADDR            addr;
+        MEM_SIZE        mem_size;
+        MEM_BLOCK       raw;
+
+        // readiness
+        LSQ_IDX         sq_idx;
+        logic [3:0]     need_byte_mask;
+    } LOAD_BAY_ENTRY;
+
+    typedef struct packed {
+        logic           vld;
+
+        PHYS_REG_IDX    t;
+        ROB_IDX         rob_idx;
+
+        DATA            dat;
+    } LOAD_BUF_ENTRY;
 
 
-    LOAD_BAYS bays; // waiting bays
-    logic [LD_BAY_SZ-1:0] fu2in_gnt;
-    logic [LD_BAY_SZ-1:0] fu2out_gnt;
+    LOAD_BAY_ENTRY [BAY_SZ-1:0] bay, bay_n;
+    LOAD_BUF_ENTRY [BUF_SZ-1:0] lbuf, lbuf_n;
+
+    logic [BAY_SZ-1:0] bay_vld;
+    logic [BAY_SZ-1:0] bay_need;
+
+    logic [BUF_SZ-1:0] lbuf_vld;
     always_comb begin
-        
-        /* Correct version */
-        i_rdy = |(~bays.vld);
-        cdb_req = |(bays.vld & bays.got);
+        foreach (bay[i]) begin
+            bay_vld[i]  = bay[i].vld;
+            bay_need[i] = |(bay[i].need_byte_mask);
+        end
 
-        ctag_ts = '0;
-        foreach (fu2out_gnt[i]) begin
-            if (!fu2out_gnt[i])
-                continue;
-            ctag_ts |= bays.t[i];
+        foreach (lbuf[i]) begin
+            lbuf_vld[i] = lbuf[i].vld;
         end
     end
 
 
+    logic [BAY_SZ-1:0] in2bay_gnt;
+    logic [BUF_SZ-1:0] lbuf2cdb_gnt;
     generate
         psel_gen #(
-            .WIDTH(LD_BAY_SZ),
+            .WIDTH(BAY_SZ),
             .REQS(1)
         ) arb_in (
-            .req    (~bays.vld),
-            .gnt    (fu2in_gnt)
+            .req    (~bay_vld),
+            .gnt    (in2bay_gnt)
         );
 
         psel_gen #(
-            .WIDTH(LD_BAY_SZ),
-            .REQS(1)
+            .WIDTH  (BUF_SZ),
+            .REQS   (1)
         ) arb_out (
-            .req    (bays.vld & bays.got),
-            .gnt    (fu2out_gnt)
+            .req    (lbuf_vld),
+            .gnt    (lbuf2cdb_gnt)
         );
     endgenerate
 
-    ADDR        tmp_addrs;
-    MEM_SIZE    tmp_sizes;
+
 
     always_comb begin
-        // load address computation
-        tmp_addrs = i_regs.rs1 + i_regs.dat.opb;
-        tmp_sizes = i_regs.dat.mem_size;
+        i_rdy   = |in2bay_gnt;
+        cdb_req = |lbuf_vld;
 
-        lq_out.ld_ex_en     = i_vld;
-        lq_out.ld_lq_idx    = i_regs.dat.lq_idx;
-        lq_out.ld_addr      = tmp_addrs;
-        lq_out.ld_mem_size  = tmp_sizes;
-    end
-
-    CPL_CAND [1:0] cands_shr;
-    always_comb begin
-        o_cands = cands_shr[1];
-    end    
-
-    //LD memory request logic
-    logic req_en, next_req_en;
-    logic [$clog2(`LD_BAY_SZ):0] curr_frwd, next_frwd;
-    logic [LD_BAY_SZ-1:0] next_got;
-    always_comb begin
-        next_req_en = req_en;
-        next_frwd = curr_frwd;
-
-        if (!req_en || (req_en && (dcache_in.status == LD_SUCC))) begin
-            next_req_en = 0;
-            next_frwd = '0;
-            for (int unsigned i = 0; i < `LD_BAY_SZ; i++) begin
-                if ((!bays.vld[i]) || bays.got[i] || next_got[i]) continue;
-
-                next_req_en = 1;
-                next_frwd = i;
-                break;
-            end
-        end
-    end
-
-    always_comb begin
-        dcache_out = '0;
-
-        if (req_en) begin
-            dcache_out.vld = 1;
-            dcache_out.addr = bays.addr[curr_frwd];
-        end
-    end
-
-    always_ff @(posedge clock) begin
-        if (reset || flush) begin
-            req_en <= 0;
-            curr_frwd <= '0;
-        end
-        else begin
-            req_en <= next_req_en;
-            curr_frwd <= next_frwd;
-        end
-    end
-
-    //ST-LD forwarding request logic
-    always_comb begin
-        ld_sq_out = '0;
-        foreach (bays.vld[i]) begin
-            if (!bays.vld[i] || bays.got[i]) continue;
-            
-            ld_sq_out.forward_req_en[i] = bays.vld[i];
-            ld_sq_out.forward_addr[i] = bays.addr[i];
-            ld_sq_out.forward_mem_size[i] = bays.mem_size[i];
-            ld_sq_out.forward_sq_idx[i] = bays.sq_idx[i];
-        end
-    end
-
-    //ST-LD forwarding parsing logic
-    logic [LD_BAY_SZ-1:0][3:0] next_st_frwd_byte_mask;
-    DATA_BLOCK [LD_BAY_SZ-1:0] next_dat;
-    always_comb begin
-        next_got = bays.got;
-        next_st_frwd_byte_mask = '0;
-        next_dat = bays.dat;
-        for (int unsigned i = 0; i < LD_BAY_SZ; i++) begin
-            if (bays.got[i])
+        ctag_ts = '0;
+        foreach (lbuf2cdb_gnt[i]) begin
+            if (!lbuf2cdb_gnt[i])
                 continue;
-
-            // if (pending && dcache_data_valid && (i == pending_frwd)) begin
-
-            //     next_dat[i] = (dcache_data.word_level[bays.addr[i][2]]) >> bays.addr[i][1:0];
-            //     next_got[i] = 1;
-            // end
-
-            if (req_en && (dcache_in.status == LD_SUCC) && (i == curr_frwd)) begin
-                next_dat[i] = (dcache_in.dat.word_level[bays.addr[i][2]]) >> bays.addr[i][1:0];
-                next_got[i] = 1;
-            end
-
-            // for (int unsigned b = 0; b < 4; ++b) begin
-            //     if (!sq_in.forward_byte_en[i][b])
-            //         continue;
-            //     next_dat[i].byte_level[b] = sq_in.forward_data[i].byte_level[b];
-            // end
-
-            if (sq_in.forward_byte_en[i][0])
-                next_dat[i].byte_level[0] = sq_in.forward_data[i].byte_level[0];
-            if (sq_in.forward_byte_en[i][1])
-                next_dat[i].byte_level[1] = sq_in.forward_data[i].byte_level[1];
-            if (sq_in.forward_byte_en[i][2])
-                next_dat[i].byte_level[2] = sq_in.forward_data[i].byte_level[2];
-            if (sq_in.forward_byte_en[i][3])
-                next_dat[i].byte_level[3] = sq_in.forward_data[i].byte_level[3];
-            next_st_frwd_byte_mask[i] = bays.st_frwd_byte_mask[i] | sq_in.forward_byte_en[i];
-
-            next_got[i] |= ($countones(next_st_frwd_byte_mask[i]) == (2**bays.mem_size[i]));
-
-            if (next_got[i]) begin
-                if (bays.rd_unsigned[i]) begin
-                    if (bays.mem_size[i] == BYTE) begin
-                        next_dat[i][31:8] = '0;
-                    end else if (bays.mem_size[i] == HALF) begin
-                        next_dat[i][31:16] = '0;
-                    end
-                end
-                else begin
-                    if (bays.mem_size[i] == BYTE) begin
-                        next_dat[i][31:8] = {(24){next_dat[i][7]}};
-                    end else if (bays.mem_size[i] == HALF) begin
-                        next_dat[i][31:16] = {(16){next_dat[i][15]}};
-                    end
-                end
-            end
-
-                // $display("FORWARDING_OCCURING: %0d, mask: %4b, final_data: %0d, ones: %0d, size: %0d, next_got:%b", sq_in.forward_data[i], sq_in.forward_byte_en[i], next_dat[i],$countones(next_st_frwd_byte_mask),2**bays.mem_size[i],next_got[i]);
+            ctag_ts |= lbuf[i].t;
         end
     end
 
-    always_ff @(posedge clock) begin
 
-        if (reset || flush) begin
-            bays <= '0;
-            cands_shr <= '0;
-        end else begin
-            foreach (fu2in_gnt[i]) begin
-                if (!(fu2in_gnt[i] && i_vld))
-                    continue;
 
-                bays.vld     [i] <= 1;
-                bays.got     [i] <= 0;
-                bays.t       [i] <= i_regs.dat.t;
-                bays.rob_idx [i] <= i_regs.dat.rob_idx;
-                bays.addr    [i] <= tmp_addrs;
-                bays.mem_size[i] <= tmp_sizes;
-                bays.dat     [i] <= '0;
-                bays.sq_idx  [i] <= i_regs.dat.sq_idx;
-                bays.st_frwd_byte_mask[i] <= '0;
-                bays.rd_unsigned[i] <= i_regs.dat.rd_unsigned;
-            end
+    // ADDR        tmp_addrs;
+    // MEM_SIZE    tmp_sizes;
 
-            foreach (next_got[i]) begin
-                bays.got[i] <= next_got[i];
-                bays.dat[i] <= next_dat[i];
-                bays.st_frwd_byte_mask[i] <= next_st_frwd_byte_mask[i];
-            end
+    // always_comb begin
+    //     // load address computation
+    //     tmp_addrs = i_regs.rs1 + i_regs.dat.opb;
+    //     tmp_sizes = i_regs.dat.mem_size;
 
-            foreach (fu2out_gnt[i]) begin
-                if (!(fu2out_gnt[i] && cdb_gnt))
-                    continue;
-                bays.vld     [i] <= 0;
-                bays.got     [i] <= 0;
-                bays.t       [i] <= '0;
-                bays.rob_idx [i] <= '0;
-                bays.addr    [i] <= '0;
-                bays.mem_size[i] <= '0;
-                bays.dat     [i] <= '0;
-                bays.sq_idx  [i] <= '0;
-                bays.st_frwd_byte_mask[i] <= '0;
+    //     lq_out.ld_ex_en     = i_vld;
+    //     lq_out.ld_lq_idx    = i_regs.dat.lq_idx;
+    //     lq_out.ld_addr      = tmp_addrs;
+    //     lq_out.ld_mem_size  = tmp_sizes;
+    // end
 
-                cands_shr[0] <= CPL_CAND'{
-                    t       : bays.t[i],
-                    rob_idx : bays.rob_idx[i],
-                    data    : bays.dat[i]
-                }; 
-            end
+    // CPL_CAND [1:0] cands_shr;
+    // always_comb begin
+    //     o_cands = cands_shr[1];
+    // end    
 
-            cands_shr[1] <= cands_shr[0];
-        end
-    end
+    // //LD memory request logic
+    // logic req_en, next_req_en;
+    // logic [$clog2(`LD_BAY_SZ):0] curr_frwd, next_frwd;
+    // logic [LD_BAY_SZ-1:0] next_got;
+    // always_comb begin
+    //     next_req_en = req_en;
+    //     next_frwd = curr_frwd;
+
+    //     if (!req_en || (req_en && (dcache_in.status == LD_SUCC))) begin
+    //         next_req_en = 0;
+    //         next_frwd = '0;
+    //         for (int unsigned i = 0; i < `LD_BAY_SZ; i++) begin
+    //             if ((!bays.vld[i]) || bays.got[i] || next_got[i]) continue;
+
+    //             next_req_en = 1;
+    //             next_frwd = i;
+    //             break;
+    //         end
+    //     end
+    // end
+
+    // always_comb begin
+    //     dcache_out = '0;
+
+    //     if (req_en) begin
+    //         dcache_out.vld = 1;
+    //         dcache_out.addr = bays.addr[curr_frwd];
+    //     end
+    // end
+
+    // always_ff @(posedge clock) begin
+    //     if (reset || flush) begin
+    //         req_en <= 0;
+    //         curr_frwd <= '0;
+    //     end
+    //     else begin
+    //         req_en <= next_req_en;
+    //         curr_frwd <= next_frwd;
+    //     end
+    // end
+
+    // //ST-LD forwarding request logic
+    // always_comb begin
+    //     ld_sq_out = '0;
+    //     foreach (bays.vld[i]) begin
+    //         if (!bays.vld[i] || bays.got[i]) continue;
+            
+    //         ld_sq_out.forward_req_en[i] = bays.vld[i];
+    //         ld_sq_out.forward_addr[i] = bays.addr[i];
+    //         ld_sq_out.forward_mem_size[i] = bays.mem_size[i];
+    //         ld_sq_out.forward_sq_idx[i] = bays.sq_idx[i];
+    //     end
+    // end
+
+    // //ST-LD forwarding parsing logic
+    // logic [LD_BAY_SZ-1:0][3:0] next_st_frwd_byte_mask;
+    // DATA_BLOCK [LD_BAY_SZ-1:0] next_dat;
+    // always_comb begin
+    //     next_got = bays.got;
+    //     next_st_frwd_byte_mask = '0;
+    //     next_dat = bays.dat;
+    //     for (int unsigned i = 0; i < LD_BAY_SZ; i++) begin
+    //         if (bays.got[i])
+    //             continue;
+
+    //         // if (pending && dcache_data_valid && (i == pending_frwd)) begin
+
+    //         //     next_dat[i] = (dcache_data.word_level[bays.addr[i][2]]) >> bays.addr[i][1:0];
+    //         //     next_got[i] = 1;
+    //         // end
+
+    //         if (req_en && (dcache_in.status == LD_SUCC) && (i == curr_frwd)) begin
+    //             next_dat[i] = (dcache_in.dat.word_level[bays.addr[i][2]]) >> bays.addr[i][1:0];
+    //             next_got[i] = 1;
+    //         end
+
+    //         // for (int unsigned b = 0; b < 4; ++b) begin
+    //         //     if (!sq_in.forward_byte_en[i][b])
+    //         //         continue;
+    //         //     next_dat[i].byte_level[b] = sq_in.forward_data[i].byte_level[b];
+    //         // end
+
+    //         if (sq_in.forward_byte_en[i][0])
+    //             next_dat[i].byte_level[0] = sq_in.forward_data[i].byte_level[0];
+    //         if (sq_in.forward_byte_en[i][1])
+    //             next_dat[i].byte_level[1] = sq_in.forward_data[i].byte_level[1];
+    //         if (sq_in.forward_byte_en[i][2])
+    //             next_dat[i].byte_level[2] = sq_in.forward_data[i].byte_level[2];
+    //         if (sq_in.forward_byte_en[i][3])
+    //             next_dat[i].byte_level[3] = sq_in.forward_data[i].byte_level[3];
+    //         next_st_frwd_byte_mask[i] = bays.st_frwd_byte_mask[i] | sq_in.forward_byte_en[i];
+
+    //         next_got[i] |= ($countones(next_st_frwd_byte_mask[i]) == (2**bays.mem_size[i]));
+
+    //         if (next_got[i]) begin
+    //             if (bays.rd_unsigned[i]) begin
+    //                 if (bays.mem_size[i] == BYTE) begin
+    //                     next_dat[i][31:8] = '0;
+    //                 end else if (bays.mem_size[i] == HALF) begin
+    //                     next_dat[i][31:16] = '0;
+    //                 end
+    //             end
+    //             else begin
+    //                 if (bays.mem_size[i] == BYTE) begin
+    //                     next_dat[i][31:8] = {(24){next_dat[i][7]}};
+    //                 end else if (bays.mem_size[i] == HALF) begin
+    //                     next_dat[i][31:16] = {(16){next_dat[i][15]}};
+    //                 end
+    //             end
+    //         end
+
+    //             // $display("FORWARDING_OCCURING: %0d, mask: %4b, final_data: %0d, ones: %0d, size: %0d, next_got:%b", sq_in.forward_data[i], sq_in.forward_byte_en[i], next_dat[i],$countones(next_st_frwd_byte_mask),2**bays.mem_size[i],next_got[i]);
+    //     end
+    // end
+
+    // always_ff @(posedge clock) begin
+
+    //     if (reset || flush) begin
+    //         bays <= '0;
+    //         cands_shr <= '0;
+    //     end else begin
+    //         foreach (in2bay_gnt[i]) begin
+    //             if (!(in2bay_gnt[i] && i_vld))
+    //                 continue;
+
+    //             bays.vld     [i] <= 1;
+    //             bays.got     [i] <= 0;
+    //             bays.t       [i] <= i_regs.dat.t;
+    //             bays.rob_idx [i] <= i_regs.dat.rob_idx;
+    //             bays.addr    [i] <= tmp_addrs;
+    //             bays.mem_size[i] <= tmp_sizes;
+    //             bays.dat     [i] <= '0;
+    //             bays.sq_idx  [i] <= i_regs.dat.sq_idx;
+    //             bays.st_frwd_byte_mask[i] <= '0;
+    //             bays.rd_unsigned[i] <= i_regs.dat.rd_unsigned;
+    //         end
+
+    //         foreach (next_got[i]) begin
+    //             bays.got[i] <= next_got[i];
+    //             bays.dat[i] <= next_dat[i];
+    //             bays.st_frwd_byte_mask[i] <= next_st_frwd_byte_mask[i];
+    //         end
+
+    //         foreach (lbuf2cdb_gnt[i]) begin
+    //             if (!(lbuf2cdb_gnt[i] && cdb_gnt))
+    //                 continue;
+    //             bays.vld     [i] <= 0;
+    //             bays.got     [i] <= 0;
+    //             bays.t       [i] <= '0;
+    //             bays.rob_idx [i] <= '0;
+    //             bays.addr    [i] <= '0;
+    //             bays.mem_size[i] <= '0;
+    //             bays.dat     [i] <= '0;
+    //             bays.sq_idx  [i] <= '0;
+    //             bays.st_frwd_byte_mask[i] <= '0;
+
+    //             cands_shr[0] <= CPL_CAND'{
+    //                 t       : bays.t[i],
+    //                 rob_idx : bays.rob_idx[i],
+    //                 data    : bays.dat[i]
+    //             }; 
+    //         end
+
+    //         cands_shr[1] <= cands_shr[0];
+    //     end
+    // end
 
     // `ifdef DEBUG
     // always_ff @(posedge clock) begin
@@ -280,7 +313,7 @@ module lod_ex(
     //         //     o_cands[0].data
     //         // );
     //         $display("ren: %b", bays.vld & ~bays.got);
-    //         foreach (fu2in_gnt[i]) begin
+    //         foreach (in2bay_gnt[i]) begin
     //             $display("bays[%2d]: vld=%b, got=%b, t=%2d, rob_idx=%2d, addr=%x, mem_size=%2d, dat=%x",
     //                 i,
     //                 bays.vld    [i],
