@@ -182,8 +182,8 @@ module sq #(parameter
 
     // always_ff @(posedge clock) begin
     //     if (ex_frwd_in.forward_req_en[0]) begin
-    //         $display("FORWARDING: addr=%h, waddr=%h, data=%h, byte_mask=%b",ex_frwd_in.forward_addr[0],waddr(ex_frwd_in.forward_addr[0]),execute_out.forward_data[0], execute_out.forward_byte_en[0]);
-
+    //         $display("FORWARDING: addr=%h, waddr=%h, idx_found=%b, matching_idx=%0d, data=%h, byte_mask=%b",ex_frwd_in.forward_addr[0],waddr(ex_frwd_in.forward_addr[0]),idx_found[0],matching_idx[0],execute_out.forward_data[0], execute_out.forward_byte_en[0]);
+    //         $display("RAW_MATCHES= %b, RAW_SHIFTED=%b, GRANTED_UNSHIFTED=%b, FINAL_MATCHES=%b",byte_matches[0][0],rotate_left(byte_matches[0][0],(LSQ_SZ-1)-matching_idx[0]),shifted_right_matches[0][0],final_matches[0][0]);
     //     end
     //     $display("RET_HEAD: %0d", ret_head);
     //     for (int i = 0; i < `LSQ_SZ; i++) begin
@@ -390,7 +390,7 @@ module sq #(parameter
         input logic [LSQ_SZ-1:0] data;
         input int unsigned shift;
         begin
-            rotate_left = (data << shift) | (data >> shift);
+            rotate_left = (data << shift) | (data >> LSQ_SZ-shift);
         end
     endfunction
 
@@ -398,7 +398,7 @@ module sq #(parameter
         input logic [LSQ_SZ-1:0] data;
         input int unsigned shift;
         begin
-            rotate_right = (data >> shift) | (data << shift);
+            rotate_right = (data >> shift) | (data << LSQ_SZ-shift);
         end
     endfunction
 

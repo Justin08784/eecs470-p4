@@ -13,6 +13,7 @@ TESTS=(
     insertion
     fib_long
     saxpy
+    fib_rec
 )
 
 EXTS=(
