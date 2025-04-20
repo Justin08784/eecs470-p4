@@ -89,7 +89,7 @@ module lod_ex(
         tmp_addrs = i_regs.rs1 + i_regs.dat.opb;
         tmp_sizes = i_regs.dat.mem_size;
 
-        lq_out.ld_ex_en     = i_vld;
+        lq_out.ld_ex_en     = i_vld; // FIXME: Should this be i_vld && i_rdy? Load bay may not actually be empty.
         lq_out.ld_lq_idx    = i_regs.dat.lq_idx;
         lq_out.ld_addr      = tmp_addrs;
         lq_out.ld_mem_size  = tmp_sizes;
