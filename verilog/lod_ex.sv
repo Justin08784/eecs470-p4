@@ -289,10 +289,10 @@ module lod_ex(
     end
 
 
-
-    QUERY_BAY_ENTRY cur;
-    logic [1:0] iw_off;
     always_comb begin
+        QUERY_BAY_ENTRY cur;
+        logic [1:0] iw_off;
+
         lbuf_n = lbuf;
 
         foreach (lbuf_n[i]) begin
@@ -327,11 +327,10 @@ module lod_ex(
 
 
     CPL_CAND [1:0] cands_shr, cands_shr_n;
-    DW_ACCESS acc;
-    DATA_BLOCK o_dat;
     always_comb begin
         LOAD_BUFFER_ENTRY tmp;
         logic sign;
+        DATA_BLOCK o_dat;
 
         cands_shr_n[0] = '0;
         cands_shr_n[1] = cands_shr[0];
@@ -341,22 +340,22 @@ module lod_ex(
 
             tmp = lbuf[i];
             sign = 0;
-            case (lbuf[i].mem_size)
+            case (tmp.mem_size)
             BYTE: sign = tmp.raw[7];
             HALF: sign = tmp.raw[15];
             default:;
             endcase
 
             o_dat = tmp.rd_unsigned ? '0 : {(32){sign}};
-            case (lbuf[i].mem_size)
-            BYTE: o_dat.byte_level[0] = lbuf[i].raw.byte_level[lbuf[i].iw_off];
-            HALF: o_dat.half_level[0] = lbuf[i].raw.half_level[lbuf[i].iw_off];
+            case (tmp.mem_size)
+            BYTE: o_dat.byte_level[0] = tmp.raw.byte_level[tmp.iw_off];
+            HALF: o_dat.half_level[0] = tmp.raw.half_level[tmp.iw_off];
             default:;
             endcase
 
             cands_shr_n[0] = CPL_CAND'{
-                t       : lbuf[i].t,
-                rob_idx : lbuf[i].rob_idx,
+                t       : tmp.t,
+                rob_idx : tmp.rob_idx,
                 data    : o_dat
             }; 
         end
