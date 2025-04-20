@@ -399,7 +399,7 @@ module stage_ex_p4 (
                 t1      : rs_in.fu_dat_mult[i].t1,
                 t2      : rs_in.fu_dat_mult[i].t2,
                 rob_idx : rs_in.fu_dat_mult[i].rob_idx,
-                func    : rs_in.fu_dat_mult[i].mult_func//inst.r.funct3
+                func    : rs_in.fu_dat_mult[i].inst.r.funct3
             };
 
             ppln_skid #(

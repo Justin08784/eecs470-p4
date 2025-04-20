@@ -1,9 +1,6 @@
 
 // The decoder, copied from project 3
 
-// This has a few changes, it now sets a "mult" flag for multiply instructions
-// Pass these to the mult module with inst.r.funct3 as the MULT_FUNC
-
 `include "sys_defs.svh"
 `include "ISA.svh"
 
@@ -18,7 +15,6 @@ module decoder_p4 (
     output ALU_OPB_SELECT opb_select,
     output logic          has_dest, // if there is a destination register
     output ALU_FUNC       alu_func,
-    output MULT_FUNC      mult_func,
     output logic          mult, rd_mem, wr_mem, cond_branch, uncond_branch,
     output logic          csr_op, // used for CSR operations, we only use this as a cheap way to get the return code out
     output logic          halt,   // non-zero on a halt
@@ -33,7 +29,6 @@ module decoder_p4 (
         opa_select    = OPA_IS_RS1;
         opb_select    = OPB_IS_RS2;
         alu_func      = ALU_ADD;
-        mult_func     = M_MUL;
         has_dest      = `FALSE;
         csr_op        = `FALSE;
         mult          = `FALSE;
@@ -79,25 +74,21 @@ module decoder_p4 (
                     fu_idx     = FU_MULT;
                     has_dest   = `TRUE;
                     mult       = `TRUE;
-                    mult_func   = M_MULHU;
                 end
                 `RV32_MULHSU: begin
                     fu_idx     = FU_MULT;
                     has_dest   = `TRUE;
                     mult       = `TRUE;
-                    mult_func   = M_MULHSU;
                 end
                 `RV32_MULH: begin
                     fu_idx     = FU_MULT;
                     has_dest   = `TRUE;
                     mult       = `TRUE;
-                    mult_func   = M_MULH;
                 end
                 `RV32_MUL: begin //, `RV32_MULH, `RV32_MULHSU, `RV32_MULHU: begin
                     fu_idx     = FU_MULT;
                     has_dest   = `TRUE;
                     mult       = `TRUE;
-                    mult_func  = M_MUL;
                     // stage_ex uses inst.r.funct3 as the mult function
                 end
                 `RV32_LB, `RV32_LH, `RV32_LW,
@@ -282,7 +273,6 @@ module stage_id_p4 (
             .opa_select    (tmp[i].opa_select),
             .opb_select    (tmp[i].opb_select),
             .alu_func      (tmp[i].alu_func),
-            .mult_func     (tmp[i].mult_func),
             .has_dest      (has_dest_reg[i]),
             .mult          (tmp[i].mult),
             .rd_mem        (tmp[i].rd_mem),
@@ -333,7 +323,6 @@ module stage_id_p4 (
 
                 dest_reg_idx    : (has_dest_reg[i]) ? f_in.f_dat[i].inst.r.rd : `ZERO_REG,
                 alu_func        : tmp[i].alu_func,
-                mult_func       : tmp[i].mult_func,
                 mult            : tmp[i].mult,
                 rd_mem          : tmp[i].rd_mem,
                 wr_mem          : tmp[i].wr_mem,
