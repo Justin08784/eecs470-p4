@@ -45,6 +45,14 @@ module lod_ex(
     /* BACKEND */
     output CPL_CAND o_cands
 );
+    // always_ff @(posedge clock) begin
+    //     if (!reset) begin
+    //         $display("i_rdy: %b, i_vld: %b", i_rdy, i_vld);
+    //         $display("%b %b %b", lq_out, ld_sq_out, dcache_out);
+    //         $display("%b %b %b", cdb_req, ctag_ts, o_cands);
+
+    //     end
+    // end
     localparam BAY_SZ = `LD_BAY_SZ;
     localparam BUF_SZ = 4;
 
@@ -130,9 +138,9 @@ module lod_ex(
 
     /* Bay -> Lbuf */
     // FIXME: Change lbuf to a compressible ring buffer to avoid crossbar
-    logic [BAY_SZ-1:0]  dis_vld_req, dis_vld_gnt;
-    logic [LBUF_SZ-1:0] dis_rdy_req, dis_rdy_gnt;
-    localparam DIS_BUS_SZ = 2;
+    logic [BAY_SZ-1:0]  dis_vld_req;
+    logic [LBUF_SZ-1:0] dis_rdy_req;
+    localparam DIS_BUS_SZ = 1;
     logic [DIS_BUS_SZ-1:0][BAY_SZ-1:0]  dis_vld_gbus;
     logic [DIS_BUS_SZ-1:0][LBUF_SZ-1:0] dis_rdy_gbus;
 
@@ -188,13 +196,13 @@ module lod_ex(
     );
 
     always_comb begin
-        cdb_req = |bay_vld;
+        cdb_req = |lbuf_vld;
 
         ctag_ts = '0;
         foreach (lbuf2cdb_gnt[i]) begin
             if (!lbuf2cdb_gnt[i])
                 continue;
-            ctag_ts |= bay[i].t;
+            ctag_ts |= lbuf[i].t;
         end
     end
 
@@ -366,15 +374,80 @@ module lod_ex(
 
     always_ff @(posedge clock) begin
         if (reset || flush) begin
+            prv_qry     <= '0;
             bay         <= '0;
             lbuf        <= '0;
             cands_shr   <= '0;
         end else begin
+            if (bay_need[qry])
+                prv_qry <= qry;
             bay         <= bay_n;
             lbuf        <= lbuf_n;
             cands_shr   <= cands_shr_n;
         end
     end
+
+`ifdef DEBUG
+    always_ff @(posedge clock) begin
+        if (!reset) begin
+            $display("\n[%0t] <<< lod_ex DEBUG >>>", $time);
+            $display("  in2bay_gnt  = %b | i_vld = %b | i_rdy = %b", in2bay_gnt, i_vld, i_rdy);
+            $display("  dis_en_bay  = %b", dis_en_bay);
+            $display("  lbuf2cdb_gnt= %b | cdb_gnt = %b", lbuf2cdb_gnt, cdb_gnt);
+            $display("  cdb_req     = %b | ctag_ts = %0d", cdb_req, ctag_ts);
+
+            $display("  -- BAY STATE --");
+            for (int i = 0; i < BAY_SZ; ++i) begin
+                if (!bay[i].vld) begin
+                    $display("bay[%2d]: ", i);
+                    continue;
+                end
+                $display("bay[%2d]: vld=%b rob_idx=%3d t=%2d addr=0x%08x size=%s unsign=%b nbm=%b raw=%h",
+                    i,
+                    bay[i].vld,
+                    bay[i].rob_idx,
+                    bay[i].t,
+                    bay[i].addr,
+                    dbg_mem_size(bay[i].mem_size),
+                    bay[i].rd_unsigned,
+                    bay[i].need_byte_mask,
+                    bay[i].raw
+                );
+            end
+
+            for (int i = 0; i < BAY_SZ; ++i)
+                $display("dis_en_bay2buf[%1d]: %b", i, dis_en_bay2buf[i]);
+            $display("dis_vld_req: %b", dis_vld_req);
+            $display("dis_rdy_req: %b", dis_vld_req);
+
+            $display("  -- LBUF STATE --");
+            for (int i = 0; i < LBUF_SZ; ++i) begin
+                if (!lbuf[i].vld) begin
+                    $display("lbuf[%2d]: ", i);
+                    continue;
+                end
+                $display("lbuf[%2d]: vld=%b rob_idx=%3d t=%2d iw_off=%2b size=%s unsign=%b raw=%h",
+                    i,
+                    lbuf[i].vld,
+                    lbuf[i].rob_idx,
+                    lbuf[i].t,
+                    lbuf[i].iw_off,
+                    dbg_mem_size(lbuf[i].mem_size),
+                    lbuf[i].rd_unsigned,
+                    lbuf[i].raw
+                );
+            end
+
+            $display("  -- COMPLETION (CDB OUT) --");
+            $display("t=%2d, rob_idx=%2d, data=%x",
+                o_cands.t,
+                o_cands.rob_idx,
+                o_cands.data
+            );
+            $display(">>> END DEBUG <<<\n");
+        end
+    end
+`endif
 
 
 
