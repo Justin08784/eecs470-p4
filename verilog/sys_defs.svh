@@ -69,7 +69,7 @@
 ///////////////////////////////
 /* How can we implement this in the Makefile? */
 // comment out to enable synth only constructions
-`define SYNTH
+// `define SYNTH
 
 `ifndef SYNTH
 // comment out to disable DEBUG:
@@ -661,6 +661,7 @@ typedef struct packed {
 
     REG_IDX  dest_reg_idx;  // destination (writeback) register index
     ALU_FUNC alu_func;      // ALU function select (ALU_xxx *)
+    MULT_FUNC mult_func;
     logic    mult;          // Is inst a multiply instruction?
     logic    rd_mem;        // Does inst read memory?
     logic    wr_mem;        // Does inst write memory?
