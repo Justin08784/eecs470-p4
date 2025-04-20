@@ -30,12 +30,12 @@ import "DPI-C" function string decode_inst(int inst);
 //import "DPI-C" function void close_pipeline_output_file();
 
 
-`define TB_MAX_CYCLES 50000000
+`define TB_MAX_CYCLES 2500
 // `define TB_MAX_CYCLES 10000
 
 
 // Debug cycle limits, both inclusive
-localparam DBG_CYCLE_MIN = 0;
+localparam DBG_CYCLE_MIN = 2400;
 localparam DBG_CYCLE_MAX = `TB_MAX_CYCLES;
 // localparam DBG_CYCLE_MIN = 1480;
 // localparam DBG_CYCLE_MAX = 1510;
@@ -116,7 +116,7 @@ module testbench;
         .dbg_rob        (dbg_rob),
         .dbg_rs         (dbg_rs),
         .dbg_sq         (dbg_sq),
-        .dbg_retire     (dbg_retire)
+        .dbg_retire     (dbg_retire),
 `endif
         .committed_insts (committed_insts)
     );
@@ -670,6 +670,7 @@ module testbench;
 
         $display(">> Fetch >>");
         $display("r_in: {flush: %b, corrected_PC: 0x%x}", flush, r_in.corrected_PC);
+        $display("d_out: {f_en_cnt: %b, dat: [%x, %x]}", d_out.f_en_cnt, d_out.f_dat[0], d_out.f_dat[1]);
         $display("PC_reg:  %x", PC_reg);
         $display("Imem_data: %x", Imem_data);
         $display("<< Fetch <<");
@@ -1510,7 +1511,7 @@ module testbench;
         print_fetch();
         // print_icache();
         // print_decode();
-        // print_rob();
+        print_rob();
         // print_fl();
         // print_dispatch();
         // print_map_table();
@@ -1539,9 +1540,9 @@ module testbench;
         print_rs();
         // print_execute();
         // print_dcache();
-        print_sq();
+        // print_sq();
         // print_retbuf();
-        print_lq();
+        // print_lq();
         // print_retire();
         $display("  | << CYCLE: %3d (t: %3d)", clock_count-1, $time);
     endtask
