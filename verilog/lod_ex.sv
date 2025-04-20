@@ -49,7 +49,7 @@ module lod_ex(
         logic [3:0]     need_byte_mask;
     } LOAD_BAY_ENTRY;
 
-    LOAD_BAY_ENTRY  [BAY_SZ-1:0] bay, bay_n;
+    LOAD_BAY_ENTRY  [BAY_SZ-1:0] bay, bay_n1, bay_n2;
     logic           [BAY_SZ-1:0] bay_vld;
     logic           [BAY_SZ-1:0] bay_need;
 
@@ -65,20 +65,19 @@ module lod_ex(
         prv_qry,
         nex_qry,
         qry;
-    logic [BAY_SZ-1:0] nex_qry_req, nex_qry_gnt;
+    logic [BAY_SZ-1:0] qry_req, qry_gnt;
 
     always_comb begin
-        foreach (nex_qry_req[i])
-            nex_qry_req = bay_vld[i] && bay_need[i];
-    
+        qry_req = bay_vld & bay_need;
         nex_qry = 0;
-        foreach (nex_qry_gnt[i]) begin
-            if (!nex_qry_gnt[i])
+        foreach (qry_gnt[i]) begin
+            if (!qry_gnt[i])
                 continue;
-            nex_qry |= i; // should be 1-hot
+            nex_qry = i; // should be 1-hot
+            break;
         end
 
-        qry = nex_qry_req[prv_qry]
+        qry = qry_req[prv_qry]
             ? prv_qry
             : nex_qry;
     end
@@ -87,8 +86,8 @@ module lod_ex(
         .WIDTH  (BAY_SZ),
         .REQS   (1)
     ) qry_sel (
-        .req    (nex_qry_req),
-        .gnt    (nex_qry_gnt)
+        .req    (qry_req),
+        .gnt    (qry_gnt)
     );
 
     /* In -> Bay */
@@ -139,6 +138,42 @@ module lod_ex(
             ctag_ts |= bay[i].t;
         end
     end
+
+    /* Query handling */
+    logic           qry_vld;
+    LOAD_BAY_ENTRY  qry_entry;
+    always_comb begin
+        // only let the query ask dcache
+        qry_vld = qry_req[qry];
+        qry_entry = bay[qry];
+        dcache_out = '{
+            vld     : qry_vld,
+            addr    : qry_entry.addr
+        };
+
+        // but any bay entry can ask the SQ
+        ld_sq_out = '0;
+        foreach (bay[i]) begin
+            ld_sq_out.forward_req_en  [i] = qry_req[i];
+            ld_sq_out.forward_addr    [i] = bay[i].addr;
+            ld_sq_out.forward_mem_size[i] = bay[i].mem_size; // TODO: REMOVE
+            ld_sq_out.forward_sq_idx  [i] = bay[i].sq_idxc;
+        end
+
+
+        bay_n1 = bay;
+        if (dcache_in.vld) begin
+            bay_n1[qry].raw = dcache_in.dat[idw_word(qry_entry.addr)];
+            bay_n1[qry].need_byte_mask  = '1;
+        end
+        // bay_n1[qry].need_byte_mask = 
+
+        bay_n2 = bay_n1;
+        
+
+    end
+
+
 
     // ADDR        tmp_addrs;
     // MEM_SIZE    tmp_sizes;
