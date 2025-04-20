@@ -101,11 +101,12 @@ module testbench;
         .proc2mem_size    (proc2mem_size),
 `endif
 
+        .dbg_dcache     (dbg_dcache),
+`ifdef DEBUG
         .committed_insts (committed_insts),
 
         .dbg_execute    (dbg_execute),
         .dbg_fl         (dbg_fl),
-        .dbg_dcache     (dbg_dcache),
         .dbg_btq        (dbg_btq),
         .dbg_fetch      (dbg_fetch),
         .dbg_decode     (dbg_decode),
@@ -117,6 +118,10 @@ module testbench;
         .dbg_rs         (dbg_rs),
         .dbg_sq         (dbg_sq),
         .dbg_retire     (dbg_retire)
+`endif
+`ifndef DEBUG
+        .committed_insts (committed_insts)
+`endif
     );
 
 
