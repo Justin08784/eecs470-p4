@@ -55,6 +55,10 @@ module lod_ex(
         PHYS_REG_IDX    t;
         ROB_IDX         rob_idx;
 
+        // byte access information
+        logic           rd_unsigned;
+        MEM_SIZE        mem_size;
+
         DATA            dat;
     } LOAD_BUF_ENTRY;
 
@@ -112,6 +116,50 @@ module lod_ex(
         end
     end
 
+    logic [$clog2(BAY_SZ)-1:0]
+        prv_qry,
+        nex_qry,
+        qry;
+
+    logic [BAY_SZ-1:0] nex_qry_req, nex_qry_gnt;
+    always_comb begin
+        foreach (nex_qry_req[i])
+            nex_qry_req = bay_vld[i] && bay_need[i];
+    
+        nex_qry = 0;
+        foreach (nex_qry_gnt[i]) begin
+            if (!nex_qry_gnt[i])
+                continue;
+            nex_qry |= i; // should be 1-hot
+        end
+
+        qry = nex_qry_req[prv_qry]
+            ? prv_qry
+            : nex_qry;
+    end
+
+    psel_gen #(
+        .WIDTH  (BAY_SZ),
+        .REQS   (1)
+    ) qry_sel (
+        .req    (nex_qry_req),
+        .gnt    (nex_qry_gnt)
+    );
+
+    ADDR        in_addr;
+    MEM_SIZE    in_size;
+    always_comb begin
+        // load address computation
+        in_addr = i_regs.rs1 + i_regs.dat.opb;
+        in_size = i_regs.dat.mem_size;
+
+        lq_out = '{
+            ld_ex_en     : i_vld,
+            ld_lq_idx    : i_regs.dat.lq_idx,
+            ld_addr      : in_addr,
+            ld_mem_size  : in_size
+        };
+    end
 
 
     // ADDR        tmp_addrs;
