@@ -232,7 +232,13 @@ module lod_ex(
 
     always_comb begin
         qry_req = bay_vld & bay_need;
-        nex_qry = $clog2(qry_gnt);
+        nex_qry = 0;
+        foreach (qry_gnt[i]) begin
+            if (!qry_gnt[i])
+                continue;
+            nex_qry = i;
+            break;
+        end
 
         qry = qry_req[prv_qry]
             ? prv_qry
