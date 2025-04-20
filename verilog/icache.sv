@@ -67,6 +67,7 @@ module icache (
     input clock,
     input reset,
     input flush,
+    input branch_pred,
 
     // From memory
     input MEM_TAG   Imem2proc_transaction_tag, // Should be zero unless there is a response
@@ -194,7 +195,7 @@ module icache (
                 icache_tags[write_index].tags  <= write_tag;
                 icache_tags[write_index].valid <= 1'b1;
             end
-            flushed          <= flush; //delay flush by a cycle so you can actually grab new PC from proc2Icache_addr
+            flushed          <= flush || branch_pred; //delay flush by a cycle so you can actually grab new PC from proc2Icache_addr
             if(flushed) begin //if we are branching
                 if(Icache_valid_out) begin 
                     PC_prefetch <= proc2Icache_addr + 8; //if we branch to a cache hit, start prefetching a block later so PC_prefetch - PC doesn't go negative and overflow, because PC will be incrementing on the next clock cycle
