@@ -1,5 +1,21 @@
 `include "sys_defs.svh"
 `include "execute.svh"
+
+function automatic DATA_BLOCK bytewise_override(
+    input DATA_BLOCK  dst,
+    input DATA_BLOCK  src,
+    input logic [3:0] src_bmask
+);
+    DATA_BLOCK rv;
+    rv = dst;
+    foreach (src.byte_level[b]) begin
+        if (!src_bmask[b])
+            continue;
+        rv.byte_level[b] = src.byte_level[b];
+    end
+    return rv;
+endfunction
+
 module lod_ex(
     input clock,
     input reset,
@@ -49,7 +65,7 @@ module lod_ex(
         logic [3:0]     need_byte_mask;
     } QUERY_BAY_ENTRY;
 
-    QUERY_BAY_ENTRY [BAY_SZ-1:0] bay, bay_n1, bay_n2;
+    QUERY_BAY_ENTRY [BAY_SZ-1:0] bay, bay_n;
     logic           [BAY_SZ-1:0] bay_vld;
     logic           [BAY_SZ-1:0] bay_need;
 
@@ -60,7 +76,7 @@ module lod_ex(
         end
     end
 
-    localparam LBUF_SZ = 3;
+    localparam LBUF_SZ = 4;
     typedef struct packed {
         logic           vld;
 
@@ -80,6 +96,94 @@ module lod_ex(
     always_comb begin
         foreach (lbuf_vld[i])
             lbuf_vld[i] = lbuf[i].vld;
+    end
+
+    /* In -> Bay */
+    logic [BAY_SZ-1:0] in2bay_gnt;
+    psel_gen #(
+        .WIDTH(BAY_SZ),
+        .REQS(1)
+    ) arb_in (
+        .req    (~bay_vld),
+        .gnt    (in2bay_gnt)
+    );
+
+    struct packed {
+        ADDR        addr;
+        logic [3:0] need_byte_mask;
+    } in_parse;
+    always_comb begin
+        i_rdy   = |in2bay_gnt;
+
+        in_parse = '{
+            addr    : i_regs.rs1 + i_regs.dat.opb, // load address computation
+            need_byte_mask  : '1 // FIXME
+        };
+
+        lq_out = '{
+            ld_ex_en     : i_vld && i_rdy, // FIXME: or is just i_vld fine?
+            ld_lq_idx    : i_regs.dat.lq_idx,
+            ld_addr      : in_parse.addr,
+            ld_mem_size  : i_regs.dat.mem_size
+        };
+    end
+
+    /* Bay -> Lbuf */
+    // FIXME: Change lbuf to a compressible ring buffer to avoid crossbar
+    logic [BAY_SZ-1:0]  dis_vld_req, dis_vld_gnt;
+    logic [LBUF_SZ-1:0] dis_rdy_req, dis_rdy_gnt;
+    localparam DIS_BUS_SZ = 1;
+    logic [DIS_BUS_SZ-1:0][BAY_SZ-1:0]  dis_vld_gbus;
+    logic [DIS_BUS_SZ-1:0][LBUF_SZ-1:0] dis_rdy_gbus;
+
+    assign dis_vld_req = bay_vld & ~bay_need;
+    assign dis_rdy_req = ~lbuf_vld; // TODO: also reflect same-cycle frees due to "to-issue" (i.e. got CDB reservation)
+    psel_gen #(
+        .WIDTH  (BAY_SZ),
+        .REQS   (DIS_BUS_SZ)
+    ) arb_dis_vld (
+        .req    (dis_vld_req),
+        .gnt_bus(dis_vld_gbus)
+    );
+
+    psel_gen #(
+        .WIDTH  (LBUF_SZ),
+        .REQS   (DIS_BUS_SZ)
+    ) arb_dis_rdy (
+        .req    (dis_rdy_req),
+        .gnt_bus(dis_rdy_gbus)
+    );
+
+    logic [DIS_BUS_SZ-1:0] dis_en;
+    logic [BAY_SZ-1:0]  dis_en_bay;
+    logic [LBUF_SZ-1:0] dis_en_buf;
+    always_comb begin
+        dis_en_bay = '0;
+        foreach (dis_vld_gbus[i, j])
+            dis_en_bay[j] |= dis_vld_gbus[i][j] && |dis_rdy_gbus[i];
+    end
+
+
+
+    /* Lbuf -> CDB shr */
+    logic [LBUF_SZ-1:0] lbuf2cdb_gnt;
+    psel_gen #(
+        .WIDTH  (LBUF_SZ),
+        .REQS   (1)
+    ) arb_out (
+        .req    (lbuf_vld),
+        .gnt    (lbuf2cdb_gnt)
+    );
+
+    always_comb begin
+        cdb_req = |bay_vld;
+
+        ctag_ts = '0;
+        foreach (lbuf2cdb_gnt[i]) begin
+            if (!lbuf2cdb_gnt[i])
+                continue;
+            ctag_ts |= bay[i].t;
+        end
     end
 
 
@@ -113,64 +217,13 @@ module lod_ex(
         .gnt    (qry_gnt)
     );
 
-    /* In -> Bay */
-    logic [BAY_SZ-1:0] in2bay_gnt;
-    psel_gen #(
-        .WIDTH(BAY_SZ),
-        .REQS(1)
-    ) arb_in (
-        .req    (~bay_vld),
-        .gnt    (in2bay_gnt)
-    );
-    ADDR        in_addr;
-    MEM_SIZE    in_size;
-
-    always_comb begin
-        i_rdy   = |in2bay_gnt;
-
-        // load address computation
-        in_addr = i_regs.rs1 + i_regs.dat.opb;
-        in_size = i_regs.dat.mem_size;
-
-        lq_out = '{
-            ld_ex_en     : i_vld && i_rdy, // FIXME: or is just i_vld fine?
-            ld_lq_idx    : i_regs.dat.lq_idx,
-            ld_addr      : in_addr,
-            ld_mem_size  : in_size
-        };
-    end
-
-
-    /* Bay -> CDB shr */
-    logic [LBUF_SZ-1:0] lbuf2cdb_gnt;
-    psel_gen #(
-        .WIDTH  (LBUF_SZ),
-        .REQS   (1)
-    ) arb_out (
-        .req    (lbuf_vld),
-        .gnt    (lbuf2cdb_gnt)
-    );
-
-    always_comb begin
-        cdb_req = |bay_vld;
-
-        ctag_ts = '0;
-        foreach (lbuf2cdb_gnt[i]) begin
-            if (!lbuf2cdb_gnt[i])
-                continue;
-            ctag_ts |= bay[i].t;
-        end
-    end
-
-    /* Query handling */
-    logic            qry_vld;
+    /* Query + forward handling */
     QUERY_BAY_ENTRY  qry_entry;
     always_comb begin
         // only let the query ask dcache
-        qry_vld = qry_req[qry];
         qry_entry = bay[qry];
         dcache_out = '{
-            vld     : qry_vld,
+            vld     : qry_req[qry],
             addr    : qry_entry.addr
         };
 
@@ -183,24 +236,53 @@ module lod_ex(
             ld_sq_out.forward_sq_idx  [i] = bay[i].sq_idx;
         end
 
-
-        bay_n1 = bay;
+        bay_n = bay;
+        // merge dcache result
         if (dcache_in.status == LD_SUCC) begin
-            bay_n1[qry].need_byte_mask &= '0;
-            bay_n1[qry].raw = dcache_in.dat[idw_word(qry_entry.addr)];
+            bay_n[qry].need_byte_mask &= '0;
+            bay_n[qry].raw            = dcache_in.dat[idw_word(qry_entry.addr)];
         end
 
-        bay_n2 = bay_n1;
-        foreach (bay_n2[i]) begin
-            bay_n2[i].need_byte_mask &= ~sq_in.forward_byte_en[i];
+        foreach (bay_n[i]) begin
+            if (qry_req[i]) begin
+                // merge store forwards
 
-            for (int unsigned b = 0; b < 4; ++b) begin
-                if (!sq_in.forward_byte_en[i][b])
-                    continue;
-                bay_n2[i].raw.byte_level[b] = sq_in.forward_data[i].byte_level[b];
+                bay_n[i].need_byte_mask &= ~sq_in.forward_byte_en[i];
+                bay_n[qry].raw = bytewise_override(
+                    bay_n[i].raw,               // dst
+                    sq_in.forward_data[i],      // src
+                    sq_in.forward_byte_en[i]    // src_bmask
+                );
+                continue;
             end
+
+            if (in2bay_gnt[i] && i_vld) begin
+                // in->bay logic
+
+                bay_n[i] = '{
+                    vld     : 1,
+                    t       : i_regs.dat.t,
+                    rob_idx : i_regs.dat.rob_idx,
+                    addr    : in_parse.addr,
+                    mem_size: i_regs.dat.mem_size,
+                    raw     : '0,
+                    sq_idx  : i_regs.dat.sq_idx,
+                    need_byte_mask  : in_parse.need_byte_mask,
+                    rd_unsigned     : i_regs.dat.rd_unsigned
+                };
+
+                continue;
+            end 
+
+
+            // bay->lbuf logic
+
         end
+
+
     end
+
+
 
 
 
