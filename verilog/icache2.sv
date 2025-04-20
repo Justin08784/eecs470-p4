@@ -3,9 +3,6 @@ import icache_svh::*;
 
 
 module icache2 (
-    `ifdef DEBUG
-    output DBG_imoney dbg,
-    `endif 
     input clock,
     input reset,
     input flush,
