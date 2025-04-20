@@ -241,7 +241,7 @@ module mult_stage #(
         O_NONE: begin
             assign i_rdy = o_rdy;
             assign o_vld = i_vld;
-            assign o_dat = i_dat;
+            assign o_dat = tmp_dat;
         end
 
         O_SKID: begin
