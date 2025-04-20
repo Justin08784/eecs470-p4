@@ -116,16 +116,32 @@ module lod_ex(
         .gnt    (in2bay_gnt)
     );
 
+    typedef union packed {
+        logic [3:0]      byte_level;
+        logic [1:0][1:0] half_level;
+    } DATA_BYTE_MASK;
     struct packed {
         ADDR        addr;
         logic [3:0] need_byte_mask;
     } in_parse;
+
     always_comb begin
+        ADDR tmp_addr;
+        DATA_BYTE_MASK tmp_bmask;
+
         i_rdy   = |in2bay_gnt;
+        tmp_addr = i_regs.rs1 + i_regs.dat.opb; // load address computation
+
+        tmp_bmask = '0;
+        case (i_regs.dat.mem_size)
+        BYTE: tmp_bmask[tmp_addr[1:0]]  = '1;
+        HALF: tmp_bmask[tmp_addr[2]]    = '1;
+        WORD: tmp_bmask = '1;
+        endcase
 
         in_parse = '{
-            addr    : i_regs.rs1 + i_regs.dat.opb, // load address computation
-            need_byte_mask  : '1 // FIXME
+            addr            : tmp_addr,
+            need_byte_mask  : tmp_bmask
         };
 
         lq_out = '{
