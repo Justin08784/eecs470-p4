@@ -146,7 +146,7 @@ module fill_handler (
                     op     : op,
                     en     : 1,
                     wr_mem : 1,
-                    addr   : {hdr.tag[sid][way], way, 3'b000},
+                    addr   : {hdr.tag[sid][way], sid, 3'b000},
                     mem_data : r_rcv.dat,
                     mem_size : DOUBLE
                 };
