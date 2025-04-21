@@ -1,8 +1,4 @@
 TESTS=(
-    test1
-    test2
-    test3
-    test8
     mult_no_lsq
     btest1
     btest2
@@ -14,8 +10,25 @@ TESTS=(
     fib_long
     saxpy
     fib_rec
-    copy_long
     evens_long
+    fib
+    haha
+    halt
+    bfs
+    fc_forward
+    graph
+    basic_malloc
+    backtrack
+    sort_search
+    outer_product
+    priority_queue
+    insertionsort
+    matrix_mult_rec
+    mergesort
+    omegalul
+    quicksort
+    sort_search
+    dft
 )
 
 EXTS=(
@@ -30,6 +43,6 @@ make ${TESTS[@]/%/.out}
 for t in "${TESTS[@]}"; do
     for ext in "${EXTS[@]}"; do
         echo "Diffing $t.$ext..."
-        diff "correct_out/${t}.${ext}" "output/${t}.${ext}"
+        diff "correct_out_p3/${t}.${ext}" "output/${t}.${ext}"
     done
 done
