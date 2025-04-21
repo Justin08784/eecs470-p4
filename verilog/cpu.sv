@@ -36,14 +36,13 @@ module cpu (
     output MEM_SIZE    proc2mem_size,    // Data size sent to memory
     output DBG_dcache   dbg_dcache,
 
-    `ifdef DEBUG
-    // Note: these are assigned at the very bottom of the module
-    output COMMIT_PACKET [`N-1:0] committed_insts,
 
+    `ifdef DEBUG
     // Debug outputs: these signals are solely used for debugging in testbenches
     // Do not change for project 3
     // You should definitely change these for project 4
 
+    input  logic        print_en, // high iff current cycle in dbg cycle range
     output DBG_execute  dbg_execute,
     output DBG_fl       dbg_fl,
     output DBG_btq      dbg_btq,
@@ -57,12 +56,10 @@ module cpu (
     output DBG_rob      dbg_rob,
     output DBG_rs       dbg_rs,
     output DBG_sq       dbg_sq,
-    output DBG_retire   dbg_retire
+    output DBG_retire   dbg_retire,
     `endif 
-    
-    `ifndef DEBUG
+
     output COMMIT_PACKET [`N-1:0] committed_insts
-    `endif
 );
     /* Global controls*/
     logic flush;
@@ -148,6 +145,7 @@ module cpu (
 
         .clock(clock),
         .reset(reset),
+        .flush(flush),
 
         // input from memory
         .mem_in_transaction_tag (mem2dcache_transaction_tag),
@@ -475,6 +473,8 @@ module cpu (
     executeLD2sq exec_ld_2_sq;
     // MEM_TAG temp_tag;
     sq2execute sq_2_exec;
+    sq2lq sq_2_lq;
+    lq2sq lq_2_sq;
     // assign temp_tag = (ret_2_mem.Dmem_command == MEM_STORE) ? 1 : 0;
 
     sq #(
@@ -504,7 +504,10 @@ module cpu (
         .retire_out     (sq_2_retire),
 
         .dcache_in      (dcache_2_sq), // FIXME FIXME FIXME FIXME
-        .dcache_out     (sq_2_dcache)
+        .dcache_out     (sq_2_dcache),
+
+        .lq_in          (lq_2_sq),
+        .lq_out         (sq_2_lq)
 );
 
 
@@ -528,10 +531,12 @@ module cpu (
         .dispatch_in(dis_2_lq),
         .retire_in(retire_2_lq),
         .execute_in(exec_2_lq),
-        .execST_in(execST_2_lq),
 
         .dispatch_out(lq_2_dis),
-        .retire_out(lq_2_retire)
+        .retire_out(lq_2_retire),
+
+        .sq_out(lq_2_sq),
+        .sq_in(sq_2_lq)
     );
 
     //////////////////////////////////////////////////
@@ -543,6 +548,7 @@ module cpu (
     stage_ex_p4 ex_0 (
         `ifdef DEBUG
         .dbg    (dbg_execute),
+        .print_en (print_en),
         `endif
         .clock  (clock),
         .reset  (reset),

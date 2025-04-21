@@ -22,6 +22,9 @@ cov_report_*/
 # ignore the entire build/ folder
 build/
 
+# ignore the jgproject/ folder
+jgproject/
+
 # synthesis files
 *.vg
 *.rep

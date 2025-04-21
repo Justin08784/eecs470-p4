@@ -1,0 +1,12 @@
+
+Final memory state and exit status:
+
+@@@ Unified Memory contents hex on left, decimal on right: 
+@@@
+@@@ mem[    0] = 0031019300500113 : 13794004735885587
+@@@ mem[    8] = fff10113003102b3 : 18442523130178110131
+@@@ mem[   16] = 10500073fe011ae3 : 1175440000926423779
+@@@
+@@@
+@@@ System halted on WFI instruction
+@@@

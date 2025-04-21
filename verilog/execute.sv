@@ -194,7 +194,11 @@ module str_ex(
 
     always_comb begin
         ADDR  addr;
+        sq_out = '0;
+        st_lq_out = '0;
         foreach(i_vld[i]) begin
+            if (!i_vld[i])
+                continue;
             // store address computation
             addr = i_regs[i].rs1 + i_regs[i].dat.opb;
 
@@ -293,9 +297,9 @@ endmodule
 
 module stage_ex_p4 (
     `ifdef DEBUG
-    input  logic print_en,
     output DBG_execute dbg,
     `endif
+    input print_en,
     input clock,
     input reset,
     input flush,
@@ -701,6 +705,9 @@ module stage_ex_p4 (
     );
 
     lod_ex lod_ex0 (
+        `ifdef DEBUG
+        .print_en(print_en),
+        `endif
         .clock  (clock),
         .reset  (reset),
         .flush  (flush),

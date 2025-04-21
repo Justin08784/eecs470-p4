@@ -3,20 +3,27 @@
 
 `include "sys_defs.svh"
 
+localparam ASSOC   = 4; // i.e. NUM_WAYS
+localparam MSHR_SZ = 16;
 localparam NUM_CACHE_LINES  =  `DCACHE_LINES;
+localparam NUM_SETS         = NUM_CACHE_LINES / ASSOC;
+localparam SET_INDEX_BITS   = $clog2(NUM_SETS);
 localparam OFFSET_BITS      = 3;
-localparam WAY_BITS         = $clog2(NUM_CACHE_LINES);
-localparam TAG_BITS         = 16 - WAY_BITS - OFFSET_BITS;
-typedef logic [TAG_BITS-1:0]    TAG;
-typedef logic [OFFSET_BITS-1:0] OFF;
-typedef logic [$clog2(NUM_CACHE_LINES)-1:0] WAY;
-// typedef logic [ASSOC-1:0][ASSOC-1:0]AGE;
+localparam TAG_BITS         = 16 - SET_INDEX_BITS - OFFSET_BITS;
+typedef logic [SET_INDEX_BITS-1:0]  SID;
+typedef logic [TAG_BITS-1:0]        TAG;
+typedef logic [OFFSET_BITS-1:0]     OFF;
+typedef logic [$clog2(ASSOC)-1:0]   WAY;
+typedef logic [ASSOC-1:0][ASSOC-1:0]AGE;
 
 function automatic TAG get_tag(input ADDR addr);
     return addr[15:16-TAG_BITS];
 endfunction
-function automatic WAY get_way(input ADDR addr);
-    return addr[WAY_BITS+2:3];
+function automatic SID get_sid(input ADDR addr);
+    return addr[SET_INDEX_BITS+OFFSET_BITS-1 : OFFSET_BITS];
+endfunction
+function automatic OFF get_off(input ADDR addr);
+    return addr[OFFSET_BITS-1:0];
 endfunction
 
 typedef struct packed {
@@ -41,10 +48,10 @@ typedef enum logic [3:0] {
 } OP_TAG;
 
 typedef enum logic [1:0] {
-    S_IDLE,
-    S_NTAG,
-    S_WAIT,
-    S_FILL
+    S_IDLE=0,
+    S_NTAG=1,
+    S_WAIT=2,
+    S_FILL=3
 } MSHR_STATUS;
 
 typedef struct packed {
@@ -57,9 +64,10 @@ typedef struct packed {
 } MSHR_ENTRY;
 
 typedef struct packed {
-    logic   [NUM_CACHE_LINES-1:0] vld;
-    logic   [NUM_CACHE_LINES-1:0] dirty;
-    TAG     [NUM_CACHE_LINES-1:0] tag;
+    logic   [NUM_SETS-1:0][ASSOC-1:0] vld;
+    logic   [NUM_SETS-1:0][ASSOC-1:0] dirty;
+    TAG     [NUM_SETS-1:0][ASSOC-1:0] tag;
+    AGE     [NUM_SETS-1:0]            age;
 } CACHE_HEADER;
 
 
@@ -133,6 +141,7 @@ typedef struct packed {
 /* NOTE: This is also used to generate .out, so cannot debug guard
 it as is typical for dbg structs. */
 typedef struct packed {
+`ifdef DEBUG
     // input from memory
     MEM_TAG       mem_in_transaction_tag;
     MEM_BLOCK     mem_in_data;
@@ -151,33 +160,72 @@ typedef struct packed {
     dcache2sq sq_out;
 
     MSHR_ENTRY mshr;
+`endif
     CACHE_HEADER hdr;
-    logic [NUM_CACHE_LINES-1:0][$bits(MEM_BLOCK)-1:0] memDP;
+    logic [NUM_SETS-1:0][ASSOC-1:0][$bits(MEM_BLOCK)-1:0] memDP;
 } DBG_dcache;
 
-function automatic MEM_BLOCK _query_cache(
+typedef struct packed {
+    logic   hit;
+    TAG     tag;
+    WAY     way;
+    SID     sid;
+} CACHE_LOC;
+
+function automatic CACHE_LOC cache_locate(
     input CACHE_HEADER hdr,
-    input logic [NUM_CACHE_LINES-1:0][$bits(MEM_BLOCK)-1:0] state,
+    input ADDR addr
+);
+    logic   hit;
+    TAG     tag;
+    WAY     way;
+    SID     sid;
+    tag = get_tag(addr);
+    sid = get_sid(addr);
+
+    way = 0;
+    hit = 0;
+    for (int w = 0; w < ASSOC; ++w) begin
+        if (hdr.vld[sid][w] && (tag == hdr.tag[sid][w])) begin
+            hit = 1;
+            way = w;
+            break;
+        end
+    end
+
+    return '{
+        hit : hit,
+        tag : tag,
+        way : way,
+        sid : sid
+    };
+endfunction
+
+typedef struct packed {
+    logic       vdm; // valid, dirty, match
+    MEM_BLOCK   blk;
+} QUERY_CACHE_RES;
+
+function automatic QUERY_CACHE_RES _query_cache(
+    input CACHE_HEADER hdr,
+    logic [NUM_SETS-1:0][ASSOC-1:0][$bits(MEM_BLOCK)-1:0] state,
     input int double_idx
 );
     MEM_BLOCK   rv;
+    CACHE_LOC   loc;
     ADDR        addr;
-    WAY         way;
-    TAG         tag;
-    logic       vld;
     logic       match;
 
     addr = 8 * double_idx;
-    way = get_way(addr);
-    tag = get_tag(addr);
+    loc = cache_locate(hdr, addr);
 
-    vld = hdr.vld[way];
-    match = tag == hdr.tag[way];
+    match = loc.hit;
+    rv  = state[loc.sid][loc.way];
 
-    rv = (vld && match)
-        ? state[way]
-        : '0;
-    return rv;
+    return '{
+        vdm : hdr.vld[loc.sid][loc.way] && match && hdr.dirty[loc.sid][loc.way],
+        blk : rv
+    };
 endfunction
 
 
