@@ -194,7 +194,10 @@ module str_ex(
 
     always_comb begin
         ADDR  addr;
+        sq_out = '0;
         foreach(i_vld[i]) begin
+            if (!i_vld[i])
+                continue;
             // store address computation
             addr = i_regs[i].rs1 + i_regs[i].dat.opb;
 
