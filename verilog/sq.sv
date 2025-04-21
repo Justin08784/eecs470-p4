@@ -123,10 +123,16 @@ module sq #(parameter
 
     genvar bay_m,byte_m,table_m,mask_m;
 
+    // always_ff @(posedge clock) begin
+    //     if (ex_frwd_in.forward_req_en[0]) begin
+    //         $display("FORWARDING: sq_idx=%2d, lq_idx=%2d", ex_frwd_in.forward_sq_idx[0], ex_frwd_in.forward_lq_pair[0]);
+    //     end
+    // end
+
     generate
         for (bay_m = 0; bay_m < LD_BAY_SZ; bay_m++) begin : find_bay_matches1
             assign matching_idx[bay_m] = ex_frwd_in.forward_sq_idx[bay_m];
-            assign idx_found[bay_m] = state[matching_idx[bay_m]].in_range;
+            assign idx_found[bay_m] = state[matching_idx[bay_m]].in_range & (state[matching_idx[bay_m]].lq_pair == ex_frwd_in.forward_lq_pair[bay_m]);
         end
     endgenerate
 
@@ -252,6 +258,8 @@ module sq #(parameter
         id_in_range = '0;
         err_en = '0;
 
+        lq_out.last_retired_lq_pair = (ret_head != head) ? state[(ret_head+ret_buf_used-1)%LSQ_SZ].lq_pair : 0;
+
         foreach(lq_in.ck_en[i]) begin
             if (!lq_in.ck_en[i]) continue;
 
@@ -287,7 +295,7 @@ module sq #(parameter
             tail    <= 0;
             // tail_dbl <= 0;
             state   <= '0;
-            last_used_sq_idx <= LSQ_SZ; //outside of SQ range so that if bay_m load occurs before the first store we don't flag it falsely
+            last_used_sq_idx <= LSQ_SZ-1; //outside of SQ range so that if bay_m load occurs before the first store we don't flag it falsely
             next_complete <= '0;
             no_store_yet <= '1;
             has_retired_something <= 0;
@@ -306,7 +314,7 @@ module sq #(parameter
             if (has_retired_something) begin
                 last_used_sq_idx <= ((ret_head == 0) && (ret_buf_used == 0)) ? (LSQ_SZ - 1) : (ret_head + ret_buf_used - 1) % LSQ_SZ;
             end
-            else last_used_sq_idx <= LSQ_SZ;
+            else last_used_sq_idx <= LSQ_SZ-1;
             // last_used_sq_idx <= has_retired_something ? (ret_head + ret_buf_used - 1) % LSQ_SZ : LSQ_SZ;
             next_complete <= '0;
             no_store_yet <= ~has_retired_something;
@@ -335,7 +343,7 @@ module sq #(parameter
             no_store_yet <= (dispatch_in.sq_d_en_cnt > 0) ? 0 : no_store_yet;
             has_retired_something <= has_retired_something | (retire_in.r_en > 0);
 
-            // $display("LAST_USED: %0d, %byte_m", last_used_sq_idx, no_store_yet);
+            // $display("LAST_USED: %0d, %b", last_used_sq_idx, no_store_yet);
 
             next_complete <= execute_in;
             // uncombined_forward_data <= next_sq_2_exec;
@@ -361,6 +369,7 @@ module sq #(parameter
                 cur_idx = d_idxs[i];
                 state[cur_idx] <= '{
                     sq_idx              : next_ids[i],
+                    lq_pair             : dispatch_in.lq_pair[i],
                     rob_idx             : dispatch_in.rob_idx[i],
                     addr                : '0,
                     bytewise_addr_mask  : '0,

@@ -303,6 +303,7 @@ module stage_id_p4 (
                 btq_idx     : '0,
                 sq_idx      : '0,
                 lq_idx      : '0,
+                lq_pair     : '0,
                 is_brch   : tmp[i].cond_branch || tmp[i].uncond_branch,
 
                 bhr         : f_in.f_dat[i].bhr, 

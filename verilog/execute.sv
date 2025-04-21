@@ -423,6 +423,7 @@ module stage_ex_p4 (
                 opb     : `RV32_signext_Iimm(rs_in.fu_dat_load[i].inst),
 
                 lq_idx  : rs_in.fu_dat_load[i].lq_idx,
+                lq_pair : rs_in.fu_dat_load[i].lq_pair,
                 sq_idx  : rs_in.fu_dat_load[i].sq_idx,
                 rob_idx : rs_in.fu_dat_load[i].rob_idx,
                 mem_size: MEM_SIZE'(rs_in.fu_dat_load[i].inst.r.funct3[1:0]),
