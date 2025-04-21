@@ -34,10 +34,10 @@ function automatic MEM_BLOCK apply_store(
 
     posw = prew;
     case (size)
-        BYTE  : posw.byte_level[acc.byte_off] = wdat.byte_level[0];
-        HALF  : posw.half_level[acc.half_off] = wdat.half_level[0];
-        WORD  : posw.word_level[acc.word_off] = wdat.word_level;
-        default:;
+    BYTE  : posw.byte_level[acc.byte_off] = wdat.byte_level[0];
+    HALF  : posw.half_level[acc.half_off] = wdat.half_level[0];
+    WORD  : posw.word_level[acc.word_off] = wdat.word_level;
+    default:;
     endcase
 
     return posw;
@@ -144,42 +144,42 @@ module fill_handler (
 
         {r_snd, w_snd, mshr_snd} = '0;
         case (op)
-            OP_FILL_EVICT: begin
-                r_snd = '{
-                    vld : 1,
-                    sid : sid,
-                    way : way
-                };
+        OP_FILL_EVICT: begin
+            r_snd = '{
+                vld : 1,
+                sid : sid,
+                way : way
+            };
 
-                w_snd = '{
-                    vld : 1,
-                    sid : sid,
-                    way : way,
-                    dat : mshr.mem_data
-                };
+            w_snd = '{
+                vld : 1,
+                sid : sid,
+                way : way,
+                dat : mshr.mem_data
+            };
 
-                mshr_snd = '{
-                    op     : op,
-                    en     : 1,
-                    wr_mem : 1,
-                    addr   : {hdr.tag[sid][way], sid, 3'b000},
-                    mem_data : r_rcv.dat,
-                    mem_size : DOUBLE
-                };
-            end
+            mshr_snd = '{
+                op     : op,
+                en     : 1,
+                wr_mem : 1,
+                addr   : {hdr.tag[sid][way], sid, 3'b000},
+                mem_data : r_rcv.dat,
+                mem_size : DOUBLE
+            };
+        end
 
-            OP_FILL_NO_EVICT: begin
-                w_snd = '{
-                    vld : 1,
-                    sid : sid,
-                    way : way,
-                    dat : mshr.mem_data
-                };
+        OP_FILL_NO_EVICT: begin
+            w_snd = '{
+                vld : 1,
+                sid : sid,
+                way : way,
+                dat : mshr.mem_data
+            };
 
-                mshr_snd.op = op;
-                mshr_snd.en = 1;
-            end
-            default:;
+            mshr_snd.op = op;
+            mshr_snd.en = 1;
+        end
+        default:;
         endcase
     end
 
@@ -224,25 +224,25 @@ module load_handler (
         {r_snd, mshr_snd} = '0;
 
         case (op)
-            OP_LOAD_HIT: begin
-                r_snd = '{
-                    vld : 1,
-                    sid : loc.sid,
-                    way : loc.way
-                };
-            end
+        OP_LOAD_HIT: begin
+            r_snd = '{
+                vld : 1,
+                sid : loc.sid,
+                way : loc.way
+            };
+        end
 
-            OP_LOAD_MISS: begin
-                mshr_snd = '{
-                    op     : op,
-                    en     : 1,
-                    wr_mem : 0,
-                    addr   : dw_align(ld_in.addr),
-                    mem_data : '0,
-                    mem_size : DOUBLE
-                };
-            end
-            default:;
+        OP_LOAD_MISS: begin
+            mshr_snd = '{
+                op     : op,
+                en     : 1,
+                wr_mem : 0,
+                addr   : dw_align(ld_in.addr),
+                mem_data : '0,
+                mem_size : DOUBLE
+            };
+        end
+        default:;
         endcase
     end
 
@@ -294,38 +294,38 @@ module stor_handler (
 
         {r_snd, w_snd, mshr_snd} = '0;
         case (op)
-            OP_STOR_HIT: begin
-                r_snd = '{
-                    vld : 1,
-                    sid : loc.sid,
-                    way : loc.way
-                };
+        OP_STOR_HIT: begin
+            r_snd = '{
+                vld : 1,
+                sid : loc.sid,
+                way : loc.way
+            };
 
-                w_snd = '{
-                    vld : 1,
-                    sid : loc.sid,
-                    way : loc.way,
-                    dat : apply_store(
-                        sq_in.size, // size
-                        sq_in.addr, // addr
-                        sq_in.dat,  // wdat
-                        r_rcv.dat   // prew
-                    )
-                };
+            w_snd = '{
+                vld : 1,
+                sid : loc.sid,
+                way : loc.way,
+                dat : apply_store(
+                    sq_in.size, // size
+                    sq_in.addr, // addr
+                    sq_in.dat,  // wdat
+                    r_rcv.dat   // prew
+                )
+            };
 
-            end
+        end
 
-            OP_STOR_MISS: begin
-                mshr_snd = '{
-                    op     : op,
-                    en     : 1,
-                    wr_mem : 0,
-                    addr   : dw_align(sq_in.addr),
-                    mem_data : '0,
-                    mem_size : DOUBLE
-                };
-            end
-            default:;
+        OP_STOR_MISS: begin
+            mshr_snd = '{
+                op     : op,
+                en     : 1,
+                wr_mem : 0,
+                addr   : dw_align(sq_in.addr),
+                mem_data : '0,
+                mem_size : DOUBLE
+            };
+        end
+        default:;
         endcase
     end
 
