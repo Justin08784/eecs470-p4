@@ -50,7 +50,9 @@ module branch_history_table (
                table_array[update_idx1] <= {table_array[update_idx1][`HISTORY_BITS-2:0], taken1};
         end
 
-       //  $display("  BHR0 0b%8b TAKEN0: 0b%1b ", bhr0, taken0);
-       //  $display("  BHR0 0b%8b TAKEN1: 0b%1b ", bhr1, taken1);
+        `ifdef DEBUG
+             $display("  BHR0 0b%8b TAKEN0: 0b%1b ", bhr0, taken0);
+             $display("  BHR0 0b%8b TAKEN1: 0b%1b ", bhr1, taken1);
+         `endif
     end
 endmodule

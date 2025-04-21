@@ -259,6 +259,8 @@ module cpu (
     dispatch2lq dis_2_lq;
     lq2dispatch lq_2_dis;
 
+    dispatch2predictor dispatch_2_pred;
+
     dispatch dispatcher(
         `ifdef DEBUG
         .dbg        (dbg_dispatch),
@@ -282,6 +284,7 @@ module cpu (
         .btq_out    (dispatch_2_btq),
         .map_in     (map_2_dispatch),
         .map_out    (dispatch_2_map),
+        .pred_out   (dispatch_2_pred),
         .lq_in      (lq_2_dis),
         .lq_out     (dis_2_lq),
 
@@ -343,6 +346,9 @@ module cpu (
         .gshare_pred    (gshare_pred),
         .corr_pred      (corr_pred), 
         //.ret_2_fetch    (ret_2_fetch),
+
+        .mispred_taken  (mispred_taken),
+
         .retire_exec    (retire_exec)
     );
 
@@ -354,7 +360,8 @@ module cpu (
         retired_bhr     : bhr_from_btq,
         correlated_bhr  : correlated_bhr_d,
         gshare_pred     : gshare_pred,
-        corr_pred       : corr_pred
+        corr_pred       : corr_pred,
+        mispred_taken   : mispred_taken
     };
 
 

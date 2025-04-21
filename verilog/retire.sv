@@ -37,6 +37,8 @@ module retire (
     output logic [`N-1:0] corr_pred, 
     //output retire2fetch ret_2_fetch,
 
+    output logic mispred_taken, 
+
     output retire_final retire_exec
 );
     logic [$clog2(`N):0] r_en_cnt;
@@ -69,6 +71,8 @@ module retire (
     logic [`N-1:0] gshare_pred_n;
     logic [`N-1:0] corr_pred_n;
     logic store_retire;
+
+    logic mispred_taken_n;
     
     always_comb begin
         sq_out = '0;
@@ -92,6 +96,8 @@ module retire (
         correlated_bhr_d_n = '0;
         gshare_pred_n = '0;
         corr_pred_n = '0;
+
+        mispred_taken_n = '0;
 
         btq_out = '0;
 
@@ -142,6 +148,8 @@ module retire (
 
             gshare_pred_n[i] = btq_in.dat[btq_rd_cnt].gshare_pred;
             corr_pred_n[i] = btq_in.dat[btq_rd_cnt].corr_pred;
+            $display("BTQ_IN PC: 0x%x, BTQ_IN TGT: 0x%x} ", btq_in.dat[btq_rd_cnt].PC, btq_in.dat[btq_rd_cnt].tgt);
+            $display("BTQ_IN PRED: %x,  BTQ_IN TAKE: %x", btq_in.dat[btq_rd_cnt].pred, btq_in.dat[btq_rd_cnt].take);        
             if (btq_in.dat[btq_rd_cnt].pred != btq_in.dat[btq_rd_cnt].take) begin
                 // is mispred?
                 mispred = 1;
@@ -150,6 +158,8 @@ module retire (
                     : btq_in.dat[btq_rd_cnt].NPC;
 
                 branch_taken_n[i] = btq_in.dat[btq_rd_cnt].take ? 1'b1 : 1'b0;
+
+                mispred_taken_n = btq_in.dat[btq_rd_cnt].take ? 1'b1 : 1'b0;
 
                 ++btq_rd_cnt;
                 break;
@@ -162,6 +172,8 @@ module retire (
 
                 ++btq_rd_cnt;
                 break;
+            end else begin
+                 branch_taken_n[i] = btq_in.dat[btq_rd_cnt].take ? 1'b1 : 1'b0;
             end
             ++btq_rd_cnt;
         end
@@ -229,6 +241,8 @@ module retire (
             gshare_pred      <= '0;
             corr_pred        <= '0;
 
+            mispred_taken    <= '0;
+
         end else begin
 /* ======================================== */
             flush        <= flush_n;
@@ -243,6 +257,8 @@ module retire (
             correlated_bhr_d <= correlated_bhr_d_n;
             gshare_pred      <= gshare_pred_n;
             corr_pred        <= corr_pred_n;
+
+            mispred_taken    <= mispred_taken_n;
 /* ======================================== */
         end
     end

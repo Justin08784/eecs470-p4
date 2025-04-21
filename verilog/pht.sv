@@ -53,4 +53,20 @@ module pht (
         end
     end
 
+    `ifdef DEBUG
+        always_ff @(posedge clock) begin
+            $display("  pht[update_index0] = %2b", pht[update_index0]);
+            $display("  pht[update_index1] = %2b", pht[update_index1]);
+
+            $display("  update_index0 = %8b", update_index0);
+            $display("  update_index1 = %8b", update_index1);
+
+            $display("  pht[predict_index0] = %2b", pht[predict_index0]);
+            $display("  pht[predict_index1] = %2b", pht[predict_index1]);
+
+            $display("  predict_index0 = %8b", predict_index0);
+            $display("  predict_index1 = %8b", predict_index1);
+        end
+    `endif
+
 endmodule

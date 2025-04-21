@@ -44,7 +44,9 @@ module dispatch #(parameter
 
     // Map table
     input   map_table2dispatch map_in,
-    output  dispatch2map_table map_out
+    output  dispatch2map_table map_out,
+
+    output  dispatch2predictor pred_out
     
 );
 
@@ -249,8 +251,13 @@ always_comb begin
             btq_out.gshare_pred[btq_wr_idx] = rename_in[i].gshare_pred;
             btq_out.corr_pred[btq_wr_idx] = rename_in[i].corr_pred;
             btq_out.correlated_bhr[btq_wr_idx] = rename_in[i].correlated_bhr;
+
+            pred_out.fetch_pred[i] = rename_in[i].pred;
+
             ++btq_wr_idx;
         end
+
+        pred_out.is_branch[i] = rename_in[i].is_brch;
     end
 end
 

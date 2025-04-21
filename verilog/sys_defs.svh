@@ -80,7 +80,7 @@
 
 `ifndef SYNTH
 // comment out to disable DEBUG:
-// `define DEBUG
+//`define DEBUG
 // comment to disable clock cycle print
 // `define CYCLE_PRINT
 `endif
@@ -601,6 +601,8 @@ typedef struct packed {
 
     logic [`N-1:0] corr_pred;
 
+    logic mispred_taken;
+
 
 
 } retire2fetch;
@@ -805,6 +807,12 @@ typedef struct packed {
     // to RS/ROB)
 } dispatch2map_table;
 
+typedef struct packed {
+    logic [`N-1:0] fetch_pred;
+    logic [`N-1:0] is_branch;
+
+} dispatch2predictor;
+
 
 // By Map Table
 
@@ -945,6 +953,7 @@ typedef struct packed {
 
     logic flush;
     logic [4:0] spec_branch_count;
+    logic mispred_taken;
 
 } fetch2predictor;
 

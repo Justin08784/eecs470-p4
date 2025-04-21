@@ -7,6 +7,8 @@ module gshare (
 
     input  fetch2predictor    fetch_2_pred,
 
+    input dispatch2predictor  dispatch_2_pred,
+
     output predictor2fetch     pred_2_fetch
 );
 
@@ -20,13 +22,14 @@ module gshare (
         .clock(clock),
         .reset(reset),
         .fetch_2_pred(fetch_2_pred),
+        .dispatch_in(dispatch_2_pred),
         .globalBHR(globalBHR)
     );
 
     assign pred_2_fetch.bhr = globalBHR;
 
-    assign predict_index[0] = fetch_2_pred.PC[0][`GSHARE_GBHR_WIDTH-1:0] ^ globalBHR;
-    assign predict_index[1] = fetch_2_pred.PC[1][`GSHARE_GBHR_WIDTH-1:0] ^ globalBHR;
+    assign predict_index[0] = fetch_2_pred.PC[0][`GSHARE_GBHR_WIDTH-1:0] ^ globalBHR[7:0];
+    assign predict_index[1] = fetch_2_pred.PC[1][`GSHARE_GBHR_WIDTH-1:0] ^ globalBHR[7:0];
 
     
 
@@ -61,16 +64,16 @@ module gshare (
 
      always_ff @(posedge clock) begin
         `ifdef DEBUG
-            $display("  GLOBAL BHR = %8b", globalBHR);
-            $display("  predict_taken[0] = %1b", predict_taken[0]);
-            $display("  predict_taken[1] = %1b", predict_taken[1]);
-            $display("  predict_index[0] = %8b", predict_index[0]);
-            $display("  predict_index[1] = %8b", predict_index[1]);
-            $display("  prediction[0] = %1b", prediction[0]);
-            $display("  prediction[1] = %1b", prediction[1]);
+            // $display("  GLOBAL BHR = %8b", globalBHR);
+            // $display("  predict_taken[0] = %1b", predict_taken[0]);
+            // $display("  predict_taken[1] = %1b", predict_taken[1]);
+            // $display("  predict_index[0] = %8b", predict_index[0]);
+            // $display("  predict_index[1] = %8b", predict_index[1]);
+            // $display("  prediction[0] = %1b", prediction[0]);
+            // $display("  prediction[1] = %1b", prediction[1]);
 
-            $display("  fetch_2_pred.taken[0] = %1b", fetch_2_pred.taken[0]);
-            $display("  fetch_2_pred.taken[1] = %1b", fetch_2_pred.taken[1]);
+            // $display("  fetch_2_pred.taken[0] = %1b", fetch_2_pred.taken[0]);
+            // $display("  fetch_2_pred.taken[1] = %1b", fetch_2_pred.taken[1]);
         //  fetch_2_pred.taken[0]
             //fetch_2_pred.taken[0]
         `endif
