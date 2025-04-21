@@ -41,10 +41,10 @@ typedef enum logic [3:0] {
 } OP_TAG;
 
 typedef enum logic [1:0] {
-    S_IDLE,
-    S_NTAG,
-    S_WAIT,
-    S_FILL
+    S_IDLE=0,
+    S_NTAG=1,
+    S_WAIT=2,
+    S_FILL=3
 } MSHR_STATUS;
 
 typedef struct packed {
