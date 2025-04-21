@@ -36,8 +36,8 @@ import "DPI-C" function string decode_inst(int inst);
 
 
 // Debug cycle limits, both inclusive
-localparam DBG_CYCLE_MIN = 0;
-localparam DBG_CYCLE_MAX = `TB_MAX_CYCLES;
+localparam DBG_CYCLE_MIN = 29800;
+localparam DBG_CYCLE_MAX = 31000;//`TB_MAX_CYCLES;
 // localparam DBG_CYCLE_MIN = 1480;
 // localparam DBG_CYCLE_MAX = 1510;
 // localparam DBG_CYCLE_MIN = 1300;
@@ -1078,7 +1078,7 @@ module testbench;
 
         $display("  | >> LQ");
         for (int i = 0; i < `LSQ_SZ; i++) begin
-            $display("Entry [%2d]: sq_idx=%2d, PC=%2d, addr=%4x, d_valid=%b, err_ld_ooo=%b%s",
+            $display("Entry [%2d]: sq_idx=%2d, PC=%4x, addr=%4x, d_valid=%b, err_ld_ooo=%b%s",
             i,
             state[i].sq_idx,
             state[i].inst_pc,
@@ -1525,7 +1525,7 @@ module testbench;
         // print_map_table();
         // print_prf();
         // print_btq();
-        // print_rob();
+        print_rob();
 
         // $display("---- rob_debug contents ----");
         // foreach (rob_debug[idx]) begin
@@ -1547,10 +1547,10 @@ module testbench;
         // );
         // print_rs();
         // print_execute();
-        print_dcache();
-        // print_sq();
+        // print_dcache();
+        print_sq();
         // print_retbuf();
-        // print_lq();
+        print_lq();
         // print_retire();
         $display("  | << CYCLE: %3d (t: %3d)", clock_count-1, $time);
     endtask
