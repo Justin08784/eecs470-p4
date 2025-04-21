@@ -3,20 +3,27 @@
 
 `include "sys_defs.svh"
 
+localparam ASSOC   = 4; // i.e. NUM_WAYS
+localparam MSHR_SZ = 16;
 localparam NUM_CACHE_LINES  =  `DCACHE_LINES;
+localparam NUM_SETS         = NUM_CACHE_LINES / ASSOC;
+localparam SET_INDEX_BITS   = $clog2(NUM_SETS);
 localparam OFFSET_BITS      = 3;
-localparam WAY_BITS         = $clog2(NUM_CACHE_LINES);
-localparam TAG_BITS         = 16 - WAY_BITS - OFFSET_BITS;
-typedef logic [TAG_BITS-1:0]    TAG;
-typedef logic [OFFSET_BITS-1:0] OFF;
-typedef logic [$clog2(NUM_CACHE_LINES)-1:0] WAY;
-// typedef logic [ASSOC-1:0][ASSOC-1:0]AGE;
+localparam TAG_BITS         = 16 - SET_INDEX_BITS - OFFSET_BITS;
+typedef logic [SET_INDEX_BITS-1:0]  SID;
+typedef logic [TAG_BITS-1:0]        TAG;
+typedef logic [OFFSET_BITS-1:0]     OFF;
+typedef logic [$clog2(ASSOC)-1:0]   WAY;
+typedef logic [ASSOC-1:0][ASSOC-1:0]AGE;
 
 function automatic TAG get_tag(input ADDR addr);
     return addr[15:16-TAG_BITS];
 endfunction
-function automatic WAY get_way(input ADDR addr);
-    return addr[WAY_BITS+2:3];
+function automatic SID get_sid(input ADDR addr);
+    return addr[SET_INDEX_BITS+OFFSET_BITS-1 : OFFSET_BITS];
+endfunction
+function automatic OFF get_off(input ADDR addr);
+    return addr[OFFSET_BITS-1:0];
 endfunction
 
 typedef struct packed {
@@ -57,9 +64,10 @@ typedef struct packed {
 } MSHR_ENTRY;
 
 typedef struct packed {
-    logic   [NUM_CACHE_LINES-1:0] vld;
-    logic   [NUM_CACHE_LINES-1:0] dirty;
-    TAG     [NUM_CACHE_LINES-1:0] tag;
+    logic   [NUM_SETS-1:0][ASSOC-1:0] vld;
+    logic   [NUM_SETS-1:0][ASSOC-1:0] dirty;
+    TAG     [NUM_SETS-1:0][ASSOC-1:0] tag;
+    AGE     [NUM_SETS-1:0]            age;
 } CACHE_HEADER;
 
 
@@ -152,8 +160,44 @@ typedef struct packed {
 
     MSHR_ENTRY mshr;
     CACHE_HEADER hdr;
-    logic [NUM_CACHE_LINES-1:0][$bits(MEM_BLOCK)-1:0] memDP;
+    logic [NUM_SETS-1:0][ASSOC-1:0][$bits(MEM_BLOCK)-1:0] memDP;
 } DBG_dcache;
+
+typedef struct packed {
+    logic   hit;
+    TAG     tag;
+    WAY     way;
+    SID     sid;
+} CACHE_LOC;
+
+function automatic CACHE_LOC cache_locate(
+    input CACHE_HEADER hdr,
+    input ADDR addr
+);
+    logic   hit;
+    TAG     tag;
+    WAY     way;
+    SID     sid;
+    tag = get_tag(addr);
+    sid = get_sid(addr);
+
+    way = 0;
+    hit = 0;
+    for (int w = 0; w < ASSOC; ++w) begin
+        if (hdr.vld[sid][w] && (tag == hdr.tag[sid][w])) begin
+            hit = 1;
+            way = w;
+            break;
+        end
+    end
+
+    return '{
+        hit : hit,
+        tag : tag,
+        way : way,
+        sid : sid
+    };
+endfunction
 
 typedef struct packed {
     logic       vdm; // valid, dirty, match
@@ -162,25 +206,22 @@ typedef struct packed {
 
 function automatic QUERY_CACHE_RES _query_cache(
     input CACHE_HEADER hdr,
-    input logic [NUM_CACHE_LINES-1:0][$bits(MEM_BLOCK)-1:0] state,
+    logic [NUM_SETS-1:0][ASSOC-1:0][$bits(MEM_BLOCK)-1:0] state,
     input int double_idx
 );
     MEM_BLOCK   rv;
+    CACHE_LOC   loc;
     ADDR        addr;
-    WAY         way;
-    TAG         tag;
-    logic       vld;
     logic       match;
 
     addr = 8 * double_idx;
-    way = get_way(addr);
-    tag = get_tag(addr);
+    loc = cache_locate(hdr, addr);
 
-    match = tag == hdr.tag[way];
-    rv = state[way];
+    match = loc.hit;
+    rv  = state[loc.sid][loc.way];
 
     return '{
-        vdm : hdr.vld[way] && match && hdr.dirty[way],
+        vdm : hdr.vld[loc.sid][loc.way] && match && hdr.dirty[loc.sid][loc.way],
         blk : rv
     };
 endfunction

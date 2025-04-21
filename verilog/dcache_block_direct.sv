@@ -1,48 +1,6 @@
 `include "sys_defs.svh"
 `include "dcache_block_direct.svh"
 
-typedef struct packed {
-    logic   hit;
-    TAG     tag;
-    WAY     way;
-} CACHE_LOC;
-
-function automatic CACHE_LOC cache_locate(
-    input CACHE_HEADER hdr,
-    input ADDR addr
-);
-    logic   hit;
-    TAG     tag;
-    WAY     way;
-    tag = get_tag(addr);
-    way = get_way(addr);
-    hit = hdr.vld[way] && (tag == hdr.tag[way]);
-    return '{hit, tag, way};
-endfunction
-
-function automatic DATA_BLOCK extract_load(
-    input MEM_SIZE    size,
-    input ADDR        addr,
-    input MEM_BLOCK   raw
-);
-    DATA_BLOCK rv;
-    DW_ACCESS acc;
-
-    rv = '0;
-    acc = '{
-        byte_off : idw_byte(addr),
-        half_off : idw_half(addr),
-        word_off : idw_word(addr)
-    };
-
-    case (size)
-        BYTE  : rv = raw.byte_level[acc.byte_off];
-        HALF  : rv = raw.half_level[acc.half_off];
-        WORD  : rv = raw.word_level[acc.word_off];
-        default:;
-    endcase
-    return rv;
-endfunction
 
 function automatic MEM_BLOCK apply_store(
     input MEM_SIZE      size,
@@ -71,6 +29,7 @@ endfunction
 
 typedef struct packed {
     logic       vld;
+    SID         sid;
     WAY         way;
 } READ_SND;
 typedef struct packed {
@@ -79,6 +38,7 @@ typedef struct packed {
 
 typedef struct packed {
     logic       vld;
+    SID         sid;
     WAY         way;
     MEM_BLOCK   dat;
 } WRIT_SND;
@@ -108,16 +68,60 @@ module fill_handler (
     input  READ_RCV     r_rcv
 );
     OP_TAG op;
+    SID    sid;
     WAY    way;
+
+    logic [NUM_SETS-1:0] evict;
+    logic [NUM_SETS-1:0][ASSOC-1:0] free_gnt;
+    logic [NUM_SETS-1:0][ASSOC-1:0] lru;
+    logic [NUM_SETS-1:0][ASSOC-1:0] wmsks;
+    logic [NUM_SETS-1:0][$clog2(ASSOC)-1:0] ways;
+    generate
+    for (genvar s = 0; s < NUM_SETS; ++s) begin : gen_sets
+        psel_gen #(
+            .WIDTH(ASSOC),
+            .REQS(1)
+        ) free_way (
+            .req (~hdr.vld[s]),
+            .gnt (free_gnt[s])
+        );
+    end
+    endgenerate
+
+    always_comb begin
+        foreach (evict[s])
+            evict[s] = !(|free_gnt[s]);
+
+        foreach (lru[s, w])
+            lru[s][w] = w == 0; // FIXME: bully 0 way
+
+        foreach (wmsks[s]) begin
+            wmsks[s] = evict[s]
+                ? lru[s]        // evict a block
+                : free_gnt[s];  // free entry available
+        end
+
+        ways = '0;
+        foreach (ways[s]) begin
+            for (int w = 0; w < ASSOC; ++w) begin
+                if (!wmsks[s][w])
+                    continue;
+                ways[s] = w;
+                break;
+            end
+        end
+
+    end
 
     always_comb begin
         req = mshr.status == S_FILL;
 
-        way = get_way(mshr.addr);
+        sid = get_sid(mshr.addr);
+        way = ways[sid];
 
         op = OP_NONE;
         if (req) begin
-            op = hdr.vld[way]
+            op = evict[sid]
                 ? OP_FILL_EVICT
                 : OP_FILL_NO_EVICT;
         end
@@ -127,11 +131,13 @@ module fill_handler (
             OP_FILL_EVICT: begin
                 r_snd = '{
                     vld : 1,
+                    sid : sid,
                     way : way
                 };
 
                 w_snd = '{
                     vld : 1,
+                    sid : sid,
                     way : way,
                     dat : mshr.mem_data
                 };
@@ -140,7 +146,7 @@ module fill_handler (
                     op     : op,
                     en     : 1,
                     wr_mem : 1,
-                    addr   : {hdr.tag[way], way, 3'b000},
+                    addr   : {hdr.tag[sid][way], way, 3'b000},
                     mem_data : r_rcv.dat,
                     mem_size : DOUBLE
                 };
@@ -149,6 +155,7 @@ module fill_handler (
             OP_FILL_NO_EVICT: begin
                 w_snd = '{
                     vld : 1,
+                    sid : sid,
                     way : way,
                     dat : mshr.mem_data
                 };
@@ -204,6 +211,7 @@ module load_handler (
             OP_LOAD_HIT: begin
                 r_snd = '{
                     vld : 1,
+                    sid : loc.sid,
                     way : loc.way
                 };
             end
@@ -254,8 +262,8 @@ module stor_handler (
     input  READ_RCV     r_rcv
 
 );
-   OP_TAG op;
-   CACHE_LOC loc;
+    OP_TAG op;
+    CACHE_LOC loc;
 
     always_comb begin
         loc = cache_locate(hdr, sq_in.addr);
@@ -273,11 +281,13 @@ module stor_handler (
             OP_STOR_HIT: begin
                 r_snd = '{
                     vld : 1,
+                    sid : loc.sid,
                     way : loc.way
                 };
 
                 w_snd = '{
                     vld : 1,
+                    sid : loc.sid,
                     way : loc.way,
                     dat : apply_store(
                         sq_in.size, // size
@@ -454,35 +464,32 @@ module dcache_block (
 );
     CACHE_HEADER hdr, hdr_n;
 
-    logic   ren,  wen;
-    WAY     rway, wway;
-    MEM_BLOCK rdat, wdat;
-    logic [NUM_CACHE_LINES-1:0] free_gnt;
-    logic [NUM_CACHE_LINES-1:0][$bits(MEM_BLOCK)-1:0] dbg_memDP;
-    memDP #(
-        .WIDTH     ($bits(MEM_BLOCK)),
-        .DEPTH     (NUM_CACHE_LINES),
-        .READ_PORTS(1),
-        .BYPASS_EN (0)
-    ) state (
-        .dbg  (dbg_memDP),
-        .clock(clock),
-        .reset(reset),
-        .re   (ren ),
-        .raddr(rway),
-        .rdata(rdat),
-        .we   (wen ),
-        .waddr(wway),
-        .wdata(wdat)
-    );
+    logic   [NUM_SETS-1:0]        wen;
+    WAY     [NUM_SETS-1:0]  rway, wway;
+    MEM_BLOCK[NUM_SETS-1:0] rdat, wdat;
+    SID     rsid, wsid;
+    logic   [NUM_SETS-1:0][ASSOC-1:0][$bits(MEM_BLOCK)-1:0] dbg_memDP;
 
-    psel_gen #(
-        .WIDTH(NUM_CACHE_LINES),
-        .REQS(1)
-    ) free_way (
-        .req (~hdr.vld),
-        .gnt (free_gnt)
-    );
+    generate
+    for (genvar s = 0; s < NUM_SETS; ++s) begin : gen_sets
+        memDP #(
+            .WIDTH     ($bits(MEM_BLOCK)),
+            .DEPTH     (ASSOC),
+            .READ_PORTS(1),
+            .BYPASS_EN (0)
+        ) set_i (
+            .dbg  (dbg_memDP[s]),
+            .clock(clock),
+            .reset(reset),
+            .re   (1'b1),
+            .raddr(rway[s]),
+            .rdata(rdat[s]),
+            .we   (wen [s]),
+            .waddr(wway[s]),
+            .wdata(wdat[s])
+        );
+    end
+    endgenerate
 
     typedef enum logic[1:0] {
         REQR_STOR, // lowest priority
@@ -511,14 +518,20 @@ module dcache_block (
             break;
         end
 
-        r_rcvs = '0;
-        ren  = 1;
-        rway = r_snds[gnt_reqr];
-        r_rcvs[gnt_reqr] = rdat;
+        rway    = '0;
+        wen     = '0;
+        wway    = '0;
+        wdat    = '0;
 
-        wen  = w_snds[gnt_reqr].vld;
-        wway = w_snds[gnt_reqr].way;
-        wdat = w_snds[gnt_reqr].dat;
+        r_rcvs      = '0;
+        rsid        = r_snds[gnt_reqr].sid;
+        rway[rsid]  = r_snds[gnt_reqr].way;
+        r_rcvs[gnt_reqr].dat = rdat[rsid];
+
+        wsid        = w_snds[gnt_reqr].sid;
+        wen[wsid]   = w_snds[gnt_reqr].vld;
+        wway[wsid]  = w_snds[gnt_reqr].way;
+        wdat[wsid]  = w_snds[gnt_reqr].dat;
     end
 
 
@@ -546,8 +559,9 @@ module dcache_block (
     );
 
     // header manager
-    WAY tmp_way;
     always_comb begin
+        SID tmp_sid;
+        WAY tmp_way;
         hdr_n = hdr;
         foreach (gnt[reqr]) begin
             if (!gnt[reqr])
@@ -555,18 +569,20 @@ module dcache_block (
 
             case (reqr)
             REQR_FILL: begin
+                tmp_sid = w_snds[REQR_FILL].sid;
                 tmp_way = w_snds[REQR_FILL].way;
-                hdr_n.vld[tmp_way]      = 1;
-                hdr_n.dirty[tmp_way]    = mshr.wr_mem;
-                hdr_n.tag[tmp_way]      = get_tag(mshr.addr);
+                hdr_n.vld   [tmp_sid][tmp_way]  = 1;
+                hdr_n.dirty [tmp_sid][tmp_way]  = mshr.wr_mem;
+                hdr_n.tag   [tmp_sid][tmp_way]  = get_tag(mshr.addr);
             end
             REQR_LOAD: begin
                 // TODO: LRU update (and victim update)
             end
             REQR_STOR: begin
                 // TODO: LRU update
-                tmp_way                 = w_snds[REQR_STOR].way;
-                hdr_n.dirty[tmp_way]    = 1;
+                tmp_sid = w_snds[REQR_STOR].sid;
+                tmp_way = w_snds[REQR_STOR].way;
+                hdr_n.dirty[tmp_sid][tmp_way] = 1;
             end
             default:;
             endcase

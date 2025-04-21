@@ -30,14 +30,14 @@ import "DPI-C" function string decode_inst(int inst);
 //import "DPI-C" function void close_pipeline_output_file();
 
 
-`define TB_MAX_CYCLES 50000
+`define TB_MAX_CYCLES 50000000
 // `define TB_MAX_CYCLES 2500
 // `define TB_MAX_CYCLES 10000
 
 
 // Debug cycle limits, both inclusive
-localparam DBG_CYCLE_MIN = 29800;
-localparam DBG_CYCLE_MAX = 31000;//`TB_MAX_CYCLES;
+localparam DBG_CYCLE_MIN = 0;
+localparam DBG_CYCLE_MAX = `TB_MAX_CYCLES;
 // localparam DBG_CYCLE_MIN = 1480;
 // localparam DBG_CYCLE_MAX = 1510;
 // localparam DBG_CYCLE_MIN = 1300;
@@ -1214,7 +1214,7 @@ module testbench;
 
         MSHR_ENTRY mshr;
         CACHE_HEADER hdr;
-        logic [NUM_CACHE_LINES-1:0][$bits(MEM_BLOCK)-1:0] dbg_memDP;
+        logic [NUM_SETS-1:0][ASSOC-1:0][$bits(MEM_BLOCK)-1:0] dbg_memDP;
 
         mem_in_transaction_tag = dbg_dcache.mem_in_transaction_tag;
         mem_in_data     = dbg_dcache.mem_in_data;
@@ -1278,19 +1278,22 @@ module testbench;
         $display("}");
 
         $display("");
-        for (int i = 0; i < NUM_CACHE_LINES; ++i) begin
-            if (!hdr.vld[i]) begin
-                $display("header[%2d]:", i);
-                continue;
+        for (int s = 0; s < NUM_SETS; ++s) begin
+            $display("set[%2d]:", s);
+            for (int w = 0; w < ASSOC; ++w) begin
+                if (!hdr.vld[s][w]) begin
+                    $display("  blk[%1d]: ", w);
+                    continue;
+                end
+                $display("  blk[%1d]: {vld: %b, dirty: %b, tag: 0x%x} data: %x, (addr: 0x%x)",
+                    w,
+                    hdr.vld     [s][w],
+                    hdr.dirty   [s][w],
+                    hdr.tag     [s][w],
+                    dbg_memDP   [s][w],
+                    {hdr.tag[s][w], SID'(s), 3'b000}
+                );
             end
-            $display("header[%2d]: {vld: %b, dirty: %b, tag: 0x%x} data: %x, (addr: 0x%x)",
-                i,
-                hdr.vld[i],
-                hdr.dirty[i],
-                hdr.tag[i],
-                dbg_memDP[i],
-                {hdr.tag[i], WAY'(i), 3'b000}
-            );
         end
 
         $display("  | << DCACHE <<");
@@ -1548,7 +1551,7 @@ module testbench;
         // );
         // print_rs();
         // print_execute();
-        // print_dcache();
+        print_dcache();
         print_sq();
         // print_retbuf();
         print_lq();
