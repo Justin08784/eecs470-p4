@@ -22,12 +22,14 @@ module sq #(parameter
     input executeLD2sq  ex_frwd_in,
     input retire2sq     retire_in,
     input dcache2sq     dcache_in,
+    input lq2sq         lq_in,
 
     output sq2dispatch  dispatch_out,
     output sq2execute   execute_out,
     output sq2rob       rob_out,
     output sq2retire    retire_out,
-    output sq2dcache    dcache_out
+    output sq2dcache    dcache_out,
+    output sq2lq        lq_out
 );
 
     localparam NUM_DPORTS = N; // dispatch ports (in-order)
@@ -329,6 +331,32 @@ module sq #(parameter
             next_ids            : next_ids,
             no_store_yet        : no_store_yet
         };
+    end
+
+
+    /* >> ======== SECTION: Load OoO Check ======== >> */
+    logic [`NUM_FU_LOAD-1:0] id_in_range;
+    logic [`NUM_FU_LOAD-1:0] err_en;
+    always_comb begin
+        lq_out = '0;
+        id_in_range = '0;
+        err_en = '0;
+
+        foreach(lq_in.ck_en[i]) begin
+            if (!lq_in.ck_en[i]) continue;
+
+            for (int unsigned j = 0, LSQ_IDX idx = 0; j < LSQ_SZ; j++) begin
+                idx = (head + j) % LSQ_SZ;
+                if (j >= (used - ret_buf_used)) break;//(idx == ret_head) && (ret_head != head)) break;
+
+                if (!state[idx].d_vld && state[idx].in_range) err_en[i] = 1;
+                if (idx == lq_in.idxs[i]) begin
+                    id_in_range[i] = 1;
+                    break; 
+                end
+            end
+            lq_out.err_en[i] = err_en[i] & id_in_range[i];
+        end
     end
 
     logic has_retired_something;

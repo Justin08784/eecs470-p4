@@ -1074,7 +1074,7 @@ module testbench;
 
         $display("  | >> LQ");
         for (int i = 0; i < `LSQ_SZ; i++) begin
-            $display("Entry [%2d]: sq_idx=%2d, PC=%2d, addr=%4x, d_valid=%b, err_ld_ooo=%b%s",
+            $display("Entry [%2d]: sq_idx=%2d, PC=%4x, addr=%4x, d_valid=%b, err_ld_ooo=%b%s",
             i,
             state[i].sq_idx,
             state[i].inst_pc,

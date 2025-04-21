@@ -185,9 +185,8 @@ module str_ex(
     input  logic    [`NUM_FU_STORE-1:0]  i_vld,
     input  STR_REGS [`NUM_FU_STORE-1:0]  i_regs,
     
-    output  execute2sq sq_out,
+    output  execute2sq sq_out
     // FIXME: Isn't an lq2execute needed? <-- Answer: No, if an issue is found when forwarding the SQ_IDX to LQ, it is flagged in the ROB to restart from that PC
-    output  execeuteST2lq st_lq_out
 );
     // FIXME: Is this right? 
     assign i_rdy = '1;
@@ -203,11 +202,6 @@ module str_ex(
             sq_out.st_addr[i]       = addr;
             sq_out.st_data[i]       = i_regs[i].rs2;
             sq_out.st_mem_size[i]   = i_regs[i].dat.mem_size;
-
-            st_lq_out.st_en[i]      = i_vld[i];
-            st_lq_out.st_sq_idx[i]  = i_regs[i].dat.sq_idx;
-
-
         end
     end
 
@@ -306,7 +300,6 @@ module stage_ex_p4 (
     output  execute2sq sq_out,
     // FIXME: Isn't an lq2execute needed?
     output  execute2lq lq_out,
-    output  execeuteST2lq st_lq_out,
     output  executeLD2sq ld_sq_out,
 
     input   dcache2ld   dcache_in,
@@ -731,8 +724,7 @@ module stage_ex_p4 (
         .i_regs (regs.o_dat.str),
         .i_rdy  (ex.i_rdy.str),
 
-        .sq_out(sq_out),
-        .st_lq_out(st_lq_out)
+        .sq_out(sq_out)
     );
 
     /* >> ======== STAGE 4/?: CDB data/tag broadcast ======== >> */

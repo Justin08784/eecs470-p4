@@ -475,6 +475,8 @@ module cpu (
     executeLD2sq exec_ld_2_sq;
     // MEM_TAG temp_tag;
     sq2execute sq_2_exec;
+    sq2lq sq_2_lq;
+    lq2sq lq_2_sq;
     // assign temp_tag = (ret_2_mem.Dmem_command == MEM_STORE) ? 1 : 0;
 
     sq #(
@@ -504,7 +506,10 @@ module cpu (
         .retire_out     (sq_2_retire),
 
         .dcache_in      (dcache_2_sq), // FIXME FIXME FIXME FIXME
-        .dcache_out     (sq_2_dcache)
+        .dcache_out     (sq_2_dcache),
+
+        .lq_in          (lq_2_sq),
+        .lq_out         (sq_2_lq)
 );
 
 
@@ -515,7 +520,6 @@ module cpu (
     //////////////////////////////////////////////////
 
     execute2lq exec_2_lq;
-    execeuteST2lq execST_2_lq;
 
     lq lq_0(
         `ifdef DEBUG
@@ -528,10 +532,12 @@ module cpu (
         .dispatch_in(dis_2_lq),
         .retire_in(retire_2_lq),
         .execute_in(exec_2_lq),
-        .execST_in(execST_2_lq),
 
         .dispatch_out(lq_2_dis),
-        .retire_out(lq_2_retire)
+        .retire_out(lq_2_retire),
+
+        .sq_out(lq_2_sq),
+        .sq_in(sq_2_lq)
     );
 
     //////////////////////////////////////////////////
@@ -555,7 +561,6 @@ module cpu (
         .sq_out (exec_2_sq),
 
         .lq_out     (exec_2_lq),
-        .st_lq_out  (execST_2_lq),
         .ld_sq_out  (exec_ld_2_sq),
 
         .dcache_in  (dcache_2_ld), // FIXME FIXME FIXME FIXME
