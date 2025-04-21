@@ -513,8 +513,8 @@ module dcache_block (
 
         r_rcvs = '0;
         ren  = 1;
-        rway = r_snds[gnt_reqr];
-        r_rcvs[gnt_reqr] = rdat;
+        rway = r_snds[gnt_reqr].way;
+        r_rcvs[gnt_reqr].dat = rdat;
 
         wen  = w_snds[gnt_reqr].vld;
         wway = w_snds[gnt_reqr].way;

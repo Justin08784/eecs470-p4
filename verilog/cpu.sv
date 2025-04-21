@@ -36,14 +36,13 @@ module cpu (
     output MEM_SIZE    proc2mem_size,    // Data size sent to memory
     output DBG_dcache   dbg_dcache,
 
-    `ifdef DEBUG
-    // Note: these are assigned at the very bottom of the module
-    output COMMIT_PACKET [`N-1:0] committed_insts,
 
+    `ifdef DEBUG
     // Debug outputs: these signals are solely used for debugging in testbenches
     // Do not change for project 3
     // You should definitely change these for project 4
 
+    input  logic        print_en, // high iff current cycle in dbg cycle range
     output DBG_execute  dbg_execute,
     output DBG_fl       dbg_fl,
     output DBG_btq      dbg_btq,
@@ -57,12 +56,10 @@ module cpu (
     output DBG_rob      dbg_rob,
     output DBG_rs       dbg_rs,
     output DBG_sq       dbg_sq,
-    output DBG_retire   dbg_retire
+    output DBG_retire   dbg_retire,
     `endif 
-    
-    `ifndef DEBUG
+
     output COMMIT_PACKET [`N-1:0] committed_insts
-    `endif
 );
     /* Global controls*/
     logic flush;
@@ -551,6 +548,7 @@ module cpu (
     stage_ex_p4 ex_0 (
         `ifdef DEBUG
         .dbg    (dbg_execute),
+        .print_en (print_en),
         `endif
         .clock  (clock),
         .reset  (reset),

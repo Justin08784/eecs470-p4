@@ -17,6 +17,9 @@ function automatic DATA_BLOCK bytewise_override(
 endfunction
 
 module lod_ex(
+    `ifdef DEBUG
+    input print_en,
+    `endif
     input clock,
     input reset,
     input flush,
@@ -414,7 +417,7 @@ module lod_ex(
 
 `ifdef DEBUG
     always_ff @(posedge clock) begin
-        if (!reset) begin
+        if (!reset && print_en) begin
             $display("\n[%0t] <<< lod_ex DEBUG >>>", $time);
             $display("  flush: %b", flush);
             $display("  in2bay_gnt  = %b | i_vld = %b | i_rdy = %b", in2bay_gnt, i_vld, i_rdy);

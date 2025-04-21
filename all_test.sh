@@ -43,6 +43,13 @@ make ${TESTS[@]/%/.out}
 for t in "${TESTS[@]}"; do
     for ext in "${EXTS[@]}"; do
         echo "Diffing $t.$ext..."
-        diff "correct_out/${t}.${ext}" "output/${t}.${ext}"
+        diff "correct_out/${t}.${ext}" "output/${t}.${ext}" > "diffs/${t}.${ext}.diff"
+        # diff "correct_out/${t}.${ext}" "output/${t}.${ext}"
     done
+done
+
+for file in diffs/*.diff; do
+    if [ -s "$file" ]; then
+        echo Nonzero diff in "$file"
+    fi
 done

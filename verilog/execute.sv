@@ -299,6 +299,7 @@ module stage_ex_p4 (
     `ifdef DEBUG
     output DBG_execute dbg,
     `endif
+    input print_en,
     input clock,
     input reset,
     input flush,
@@ -705,6 +706,9 @@ module stage_ex_p4 (
     );
 
     lod_ex lod_ex0 (
+        `ifdef DEBUG
+        .print_en(print_en),
+        `endif
         .clock  (clock),
         .reset  (reset),
         .flush  (flush),

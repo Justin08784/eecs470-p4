@@ -53,6 +53,7 @@ module testbench;
     int out_fileno, cpi_fileno, wb_fileno; // verilog uses integer file handles with $fopen and $fclose
 
     // variables used in the testbench
+    logic        print_en;
     logic        clock;
     logic        reset;
     logic [31:0] clock_count; // also used for terminating infinite loops
@@ -105,6 +106,8 @@ module testbench;
         // EXCEPTION: The only debug which should not be debug guarded. Needed for .out.
         .dbg_dcache     (dbg_dcache),
 `ifdef DEBUG
+        .print_en       (print_en),
+
         .dbg_execute    (dbg_execute),
         .dbg_fl         (dbg_fl),
         .dbg_btq        (dbg_btq),
@@ -218,6 +221,7 @@ module testbench;
             clock_count = 0;
             instr_count = 0;
         end else begin
+            print_en = (DBG_CYCLE_MIN <= clock_count-1) && (clock_count-1 <= DBG_CYCLE_MAX);
             /* Provided delay <revert if necessary> */
             // #2; // wait a short time to avoid a clock edge
             /* Our delay */
@@ -1511,10 +1515,7 @@ module testbench;
     task print_custom_data;
         int cycle_no;
         cycle_no = clock_count - 1;
-
-        if (cycle_no < DBG_CYCLE_MIN)
-            return;
-        if (cycle_no > DBG_CYCLE_MAX)
+        if (!print_en)
             return;
 
         $display("  | >> CYCLE: %3d (t: %3d)", clock_count-1, $time);
