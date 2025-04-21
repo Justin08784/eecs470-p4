@@ -183,7 +183,6 @@ function automatic QUERY_CACHE_RES _query_cache(
         vdm : hdr.vld[way] && match && hdr.dirty[way],
         blk : rv
     };
-    return rv;
 endfunction
 
 
