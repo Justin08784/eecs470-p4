@@ -2,6 +2,22 @@
 `include "dcache_block_direct.svh"
 
 
+function automatic AGE update_lru(
+    input AGE age,
+    input WAY way
+);
+    AGE rv;
+    rv = age;
+    foreach(rv[i, j]) begin
+        if (i == way)
+            rv[i][j] = i == j;
+        else if (j == way)
+            rv[i][j] = 1;
+    end
+    return rv;
+endfunction
+
+
 function automatic MEM_BLOCK apply_store(
     input MEM_SIZE      size,
     input ADDR          addr,
@@ -93,7 +109,7 @@ module fill_handler (
             evict[s] = !(|free_gnt[s]);
 
         foreach (lru[s, w])
-            lru[s][w] = w == 0; // FIXME: bully 0 way
+            lru[s][w] = &hdr.age[s][w];
 
         foreach (wmsks[s]) begin
             wmsks[s] = evict[s]
@@ -574,15 +590,23 @@ module dcache_block (
                 hdr_n.vld   [tmp_sid][tmp_way]  = 1;
                 hdr_n.dirty [tmp_sid][tmp_way]  = mshr.wr_mem;
                 hdr_n.tag   [tmp_sid][tmp_way]  = get_tag(mshr.addr);
+
+                hdr_n.age   [tmp_sid] = update_lru(hdr.age[tmp_sid], tmp_way);
             end
             REQR_LOAD: begin
                 // TODO: LRU update (and victim update)
+                tmp_sid = r_snds[REQR_LOAD].sid;
+                tmp_way = r_snds[REQR_LOAD].way;
+
+                hdr_n.age   [tmp_sid] = update_lru(hdr.age[tmp_sid], tmp_way);
             end
             REQR_STOR: begin
                 // TODO: LRU update
                 tmp_sid = w_snds[REQR_STOR].sid;
                 tmp_way = w_snds[REQR_STOR].way;
                 hdr_n.dirty[tmp_sid][tmp_way] = 1;
+
+                hdr_n.age   [tmp_sid] = update_lru(hdr.age[tmp_sid], tmp_way);
             end
             default:;
             endcase
