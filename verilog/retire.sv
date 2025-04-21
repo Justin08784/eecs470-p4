@@ -98,6 +98,13 @@ module retire (
 
 
         for (int i = 0; i < rob_in.r_vld_cnt; ++i) begin
+            if (rob_in.entries[i].rd_mem && lq_in.err_ld_ooo[lq_rd_cnt]) begin
+                if (lq_in.err_ld_ooo[lq_rd_cnt]) begin
+                    ld_ooo  = 1;
+                    ld_PC   = lq_in.PC[lq_rd_cnt];
+                    break;
+                end
+            end
             if (!rob_in.entries[i].cpl)
                 break;
             if (rob_in.entries[i].halt && (!sq_in.sq_ret_complete || i != 0)) begin
@@ -114,11 +121,11 @@ module retire (
 
             if (rob_in.entries[i].rd_mem) begin
                 // if (0) begin // TODO: enable when lq_in.err_ld_ooo is actually set
-                if (lq_in.err_ld_ooo[lq_rd_cnt]) begin
-                    ld_ooo  = 1;
-                    ld_PC   = lq_in.PC[lq_rd_cnt];
-                    break;
-                end
+                // if (lq_in.err_ld_ooo[lq_rd_cnt]) begin
+                //     ld_ooo  = 1;
+                //     ld_PC   = lq_in.PC[lq_rd_cnt];
+                //     break;
+                // end
                 ++lq_rd_cnt; 
             end
 
