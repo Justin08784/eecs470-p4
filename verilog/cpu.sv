@@ -148,6 +148,7 @@ module cpu (
 
         .clock(clock),
         .reset(reset),
+        .flush(flush),
 
         // input from memory
         .mem_in_transaction_tag (mem2dcache_transaction_tag),

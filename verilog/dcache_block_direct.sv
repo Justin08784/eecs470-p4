@@ -314,6 +314,7 @@ endmodule;
 module refill_engine (
     input reset,
     input clock,
+    input flush,
     // expose mshr state
     output MSHR_ENTRY   mshr_out,
 
@@ -412,6 +413,12 @@ module refill_engine (
     always_ff @(posedge clock) begin
         if (reset) begin
             mshr <= '0;
+        end else if (flush && !mshr.wr_mem && mshr.miss_tag == 0) begin
+            /* FIXME: This seems rather hacky. During flush, clear a load request if it
+            has not allocated miss_tag. This prevents the potentially spurious
+            requests of ooo loads (e.g. oob addresses) from persisting in the dcache--
+            dcache would get stuck requesting the bad address continuously. */
+            mshr <= '0;
         end else begin
             mshr <= mshr_n;
         end
@@ -426,6 +433,7 @@ module dcache_block (
 
     input logic clock,
     input logic reset,
+    input logic flush,
 
     // input from memory
     input  MEM_TAG       mem_in_transaction_tag,
@@ -523,6 +531,7 @@ module dcache_block (
     refill_engine dec_refill (
         .reset  (reset),
         .clock  (clock),
+        .flush  (flush),
 
         .mshr_out(mshr),
         .snd_in  (mshr_snds[gnt_reqr]),
