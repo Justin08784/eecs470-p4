@@ -155,10 +155,8 @@ module sq #(parameter
             for (byte_m = 0; byte_m < 4; byte_m++) begin : find_byte_matches1
                 for (table_m = 0; table_m < LSQ_SZ; table_m++) begin : find_table_matches
                     assign byte_matches[bay_m][byte_m][table_m] = state[table_m].d_vld && (waddr(state[table_m].addr) == waddr(ex_frwd_in.forward_addr[bay_m])) ? 
-                        state[table_m].bytewise_addr_mask[byte_m] : '0;// & match_mask[bay_m][table_m] : '0;
-                end
-
-                // assign shifted_left_matches[bay_m][byte_m] = rotate_left(byte_matches[bay_m][byte_m],(LSQ_SZ-1)-matching_idx[bay_m]);                    
+                        state[table_m].bytewise_addr_mask[byte_m] : '0;
+                end                
             end
         end
     endgenerate
@@ -182,7 +180,6 @@ module sq #(parameter
     generate
         for (bay_m = 0; bay_m < LD_BAY_SZ; bay_m++) begin : find_bay_matches5
             for (byte_m = 0; byte_m < 4; byte_m++) begin : find_byte_matches3
-                // assign final_matches[bay_m][byte_m] = rotate_right(shifted_right_matches[bay_m][byte_m],(LSQ_SZ-1)-matching_idx[bay_m]);
                 assign encoded_idxs[bay_m][byte_m] = encode_idx(rotate_right(shifted_right_matches[bay_m][byte_m],(LSQ_SZ-1)-matching_idx[bay_m]));
                 assign next_sq_2_exec.forward_data[bay_m].byte_level[byte_m] = shifted_right_matches[bay_m][byte_m] != 0 ? state[encoded_idxs[bay_m][byte_m]].data.byte_level[byte_m] : '0;
                 assign next_sq_2_exec.forward_byte_en[bay_m][byte_m] = shifted_right_matches[bay_m][byte_m] != 0 ? state[encoded_idxs[bay_m][byte_m]].bytewise_addr_mask[byte_m] : '0;//1;
@@ -194,48 +191,6 @@ module sq #(parameter
     generate
         for (bay_m = 0; bay_m < LD_BAY_SZ; bay_m++) begin : find_bay_matches6
 
-            // assign matching_idx[bay_m] = ex_frwd_in.forward_sq_idx[bay_m];
-            // assign idx_found[bay_m] = state[matching_idx[bay_m]].in_range;
-
-            // for (mask_m = 0; mask_m < LSQ_SZ; mask_m++) begin : find_match_mask
-
-            //     // if (!state[mask_m].in_range) assign match_mask[bay_m][mask_m] = 0;
-            //     // else if (tail > head) assign match_mask[bay_m][mask_m] = (mask_m >= ret_head) && (mask_m <= matching_idx[bay_m]);
-            //     // else if (matching_idx[bay_m] < tail) assign match_mask[bay_m][mask_m] = (mask_m <= matching_idx[bay_m]) || (mask_m >= ret_head);
-            //     // else assign match_mask[bay_m][mask_m] = (mask_m >= ret_head) && (mask_m <= matching_idx[bay_m]);
-
-            //     assign match_mask[bay_m][mask_m] = !state[mask_m].in_range ?
-            //         0 :
-            //         tail > ret_head ?
-            //             (mask_m >= ret_head) && (mask_m <= matching_idx[bay_m]) :
-            //             matching_idx[bay_m] < tail ?
-            //                 (mask_m <= matching_idx[bay_m]) || (mask_m >= ret_head) :
-            //                 (mask_m >= ret_head) && (mask_m <= matching_idx[bay_m]);
-            // end
-            
-
-            // for (byte_m = 0; byte_m < 4; byte_m++) begin : find_byte_matches
-            //     for (table_m = 0; table_m < LSQ_SZ; table_m++) begin : find_table_matches
-            //         assign byte_matches[bay_m][byte_m][table_m] = state[table_m].d_vld && (waddr(state[table_m].addr) == waddr(ex_frwd_in.forward_addr[bay_m])) ? 
-            //             state[table_m].bytewise_addr_mask[byte_m] & match_mask[bay_m][table_m] : '0;
-            //     end
-
-            //     assign shifted_left_matches[bay_m][byte_m] = rotate_left(byte_matches[bay_m][byte_m],(LSQ_SZ-1)-matching_idx[bay_m]);
-
-            //     psel_gen #(
-            //     .WIDTH  (LSQ_SZ),
-            //     .REQS   (1)
-            //     ) sel (
-            //         .req    (shifted_left_matches[bay_m][byte_m]),
-            //         .gnt    (shifted_right_matches[bay_m][byte_m])
-            //     );
-            //     assign final_matches[bay_m][byte_m] = rotate_right(shifted_right_matches[bay_m][byte_m],(LSQ_SZ-1)-matching_idx[bay_m]);
-            //     assign next_sq_2_exec.forward_data[bay_m].byte_level[byte_m] = final_matches[bay_m][byte_m] != 0 ? state[encoded_idxs[bay_m][byte_m]].data.byte_level[byte_m] : '0;
-            //     assign next_sq_2_exec.forward_byte_en[bay_m][byte_m] = final_matches[bay_m][byte_m] != 0 ? state[encoded_idxs[bay_m][byte_m]].bytewise_addr_mask[byte_m] : '0;//1;
-                    
-            // end
-
-            // assign next_sq_2_exec.forward_en[bay_m] = (next_sq_2_exec.forward_byte_en[bay_m] != 0);
             assign word_off[bay_m] = iw_off(ex_frwd_in.forward_addr[bay_m]);
 
             assign execute_out.forward_en[bay_m] = idx_found[bay_m] && ex_frwd_in.forward_req_en[bay_m] && next_sq_2_exec.forward_en[bay_m];
@@ -251,51 +206,6 @@ module sq #(parameter
 
         end
     endgenerate
-
-    // always_ff @(posedge clock) begin
-    //     if (reset || flush) execute_out <= '0;
-    //     else begin
-    //         foreach(execute_out.forward_en[i]) begin
-    //             execute_out.forward_en[i] <= intermediate.forward_en[i];
-
-    //             execute_out.forward_data[i] <= intermediate.forward_data[i];
-
-    //             execute_out.forward_byte_en[i] <= intermediate.forward_byte_en[i];
-                    
-    //             execute_out.forward_mem_size[i] = intermediate.forward_mem_size[i];
-    //         end
-    //     end
-    // end
-
-    // always_ff @(posedge clock) begin
-    //     if (ex_frwd_in.forward_req_en[0]) begin
-    //         $display("FORWARDING: addr=%h, waddr=%h, idx_found=%b, matching_idx=%0d, data=%h, byte_mask=%b",ex_frwd_in.forward_addr[0],waddr(ex_frwd_in.forward_addr[0]),idx_found[0],matching_idx[0],execute_out.forward_data[0], execute_out.forward_byte_en[0]);
-    //         $display("RAW_MATCHES= %b, RAW_SHIFTED=%b, GRANTED_UNSHIFTED=%b, FINAL_MATCHES=%b",byte_matches[0][0],rotate_left(byte_matches[0][0],(LSQ_SZ-1)-matching_idx[0]),shifted_right_matches[0][0],final_matches[0][0]);
-    //     end
-    //     $display("RET_HEAD: %0d", ret_head);
-    //     for (int i = 0; i < `LSQ_SZ; i++) begin
-    //         $display("Entry [%2d]: sq_idx=%2d, rob_idx=%2d, addr=%4x, data=%x, d_valid=%b, in_range=%b, mem_size: %0d, addr mask=%4b, waddr=%h, match_mask:%b%s",
-    //         i,
-    //         state[i].sq_idx,
-    //         state[i].rob_idx,
-    //         state[i].addr,
-    //         state[i].data,
-    //         state[i].d_vld,
-    //         state[i].in_range,
-    //         state[i].mem_size,
-    //         state[i].bytewise_addr_mask,
-    //         waddr(state[i].addr),
-    //         match_mask[0][i],
-    //             (i == head && head == tail) 
-    //                 ? " << h/t"
-    //                 : (i == head) 
-    //                     ? " << h" 
-    //                     : (i == tail)
-    //                         ? " << t"
-    //                         : ""
-    //         );
-    //     end
-    // end
 
 
     logic [`NUM_FU_STORE-1:0] [3:0] bytewise_addr_mask;
@@ -580,3 +490,65 @@ module sq #(parameter
 
 
 endmodule
+
+
+// generate
+//         for (bay_m = 0; bay_m < LD_BAY_SZ; bay_m++) begin : find_bay_matches6
+
+//             // assign matching_idx[bay_m] = ex_frwd_in.forward_sq_idx[bay_m];
+//             // assign idx_found[bay_m] = state[matching_idx[bay_m]].in_range;
+
+//             // for (mask_m = 0; mask_m < LSQ_SZ; mask_m++) begin : find_match_mask
+
+//             //     // if (!state[mask_m].in_range) assign match_mask[bay_m][mask_m] = 0;
+//             //     // else if (tail > head) assign match_mask[bay_m][mask_m] = (mask_m >= ret_head) && (mask_m <= matching_idx[bay_m]);
+//             //     // else if (matching_idx[bay_m] < tail) assign match_mask[bay_m][mask_m] = (mask_m <= matching_idx[bay_m]) || (mask_m >= ret_head);
+//             //     // else assign match_mask[bay_m][mask_m] = (mask_m >= ret_head) && (mask_m <= matching_idx[bay_m]);
+
+//             //     assign match_mask[bay_m][mask_m] = !state[mask_m].in_range ?
+//             //         0 :
+//             //         tail > ret_head ?
+//             //             (mask_m >= ret_head) && (mask_m <= matching_idx[bay_m]) :
+//             //             matching_idx[bay_m] < tail ?
+//             //                 (mask_m <= matching_idx[bay_m]) || (mask_m >= ret_head) :
+//             //                 (mask_m >= ret_head) && (mask_m <= matching_idx[bay_m]);
+//             // end
+            
+
+//             // for (byte_m = 0; byte_m < 4; byte_m++) begin : find_byte_matches
+//             //     for (table_m = 0; table_m < LSQ_SZ; table_m++) begin : find_table_matches
+//             //         assign byte_matches[bay_m][byte_m][table_m] = state[table_m].d_vld && (waddr(state[table_m].addr) == waddr(ex_frwd_in.forward_addr[bay_m])) ? 
+//             //             state[table_m].bytewise_addr_mask[byte_m] & match_mask[bay_m][table_m] : '0;
+//             //     end
+
+//             //     assign shifted_left_matches[bay_m][byte_m] = rotate_left(byte_matches[bay_m][byte_m],(LSQ_SZ-1)-matching_idx[bay_m]);
+
+//             //     psel_gen #(
+//             //     .WIDTH  (LSQ_SZ),
+//             //     .REQS   (1)
+//             //     ) sel (
+//             //         .req    (shifted_left_matches[bay_m][byte_m]),
+//             //         .gnt    (shifted_right_matches[bay_m][byte_m])
+//             //     );
+//             //     assign final_matches[bay_m][byte_m] = rotate_right(shifted_right_matches[bay_m][byte_m],(LSQ_SZ-1)-matching_idx[bay_m]);
+//             //     assign next_sq_2_exec.forward_data[bay_m].byte_level[byte_m] = final_matches[bay_m][byte_m] != 0 ? state[encoded_idxs[bay_m][byte_m]].data.byte_level[byte_m] : '0;
+//             //     assign next_sq_2_exec.forward_byte_en[bay_m][byte_m] = final_matches[bay_m][byte_m] != 0 ? state[encoded_idxs[bay_m][byte_m]].bytewise_addr_mask[byte_m] : '0;//1;
+                    
+//             // end
+
+//             // assign next_sq_2_exec.forward_en[bay_m] = (next_sq_2_exec.forward_byte_en[bay_m] != 0);
+//             assign word_off[bay_m] = iw_off(ex_frwd_in.forward_addr[bay_m]);
+
+//             assign execute_out.forward_en[bay_m] = idx_found[bay_m] && ex_frwd_in.forward_req_en[bay_m] && next_sq_2_exec.forward_en[bay_m];
+
+//             assign execute_out.forward_data[bay_m] = idx_found[bay_m] && ex_frwd_in.forward_req_en[bay_m] ? next_sq_2_exec.forward_data[bay_m] : '0;
+//                 // shift_data(next_sq_2_exec.forward_data[bay_m], word_off[bay_m], ex_frwd_in.forward_mem_size[bay_m]) : '0; 
+            
+//             assign execute_out.forward_byte_en[bay_m] = idx_found[bay_m] && ex_frwd_in.forward_req_en[bay_m] ? next_sq_2_exec.forward_byte_en[bay_m] : '0;
+//                 // shift_byte_mask(next_sq_2_exec.forward_byte_en[bay_m], word_off[bay_m], ex_frwd_in.forward_mem_size[bay_m]) : '0;
+
+//             assign execute_out.forward_mem_size[bay_m] = idx_found[bay_m] && ex_frwd_in.forward_req_en[bay_m] ? 
+//                 ex_frwd_in.forward_mem_size[bay_m] : 0;
+
+//         end
+//     endgenerate
