@@ -31,14 +31,13 @@ import "DPI-C" function string decode_inst(int inst);
 
 
 `define TB_MAX_CYCLES 50000000
-// `define TB_MAX_CYCLES 20000
+// `define TB_MAX_CYCLES 2500
+// `define TB_MAX_CYCLES 10000
 
 
 // Debug cycle limits, both inclusive
 localparam DBG_CYCLE_MIN = 0;
 localparam DBG_CYCLE_MAX = `TB_MAX_CYCLES;
-// localparam DBG_CYCLE_MIN = 150;
-// localparam DBG_CYCLE_MAX = 210;//`TB_MAX_CYCLES;
 // localparam DBG_CYCLE_MIN = 1480;
 // localparam DBG_CYCLE_MAX = 1510;
 // localparam DBG_CYCLE_MIN = 1300;
@@ -54,6 +53,7 @@ module testbench;
     int out_fileno, cpi_fileno, wb_fileno; // verilog uses integer file handles with $fopen and $fclose
 
     // variables used in the testbench
+    logic        print_en;
     logic        clock;
     logic        reset;
     logic [31:0] clock_count; // also used for terminating infinite loops
@@ -103,9 +103,10 @@ module testbench;
         .proc2mem_size    (proc2mem_size),
 `endif
 
+        // EXCEPTION: The only debug which should not be debug guarded. Needed for .out.
         .dbg_dcache     (dbg_dcache),
 `ifdef DEBUG
-        .committed_insts (committed_insts),
+        .print_en       (print_en),
 
         .dbg_execute    (dbg_execute),
         .dbg_fl         (dbg_fl),
@@ -119,11 +120,9 @@ module testbench;
         .dbg_rob        (dbg_rob),
         .dbg_rs         (dbg_rs),
         .dbg_sq         (dbg_sq),
-        .dbg_retire     (dbg_retire)
+        .dbg_retire     (dbg_retire),
 `endif
-`ifndef DEBUG
         .committed_insts (committed_insts)
-`endif
     );
 
 
@@ -207,6 +206,9 @@ module testbench;
     // shadow ROB containing only debug info
     typedef struct packed {
         int   id;
+        logic is_brch;
+        logic wr_mem;
+        logic rd_mem;
         logic halt;
         logic illegal;
         ADDR NPC;
@@ -219,6 +221,7 @@ module testbench;
             clock_count = 0;
             instr_count = 0;
         end else begin
+            print_en = (DBG_CYCLE_MIN <= clock_count-1) && (clock_count-1 <= DBG_CYCLE_MAX);
             /* Provided delay <revert if necessary> */
             // #2; // wait a short time to avoid a clock edge
             /* Our delay */
@@ -259,6 +262,9 @@ module testbench;
                     id      : verisimpleV.rs_0.d_in.d_dat[i].id,
                     halt    : verisimpleV.rob_0.d_in.halt[i],
                     illegal : verisimpleV.rob_0.d_in.illegal[i],
+                    is_brch: verisimpleV.rob_0.d_in.is_brch[i],
+                    rd_mem : verisimpleV.rob_0.d_in.rd_mem[i],
+                    wr_mem : verisimpleV.rob_0.d_in.wr_mem[i],
                     NPC     : verisimpleV.rs_0.d_in.d_dat[i].NPC
                 };
             end
@@ -460,6 +466,7 @@ module testbench;
     task show_final_mem_and_status;
         input EXCEPTION_CODE final_status;
         int showing_data;
+        QUERY_CACHE_RES cache_res;
         begin
             MEM_BLOCK blk, cache_blk, mem_blk;
             $fdisplay(out_fileno, "\nFinal memory state and exit status:\n");
@@ -467,13 +474,13 @@ module testbench;
             $fdisplay(out_fileno, "@@@");
             showing_data = 0;
             for (int k = 0; k <= `MEM_64BIT_LINES - 1; k = k+1) begin
-                cache_blk   = _query_cache(
+                cache_res = _query_cache(
                     dbg_dcache.hdr,
                     dbg_dcache.memDP,
                     k
                 );
                 mem_blk     = memory.unified_memory[k];
-                blk         = cache_blk != '0 ? cache_blk : mem_blk;
+                blk         = cache_res.vdm ? cache_res.blk : mem_blk;
                 if (blk != 0) begin
                     $fdisplay(out_fileno, "@@@ mem[%5d] = %x : %0d", k*8, blk, blk);
                     showing_data = 1;
@@ -675,6 +682,7 @@ module testbench;
 
         $display(">> Fetch >>");
         $display("r_in: {flush: %b, corrected_PC: 0x%x}", flush, r_in.corrected_PC);
+        $display("d_out: {f_en_cnt: %b, dat: [%x, %x]}", d_out.f_en_cnt, d_out.f_dat[0], d_out.f_dat[1]);
         $display("PC_reg:  %x", PC_reg);
         $display("Imem_data: %x", Imem_data);
         $display("<< Fetch <<");
@@ -1206,7 +1214,7 @@ module testbench;
 
         MSHR_ENTRY mshr;
         CACHE_HEADER hdr;
-        logic [NUM_CACHE_LINES-1:0][$bits(MEM_BLOCK)-1:0] dbg_memDP;
+        logic [NUM_SETS-1:0][ASSOC-1:0][$bits(MEM_BLOCK)-1:0] dbg_memDP;
 
         mem_in_transaction_tag = dbg_dcache.mem_in_transaction_tag;
         mem_in_data     = dbg_dcache.mem_in_data;
@@ -1270,35 +1278,26 @@ module testbench;
         $display("}");
 
         $display("");
-        for (int i = 0; i < NUM_CACHE_LINES; ++i) begin
-            if (!hdr.vld[i]) begin
-                $display("header[%2d]:", i);
-                continue;
+        for (int s = 0; s < NUM_SETS; ++s) begin
+            $display("set[%2d]:", s);
+            for (int w = 0; w < ASSOC; ++w) begin
+                if (!hdr.vld[s][w]) begin
+                    $display("  blk[%1d]: ", w);
+                    continue;
+                end
+                $display("  blk[%1d]: {vld: %b, dirty: %b, tag: 0x%x} data: %x, (addr: 0x%x)",
+                    w,
+                    hdr.vld     [s][w],
+                    hdr.dirty   [s][w],
+                    hdr.tag     [s][w],
+                    dbg_memDP   [s][w],
+                    {hdr.tag[s][w], SID'(s), 3'b000}
+                );
             end
-            $display("header[%2d]: {vld: %b, dirty: %b, tag: 0x%x} data: %x, (addr: 0x%x)",
-                i,
-                hdr.vld[i],
-                hdr.dirty[i],
-                hdr.tag[i],
-                dbg_memDP[i],
-                {hdr.tag[i], WAY'(i), 3'b000}
-            );
         end
 
         $display("  | << DCACHE <<");
     endtask
-
-    function automatic string dbg_mult_func(MULT_FUNC func);
-        string rv = "";
-        case (func)
-        M_MUL:      rv="M_MUL";
-        M_MULH:     rv="M_MULH";
-        M_MULHSU:   rv="M_MULHSU";
-        M_MULHU:    rv="M_MULHU";
-        default:;
-        endcase
-        return rv;
-    endfunction;
 
     task print_execute();
         execute2btq btq_out;
@@ -1356,7 +1355,7 @@ module testbench;
         end
 
         for (int i = 0; i < `NUM_FU_MULT; ++i) begin
-            $display("mul_iss[%0d]: rdy: %b, vld: %b, t: %2d, t1: %2d, t2: %2d, rob_idx: %2d, func: %s",
+            $display("mul_iss[%0d]: rdy: %b, vld: %b, t: %2d, t1: %2d, t2: %2d, rob_idx: %2d, func: 0x%x",
                 i,
                 dbg_execute.iss.i_rdy.mul[i],
                 dbg_execute.iss.o_vld.mul[i],
@@ -1364,7 +1363,7 @@ module testbench;
                 dbg_execute.iss.o_dat.mul[i].t1,
                 dbg_execute.iss.o_dat.mul[i].t2,
                 dbg_execute.iss.o_dat.mul[i].rob_idx,
-                dbg_mult_func(dbg_execute.iss.o_dat.mul[i].func)
+                dbg_execute.iss.o_dat.mul[i].func
             );
         end
 
@@ -1517,10 +1516,7 @@ module testbench;
     task print_custom_data;
         int cycle_no;
         cycle_no = clock_count - 1;
-
-        if (cycle_no < DBG_CYCLE_MIN)
-            return;
-        if (cycle_no > DBG_CYCLE_MAX)
+        if (!print_en)
             return;
 
         $display("  | >> CYCLE: %3d (t: %3d)", clock_count-1, $time);
@@ -1553,12 +1549,12 @@ module testbench;
         //      mem2proc_data,
         //      mem2proc_data_tag
         // );
-        print_rs();
+        // print_rs();
         // print_execute();
-        // print_dcache();
-        // print_sq();
+        print_dcache();
+        print_sq();
         // print_retbuf();
-        // print_lq();
+        print_lq();
         // print_retire();
         $display("  | << CYCLE: %3d (t: %3d)", clock_count-1, $time);
     endtask

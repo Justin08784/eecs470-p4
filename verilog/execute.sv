@@ -193,7 +193,11 @@ module str_ex(
 
     always_comb begin
         ADDR  addr;
+        sq_out = '0;
+        st_lq_out = '0;
         foreach(i_vld[i]) begin
+            if (!i_vld[i])
+                continue;
             // store address computation
             addr = i_regs[i].rs1 + i_regs[i].dat.opb;
 
@@ -289,6 +293,7 @@ module stage_ex_p4 (
     `ifdef DEBUG
     output DBG_execute dbg,
     `endif
+    input print_en,
     input clock,
     input reset,
     input flush,
@@ -391,7 +396,7 @@ module stage_ex_p4 (
                 t1      : rs_in.fu_dat_mult[i].t1,
                 t2      : rs_in.fu_dat_mult[i].t2,
                 rob_idx : rs_in.fu_dat_mult[i].rob_idx,
-                func    : rs_in.fu_dat_mult[i].mult_func//inst.r.funct3
+                func    : rs_in.fu_dat_mult[i].inst.r.funct3
             };
 
             ppln_skid #(
@@ -693,6 +698,9 @@ module stage_ex_p4 (
     );
 
     lod_ex lod_ex0 (
+        `ifdef DEBUG
+        .print_en(print_en),
+        `endif
         .clock  (clock),
         .reset  (reset),
         .flush  (flush),
