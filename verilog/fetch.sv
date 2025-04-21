@@ -182,10 +182,9 @@ module stage_if_p4 (
     logic [1:0] gshare_pred;
     logic [255:0][1:0] chooser_table;
 
-   assign predict_taken = pred_in_corr.prediction;
 
     
-  /* always_comb begin
+   always_comb begin
         case (chooser_table[PC_reg[7:0]])
             2'b00: predict_taken = pred_in_gshare.prediction;
             2'b01: predict_taken = pred_in_gshare.prediction;
@@ -217,7 +216,7 @@ module stage_if_p4 (
                     chooser_table[idx] <= chooser_table[idx] + 1;
             end
         end
-    end*/
+    end
 
 
 

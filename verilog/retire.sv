@@ -179,9 +179,9 @@ module retire (
 
                 ++btq_rd_cnt;
                 break;
-            end /*else begin
+            end else begin
                  branch_taken_n[i] = btq_in.dat[btq_rd_cnt].take ? 1'b1 : 1'b0;
-            end*/
+            end
             ++btq_rd_cnt;
         end
 
