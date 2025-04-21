@@ -36,7 +36,7 @@ import "DPI-C" function string decode_inst(int inst);
 
 
 // Debug cycle limits, both inclusive
-localparam DBG_CYCLE_MIN = 2400;
+localparam DBG_CYCLE_MIN = 0;
 localparam DBG_CYCLE_MAX = `TB_MAX_CYCLES;
 // localparam DBG_CYCLE_MIN = 1480;
 // localparam DBG_CYCLE_MAX = 1510;
@@ -203,6 +203,9 @@ module testbench;
     // shadow ROB containing only debug info
     typedef struct packed {
         int   id;
+        logic is_brch;
+        logic wr_mem;
+        logic rd_mem;
         logic halt;
         logic illegal;
         ADDR NPC;
@@ -255,6 +258,9 @@ module testbench;
                     id      : verisimpleV.rs_0.d_in.d_dat[i].id,
                     halt    : verisimpleV.rob_0.d_in.halt[i],
                     illegal : verisimpleV.rob_0.d_in.illegal[i],
+                    is_brch: verisimpleV.rob_0.d_in.is_brch[i],
+                    rd_mem : verisimpleV.rob_0.d_in.rd_mem[i],
+                    wr_mem : verisimpleV.rob_0.d_in.wr_mem[i],
                     NPC     : verisimpleV.rs_0.d_in.d_dat[i].NPC
                 };
             end
@@ -456,6 +462,7 @@ module testbench;
     task show_final_mem_and_status;
         input EXCEPTION_CODE final_status;
         int showing_data;
+        QUERY_CACHE_RES cache_res;
         begin
             MEM_BLOCK blk, cache_blk, mem_blk;
             $fdisplay(out_fileno, "\nFinal memory state and exit status:\n");
@@ -463,13 +470,13 @@ module testbench;
             $fdisplay(out_fileno, "@@@");
             showing_data = 0;
             for (int k = 0; k <= `MEM_64BIT_LINES - 1; k = k+1) begin
-                cache_blk   = _query_cache(
+                cache_res = _query_cache(
                     dbg_dcache.hdr,
                     dbg_dcache.memDP,
                     k
                 );
                 mem_blk     = memory.unified_memory[k];
-                blk         = cache_blk != '0 ? cache_blk : mem_blk;
+                blk         = cache_res.vdm ? cache_res.blk : mem_blk;
                 if (blk != 0) begin
                     $fdisplay(out_fileno, "@@@ mem[%5d] = %x : %0d", k*8, blk, blk);
                     showing_data = 1;
@@ -1509,10 +1516,10 @@ module testbench;
             return;
 
         $display("  | >> CYCLE: %3d (t: %3d)", clock_count-1, $time);
-        print_fetch();
+        // print_fetch();
         // print_icache();
         // print_decode();
-        print_rob();
+        // print_rob();
         // print_fl();
         // print_dispatch();
         // print_map_table();
@@ -1538,8 +1545,8 @@ module testbench;
         //      mem2proc_data,
         //      mem2proc_data_tag
         // );
-        print_rs();
-        print_execute();
+        // print_rs();
+        // print_execute();
         print_dcache();
         // print_sq();
         // print_retbuf();

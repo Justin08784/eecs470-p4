@@ -155,7 +155,12 @@ typedef struct packed {
     logic [NUM_CACHE_LINES-1:0][$bits(MEM_BLOCK)-1:0] memDP;
 } DBG_dcache;
 
-function automatic MEM_BLOCK _query_cache(
+typedef struct packed {
+    logic       vdm; // valid, dirty, match
+    MEM_BLOCK   blk;
+} QUERY_CACHE_RES;
+
+function automatic QUERY_CACHE_RES _query_cache(
     input CACHE_HEADER hdr,
     input logic [NUM_CACHE_LINES-1:0][$bits(MEM_BLOCK)-1:0] state,
     input int double_idx
@@ -171,12 +176,13 @@ function automatic MEM_BLOCK _query_cache(
     way = get_way(addr);
     tag = get_tag(addr);
 
-    vld = hdr.vld[way];
     match = tag == hdr.tag[way];
+    rv = state[way];
 
-    rv = (vld && match)
-        ? state[way]
-        : '0;
+    return '{
+        vdm : hdr.vld[way] && match && hdr.dirty[way],
+        blk : rv
+    };
     return rv;
 endfunction
 
