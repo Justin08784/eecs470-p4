@@ -69,8 +69,19 @@ module retire (
     logic [`N-1:0] gshare_pred_n;
     logic [`N-1:0] corr_pred_n;
     logic store_retire;
-    
+
+    typedef enum logic [2:0] {
+        RO_LOAD,
+        RO_STOR,
+        RO_BRCH,
+        RO_HALT,
+        RO_ELSE
+    } RETIRE_OP;
+
     always_comb begin
+        RETIRE_OP  op;
+        ROB_ENTRY  rob_dat;
+
         sq_out = '0;
         store_retire = 0;
 
@@ -95,82 +106,91 @@ module retire (
 
         btq_out = '0;
 
-
-
         for (int i = 0; i < rob_in.r_vld_cnt; ++i) begin
-            if (rob_in.entries[i].rd_mem && lq_in.err_ld_ooo[lq_rd_cnt]) begin
+            rob_dat = rob_in.entries[i];
+
+            op = RO_ELSE;
+            if (rob_dat.rd_mem)
+                op = RO_LOAD;
+            if (rob_dat.wr_mem)
+                op = RO_STOR;
+            if (rob_dat.is_brch)
+                op = RO_BRCH;
+            if (rob_dat.halt)
+                op = RO_HALT;
+
+            case (op)
+            RO_LOAD: begin
                 if (lq_in.err_ld_ooo[lq_rd_cnt]) begin
                     ld_ooo  = 1;
                     ld_PC   = lq_in.PC[lq_rd_cnt];
                     break;
                 end
-            end
-            if (!rob_in.entries[i].cpl)
-                break;
-            if (rob_in.entries[i].halt && (!sq_in.sq_ret_complete || i != 0)) begin
-                /* A halt may retire IFF 
-                a) The ret buffer is empty (i.e. retired to memory) 
-                b) The halt is at the head of the ROB (i.e. i == 0). 
-                
-                (b. addresses the edge case where instructions in the same retire
-                batch, before the halt, are stores. Next cycle the ret buffer
-                will not be empty.)
-                */
-                break;
-            end
 
-            if (rob_in.entries[i].rd_mem) begin
-                // if (0) begin // TODO: enable when lq_in.err_ld_ooo is actually set
-                // if (lq_in.err_ld_ooo[lq_rd_cnt]) begin
-                //     ld_ooo  = 1;
-                //     ld_PC   = lq_in.PC[lq_rd_cnt];
-                //     break;
-                // end
-                ++lq_rd_cnt; 
-            end
+                if (!rob_dat.cpl)
+                    break;
 
-            if (rob_in.entries[i].wr_mem) begin
+                ++r_en_cnt;
+                ++lq_rd_cnt;
+            end
+            RO_STOR: begin
+                if (!rob_dat.cpl)
+                    break;
                 if (sq_rd_cnt >= sq_in.sq_ret_en)
                     break;
-                ++sq_rd_cnt; 
+                ++r_en_cnt;
+                ++sq_rd_cnt;
             end
-            
-            ++r_en_cnt;
+            RO_BRCH: begin
+                if (!rob_dat.cpl)
+                    break;
+                ++r_en_cnt;
 
-            if (!rob_in.entries[i].is_brch)
-                continue;
+                update_en_n[i] = 1;
 
-            update_en_n[i] = 1;
+                PC_original_n[i] = btq_in.dat[btq_rd_cnt].PC;
 
-            PC_original_n[i] = btq_in.dat[btq_rd_cnt].PC;
+                bhr_from_btq_n[i] = btq_in.dat[btq_rd_cnt].bhr;
+                correlated_bhr_d_n[i] = btq_in.dat[btq_rd_cnt].correlated_bhr;
 
-            bhr_from_btq_n[i] = btq_in.dat[btq_rd_cnt].bhr;
-            correlated_bhr_d_n[i] = btq_in.dat[btq_rd_cnt].correlated_bhr;
+                gshare_pred_n[i] = btq_in.dat[btq_rd_cnt].gshare_pred;
+                corr_pred_n[i] = btq_in.dat[btq_rd_cnt].corr_pred;
+                if (btq_in.dat[btq_rd_cnt].pred != btq_in.dat[btq_rd_cnt].take) begin
+                    // is mispred?
+                    mispred = 1;
+                    mispred_target = btq_in.dat[btq_rd_cnt].take
+                        ? btq_in.dat[btq_rd_cnt].tgt
+                        : btq_in.dat[btq_rd_cnt].NPC;
 
-            gshare_pred_n[i] = btq_in.dat[btq_rd_cnt].gshare_pred;
-            corr_pred_n[i] = btq_in.dat[btq_rd_cnt].corr_pred;
-            if (btq_in.dat[btq_rd_cnt].pred != btq_in.dat[btq_rd_cnt].take) begin
-                // is mispred?
-                mispred = 1;
-                mispred_target = btq_in.dat[btq_rd_cnt].take
-                    ? btq_in.dat[btq_rd_cnt].tgt
-                    : btq_in.dat[btq_rd_cnt].NPC;
+                    branch_taken_n[i] = btq_in.dat[btq_rd_cnt].take ? 1'b1 : 1'b0;
 
-                branch_taken_n[i] = btq_in.dat[btq_rd_cnt].take ? 1'b1 : 1'b0;
+                    ++btq_rd_cnt;
+                    break;
+                end
+                else if (btq_in.dat[btq_rd_cnt].take && (btq_in.dat[btq_rd_cnt].pred_tgt != btq_in.dat[btq_rd_cnt].tgt)) begin
+                    mispred = 1;
+                    mispred_target = btq_in.dat[btq_rd_cnt].tgt;
 
+                    branch_taken_n[i] = 1'b1;
+
+                    ++btq_rd_cnt;
+                    break;
+                end
                 ++btq_rd_cnt;
-                break;
             end
-            else if (btq_in.dat[btq_rd_cnt].take && (btq_in.dat[btq_rd_cnt].pred_tgt != btq_in.dat[btq_rd_cnt].tgt)) begin
-                mispred = 1;
-                mispred_target = btq_in.dat[btq_rd_cnt].tgt;
-
-                branch_taken_n[i] = 1'b1;
-
-                ++btq_rd_cnt;
-                break;
+            RO_HALT: begin
+                if (!rob_dat.cpl)
+                    break;
+                if (!sq_in.sq_ret_complete || i != 0)
+                    break;
+                ++r_en_cnt;
             end
-            ++btq_rd_cnt;
+            RO_ELSE: begin
+                if (!rob_dat.cpl)
+                    break;
+                ++r_en_cnt;
+            end
+            endcase
         end
 
         flush_n = mispred || ld_ooo;

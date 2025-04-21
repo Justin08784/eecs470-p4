@@ -115,21 +115,21 @@ module cpu (
         end
     end
 
-    always_ff @(posedge clock) begin
-        if (!reset) begin
-            $display("dcache2mem: {cmd: %1d, addr: %x, data: %x}",
-                dcache2mem_command,
-                dcache2mem_addr,
-                dcache2mem_data
-            );
-            $display("icache2mem: {cmd: %1d, addr: %x}",
-            fetch2mem_command,
-            fetch2mem_addr
-            );
-            $display("mem_transaction_tag: %0d", mem2proc_transaction_tag);
-            $display("mem_2_proc: {data_tag: %0d, data: %x}", mem2proc_data_tag, mem2proc_data);
-        end
-    end
+    // always_ff @(posedge clock) begin
+    //     if (!reset) begin
+    //         $display("dcache2mem: {cmd: %1d, addr: %x, data: %x}",
+    //             dcache2mem_command,
+    //             dcache2mem_addr,
+    //             dcache2mem_data
+    //         );
+    //         $display("icache2mem: {cmd: %1d, addr: %x}",
+    //         fetch2mem_command,
+    //         fetch2mem_addr
+    //         );
+    //         $display("mem_transaction_tag: %0d", mem2proc_transaction_tag);
+    //         $display("mem_2_proc: {data_tag: %0d, data: %x}", mem2proc_data_tag, mem2proc_data);
+    //     end
+    // end
 
     //////////////////////////////////////////////////
     //                                              //
