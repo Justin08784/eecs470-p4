@@ -36,8 +36,8 @@ import "DPI-C" function string decode_inst(int inst);
 
 
 // Debug cycle limits, both inclusive
-localparam DBG_CYCLE_MIN = 29800;
-localparam DBG_CYCLE_MAX = 31000;//`TB_MAX_CYCLES;
+localparam DBG_CYCLE_MIN = 0;
+localparam DBG_CYCLE_MAX = `TB_MAX_CYCLES;
 // localparam DBG_CYCLE_MIN = 1480;
 // localparam DBG_CYCLE_MAX = 1510;
 // localparam DBG_CYCLE_MIN = 1300;
@@ -1029,9 +1029,10 @@ module testbench;
         $display("FREE: %0d", free);
         $display("RSVD: %0d", rsvd);
         for (int i = 0; i < `LSQ_SZ; i++) begin
-            $display("Entry [%2d]: sq_idx=%2d, rob_idx=%2d, addr=%4x, data=%x, d_valid=%b, in_range=%b, mem_size: %0d, addr mask=%4b%s",
+            $display("Entry [%2d]: sq_idx=%2d, lq_pair=%2d, rob_idx=%2d, addr=%4x, data=%x, d_valid=%b, in_range=%b, mem_size: %0d, addr mask=%4b%s",
             i,
             state[i].sq_idx,
+            state[i].lq_pair,
             state[i].rob_idx,
             state[i].addr,
             state[i].data,
@@ -1078,9 +1079,10 @@ module testbench;
 
         $display("  | >> LQ");
         for (int i = 0; i < `LSQ_SZ; i++) begin
-            $display("Entry [%2d]: sq_idx=%2d, PC=%4x, addr=%4x, d_valid=%b, err_ld_ooo=%b%s",
+            $display("Entry [%2d]: sq_idx=%2d, lq_pair=%2d, PC=%4x, addr=%4x, d_valid=%b, err_ld_ooo=%b%s",
             i,
             state[i].sq_idx,
+            state[i].lq_pair,
             state[i].inst_pc,
             state[i].addr,
             state[i].d_vld,

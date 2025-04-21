@@ -70,6 +70,7 @@ module lod_ex(
 
         // readiness
         LSQ_IDX         sq_idx;
+        LSQ_IDX         lq_pair;
         logic [3:0]     need_byte_mask;
     } QUERY_BAY_ENTRY;
 
@@ -270,6 +271,7 @@ module lod_ex(
             ld_sq_out.forward_addr    [i] = bay[i].addr;
             ld_sq_out.forward_mem_size[i] = bay[i].mem_size; // TODO: REMOVE
             ld_sq_out.forward_sq_idx  [i] = bay[i].sq_idx;
+            ld_sq_out.forward_lq_pair  [i] = bay[i].lq_pair;
         end
 
         bay_n = bay;
@@ -303,6 +305,7 @@ module lod_ex(
                     mem_size: i_regs.dat.mem_size,
                     raw     : '0,
                     sq_idx  : i_regs.dat.sq_idx,
+                    lq_pair  : i_regs.dat.lq_pair,
                     need_byte_mask  : in_parse.need_byte_mask,
                     rd_unsigned     : i_regs.dat.rd_unsigned
                 };
