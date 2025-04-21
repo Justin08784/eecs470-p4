@@ -47,3 +47,9 @@ for t in "${TESTS[@]}"; do
         # diff "correct_out/${t}.${ext}" "output/${t}.${ext}"
     done
 done
+
+for file in diffs/*.diff; do
+    if [ -s "$file" ]; then
+        echo Nonzero diff in "$file"
+    fi
+done
