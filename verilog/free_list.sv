@@ -8,6 +8,9 @@ Free List
 module free_list #(parameter 
     N=`N
 ) (
+    `ifdef DEBUG
+    output DBG_fl dbg,
+    `endif
     input clock, reset, flush,
     // retire
     input retire_final r_in,
@@ -90,6 +93,7 @@ module free_list #(parameter
     end
    
 
+    FIFO_STATE dbg_fifo;
     fifo #(
         .INSTANCE_ID(0),
         .DEPTH(DEPTH),
@@ -100,6 +104,9 @@ module free_list #(parameter
         .ENABLE_INTR_FWD(`FALSE),
         .RESET_STATE(RESET_STATE)
     ) lst (
+        `ifdef DEBUG
+        .dbg(dbg_fifo),
+        `endif
         .clock(clock),
         .reset(reset),
         .flush(flush),
@@ -113,6 +120,20 @@ module free_list #(parameter
         .free_scnt(), // do we need this? how would even retire return more pregs than in existence?
         .used_scnt(d_out.free_rdy_scnt)
     );
+
+    `ifdef DEBUG
+    assign dbg = '{
+        r_in:r_in,
+        d_in:d_in,
+        d_out:d_out,
+        fifo: '{
+            head:   dbg_fifo.head,
+            tail:   dbg_fifo.tail,
+            state:  dbg_fifo.state,
+            used:   dbg_fifo.used
+        }
+    };
+    `endif
 
     // debugging
     // always_ff @(posedge clock) begin

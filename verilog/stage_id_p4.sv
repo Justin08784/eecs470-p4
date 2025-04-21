@@ -1,9 +1,6 @@
 
 // The decoder, copied from project 3
 
-// This has a few changes, it now sets a "mult" flag for multiply instructions
-// Pass these to the mult module with inst.r.funct3 as the MULT_FUNC
-
 `include "sys_defs.svh"
 `include "ISA.svh"
 
@@ -73,7 +70,22 @@ module decoder_p4 (
                     cond_branch = `TRUE;
                     // stage_ex uses inst.b.funct3 as the branch function
                 end
-                `RV32_MUL, `RV32_MULH, `RV32_MULHSU, `RV32_MULHU: begin
+                `RV32_MULHU: begin
+                    fu_idx     = FU_MULT;
+                    has_dest   = `TRUE;
+                    mult       = `TRUE;
+                end
+                `RV32_MULHSU: begin
+                    fu_idx     = FU_MULT;
+                    has_dest   = `TRUE;
+                    mult       = `TRUE;
+                end
+                `RV32_MULH: begin
+                    fu_idx     = FU_MULT;
+                    has_dest   = `TRUE;
+                    mult       = `TRUE;
+                end
+                `RV32_MUL: begin //, `RV32_MULH, `RV32_MULHSU, `RV32_MULHU: begin
                     fu_idx     = FU_MULT;
                     has_dest   = `TRUE;
                     mult       = `TRUE;
@@ -254,7 +266,7 @@ module stage_id_p4 (
         decoder_p4 decoder_i (
             // Inputs
             .inst  (f_in.f_dat[i].inst),
-            .valid (f_in.f_dat[i].valid),
+            .valid (`TRUE),
 
             // Outputs
             .fu_idx        (tmp[i].fu_idx),
@@ -292,6 +304,15 @@ module stage_id_p4 (
                 sq_idx      : '0,
                 lq_idx      : '0,
                 is_brch   : tmp[i].cond_branch || tmp[i].uncond_branch,
+
+                bhr         : f_in.f_dat[i].bhr, 
+                pred        : f_in.f_dat[i].pred,
+                pred_tgt    : f_in.f_dat[i].pred_tgt,
+
+                correlated_bhr : f_in.f_dat[i].correlated_bhr,
+
+                gshare_pred : f_in.f_dat[i].gshare_pred,
+                corr_pred   : f_in.f_dat[i].corr_pred,
 
                 inst        : f_in.f_dat[i].inst,
                 PC          : f_in.f_dat[i].PC,

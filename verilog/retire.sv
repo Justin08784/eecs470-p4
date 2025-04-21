@@ -26,9 +26,18 @@ module retire (
 
     output logic flush,
     output ADDR  corrected_PC,
-    output retire_final retire_exec,
+    output logic [`N-1:0] branch_taken,
+    output logic [`N-1:0] update_en,
+    output ADDR [`N-1:0] PC_original,
+    output logic [`N-1:0] [7:0] bhr_from_btq,
 
-    input logic mem_in_use
+
+    output logic [`N-1:0] [7:0] correlated_bhr_d,
+    output logic [`N-1:0] gshare_pred,
+    output logic [`N-1:0] corr_pred, 
+    //output retire2fetch ret_2_fetch,
+
+    output retire_final retire_exec
 );
     logic [$clog2(`N):0] r_en_cnt;
     logic [$clog2(`N):0] btq_rd_cnt;
@@ -49,8 +58,21 @@ module retire (
 
     logic flush_n;
     ADDR  corrected_PC_n;
+
+    logic [`N-1:0] branch_taken_n;
+    logic [`N-1:0] update_en_n;
+    ADDR [`N-1:0] PC_original_n;
+    logic [`N-1:0] [7:0] bhr_from_btq_n;
+
+
+    logic [`N-1:0] [7:0] correlated_bhr_d_n;
+    logic [`N-1:0] gshare_pred_n;
+    logic [`N-1:0] corr_pred_n;
+    logic store_retire;
+    
     always_comb begin
         sq_out = '0;
+        store_retire = 0;
 
         mispred = 0;
         mispred_target = '0;
@@ -61,11 +83,34 @@ module retire (
         btq_rd_cnt  = 0;
         sq_rd_cnt   = 0;
         lq_rd_cnt   = 0;
+
+        branch_taken_n = '0;
+        update_en_n = '0;
+        PC_original_n = '0;
+        bhr_from_btq_n = '0;
+
+        correlated_bhr_d_n = '0;
+        gshare_pred_n = '0;
+        corr_pred_n = '0;
+
+        btq_out = '0;
+
+
+
         for (int i = 0; i < rob_in.r_vld_cnt; ++i) begin
             if (!rob_in.entries[i].cpl)
                 break;
-            if (rob_in.entries[i].halt && (!sq_in.sq_ret_complete || mem_in_use))
+            if (rob_in.entries[i].halt && (!sq_in.sq_ret_complete || i != 0)) begin
+                /* A halt may retire IFF 
+                a) The ret buffer is empty (i.e. retired to memory) 
+                b) The halt is at the head of the ROB (i.e. i == 0). 
+                
+                (b. addresses the edge case where instructions in the same retire
+                batch, before the halt, are stores. Next cycle the ret buffer
+                will not be empty.)
+                */
                 break;
+            end
 
             if (rob_in.entries[i].rd_mem) begin
                 // if (0) begin // TODO: enable when lq_in.err_ld_ooo is actually set
@@ -78,23 +123,46 @@ module retire (
             end
 
             if (rob_in.entries[i].wr_mem) begin
-                if (sq_rd_cnt >= sq_in.sq_ret_en) break;
+                if (sq_rd_cnt >= sq_in.sq_ret_en)
+                    break;
                 ++sq_rd_cnt; 
             end
             
             ++r_en_cnt;
-            
+
             if (!rob_in.entries[i].is_brch)
                 continue;
+
+            update_en_n[i] = 1;
+
+            PC_original_n[i] = btq_in.dat[btq_rd_cnt].PC;
+
+            bhr_from_btq_n[i] = btq_in.dat[btq_rd_cnt].bhr;
+            correlated_bhr_d_n[i] = btq_in.dat[btq_rd_cnt].correlated_bhr;
+
+            gshare_pred_n[i] = btq_in.dat[btq_rd_cnt].gshare_pred;
+            corr_pred_n[i] = btq_in.dat[btq_rd_cnt].corr_pred;
             if (btq_in.dat[btq_rd_cnt].pred != btq_in.dat[btq_rd_cnt].take) begin
                 // is mispred?
                 mispred = 1;
                 mispred_target = btq_in.dat[btq_rd_cnt].take
                     ? btq_in.dat[btq_rd_cnt].tgt
                     : btq_in.dat[btq_rd_cnt].NPC;
+
+                branch_taken_n[i] = btq_in.dat[btq_rd_cnt].take ? 1'b1 : 1'b0;
+
                 ++btq_rd_cnt;
                 break;
-            end 
+            end
+            else if (btq_in.dat[btq_rd_cnt].take && (btq_in.dat[btq_rd_cnt].pred_tgt != btq_in.dat[btq_rd_cnt].tgt)) begin
+                mispred = 1;
+                mispred_target = btq_in.dat[btq_rd_cnt].tgt;
+
+                branch_taken_n[i] = 1'b1;
+
+                ++btq_rd_cnt;
+                break;
+            end
             ++btq_rd_cnt;
         end
 
@@ -137,8 +205,7 @@ module retire (
         };
 
         lq_out = flush ? '0 : '{
-            r_en : lq_rd_cnt,
-            r_pos: '0 // FIXME: What is this even used for?
+            r_en : lq_rd_cnt
         };
     end
 
@@ -150,10 +217,32 @@ module retire (
             control path cannot retrigger. */
             flush        <= '0;
             corrected_PC <= '0;
+
+
+            branch_taken <= '0;
+            update_en    <= '0;
+            PC_original  <= '0;
+            bhr_from_btq <= '0;
+
+
+            correlated_bhr_d <= '0;
+            gshare_pred      <= '0;
+            corr_pred        <= '0;
+
         end else begin
 /* ======================================== */
             flush        <= flush_n;
             corrected_PC <= corrected_PC_n;
+
+            branch_taken <= branch_taken_n;
+            update_en    <= update_en_n;
+            PC_original  <= PC_original_n;
+            bhr_from_btq <= bhr_from_btq_n;
+
+
+            correlated_bhr_d <= correlated_bhr_d_n;
+            gshare_pred      <= gshare_pred_n;
+            corr_pred        <= corr_pred_n;
 /* ======================================== */
         end
     end

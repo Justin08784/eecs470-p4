@@ -245,6 +245,7 @@ module mul_ex(
                 t       : i_regs[i].dat.t,
                 rob_idx : i_regs[i].dat.rob_idx
             };
+            // $display("MULT_FUNC: %0d", i_regs[i].dat.func);
         end
     end
 
@@ -291,6 +292,10 @@ module mul_ex(
 endmodule
 
 module stage_ex_p4 (
+    `ifdef DEBUG
+    input  logic print_en,
+    output DBG_execute dbg,
+    `endif
     input clock,
     input reset,
     input flush,
@@ -305,12 +310,8 @@ module stage_ex_p4 (
     output  execeuteST2lq st_lq_out,
     output  executeLD2sq ld_sq_out,
 
-    input logic dcache_accepted,
-    input logic dcache_data_valid,
-    input MEM_BLOCK dcache_data,
-
-    output MEM_COMMAND mem_command,
-    output ADDR mem_addr,
+    input   dcache2ld   dcache_in,
+    output   ld2dcache   dcache_out,
 
     input   prf2execute prf_in,
     output  execute2prf prf_out,
@@ -712,12 +713,8 @@ module stage_ex_p4 (
         .lq_out(lq_out),
         .ld_sq_out(ld_sq_out),
 
-        .dcache_accepted(dcache_accepted),
-        .dcache_data_valid(dcache_data_valid),
-        .dcache_data(dcache_data),
-
-        .mem_command(mem_command),
-        .mem_addr(mem_addr),
+        .dcache_in(dcache_in),
+        .dcache_out(dcache_out),
 
         .cdb_req(cdb_req.lod),
         .ctag_ts(ctag_ts.lod),
@@ -937,5 +934,27 @@ module stage_ex_p4 (
     //     end
     // end
     // `endif // DEBUG
+    `ifdef DEBUG
+    assign dbg = '{
+        btq_out : btq_out,
+        ctag_out: ctag_out,
+        cdat_out: cdat_out,
+        iss     : iss,
+        regs    : regs,
+
+        cands   : cands,
+        cands_flat      : cands_flat,
+
+        ctag_ts : ctag_ts,
+        ctag_ts_flat : ctag_ts_flat,
+
+        cdb2fu_gbus_shr : cdb2fu_gbus_shr,
+        cdb2fu_gbus : cdb2fu_gbus,
+        cdb_gnt_shr : cdb_gnt_shr,
+
+        cdb_req : cdb_req,
+        cdb_gnt : cdb_gnt
+    };
+    `endif
 
 endmodule // stage_ex

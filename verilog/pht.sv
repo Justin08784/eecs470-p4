@@ -51,11 +51,6 @@ module pht (
                     pht[update_index1] <= pht[update_index1] - 1;
             end
         end
-        $display("  pht[update_index0] = %2b", pht[update_index0]);
-        $display("  pht[update_index1] = %2b", pht[update_index1]);
-
-        $display("  pht[predict_index0] = %2b", pht[predict_index0]);
-        $display("  pht[predict_index1] = %2b", pht[predict_index1]);
     end
 
 endmodule

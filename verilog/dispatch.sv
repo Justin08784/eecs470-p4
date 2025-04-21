@@ -82,7 +82,6 @@ end
 //logic for free list
 logic [N-1:0]           bus_alloc_preg;
 logic [$clog2(N):0]     num_alloc_preg;
-logic [N-1:0][N-1:0]    gbus_preg2insn;
 always_comb begin
     //determining how many instructions have a dest reg
     foreach (bus_alloc_preg[i])
@@ -92,24 +91,19 @@ always_comb begin
     free_out.free_d_en_cnt = num_alloc_preg;
 end
 
-psel_gen #(
-    .WIDTH  (N),
-    .REQS   (N)
-) sel (
-    .req    (bus_alloc_preg),
-    .gnt_bus(gbus_preg2insn)
-);
-
 ID_RESULT [`N-1:0] tmp_decode2alloc;
+int rd_idx = 0;
 always_comb begin
     tmp_decode2alloc = '0;
     for (int unsigned i = 0; i < `N; ++i)
         tmp_decode2alloc[i] = decode_in.d_dat[i];
 
     //handling dest tags
-    foreach(gbus_preg2insn[i, j]) begin
-        if (gbus_preg2insn[i][j])
-            tmp_decode2alloc[j].t |= free_in.d_ts[i];
+    for (int i = 0, rd_idx = 0; i < N; ++i) begin
+        if (bus_alloc_preg[i]) begin
+            tmp_decode2alloc[i].t |= free_in.d_ts[rd_idx];
+            ++rd_idx;
+        end
     end
 end
 
@@ -218,6 +212,14 @@ always_comb begin
     btq_wr_idx  = 0;
     btq_out.NPC = '0;
 
+    btq_out.PC = '0;
+    btq_out.bhr = '0;
+    btq_out.pred = '0;
+    btq_out.pred_tgt = '0;
+    btq_out.gshare_pred = '0;
+    btq_out.corr_pred = '0;
+    btq_out.correlated_bhr = '0;
+
     for (int i = 0; i < `N; ++i) begin
         tmp_alloc2rename[i].dat         = rename_in[i];
 
@@ -238,6 +240,15 @@ always_comb begin
         if (rename_in[i].is_brch) begin
             tmp_alloc2rename[i].dat.btq_idx = btq_in.btq_idxs[btq_wr_idx];
             btq_out.NPC[btq_wr_idx] = rename_in[i].NPC;
+            btq_out.PC[btq_wr_idx] =      rename_in[i].PC;
+            btq_out.pred_tgt[btq_wr_idx] = rename_in[i].pred_tgt;
+
+            btq_out.bhr[btq_wr_idx] = rename_in[i].bhr;
+            btq_out.pred[btq_wr_idx] = rename_in[i].pred;
+
+            btq_out.gshare_pred[btq_wr_idx] = rename_in[i].gshare_pred;
+            btq_out.corr_pred[btq_wr_idx] = rename_in[i].corr_pred;
+            btq_out.correlated_bhr[btq_wr_idx] = rename_in[i].correlated_bhr;
             ++btq_wr_idx;
         end
     end
@@ -322,8 +333,31 @@ always_comb begin
         end
     end
 
-    sq_out.sq_d_en_cnt = sq_wr_idx;
-    lq_out.lq_d_en_cnt = lq_wr_idx;
+    // sq_out.sq_d_en_cnt = sq_wr_idx;
+    // lq_out.lq_d_en_cnt = lq_wr_idx;
+end
+
+
+logic [$clog2(`N):0] sq_wr_cnt;
+logic [$clog2(`N):0] lq_wr_cnt;
+always_comb begin
+    sq_wr_cnt = 0;
+    lq_wr_cnt = 0;
+
+    for (int i = 0; i < `N; i++) begin
+        if (i >= commit_en_cnt) continue;
+        
+        if (commit_in[i].dat.wr_mem) begin
+            ++sq_wr_cnt;
+        end
+
+        if (commit_in[i].dat.rd_mem) begin
+            ++lq_wr_cnt;
+        end
+    end
+
+    sq_out.sq_d_en_cnt = sq_wr_cnt;
+    lq_out.lq_d_en_cnt = lq_wr_cnt;
 end
 
 // handle rob output 

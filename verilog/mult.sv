@@ -176,29 +176,28 @@ module mult #(
         result = (o_pkt.func == M_MUL)
             ? o_pkt.sum[31:0]
             : o_pkt.sum[63:32];
-    
         o_t         = o_pkt.t;
         o_rob_idx   = o_pkt.rob_idx;
     end
 
-    `ifdef DEBUG
-    always_ff @(posedge clock) begin
-        if (!reset && ID == 1) begin
-            $display("  %3d | >> mul%0d >>", $time, ID);
-            for (int unsigned i = 0; i < `MULT_STAGES+1; ++i) begin
-                $display("– sum: %x, mplier: %x, mcand: %x, func: %0d, tag: %2d, rob_idx: %2d",
-                    pkts[i].sum,
-                    pkts[i].mplier,
-                    pkts[i].mcand,
-                    pkts[i].func,
-                    pkts[i].t,
-                    pkts[i].rob_idx
-                );
-            end
-            $display("  %3d | << mul%0d <<", $time, ID);
-        end
-    end
-    `endif // DEBUG
+    // `ifdef DEBUG
+    // always_ff @(posedge clock) begin
+    //     if (!reset && ID == 0) begin
+    //         $display("  %3d | >> mul%0d >>", $time, ID);
+    //         for (int unsigned i = 0; i < `MULT_STAGES+1; ++i) begin
+    //             $display("– sum: %x, mplier: %x, mcand: %x, func: %0d, tag: %2d, rob_idx: %2d",
+    //                 pkts[i].sum,
+    //                 pkts[i].mplier,
+    //                 pkts[i].mcand,
+    //                 pkts[i].func,
+    //                 pkts[i].t,
+    //                 pkts[i].rob_idx
+    //             );
+    //         end
+    //         $display("  %3d | << mul%0d <<", $time, ID);
+    //     end
+    // end
+    // `endif // DEBUG
 
 endmodule // mult
 
@@ -241,7 +240,7 @@ module mult_stage #(
         O_NONE: begin
             assign i_rdy = o_rdy;
             assign o_vld = i_vld;
-            assign o_dat = i_dat;
+            assign o_dat = tmp_dat;
         end
 
         O_SKID: begin

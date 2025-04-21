@@ -44,7 +44,7 @@
 `define NUM_FU_ALU 2
 `define NUM_FU_MULT 1
 `define NUM_FU_LOAD 1
-`define LD_BAY_SZ 4 //num load bays in the FU
+`define LD_BAY_SZ 1 //num load bays in the FU
 `define NUM_FU_STORE 1
 // `define NUM_FU_TOTAL `NUM_FU_ALU + `NUM_FU_MULT + `NUM_FU_LOAD + `NUM_FU_STORE
 `define NUM_FU_TOTAL `NUM_FU_ALU + `NUM_FU_MULT + `NUM_FU_LOAD + `NUM_FU_STORE
@@ -56,6 +56,11 @@
 
 `define BTB_ENTRIES 256
 `define BTB_TAG_WIDTH 12
+
+`define BHT_ENTRIES 256
+`define HISTORY_BITS 8
+`define PHT_ENTRIES 256
+//`define HISTORY_BITS 8
 
 `define PREFETCH_CAP 24 // <- how far ahead we can prefetch
 
@@ -69,6 +74,8 @@
 `ifndef SYNTH
 // comment out to disable DEBUG:
 // `define DEBUG
+// comment to disable clock cycle print
+// `define CYCLE_PRINT
 `endif
 
 ///////////////////////////////
@@ -366,7 +373,13 @@ typedef struct packed {
     INST  inst;
     ADDR  PC;
     ADDR  NPC; // PC + 4
-    logic valid;
+    ADDR pred_tgt;
+    logic [7:0] bhr;
+    logic [7:0] correlated_bhr;
+
+    logic pred;
+    logic gshare_pred;
+    logic corr_pred;
 } IF_ID_PACKET;
 
 /**
@@ -497,10 +510,17 @@ typedef struct packed {
 // By btq
 typedef logic [$clog2(`BTQ_SZ)-1:0] BTQ_IDX;
 typedef struct packed {
+    ADDR    pred_tgt;
     ADDR    tgt;   // can we actually store [29:0], since bottom bits of address are 0s anyways?
     ADDR    NPC;   // PC + 4 (i.e. address if we dont take the branch)
     logic   pred;
     logic   take;
+    ADDR    PC;
+    logic [7:0] bhr;
+    logic [7:0] correlated_bhr;
+
+    logic gshare_pred;
+    logic corr_pred;
 } BTQ_ENTRY;
 
 typedef struct packed {
@@ -539,7 +559,43 @@ typedef struct packed {
 } retire_final;
 
 typedef struct packed {
-    ADDR    corrected_PC;
+    ADDR  corrected_PC;
+
+    logic [`N-1:0] is_taken;
+
+    logic [`N-1:0] update_en;
+
+    ADDR [`N-1:0] PC;
+
+    //logic []
+
+
+    //retire2btb
+    /*COMMENT OUT FOR NOW BUT NEED BACK IN*///ADDR [`N-1:0] PC;
+  //  logic [`N-1:0] is_taken;
+   // logic [`N-1:0] [15:0] target;
+
+    //retire2predictor
+  //  logic [`N-1:0] update_enable;
+    //logic [`N-1:0]taken;
+  //  ADDR [`N-1:0] PC;
+
+    //logic [7:0] bhr;
+
+    //logic [`N-1:0][31:0] PC;
+    //logic [`N-1:0] is_taken;
+    //logic [`N-1:0] [15:0] target;
+
+    logic [`N-1:0] [7:0] retired_bhr;
+
+    logic [`N-1:0] [7:0] correlated_bhr;
+
+    logic [`N-1:0] gshare_pred;
+
+    logic [`N-1:0] corr_pred;
+
+
+
 } retire2fetch;
 
 typedef struct packed {
@@ -550,6 +606,16 @@ typedef struct packed {
         // How many branch instructions dispatching?
         // Sender must ensure branch insns packed to lowest indices.
     ADDR    [`N-1:0]       NPC;
+    ADDR    [`N-1:0]       PC;
+    ADDR    [`N-1:0]       pred_tgt;
+
+    logic   [`N-1:0] [7:0] bhr;
+
+    logic   [`N-1:0] [7:0] correlated_bhr;
+
+    logic   [`N-1:0] pred;
+    logic   [`N-1:0] gshare_pred;
+    logic   [`N-1:0] corr_pred;
 } dispatch2btq;
 
 // Reservation station stuff
@@ -575,6 +641,14 @@ typedef struct packed {
     LSQ_IDX         sq_idx;
     LSQ_IDX         lq_idx; //THESE ARE TWO DIFFERENT THINGS, BOTH REQUIRED. DO *NOT* COMBINE THEM
     logic           is_brch; // Is inst a branch?
+
+    logic   [7:0]   bhr;
+    logic   [7:0]   correlated_bhr;
+
+    logic           pred;
+    ADDR            pred_tgt;
+    logic           gshare_pred;
+    logic           corr_pred;
     
 
     /* from ID_EX_PACKET */
@@ -824,7 +898,17 @@ typedef struct packed {
 } free_list2dispatch;
 
 typedef struct packed {
-    logic [`N-1:0][31:0] PC;
+    //logic [`N-1:0][31:0] PC;
+
+    ADDR [`N-1:0] PC;
+
+    
+    //retire2btb stuff
+    ADDR [`N-1:0] correct_PC;
+    logic [`N-1:0] is_taken;
+    logic [`N-1:0] [15:0] target;
+
+
 } fetch2btb;
 
 typedef struct packed {
@@ -838,14 +922,24 @@ typedef struct packed {
     logic [`N-1:0][31:0] PC;
     logic [`N-1:0] is_taken;
     logic [`N-1:0] [15:0] target;
-} execute2btb;
+} retire2btb;
 
 typedef struct packed {
     ADDR [`N-1:0] PC;
+
+    //retire2predictor stuff
+    logic [`N-1:0] update_enable;
+    logic [`N-1:0]taken;
+    ADDR [`N-1:0] correct_PC;
+
+    logic [`N-1:0] [7:0] retired_bhr;
+    logic [`N-1:0] [7:0] correlated_bhr;
+
 } fetch2predictor;
 
 typedef struct packed {
     logic [`N-1:0] prediction;
+    logic [`N-1:0] [7:0]    bhr;
 } predictor2fetch;
 
 typedef struct packed {
@@ -984,7 +1078,6 @@ typedef struct packed {
 
 typedef struct packed {
     logic   [$clog2(`N):0] r_en;
-    ROB_IDX [`N-1:0] r_pos;
 } retire2lq;
 
 typedef struct packed {
@@ -1171,18 +1264,18 @@ typedef struct packed {
     logic [$clog2(`LSQ_SZ)-1:0] ret_head;
     logic [$clog2(`LSQ_SZ)-1:0] tail;
     logic [$clog2(`LSQ_SZ):0]   used;
+    logic [$clog2(`LSQ_SZ):0]   free;
+    logic [$clog2(`LSQ_SZ):0]   rsvd;
     // I/O
 
     dispatch2sq   dis_2_sq;
     execute2sq    exec_2_sq;
     retire2sq     retire_2_sq;
-    MEM_TAG       mem2proc_transaction_tag;
 
     sq2dispatch  sq_2_dis;
     sq2execute   sq_2_exec;
     // sq2rs sq_2_rs,
     sq2retire    sq_2_retire;
-    stRET2mem    ret_2_mem;
 
     DBG_retbuf   dbg_retbuf;
 } DBG_sq;
@@ -1200,6 +1293,45 @@ typedef struct packed {
     ADDR  mispred_target;
     retire_final retire_exec;
 } DBG_retire;
+
+
+localparam FL_DEPTH = `ROB_SZ;
+localparam FL_WIDTH = $bits(PHYS_REG_IDX);
+typedef struct packed {
+    retire_final r_in;
+    dispatch2free_list d_in;
+    free_list2dispatch d_out;
+    struct packed {
+        logic [$clog2(FL_DEPTH)-1:0]       head;
+        logic [$clog2(FL_DEPTH)-1:0]       tail;
+        logic [FL_DEPTH-1:0][FL_WIDTH-1:0] state;
+        logic [$clog2(FL_DEPTH):0]         used;
+    } fifo;
+} DBG_fl;
+
+`ifdef DEBUG
+function automatic string dbg_mem_cmd(input MEM_COMMAND cmd);
+    string rv;
+    case (cmd)
+        MEM_NONE:   rv = "NONE";
+        MEM_STORE:  rv = "STOR";
+        MEM_LOAD:   rv = "LOAD";
+    endcase
+    return rv;
+endfunction
+
+function automatic string dbg_mem_size(input MEM_SIZE size);
+    string rv;
+    rv = "unknown mem size";
+    case (size)
+        BYTE:   rv = "BYTE";
+        HALF:   rv = "HALF";
+        WORD:   rv = "WORD";
+        DOUBLE: rv = "DOUBLE";
+    endcase
+    return rv;
+endfunction;
+`endif
 
 
 `endif // __SYS_DEFS_SVH__
