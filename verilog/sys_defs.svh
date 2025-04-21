@@ -55,7 +55,14 @@
 
 
 `define BTB_ENTRIES 256
-`define BTB_TAG_WIDTH 12
+`define BTB_TAG_WIDTH 22//12
+`define BTB_TARGET_WIDTH 16
+
+`define GSHARE_GBHR_WIDTH 8
+`define GSHARE_PHT_INDEX_WIDTH 8
+
+`define CORR_BHR_WIDTH 8
+
 
 `define BHT_ENTRIES 256
 `define HISTORY_BITS 8
@@ -907,23 +914,23 @@ typedef struct packed {
     //retire2btb stuff
     ADDR [`N-1:0] correct_PC;
     logic [`N-1:0] is_taken;
-    logic [`N-1:0] [15:0] target;
+    logic [`N-1:0] [`BTB_TARGET_WIDTH-1:0] target;
 
 
 } fetch2btb;
 
 typedef struct packed {
    // ADDR [`N-1:0]  PC,
-    logic [`N-1:0] [15:0] target;
+    logic [`N-1:0] [`BTB_TARGET_WIDTH-1:0] target;
     logic [`N-1:0] hit;
 } btb2fetch;
 
 
-typedef struct packed {
+/*typedef struct packed {
     logic [`N-1:0][31:0] PC;
     logic [`N-1:0] is_taken;
     logic [`N-1:0] [15:0] target;
-} retire2btb;
+} retire2btb;*/
 
 typedef struct packed {
     ADDR [`N-1:0] PC;
@@ -935,6 +942,9 @@ typedef struct packed {
 
     logic [`N-1:0] [7:0] retired_bhr;
     logic [`N-1:0] [7:0] correlated_bhr;
+
+    logic flush;
+    logic [4:0] spec_branch_count;
 
 } fetch2predictor;
 

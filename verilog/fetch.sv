@@ -127,15 +127,21 @@ module stage_if_p4 (
         .used_scnt  (used_scnt)
     );
 
+    logic [4:0] spec_branch_count;
+
+
     always_ff @(posedge clock) begin
         if (reset) begin
                 PC_reg <= 0; // initial PC value is 0 (the memory address where our program starts)
+                spec_branch_count <= 0;
         end else if (flush) begin
                 PC_reg <= r_in.corrected_PC;
+                spec_branch_count <= 0;
         end else if(mux_result_prediction) begin
             if(mux_result_prediction[0]) begin
                 if (f_cnt > 0) begin
                     PC_reg <= {16'b0, btb_in.target[0]};
+                    spec_branch_count <= spec_branch_count + 1;
                 end else begin
                     PC_reg <= PC_reg;
                 end
@@ -168,6 +174,7 @@ module stage_if_p4 (
     logic [1:0] gshare_pred;
     logic [255:0][1:0] chooser_table;
 
+   // assign predict_taken = 0;
     always_comb begin
         case (chooser_table[PC_reg[7:0]])
             2'b00: predict_taken = pred_in_gshare.prediction;
