@@ -667,6 +667,7 @@ module dcache_block (
 
   
     assign dbg = '{
+`ifdef DEBUG
         mem_in_transaction_tag  : mem_in_transaction_tag,
         mem_in_data             : mem_in_data,
         mem_in_data_tag         : mem_in_data_tag,
@@ -682,6 +683,7 @@ module dcache_block (
         sq_out  : sq_out,
 
         mshr    : mshr,
+`endif
         hdr     : hdr,
         memDP   : dbg_memDP
     };
