@@ -68,10 +68,14 @@ typedef struct packed {
     MEM_SIZE    mem_size;
 } MSHR_SND;
 
+typedef struct packed {
+    MEM_TAG miss_tag;
+} MSHR_RCV;
+
 module fill_handler (
     // Metadata to consult
     input  CACHE_HEADER hdr,
-    input  MSHR_ENTRY   mshr,
+    input  MSHR_ENTRY [NUM_MSHR-1:0] mshr_arr,
 
     /* orders */
     output logic        req,
@@ -126,11 +130,37 @@ module fill_handler (
                 break;
             end
         end
-
     end
 
+    logic [NUM_MSHR-1:0] mshr_sidle;
+    logic [NUM_MSHR-1:0] mshr_sfill;
+    logic [NUM_MSHR-1:0] mshr_sfill_sel;
     always_comb begin
-        req = mshr.status == S_FILL;
+        foreach (mshr_arr[i]) begin
+            mshr_sidle[i] = mshr_arr[i].status == S_IDLE;
+            mshr_sfill[i] = mshr_arr[i].status == S_FILL;
+        end
+    end
+
+    psel_gen #(
+        .WIDTH(NUM_MSHR),
+        .REQS (1)
+    ) sel_fill (
+        .req (mshr_sfill),
+        .gnt (mshr_sfill_sel)
+    );
+
+    always_comb begin
+        MSHR_ENTRY mshr;
+
+        req     = |mshr_sfill;
+        mshr    = '0;
+        foreach (mshr_arr[i]) begin 
+            if (!mshr_sfill_sel[i])
+                continue;
+            mshr = mshr_arr[i];
+            break;
+        end
 
         sid = get_sid(mshr.addr);
         way = ways[sid];
@@ -202,11 +232,13 @@ module load_handler (
 
     /* receipts */
     input  logic        gnt,
+    input  MSHR_RCV     mshr_rcv,
     input  READ_RCV     r_rcv
 
 );
     OP_TAG op;
     CACHE_LOC loc;
+    LD_QUERY_STATUS status;
     assign w_snd = '0;
 
     always_comb begin
@@ -221,8 +253,8 @@ module load_handler (
                 : OP_LOAD_MISS;
         end
 
+        status = LD_MISS_NTAG;
         {r_snd, mshr_snd} = '0;
-
         case (op)
         OP_LOAD_HIT: begin
             r_snd = '{
@@ -230,6 +262,9 @@ module load_handler (
                 sid : loc.sid,
                 way : loc.way
             };
+
+            if (req)
+                status = gnt ? LD_HIT_READ : LD_HIT_WAIT;
         end
 
         OP_LOAD_MISS: begin
@@ -241,6 +276,11 @@ module load_handler (
                 mem_data : '0,
                 mem_size : DOUBLE
             };
+
+            if (req)
+                status = (gnt && mshr_rcv.miss_tag != '0)
+                    ? LD_MISS_YTAG
+                    : LD_MISS_NTAG;
         end
         default:;
         endcase
@@ -248,12 +288,9 @@ module load_handler (
 
     always_comb begin
         ld_out = '{
-            tag     : '0,
+            tag     : mshr_rcv.miss_tag,
             dat     : r_rcv.dat, // FIXME: load FU will need to do the byte manip on the load!
-            status  : (gnt && op == OP_LOAD_HIT)
-                ? LD_SUCC
-                : LD_FAIL,
-            ldb     : '0
+            status  : status
         };
     end
 
@@ -279,6 +316,7 @@ module stor_handler (
 
 );
     OP_TAG op;
+    ST_QUERY_STATUS status;
     CACHE_LOC loc;
 
     always_comb begin
@@ -292,6 +330,7 @@ module stor_handler (
                 : OP_STOR_MISS;
         end
 
+        status = ST_FAIL;
         {r_snd, w_snd, mshr_snd} = '0;
         case (op)
         OP_STOR_HIT: begin
@@ -313,6 +352,8 @@ module stor_handler (
                 )
             };
 
+            if (req)
+                status = gnt ? ST_SUCC : ST_FAIL;
         end
 
         OP_STOR_MISS: begin
@@ -324,15 +365,18 @@ module stor_handler (
                 mem_data : '0,
                 mem_size : DOUBLE
             };
+
+            if (req)
+                status = (gnt && mshr_rcv.miss_tag != '0)
+                    ? ST_SUCC
+                    : ST_FAIL;
         end
         default:;
         endcase
     end
 
     assign sq_out = '{
-        status : (gnt && op == OP_STOR_HIT)
-            ? ST_SUCC
-            : ST_FAIL
+        status : status
     };
 endmodule;
 
@@ -342,9 +386,10 @@ module refill_engine (
     input clock,
     input flush,
     // expose mshr state
-    output MSHR_ENTRY   mshr_out,
+    output MSHR_ENTRY   mshr_arr_out,
 
     input  MSHR_SND     snd_in,
+    input  MSHR_RCV     rcv_out,
 
     input  MEM_TAG      mem_in_transaction_tag,
     input  MEM_BLOCK    mem_in_data,
@@ -354,14 +399,20 @@ module refill_engine (
     output ADDR         mem_out_addr,
     output MEM_BLOCK    mem_out_data
 );
-    MSHR_ENTRY mshr, mshr_n;
-    assign mshr_out = mshr;
+    MSHR_ENTRY [NUM_MSHR-1:0] mshr_arr, mshr_arr_n;
+    assign mshr_arr_out = mshr_arr;
 
     always_comb begin
-        mshr_n = mshr;
+        MSHR_ENTRY mshr, mshr_n;
         mem_out_command = '0;
         mem_out_addr    = '0;
         mem_out_data    = '0;
+
+        rcv_out         = '0;
+
+    foreach (mshr_arr[i]) begin
+        mshr    = mshr_arr[i];
+        mshr_n  = mshr;
 
         case(mshr.status)
         S_IDLE: begin
@@ -434,6 +485,9 @@ module refill_engine (
             endcase
         end
         endcase
+
+        mshr_arr_n[i] = mshr_n;
+    end
     end
 
     always_ff @(posedge clock) begin

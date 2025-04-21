@@ -54,6 +54,7 @@ typedef enum logic [1:0] {
     S_FILL=3
 } MSHR_STATUS;
 
+localparam NUM_MSHR = $bits(MEM_TAG);
 typedef struct packed {
     MSHR_STATUS status;
     logic       wr_mem;
@@ -96,9 +97,11 @@ function automatic logic [2:0] idw_byte(input ADDR addr);
 endfunction
 
 // I/O types
-typedef enum logic [1:0] {
-    LD_SUCC,
-    LD_FAIL
+typedef enum logic [2:0] {
+    LD_MISS_NTAG,   // Block not in dcache and could not alloc/coalesce. Must retry.
+    LD_MISS_YTAG,   // Block not in dcache and alloc'd/coalesced into MSHR. Proceed to load buffer.
+    LD_HIT_WAIT,    // Block in dcache and could not read. Must retry.
+    LD_HIT_READ     // Block in dcache and could read. Proceed to CDB buffer.
 } LD_QUERY_STATUS;
 
 typedef enum logic {
@@ -125,7 +128,6 @@ typedef struct packed {
     MEM_TAG         tag; //not currently in use
     MEM_BLOCK       dat;
     LD_QUERY_STATUS status;
-    LDB             ldb; //not currently in use
 } dcache2ld;
 
 typedef struct packed {
