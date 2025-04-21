@@ -293,7 +293,6 @@ endmodule
 
 module stage_ex_p4 (
     `ifdef DEBUG
-    input  logic print_en,
     output DBG_execute dbg,
     `endif
     input clock,

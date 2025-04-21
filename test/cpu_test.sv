@@ -30,7 +30,8 @@ import "DPI-C" function string decode_inst(int inst);
 //import "DPI-C" function void close_pipeline_output_file();
 
 
-`define TB_MAX_CYCLES 2500
+`define TB_MAX_CYCLES 50000000
+// `define TB_MAX_CYCLES 2500
 // `define TB_MAX_CYCLES 10000
 
 
@@ -1538,8 +1539,8 @@ module testbench;
         //      mem2proc_data_tag
         // );
         print_rs();
-        // print_execute();
-        // print_dcache();
+        print_execute();
+        print_dcache();
         // print_sq();
         // print_retbuf();
         // print_lq();
