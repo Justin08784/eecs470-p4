@@ -18,11 +18,12 @@ module lq #(parameter
 
     input dispatch2lq dispatch_in,
     input execute2lq execute_in,
-    input execeuteST2lq execST_in,
     input retire2lq retire_in,
+    input sq2lq sq_in,
 
     output lq2dispatch dispatch_out,
-    output lq2retire retire_out
+    output lq2retire retire_out,
+    output lq2sq sq_out
 );
 
     localparam NUM_DPORTS = N; // dispatch ports (in-order)
@@ -73,36 +74,15 @@ module lq #(parameter
         retire_out.err_ld_ooo[1] = state[r_idxs[1]].err_ld_ooo;
     end
 
-    LSQ_IDX err_cnt;
+
     always_comb begin
-        //handle checking if LQ got ahead of SQ and needs to flag it in ROB
-        set_err = '0;
-        err_idx = '0;
-        err_cnt = '0;
+        sq_out = '0;
 
-        for (int i = 0; i < NUM_FU_STORE; i++) begin
-            if (!execST_in.st_en[i]) continue;
+        foreach(execute_in.ld_ex_en[i]) begin
+            // if (!execute_in.ld_ex_en[i]) continue;
 
-            for (int j = 0, int idx = 0; j < used; j++) begin
-                idx = (head + j) % LSQ_SZ;
-                if ((state[idx].sq_idx == execST_in.st_sq_idx[i]) && state[idx].d_vld) begin
-                    set_err[err_cnt] = '1;
-                    err_idx[err_cnt] = idx;
-                    err_cnt++;
-                end
-            end
-        end
-        //check for st/ld on the same cycle (error since st won't be commited until next clock edge)
-        for (int i = 0; i < NUM_FU_LOAD; i++) begin
-            for (int j = 0; j < NUM_FU_STORE; j++) begin
-                if (!execST_in.st_en[j]) continue;
-
-                if ((execST_in.st_sq_idx[j] == state[execute_in.ld_lq_idx[i]].sq_idx) && execute_in.ld_ex_en[i]) begin
-                    set_err[err_cnt] = 1;
-                    err_idx[err_cnt] = execute_in.ld_lq_idx[i];
-                    err_cnt++;
-                end
-            end
+            sq_out.ck_en[i] = execute_in.ld_ex_en[i];// && (state[execute_in.ld_lq_idx[i]].sq_idx != LSQ_SZ);
+            sq_out.idxs[i] = state[execute_in.ld_lq_idx[i]].sq_idx;
         end
     end
 
@@ -137,14 +117,9 @@ module lq #(parameter
             end
 
             //handle error flags
-            // for (int unsigned i = 0; i < NUM_FU_STORE+NUM_FU_LOAD; ++i) begin
-            //     if (set_err[i])
-            //         state[err_idx[i]].err_ld_ooo <= 1;
-            // end
 
-            foreach(set_err[i]) begin
-                if (set_err[i])
-                    state[err_idx[i]].err_ld_ooo <= 1;
+            foreach(sq_out.ck_en[i]) begin
+                if (sq_out.ck_en[i] && sq_in.err_en[i]) state[execute_in.ld_lq_idx[i]].err_ld_ooo <= 1;
             end
 
             // handle dispatch (ins)
