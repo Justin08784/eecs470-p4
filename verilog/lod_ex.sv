@@ -371,8 +371,8 @@ module lod_ex(
             tmp = lbuf[i];
             sign = 0;
             case (tmp.mem_size)
-            BYTE: sign = tmp.raw[7];
-            HALF: sign = tmp.raw[15];
+            BYTE: sign = tmp.raw.byte_level[tmp.iw_off][7];
+            HALF: sign = tmp.raw.half_level[tmp.iw_off][15];
             default:;
             endcase
 
