@@ -194,7 +194,7 @@ module str_ex(
     always_comb begin
         ADDR  addr;
         sq_out = '0;
-        st_lq_out = '0;
+       // st_lq_out = '0;
         foreach(i_vld[i]) begin
             if (!i_vld[i])
                 continue;

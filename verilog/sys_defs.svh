@@ -1018,14 +1018,14 @@ typedef struct packed {
     logic   [`NUM_FU_LOAD-1:0] err_en;
 } sq2lq;
 
-typedef struct packed {
+/*typedef struct packed {
     logic   [`NUM_FU_LOAD-1:0] ck_en;
     LSQ_IDX [`NUM_FU_LOAD-1:0] idxs;
 } lq2sq;
 
 typedef struct packed {
     logic   [`NUM_FU_LOAD-1:0] err_en;
-} sq2lq;
+} sq2lq;*/
 
 typedef struct packed {
     logic       [`NUM_FU_STORE-1:0] st_ex_en; //tells SQ that a valid store is coming in on that line (bus, not count)
