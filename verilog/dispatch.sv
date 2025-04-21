@@ -293,6 +293,8 @@ always_comb begin
     lq_out.increment_lq_pair = 0;
     lq_out.inst_pc = '0;
     sq_out.rob_idx = '0;
+    sq_out.lq_pair = '0;
+    lq_out.lq_pair = '0;
 
     for (int i = 0; i < `N; i++) begin
         rs_out.d_dat[i] = commit_in[i].dat;
