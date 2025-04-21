@@ -25,7 +25,7 @@ module global_history_register (
     end*/
 
 
-   always_ff @(posedge clock or posedge reset) begin
+    always_ff @(posedge clock or posedge reset) begin
         if (reset) begin
             globalBHR <= 15'b0;
         end else if(fetch_2_pred.flush) begin
