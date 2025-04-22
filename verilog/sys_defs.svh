@@ -44,8 +44,8 @@
 `define NUM_FU_ALU 2
 `define NUM_FU_MULT 1
 `define NUM_FU_LOAD 1
-`define LD_BAY_SZ 1 //num load bays in the FU
-`define NUM_FU_STORE 1
+`define LD_BAY_SZ 2 //num load bays in the FU
+`define NUM_FU_STORE 2
 // `define NUM_FU_TOTAL `NUM_FU_ALU + `NUM_FU_MULT + `NUM_FU_LOAD + `NUM_FU_STORE
 `define NUM_FU_TOTAL `NUM_FU_ALU + `NUM_FU_MULT + `NUM_FU_LOAD + `NUM_FU_STORE
 
@@ -488,6 +488,7 @@ typedef struct packed {
 typedef logic [$clog2(`LSQ_SZ)-1:0] LSQ_IDX; 
 typedef struct packed {
     LSQ_IDX sq_idx;
+    LSQ_IDX lq_pair;
     ROB_IDX rob_idx;
     ADDR addr;
     logic [3:0] bytewise_addr_mask;
@@ -499,6 +500,7 @@ typedef struct packed {
 
 typedef struct packed {
     LSQ_IDX sq_idx;
+    LSQ_IDX lq_pair;
     ADDR addr;
     logic d_vld;
     MEM_SIZE mem_size;
@@ -640,6 +642,7 @@ typedef struct packed {
     BTQ_IDX         btq_idx;
     LSQ_IDX         sq_idx;
     LSQ_IDX         lq_idx; //THESE ARE TWO DIFFERENT THINGS, BOTH REQUIRED. DO *NOT* COMBINE THEM
+    LSQ_IDX         lq_pair;
     logic           is_brch; // Is inst a branch?
 
     logic   [7:0]   bhr;
@@ -764,6 +767,7 @@ typedef struct packed {
         // - number of enabled dispatch lines WHO NEED A LD/ST 
         //   (i.e. may only be a strict subset of dispatching insns!)
     ROB_IDX [`N-1:0] rob_idx;
+    LSQ_IDX [`N-1:0] lq_pair;
 } dispatch2sq;
 
 typedef struct packed {
@@ -772,11 +776,13 @@ typedef struct packed {
     logic   [$clog2(`N):0]  rename_en_cnt;
     // commit
     logic   [$clog2(`N):0]  lq_d_en_cnt;
+    logic increment_lq_pair;
         // To: LSQ
         // - number of enabled dispatch lines WHO NEED A LD/ST 
         //   (i.e. may only be a strict subset of dispatching insns!)
     ROB_IDX [`N-1:0] rob_idx;
     LSQ_IDX [`N-1:0] sq_idx;
+    LSQ_IDX [`N-1:0] lq_pair;
     ADDR    [`N-1:0] inst_pc;
 } dispatch2lq;
 
@@ -997,6 +1003,7 @@ typedef struct packed {
 
 typedef struct packed {
     logic   [`NUM_FU_LOAD-1:0] err_en;
+    LSQ_IDX last_retired_lq_pair;
 } sq2lq;
 
 typedef struct packed {
@@ -1013,6 +1020,7 @@ typedef struct packed {
 typedef struct packed {
     logic       [`LD_BAY_SZ-1:0] forward_req_en; //tells the SQ that a store-load forwarding request is coming in on that line (bus, not count)
     LSQ_IDX     [`LD_BAY_SZ-1:0] forward_sq_idx; //the SQ IDXs of the loads that are requesting a forward (all loads are assigned the SQ_IDX of the store that most recently was dispatched in the ID_RESULT packet)
+    LSQ_IDX     [`LD_BAY_SZ-1:0] forward_lq_pair;
     ADDR        [`LD_BAY_SZ-1:0] forward_addr; //the address of the forwarding request
     MEM_SIZE    [`LD_BAY_SZ-1:0] forward_mem_size; //MEM_SIZE'(id_ex_reg.inst.r.funct3[1:0]); <-- HOW TO FIND THIS. the size of teh data forward requested. Will be BYTE, HALF, or WORD
 } executeLD2sq;
@@ -1031,8 +1039,8 @@ typedef struct packed {
 } sq2execute;
 
 typedef struct packed {
-    logic   [$clog2(`N):0]  complete_en;
-    ROB_IDX [`N-1:0]        complete_rob_idxs;
+    logic   [`NUM_FU_STORE-1:0]  complete_en;
+    ROB_IDX [`NUM_FU_STORE-1:0]  complete_rob_idxs;
 } sq2rob;
 
 typedef struct packed {
@@ -1079,6 +1087,8 @@ typedef struct packed {
     logic   [$clog2(`N):0]      lq_rdy_scnt;
     logic   [$clog2(`LSQ_SZ):0] lq_tail;
     LSQ_IDX [`N-1:0]            next_ids;
+    LSQ_IDX                     current_lq_pair;
+    logic                       no_load_yet;
 } lq2dispatch;
 
 typedef struct packed {
