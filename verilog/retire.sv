@@ -157,7 +157,7 @@ module retire (
             // next_targets[i] = btq_in.dat[btq_rd_cnt].tgt;
 
 
-            vld_brch_reso_code[i] = 1;
+            vld_brch_reso_code[i] = !flush;
             brch_reso_code[i] = {
                 pred        : btq_in.dat[btq_rd_cnt].pred,
                 take        : btq_in.dat[btq_rd_cnt].take,

@@ -304,7 +304,9 @@ module testbench;
                         brch_misses += brch_reso_cnts[i];
                 end
                 brch_hits = brch_reso_cnts[3'b111];
-                $display("total: misses: %d, hits: %d", brch_misses, brch_hits);
+                $display("brch_misses: %d", brch_misses);
+                $display("brch_hits: %d",   brch_hits);
+                $display("brch_total: %d",  brch_misses + brch_hits);
                 
                 
                 $finish;
