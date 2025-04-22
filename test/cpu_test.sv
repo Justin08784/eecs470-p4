@@ -30,8 +30,8 @@ import "DPI-C" function string decode_inst(int inst);
 //import "DPI-C" function void close_pipeline_output_file();
 
 
-`define TB_MAX_CYCLES 50000000
-// `define TB_MAX_CYCLES 2500
+// `define TB_MAX_CYCLES 50000000
+`define TB_MAX_CYCLES 2500
 // `define TB_MAX_CYCLES 10000
 
 
@@ -218,12 +218,16 @@ module testbench;
     ROB_DEBUG_ENTRY rob_debug[int];
 
     PERF_brch_reso_code brch_reso_code;
+    int brch_misses;
+    int brch_hits;
     always @(negedge clock) begin
         if (reset) begin
             // Count the number of cycles and number of instructions committed
             clock_count = 0;
             instr_count = 0;
             brch_reso_cnts = '0;
+            brch_misses = 0;
+            brch_hits = 0;
         end else begin
             print_en = (DBG_CYCLE_MIN <= clock_count-1) && (clock_count-1 <= DBG_CYCLE_MAX);
             /* Provided delay <revert if necessary> */
@@ -294,8 +298,14 @@ module testbench;
                 output_cpi_file();
 
                 $display("\n---- Finished CPU Testbench ----\n");
-                for (logic [3:0] i = 0; i < 8; ++i)
+                for (logic [3:0] i = 0; i < 8; ++i) begin
                     $display("brch_status[%3b]: %d", i, brch_reso_cnts[i]);
+                    if (i < 7)
+                        brch_misses += brch_reso_cnts[i];
+                end
+                brch_hits = brch_reso_cnts[3'b111];
+                $display("total: misses: %d, hits: %d", brch_misses, brch_hits);
+                
                 
                 $finish;
                 // below: original. They put a #100 delay for some reason.
