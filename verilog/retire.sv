@@ -69,8 +69,14 @@ module retire (
     logic [`N-1:0] gshare_pred_n;
     logic [`N-1:0] corr_pred_n;
     logic store_retire;
+
+    logic [`N-1:0] vld_brch_reso_code;
+    PERF_brch_reso_code [`N-1:0] brch_reso_code;
     
     always_comb begin
+        vld_brch_reso_code  = '0;
+        brch_reso_code      = '0;
+
         sq_out = '0;
         store_retire = 0;
 
@@ -139,6 +145,14 @@ module retire (
 
             if (!rob_in.entries[i].is_brch)
                 continue;
+
+
+            vld_brch_reso_code[i] = 1;
+            brch_reso_code[i] = {
+                pred        : btq_in.dat[btq_rd_cnt].pred,
+                take        : btq_in.dat[btq_rd_cnt].take,
+                PC_correct  : btq_in.dat[btq_rd_cnt].pred_tgt && btq_in.dat[btq_rd_cnt].tgt
+            };
 
             update_en_n[i] = 1;
 

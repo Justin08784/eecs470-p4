@@ -52,6 +52,8 @@ module testbench;
     string out_outfile, cpi_outfile, writeback_outfile;//, pipeline_outfile;
     int out_fileno, cpi_fileno, wb_fileno; // verilog uses integer file handles with $fopen and $fclose
 
+    logic [2**$bits(PERF_brch_reso_code)-1:0][31:0] brch_reso_cnts;
+
     // variables used in the testbench
     logic        print_en;
     logic        clock;
@@ -215,11 +217,13 @@ module testbench;
     } ROB_DEBUG_ENTRY;
     ROB_DEBUG_ENTRY rob_debug[int];
 
+    PERF_brch_reso_code brch_reso_code;
     always @(negedge clock) begin
         if (reset) begin
             // Count the number of cycles and number of instructions committed
             clock_count = 0;
             instr_count = 0;
+            brch_reso_cnts = '0;
         end else begin
             print_en = (DBG_CYCLE_MIN <= clock_count-1) && (clock_count-1 <= DBG_CYCLE_MAX);
             /* Provided delay <revert if necessary> */
@@ -248,6 +252,11 @@ module testbench;
             `ifdef DEBUG
             print_custom_data();
             `endif
+            for (int i = 0; i < `N; ++i) begin
+                if (verisimpleV.retire0.vld_brch_reso_code[i]) begin
+                    ++brch_reso_cnts[verisimpleV.retire0.brch_reso_code[i]];
+                end
+            end
 
             output_reg_writeback_and_maybe_halt();
 
@@ -285,6 +294,8 @@ module testbench;
                 output_cpi_file();
 
                 $display("\n---- Finished CPU Testbench ----\n");
+                for (logic [3:0] i = 0; i < 8; ++i)
+                    $display("brch_status[%3b]: %d", i, brch_reso_cnts[i]);
                 
                 $finish;
                 // below: original. They put a #100 delay for some reason.
