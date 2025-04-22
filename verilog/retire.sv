@@ -153,8 +153,8 @@ module retire (
             if (!rob_in.entries[i].is_brch)
                 continue;
 
-            next_update_target[i] = 1;
-            next_targets[i] = btq_in.dat[btq_rd_cnt].tgt;
+            // next_update_target[i] = 1;
+            // next_targets[i] = btq_in.dat[btq_rd_cnt].tgt;
 
 
             vld_brch_reso_code[i] = 1;
@@ -181,7 +181,8 @@ module retire (
                     : btq_in.dat[btq_rd_cnt].NPC;
 
                 branch_taken_n[i] = btq_in.dat[btq_rd_cnt].take ? 1'b1 : 1'b0;
-                update_en_n[i] = 1;
+                next_update_target[i] = btq_in.dat[btq_rd_cnt].take;
+                next_targets[i] = btq_in.dat[btq_rd_cnt].tgt;
 
                 ++btq_rd_cnt;
                 break;
@@ -189,9 +190,10 @@ module retire (
             else if (btq_in.dat[btq_rd_cnt].take && (btq_in.dat[btq_rd_cnt].pred_tgt != btq_in.dat[btq_rd_cnt].tgt)) begin
                 mispred = 1;
                 mispred_target = btq_in.dat[btq_rd_cnt].tgt;
+                next_update_target[i] = 1;
+                next_targets[i] = btq_in.dat[btq_rd_cnt].tgt;
 
                 branch_taken_n[i] = 1'b1;
-                update_en_n[i] = 1;
 
                 ++btq_rd_cnt;
                 break;
