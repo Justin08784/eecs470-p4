@@ -30,8 +30,8 @@ import "DPI-C" function string decode_inst(int inst);
 //import "DPI-C" function void close_pipeline_output_file();
 
 
-// `define TB_MAX_CYCLES 50000000
-`define TB_MAX_CYCLES 2500
+`define TB_MAX_CYCLES 50000000
+// `define TB_MAX_CYCLES 2500
 // `define TB_MAX_CYCLES 10000
 
 
@@ -307,6 +307,7 @@ module testbench;
                 $display("brch_misses: %d", brch_misses);
                 $display("brch_hits: %d",   brch_hits);
                 $display("brch_total: %d",  brch_misses + brch_hits);
+                $display("hit_rate: %f", 1.0 * brch_hits / (brch_misses + brch_hits));
                 
                 
                 $finish;
