@@ -62,7 +62,7 @@
 `define PHT_ENTRIES 256
 //`define HISTORY_BITS 8
 
-`define PREFETCH_CAP 24 // <- how far ahead we can prefetch
+`define PREFETCH_CAP 56 // <- how far ahead we can prefetch
 
 ///////////////////////////////
 // --- Compil. Controls ---- //
