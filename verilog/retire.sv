@@ -171,6 +171,7 @@ module retire (
                     : btq_in.dat[btq_rd_cnt].NPC;
 
                 branch_taken_n[i] = btq_in.dat[btq_rd_cnt].take ? 1'b1 : 1'b0;
+                update_en_n[i] = 1;
 
                 ++btq_rd_cnt;
                 break;
@@ -180,6 +181,7 @@ module retire (
                 mispred_target = btq_in.dat[btq_rd_cnt].tgt;
 
                 branch_taken_n[i] = 1'b1;
+                update_en_n[i] = 1;
 
                 ++btq_rd_cnt;
                 break;
