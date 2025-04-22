@@ -26,6 +26,8 @@ module retire (
 
     output logic flush,
     output ADDR  corrected_PC,
+    output logic [`N-1:0] update_target,
+    output ADDR [`N-1:0] targets,
     output logic [`N-1:0] branch_taken,
     output logic [`N-1:0] update_en,
     output ADDR [`N-1:0] PC_original,
@@ -72,6 +74,10 @@ module retire (
 
     logic [`N-1:0] vld_brch_reso_code;
     PERF_brch_reso_code [`N-1:0] brch_reso_code;
+
+    
+    logic [`N-1:0] next_update_target;
+    ADDR [`N-1:0] next_targets;
     
     always_comb begin
         vld_brch_reso_code  = '0;
@@ -100,7 +106,8 @@ module retire (
         corr_pred_n = '0;
 
         btq_out = '0;
-
+        next_update_target = '0;
+        next_targets = '0;
 
 
         for (int i = 0; i < rob_in.r_vld_cnt; ++i) begin
@@ -146,6 +153,9 @@ module retire (
             if (!rob_in.entries[i].is_brch)
                 continue;
 
+            next_update_target[i] = 1;
+            next_targets[i] = btq_in.dat[btq_rd_cnt].tgt;
+
 
             vld_brch_reso_code[i] = 1;
             brch_reso_code[i] = {
@@ -185,6 +195,8 @@ module retire (
 
                 ++btq_rd_cnt;
                 break;
+            end else begin
+                branch_taken_n[i] = btq_in.dat[btq_rd_cnt].take;
             end
             ++btq_rd_cnt;
         end
@@ -256,6 +268,9 @@ module retire (
 /* ======================================== */
             flush        <= flush_n;
             corrected_PC <= corrected_PC_n;
+
+            update_target <= next_update_target;
+            targets <= next_targets;
 
             branch_taken <= branch_taken_n;
             update_en    <= update_en_n;

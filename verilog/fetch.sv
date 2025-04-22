@@ -36,7 +36,11 @@ module stage_if_p4 (
 
     output MEM_COMMAND  Imem_command, // Command sent to memory
     output ADDR         Imem_addr, // address sent to Instruction memory
-    output  fetch2decode d_out
+    output  fetch2decode d_out,
+
+    
+    input ADDR [`N-1:0] targets,
+    input logic [`N-1:0] update_target
 );
 
     ADDR PC_reg; // PCs we are currently fetching
@@ -148,8 +152,8 @@ module stage_if_p4 (
     end
 
 
-    assign btb_out.target = r_in.corrected_PC;
-    assign btb_out.is_taken = r_in.is_taken;
+    assign btb_out.target = targets;//r_in.corrected_PC;
+    assign btb_out.is_taken = update_target;//r_in.is_taken;
     assign btb_out.correct_PC =  r_in.PC;
     assign btb_out.PC[0] =  PC_reg;
     assign btb_out.PC[1] = PC_reg + 4; 

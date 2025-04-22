@@ -189,6 +189,9 @@ module cpu (
     predictor2fetch pred_2_fetch_gshare;
     predictor2fetch pred_2_fetch_corr;
 
+    ADDR [`N-1:0] targets;
+    logic [`N-1:0] update_target;
+
     stage_if_p4 fetch_0(
         `ifdef DEBUG
         .dbg    (dbg_fetch),
@@ -212,7 +215,9 @@ module cpu (
         .pred_in_corr   (pred_2_fetch_corr),
 
         .btb_out    (fetch_2_btb),
-        .pred_out   (fetch_2_pred)
+        .pred_out   (fetch_2_pred),
+        .targets(targets),
+        .update_target(update_target)
 
     );
 
@@ -347,7 +352,9 @@ module cpu (
         .gshare_pred    (gshare_pred),
         .corr_pred      (corr_pred), 
         //.ret_2_fetch    (ret_2_fetch),
-        .retire_exec    (retire_exec)
+        .retire_exec    (retire_exec),
+        .targets(targets),
+        .update_target(update_target)
     );
 
     assign retire_2_f = '{
