@@ -45,7 +45,7 @@
 `define NUM_FU_MULT 1
 `define NUM_FU_LOAD 1
 `define LD_BAY_SZ 2 //num load bays in the FU
-`define NUM_FU_STORE 4
+`define NUM_FU_STORE 2
 // `define NUM_FU_TOTAL `NUM_FU_ALU + `NUM_FU_MULT + `NUM_FU_LOAD + `NUM_FU_STORE
 `define NUM_FU_TOTAL `NUM_FU_ALU + `NUM_FU_MULT + `NUM_FU_LOAD + `NUM_FU_STORE
 
