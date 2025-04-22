@@ -96,7 +96,7 @@
 # there should be no need to change anything for project 3
 
 # this is a global clock period variable used in the tcl script and referenced in testbenches
-export CLOCK_PERIOD = 6.0
+export CLOCK_PERIOD = 6.5
 
 # the Verilog Compiler command and arguments
 VCS =  vcs -sverilog -xprop=tmerge +vc -Mupdate -Mdir=build/csrc -line -full64 -kdb -lca -nc \
@@ -678,7 +678,7 @@ novas.rc: initialnovas.rc
 # Directories for holding build files or run outputs
 # Targets that need these directories should add them after a pipe.
 # ex: "target: dep1 dep2 ... | build"
-build synth output programs/mem:
+diff build synth output programs/mem:
 	mkdir -p $@
 # Don't leave any files in these, they will be deleted by clean commands
 
@@ -706,6 +706,7 @@ nuke: clean clean_output clean_synth clean_programs
 
 clean_exe:
 	@$(call PRINT_COLOR, 3, removing compiled executable files)
+	rm -rf diffs/
 	rm -rf build/                         # remove the entire 'build' folder
 	rm -rf *simv *.daidir csrc *.key      # created by simv/syn_simv/vis_simv
 	rm -rf vcdplus.vpd vc_hdrs.h          # created by simv/syn_simv/vis_simv

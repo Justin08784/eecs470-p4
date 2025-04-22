@@ -290,8 +290,11 @@ always_comb begin
     lq_wr_idx       = 0;
     lq_out.rob_idx = '0; //handling latch prevention
     lq_out.sq_idx = '0;
+    lq_out.increment_lq_pair = 0;
     lq_out.inst_pc = '0;
     sq_out.rob_idx = '0;
+    sq_out.lq_pair = '0;
+    lq_out.lq_pair = '0;
 
     for (int i = 0; i < `N; i++) begin
         rs_out.d_dat[i] = commit_in[i].dat;
@@ -306,6 +309,12 @@ always_comb begin
         if (commit_in[i].dat.wr_mem) begin
             rs_out.d_dat[i].sq_idx = sq_in.next_ids[sq_wr_idx];
             sq_out.rob_idx[sq_wr_idx] = rob_in.rob_idxs[i];
+            // sq_out.lq_idx[sq_wr_idx] = lq_in.next_ids[lq_wr_idx];
+
+            sq_out.lq_pair[sq_wr_idx] = (lq_in.current_lq_pair + 1) % `LSQ_SZ;
+
+            lq_out.increment_lq_pair = 1;
+
             ++sq_wr_idx;
         end
 
@@ -313,6 +322,9 @@ always_comb begin
             // rs_out.d_dat[i].sq_idx = (sq_in.no_store_yet && (sq_wr_idx == 0)) ? `LSQ_SZ : (sq_in.last_used_sq_idx + sq_wr_idx) % `LSQ_SZ;
             // lq_out.sq_idx[lq_wr_idx] = (sq_in.no_store_yet && (sq_wr_idx == 0)) ? `LSQ_SZ : (sq_in.last_used_sq_idx + sq_wr_idx) % `LSQ_SZ;
             // $display("ASSIGNING: last_used: %0d, sq_wr_idx: %0d, no_store_yet: %b, assignment: %0d", sq_in.last_used_sq_idx, sq_wr_idx, sq_in.no_store_yet, rs_out.d_dat[i].sq_idx);
+            
+            rs_out.d_dat[i].lq_pair = lq_out.increment_lq_pair ? (lq_in.current_lq_pair + 1) % `LSQ_SZ : lq_in.current_lq_pair;
+            lq_out.lq_pair[lq_wr_idx] = lq_out.increment_lq_pair ? (lq_in.current_lq_pair + 1) % `LSQ_SZ : lq_in.current_lq_pair;
             
             if (sq_in.no_store_yet && (sq_wr_idx == 0)) begin
                 lq_out.sq_idx[lq_wr_idx] = `LSQ_SZ;

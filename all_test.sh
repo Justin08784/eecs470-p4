@@ -29,6 +29,7 @@ TESTS=(
     quicksort
     sort_search
     dft
+    alexnet
 )
 
 EXTS=(

@@ -36,6 +36,9 @@ module lq #(parameter
     logic [$clog2(LSQ_SZ)-1:0]  head;
     logic [$clog2(LSQ_SZ)-1:0]  tail;
 
+    LSQ_IDX                     current_lq_pair;
+    logic no_load_yet;
+
     LQ_ENTRY [LSQ_SZ-1:0]       state;
     logic [$clog2(LSQ_SZ):0]    used, free;
     logic [$clog2(2*`N):0]      rsvd; // sz(rename_buf) = 2*`N
@@ -62,7 +65,9 @@ module lq #(parameter
         dispatch_out = '{
             lq_rdy_scnt : free_scnt,
             lq_tail     : tail,
-            next_ids    : d_idxs
+            next_ids    : d_idxs,
+            current_lq_pair : current_lq_pair,
+            no_load_yet : no_load_yet
         }; 
     end
 
@@ -86,12 +91,20 @@ module lq #(parameter
         end
     end
 
+    always_ff @(posedge clock) begin
+        if (reset) current_lq_pair <= 0;
+        else if (flush) current_lq_pair <= sq_in.last_retired_lq_pair;
+        else current_lq_pair <= dispatch_in.increment_lq_pair ? (current_lq_pair + 1) % LSQ_SZ : current_lq_pair;
+    end
 
     always_ff @(posedge clock) begin
         if (reset || flush) begin
             used    <= 0;
             free    <= LSQ_SZ;
             rsvd    <= 0;
+
+            // current_lq_pair <= 0;
+            no_load_yet <= 1;
 
             head    <= 0;
             tail    <= 0;
@@ -100,6 +113,9 @@ module lq #(parameter
             used    <= used + dispatch_in.lq_d_en_cnt - retire_in.r_en;
             free    <= free - dispatch_in.lq_d_en_cnt + retire_in.r_en;
             rsvd    <= rsvd + dispatch_in.rename_en_cnt - dispatch_in.lq_d_en_cnt;
+
+            // current_lq_pair <= dispatch_in.increment_lq_pair ? (current_lq_pair + 1) % LSQ_SZ : current_lq_pair;
+            no_load_yet <= (dispatch_in.lq_d_en_cnt > 0) ? 0 : no_load_yet;
 
             head    <= (head + retire_in.r_en) % LSQ_SZ;
             tail    <= (tail + dispatch_in.lq_d_en_cnt) % LSQ_SZ;
@@ -129,6 +145,7 @@ module lq #(parameter
                 cur_idx = d_idxs[i];
                 state[cur_idx] <= '{
                     sq_idx : dispatch_in.sq_idx[i],
+                    lq_pair : dispatch_in.lq_pair[i],
                     addr     : '0,
                     d_vld     : '0,
                     mem_size : '0,
