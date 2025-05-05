@@ -33,6 +33,7 @@ Run the following command to sync local to remote (forwards changes local->remot
 rsync -avz --no-perms --no-owner --no-group --delete --exclude='.git/' ~/umich-cs/eecs470/p4/ off:~/p4/
 ```
 Note: .git is excluded so we don't override the file perm ignoring.
+Update: This command is now available in fwd.sh.
 
 # EECS 470 Final Project
 
