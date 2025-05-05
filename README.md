@@ -1,4 +1,26 @@
 
+# Personal Notes
+## Multiplexed SSH connection for convenience
+
+In your ~/.ssh/config, configure the CAEN lab connection as follows:
+```
+Host off
+    Hostname login-course.engin.umich.edu
+    User <uniq_name>
+    ControlMaster auto
+    ControlPath ~/.ssh/cm-%r@%h:%p
+    # 1. Indefinite connection (must manually close; no timeout)
+    ControlPersist yes
+    # ...OR...
+    # 2. Timeout after 4h idle time (could be safer)
+    ControlPersist 4h
+```
+At the start of each session, run `ssh off` once (enter password + 2FA) to start the master connection.
+The connection will persist in the background, even if you close your terminal. While it is active,
+we can run any ssh-based commands like ssh, scp, rsync–– without password or 2FA–– *in any shell process*.
+
+The master connection closes only after idle timeout or you manually close it with `ssh -O check off`.
+
 # EECS 470 Final Project
 
 Welcome to the EECS 470 Final Project!
