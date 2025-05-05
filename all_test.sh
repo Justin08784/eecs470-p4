@@ -43,6 +43,9 @@ make ${TESTS[@]/%/.out}
 correct_out_path="$HOME/eecs470/p3-w25.eshinj/output"
 
 # Diff
+mkdir diffs
+rm -rf diffs/*
+
 for t in "${TESTS[@]}"; do
     for ext in "${EXTS[@]}"; do
         echo "Diffing $t.$ext..."
