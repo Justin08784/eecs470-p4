@@ -26,19 +26,7 @@ module retire (
 
     output logic flush,
     output ADDR  corrected_PC,
-    output logic [`N-1:0] update_target,
-    output ADDR [`N-1:0] targets,
     output logic [`N-1:0] branch_taken,
-    output logic [`N-1:0] update_en,
-    output ADDR [`N-1:0] PC_original,
-    output logic [`N-1:0] [7:0] bhr_from_btq,
-
-
-    output logic [`N-1:0] [7:0] correlated_bhr_d,
-    output logic [`N-1:0] gshare_pred,
-    output logic [`N-1:0] corr_pred, 
-    //output retire2fetch ret_2_fetch,
-
     output retire_final retire_exec
 );
     logic [$clog2(`N):0] r_en_cnt;
@@ -62,29 +50,15 @@ module retire (
     ADDR  corrected_PC_n;
 
     logic [`N-1:0] branch_taken_n;
-    logic [`N-1:0] update_en_n;
-    ADDR [`N-1:0] PC_original_n;
-    logic [`N-1:0] [7:0] bhr_from_btq_n;
-
-
-    logic [`N-1:0] [7:0] correlated_bhr_d_n;
-    logic [`N-1:0] gshare_pred_n;
-    logic [`N-1:0] corr_pred_n;
-    logic store_retire;
 
     logic [`N-1:0] vld_brch_reso_code;
     PERF_brch_reso_code [`N-1:0] brch_reso_code;
 
-    
-    logic [`N-1:0] next_update_target;
-    ADDR [`N-1:0] next_targets;
-    
     always_comb begin
         vld_brch_reso_code  = '0;
         brch_reso_code      = '0;
 
         sq_out = '0;
-        store_retire = 0;
 
         mispred = 0;
         mispred_target = '0;
@@ -97,17 +71,8 @@ module retire (
         lq_rd_cnt   = 0;
 
         branch_taken_n = '0;
-        update_en_n = '0;
-        PC_original_n = '0;
-        bhr_from_btq_n = '0;
-
-        correlated_bhr_d_n = '0;
-        gshare_pred_n = '0;
-        corr_pred_n = '0;
 
         btq_out = '0;
-        next_update_target = '0;
-        next_targets = '0;
 
 
         for (int i = 0; i < rob_in.r_vld_cnt; ++i) begin
@@ -164,35 +129,22 @@ module retire (
                 PC_correct  : btq_in.dat[btq_rd_cnt].pred_tgt && btq_in.dat[btq_rd_cnt].tgt
             };
 
-            update_en_n[i] = 1;
-
-            PC_original_n[i] = btq_in.dat[btq_rd_cnt].PC;
-
-            bhr_from_btq_n[i] = btq_in.dat[btq_rd_cnt].bhr;
-            correlated_bhr_d_n[i] = btq_in.dat[btq_rd_cnt].correlated_bhr;
-
-            gshare_pred_n[i] = btq_in.dat[btq_rd_cnt].gshare_pred;
-            corr_pred_n[i] = btq_in.dat[btq_rd_cnt].corr_pred;
             if (btq_in.dat[btq_rd_cnt].pred != btq_in.dat[btq_rd_cnt].take) begin
                 // is mispred?
                 mispred = 1;
                 mispred_target = btq_in.dat[btq_rd_cnt].take
                     ? btq_in.dat[btq_rd_cnt].tgt
                     : btq_in.dat[btq_rd_cnt].NPC;
-
-                branch_taken_n[i] = btq_in.dat[btq_rd_cnt].take ? 1'b1 : 1'b0;
-                next_update_target[i] = btq_in.dat[btq_rd_cnt].take;
-                next_targets[i] = btq_in.dat[btq_rd_cnt].tgt;
+                branch_taken_n[i] = btq_in.dat[btq_rd_cnt].take;
 
                 ++btq_rd_cnt;
                 break;
-            end
-            else if (btq_in.dat[btq_rd_cnt].take && (btq_in.dat[btq_rd_cnt].pred_tgt != btq_in.dat[btq_rd_cnt].tgt)) begin
+            end else if (
+                btq_in.dat[btq_rd_cnt].take
+                && (btq_in.dat[btq_rd_cnt].pred_tgt != btq_in.dat[btq_rd_cnt].tgt)
+            ) begin
                 mispred = 1;
                 mispred_target = btq_in.dat[btq_rd_cnt].tgt;
-                next_update_target[i] = 1;
-                next_targets[i] = btq_in.dat[btq_rd_cnt].tgt;
-
                 branch_taken_n[i] = 1'b1;
 
                 ++btq_rd_cnt;
@@ -254,35 +206,12 @@ module retire (
             control path cannot retrigger. */
             flush        <= '0;
             corrected_PC <= '0;
-
-
             branch_taken <= '0;
-            update_en    <= '0;
-            PC_original  <= '0;
-            bhr_from_btq <= '0;
-
-
-            correlated_bhr_d <= '0;
-            gshare_pred      <= '0;
-            corr_pred        <= '0;
-
         end else begin
 /* ======================================== */
             flush        <= flush_n;
             corrected_PC <= corrected_PC_n;
-
-            update_target <= next_update_target;
-            targets <= next_targets;
-
             branch_taken <= branch_taken_n;
-            update_en    <= update_en_n;
-            PC_original  <= PC_original_n;
-            bhr_from_btq <= bhr_from_btq_n;
-
-
-            correlated_bhr_d <= correlated_bhr_d_n;
-            gshare_pred      <= gshare_pred_n;
-            corr_pred        <= corr_pred_n;
 /* ======================================== */
         end
     end
@@ -294,6 +223,14 @@ module retire (
                 $error("Retire: both flush conditions set!");
                 $fatal;
             end
+
+            // $display(">> Retire");
+            // $display("retire_exec: {r_en_cnt: %1d}", retire_exec.r_en_cnt);
+            // $display("rob_in: {r_vld_cnt: %1d, entries: %x}", rob_in.r_vld_cnt, rob_in.entries);
+            // $display("btq_in: {used_scnt: %1d, dat: %x}", btq_in.used_scnt, btq_in.dat);
+            // $display("sq_in: %x", sq_in);
+            // $display("lq_in: %x", lq_in);
+            // $display("<< Retire");
         end
     end
 

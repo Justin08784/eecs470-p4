@@ -210,15 +210,11 @@ logic [$clog2(`N):0] btq_wr_idx;
 always_comb begin
     tmp_alloc2rename = '0;
     btq_wr_idx  = 0;
-    btq_out.NPC = '0;
 
-    btq_out.PC = '0;
-    btq_out.bhr = '0;
-    btq_out.pred = '0;
-    btq_out.pred_tgt = '0;
-    btq_out.gshare_pred = '0;
-    btq_out.corr_pred = '0;
-    btq_out.correlated_bhr = '0;
+    btq_out.PC          = '0;
+    btq_out.NPC         = '0;
+    btq_out.pred        = '0;
+    btq_out.pred_tgt    = '0;
 
     for (int i = 0; i < `N; ++i) begin
         tmp_alloc2rename[i].dat         = rename_in[i];
@@ -239,16 +235,11 @@ always_comb begin
 
         if (rename_in[i].is_brch) begin
             tmp_alloc2rename[i].dat.btq_idx = btq_in.btq_idxs[btq_wr_idx];
-            btq_out.NPC[btq_wr_idx] = rename_in[i].NPC;
-            btq_out.PC[btq_wr_idx] =      rename_in[i].PC;
+
+            btq_out.PC[btq_wr_idx]       = rename_in[i].PC;
+            btq_out.NPC[btq_wr_idx]      = rename_in[i].NPC;
+            btq_out.pred[btq_wr_idx]     = rename_in[i].pred;
             btq_out.pred_tgt[btq_wr_idx] = rename_in[i].pred_tgt;
-
-            btq_out.bhr[btq_wr_idx] = rename_in[i].bhr;
-            btq_out.pred[btq_wr_idx] = rename_in[i].pred;
-
-            btq_out.gshare_pred[btq_wr_idx] = rename_in[i].gshare_pred;
-            btq_out.corr_pred[btq_wr_idx] = rename_in[i].corr_pred;
-            btq_out.correlated_bhr[btq_wr_idx] = rename_in[i].correlated_bhr;
             ++btq_wr_idx;
         end
     end

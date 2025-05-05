@@ -109,18 +109,14 @@ module btq #(
                     continue;
                 cur_idx = d_idxs[i];
                 state[cur_idx] <= '{
-                    tgt     : '0,
-                    NPC     : d_in.NPC[i],
                     // TODO: pred and take need to be set by fetch! I think?
+                    PC      : d_in.PC[i],
+                    NPC     : d_in.NPC[i],
                     pred    : d_in.pred[i],
                     pred_tgt: d_in.pred_tgt[i],
-                    take    : '0,
-                    PC      : d_in.PC[i],
-                    bhr     : d_in.bhr[i],
-                    correlated_bhr : d_in.correlated_bhr[i],
 
-                    gshare_pred : d_in.gshare_pred[i],
-                    corr_pred   : d_in.corr_pred[i]
+                    take    : '0,
+                    tgt     : '0
                 };
             end
         end

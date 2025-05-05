@@ -31,7 +31,7 @@ import "DPI-C" function string decode_inst(int inst);
 
 
 `define TB_MAX_CYCLES 50000000
-// `define TB_MAX_CYCLES 2500
+// `define TB_MAX_CYCLES 500
 // `define TB_MAX_CYCLES 10000
 
 
@@ -60,6 +60,9 @@ module testbench;
     logic        reset;
     logic [31:0] clock_count; // also used for terminating infinite loops
     logic [31:0] instr_count;
+
+    ADDR        [`N-1:0] f2mem_PCs;
+    MEM_BLOCK   [`N-1:0] mem2f_data;
 
     MEM_COMMAND proc2mem_command;
     ADDR        proc2mem_addr;
@@ -93,6 +96,10 @@ module testbench;
         // Inputs
         .clock (clock),
         .reset (reset),
+
+        .f2mem_PCs  (f2mem_PCs),
+        .mem2f_data (mem2f_data),
+
         .mem2proc_transaction_tag (mem2proc_transaction_tag),
         .mem2proc_data            (mem2proc_data),
         .mem2proc_data_tag        (mem2proc_data_tag),
@@ -145,6 +152,10 @@ module testbench;
         .mem2proc_data_tag        (mem2proc_data_tag)
     );
 
+    always_comb begin
+        for (int i = 0; i < `N; ++i)
+            mem2f_data[i] = memory.unified_memory[f2mem_PCs[i][15:3]];
+    end
 
     // Generate System Clock
     always begin
@@ -639,76 +650,76 @@ module testbench;
         $display("<< BTQ <<");
     endtask
 
-    task print_icache();
-        DBG_icache dbg_icache;
+    // task print_icache();
+    //     DBG_icache dbg_icache;
 
-        // internal state
-        logic changed_addr;
-        logic [12-`ICACHE_LINE_BITS:0] current_tag,   last_tag,   write_tag;
-        logic [`ICACHE_LINE_BITS -1:0] current_index, last_index, write_index;
-        logic                          got_mem_data;
-        MSHR_entry [15:0] MSHR;
-        ICACHE_TAG [`ICACHE_LINES-1:0] icache_tags;
-        // I/O
-        MEM_TAG   Imem2proc_transaction_tag;
-        MEM_BLOCK Imem2proc_data;
-        MEM_TAG   Imem2proc_data_tag;
-        ADDR proc2Icache_addr;
-        MEM_COMMAND proc2Imem_command;
-        ADDR        proc2Imem_addr;
-        MEM_BLOCK Icache_data_out;
-        logic     Icache_valid_out;
+    //     // internal state
+    //     logic changed_addr;
+    //     logic [12-`ICACHE_LINE_BITS:0] current_tag,   last_tag,   write_tag;
+    //     logic [`ICACHE_LINE_BITS -1:0] current_index, last_index, write_index;
+    //     logic                          got_mem_data;
+    //     MSHR_entry [15:0] MSHR;
+    //     ICACHE_TAG [`ICACHE_LINES-1:0] icache_tags;
+    //     // I/O
+    //     MEM_TAG   Imem2proc_transaction_tag;
+    //     MEM_BLOCK Imem2proc_data;
+    //     MEM_TAG   Imem2proc_data_tag;
+    //     ADDR proc2Icache_addr;
+    //     MEM_COMMAND proc2Imem_command;
+    //     ADDR        proc2Imem_addr;
+    //     MEM_BLOCK Icache_data_out;
+    //     logic     Icache_valid_out;
 
-        dbg_icache = dbg_fetch.dbg_icache;
-        changed_addr                = dbg_icache.changed_addr;
-        current_tag                 = dbg_icache.current_tag;
-        last_tag                    = dbg_icache.last_tag;
-        write_tag                   = dbg_icache.write_tag;
-        current_index               = dbg_icache.current_index;
-        last_index                  = dbg_icache.last_index;
-        write_index                 = dbg_icache.write_index;
-        got_mem_data                = dbg_icache.got_mem_data;
-        MSHR                        = dbg_icache.MSHR;
-        icache_tags                 = dbg_icache.icache_tags;
-        // I/O
-        Imem2proc_transaction_tag   = dbg_icache.Imem2proc_transaction_tag;
-        Imem2proc_data              = dbg_icache.Imem2proc_data;
-        Imem2proc_data_tag          = dbg_icache.Imem2proc_data_tag;
-        proc2Icache_addr            = dbg_icache.proc2Icache_addr;
-        proc2Imem_command           = dbg_icache.proc2Imem_command;
-        proc2Imem_addr              = dbg_icache.proc2Imem_addr;
-        Icache_data_out             = dbg_icache.Icache_data_out;
-        Icache_valid_out            = dbg_icache.Icache_valid_out;
+    //     dbg_icache = dbg_fetch.dbg_icache;
+    //     changed_addr                = dbg_icache.changed_addr;
+    //     current_tag                 = dbg_icache.current_tag;
+    //     last_tag                    = dbg_icache.last_tag;
+    //     write_tag                   = dbg_icache.write_tag;
+    //     current_index               = dbg_icache.current_index;
+    //     last_index                  = dbg_icache.last_index;
+    //     write_index                 = dbg_icache.write_index;
+    //     got_mem_data                = dbg_icache.got_mem_data;
+    //     MSHR                        = dbg_icache.MSHR;
+    //     icache_tags                 = dbg_icache.icache_tags;
+    //     // I/O
+    //     Imem2proc_transaction_tag   = dbg_icache.Imem2proc_transaction_tag;
+    //     Imem2proc_data              = dbg_icache.Imem2proc_data;
+    //     Imem2proc_data_tag          = dbg_icache.Imem2proc_data_tag;
+    //     proc2Icache_addr            = dbg_icache.proc2Icache_addr;
+    //     proc2Imem_command           = dbg_icache.proc2Imem_command;
+    //     proc2Imem_addr              = dbg_icache.proc2Imem_addr;
+    //     Icache_data_out             = dbg_icache.Icache_data_out;
+    //     Icache_valid_out            = dbg_icache.Icache_valid_out;
 
-        $display("  | >> ICACHE >>", $time);
-        $display("tags: {cur: %x, last: %x, wr: %x}", current_tag, last_tag, write_tag);
-        $display("read: {en %b, addr: %x, data: %x}", 1'b1, current_index, Icache_data_out);
-        $display("writ: {en %b, addr: %x, data: %x}", got_mem_data, write_index, Imem2proc_data);
-        $display("changed_addr: %b, proc2Imem_command: %1d, proc2Imem_addr: %x", changed_addr, proc2Imem_command, proc2Imem_addr);
-        $display("last: {tag: %x, idx: %x} -> curr {tag: %x, idx: %x} <changed: %b>", last_tag, last_index, current_tag, current_index, changed_addr);
-        $display("  | << ICACHE <<", $time);
-    endtask
+    //     $display("  | >> ICACHE >>", $time);
+    //     $display("tags: {cur: %x, last: %x, wr: %x}", current_tag, last_tag, write_tag);
+    //     $display("read: {en %b, addr: %x, data: %x}", 1'b1, current_index, Icache_data_out);
+    //     $display("writ: {en %b, addr: %x, data: %x}", got_mem_data, write_index, Imem2proc_data);
+    //     $display("changed_addr: %b, proc2Imem_command: %1d, proc2Imem_addr: %x", changed_addr, proc2Imem_command, proc2Imem_addr);
+    //     $display("last: {tag: %x, idx: %x} -> curr {tag: %x, idx: %x} <changed: %b>", last_tag, last_index, current_tag, current_index, changed_addr);
+    //     $display("  | << ICACHE <<", $time);
+    // endtask
 
     task print_fetch;
         logic           flush;
         decode2fetch    d_in;
         fetch2decode    d_out;
         retire2fetch    r_in;
-        MEM_BLOCK [1:0] Imem_data;
-        ADDR [`N-1:0]   PC_reg;
+        ADDR        [`N-1:0] mem_out_PCs;
+        MEM_BLOCK   [`N-1:0] mem_in_data;
 
         flush       = dbg_fetch.flush;
         d_in        = dbg_fetch.d_in;
         d_out       = dbg_fetch.d_out;
         r_in        = dbg_fetch.r_in;
-        Imem_data   = dbg_fetch.Imem_data;
-        PC_reg      = dbg_fetch.PC_reg;
+        mem_out_PCs = dbg_fetch.mem_out_PCs;
+        mem_in_data = dbg_fetch.mem_in_data;
 
         $display(">> Fetch >>");
         $display("r_in: {flush: %b, corrected_PC: 0x%x}", flush, r_in.corrected_PC);
         $display("d_out: {f_en_cnt: %b, dat: [%x, %x]}", d_out.f_en_cnt, d_out.f_dat[0], d_out.f_dat[1]);
-        $display("PC_reg:  %x", PC_reg);
-        $display("Imem_data: %x", Imem_data);
+        $display("PCs:  %x", mem_out_PCs);
+        $display("Imem_data: %x", mem_in_data);
         $display("<< Fetch <<");
     endtask
 
@@ -1546,16 +1557,15 @@ module testbench;
             return;
 
         $display("  | >> CYCLE: %3d (t: %3d)", clock_count-1, $time);
-        // print_fetch();
+        print_fetch();
         // print_icache();
         // print_decode();
-        print_rob();
+        // print_rob();
         // print_fl();
         // print_dispatch();
         // print_map_table();
         // print_prf();
-        // print_btq();
-        print_rob();
+        print_btq();
 
         // $display("---- rob_debug contents ----");
         // foreach (rob_debug[idx]) begin
@@ -1575,12 +1585,12 @@ module testbench;
         //      mem2proc_data,
         //      mem2proc_data_tag
         // );
-        // print_rs();
+        print_rs();
         // print_execute();
-        print_dcache();
-        print_sq();
+        // print_dcache();
+        // print_sq();
         // print_retbuf();
-        print_lq();
+        // print_lq();
         // print_retire();
         $display("  | << CYCLE: %3d (t: %3d)", clock_count-1, $time);
     endtask

@@ -189,7 +189,7 @@ GREP = grep -E --color=auto
 # ---- Modules to Test ---- #
 
 # TODO: add more modules here
-MODULES = cpu mult rob rs fifo free_list dispatch prf map_table stage_id_p4 execute fetch btb sq post_ret_buffer gshare skid_buffer lq victim dcache_simple correlated_predictor
+MODULES = cpu mult rob rs fifo free_list dispatch prf map_table stage_id_p4 execute fetch sq post_ret_buffer skid_buffer lq victim
 
 # TODO: update this if you add more header files
 ALL_HEADERS = $(CPU_HEADERS)
@@ -212,11 +212,6 @@ ROB_FILES = verilog/sys_defs.svh verilog/memDP.sv verilog/FIFO.sv
 build/rob.simv: $(ROB_FILES)
 build/rob.cov: $(ROB_FILES)
 synth/rob.vg: $(ROB_FILES)
-
-FIFO_FILES = verilog/sys_defs.svh
-build/fifo.simv: $(FIFO_FILES)
-build/fifo.cov: $(FIFO_FILES)
-synth/fifo.vg: $(FIFO_FILES)
 
 FIFO_FILES = verilog/sys_defs.svh
 build/fifo.simv: $(FIFO_FILES)
@@ -263,11 +258,6 @@ build/execute.simv: $(EXECUTE_FILES)
 build/execute.cov: $(EXECUTE_FILES)
 build/execute.vg: $(EXECUTE_FILES)
 
-BTB_FILES = verilog/sys_defs.svh verilog/btb.sv
-build/btb.simv: $(BTB_FILES)
-build/btb.cov: $(BTB_FILES)
-build/btb.vg: $(BTB_FILES)
-
 BTQ_FILES = verilog/sys_defs.svh
 build/btq.simv: $(BTB_FILES)
 build/btq.cov: $(BTB_FILES)
@@ -292,22 +282,6 @@ POST_RET_BUFFER_FILES = verilog/sys_defs.svh
 build/post_ret_buffer.simv: $(POST_RET_BUFFER_FILES)
 build/post_ret_buffer.cov: $(POST_RET_BUFFER_FILES)
 synth/post_ret_buffer.vg: $(POST_RET_BUFFER_FILES)
-
-GSHARE_FILES = verilog/sys_defs.svh verilog/gshare.sv verilog/prediction_buffer.sv verilog/global_history_register.sv verilog/pht.sv
-build/gshare.simv: $(GSHARE_FILES)
-build/gshare.cov: $(GSHARE_FILES)
-synth/gshare.vg: $(GSHARE_FILES)
-
-CORRELATED_FILES = verilog/sys_defs.svh verilog/correlated_predictor.sv verilog/branch_history_table.sv verilog/pht.sv
-build/correlated_predictor.simv: $(CORRELATED_FILES)
-build/correlated_predictor.cov: $(CORRELATED_FILES)
-synth/correlated_predictor.vg: $(CORRELATED_FILES)
-
-DCACHE_SIMPLE_FILES = verilog/sys_defs.svh verilog/memDP.sv verilog/mem.sv
-build/dcache_simple.simv: $(DCACHE_SIMPLE_FILES)
-build/dcache_simple.cov: $(DCACHE_SIMPLE_FILES)
-synth/dcache_simple.vg: $(DCACHE_SIMPLE_FILES)
-
 
 #################################
 # ---- Main CPU Definition ---- #
@@ -345,21 +319,12 @@ CPU_SOURCES = verilog/cpu.sv \
 			  verilog/execute.sv \
 			  verilog/lod_ex.sv \
 			  verilog/btq.sv \
-			  verilog/btb.sv \
-			  verilog/gshare.sv \
-			  verilog/prediction_buffer.sv \
 			  verilog/skid_buffer.sv \
-			  verilog/global_history_register.sv \
-			  verilog/pht.sv \
 			  verilog/retire.sv \
 			  verilog/victim.sv \
 			  verilog/sq.sv \
 			  verilog/lq.sv \
-			  verilog/branch_history_table.sv \
-			  verilog/correlated_predictor.sv \
-			  verilog/dcache_block_direct.sv \
-			  verilog/icache2.sv \
-			  verilog/dcache_simple.sv
+			  verilog/dcache_block_direct.sv
 
 
 build/cpu.simv: $(CPU_SOURCES) $(CPU_HEADERS) $(CPU_TESTBENCH)

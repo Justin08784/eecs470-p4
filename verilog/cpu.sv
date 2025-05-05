@@ -15,6 +15,9 @@ module cpu (
     input clock, // System clock
     input reset, // System reset
 
+    output  ADDR        [`N-1:0] f2mem_PCs,
+    input   MEM_BLOCK   [`N-1:0] mem2f_data,
+
     input MEM_TAG   mem2proc_transaction_tag, // Memory tag for current transaction
     input MEM_BLOCK mem2proc_data,            // Data coming back from memory
         /*
@@ -37,7 +40,7 @@ module cpu (
     output DBG_dcache   dbg_dcache,
 
 
-    `ifdef DEBUG
+`ifdef DEBUG
     // Debug outputs: these signals are solely used for debugging in testbenches
     // Do not change for project 3
     // You should definitely change these for project 4
@@ -57,7 +60,7 @@ module cpu (
     output DBG_rs       dbg_rs,
     output DBG_sq       dbg_sq,
     output DBG_retire   dbg_retire,
-    `endif 
+`endif 
 
     output COMMIT_PACKET [`N-1:0] committed_insts
 );
@@ -83,19 +86,11 @@ module cpu (
         mem2dcache_transaction_tag  = '0;
         mem2fetch_transaction_tag   = '0;
 
-        // FIXME: Ignoring requests from dcache for now
-        // if (fetch2mem_command == MEM_LOAD) begin
-        //     /*
-        //     FETCH REQUESTS COME LAST (always complete memory operations first to
-        //     get stuff commited to memory and to keep the processor FUs chugging)
-        //     */
-        //     proc2mem_command    = fetch2mem_command;
-        //     proc2mem_addr       = fetch2mem_addr;
+        /* FIXME: temporary: fake fetch makes no mem request */
+        fetch2mem_command   = MEM_NONE;
+        fetch2mem_addr      = '0;
 
-        //     mem2fetch_transaction_tag   = mem2proc_transaction_tag;
-        // end
 
-        // CORRECT:
         if (dcache2mem_command != MEM_NONE) begin
             proc2mem_command    = dcache2mem_command;
             proc2mem_addr       = dcache2mem_addr;
@@ -114,22 +109,6 @@ module cpu (
             mem2fetch_transaction_tag   = mem2proc_transaction_tag;
         end
     end
-
-    // always_ff @(posedge clock) begin
-    //     if (!reset) begin
-    //         $display("dcache2mem: {cmd: %1d, addr: %x, data: %x}",
-    //             dcache2mem_command,
-    //             dcache2mem_addr,
-    //             dcache2mem_data
-    //         );
-    //         $display("icache2mem: {cmd: %1d, addr: %x}",
-    //         fetch2mem_command,
-    //         fetch2mem_addr
-    //         );
-    //         $display("mem_transaction_tag: %0d", mem2proc_transaction_tag);
-    //         $display("mem_2_proc: {data_tag: %0d, data: %x}", mem2proc_data_tag, mem2proc_data);
-    //     end
-    // end
 
     //////////////////////////////////////////////////
     //                                              //
@@ -182,43 +161,21 @@ module cpu (
     retire2fetch retire_2_f;
     lq2retire lq_2_retire;
 
-    fetch2btb fetch_2_btb;
-    btb2fetch btb_2_fetch;
-
-    fetch2predictor fetch_2_pred;
-    predictor2fetch pred_2_fetch_gshare;
-    predictor2fetch pred_2_fetch_corr;
-
-    ADDR [`N-1:0] targets;
-    logic [`N-1:0] update_target;
-
     stage_if_p4 fetch_0(
         `ifdef DEBUG
         .dbg    (dbg_fetch),
         `endif
 
-        .clock  (clock),          // system clock
-        .reset  (reset),          // system reset
+        .clock  (clock),
+        .reset  (reset),
         .flush  (flush),
         .d_in   (decode_2_f),
+        .d_out  (f_2_decode),
+
         .r_in   (retire_2_f),
 
-        .Imem2proc_transaction_tag  (mem2fetch_transaction_tag),
-        .Imem2proc_data_tag         (mem2proc_data_tag),
-        .Imem_data                  (mem2proc_data),      // data coming back from Instruction memory
-        .Imem_command               (fetch2mem_command),
-        .Imem_addr                  (fetch2mem_addr),
-
-        .d_out          (f_2_decode),
-        .btb_in         (btb_2_fetch),
-        .pred_in_gshare (pred_2_fetch_gshare),
-        .pred_in_corr   (pred_2_fetch_corr),
-
-        .btb_out    (fetch_2_btb),
-        .pred_out   (fetch_2_pred),
-        .targets(targets),
-        .update_target(update_target)
-
+        .mem_out_PCs    (f2mem_PCs),
+        .mem_in_data    (mem2f_data)
     );
 
 
@@ -310,21 +267,7 @@ module cpu (
     retire2lq retire_2_lq;
 
     retire_final    retire_exec;
-
-
     ADDR            corrected_PC;
-  //  logic           flush_n;
-   // ADDR            corrected_PC_n;
-    logic [`N-1:0] branch_taken;
-    logic [`N-1:0] update_en;
-    ADDR [`N-1:0] PC_original;
-    logic [`N-1:0] [7:0] bhr_from_btq;
-
-    logic [`N-1:0] [7:0] correlated_bhr_d;
-    logic [`N-1:0] gshare_pred;
-    logic [`N-1:0] corr_pred;
-
-    retire2fetch ret_2_fetch;
 
     retire retire0 (
         `ifdef DEBUG
@@ -341,65 +284,15 @@ module cpu (
         .lq_in  (lq_2_retire),
         .lq_out (retire_2_lq),
 
-        .flush          (flush),
-        .corrected_PC   (corrected_PC),
-
-        .branch_taken  (branch_taken),
-        .update_en     (update_en),
-        .PC_original   (PC_original),
-        .bhr_from_btq   (bhr_from_btq),
-        .correlated_bhr_d (correlated_bhr_d),
-        .gshare_pred    (gshare_pred),
-        .corr_pred      (corr_pred), 
-        //.ret_2_fetch    (ret_2_fetch),
         .retire_exec    (retire_exec),
-        .targets(targets),
-        .update_target(update_target)
+
+        .flush          (flush),
+        .corrected_PC   (corrected_PC)
     );
 
     assign retire_2_f = '{
-        corrected_PC    : corrected_PC,
-        is_taken        : branch_taken,
-        update_en       : update_en,
-        PC              : PC_original,
-        retired_bhr     : bhr_from_btq,
-        correlated_bhr  : correlated_bhr_d,
-        gshare_pred     : gshare_pred,
-        corr_pred       : corr_pred
+        corrected_PC    : corrected_PC
     };
-
-
-    
-    gshare gshare_0(
-        .clock(clock),
-        .reset(reset),
-        .fetch_2_pred(fetch_2_pred),
-        .pred_2_fetch(pred_2_fetch_gshare)
-    );
-
-
-    correlated_predictor correlated_0(
-        .clock(clock),
-        .reset(reset),
-        .fetch_in(fetch_2_pred),
-        .pred_out(pred_2_fetch_corr)
-    );
-
-
-    //////////////////////////////////////////////////
-    //                                              //
-    //          Branch target buffer (BTB)          //
-    //                                              //
-    //////////////////////////////////////////////////  
-
-    btb btb_0(
-        .clock(clock),
-        .reset(reset),
-        .fetch_in(fetch_2_btb),
-        //.retire_in(ret_2_btb),
-        .fetch_out(btb_2_fetch)
-    );
-
 
     //////////////////////////////////////////////////
     //                                              //
