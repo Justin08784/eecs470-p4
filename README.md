@@ -19,7 +19,8 @@ At the start of each session, run `ssh off` once (enter password + 2FA) to start
 The connection will persist in the background, even if you close your terminal. While it is active,
 we can run any ssh-based commands like ssh, scp, rsync–– without password or 2FA–– *in any shell process*.
 
-The master connection closes only after idle timeout or you manually close it with `ssh -O check off`.
+The master connection closes only after idle timeout or you manually close it with `ssh -O exit off`
+(Check the status of the master via `ssh -O check off`).
 
 ## Work locally, test remotely
 Prerequisites:
