@@ -40,11 +40,13 @@ EXTS=(
 # Build all tests
 make ${TESTS[@]/%/.out}
 
+correct_out_path="$HOME/eecs470/p3-w25.eshinj/output"
+
 # Diff
 for t in "${TESTS[@]}"; do
     for ext in "${EXTS[@]}"; do
         echo "Diffing $t.$ext..."
-        diff "correct_out/${t}.${ext}" "output/${t}.${ext}" > "diffs/${t}.${ext}.diff"
+        diff "${correct_out_path}/${t}.${ext}" "output/${t}.${ext}" > "diffs/${t}.${ext}.diff"
         # diff "correct_out/${t}.${ext}" "output/${t}.${ext}"
     done
 done
