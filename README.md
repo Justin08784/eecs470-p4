@@ -21,6 +21,19 @@ we can run any ssh-based commands like ssh, scp, rsync–– without password or
 
 The master connection closes only after idle timeout or you manually close it with `ssh -O check off`.
 
+## Work locally, test remotely
+Prerequisites:
+- clone the repo in both your local machine and the CAEN remote
+- On the remote repo, run `git config core.fileMode false` to prevent git from tracking file perms.
+(rsync will forward file perm changes (especially if? only if?) local and remote are different OSes e.g.
+macos to linux).
+
+Run the following command to sync local to remote (forwards changes local->remote):
+``` {bash}
+rsync -avz --no-perms --no-owner --no-group --delete --exclude='.git/' ~/umich-cs/eecs470/p4/ off:~/p4/
+```
+Note: .git is excluded so we don't override the file perm ignoring.
+
 # EECS 470 Final Project
 
 Welcome to the EECS 470 Final Project!
