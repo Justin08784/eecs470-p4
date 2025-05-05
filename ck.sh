@@ -11,7 +11,8 @@ test_name=$1
 out_ext=$2
 num_lines=$3  # Optional third argument
 
-correct_out_path="$HOME/eecs470/p3-w25.eshinj/output"
+# correct_out_path="$HOME/eecs470/p3-w25.eshinj/output"
+correct_out_path="$HOME/p4/correct_out"
 
 # Construct the diff command
 if [ -n "$num_lines" ]; then
