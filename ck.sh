@@ -11,11 +11,13 @@ test_name=$1
 out_ext=$2
 num_lines=$3  # Optional third argument
 
+correct_out_path="$HOME/eecs470/p3-w25.eshinj/output"
+
 # Construct the diff command
 if [ -n "$num_lines" ]; then
-    cmd="diff <(head -n $num_lines correct_out/${test_name}.${out_ext}) <(head -n $num_lines output/${test_name}.${out_ext})"
+    cmd="diff <(head -n $num_lines ${correct_out_path}/${test_name}.${out_ext}) <(head -n $num_lines output/${test_name}.${out_ext})"
 else
-    cmd="diff correct_out/${test_name}.${out_ext} output/${test_name}.${out_ext}"
+    cmd="diff ${correct_out_path}/${test_name}.${out_ext} output/${test_name}.${out_ext}"
 fi
 
 # Print and execute the command
