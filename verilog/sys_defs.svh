@@ -796,9 +796,7 @@ typedef struct packed {
 // By Arch Map
 `define NUM_ARCH_REG 32
 typedef struct packed {
-    struct packed {
-        PHYS_REG_IDX t;
-    } [`NUM_ARCH_REG-1:0] state; 
+    PHYS_REG_IDX [`NUM_ARCH_REG-1:0] entries;
 } arch_map2map_table;
 
 `define BY_FU(type) \
