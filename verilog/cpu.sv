@@ -128,8 +128,8 @@ module cpu (
         .reset      (reset),
         .flush      (flush),
 
-        .decode_in  (de_2_disp),
-        .decode_out (disp_2_de),
+        .d_in       (de_2_disp),
+        .d_out      (disp_2_de),
         .rs_in      (rs_2_dispatch),
         .rs_out     (dispatch_2_rs),
         .rob_in     (rob_2_dispatch),
