@@ -40,7 +40,8 @@ EXTS=(
 # Build all tests
 make ${TESTS[@]/%/.out}
 
-correct_out_path="$HOME/eecs470/p3-w25.eshinj/output"
+# correct_out_path="$HOME/eecs470/p3-w25.eshinj/output"
+correct_out_path="$HOME/p4/correct_out"
 
 # Diff
 mkdir diffs
