@@ -16,7 +16,6 @@ module rob #(
 
     // complete (write)
     input  execute2complete_dat cdat_in,
-    input sq2rob sq_in,
 
     // dispatch (write)
     output rob2dispatch d_out,
@@ -117,20 +116,14 @@ module rob #(
                 If the same `rob_idx`appears multiple times in the CDB (e.g., [0, 0]),
                 and only the first entry has `c_en[i] == 1`, the second will
                 overwrite the intended update.
-                
+
                 For example: c_rob_idxs = [0, 0], c_en = [1, 0]
                   - i = 0: state[0].cpl <= 0 || 1 -> schedules state[0].cpl = 1
                   - i = 1: state[0].cpl <= 0 || 0 -> *overwrites* with state[0].cpl = 0
-                
+
                 This edge case seems only possible (as far as we can tell) for rob_idx 0,
                 since the CDB defaults to 0 at the start of each cycle.
                 */
-            end
-
-            //handle SQ completes
-            for (int unsigned i = 0; i < `NUM_FU_STORE; ++i) begin
-                if (sq_in.complete_en[i])
-                    state[sq_in.complete_rob_idxs[i]].cpl <= 1;
             end
 
             // handle dispatch (ins)

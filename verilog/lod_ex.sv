@@ -73,7 +73,6 @@ module lod_ex(
 
         // readiness
         LSQ_IDX         sq_idx;
-        LSQ_IDX         lq_pair;
         logic [3:0]     need_byte_mask;
     } QUERY_BAY_ENTRY;
 
@@ -308,7 +307,6 @@ module lod_ex(
                     mem_size: i_regs.dat.mem_size,
                     raw     : '0,
                     sq_idx  : i_regs.dat.sq_idx,
-                    lq_pair  : i_regs.dat.lq_pair,
                     need_byte_mask  : in_parse.need_byte_mask,
                     rd_unsigned     : i_regs.dat.rd_unsigned
                 };

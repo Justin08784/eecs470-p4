@@ -483,25 +483,11 @@ typedef struct packed {
 //dispatch if a load comes before the first store
 typedef logic [$clog2(`LSQ_SZ)-1:0] LSQ_IDX; 
 typedef struct packed {
-    LSQ_IDX sq_idx;
-    LSQ_IDX lq_pair;
-    ROB_IDX rob_idx;
-    ADDR addr;
-    logic [3:0] bytewise_addr_mask;
-    DATA_BLOCK data;
-    logic d_vld;
-    logic in_range;
-    MEM_SIZE mem_size; //MEM_SIZE'(id_ex_reg.inst.r.funct3[1:0]); <-- HOW TO FIND THIS. DO THIS WHEN PUTTING ENTRY IN FROM DISPATCH OR FROM EXECUTE
+    logic _dummy;
 } SQ_ENTRY;
 
 typedef struct packed {
-    LSQ_IDX sq_idx;
-    LSQ_IDX lq_pair;
-    ADDR addr;
-    logic d_vld;
-    MEM_SIZE mem_size;
-    ADDR inst_pc;
-    logic err_ld_ooo;
+    logic _dummy;
 } LQ_ENTRY;
 
 // BTQ stuff
@@ -590,9 +576,6 @@ typedef struct packed {
     FU_IDX          fu_idx;
     ROB_IDX         rob_idx;
     BTQ_IDX         btq_idx;
-    LSQ_IDX         sq_idx;
-    LSQ_IDX         lq_idx; //THESE ARE TWO DIFFERENT THINGS, BOTH REQUIRED. DO *NOT* COMBINE THEM
-    LSQ_IDX         lq_pair;
     logic           is_brch; // Is inst a branch?
 
     logic           pred;
@@ -697,35 +680,6 @@ typedef struct packed {
 } dispatch2free_list;
 
 typedef struct packed {
-    // alloc
-    // rename
-    logic   [$clog2(`N):0]  rename_en_cnt;
-    // commit
-    logic   [$clog2(`N):0]  sq_d_en_cnt;
-        // To: LSQ
-        // - number of enabled dispatch lines WHO NEED A LD/ST 
-        //   (i.e. may only be a strict subset of dispatching insns!)
-    ROB_IDX [`N-1:0] rob_idx;
-    LSQ_IDX [`N-1:0] lq_pair;
-} dispatch2sq;
-
-typedef struct packed {
-    // alloc
-    // rename 
-    logic   [$clog2(`N):0]  rename_en_cnt;
-    // commit
-    logic   [$clog2(`N):0]  lq_d_en_cnt;
-    logic increment_lq_pair;
-        // To: LSQ
-        // - number of enabled dispatch lines WHO NEED A LD/ST 
-        //   (i.e. may only be a strict subset of dispatching insns!)
-    ROB_IDX [`N-1:0] rob_idx;
-    LSQ_IDX [`N-1:0] sq_idx;
-    LSQ_IDX [`N-1:0] lq_pair;
-    ADDR    [`N-1:0] inst_pc;
-} dispatch2lq;
-
-typedef struct packed {
     logic         [$clog2(`N):0] en_cnt;
         // - Number of enabled dispatch lines?
         // - NOTE: For in-order stuff with serial deps (like dispatch), use c(ou)nts;
@@ -742,7 +696,6 @@ typedef struct packed {
     // to RS/ROB)
 } dispatch2map_table;
 
-
 // By Map Table
 
 typedef struct packed {
@@ -752,7 +705,6 @@ typedef struct packed {
     PHYS_REG_IDX [`N-1:0] t2s;
     PHYS_REG_IDX [`N-1:0] ts_old;
 } map_table2dispatch;
-
 
 // By RS
 typedef struct packed {
@@ -797,7 +749,6 @@ typedef struct packed {
     ROB_ENTRY   [`N-1:0]        entries; 
         // - IMPORTANT: Set from lowest indices in program-order. NO GAPS!!!
 } rob2retire;
-
 
 // By Execute
 typedef struct packed {
@@ -870,142 +821,6 @@ typedef struct packed{
     `BY_FU(DATA)    v2s;
 } prf2execute;
 
-// By SQ
-typedef struct packed {
-    logic   [$clog2(`N):0]  sq_rdy_scnt;
-    LSQ_IDX                 last_used_sq_idx;
-    LSQ_IDX [`N-1:0]        next_ids;
-    logic                   no_store_yet;
-} sq2dispatch;
-
-typedef struct packed {
-    logic       [`NUM_FU_STORE-1:0] en;
-    LSQ_IDX     [`NUM_FU_STORE-1:0] sq_idx_cdb;
-} sq2rs;
-
-
-typedef struct packed {
-    logic   [`NUM_FU_LOAD-1:0] ck_en;
-    LSQ_IDX [`NUM_FU_LOAD-1:0] idxs;
-} lq2sq;
-
-typedef struct packed {
-    logic   [`NUM_FU_LOAD-1:0] err_en;
-    LSQ_IDX last_retired_lq_pair;
-} sq2lq;
-
-typedef struct packed {
-    logic       [`NUM_FU_STORE-1:0] st_ex_en; //tells SQ that a valid store is coming in on that line (bus, not count)
-    LSQ_IDX     [`NUM_FU_STORE-1:0] st_sq_idx; //the SQ IDXs of the incoming stores, found in the ID_RESULT packet
-    ADDR        [`NUM_FU_STORE-1:0] st_addr; //address that the stores are pointing to
-    DATA        [`NUM_FU_STORE-1:0] st_data; //the data to be stored
-    MEM_SIZE    [`NUM_FU_STORE-1:0] st_mem_size; //MEM_SIZE'(id_ex_reg.inst.r.funct3[1:0]); <-- HOW TO FIND THIS. the size of the data to store. Will be BYTE, HALF, or WORD
-    
-    //NOTE:the "st_" items should be sent to SQ as soon as the address to store to is resolved and the process begins. Once the data is sent to the SQ, the store FU's job is complete.
-    //In addition, we still want to set their complete flags in the rob after execution is complete so that we can retire them.
-} execute2sq;
-
-typedef struct packed {
-    logic       [`LD_BAY_SZ-1:0] forward_req_en; //tells the SQ that a store-load forwarding request is coming in on that line (bus, not count)
-    LSQ_IDX     [`LD_BAY_SZ-1:0] forward_sq_idx; //the SQ IDXs of the loads that are requesting a forward (all loads are assigned the SQ_IDX of the store that most recently was dispatched in the ID_RESULT packet)
-    LSQ_IDX     [`LD_BAY_SZ-1:0] forward_lq_pair;
-    ADDR        [`LD_BAY_SZ-1:0] forward_addr; //the address of the forwarding request
-    MEM_SIZE    [`LD_BAY_SZ-1:0] forward_mem_size; //MEM_SIZE'(id_ex_reg.inst.r.funct3[1:0]); <-- HOW TO FIND THIS. the size of teh data forward requested. Will be BYTE, HALF, or WORD
-} executeLD2sq;
-
-typedef struct packed {
-    logic       [`LD_BAY_SZ-1:0]          forward_en; //tells the load FU if valid data to be forwarded was found (will be ready by the posedge of the next clock cycle)
-    DATA_BLOCK  [`LD_BAY_SZ-1:0]          forward_data; //the data being forwarded
-    MEM_SIZE    [`LD_BAY_SZ-1:0]          forward_mem_size; //the size of the data being forwarded. Will always match the size of the request
-    logic       [`LD_BAY_SZ-1:0] [3:0]    forward_byte_en; //a 4-wide mask telling which of the bytes are valid data being forwarded. This allows cases where you request 4000-4003, and SQ returns a match on 400-4001 and 4003 but not 4002 (and similar cases)
-    //example for byte mask:
-    //request addr 4000 size WORD
-    //SQ match 4000-4001 (HALF)
-    //SQ match 4003 (BYTE)
-    //Return data 32'b: 4003 4002 4001 4000
-    //byte mask:   4'b   1    0    1    1
-} sq2execute;
-
-typedef struct packed {
-    logic   [`NUM_FU_STORE-1:0]  complete_en;
-    ROB_IDX [`NUM_FU_STORE-1:0]  complete_rob_idxs;
-} sq2rob;
-
-typedef struct packed {
-    logic   [$clog2(`N):0]  sq_ret_en;
-    logic                   sq_ret_complete;
-} sq2retire;
-
-typedef struct packed {
-    logic   [$clog2(`N):0] r_en;
-    // ROB_IDX [`N-1:0] r_pos;
-} retire2sq;
-
-typedef struct packed {
-    MEM_COMMAND [`N-1:0] Dmem_command;    // The memory command
-    MEM_SIZE    [`N-1:0] Dmem_size;       // Size of data to read or write
-    ADDR        [`N-1:0] Dmem_addr;       // Address sent to Data memory
-    MEM_BLOCK   [`N-1:0] Dmem_store_data; // Data sent to Data memory
-} stRET2mem;
-
-typedef struct packed {
-    logic       [$clog2(`N):0] ret_cnt;
-    SQ_ENTRY    [`N-1:0] ret_st;
-    logic       [`LD_BAY_SZ-1:0] forward_req_en;
-    LSQ_IDX     [`LD_BAY_SZ-1:0] forward_sq_idx;
-    ADDR        [`LD_BAY_SZ-1:0] forward_addr;
-    MEM_SIZE    [`LD_BAY_SZ-1:0] forward_mem_size;
-} sq2stRET;
-
-typedef struct packed {
-    logic [$clog2(`N):0]    free_scnt;
-    logic [$clog2(`N):0]    used_scnt;
-} stRET2sq;
-
-typedef struct packed {
-    logic       [`LD_BAY_SZ-1:0]          forward_en;
-    ADDR        [`LD_BAY_SZ-1:0]          forward_addr;
-    DATA_BLOCK  [`LD_BAY_SZ-1:0]          forward_data;
-    MEM_SIZE    [`LD_BAY_SZ-1:0]          forward_mem_size;
-    logic       [`LD_BAY_SZ-1:0] [3:0]    forward_byte_en;
-    logic       [`LD_BAY_SZ-1:0]          sq_idx_found;    
-} forwardRET2sq;
-
-typedef struct packed {
-    logic   [$clog2(`N):0]      lq_rdy_scnt;
-    logic   [$clog2(`LSQ_SZ):0] lq_tail;
-    LSQ_IDX [`N-1:0]            next_ids;
-    LSQ_IDX                     current_lq_pair;
-    logic                       no_load_yet;
-} lq2dispatch;
-
-typedef struct packed {
-    ADDR [`N-1:0] PC;
-    logic[`N-1:0] err_ld_ooo;
-} lq2retire;
-
-typedef struct packed {
-    logic   [$clog2(`N):0] r_en;
-} retire2lq;
-
-typedef struct packed {
-    logic       [`NUM_FU_LOAD-1:0]  ld_ex_en; //tells LQ that a valid load is coming in on that line (bus, not count)
-    LSQ_IDX     [`NUM_FU_LOAD-1:0]  ld_lq_idx; //LQ IDX for the incoming loads (found in ID_RESULT packet).
-    ADDR        [`NUM_FU_LOAD-1:0]  ld_addr; //address that the load is loading from
-    MEM_SIZE    [`NUM_FU_LOAD-1:0]  ld_mem_size; //MEM_SIZE'(id_ex_reg.inst.r.funct3[1:0]); <-- HOW TO FIND THIS. size being loaded (BYTE, HALF, WORD)
-    //LQ doesn't need to talk back to execute
-
-    //NOTE: the "ld_" items should be sent to LQ as soon as the address to load from is resolved and the query begins. In addition, we still want to set their complete flags in the
-    //rob after execution is complete so that we can retire them.
-
-    //NOTE: the "st_" items should be sent to LQ as soon as the address to store to is resolved and the data is being sent to the SQ.
-} execute2lq;
-
-typedef struct packed {
-    logic       [`NUM_FU_STORE-1:0] st_en; //this comes from the STORE FUs, and tells the LQ if a valid SQ IDX is coming in on that line (bus, not count)
-    LSQ_IDX     [`NUM_FU_STORE-1:0] st_sq_idx; //SQ_IDX associated with st_en. These two items are used to check if any loads and stores have happened out-of-order to flag in the ROB
-} execeuteST2lq;
-
 typedef struct packed {
     ADDR  addr;
     logic valid;
@@ -1064,8 +879,6 @@ typedef struct packed {
     dispatch2rob rob_out;
     free_list2dispatch free_in;
     dispatch2free_list free_out;
-    sq2dispatch sq_in;
-    dispatch2sq sq_out;
     btq2dispatch btq_in;
     dispatch2btq btq_out;
     execute2complete_tag ctag_in;
@@ -1088,17 +901,7 @@ typedef struct packed {
 } DBG_btq;
 
 typedef struct packed {
-    // internal state
-    SQ_ENTRY    [`LSQ_SZ-1:0]           state;
-    logic       [$clog2(`LSQ_SZ)-1:0]    head;
-    logic       [$clog2(`LSQ_SZ)-1:0]    tail;
-    logic       [$clog2(`LSQ_SZ):0]      used;
-    // I/O
-    dispatch2lq dis_2_lq;
-    execute2lq exec_2_lq;
-    retire2lq retire_2_lq;
-
-    lq2dispatch lq_2_dis;
+    logic _dummy;
 } DBG_lq;
 
 
@@ -1151,41 +954,11 @@ typedef struct packed {
 } DBG_rs;
 
 typedef struct packed {
-    // internal state
-    SQ_ENTRY [`LSQ_SZ-1:0]     state;
-    logic [$clog2(`LSQ_SZ)-1:0] head;
-    logic [$clog2(`LSQ_SZ)-1:0] tail;
-    logic [$clog2(`LSQ_SZ):0]   used;
-    // I/O
-    sq2stRET sq_2_ret;
-    MEM_TAG mem2proc_transaction_tag;
-
-    stRET2sq ret_2_sq;
-    forwardRET2sq forward_ret_2_sq;
-    stRET2mem ret_2_mem;
+    logic _dummy;
 } DBG_retbuf;
 
 typedef struct packed {
-    // internal state
-    SQ_ENTRY [`LSQ_SZ-1:0]     state;
-    logic [$clog2(`LSQ_SZ)-1:0] head;
-    logic [$clog2(`LSQ_SZ)-1:0] ret_head;
-    logic [$clog2(`LSQ_SZ)-1:0] tail;
-    logic [$clog2(`LSQ_SZ):0]   used;
-    logic [$clog2(`LSQ_SZ):0]   free;
-    logic [$clog2(`LSQ_SZ):0]   rsvd;
-    // I/O
-
-    dispatch2sq   dis_2_sq;
-    execute2sq    exec_2_sq;
-    retire2sq     retire_2_sq;
-
-    sq2dispatch  sq_2_dis;
-    sq2execute   sq_2_exec;
-    // sq2rs sq_2_rs,
-    sq2retire    sq_2_retire;
-
-    DBG_retbuf   dbg_retbuf;
+    logic _dummy;
 } DBG_sq;
 
 typedef struct packed {
@@ -1194,9 +967,6 @@ typedef struct packed {
     rob2retire rob_in;
     btq2retire btq_in;
     retire2btq btq_out;
-    sq2retire sq_in;
-    retire2sq sq_out;
-    lq2retire lq_in;
     logic mispred;
     ADDR  mispred_target;
     retire_final retire_exec;
@@ -1247,6 +1017,5 @@ function automatic string dbg_mem_size(input MEM_SIZE size);
     return rv;
 endfunction;
 `endif
-
 
 `endif // __SYS_DEFS_SVH__

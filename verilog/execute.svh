@@ -46,7 +46,6 @@ typedef struct packed {
     DATA            opb;
 
     LSQ_IDX         lq_idx;
-    LSQ_IDX         lq_pair;
     LSQ_IDX         sq_idx;
     ROB_IDX         rob_idx;
     MEM_SIZE        mem_size;

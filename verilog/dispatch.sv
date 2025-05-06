@@ -29,12 +29,6 @@ module dispatch #(parameter
     input   free_list2dispatch free_in,
     output  dispatch2free_list free_out,
 
-    // LSQ
-    input   sq2dispatch sq_in,
-    output  dispatch2sq sq_out,
-    input   lq2dispatch lq_in,
-    output  dispatch2lq lq_out,
-    
     // BTQ
     input   btq2dispatch btq_in,
     output  dispatch2btq btq_out,
@@ -45,7 +39,6 @@ module dispatch #(parameter
     // Map table
     input   map_table2dispatch map_in,
     output  dispatch2map_table map_out
-    
 );
 
 logic [`PHYS_REG_SZ_R10K-1:0] cpl_lst;
@@ -56,8 +49,6 @@ logic [$clog2(N):0] alloc_rdy_scnt;
 logic [$clog2(N):0] alloc_vld_scnt;
 
 logic [$clog2(N):0] lim_cnt_free;
-logic [$clog2(N):0] lim_cnt_sq;
-logic [$clog2(N):0] lim_cnt_lq;
 
 // Gate by availability
 always_comb begin
@@ -147,44 +138,17 @@ always_comb begin
     end
     rename_en_cnt = `MIN(lim_cnt_btq, rename_en_cnt);
 
-    lim_cnt_sq = 0;
-    for (int unsigned i = 0, int used_cnt = 0; i < `N; ++i) begin
-        if (used_cnt + rename_in[i].wr_mem > sq_in.sq_rdy_scnt)
-            break;
-        used_cnt += rename_in[i].wr_mem;
-        ++lim_cnt_sq;
-    end
-    rename_en_cnt = `MIN(lim_cnt_sq, rename_en_cnt);
-
-    lim_cnt_lq = 0;
-    for (int unsigned i = 0, int used_cnt = 0; i < `N; ++i) begin
-        if (used_cnt + rename_in[i].rd_mem > lq_in.lq_rdy_scnt)
-            break;
-        used_cnt += rename_in[i].rd_mem;
-        ++lim_cnt_lq;
-    end
-    rename_en_cnt = `MIN(lim_cnt_lq, rename_en_cnt);
-
     rename_en_cnt = `MIN(rename_rdy_scnt, rename_en_cnt);
 end
 
 // handle btq output
 logic [`N-1:0] is_brch;
-logic [`N-1:0] wr_mem;
-logic [`N-1:0] rd_mem;
 always_comb begin
     foreach(rename_en[i])
         rename_en[i] = i < rename_en_cnt;
-
     foreach(is_brch[i])
         is_brch[i]  = rename_in[i].is_brch;
-    foreach(wr_mem[i])
-        wr_mem[i]   = rename_in[i].wr_mem;
-    foreach(rd_mem[i])
-        rd_mem[i]   = rename_in[i].rd_mem;
 
-    sq_out.rename_en_cnt= $countones(rename_en & wr_mem);
-    lq_out.rename_en_cnt= $countones(rename_en & rd_mem);
     btq_out.en_cnt      = $countones(rename_en & is_brch);
 end
 
@@ -270,22 +234,11 @@ fifo #(
 
 /* >> ==== 3. Commit Stage ==== >> */
 
-logic [$clog2(`N):0] sq_wr_idx;
-logic [$clog2(`N):0] lq_wr_idx;
 // handle rs output 
 always_comb begin
     commit_en_cnt   = `MIN(rename_vld_scnt, rs_in.rs_rdy_scnt);
     rs_out.d_en_cnt = commit_en_cnt;
     rs_out.d_dat    = '0;
-    sq_wr_idx       = 0;
-    lq_wr_idx       = 0;
-    lq_out.rob_idx = '0; //handling latch prevention
-    lq_out.sq_idx = '0;
-    lq_out.increment_lq_pair = 0;
-    lq_out.inst_pc = '0;
-    sq_out.rob_idx = '0;
-    sq_out.lq_pair = '0;
-    lq_out.lq_pair = '0;
 
     for (int i = 0; i < `N; i++) begin
         rs_out.d_dat[i] = commit_in[i].dat;
@@ -296,72 +249,9 @@ always_comb begin
         end
         rs_out.d_dat[i].t1_rdy |= cpl_lst[commit_in[i].dat.t1];
         rs_out.d_dat[i].t2_rdy |= cpl_lst[commit_in[i].dat.t2];
-
-        if (commit_in[i].dat.wr_mem) begin
-            rs_out.d_dat[i].sq_idx = sq_in.next_ids[sq_wr_idx];
-            sq_out.rob_idx[sq_wr_idx] = rob_in.rob_idxs[i];
-            // sq_out.lq_idx[sq_wr_idx] = lq_in.next_ids[lq_wr_idx];
-
-            sq_out.lq_pair[sq_wr_idx] = (lq_in.current_lq_pair + 1) % `LSQ_SZ;
-
-            lq_out.increment_lq_pair = 1;
-
-            ++sq_wr_idx;
-        end
-
-        if (commit_in[i].dat.rd_mem) begin
-            // rs_out.d_dat[i].sq_idx = (sq_in.no_store_yet && (sq_wr_idx == 0)) ? `LSQ_SZ : (sq_in.last_used_sq_idx + sq_wr_idx) % `LSQ_SZ;
-            // lq_out.sq_idx[lq_wr_idx] = (sq_in.no_store_yet && (sq_wr_idx == 0)) ? `LSQ_SZ : (sq_in.last_used_sq_idx + sq_wr_idx) % `LSQ_SZ;
-            // $display("ASSIGNING: last_used: %0d, sq_wr_idx: %0d, no_store_yet: %b, assignment: %0d", sq_in.last_used_sq_idx, sq_wr_idx, sq_in.no_store_yet, rs_out.d_dat[i].sq_idx);
-            
-            rs_out.d_dat[i].lq_pair = lq_out.increment_lq_pair ? (lq_in.current_lq_pair + 1) % `LSQ_SZ : lq_in.current_lq_pair;
-            lq_out.lq_pair[lq_wr_idx] = lq_out.increment_lq_pair ? (lq_in.current_lq_pair + 1) % `LSQ_SZ : lq_in.current_lq_pair;
-            
-            if (sq_in.no_store_yet && (sq_wr_idx == 0)) begin
-                lq_out.sq_idx[lq_wr_idx] = `LSQ_SZ;
-                rs_out.d_dat[i].sq_idx = `LSQ_SZ;
-            end
-            else if (sq_wr_idx == 0) begin
-                lq_out.sq_idx[lq_wr_idx] = sq_in.last_used_sq_idx;
-                rs_out.d_dat[i].sq_idx = sq_in.last_used_sq_idx;
-            end 
-            else begin
-                lq_out.sq_idx[lq_wr_idx] = sq_in.next_ids[sq_wr_idx-1];
-                rs_out.d_dat[i].sq_idx = sq_in.next_ids[sq_wr_idx-1];
-            end 
-            lq_out.inst_pc[lq_wr_idx] = commit_in[i].dat.PC;
-            rs_out.d_dat[i].lq_idx = lq_in.next_ids[lq_wr_idx];
-
-            ++lq_wr_idx;
-        end
     end
-
-    // sq_out.sq_d_en_cnt = sq_wr_idx;
-    // lq_out.lq_d_en_cnt = lq_wr_idx;
 end
 
-
-logic [$clog2(`N):0] sq_wr_cnt;
-logic [$clog2(`N):0] lq_wr_cnt;
-always_comb begin
-    sq_wr_cnt = 0;
-    lq_wr_cnt = 0;
-
-    for (int i = 0; i < `N; i++) begin
-        if (i >= commit_en_cnt) continue;
-        
-        if (commit_in[i].dat.wr_mem) begin
-            ++sq_wr_cnt;
-        end
-
-        if (commit_in[i].dat.rd_mem) begin
-            ++lq_wr_cnt;
-        end
-    end
-
-    sq_out.sq_d_en_cnt = sq_wr_cnt;
-    lq_out.lq_d_en_cnt = lq_wr_cnt;
-end
 
 // handle rob output 
 always_comb begin
@@ -408,8 +298,6 @@ assign dbg = '{
     rob_out,
     free_in,
     free_out,
-    sq_in,
-    sq_out,
     btq_in,
     btq_out,
     ctag_in,

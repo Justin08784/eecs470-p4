@@ -189,7 +189,7 @@ GREP = grep -E --color=auto
 # ---- Modules to Test ---- #
 
 # TODO: add more modules here
-MODULES = cpu mult rob rs fifo free_list dispatch prf map_table stage_id_p4 execute fetch sq post_ret_buffer skid_buffer lq victim
+MODULES = cpu mult rob rs fifo free_list dispatch prf map_table stage_id_p4 execute fetch skid_buffer victim
 
 # TODO: update this if you add more header files
 ALL_HEADERS = $(CPU_HEADERS)
@@ -252,7 +252,6 @@ build/map_table.cov: $(MAP_TABLE_FILES)
 build/map_table.vg: $(MAP_TABLE_FILES)
 # build/stage_id_p4.out: $(MAP_TABLE_FILES)
 
-
 EXECUTE_FILES = verilog/sys_defs.svh verilog/mult.sv verilog/psel_gen.sv
 build/execute.simv: $(EXECUTE_FILES)
 build/execute.cov: $(EXECUTE_FILES)
@@ -262,16 +261,6 @@ BTQ_FILES = verilog/sys_defs.svh
 build/btq.simv: $(BTB_FILES)
 build/btq.cov: $(BTB_FILES)
 build/btq.vg: $(BTB_FILES)
-
-SQ_FILES = verilog/sys_defs.svh verilog/psel_gen.sv
-build/sq.simv: $(SQ_FILES)
-build/sq.cov: $(SQ_FILES)
-synth/sq.vg: $(SQ_FILES)
-
-LQ_FILES = verilog/sys_defs.svh
-build/lq.simv: $(LQ_FILES)
-build/lq.cov: $(LQ_FILES)
-synth/lq.vg: $(LQ_FILES)
 
 VICTIM_FILES = verilog/sys_defs.svh verilog/psel_gen.sv
 build/victim.simv: $(VICTIM_FILES)
@@ -317,13 +306,10 @@ CPU_SOURCES = verilog/cpu.sv \
 			  verilog/fifo.sv \
 			  verilog/fetch.sv \
 			  verilog/execute.sv \
-			  verilog/lod_ex.sv \
 			  verilog/btq.sv \
 			  verilog/skid_buffer.sv \
 			  verilog/retire.sv \
 			  verilog/victim.sv \
-			  verilog/sq.sv \
-			  verilog/lq.sv \
 			  verilog/dcache_block_direct.sv
 
 

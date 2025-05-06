@@ -174,50 +174,6 @@ module alu_ex(
     endgenerate
 endmodule
 
-
-module str_ex(
-    input clock,
-    input reset,
-    input flush,
-
-    /* FRONTEND */
-    output logic    [`NUM_FU_STORE-1:0]  i_rdy,
-    input  logic    [`NUM_FU_STORE-1:0]  i_vld,
-    input  STR_REGS [`NUM_FU_STORE-1:0]  i_regs,
-    
-    output  execute2sq sq_out,
-    // FIXME: Isn't an lq2execute needed? <-- Answer: No, if an issue is found when forwarding the SQ_IDX to LQ, it is flagged in the ROB to restart from that PC
-    output  execeuteST2lq st_lq_out
-);
-    // FIXME: Is this right? 
-    assign i_rdy = '1;
-
-    always_comb begin
-        ADDR  addr;
-        sq_out = '0;
-        st_lq_out = '0;
-        foreach(i_vld[i]) begin
-            if (!i_vld[i])
-                continue;
-            // store address computation
-            addr = i_regs[i].rs1 + i_regs[i].dat.opb;
-
-            sq_out.st_ex_en[i]      = i_vld[i];
-            sq_out.st_sq_idx[i]     = i_regs[i].dat.sq_idx;
-            sq_out.st_addr[i]       = addr;
-            sq_out.st_data[i]       = i_regs[i].rs2;
-            sq_out.st_mem_size[i]   = i_regs[i].dat.mem_size;
-
-            st_lq_out.st_en[i]      = i_vld[i];
-            st_lq_out.st_sq_idx[i]  = i_regs[i].dat.sq_idx;
-
-
-        end
-    end
-
-    /* TODO: CAND generation logic. */
-endmodule
-
 module mul_ex(
     input clock,
     input reset,
@@ -296,10 +252,10 @@ module mul_ex(
 endmodule
 
 module stage_ex_p4 (
-    `ifdef DEBUG
-    output DBG_execute dbg,
-    `endif
+`ifdef DEBUG
     input print_en,
+    output DBG_execute dbg,
+`endif
     input clock,
     input reset,
     input flush,
@@ -307,15 +263,8 @@ module stage_ex_p4 (
     input   rs2execute rs_in,
     output  execute2rs rs_out,
 
-    input   sq2execute sq_in,
-    output  execute2sq sq_out,
-    // FIXME: Isn't an lq2execute needed?
-    output  execute2lq lq_out,
-    output  execeuteST2lq st_lq_out,
-    output  executeLD2sq ld_sq_out,
-
     input   dcache2ld   dcache_in,
-    output   ld2dcache   dcache_out,
+    output  ld2dcache   dcache_out,
 
     input   prf2execute prf_in,
     output  execute2prf prf_out,
@@ -429,9 +378,11 @@ module stage_ex_p4 (
                 t1      : rs_in.fu_dat_load[i].t1,
                 opb     : `RV32_signext_Iimm(rs_in.fu_dat_load[i].inst),
 
-                lq_idx  : rs_in.fu_dat_load[i].lq_idx,
-                lq_pair : rs_in.fu_dat_load[i].lq_pair,
-                sq_idx  : rs_in.fu_dat_load[i].sq_idx,
+                // >> FIXME
+                sq_idx  : '0,
+                lq_idx  : '0,
+                // << FIXME
+
                 rob_idx : rs_in.fu_dat_load[i].rob_idx,
                 mem_size: MEM_SIZE'(rs_in.fu_dat_load[i].inst.r.funct3[1:0]),
                 rd_unsigned : rs_in.fu_dat_load[i].inst.r.funct3[2]
@@ -460,7 +411,10 @@ module stage_ex_p4 (
                 t2      : rs_in.fu_dat_store[i].t2,
                 opb     : `RV32_signext_Simm(rs_in.fu_dat_store[i].inst),
 
-                sq_idx  : rs_in.fu_dat_store[i].sq_idx,
+                // >> FIXME
+                sq_idx  : '0,
+                // << FIXME
+
                 rob_idx : rs_in.fu_dat_store[i].rob_idx,
                 mem_size: MEM_SIZE'(rs_in.fu_dat_store[i].inst.r.funct3[1:0])
             };
@@ -646,7 +600,7 @@ module stage_ex_p4 (
     assign cands.str = '0; // alu, mul, lod set by respective *_ex's
     CPL_CAND [`NUM_FU_TOTAL-1:0] cands_flat;
     assign cands_flat = cands;
-    
+
     /*
     Complete grant bus shift register
     */
@@ -658,6 +612,7 @@ module stage_ex_p4 (
     assign cdb_req.alu = rs_in.fu_vld_alu;
     // cdb_req.mul set by mul_ex
     // cdb_req.lod set by lod_ex
+    assign cdb_req.lod = '0; // FIXME
     assign cdb_req.str = '0;
     `BY_FU(logic) cdb_gnt;
 
@@ -669,7 +624,7 @@ module stage_ex_p4 (
         .gnt    (cdb_gnt),  // flatten => single bus
         .gnt_bus(cdb2fu_gbus)
     );
-    
+
     /* >> ======== STAGE 3: Execution ======== >> */
     // Includes operand decode/CDB bypass just before 1st cycle of execution.
 
@@ -688,7 +643,7 @@ module stage_ex_p4 (
 
     `BY_FU(PHYS_REG_IDX) ctag_ts;
     PHYS_REG_IDX [`NUM_FU_TOTAL-1:0] ctag_ts_flat;
-    
+
     mul_ex mul_ex0 (
         .clock  (clock),
         .reset  (reset),
@@ -703,45 +658,6 @@ module stage_ex_p4 (
         .cdb_gnt(cdb_gnt.mul),
 
         .o_cands(cands.mul)
-    );
-
-    lod_ex lod_ex0 (
-        `ifdef DEBUG
-        .print_en(print_en),
-        `endif
-        .clock  (clock),
-        .reset  (reset),
-        .flush  (flush),
-
-        .i_rdy  (ex.i_rdy.lod),
-        .i_vld  (regs.o_vld.lod),
-        .i_regs (regs.o_dat.lod),
-
-        .sq_in(sq_in),
-        .lq_out(lq_out),
-        .ld_sq_out(ld_sq_out),
-
-        .dcache_in(dcache_in),
-        .dcache_out(dcache_out),
-
-        .cdb_req(cdb_req.lod),
-        .ctag_ts(ctag_ts.lod),
-        .cdb_gnt(cdb_gnt.lod),
-        
-        .o_cands(cands.lod)
-    );
-
-    str_ex str_ex0 (
-        .clock  (clock),
-        .reset  (reset),
-        .flush  (flush),
-
-        .i_vld  (regs.o_vld.str),
-        .i_regs (regs.o_dat.str),
-        .i_rdy  (ex.i_rdy.str),
-
-        .sq_out(sq_out),
-        .st_lq_out(st_lq_out)
     );
 
     /* >> ======== STAGE 4/?: CDB data/tag broadcast ======== >> */

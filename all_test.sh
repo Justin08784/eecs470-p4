@@ -15,44 +15,44 @@ TESTS=(
     test3
 
     # contains mem ops
-    2store_1evi
-    copy_long
-    copy
-    crt
-    evens_long
-    evens
-    fib_long
-    fib_rec
-    fib
-    haha
-    hw4q4a
-    hw4q4c
-    insertion
-    mult_orig
-    no_hazard
-    parallel
-    sampler
-    saxpy
-    test4
-    test5
-    test6
-    test7
-    test8
-    alexnet
-    backtrack
-    basic_malloc
-    bfs
-    dft
-    fc_forward
-    graph
-    insertionsort
-    matrix_mult_rec
-    mergesort
-    omegalul
-    outer_product
-    priority_queue
-    quicksort
-    sort_search
+    # 2store_1evi
+    # copy_long
+    # copy
+    # crt
+    # evens_long
+    # evens
+    # fib_long
+    # fib_rec
+    # fib
+    # haha
+    # hw4q4a
+    # hw4q4c
+    # insertion
+    # mult_orig
+    # no_hazard
+    # parallel
+    # sampler
+    # saxpy
+    # test4
+    # test5
+    # test6
+    # test7
+    # test8
+    # alexnet
+    # backtrack
+    # basic_malloc
+    # bfs
+    # dft
+    # fc_forward
+    # graph
+    # insertionsort
+    # matrix_mult_rec
+    # mergesort
+    # omegalul
+    # outer_product
+    # priority_queue
+    # quicksort
+    # sort_search
 )
 
 EXTS=(

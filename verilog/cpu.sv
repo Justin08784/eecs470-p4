@@ -37,14 +37,10 @@ module cpu (
     output ADDR        proc2mem_addr,    // Address sent to memory
     output MEM_BLOCK   proc2mem_data,    // Data sent to memory
     output MEM_SIZE    proc2mem_size,    // Data size sent to memory
+
     output DBG_dcache   dbg_dcache,
 
-
 `ifdef DEBUG
-    // Debug outputs: these signals are solely used for debugging in testbenches
-    // Do not change for project 3
-    // You should definitely change these for project 4
-
     input  logic        print_en, // high iff current cycle in dbg cycle range
     output DBG_execute  dbg_execute,
     output DBG_fl       dbg_fl,
@@ -53,7 +49,6 @@ module cpu (
     output DBG_decode   dbg_decode,
     output DBG_dispatch dbg_dispatch,
     output DBG_lq       dbg_lq,
-    // output DBG_icache   dbg_icache, // icache is submodule of fetch; dont need separate line
     output DBG_mt       dbg_mt,
     output DBG_prf      dbg_prf,
     output DBG_rob      dbg_rob,
@@ -68,87 +63,14 @@ module cpu (
     logic flush;
 
 
-    MEM_COMMAND dcache2mem_command;
-    DATA        dcache2mem_addr;
-    MEM_BLOCK   dcache2mem_data;
-    MEM_TAG     mem2dcache_transaction_tag;
-
-    MEM_COMMAND fetch2mem_command;
-    DATA        fetch2mem_addr;
-    MEM_TAG     mem2fetch_transaction_tag;
-
     always_comb begin
         proc2mem_command    = MEM_NONE;
         proc2mem_addr       = '0;
         proc2mem_data       = '0;
         proc2mem_size       = DOUBLE;
 
-        mem2dcache_transaction_tag  = '0;
-        mem2fetch_transaction_tag   = '0;
-
-        /* FIXME: temporary: fake fetch makes no mem request */
-        fetch2mem_command   = MEM_NONE;
-        fetch2mem_addr      = '0;
-
-
-        if (dcache2mem_command != MEM_NONE) begin
-            proc2mem_command    = dcache2mem_command;
-            proc2mem_addr       = dcache2mem_addr;
-            proc2mem_data       = dcache2mem_data;
-
-            mem2dcache_transaction_tag  = mem2proc_transaction_tag;
-
-        end else if (fetch2mem_command == MEM_LOAD) begin
-            /*
-            FETCH REQUESTS COME LAST (always complete memory operations first to
-            get stuff commited to memory and to keep the processor FUs chugging)
-            */
-            proc2mem_command    = fetch2mem_command;
-            proc2mem_addr       = fetch2mem_addr;
-
-            mem2fetch_transaction_tag   = mem2proc_transaction_tag;
-        end
+        dbg_dcache = '0;
     end
-
-    //////////////////////////////////////////////////
-    //                                              //
-    //                   Dcache                     //
-    //                                              //
-    ////////////////////////////////////////////////// 
-    // Load (w/ load FU)
-    ld2dcache ld_2_dcache;
-    dcache2ld dcache_2_ld;
-
-    // Store (w/ SQ)
-    sq2dcache sq_2_dcache;
-    dcache2sq dcache_2_sq;
-
-    dcache_block dcache0 (
-        // `ifdef DEBUG
-        .dbg(dbg_dcache),
-        // `endif
-
-        .clock(clock),
-        .reset(reset),
-        .flush(flush),
-
-        // input from memory
-        .mem_in_transaction_tag (mem2dcache_transaction_tag),
-        .mem_in_data            (mem2proc_data),
-        .mem_in_data_tag        (mem2proc_data_tag),
-
-        .mem_out_command        (dcache2mem_command),
-        .mem_out_addr           (dcache2mem_addr),
-        .mem_out_data           (dcache2mem_data),
-
-        // Load (w/ load FU)
-        .ld_in  (ld_2_dcache), // FIXME: reenable
-        .ld_out (dcache_2_ld),
-
-        // Store (w/ SQ)
-        .sq_in  (sq_2_dcache), // FIXME: reenable
-        .sq_out (dcache_2_sq)
-    );
 
     //////////////////////////////////////////////////
     //                                              //
@@ -159,7 +81,6 @@ module cpu (
     fetch2decode f_2_decode;
     decode2fetch decode_2_f;
     retire2fetch retire_2_f;
-    lq2retire lq_2_retire;
 
     stage_if_p4 fetch_0(
         `ifdef DEBUG
@@ -220,10 +141,6 @@ module cpu (
     btq2dispatch btq_2_dispatch;
     execute2complete_tag ex_2_ctag;
     execute2complete_dat ex_2_cdat;
-    dispatch2sq dispatch_2_sq;
-    sq2dispatch sq_2_dispatch;
-    dispatch2lq dis_2_lq;
-    lq2dispatch lq_2_dis;
 
     dispatch dispatcher(
         `ifdef DEBUG
@@ -242,14 +159,10 @@ module cpu (
         .rob_out    (dispatch_2_rob),
         .free_in    (fl_2_dispatch),
         .free_out   (dispatch_2_fl),
-        .sq_in      (sq_2_dispatch),
-        .sq_out     (dispatch_2_sq),
         .btq_in     (btq_2_dispatch),
         .btq_out    (dispatch_2_btq),
         .map_in     (map_2_dispatch),
         .map_out    (dispatch_2_map),
-        .lq_in      (lq_2_dis),
-        .lq_out     (dis_2_lq),
 
         .ctag_in    (ex_2_ctag)
     );
@@ -262,9 +175,6 @@ module cpu (
     rob2retire rob_2_retire;
     btq2retire btq_2_retire;
     retire2btq retire_2_btq;
-    sq2retire sq_2_retire;
-    retire2sq retire_2_sq;
-    retire2lq retire_2_lq;
 
     retire_final    retire_exec;
     ADDR            corrected_PC;
@@ -279,10 +189,6 @@ module cpu (
         .rob_in (rob_2_retire),
         .btq_in (btq_2_retire),
         .btq_out(retire_2_btq),
-        .sq_in  (sq_2_retire),
-        .sq_out (retire_2_sq),
-        .lq_in  (lq_2_retire),
-        .lq_out (retire_2_lq),
 
         .retire_exec    (retire_exec),
 
@@ -349,8 +255,6 @@ module cpu (
     //                                              //
     //////////////////////////////////////////////////  
 
-    sq2rob sq_2_rob;
-
     rob #(
         .ROB_SZ(`ROB_SZ),
         .N(`N)
@@ -364,85 +268,8 @@ module cpu (
         .r_out      (rob_2_retire),
         .r_in       (retire_exec),
         .cdat_in    (ex_2_cdat),
-        .sq_in      (sq_2_rob),
         .d_out      (rob_2_dispatch),
         .d_in       (dispatch_2_rob)
-    );
-
-    //////////////////////////////////////////////////
-    //                                              //
-    //                      SQ                      //
-    //                                              //
-    ////////////////////////////////////////////////// 
-
-    execute2sq exec_2_sq;
-    executeLD2sq exec_ld_2_sq;
-    // MEM_TAG temp_tag;
-    sq2execute sq_2_exec;
-    sq2lq sq_2_lq;
-    lq2sq lq_2_sq;
-    // assign temp_tag = (ret_2_mem.Dmem_command == MEM_STORE) ? 1 : 0;
-
-    sq #(
-        .N(`N),
-        .LSQ_SZ(`LSQ_SZ),
-        // .LSQ_SZ_DBL(`LSQ_SZ_DBL),
-        .NUM_FU_STORE(`NUM_FU_STORE),
-        .NUM_FU_LOAD(`NUM_FU_LOAD),
-        .LD_BAY_SZ(`LD_BAY_SZ)
-    ) sq_0 (
-        `ifdef DEBUG
-        .dbg        (dbg_sq),
-        `endif
-        .clock      (clock),
-        .reset      (reset),
-        .flush      (flush),
-
-        .dispatch_in    (dispatch_2_sq),
-        .dispatch_out   (sq_2_dispatch),
-
-        .execute_in     (exec_2_sq),
-        .ex_frwd_in     (exec_ld_2_sq),
-        .execute_out    (sq_2_exec),
-        .rob_out        (sq_2_rob),
-
-        .retire_in      (retire_2_sq),
-        .retire_out     (sq_2_retire),
-
-        .dcache_in      (dcache_2_sq), // FIXME FIXME FIXME FIXME
-        .dcache_out     (sq_2_dcache),
-
-        .lq_in          (lq_2_sq),
-        .lq_out         (sq_2_lq)
-);
-
-
-    //////////////////////////////////////////////////
-    //                                              //
-    //                      LQ                      //
-    //                                              //
-    //////////////////////////////////////////////////
-
-    execute2lq exec_2_lq;
-    execeuteST2lq execST_2_lq;
-
-    lq lq_0(
-        `ifdef DEBUG
-        .dbg        (dbg_lq),
-        `endif
-        .clock(clock),
-        .reset(reset),
-        .flush(flush),
-
-        .dispatch_in(dis_2_lq),
-        .retire_in(retire_2_lq),
-        .execute_in(exec_2_lq),
-
-        .dispatch_out(lq_2_dis),
-        .retire_out(lq_2_retire),
-
-        .sq_out(lq_2_sq),
-        .sq_in(sq_2_lq)
     );
 
     //////////////////////////////////////////////////
@@ -462,16 +289,6 @@ module cpu (
 
         .rs_in  (rs_2_ex),
         .rs_out (ex_2_rs),
-
-        .sq_in  (sq_2_exec),
-        .sq_out (exec_2_sq),
-
-        .lq_out     (exec_2_lq),
-        .st_lq_out  (execST_2_lq),
-        .ld_sq_out  (exec_ld_2_sq),
-
-        .dcache_in  (dcache_2_ld), // FIXME FIXME FIXME FIXME
-        .dcache_out (ld_2_dcache),
 
         .prf_in     (prf_2_ex),
         .prf_out    (ex_2_prf),
