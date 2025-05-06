@@ -50,7 +50,7 @@
 `define NUM_FU_TOTAL `NUM_FU_ALU + `NUM_FU_MULT + `NUM_FU_LOAD + `NUM_FU_STORE
 
 // number of mult stages (2, 4) (you likely don't need 8)
-`define MULT_STAGES 8
+`define MULT_STAGES 16
 // Justin: funny enough we need at least 8 or else multiply is on critical path
 
 
