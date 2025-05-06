@@ -40,13 +40,7 @@ module retire (
 
     logic [`N-1:0] branch_taken_n;
 
-    logic [`N-1:0] vld_brch_reso_code;
-    PERF_brch_reso_code [`N-1:0] brch_reso_code;
-
     always_comb begin
-        vld_brch_reso_code  = '0;
-        brch_reso_code      = '0;
-
         mispred = 0;
         mispred_target = '0;
 
@@ -77,13 +71,6 @@ module retire (
 
             if (!rob_in.entries[i].is_brch)
                 continue;
-
-            vld_brch_reso_code[i] = !flush;
-            brch_reso_code[i] = {
-                pred        : btq_in.dat[btq_rd_cnt].pred,
-                take        : btq_in.dat[btq_rd_cnt].take,
-                PC_correct  : btq_in.dat[btq_rd_cnt].pred_tgt && btq_in.dat[btq_rd_cnt].tgt
-            };
 
             if (btq_in.dat[btq_rd_cnt].pred != btq_in.dat[btq_rd_cnt].take) begin
                 // is mispred?

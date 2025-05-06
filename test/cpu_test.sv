@@ -52,8 +52,6 @@ module testbench;
     string out_outfile, cpi_outfile, writeback_outfile;//, pipeline_outfile;
     int out_fileno, cpi_fileno, wb_fileno; // verilog uses integer file handles with $fopen and $fclose
 
-    logic [2**$bits(PERF_brch_reso_code)-1:0][31:0] brch_reso_cnts;
-
     // variables used in the testbench
     logic        print_en;
     logic        clock;
@@ -228,17 +226,11 @@ module testbench;
     } ROB_DEBUG_ENTRY;
     ROB_DEBUG_ENTRY rob_debug[int];
 
-    PERF_brch_reso_code brch_reso_code;
-    int brch_misses;
-    int brch_hits;
     always @(negedge clock) begin
         if (reset) begin
             // Count the number of cycles and number of instructions committed
             clock_count = 0;
             instr_count = 0;
-            brch_reso_cnts = '0;
-            brch_misses = 0;
-            brch_hits = 0;
         end else begin
             print_en = (DBG_CYCLE_MIN <= clock_count-1) && (clock_count-1 <= DBG_CYCLE_MAX);
             /* Provided delay <revert if necessary> */
@@ -264,18 +256,12 @@ module testbench;
             // print_membus({30'b0,proc2mem_command}, proc2mem_addr[31:0],
             //              proc2mem_data[63:32], proc2mem_data[31:0]);
 
-            `ifdef DEBUG
+`ifdef DEBUG
             print_custom_data();
-            `endif
-            for (int i = 0; i < `N; ++i) begin
-                if (verisimpleV.retire0.vld_brch_reso_code[i]) begin
-                    ++brch_reso_cnts[verisimpleV.retire0.brch_reso_code[i]];
-                end
-            end
-
+`endif
             output_reg_writeback_and_maybe_halt();
 
-            `ifndef SYNTH
+`ifndef SYNTH
             // Add new dispatches to rob
             // TODO: Should this be cleared on branch mispredict?
             for (int i = 0, int cur_idx = 0; i < `N; ++i) begin
@@ -292,7 +278,7 @@ module testbench;
                     NPC     : verisimpleV.rs_0.d_in.d_dat[i].NPC
                 };
             end
-            `endif // SYNTH
+`endif // SYNTH
 
             // stop the processor
             if (error_status != NO_ERROR || clock_count > `TB_MAX_CYCLES) begin
@@ -309,18 +295,6 @@ module testbench;
                 output_cpi_file();
 
                 $display("\n---- Finished CPU Testbench ----\n");
-                for (logic [3:0] i = 0; i < 8; ++i) begin
-                    $display("brch_status[%3b]: %d", i, brch_reso_cnts[i]);
-                    if (i < 7)
-                        brch_misses += brch_reso_cnts[i];
-                end
-                brch_hits = brch_reso_cnts[3'b111];
-                $display("brch_misses: %d", brch_misses);
-                $display("brch_hits: %d",   brch_hits);
-                $display("brch_total: %d",  brch_misses + brch_hits);
-                $display("hit_rate: %f", 1.0 * brch_hits / (brch_misses + brch_hits));
-                
-                
                 $finish;
                 // below: original. They put a #100 delay for some reason.
                 // #100 $finish;
@@ -354,7 +328,7 @@ module testbench;
             halt    = committed_insts[n].halt;
             illegal = committed_insts[n].illegal;
 
-            `ifndef SYNTH
+`ifndef SYNTH
             cur_idx = verisimpleV.rob_0.rtre_idxs[n];
             id      = rob_debug[cur_idx].id;
             pc      = rob_debug[cur_idx].NPC - 4;
@@ -368,14 +342,16 @@ module testbench;
             ];
             // print the committed instructions to the writeback output file
             if (reg_idx == `ZERO_REG) begin
-                `ifdef CYCLE_PRINT
+`ifdef CYCLE_PRINT
                     $fdisplay(wb_fileno, "(%4d) PC %4x:%-8s| ---          | CYCLE=%0d", id, pc, decode_inst(inst), clock_count);
-                `endif
-                `ifndef CYCLE_PRINT
+`endif
+
+`ifndef CYCLE_PRINT
                     $fdisplay(wb_fileno, "PC %4x:%-8s| ---", pc, decode_inst(inst));
-                `endif
+`endif
             end else begin
-                `ifdef CYCLE_PRINT
+
+`ifdef CYCLE_PRINT
                 $fdisplay(wb_fileno, "(%4d) PC %4x:%-8s| r%02d=%-8x | CYCLE=%0d (t_old: %2d -> t: %2d)",
                           id,
                           pc,
@@ -386,42 +362,18 @@ module testbench;
                           t_old,
                           tag
                 );
-                `endif 
-                `ifndef CYCLE_PRINT
+`endif 
+
+`ifndef CYCLE_PRINT
                 $fdisplay(wb_fileno, "PC %4x:%-8s| r%02d=%-8x",
                           pc,
                           decode_inst(inst),
                           reg_idx,
                           data);
-                `endif
+`endif
             end
 
-            // if (reg_idx == `ZERO_REG) begin
-            //     $fdisplay(wb_fileno, "(%4d) PC %4x:%-8s| ---", id, pc, decode_inst(inst));
-            // end else begin
-            //     $fdisplay(wb_fileno, "(%4d) PC %4x:%-8s| r%02d=%-8x",
-            //               id,
-            //               pc,
-            //               decode_inst(inst),
-            //               reg_idx,
-            //               data);
-            // rob_debug.delete(cur_idx);
-            // end
-
-            `ifdef DEBUG
-            $display("commit[%0d]: (id: %4d, pc: 0x%x, inst: 0x%x) vld: %b, halt: %b, illegal: %b, data: %x",
-                n,
-                id,
-                pc,
-                inst,
-                committed_insts[n].valid,
-                committed_insts[n].halt,
-                committed_insts[n].illegal,
-                data
-            );
-            `endif // DEBUG
-
-            `endif // SYNTH
+`endif // SYNTH
 
             // exit if we have an illegal instruction or a halt
             if (illegal) begin
@@ -543,7 +495,7 @@ module testbench;
     // OPTIONAL: Print our your data here
     // It will go to the $program.log file
     function print_id_result(input ID_RESULT x);
-        $display("ID_RESULT: id=%3d t=%2d t1=%2d t2=%2d t1_rdy=%b t2_rdy=%b fu_idx=%2d rob_idx=%2d btq_idx=%2d sq_idx=%2d lq_idx=%2d is_brch:%b inst=%h PC=%h NPC=%h opa_select=%1d opb_select=%1d dest_reg_idx=%2d alu_func=%1d mult=%b rd_mem=%b wr_mem=%b cond_branch=%b uncond_branch=%b halt=%b illegal=%b csr_op=%b",
+        $display("ID_RESULT: id=%3d t=%2d t1=%2d t2=%2d t1_rdy=%b t2_rdy=%b fu_idx=%2d rob_idx=%2d btq_idx=%2d is_brch:%b inst=%h PC=%h NPC=%h opa_select=%1d opb_select=%1d dest_reg_idx=%2d alu_func=%1d mult=%b rd_mem=%b wr_mem=%b cond_branch=%b uncond_branch=%b halt=%b illegal=%b csr_op=%b",
             x.id,
             x.t,
             x.t1,
@@ -553,8 +505,6 @@ module testbench;
             x.fu_idx,
             x.rob_idx,
             x.btq_idx,
-            x.sq_idx,
-            x.lq_idx,
             x.is_brch,
             x.inst,
             x.PC,
@@ -771,8 +721,6 @@ module testbench;
         dispatch2rob          rob_out;
         free_list2dispatch    free_in;
         dispatch2free_list    free_out;
-        sq2dispatch           sq_in;
-        dispatch2sq           sq_out;
         btq2dispatch          btq_in;
         dispatch2btq          btq_out;
         execute2complete_tag  ctag_in;
@@ -787,8 +735,6 @@ module testbench;
         rob_out    = dbg_dispatch.rob_out;
         free_in    = dbg_dispatch.free_in;
         free_out   = dbg_dispatch.free_out;
-        sq_in      = dbg_dispatch.sq_in;
-        sq_out     = dbg_dispatch.sq_out;
         btq_in     = dbg_dispatch.btq_in;
         btq_out    = dbg_dispatch.btq_out;
         ctag_in    = dbg_dispatch.ctag_in;
@@ -854,8 +800,8 @@ module testbench;
                 entries[r],
                 dbg_prf.file[entries[r]],
                 r, 
-                am_in.state[r],
-                dbg_prf.file[am_in.state[r]],
+                am_in.entries[r],
+                dbg_prf.file[am_in.entries[r]],
                 duplicate
             );
         end
@@ -1003,7 +949,7 @@ module testbench;
                 continue;
             end
 
-            $display("Entry [%2d]: pc=0x%x, id=%3d (%x), busy=%b, issued=%b, t=%2d, t1=%2d, t2=%2d, t1_rdy=%b, t2_rdy=%b, fu=%s(%2d), sq_idx=%0d",
+            $display("Entry [%2d]: pc=0x%x, id=%3d (%x), busy=%b, issued=%b, t=%2d, t1=%2d, t2=%2d, t1_rdy=%b, t2_rdy=%b, fu=%s(%2d)",
                 i, 
                 entries[i].dat.PC,
                 entries[i].dat.id, 
@@ -1015,10 +961,9 @@ module testbench;
                 entries[i].dat.t2, 
                 entries[i].dat.t1_rdy, 
                 entries[i].dat.t2_rdy, 
-                
+
                 entries[i].busy ? fu_name : "*",
-                entries[i].dat.fu_idx,
-                entries[i].dat.sq_idx
+                entries[i].dat.fu_idx
             );
         end
         $display("  | << RS <<");
@@ -1026,173 +971,18 @@ module testbench;
     endtask
 
     task print_sq;
-        // internal state
-        SQ_ENTRY [`LSQ_SZ-1:0]      state;
-        logic [$clog2(`LSQ_SZ)-1:0] head;
-        logic [$clog2(`LSQ_SZ)-1:0] ret_head;
-        logic [$clog2(`LSQ_SZ)-1:0] tail;
-        logic [$clog2(`LSQ_SZ):0]   used;
-        logic [$clog2(`LSQ_SZ):0]   free;
-        logic [$clog2(`LSQ_SZ):0]   rsvd;
-        // I/O
-
-        dispatch2sq   dis_2_sq;
-        execute2sq    exec_2_sq;
-        retire2sq     retire_2_sq;
-
-        sq2dispatch  sq_2_dis;
-        sq2execute   sq_2_exec;
-        // sq2rs sq_2_rs,
-        sq2retire    sq_2_retire;
-        stRET2mem    ret_2_mem;
-
-        state   = dbg_sq.state;
-        head    = dbg_sq.head;
-        ret_head= dbg_sq.ret_head;
-        tail    = dbg_sq.tail;
-        used    = dbg_sq.used;
-        free    = dbg_sq.free;
-        rsvd    = dbg_sq.rsvd;
-
-        dis_2_sq    = dbg_sq.dis_2_sq;
-        exec_2_sq   = dbg_sq.exec_2_sq;
-        retire_2_sq = dbg_sq.retire_2_sq;
-
-        sq_2_dis    = dbg_sq.sq_2_dis;
-        sq_2_exec   = dbg_sq.sq_2_exec;
-        sq_2_retire = dbg_sq.sq_2_retire;
-
-        $display("  | >> SQ");
-        $display("RET_HEAD: %0d", ret_head);
-        $display("USED: %0d", used);
-        $display("FREE: %0d", free);
-        $display("RSVD: %0d", rsvd);
-        for (int i = 0; i < `LSQ_SZ; i++) begin
-            $display("Entry [%2d]: sq_idx=%2d, lq_pair=%2d, rob_idx=%2d, addr=%4x, data=%x, d_valid=%b, in_range=%b, mem_size: %0d, addr mask=%4b%s",
-            i,
-            state[i].sq_idx,
-            state[i].lq_pair,
-            state[i].rob_idx,
-            state[i].addr,
-            state[i].data,
-            state[i].d_vld,
-            state[i].in_range,
-            state[i].mem_size,
-            state[i].bytewise_addr_mask,
-                (i == head && head == tail) 
-                    ? " << h/t"
-                    : (i == head) 
-                        ? " << h" 
-                        : (i == tail)
-                            ? " << t"
-                            : ""
-            );
-        end
-        $display("  | << SQ");
     endtask
 
     task print_lq;
-        // internal state
-        LQ_ENTRY [`LSQ_SZ-1:0]      state;
-        logic [$clog2(`LSQ_SZ)-1:0] head;
-        logic [$clog2(`LSQ_SZ)-1:0] tail;
-        logic [$clog2(`LSQ_SZ):0]   used;
-        // I/O
-
-        dispatch2lq   dis_2_lq;
-        execute2lq    exec_2_lq;
-        retire2lq     retire_2_lq;
-
-        lq2dispatch  lq_2_dis;
-
-        state   = dbg_lq.state;
-        head    = dbg_lq.head;
-        tail    = dbg_lq.tail;
-        used    = dbg_lq.used;
-
-        dis_2_lq    = dbg_lq.dis_2_lq;
-        exec_2_lq   = dbg_lq.exec_2_lq;
-        retire_2_lq = dbg_lq.retire_2_lq;
-
-        lq_2_dis    = dbg_lq.lq_2_dis;
-
-        $display("  | >> LQ");
-        for (int i = 0; i < `LSQ_SZ; i++) begin
-            $display("Entry [%2d]: sq_idx=%2d, lq_pair=%2d, PC=%4x, addr=%4x, d_valid=%b, err_ld_ooo=%b%s",
-            i,
-            state[i].sq_idx,
-            state[i].lq_pair,
-            state[i].inst_pc,
-            state[i].addr,
-            state[i].d_vld,
-            state[i].err_ld_ooo,
-                (i == head && head == tail) 
-                    ? " << h/t"
-                    : (i == head) 
-                        ? " << h" 
-                        : (i == tail)
-                            ? " << t"
-                            : ""
-            );
-        end
-        $display("  | << LQ");
     endtask
 
     task print_retbuf;
-        DBG_retbuf dbg_retbuf;
-        // internal state
-        SQ_ENTRY [`LSQ_SZ-1:0]     state;
-        logic [$clog2(`LSQ_SZ)-1:0] head;
-        logic [$clog2(`LSQ_SZ)-1:0] tail;
-        logic [$clog2(`LSQ_SZ):0]   used;
-        // I/O
-        sq2stRET sq_2_ret;
-        MEM_TAG mem2proc_transaction_tag;
-        stRET2sq ret_2_sq;
-        forwardRET2sq forward_ret_2_sq;
-        stRET2mem ret_2_mem;
-
-        dbg_retbuf = dbg_sq.dbg_retbuf;
-        state   = dbg_retbuf.state;
-        head    = dbg_retbuf.head;
-        tail    = dbg_retbuf.tail;
-        used    = dbg_retbuf.used;
-
-        sq_2_ret                 = dbg_retbuf.sq_2_ret;
-        mem2proc_transaction_tag = dbg_retbuf.mem2proc_transaction_tag;
-        ret_2_sq                 = dbg_retbuf.ret_2_sq;
-        forward_ret_2_sq         = dbg_retbuf.forward_ret_2_sq;
-        ret_2_mem                = dbg_retbuf.ret_2_mem;
-
-        $display("  >> RET buffer");
-        for (int i = 0; i < `SQ_RET_BUF_SZ; i++) begin
-            $display("Entry [%2d]: sq_idx=%2d, rob_idx=%2d, addr=%4x, data=%x, d_valid=%b%s",
-            i,
-            state[i].sq_idx,
-            state[i].rob_idx,
-            state[i].addr,
-            state[i].data,
-            state[i].d_vld,
-                (i == head && head == tail) 
-                    ? " << h/t"
-                    : (i == head) 
-                        ? " << h" 
-                        : (i == tail)
-                            ? " << t"
-                            : ""
-            );
-        end
-        $display("  | << RET buffer");
-
     endtask
 
     task print_retire;
         rob2retire rob_in;
         btq2retire btq_in;
         retire2btq btq_out;
-        sq2retire sq_in;
-        retire2sq sq_out;
-        lq2retire lq_in;
         logic mispred;
         ADDR  mispred_target;
         retire_final retire_exec;
@@ -1200,9 +990,6 @@ module testbench;
         rob_in         = dbg_retire.rob_in;
         btq_in         = dbg_retire.btq_in;
         btq_out        = dbg_retire.btq_out;
-        sq_in          = dbg_retire.sq_in;
-        sq_out         = dbg_retire.sq_out;
-        lq_in          = dbg_retire.lq_in;
         mispred        = dbg_retire.mispred;
         mispred_target = dbg_retire.mispred_target;
         retire_exec    = dbg_retire.retire_exec;
@@ -1218,14 +1005,6 @@ module testbench;
             );
         end
         $display("btq_rd_cnt: %0d", btq_out.rd_cnt);
-
-        for (int i = 0; i < `N; ++i) begin
-            $display("lq_in [%2d]: PC: %x, err_ld_ooo: %b",
-                i,
-                lq_in.PC[i],
-                lq_in.err_ld_ooo[i]
-            );
-        end
 
         $display("retire_exec.r_en_cnt: %0d", retire_exec.r_en_cnt);
         $display("  | << retire <<");
@@ -1556,8 +1335,8 @@ module testbench;
         if (!print_en)
             return;
 
-        $display("  | >> CYCLE: %3d (t: %3d)", clock_count-1, $time);
-        print_fetch();
+        // $display("  | >> CYCLE: %3d (t: %3d)", clock_count-1, $time);
+        // print_fetch();
         // print_icache();
         // print_decode();
         // print_rob();
@@ -1565,7 +1344,7 @@ module testbench;
         // print_dispatch();
         // print_map_table();
         // print_prf();
-        print_btq();
+        // print_btq();
 
         // $display("---- rob_debug contents ----");
         // foreach (rob_debug[idx]) begin
@@ -1585,14 +1364,14 @@ module testbench;
         //      mem2proc_data,
         //      mem2proc_data_tag
         // );
-        print_rs();
+        // print_rs();
         // print_execute();
         // print_dcache();
         // print_sq();
         // print_retbuf();
         // print_lq();
         // print_retire();
-        $display("  | << CYCLE: %3d (t: %3d)", clock_count-1, $time);
+        // $display("  | << CYCLE: %3d (t: %3d)", clock_count-1, $time);
     endtask
 `endif // DEBUG
 

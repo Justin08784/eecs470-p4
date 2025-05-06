@@ -971,13 +971,6 @@ typedef struct packed {
 } DBG_retire;
 
 
-typedef struct packed {
-    logic take;
-    logic pred;
-    logic PC_correct;
-} PERF_brch_reso_code;
-
-
 localparam FL_DEPTH = `ROB_SZ;
 localparam FL_WIDTH = $bits(PHYS_REG_IDX);
 typedef struct packed {
