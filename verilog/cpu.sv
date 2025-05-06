@@ -1,25 +1,15 @@
-/////////////////////////////////////////////////////////////////////////
-//                                                                     //
-//   Modulename :  cpu.sv                                              //
-//                                                                     //
-//  Description :  Top-level module of the verisimple processor;       //
-//                 This instantiates and connects the 5 stages of the  //
-//                 Verisimple pipeline together.                       //
-//                                                                     //
-/////////////////////////////////////////////////////////////////////////
-
 `include "sys_defs.svh"
 `include "dcache_block_direct.svh"
 
 module cpu (
-    input clock, // System clock
-    input reset, // System reset
+    input  clock,
+    input  reset,
 
-    output  ADDR        [`N-1:0] f2mem_PCs,
-    input   MEM_BLOCK   [`N-1:0] mem2f_data,
+    output ADDR         [`N-1:0] f2mem_PCs,
+    input  MEM_BLOCK    [`N-1:0] mem2f_data,
 
-    input MEM_TAG   mem2proc_transaction_tag, // Memory tag for current transaction
-    input MEM_BLOCK mem2proc_data,            // Data coming back from memory
+    input  MEM_TAG      mem2proc_transaction_tag, // Memory tag for current transaction
+    input  MEM_BLOCK    mem2proc_data,            // Data coming back from memory
         /*
         Q: Why 2 mem blocks when each mem block supplies a double word
         i.e. 8 bytes i.e. 2 insns? Isn't this enough to support 2-size fetch?
@@ -31,12 +21,12 @@ module cpu (
         mem2proc_data[0], but the next instruction (PC + 4) is in the *first half*
         of mem2proc_data[1]. One memory block isn't enough to cover both.
         */
-    input MEM_TAG   mem2proc_data_tag,        // Tag for which transaction data is for
+    input  MEM_TAG      mem2proc_data_tag,        // Tag for which transaction data is for
 
-    output MEM_COMMAND proc2mem_command, // Command sent to memory
-    output ADDR        proc2mem_addr,    // Address sent to memory
-    output MEM_BLOCK   proc2mem_data,    // Data sent to memory
-    output MEM_SIZE    proc2mem_size,    // Data size sent to memory
+    output MEM_COMMAND  proc2mem_command, // Command sent to memory
+    output ADDR         proc2mem_addr,    // Address sent to memory
+    output MEM_BLOCK    proc2mem_data,    // Data sent to memory
+    output MEM_SIZE     proc2mem_size,    // Data size sent to memory
 
     output DBG_dcache   dbg_dcache,
 
@@ -63,6 +53,7 @@ module cpu (
     logic flush;
 
 
+    /* Memory stubs */
     always_comb begin
         proc2mem_command    = MEM_NONE;
         proc2mem_addr       = '0;
@@ -72,27 +63,22 @@ module cpu (
         dbg_dcache = '0;
     end
 
-    //////////////////////////////////////////////////
-    //                                              //
-    //                   Fetch                      //
-    //                                              //
-    //////////////////////////////////////////////////  
 
+    /* >> ==== Fetch ==== >> */
     fetch2decode f_2_decode;
     decode2fetch decode_2_f;
     retire2fetch retire_2_f;
 
     stage_if_p4 fetch_0(
-        `ifdef DEBUG
+`ifdef DEBUG
         .dbg    (dbg_fetch),
-        `endif
-
+`endif
         .clock  (clock),
         .reset  (reset),
         .flush  (flush),
+
         .d_in   (decode_2_f),
         .d_out  (f_2_decode),
-
         .r_in   (retire_2_f),
 
         .mem_out_PCs    (f2mem_PCs),
@@ -100,35 +86,26 @@ module cpu (
     );
 
 
-
-    //////////////////////////////////////////////////
-    //                                              //
-    //                   Decode                     //
-    //                                              //
-    //////////////////////////////////////////////////   
+    /* >> ==== Decode ==== >> */
     decode2dispatch de_2_disp;
     dispatch2decode disp_2_de;
 
     stage_id_p4 decoder0 (
-        `ifdef DEBUG
+`ifdef DEBUG
         .dbg    (dbg_decode),
-        `endif
-
+`endif
         .clock  (clock),
         .reset  (reset),
         .flush  (flush),
+
         .f_in   (f_2_decode),
         .f_out  (decode_2_f),
         .d_in   (disp_2_de),
         .d_out  (de_2_disp)
     );
 
-    //////////////////////////////////////////////////
-    //                                              //
-    //                   Dispatch                   //
-    //                                              //
-    //////////////////////////////////////////////////   
 
+    /* >> ==== Dispatch ==== >> */
     rs2dispatch rs_2_dispatch;
     dispatch2rs dispatch_2_rs;
     rob2dispatch rob_2_dispatch;
@@ -143,9 +120,9 @@ module cpu (
     execute2complete_dat ex_2_cdat;
 
     dispatch dispatcher(
-        `ifdef DEBUG
+`ifdef DEBUG
         .dbg        (dbg_dispatch),
-        `endif
+`endif
 
         .clock      (clock),
         .reset      (reset),
@@ -167,11 +144,8 @@ module cpu (
         .ctag_in    (ex_2_ctag)
     );
 
-    //////////////////////////////////////////////////
-    //                                              //
-    //                  Retire                      //
-    //                                              //
-    //////////////////////////////////////////////////  
+
+    /* >> ==== Retire ==== >> */
     rob2retire rob_2_retire;
     btq2retire btq_2_retire;
     retire2btq retire_2_btq;
@@ -180,9 +154,9 @@ module cpu (
     ADDR            corrected_PC;
 
     retire retire0 (
-        `ifdef DEBUG
+`ifdef DEBUG
         .dbg    (dbg_retire),
-        `endif
+`endif
         .clock  (clock),
         .reset  (reset),
 
@@ -195,21 +169,16 @@ module cpu (
         .flush          (flush),
         .corrected_PC   (corrected_PC)
     );
+    assign retire_2_f = '{corrected_PC : corrected_PC};
 
-    assign retire_2_f = '{
-        corrected_PC    : corrected_PC
-    };
 
-    //////////////////////////////////////////////////
-    //                                              //
-    //           Branch target queue (BTQ)          //
-    //                                              //
-    //////////////////////////////////////////////////  
+    /* >> ==== Branch target queue (BTQ) ==== >> */
     execute2btq ex_2_btq;
+
     btq btq_0(
-        `ifdef DEBUG
+`ifdef DEBUG
         .dbg    (dbg_btq),
-        `endif
+`endif
 
         .clock  (clock),
         .reset  (reset),
@@ -223,21 +192,17 @@ module cpu (
         .d_out  (btq_2_dispatch)
     );
 
-    //////////////////////////////////////////////////
-    //                                              //
-    //              Reservation Station             //
-    //                                              //
-    //////////////////////////////////////////////////  
+
+    /* >> ==== Reservation station (RS) ==== >> */
     execute2rs      ex_2_rs; 
     rs2execute      rs_2_ex;
-
     execute2prf     ex_2_prf;
     prf2execute     prf_2_ex;
 
     rs rs_0(
-        `ifdef DEBUG
+`ifdef DEBUG
         .dbg        (dbg_rs),
-        `endif
+`endif
         .clock  (clock),
         .reset  (reset),
         .flush  (flush),
@@ -248,47 +213,41 @@ module cpu (
         .ex_out (rs_2_ex),
         .ctag_in(ex_2_ctag)
     );
-    
-    //////////////////////////////////////////////////
-    //                                              //
-    //                Re-Order Buffer               //
-    //                                              //
-    //////////////////////////////////////////////////  
 
+
+    /* >> ==== ROB ==== >> */
     rob #(
         .ROB_SZ(`ROB_SZ),
         .N(`N)
     ) rob_0 (
-        `ifdef DEBUG
+`ifdef DEBUG
         .dbg        (dbg_rob),
-        `endif
+`endif
         .clock      (clock),
         .reset      (reset),
         .flush      (flush),
-        .r_out      (rob_2_retire),
+
         .r_in       (retire_exec),
-        .cdat_in    (ex_2_cdat),
+        .r_out      (rob_2_retire),
+        .d_in       (dispatch_2_rob),
         .d_out      (rob_2_dispatch),
-        .d_in       (dispatch_2_rob)
+
+        .cdat_in    (ex_2_cdat)
     );
 
-    //////////////////////////////////////////////////
-    //                                              //
-    //                  Execute                     //
-    //                                              //
-    ////////////////////////////////////////////////// 
 
+    /* >> ==== Execute ==== >> */
     stage_ex_p4 ex_0 (
-        `ifdef DEBUG
-        .dbg    (dbg_execute),
-        .print_en (print_en),
-        `endif
-        .clock  (clock),
-        .reset  (reset),
-        .flush  (flush),
+`ifdef DEBUG
+        .dbg        (dbg_execute),
+        .print_en   (print_en),
+`endif
+        .clock      (clock),
+        .reset      (reset),
+        .flush      (flush),
 
-        .rs_in  (rs_2_ex),
-        .rs_out (ex_2_rs),
+        .rs_in      (rs_2_ex),
+        .rs_out     (ex_2_rs),
 
         .prf_in     (prf_2_ex),
         .prf_out    (ex_2_prf),
@@ -300,20 +259,15 @@ module cpu (
     );
 
 
-
-    //////////////////////////////////////////////////
-    //                                              //
-    //                  Map Table                   //
-    //                                              //
-    //////////////////////////////////////////////////  
-
+    /* >> ==== Map table ==== >> */
     arch_map2map_table am_2_mt;
+
     map_table #(
         .N(`N)
     ) map_table_0 (
-        `ifdef DEBUG
+`ifdef DEBUG
         .dbg    (dbg_mt),
-        `endif
+`endif
         .clock  (clock),
         .reset  (reset),
         .flush  (flush),
@@ -323,12 +277,8 @@ module cpu (
         .d_out  (map_2_dispatch)
     );
 
-    //////////////////////////////////////////////////
-    //                                              //
-    //           Architectural Map Table            //
-    //                                              //
-    //////////////////////////////////////////////////  
 
+    /* >> ==== Architectural map (table) ==== >> */
     arch_map #(
         .N(`N)
     ) arch_map_0 (
@@ -340,18 +290,14 @@ module cpu (
         .r_in   (retire_exec)
     );
 
-    //////////////////////////////////////////////////
-    //                                              //
-    //                  Free List                   //
-    //                                              //
-    //////////////////////////////////////////////////  
 
+    /* >> ==== Free list ==== >> */
     free_list #(
         .N(`N)
     ) free_list_0 (
-        `ifdef DEBUG
+`ifdef DEBUG
         .dbg    (dbg_fl),
-        `endif
+`endif
         .clock  (clock),
         .reset  (reset),
         .flush  (flush),
@@ -360,12 +306,9 @@ module cpu (
         .d_out  (fl_2_dispatch)
     );
 
-    //////////////////////////////////////////////////
-    //                                              //
-    //            Physical Register File            //
-    //                                              //
-    //////////////////////////////////////////////////  
-    `ifdef DEBUG
+
+    /* >> ==== Physical register file (PRF) ==== >> */
+`ifdef DEBUG
     logic [`PHYS_REG_SZ_R10K-1:0][$bits(DATA)-1:0] dbg_file;
     assign dbg_prf = '{
         file    : dbg_file,
@@ -373,18 +316,16 @@ module cpu (
         ex_in   : ex_2_prf,
         ex_out  : prf_2_ex
     };
-    `endif
+`endif
 
     prf #(
         .N(`N),
         .BYPASS_EN(1)
     ) prf_0 (
-        `ifdef DEBUG
+`ifdef DEBUG
         .dbg_file   (dbg_file),
-        `endif
+`endif
         .clock      (clock),
-        .cdat_in    (ex_2_cdat),
-
         /* 
         Here each X_BY_FU type is coerced into a flat X array type
         This convenience is why we opt to avoid wrapping these I/Os into
@@ -395,17 +336,15 @@ module cpu (
         .s_t1s      (ex_2_prf.t1s),
         .s_t2s      (ex_2_prf.t2s),
         .s_v1s      (prf_2_ex.v1s),
-        .s_v2s      (prf_2_ex.v2s)
+        .s_v2s      (prf_2_ex.v2s),
+
+        .cdat_in    (ex_2_cdat)
+
     );
 
 
-    // //////////////////////////////////////////////////
-    // //                                              //
-    // //               Pipeline Outputs               //
-    // //                                              //
-    // //////////////////////////////////////////////////
-
-    // // Output the committed instruction to the testbench for counting
+    /* >> ==== Pipeline outputs ==== >> */
+    // Output the committed instruction to the testbench for counting
     always_comb begin
         committed_insts = '0;
         foreach(committed_insts[i]) begin
@@ -418,18 +357,5 @@ module cpu (
             committed_insts[i].illegal    = retire_exec.illegal[i];
         end
     end
-
-    // logic [$clog2(16):0] mem_rsvd, mem_rsvd_n;
-    // always_ff @(posedge clock) begin
-    //     if (reset) begin
-    //         mem_rsvd <= '0;
-    //     end else begin
-    //         mem_rsvd <= mem_rsvd
-    //             + ((proc2mem_command == MEM_LOAD) && mem2proc_transaction_tag != 0)
-    //             - (mem2proc_data_tag != 0);
-    //         $display("mem_rsvd: %2d", mem_rsvd);
-    //     end
-    // end
-
 
 endmodule // pipeline
