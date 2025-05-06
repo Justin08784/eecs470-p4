@@ -1,29 +1,23 @@
 `include "sys_defs.svh"
 
-/*
-TODO: I think there might need to be a retire module that interfaces with
-both ROB and BTQ. Like if a retiring branch insn is mispredicted,
-the rob insns after it should not be committed!
-
-Maybe something that handles both rollback and retire?
-*/
-
 /* Branch target queue */
 module btq #(
     parameter BTQ_SZ = `BTQ_SZ,  // num elements
     parameter N=`N
 ) (
-    `ifdef DEBUG
+`ifdef DEBUG
     output DBG_btq dbg,
-    `endif 
-    input clock, reset, flush,
+`endif 
+    input  clock,
+    input  reset,
+    input  flush,
 
     // retire
-    input  retire2btq       r_in,
-    output btq2retire       r_out,
+    input  retire2btq   r_in,
+    output btq2retire   r_out,
 
     // complete (write)
-    input  execute2btq      ex_in,
+    input  execute2btq  ex_in,
 
     // dispatch (write)
     input  dispatch2btq d_in,
@@ -39,7 +33,7 @@ module btq #(
     logic [$clog2(BTQ_SZ):0]    used;
 
     logic [$clog2(BTQ_SZ):0]    free;
-    assign free         = BTQ_SZ - used;
+    assign free = BTQ_SZ - used;
 
     logic [$clog2(NUM_DPORTS):0]    wr_cnt;
     logic [$clog2(NUM_RPORTS):0]    rd_cnt;
@@ -94,22 +88,22 @@ module btq #(
             tail    <= (tail + wr_cnt) % BTQ_SZ;
 
             // handle complete (ins)
-            for (int unsigned i = 0, int cur_idx = 0; i < NUM_CPORTS; ++i) begin
+            for (int i = 0, int idx = 0; i < NUM_CPORTS; ++i) begin
+                idx = ex_in.dat[i].btq_idx;
                 if (!ex_in.dat[i].en)
                     continue;
-                cur_idx = ex_in.dat[i].btq_idx;
 
-                state[cur_idx].tgt  <= ex_in.dat[i].tgt;
-                state[cur_idx].take <= ex_in.dat[i].take;
+                state[idx].tgt  <= ex_in.dat[i].tgt;
+                state[idx].take <= ex_in.dat[i].take;
             end
 
             // handle dispatch (ins)
-            for (int unsigned i = 0, int cur_idx = 0; i < NUM_DPORTS; ++i) begin
+            for (int i = 0, int idx = 0; i < NUM_DPORTS; ++i) begin
+                idx = d_idxs[i];
                 if (i >= wr_cnt)
                     continue;
-                cur_idx = d_idxs[i];
-                state[cur_idx] <= '{
-                    // TODO: pred and take need to be set by fetch! I think?
+
+                state[idx] <= '{
                     PC      : d_in.PC[i],
                     NPC     : d_in.NPC[i],
                     pred    : d_in.pred[i],
@@ -122,7 +116,7 @@ module btq #(
         end
     end
 
-    `ifdef DEBUG
+`ifdef DEBUG
     assign dbg = '{
         state,
         head,
@@ -134,6 +128,6 @@ module btq #(
         d_in,
         d_out
     };
-    `endif
+`endif
 
 endmodule
