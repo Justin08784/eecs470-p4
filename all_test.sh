@@ -1,35 +1,58 @@
 TESTS=(
-    mult_no_lsq
+    # no mem ops
+    branchy_nested
+    branchy
+    branchzero
     btest1
     btest2
-    evens
-    sampler
+    dummy_branches
+    halt
+    hw4q4b
+    hw4
+    mult_no_lsq
+    test1
+    test2
+    test3
+
+    # contains mem ops
+    2store_1evi
+    copy_long
     copy
-    mult_orig
-    insertion
-    fib_long
-    saxpy
-    fib_rec
+    crt
     evens_long
+    evens
+    fib_long
+    fib_rec
     fib
     haha
-    halt
+    hw4q4a
+    hw4q4c
+    insertion
+    mult_orig
+    no_hazard
+    parallel
+    sampler
+    saxpy
+    test4
+    test5
+    test6
+    test7
+    test8
+    alexnet
+    backtrack
+    basic_malloc
     bfs
+    dft
     fc_forward
     graph
-    basic_malloc
-    backtrack
-    sort_search
-    outer_product
-    priority_queue
     insertionsort
     matrix_mult_rec
     mergesort
     omegalul
+    outer_product
+    priority_queue
     quicksort
     sort_search
-    dft
-    alexnet
 )
 
 EXTS=(
