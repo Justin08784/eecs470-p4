@@ -3,10 +3,11 @@ TESTS=(
     branchy_nested
     branchy
     branchzero
-    btest1
-    btest2
+    btest1-nomem
+    btest2-nomem
     dummy_branches
     halt
+    hw4q4a-nomem
     hw4q4b
     hw4
     mult_no_lsq
@@ -15,6 +16,8 @@ TESTS=(
     test3
 
     # contains mem ops
+    # btest1
+    # btest2
     # 2store_1evi
     # copy_long
     # copy
