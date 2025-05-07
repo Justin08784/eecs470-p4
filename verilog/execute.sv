@@ -94,14 +94,17 @@ module alu_ex(
     output CPL_CAND [`NUM_FU_ALU-1:0]   o_cands
 );
     ALU_OPS [`NUM_FU_ALU-1:0] ops;
+    ADDR    [`NUM_FU_ALU-1:0] pc_addrs, npc_addrs;
     always_comb begin
         DATA opa, opb;
         foreach(ops[i]) begin
+            pc_addrs[i]     = w2addr(i_regs[i].dat.PC);
+            npc_addrs[i]    = w2addr(i_regs[i].dat.PC + 1);
             // ALU opA mux
             case (i_regs[i].dat.opa_select)
                 OPA_IS_RS1:  opa = i_regs[i].rs1;
-                OPA_IS_NPC:  opa = w2addr(i_regs[i].dat.PC + 1);
-                OPA_IS_PC:   opa = w2addr(i_regs[i].dat.PC);
+                OPA_IS_NPC:  opa = npc_addrs[i];
+                OPA_IS_PC:   opa = pc_addrs[i];
                 OPA_IS_ZERO: opa = 0;
                 default:     opa = 32'hdeadface; // dead face
             endcase
@@ -158,9 +161,7 @@ module alu_ex(
             assign tmp_data[i] = '{
                 t       : ops[i].t,
                 rob_idx : ops[i].rob_idx,
-                data    : tmp_take[i]
-                    ? w2addr(i_regs[i].dat.PC + 1) // npc
-                    : tmp_res[i]
+                data    : tmp_take[i] ? npc_addrs[i] : tmp_res[i]
             };
 
             assign o_cands[i] = tmp_data[i];
