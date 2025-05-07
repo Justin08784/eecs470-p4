@@ -43,6 +43,7 @@ localparam DBG_CYCLE_MAX = `TB_MAX_CYCLES;
 // localparam DBG_CYCLE_MIN = 1300;
 // localparam DBG_CYCLE_MAX = 1500;
 
+
 module testbench;
     // string inputs for loading memory and output files
     // run like: cd build && ./simv +MEMORY=../programs/mem/<my_program>.mem +OUTPUT=../output/<my_program>
