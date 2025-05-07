@@ -10,6 +10,52 @@
 
 `include "sys_defs.svh"
 
+/*
+- unsure about correctness of call/ret checking; make sure to
+test thoroughly with progs with function calls
+- TODO: move this to icache refill path and store the 4 bits in
+the icache metadata
+*/
+module predecoder (
+    input  INST     inst,
+
+    output logic    call,
+    output logic    ret,
+    output logic    cond_branch
+    output logic    uncond_branch
+);
+    always_comb begin
+        REG_IDX rd;
+        call            = `FALSE;
+        ret             = `FALSE;
+        cond_branch     = `FALSE;
+        uncond_branch   = `FALSE;
+        rd = inst.r.rd;
+
+        casez (inst)
+            `RV32_JAL: begin
+                uncond_branch = `TRUE;
+                call = (rd == 5'd1) || (rd == 5'd5);
+            end
+
+            `RV32_JALR: begin
+                uncond_branch = `TRUE;
+                call = (rd == 5'd1) || (rd == 5'd5);
+                ret  = (rd         == `ZERO_REG)    &&
+                       (inst.r.rs1 == 5'd1)         &&   // rs1 lives in same bit‑slice for I‑type
+                       (inst.i.imm == 12'd0);
+            end
+
+            `RV32_BEQ, `RV32_BNE, `RV32_BLT, `RV32_BGE,
+            `RV32_BLTU, `RV32_BGEU: begin
+                cond_branch = `TRUE;
+                // stage_ex uses inst.b.funct3 as the branch function
+            end
+            default:;
+        endcase // casez (inst)
+    end // always
+endmodule // predecoder
+
 module stage_if_p4 (
 `ifdef DEBUG
     output  DBG_fetch dbg,
@@ -36,7 +82,7 @@ module stage_if_p4 (
         logic woff;
 
         d_out.f_en_cnt = `MIN(used_scnt, d_in.d_rdy_cnt);
-        f_cnt = free_scnt < `N ? 0 : `N; // no partial fetches (for simplicity)! 
+        f_cnt = free_scnt;
 
         PC_n[0] = PC_reg;
         for (int i = 0; i < `N; ++i) begin
