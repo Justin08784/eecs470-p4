@@ -21,7 +21,7 @@ module predecoder (
 
     output logic    call,
     output logic    ret,
-    output logic    cond_branch
+    output logic    cond_branch,
     output logic    uncond_branch
 );
     always_comb begin
