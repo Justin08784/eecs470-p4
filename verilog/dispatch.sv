@@ -125,15 +125,10 @@ module dispatch #(parameter
 
     /* >> ==== 2. Rename Stage ==== >> */
 
-    always_comb begin
-        logic [$clog2(`N):0] lim_cnt_btq;
-        rename_en_cnt = alloc_vld_scnt;
-
-        rename_en_cnt = `MIN(rename_rdy_scnt, rename_en_cnt);
-    end
-
     // handle map table output 
     always_comb begin
+        rename_en_cnt = `MIN(rename_rdy_scnt, alloc_vld_scnt);
+
         map_out = '0;
         map_out.en_cnt  = rename_en_cnt;
 
@@ -260,8 +255,6 @@ module dispatch #(parameter
         rob_out,
         free_in,
         free_out,
-        btq_in,
-        btq_out,
         ctag_in,
         map_in,
         map_out
