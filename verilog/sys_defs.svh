@@ -386,7 +386,7 @@ typedef struct packed {
     WADDR PC;
 
     logic   pred;
-    ADDR    pred_tgt;
+    WADDR   pred_tgt;
 } IF_ID_PACKET;
 
 /**
@@ -508,10 +508,10 @@ typedef struct packed {
 
     WADDR   PC;
     logic   pred;
-    ADDR    pred_tgt;
+    WADDR   pred_tgt;
 
     logic   take;
-    WADDR   tgt;   // can we actually store [29:0], since bottom bits of address are 0s anyways?
+    WADDR   tgt;
 } BTQ_ENTRY;
 
 typedef struct packed {
@@ -550,7 +550,7 @@ typedef struct packed {
 } retire_final;
 
 typedef struct packed {
-    ADDR  corrected_PC;
+    WADDR  corrected_PC;
 } retire2fetch;
 
 typedef struct packed {
@@ -561,7 +561,7 @@ typedef struct packed {
         // How many branch instructions dispatching?
         // Sender must ensure branch insns packed to lowest indices.
     WADDR   [`N-1:0]    PC;
-    ADDR    [`N-1:0]    pred_tgt;
+    WADDR   [`N-1:0]    pred_tgt;
     logic   [`N-1:0]    pred;
 } dispatch2btq;
 
@@ -588,7 +588,7 @@ typedef struct packed {
     logic           is_brch; // Is inst a branch?
 
     logic           pred;
-    ADDR            pred_tgt;
+    WADDR           pred_tgt;
 
     /* from ID_EX_PACKET */
     INST inst;
@@ -974,7 +974,7 @@ typedef struct packed {
     btq2retire btq_in;
     retire2btq btq_out;
     logic mispred;
-    ADDR  mispred_target;
+    WADDR mispred_target;
     retire_final retire_exec;
 } DBG_retire;
 
