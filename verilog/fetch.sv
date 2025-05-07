@@ -26,8 +26,8 @@ module stage_if_p4 (
     output  ADDR        [`N-1:0] mem_out_PCs,
     input   MEM_BLOCK   [`N-1:0] mem_in_data
 );
-    ADDR PC_reg;        // base PC for this cycle
-    ADDR [`N:0] PC_n;   // PC_n[m] := next PC if we fetch "m" this cycle (inaccurate past the 1st branch)
+    WADDR PC_reg;       // base PC for this cycle
+    WADDR [`N:0] PC_n;  // PC_n[m] := next PC if we fetch "m" this cycle (inaccurate past the 1st branch)
 
     logic [$clog2(`N):0]    free_scnt, used_scnt, f_cnt;
     IF_ID_PACKET [`N-1:0]   f_dat;
@@ -40,8 +40,8 @@ module stage_if_p4 (
 
         PC_n[0] = PC_reg;
         for (int i = 0; i < `N; ++i) begin
-            PC_n[i + 1] = PC_reg + 4*(i + 1);
-            mem_out_PCs[i] = PC_n[i];
+            PC_n[i + 1] = PC_reg + i + 1;
+            mem_out_PCs[i] = w2addr(PC_n[i]);
         end
 
         for (int unsigned i = 0; i < `N; ++i) begin
@@ -49,8 +49,8 @@ module stage_if_p4 (
 
             f_dat[i] = '{
                 inst    : mem_in_data[i].word_level[woff],
-                PC      : PC_n[i],
-                NPC     : PC_n[i] + 4,
+                PC      : w2addr(PC_n[i]),
+                NPC     : w2addr(PC_n[i] + 1),
                 pred    : 1'b0,
                 pred_tgt: '0
             };
@@ -80,7 +80,7 @@ module stage_if_p4 (
         if (reset) begin
             PC_reg <= 0;                    // initial PC value is 0 (the memory address where our program starts)
         end else if (flush) begin
-            PC_reg <= r_in.corrected_PC;    // update to a taken branch (does not depend on valid bit)...
+            PC_reg <= addr2w(r_in.corrected_PC);    // update to a taken branch (does not depend on valid bit)...
         end else begin
             PC_reg <= PC_n[f_cnt];          // ...or transition to next PC if valid
         end

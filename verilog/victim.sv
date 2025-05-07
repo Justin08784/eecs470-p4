@@ -1,10 +1,5 @@
 `include "sys_defs.svh"
 
-/* Get double word address; restricting to only actually used 16 LSB. */
-function automatic logic[12:0] get_dwaddr(input ADDR addr);
-    return addr[15:3];
-endfunction
-
 localparam sz = 4;
 typedef struct packed {
     logic       [sz-1:0]        vld;
@@ -52,7 +47,7 @@ module victim_cache (
         rmsk = '0;
         rdat = '0;
         foreach(tag[i]) begin
-            if (ren && vld[i] && tag[i] == get_dwaddr(raddr)) begin
+            if (ren && vld[i] && tag[i] == addr2dw(raddr)) begin
                 rmsk[i] |= 1;
                 rdat    |= dat[i];
             end
@@ -103,7 +98,7 @@ module victim_cache (
                     if (!wmsk[i])
                         continue;
                     vld[i] <= 1;
-                    tag[i] <= get_dwaddr(waddr);
+                    tag[i] <= addr2dw(waddr);
                     dat[i] <= wdat;
                 end
 

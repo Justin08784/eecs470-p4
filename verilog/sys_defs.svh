@@ -93,6 +93,37 @@ typedef logic [31:0] ADDR;
 typedef logic [31:0] DATA;
 typedef logic [4:0] REG_IDX;
 
+typedef logic [15:0] BADDR;
+typedef logic [14:0] HADDR;
+typedef logic [13:0] WADDR;
+typedef logic [12:0] DWADDR;
+
+// Double word address (restricted to only used 16 LSB)
+function automatic DWADDR addr2dw(input ADDR addr);
+    return addr[15:3];
+endfunction
+function automatic ADDR dw2addr(input DWADDR addr);
+    return {16'b0, addr, 3'b0};
+endfunction
+
+// Word address
+function automatic WADDR addr2w(input ADDR addr);
+    return addr[15:2];
+endfunction
+function automatic ADDR w2addr(input WADDR addr);
+    return {16'b0, addr, 2'b0};
+endfunction
+
+// In-word byte offset
+function automatic logic[1:0] iw_off(input ADDR addr);
+    return addr[1:0];
+endfunction
+
+// In-double-word byte offset
+function automatic logic[2:0] idw_off(input ADDR addr);
+    return addr[2:0];
+endfunction
+
 /* 
 NEED CLARIFICATION:
 NOTE: We will use PHYS_REG_IDX = 0 as a sentinel (to denote "no register" / "is immediate operand").
@@ -176,25 +207,6 @@ typedef union packed {
     logic [1:0][15:0] half_level;
     logic      [31:0] word_level;
 } DATA_BLOCK;
-
-// Get word address; restricting to only actually used 16 LSB.
-function automatic logic[13:0] waddr(input ADDR addr);
-    return addr[15:2];
-endfunction
-// Double word address
-function automatic logic[12:0] dwaddr(input ADDR addr);
-    return addr[15:3];
-endfunction
-
-// In-word byte offset
-function automatic logic[1:0] iw_off(input ADDR addr);
-    return addr[1:0];
-endfunction
-
-// In-double-word byte offset
-function automatic logic[2:0] idw_off(input ADDR addr);
-    return addr[2:0];
-endfunction
 
 ///////////////////////////////
 // ---- Exception Codes ---- //
