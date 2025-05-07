@@ -23,7 +23,7 @@ module btq #(
     // complete (write)
     input  execute2btq  ex_in
 );
-    localparam NUM_DPORTS = N; // dispatch ports (in-order)
+    localparam NUM_FPORTS = N; // dispatch ports (in-order)
     localparam NUM_RPORTS = N; // retire ports (in-order)
     localparam NUM_CPORTS = `NUM_FU_ALU; // complete ports (*OUT-OF-ORDER*)
 
@@ -35,17 +35,17 @@ module btq #(
     logic [$clog2(BTQ_SZ):0]    free;
     assign free = BTQ_SZ - used;
 
-    logic [$clog2(NUM_DPORTS):0]    wr_cnt;
+    logic [$clog2(NUM_FPORTS):0]    wr_cnt;
     logic [$clog2(NUM_RPORTS):0]    rd_cnt;
     assign wr_cnt = f_in.en_cnt;
     assign rd_cnt = r_in.rd_cnt;
 
     logic [NUM_RPORTS-1:0][$clog2(BTQ_SZ)-1:0] r_idxs;
-    logic [NUM_DPORTS-1:0][$clog2(BTQ_SZ)-1:0] d_idxs;
+    logic [NUM_FPORTS-1:0][$clog2(BTQ_SZ)-1:0] d_idxs;
     always_comb begin
         for (int unsigned i = 0; i < NUM_RPORTS; ++i)
             r_idxs[i] = (head + i) % BTQ_SZ;
-        for (int unsigned i = 0; i < NUM_DPORTS; ++i)
+        for (int unsigned i = 0; i < NUM_FPORTS; ++i)
             d_idxs[i] = (tail + i) % BTQ_SZ;
 
         // handle retire (outs)
@@ -58,16 +58,16 @@ module btq #(
         /*
         TODO: This tradeoff needs consideration for performance
         Option 1: 
-        d_out.rdy_scnt = `MIN(free + rd_cnt, NUM_DPORTS);
+        d_out.rdy_scnt = `MIN(free + rd_cnt, NUM_FPORTS);
         + avoids dispatch stalls when BTQ is full if N branches retire per cycle
         - longer combinational delay due to dependency on rd_cnt
 
         Option 2: 
-        d_out.rdy_scnt = `MIN(free, NUM_DPORTS);
+        d_out.rdy_scnt = `MIN(free, NUM_FPORTS);
         (opposite of above points)
         */
         f_out = '{
-            rdy_scnt    : `MIN(free, NUM_DPORTS),
+            rdy_scnt    : `MIN(free, NUM_FPORTS),
             btq_idxs    : d_idxs
         };
     end
@@ -98,7 +98,7 @@ module btq #(
             end
 
             // handle dispatch (ins)
-            for (int i = 0, int idx = 0; i < NUM_DPORTS; ++i) begin
+            for (int i = 0, int idx = 0; i < NUM_FPORTS; ++i) begin
                 idx = d_idxs[i];
                 if (i >= wr_cnt)
                     continue;
