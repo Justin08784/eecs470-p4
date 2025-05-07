@@ -39,189 +39,187 @@ module decoder_p4 (
         halt          = `FALSE;
         illegal       = `FALSE;
 
-        if (valid) begin
-            casez (inst)
-                `RV32_LUI: begin
-                    has_dest   = `TRUE;
-                    opa_select = OPA_IS_ZERO;
-                    opb_select = OPB_IS_U_IMM;
-                end
-                `RV32_AUIPC: begin
-                    has_dest   = `TRUE;
-                    opa_select = OPA_IS_PC;
-                    opb_select = OPB_IS_U_IMM;
-                end
-                `RV32_JAL: begin
-                    has_dest      = `TRUE;
-                    opa_select    = OPA_IS_PC;
-                    opb_select    = OPB_IS_J_IMM;
-                    uncond_branch = `TRUE;
-                end
-                `RV32_JALR: begin
-                    has_dest      = `TRUE;
-                    opa_select    = OPA_IS_RS1;
-                    opb_select    = OPB_IS_I_IMM;
-                    uncond_branch = `TRUE;
-                end
-                `RV32_BEQ, `RV32_BNE, `RV32_BLT, `RV32_BGE,
-                `RV32_BLTU, `RV32_BGEU: begin
-                    opa_select  = OPA_IS_PC;
-                    opb_select  = OPB_IS_B_IMM;
-                    cond_branch = `TRUE;
-                    // stage_ex uses inst.b.funct3 as the branch function
-                end
-                `RV32_MULHU: begin
-                    fu_idx     = FU_MULT;
-                    has_dest   = `TRUE;
-                    mult       = `TRUE;
-                end
-                `RV32_MULHSU: begin
-                    fu_idx     = FU_MULT;
-                    has_dest   = `TRUE;
-                    mult       = `TRUE;
-                end
-                `RV32_MULH: begin
-                    fu_idx     = FU_MULT;
-                    has_dest   = `TRUE;
-                    mult       = `TRUE;
-                end
-                `RV32_MUL: begin //, `RV32_MULH, `RV32_MULHSU, `RV32_MULHU: begin
-                    fu_idx     = FU_MULT;
-                    has_dest   = `TRUE;
-                    mult       = `TRUE;
-                    // stage_ex uses inst.r.funct3 as the mult function
-                end
-                `RV32_LB, `RV32_LH, `RV32_LW,
-                `RV32_LBU, `RV32_LHU: begin
-                    fu_idx     = FU_LOAD;
-                    has_dest   = `TRUE;
-                    opb_select = OPB_IS_I_IMM;
-                    rd_mem     = `TRUE;
-                    // stage_ex uses inst.r.funct3 as the load size and signedness
-                end
-                `RV32_SB, `RV32_SH, `RV32_SW: begin
-                    fu_idx     = FU_STORE;
-                    opb_select = OPB_IS_S_IMM;
-                    wr_mem     = `TRUE;
-                    // stage_ex uses inst.r.funct3 as the store size
-                end
-                `RV32_ADDI: begin
-                    has_dest   = `TRUE;
-                    opb_select = OPB_IS_I_IMM;
-                end
-                `RV32_SLTI: begin
-                    fu_idx     = FU_ALU;
-                    has_dest   = `TRUE;
-                    opb_select = OPB_IS_I_IMM;
-                    alu_func   = ALU_SLT;
-                end
-                `RV32_SLTIU: begin
-                    fu_idx     = FU_ALU;
-                    has_dest   = `TRUE;
-                    opb_select = OPB_IS_I_IMM;
-                    alu_func   = ALU_SLTU;
-                end
-                `RV32_ANDI: begin
-                    fu_idx     = FU_ALU;
-                    has_dest   = `TRUE;
-                    opb_select = OPB_IS_I_IMM;
-                    alu_func   = ALU_AND;
-                end
-                `RV32_ORI: begin
-                    fu_idx     = FU_ALU;
-                    has_dest   = `TRUE;
-                    opb_select = OPB_IS_I_IMM;
-                    alu_func   = ALU_OR;
-                end
-                `RV32_XORI: begin
-                    fu_idx     = FU_ALU;
-                    has_dest   = `TRUE;
-                    opb_select = OPB_IS_I_IMM;
-                    alu_func   = ALU_XOR;
-                end
-                `RV32_SLLI: begin
-                    fu_idx     = FU_ALU;
-                    has_dest   = `TRUE;
-                    opb_select = OPB_IS_I_IMM;
-                    alu_func   = ALU_SLL;
-                end
-                `RV32_SRLI: begin
-                    fu_idx     = FU_ALU;
-                    has_dest   = `TRUE;
-                    opb_select = OPB_IS_I_IMM;
-                    alu_func   = ALU_SRL;
-                end
-                `RV32_SRAI: begin
-                    fu_idx     = FU_ALU;
-                    has_dest   = `TRUE;
-                    opb_select = OPB_IS_I_IMM;
-                    alu_func   = ALU_SRA;
-                end
-                `RV32_ADD: begin
-                    fu_idx     = FU_ALU;
-                    has_dest   = `TRUE;
-                end
-                `RV32_SUB: begin
-                    fu_idx     = FU_ALU;
-                    has_dest   = `TRUE;
-                    alu_func   = ALU_SUB;
-                end
-                `RV32_SLT: begin
-                    fu_idx     = FU_ALU;
-                    has_dest   = `TRUE;
-                    alu_func   = ALU_SLT;
-                end
-                `RV32_SLTU: begin
-                    fu_idx     = FU_ALU;
-                    has_dest   = `TRUE;
-                    alu_func   = ALU_SLTU;
-                end
-                `RV32_AND: begin
-                    fu_idx     = FU_ALU;
-                    has_dest   = `TRUE;
-                    alu_func   = ALU_AND;
-                end
-                `RV32_OR: begin
-                    fu_idx     = FU_ALU;
-                    has_dest   = `TRUE;
-                    alu_func   = ALU_OR;
-                end
-                `RV32_XOR: begin
-                    fu_idx     = FU_ALU;
-                    has_dest   = `TRUE;
-                    alu_func   = ALU_XOR;
-                end
-                `RV32_SLL: begin
-                    fu_idx     = FU_ALU;
-                    has_dest   = `TRUE;
-                    alu_func   = ALU_SLL;
-                end
-                `RV32_SRL: begin
-                    fu_idx     = FU_ALU;
-                    has_dest   = `TRUE;
-                    alu_func   = ALU_SRL;
-                end
-                `RV32_SRA: begin
-                    fu_idx     = FU_ALU;
-                    has_dest   = `TRUE;
-                    alu_func   = ALU_SRA;
-                end
-                `RV32_CSRRW, `RV32_CSRRS, `RV32_CSRRC: begin
-                    csr_op = `TRUE;
-                end
-                `WFI: begin
-                    fu_idx      = FU_ALU;
-                    halt = `TRUE;
-                    has_dest   = `FALSE;
-                    alu_func   = ALU_ADD;
-                    opa_select = OPA_IS_ZERO;
-                    opb_select = OPB_IS_I_IMM;
-                end
-                default: begin
-                    illegal = `TRUE;
-                end
-            endcase // casez (inst)
-        end // if (valid)
+        casez (inst)
+            `RV32_LUI: begin
+                has_dest   = `TRUE;
+                opa_select = OPA_IS_ZERO;
+                opb_select = OPB_IS_U_IMM;
+            end
+            `RV32_AUIPC: begin
+                has_dest   = `TRUE;
+                opa_select = OPA_IS_PC;
+                opb_select = OPB_IS_U_IMM;
+            end
+            `RV32_JAL: begin
+                has_dest      = `TRUE;
+                opa_select    = OPA_IS_PC;
+                opb_select    = OPB_IS_J_IMM;
+                uncond_branch = `TRUE;
+            end
+            `RV32_JALR: begin
+                has_dest      = `TRUE;
+                opa_select    = OPA_IS_RS1;
+                opb_select    = OPB_IS_I_IMM;
+                uncond_branch = `TRUE;
+            end
+            `RV32_BEQ, `RV32_BNE, `RV32_BLT, `RV32_BGE,
+            `RV32_BLTU, `RV32_BGEU: begin
+                opa_select  = OPA_IS_PC;
+                opb_select  = OPB_IS_B_IMM;
+                cond_branch = `TRUE;
+                // stage_ex uses inst.b.funct3 as the branch function
+            end
+            `RV32_MULHU: begin
+                fu_idx     = FU_MULT;
+                has_dest   = `TRUE;
+                mult       = `TRUE;
+            end
+            `RV32_MULHSU: begin
+                fu_idx     = FU_MULT;
+                has_dest   = `TRUE;
+                mult       = `TRUE;
+            end
+            `RV32_MULH: begin
+                fu_idx     = FU_MULT;
+                has_dest   = `TRUE;
+                mult       = `TRUE;
+            end
+            `RV32_MUL: begin //, `RV32_MULH, `RV32_MULHSU, `RV32_MULHU: begin
+                fu_idx     = FU_MULT;
+                has_dest   = `TRUE;
+                mult       = `TRUE;
+                // stage_ex uses inst.r.funct3 as the mult function
+            end
+            `RV32_LB, `RV32_LH, `RV32_LW,
+            `RV32_LBU, `RV32_LHU: begin
+                fu_idx     = FU_LOAD;
+                has_dest   = `TRUE;
+                opb_select = OPB_IS_I_IMM;
+                rd_mem     = `TRUE;
+                // stage_ex uses inst.r.funct3 as the load size and signedness
+            end
+            `RV32_SB, `RV32_SH, `RV32_SW: begin
+                fu_idx     = FU_STORE;
+                opb_select = OPB_IS_S_IMM;
+                wr_mem     = `TRUE;
+                // stage_ex uses inst.r.funct3 as the store size
+            end
+            `RV32_ADDI: begin
+                has_dest   = `TRUE;
+                opb_select = OPB_IS_I_IMM;
+            end
+            `RV32_SLTI: begin
+                fu_idx     = FU_ALU;
+                has_dest   = `TRUE;
+                opb_select = OPB_IS_I_IMM;
+                alu_func   = ALU_SLT;
+            end
+            `RV32_SLTIU: begin
+                fu_idx     = FU_ALU;
+                has_dest   = `TRUE;
+                opb_select = OPB_IS_I_IMM;
+                alu_func   = ALU_SLTU;
+            end
+            `RV32_ANDI: begin
+                fu_idx     = FU_ALU;
+                has_dest   = `TRUE;
+                opb_select = OPB_IS_I_IMM;
+                alu_func   = ALU_AND;
+            end
+            `RV32_ORI: begin
+                fu_idx     = FU_ALU;
+                has_dest   = `TRUE;
+                opb_select = OPB_IS_I_IMM;
+                alu_func   = ALU_OR;
+            end
+            `RV32_XORI: begin
+                fu_idx     = FU_ALU;
+                has_dest   = `TRUE;
+                opb_select = OPB_IS_I_IMM;
+                alu_func   = ALU_XOR;
+            end
+            `RV32_SLLI: begin
+                fu_idx     = FU_ALU;
+                has_dest   = `TRUE;
+                opb_select = OPB_IS_I_IMM;
+                alu_func   = ALU_SLL;
+            end
+            `RV32_SRLI: begin
+                fu_idx     = FU_ALU;
+                has_dest   = `TRUE;
+                opb_select = OPB_IS_I_IMM;
+                alu_func   = ALU_SRL;
+            end
+            `RV32_SRAI: begin
+                fu_idx     = FU_ALU;
+                has_dest   = `TRUE;
+                opb_select = OPB_IS_I_IMM;
+                alu_func   = ALU_SRA;
+            end
+            `RV32_ADD: begin
+                fu_idx     = FU_ALU;
+                has_dest   = `TRUE;
+            end
+            `RV32_SUB: begin
+                fu_idx     = FU_ALU;
+                has_dest   = `TRUE;
+                alu_func   = ALU_SUB;
+            end
+            `RV32_SLT: begin
+                fu_idx     = FU_ALU;
+                has_dest   = `TRUE;
+                alu_func   = ALU_SLT;
+            end
+            `RV32_SLTU: begin
+                fu_idx     = FU_ALU;
+                has_dest   = `TRUE;
+                alu_func   = ALU_SLTU;
+            end
+            `RV32_AND: begin
+                fu_idx     = FU_ALU;
+                has_dest   = `TRUE;
+                alu_func   = ALU_AND;
+            end
+            `RV32_OR: begin
+                fu_idx     = FU_ALU;
+                has_dest   = `TRUE;
+                alu_func   = ALU_OR;
+            end
+            `RV32_XOR: begin
+                fu_idx     = FU_ALU;
+                has_dest   = `TRUE;
+                alu_func   = ALU_XOR;
+            end
+            `RV32_SLL: begin
+                fu_idx     = FU_ALU;
+                has_dest   = `TRUE;
+                alu_func   = ALU_SLL;
+            end
+            `RV32_SRL: begin
+                fu_idx     = FU_ALU;
+                has_dest   = `TRUE;
+                alu_func   = ALU_SRL;
+            end
+            `RV32_SRA: begin
+                fu_idx     = FU_ALU;
+                has_dest   = `TRUE;
+                alu_func   = ALU_SRA;
+            end
+            `RV32_CSRRW, `RV32_CSRRS, `RV32_CSRRC: begin
+                csr_op = `TRUE;
+            end
+            `WFI: begin
+                fu_idx      = FU_ALU;
+                halt = `TRUE;
+                has_dest   = `FALSE;
+                alu_func   = ALU_ADD;
+                opa_select = OPA_IS_ZERO;
+                opb_select = OPB_IS_I_IMM;
+            end
+            default: begin
+                illegal = `TRUE;
+            end
+        endcase // casez (inst)
     end // always
 
 endmodule // decoder
@@ -266,7 +264,6 @@ module stage_id_p4 (
         decoder_p4 decoder_i (
             // Inputs
             .inst  (f_in.f_dat[i].inst),
-            .valid (`TRUE),
 
             // Outputs
             .fu_idx        (tmp[i].fu_idx),
