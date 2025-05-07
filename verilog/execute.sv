@@ -320,8 +320,8 @@ module stage_ex_p4 (
                 btq_idx : rs_in.fu_dat_alu[i].btq_idx,
 
                 inst    : rs_in.fu_dat_alu[i].inst,
-                PC      : rs_in.fu_dat_alu[i].PC,
-                NPC     : rs_in.fu_dat_alu[i].NPC,
+                PC      : w2addr(rs_in.fu_dat_alu[i].PC),
+                NPC     : w2addr(rs_in.fu_dat_alu[i].PC + 1),
 
                 opa_select  : rs_in.fu_dat_alu[i].opa_select,
                 opb_select  : rs_in.fu_dat_alu[i].opb_select,

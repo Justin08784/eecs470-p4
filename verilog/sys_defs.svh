@@ -383,8 +383,7 @@ typedef enum logic [2:0] {
  */
 typedef struct packed {
     INST  inst;
-    ADDR  PC;
-    ADDR  NPC; // PC + 4
+    WADDR PC;
 
     logic   pred;
     ADDR    pred_tgt;
@@ -507,8 +506,7 @@ typedef struct packed {
 typedef logic [$clog2(`BTQ_SZ)-1:0] BTQ_IDX;
 typedef struct packed {
 
-    ADDR    PC;
-    ADDR    NPC;   // PC + 4 (i.e. address if we dont take the branch)
+    WADDR   PC;
     logic   pred;
     ADDR    pred_tgt;
 
@@ -562,8 +560,7 @@ typedef struct packed {
     logic   [$clog2(`N):0] en_cnt;
         // How many branch instructions dispatching?
         // Sender must ensure branch insns packed to lowest indices.
-    ADDR    [`N-1:0]    NPC;
-    ADDR    [`N-1:0]    PC;
+    WADDR   [`N-1:0]    PC;
     ADDR    [`N-1:0]    pred_tgt;
     logic   [`N-1:0]    pred;
 } dispatch2btq;
@@ -595,8 +592,7 @@ typedef struct packed {
 
     /* from ID_EX_PACKET */
     INST inst;
-    ADDR PC;
-    ADDR NPC; // PC + 4
+    WADDR PC;
 
     ALU_OPA_SELECT opa_select; // ALU opa mux select (ALU_OPA_xxx *)
     ALU_OPB_SELECT opb_select; // ALU opb mux select (ALU_OPB_xxx *)

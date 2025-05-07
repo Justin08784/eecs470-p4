@@ -181,7 +181,6 @@ module dispatch #(parameter
         btq_wr_idx  = 0;
 
         btq_out.PC          = '0;
-        btq_out.NPC         = '0;
         btq_out.pred        = '0;
         btq_out.pred_tgt    = '0;
 
@@ -206,7 +205,6 @@ module dispatch #(parameter
                 tmp_alloc2rename[i].dat.btq_idx = btq_in.btq_idxs[btq_wr_idx];
 
                 btq_out.PC[btq_wr_idx]       = rename_in[i].PC;
-                btq_out.NPC[btq_wr_idx]      = rename_in[i].NPC;
                 btq_out.pred[btq_wr_idx]     = rename_in[i].pred;
                 btq_out.pred_tgt[btq_wr_idx] = rename_in[i].pred_tgt;
                 ++btq_wr_idx;

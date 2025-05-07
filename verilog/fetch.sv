@@ -49,8 +49,7 @@ module stage_if_p4 (
 
             f_dat[i] = '{
                 inst    : mem_in_data[i].word_level[woff],
-                PC      : w2addr(PC_n[i]),
-                NPC     : w2addr(PC_n[i] + 1),
+                PC      : PC_n[i],
                 pred    : 1'b0,
                 pred_tgt: '0
             };

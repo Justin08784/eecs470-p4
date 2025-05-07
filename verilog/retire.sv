@@ -77,7 +77,7 @@ module retire (
                 mispred = 1;
                 mispred_target = btq_in.dat[btq_rd_cnt].take
                     ? btq_in.dat[btq_rd_cnt].tgt
-                    : btq_in.dat[btq_rd_cnt].NPC;
+                    : w2addr(btq_in.dat[btq_rd_cnt].PC + 1);
                 branch_taken_n[i] = btq_in.dat[btq_rd_cnt].take;
 
                 ++btq_rd_cnt;

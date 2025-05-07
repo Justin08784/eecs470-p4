@@ -272,10 +272,10 @@ module testbench;
                     id      : verisimpleV.rs_0.d_in.d_dat[i].id,
                     halt    : verisimpleV.rob_0.d_in.halt[i],
                     illegal : verisimpleV.rob_0.d_in.illegal[i],
-                    is_brch: verisimpleV.rob_0.d_in.is_brch[i],
-                    rd_mem : verisimpleV.rob_0.d_in.rd_mem[i],
-                    wr_mem : verisimpleV.rob_0.d_in.wr_mem[i],
-                    NPC     : verisimpleV.rs_0.d_in.d_dat[i].NPC
+                    is_brch : verisimpleV.rob_0.d_in.is_brch[i],
+                    rd_mem  : verisimpleV.rob_0.d_in.rd_mem[i],
+                    wr_mem  : verisimpleV.rob_0.d_in.wr_mem[i],
+                    NPC     : w2addr(verisimpleV.rs_0.d_in.d_dat[i].PC + 1)
                 };
             end
 `endif // SYNTH
@@ -495,7 +495,7 @@ module testbench;
     // OPTIONAL: Print our your data here
     // It will go to the $program.log file
     function print_id_result(input ID_RESULT x);
-        $display("ID_RESULT: id=%3d t=%2d t1=%2d t2=%2d t1_rdy=%b t2_rdy=%b fu_idx=%2d rob_idx=%2d btq_idx=%2d is_brch:%b inst=%h PC=%h NPC=%h opa_select=%1d opb_select=%1d dest_reg_idx=%2d alu_func=%1d mult=%b rd_mem=%b wr_mem=%b cond_branch=%b uncond_branch=%b halt=%b illegal=%b csr_op=%b",
+        $display("ID_RESULT: id=%3d t=%2d t1=%2d t2=%2d t1_rdy=%b t2_rdy=%b fu_idx=%2d rob_idx=%2d btq_idx=%2d is_brch:%b inst=%h PC=%h opa_select=%1d opb_select=%1d dest_reg_idx=%2d alu_func=%1d mult=%b rd_mem=%b wr_mem=%b cond_branch=%b uncond_branch=%b halt=%b illegal=%b csr_op=%b",
             x.id,
             x.t,
             x.t1,
@@ -508,7 +508,6 @@ module testbench;
             x.is_brch,
             x.inst,
             x.PC,
-            x.NPC,
             x.opa_select,
             x.opb_select,
             x.dest_reg_idx,
@@ -559,10 +558,9 @@ module testbench;
 
         $display(">> BTQ >>");
         for (int i = 0; i < `BTQ_SZ; ++i) begin
-            $display("BTQ [%0d]: tgt: %x, NPC: %x, pred: %b, take: %b%s", 
+            $display("BTQ [%0d]: tgt: %x, pred: %b, take: %b%s",
                 i,
                 state[i].tgt,
-                state[i].NPC,
                 state[i].pred,
                 state[i].take,
                 (i == head && head == tail) 
@@ -578,7 +576,7 @@ module testbench;
         end
 
         for (int i = 0; i < `N; ++i) begin
-            $display("ex_in[%0d]: en: %b, btq_idx: %d, take: %b, tgt: %x", 
+            $display("ex_in[%0d]: en: %b, btq_idx: %d, take: %b, tgt: %x",
                 i,
                 ex_in.dat[i].en,
                 ex_in.dat[i].btq_idx,
@@ -589,10 +587,9 @@ module testbench;
         $display("r_in: rd_cnt %d", r_in.rd_cnt);
         $display("r_out: used_scnt: %0d", r_out.used_scnt);
         for (int i = 0; i < `N; ++i) begin
-            $display("r_out[%d]: tgt: %x, NPC: %x, pred: %b, take: %b", 
+            $display("r_out[%d]: tgt: %x, pred: %b, take: %b",
                 i,
                 r_out.dat[i].tgt,
-                r_out.dat[i].NPC,
                 r_out.dat[i].pred,
                 r_out.dat[i].take
             );
@@ -996,10 +993,9 @@ module testbench;
 
         $display("  | >> retire >>");
         for (int i = 0; i < `N; ++i) begin
-            $display("btq_out [%0d]: tgt: %x, NPC: %x, pred: %b, take: %b", 
+            $display("btq_out [%0d]: tgt: %x, pred: %b, take: %b",
                 i,
                 btq_in.dat[i].tgt,
-                btq_in.dat[i].NPC,
                 btq_in.dat[i].pred,
                 btq_in.dat[i].take
             );

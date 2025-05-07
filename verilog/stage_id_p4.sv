@@ -308,7 +308,6 @@ module stage_id_p4 (
 
                 inst        : f_in.f_dat[i].inst,
                 PC          : f_in.f_dat[i].PC,
-                NPC         : f_in.f_dat[i].NPC,
 
                 opa_select      : tmp[i].opa_select,
                 opb_select      : tmp[i].opb_select,

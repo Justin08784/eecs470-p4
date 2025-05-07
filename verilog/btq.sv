@@ -105,7 +105,6 @@ module btq #(
 
                 state[idx] <= '{
                     PC      : d_in.PC[i],
-                    NPC     : d_in.NPC[i],
                     pred    : d_in.pred[i],
                     pred_tgt: d_in.pred_tgt[i],
 
