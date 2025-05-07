@@ -5,8 +5,8 @@ module cpu (
     input  clock,
     input  reset,
 
-    output ADDR         [`N-1:0] f2mem_PCs,
-    input  MEM_BLOCK    [`N-1:0] mem2f_data,
+    input  mem2fetch mem2f,
+    output fetch2mem f2mem,
 
     input  MEM_TAG      mem2proc_transaction_tag, // Memory tag for current transaction
     input  MEM_BLOCK    mem2proc_data,            // Data coming back from memory
@@ -85,8 +85,8 @@ module cpu (
         .d_out  (f_2_decode),
         .r_in   (retire_2_f),
 
-        .mem_out_PCs    (f2mem_PCs),
-        .mem_in_data    (mem2f_data)
+        .mem_in (mem2f),
+        .mem_out(f2mem)
     );
 
 

@@ -10,52 +10,6 @@
 
 `include "sys_defs.svh"
 
-/*
-- unsure about correctness of call/ret checking; make sure to
-test thoroughly with progs with function calls
-- TODO: move this to icache refill path and store the 4 bits in
-the icache metadata
-*/
-module predecoder (
-    input  INST     inst,
-
-    output logic    call,
-    output logic    ret,
-    output logic    cond_branch,
-    output logic    uncond_branch
-);
-    always_comb begin
-        REG_IDX rd;
-        call            = `FALSE;
-        ret             = `FALSE;
-        cond_branch     = `FALSE;
-        uncond_branch   = `FALSE;
-        rd = inst.r.rd;
-
-        casez (inst)
-            `RV32_JAL: begin
-                uncond_branch = `TRUE;
-                call = (rd == 5'd1) || (rd == 5'd5);
-            end
-
-            `RV32_JALR: begin
-                uncond_branch = `TRUE;
-                call = (rd == 5'd1) || (rd == 5'd5);
-                ret  = (rd         == `ZERO_REG)    &&
-                       (inst.r.rs1 == 5'd1)         &&   // rs1 lives in same bit‑slice for I‑type
-                       (inst.i.imm == 12'd0);
-            end
-
-            `RV32_BEQ, `RV32_BNE, `RV32_BLT, `RV32_BGE,
-            `RV32_BLTU, `RV32_BGEU: begin
-                cond_branch = `TRUE;
-                // stage_ex uses inst.b.funct3 as the branch function
-            end
-            default:;
-        endcase // casez (inst)
-    end // always
-endmodule // predecoder
-
 module stage_if_p4 (
 `ifdef DEBUG
     output  DBG_fetch dbg,
@@ -72,8 +26,8 @@ module stage_if_p4 (
 
     input   retire2fetch r_in,
 
-    output  ADDR        [`N-1:0] mem_out_PCs,
-    input   MEM_BLOCK   [`N-1:0] mem_in_data
+    input   mem2fetch mem_in,
+    output  fetch2mem mem_out
 );
     WADDR PC_reg;       // base PC for this cycle
     WADDR [`N:0] PC_n;  // PC_n[m] := next PC if we fetch "m" this cycle (inaccurate past the 1st branch)
@@ -82,33 +36,22 @@ module stage_if_p4 (
     logic [`N-1:0]          f_en;
     IF_ID_PACKET [`N-1:0]   f_dat;
 
-    struct packed {
-        logic call;
-        logic ret;
-        logic cond_branch;
-        logic uncond_branch;
-    } [`N-1:0] f_md;
-    logic [`N-1:0] is_brch;
-
-    generate
-    for (genvar i = 0; i < `N; ++i) begin : gen_predecs
-        predecoder predec_i (
-            .inst           (f_dat[i].inst),
-
-            .call           (f_md[i].call),
-            .ret            (f_md[i].ret),
-            .cond_branch    (f_md[i].cond_branch),
-            .uncond_branch  (f_md[i].uncond_branch)
-        );
-
-        assign is_brch[i] = f_md[i].cond_branch || f_md[i].uncond_branch;
-    end
-    endgenerate
 
     always_comb begin
         logic woff;
         logic [$clog2(`N):0] btq_wr_idx;
         logic [$clog2(`N):0] lim_cnt_btq;
+        struct packed {
+            logic call;
+            logic ret;
+            logic cond_branch;
+            logic uncond_branch;
+        } [`N-1:0] f_md;
+        logic [`N-1:0] is_brch;
+
+        f_md = mem_in.f_md;
+        foreach (is_brch[i])
+            is_brch[i] = f_md[i].cond_branch || f_md[i].uncond_branch;
 
 
         d_out.f_en_cnt = `MIN(used_scnt, d_in.d_rdy_cnt);
@@ -116,14 +59,14 @@ module stage_if_p4 (
         PC_n[0] = PC_reg;
         for (int i = 0; i < `N; ++i) begin
             PC_n[i + 1] = PC_reg + i + 1;
-            mem_out_PCs[i] = w2addr(PC_n[i]);
+            mem_out.PCs[i] = w2addr(PC_n[i]);
         end
 
         for (int unsigned i = 0; i < `N; ++i) begin
             woff = PC_n[i][0];
 
             f_dat[i] = '{
-                inst    : mem_in_data[i].word_level[woff],
+                inst    : mem_in.data[i].word_level[woff],
                 PC      : PC_n[i],
                 btq_idx : '0    // default; overwrite below
             };

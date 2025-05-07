@@ -10,6 +10,7 @@
 `include "sys_defs.svh"
 `include "dcache_block_direct.svh"
 `include "execute.svh"
+`include "ISA.svh"
 
 // P4 TODO: Add your own debugging framework. Basic printing of data structures
 //          is an absolute necessity for the project. You can use C functions 
@@ -44,6 +45,53 @@ localparam DBG_CYCLE_MAX = `TB_MAX_CYCLES;
 // localparam DBG_CYCLE_MAX = 1500;
 
 
+/*
+- unsure about correctness of call/ret checking; make sure to
+test thoroughly with progs with function calls
+- TODO: move this to icache refill path and store the 4 bits in
+the icache metadata
+*/
+module predecoder (
+    input  INST     inst,
+
+    output logic    call,
+    output logic    ret,
+    output logic    cond_branch,
+    output logic    uncond_branch
+);
+    always_comb begin
+        REG_IDX rd;
+        call            = `FALSE;
+        ret             = `FALSE;
+        cond_branch     = `FALSE;
+        uncond_branch   = `FALSE;
+        rd = inst.r.rd;
+
+        casez (inst)
+            `RV32_JAL: begin
+                uncond_branch = `TRUE;
+                call = (rd == 5'd1) || (rd == 5'd5);
+            end
+
+            `RV32_JALR: begin
+                uncond_branch = `TRUE;
+                call = (rd == 5'd1) || (rd == 5'd5);
+                ret  = (rd         == `ZERO_REG)    &&
+                       (inst.r.rs1 == 5'd1)         &&   // rs1 lives in same bit‑slice for I‑type
+                       (inst.i.imm == 12'd0);
+            end
+
+            `RV32_BEQ, `RV32_BNE, `RV32_BLT, `RV32_BGE,
+            `RV32_BLTU, `RV32_BGEU: begin
+                cond_branch = `TRUE;
+                // stage_ex uses inst.b.funct3 as the branch function
+            end
+            default:;
+        endcase // casez (inst)
+    end // always
+endmodule // predecoder
+
+
 module testbench;
     // string inputs for loading memory and output files
     // run like: cd build && ./simv +MEMORY=../programs/mem/<my_program>.mem +OUTPUT=../output/<my_program>
@@ -60,8 +108,8 @@ module testbench;
     logic [31:0] clock_count; // also used for terminating infinite loops
     logic [31:0] instr_count;
 
-    ADDR        [`N-1:0] f2mem_PCs;
-    MEM_BLOCK   [`N-1:0] mem2f_data;
+    mem2fetch   mem2f;
+    fetch2mem   f2mem;
 
     MEM_COMMAND proc2mem_command;
     ADDR        proc2mem_addr;
@@ -96,8 +144,8 @@ module testbench;
         .clock (clock),
         .reset (reset),
 
-        .f2mem_PCs  (f2mem_PCs),
-        .mem2f_data (mem2f_data),
+        .f2mem (f2mem),
+        .mem2f (mem2f),
 
         .mem2proc_transaction_tag (mem2proc_transaction_tag),
         .mem2proc_data            (mem2proc_data),
@@ -153,8 +201,21 @@ module testbench;
 
     always_comb begin
         for (int i = 0; i < `N; ++i)
-            mem2f_data[i] = memory.unified_memory[f2mem_PCs[i][15:3]];
+            mem2f.data[i] = memory.unified_memory[f2mem.PCs[i][15:3]];
     end
+
+    generate
+    for (genvar i = 0; i < `N; ++i) begin : gen_predecs
+        predecoder predec_i (
+            .inst           (mem2f.data[i].word_level[f2mem.PCs[i][2]]),
+
+            .call           (mem2f.f_md[i].call),
+            .ret            (mem2f.f_md[i].ret),
+            .cond_branch    (mem2f.f_md[i].cond_branch),
+            .uncond_branch  (mem2f.f_md[i].uncond_branch)
+        );
+    end
+    endgenerate
 
     // Generate System Clock
     always begin
