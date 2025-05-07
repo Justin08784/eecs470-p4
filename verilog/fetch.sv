@@ -67,6 +67,9 @@ module stage_if_p4 (
     input   decode2fetch d_in,
     output  fetch2decode d_out,
 
+    input   btq2fetch btq_in,
+    output  fetch2btq btq_out,
+
     input   retire2fetch r_in,
 
     output  ADDR        [`N-1:0] mem_out_PCs,
@@ -76,13 +79,39 @@ module stage_if_p4 (
     WADDR [`N:0] PC_n;  // PC_n[m] := next PC if we fetch "m" this cycle (inaccurate past the 1st branch)
 
     logic [$clog2(`N):0]    free_scnt, used_scnt, f_cnt;
+    logic [`N-1:0]          f_en;
     IF_ID_PACKET [`N-1:0]   f_dat;
+
+    struct packed {
+        logic call;
+        logic ret;
+        logic cond_branch;
+        logic uncond_branch;
+    } [`N-1:0] f_md;
+    logic [`N-1:0] is_brch;
+
+    generate
+    for (genvar i = 0; i < `N; ++i) begin : gen_predecs
+        predecoder predec_i (
+            .inst           (f_dat[i].inst),
+
+            .call           (f_md[i].call),
+            .ret            (f_md[i].ret),
+            .cond_branch    (f_md[i].cond_branch),
+            .uncond_branch  (f_md[i].uncond_branch)
+        );
+
+        assign is_brch[i] = f_md[i].cond_branch || f_md[i].uncond_branch;
+    end
+    endgenerate
 
     always_comb begin
         logic woff;
+        logic [$clog2(`N):0] btq_wr_idx;
+        logic [$clog2(`N):0] lim_cnt_btq;
+
 
         d_out.f_en_cnt = `MIN(used_scnt, d_in.d_rdy_cnt);
-        f_cnt = free_scnt;
 
         PC_n[0] = PC_reg;
         for (int i = 0; i < `N; ++i) begin
@@ -96,9 +125,43 @@ module stage_if_p4 (
             f_dat[i] = '{
                 inst    : mem_in_data[i].word_level[woff],
                 PC      : PC_n[i],
-                pred    : 1'b0,
-                pred_tgt: '0
+                btq_idx : '0    // default; overwrite below
             };
+        end
+
+        f_cnt = free_scnt;
+        lim_cnt_btq = 0;
+        for (int i = 0, int used_cnt = 0; i < `N; ++i) begin
+            if (used_cnt + is_brch[i] > btq_in.rdy_scnt)
+                break;
+            used_cnt += is_brch[i];
+            ++lim_cnt_btq;
+        end
+        f_cnt = `MIN(lim_cnt_btq, f_cnt);
+
+
+        // handle btq output
+        foreach(f_en[i])
+            f_en[i] = i < f_cnt;
+        btq_out = '{
+            en_cnt      : $countones(f_en & is_brch),
+
+            // defaults; overwrite below
+            PC          : '0,
+            pred        : '0,
+            pred_tgt    : '0
+        };
+
+        btq_wr_idx  = 0;
+        for (int i = 0; i < `N; ++i) begin
+            if (!is_brch[i])
+                continue;
+            f_dat[i].btq_idx = btq_in.btq_idxs[btq_wr_idx];
+
+            btq_out.PC[btq_wr_idx]       = f_dat[i].PC;
+            btq_out.pred[btq_wr_idx]     = 1'b0;    // FIXME
+            btq_out.pred_tgt[btq_wr_idx] = '0;      // FIXME
+            ++btq_wr_idx;
         end
     end
 

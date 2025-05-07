@@ -297,14 +297,11 @@ module stage_id_p4 (
 
                 fu_idx      : tmp[i].fu_idx,
                 rob_idx     : '0,
-                btq_idx     : '0,
-                is_brch   : tmp[i].cond_branch || tmp[i].uncond_branch,
-
-                pred        : f_in.f_dat[i].pred,
-                pred_tgt    : f_in.f_dat[i].pred_tgt,
+                is_brch     : tmp[i].cond_branch || tmp[i].uncond_branch,
 
                 inst        : f_in.f_dat[i].inst,
                 PC          : f_in.f_dat[i].PC,
+                btq_idx     : f_in.f_dat[i].btq_idx,
 
                 opa_select      : tmp[i].opa_select,
                 opb_select      : tmp[i].opb_select,

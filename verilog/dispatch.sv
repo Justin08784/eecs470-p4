@@ -31,10 +31,6 @@ module dispatch #(parameter
     input   free_list2dispatch free_in,
     output  dispatch2free_list free_out,
 
-    // BTQ
-    input   btq2dispatch btq_in,
-    output  dispatch2btq btq_out,
-
     // CDB (completions)
     input   execute2complete_tag ctag_in,
 
@@ -133,27 +129,7 @@ module dispatch #(parameter
         logic [$clog2(`N):0] lim_cnt_btq;
         rename_en_cnt = alloc_vld_scnt;
 
-        lim_cnt_btq = 0;
-        for (int i = 0, int used_cnt = 0; i < `N; ++i) begin
-            if (used_cnt + rename_in[i].is_brch > btq_in.btq_rdy_scnt)
-                break;
-            used_cnt += rename_in[i].is_brch;
-            ++lim_cnt_btq;
-        end
-        rename_en_cnt = `MIN(lim_cnt_btq, rename_en_cnt);
-
         rename_en_cnt = `MIN(rename_rdy_scnt, rename_en_cnt);
-    end
-
-    // handle btq output
-    always_comb begin
-        logic [`N-1:0] is_brch;
-        foreach(rename_en[i])
-            rename_en[i] = i < rename_en_cnt;
-        foreach(is_brch[i])
-            is_brch[i] = rename_in[i].is_brch;
-
-        btq_out.en_cnt = $countones(rename_en & is_brch);
     end
 
     // handle map table output 
@@ -175,14 +151,8 @@ module dispatch #(parameter
     always_comb begin
         logic [`N-1:0] rd_src1s;
         logic [`N-1:0] rd_src2s;
-        logic [$clog2(`N):0] btq_wr_idx;
 
         tmp_alloc2rename = '0;
-        btq_wr_idx  = 0;
-
-        btq_out.PC          = '0;
-        btq_out.pred        = '0;
-        btq_out.pred_tgt    = '0;
 
         for (int i = 0; i < `N; ++i) begin
             tmp_alloc2rename[i].dat         = rename_in[i];
@@ -200,15 +170,6 @@ module dispatch #(parameter
                 || rename_in[i].wr_mem;
             tmp_alloc2rename[i].dat.t1_rdy  = !rd_src1s[i];
             tmp_alloc2rename[i].dat.t2_rdy  = !rd_src2s[i];
-
-            if (rename_in[i].is_brch) begin
-                tmp_alloc2rename[i].dat.btq_idx = btq_in.btq_idxs[btq_wr_idx];
-
-                btq_out.PC[btq_wr_idx]       = rename_in[i].PC;
-                btq_out.pred[btq_wr_idx]     = rename_in[i].pred;
-                btq_out.pred_tgt[btq_wr_idx] = rename_in[i].pred_tgt;
-                ++btq_wr_idx;
-            end
         end
     end
 

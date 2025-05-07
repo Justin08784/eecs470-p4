@@ -66,6 +66,8 @@ module cpu (
 
     /* >> ==== Fetch ==== >> */
     fetch2decode f_2_decode;
+    fetch2btq    f_2_btq;
+    btq2fetch    btq_2_f;
     decode2fetch decode_2_f;
     retire2fetch retire_2_f;
 
@@ -77,6 +79,8 @@ module cpu (
         .reset  (reset),
         .flush  (flush),
 
+        .btq_in (btq_2_f),
+        .btq_out(f_2_btq),
         .d_in   (decode_2_f),
         .d_out  (f_2_decode),
         .r_in   (retire_2_f),
@@ -114,8 +118,6 @@ module cpu (
     free_list2dispatch fl_2_dispatch;
     dispatch2map_table dispatch_2_map;
     map_table2dispatch map_2_dispatch;
-    dispatch2btq dispatch_2_btq;
-    btq2dispatch btq_2_dispatch;
     execute2complete_tag ex_2_ctag;
     execute2complete_dat ex_2_cdat;
 
@@ -136,8 +138,6 @@ module cpu (
         .rob_out    (dispatch_2_rob),
         .free_in    (fl_2_dispatch),
         .free_out   (dispatch_2_fl),
-        .btq_in     (btq_2_dispatch),
-        .btq_out    (dispatch_2_btq),
         .map_in     (map_2_dispatch),
         .map_out    (dispatch_2_map),
 
@@ -184,12 +184,12 @@ module cpu (
         .reset  (reset),
         .flush  (flush),
 
+        .f_in   (f_2_btq),
+        .f_out  (btq_2_f),
         .ex_in  (ex_2_btq),
 
         .r_in   (retire_2_btq),
-        .r_out  (btq_2_retire),
-        .d_in   (dispatch_2_btq),
-        .d_out  (btq_2_dispatch)
+        .r_out  (btq_2_retire)
     );
 
 

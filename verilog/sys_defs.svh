@@ -381,12 +381,11 @@ typedef enum logic [2:0] {
  * IF_ID Packet:
  * Data exchanged from the IF to the ID stage
  */
+typedef logic [$clog2(`BTQ_SZ)-1:0] BTQ_IDX;
 typedef struct packed {
-    INST  inst;
-    WADDR PC;
-
-    logic   pred;
-    WADDR   pred_tgt;
+    INST    inst;
+    WADDR   PC;
+    BTQ_IDX btq_idx;
 } IF_ID_PACKET;
 
 /**
@@ -503,7 +502,6 @@ typedef struct packed {
 
 // BTQ stuff
 // By btq
-typedef logic [$clog2(`BTQ_SZ)-1:0] BTQ_IDX;
 typedef struct packed {
 
     WADDR   PC;
@@ -513,11 +511,6 @@ typedef struct packed {
     logic   take;
     WADDR   tgt;
 } BTQ_ENTRY;
-
-typedef struct packed {
-    logic   [$clog2(`N):0]  btq_rdy_scnt;
-    BTQ_IDX [`N-1:0]        btq_idxs;
-} btq2dispatch;
 
 typedef struct packed {
     logic   [$clog2(`N):0]  used_scnt; // FIXME: This is actually unused?
@@ -553,18 +546,6 @@ typedef struct packed {
     WADDR  corrected_PC;
 } retire2fetch;
 
-typedef struct packed {
-    /* Alloc */
-    /* Rename */
-    /* Commit */
-    logic   [$clog2(`N):0] en_cnt;
-        // How many branch instructions dispatching?
-        // Sender must ensure branch insns packed to lowest indices.
-    WADDR   [`N-1:0]    PC;
-    WADDR   [`N-1:0]    pred_tgt;
-    logic   [`N-1:0]    pred;
-} dispatch2btq;
-
 // Reservation station stuff
 typedef enum logic [1:0] {
     FU_ALU  = 2'b00,
@@ -586,9 +567,6 @@ typedef struct packed {
     ROB_IDX         rob_idx;
     BTQ_IDX         btq_idx;
     logic           is_brch; // Is inst a branch?
-
-    logic           pred;
-    WADDR           pred_tgt;
 
     /* from ID_EX_PACKET */
     INST inst;
@@ -627,6 +605,20 @@ typedef struct packed {
 typedef struct packed {
     logic       [$clog2(`N):0]  d_rdy_cnt;
 } decode2fetch;
+
+typedef struct packed {
+    logic   [$clog2(`N):0] en_cnt;
+        // How many branch instructions dispatching?
+        // Sender must ensure branch insns packed to lowest indices.
+    WADDR   [`N-1:0]    PC;
+    WADDR   [`N-1:0]    pred_tgt;
+    logic   [`N-1:0]    pred;
+} fetch2btq;
+
+typedef struct packed {
+    logic   [$clog2(`N):0]  rdy_scnt;
+    BTQ_IDX [`N-1:0]        btq_idxs;
+} btq2fetch;
 
 typedef struct packed {
     logic       [$clog2(`N):0]  d_vld_scnt;
@@ -885,8 +877,6 @@ typedef struct packed {
     dispatch2rob rob_out;
     free_list2dispatch free_in;
     dispatch2free_list free_out;
-    btq2dispatch btq_in;
-    dispatch2btq btq_out;
     execute2complete_tag ctag_in;
     map_table2dispatch map_in;
     dispatch2map_table map_out;
@@ -902,8 +892,6 @@ typedef struct packed {
     retire2btq           r_in;
     btq2retire           r_out;
     execute2btq          ex_in;
-    dispatch2btq         d_in;
-    btq2dispatch         d_out;
 } DBG_btq;
 
 typedef struct packed {

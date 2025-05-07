@@ -12,16 +12,16 @@ module btq #(
     input  reset,
     input  flush,
 
+    // fetch
+    input  fetch2btq f_in,
+    output btq2fetch f_out,
+
     // retire
     input  retire2btq   r_in,
     output btq2retire   r_out,
 
     // complete (write)
-    input  execute2btq  ex_in,
-
-    // dispatch (write)
-    input  dispatch2btq d_in,
-    output btq2dispatch d_out
+    input  execute2btq  ex_in
 );
     localparam NUM_DPORTS = N; // dispatch ports (in-order)
     localparam NUM_RPORTS = N; // retire ports (in-order)
@@ -37,7 +37,7 @@ module btq #(
 
     logic [$clog2(NUM_DPORTS):0]    wr_cnt;
     logic [$clog2(NUM_RPORTS):0]    rd_cnt;
-    assign wr_cnt = d_in.en_cnt;
+    assign wr_cnt = f_in.en_cnt;
     assign rd_cnt = r_in.rd_cnt;
 
     logic [NUM_RPORTS-1:0][$clog2(BTQ_SZ)-1:0] r_idxs;
@@ -58,17 +58,17 @@ module btq #(
         /*
         TODO: This tradeoff needs consideration for performance
         Option 1: 
-        d_out.btq_rdy_scnt = `MIN(free + rd_cnt, NUM_DPORTS);
+        d_out.rdy_scnt = `MIN(free + rd_cnt, NUM_DPORTS);
         + avoids dispatch stalls when BTQ is full if N branches retire per cycle
         - longer combinational delay due to dependency on rd_cnt
 
         Option 2: 
-        d_out.btq_rdy_scnt = `MIN(free, NUM_DPORTS);
+        d_out.rdy_scnt = `MIN(free, NUM_DPORTS);
         (opposite of above points)
         */
-        d_out = '{
-            btq_rdy_scnt : `MIN(free, NUM_DPORTS),
-            btq_idxs     : d_idxs
+        f_out = '{
+            rdy_scnt    : `MIN(free, NUM_DPORTS),
+            btq_idxs    : d_idxs
         };
     end
 
@@ -104,9 +104,9 @@ module btq #(
                     continue;
 
                 state[idx] <= '{
-                    PC      : d_in.PC[i],
-                    pred    : d_in.pred[i],
-                    pred_tgt: d_in.pred_tgt[i],
+                    PC      : f_in.PC[i],
+                    pred    : f_in.pred[i],
+                    pred_tgt: f_in.pred_tgt[i],
 
                     take    : '0,
                     tgt     : '0
