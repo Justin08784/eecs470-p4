@@ -100,8 +100,8 @@ module alu_ex(
             // ALU opA mux
             case (i_regs[i].dat.opa_select)
                 OPA_IS_RS1:  opa = i_regs[i].rs1;
-                OPA_IS_NPC:  opa = i_regs[i].dat.NPC;
-                OPA_IS_PC:   opa = i_regs[i].dat.PC;
+                OPA_IS_NPC:  opa = w2addr(i_regs[i].dat.PC + 1);
+                OPA_IS_PC:   opa = w2addr(i_regs[i].dat.PC);
                 OPA_IS_ZERO: opa = 0;
                 default:     opa = 32'hdeadface; // dead face
             endcase
@@ -158,7 +158,9 @@ module alu_ex(
             assign tmp_data[i] = '{
                 t       : ops[i].t,
                 rob_idx : ops[i].rob_idx,
-                data    : tmp_take[i] ? i_regs[i].dat.NPC : tmp_res[i]
+                data    : tmp_take[i]
+                    ? w2addr(i_regs[i].dat.PC + 1) // npc
+                    : tmp_res[i]
             };
 
             assign o_cands[i] = tmp_data[i];
@@ -167,7 +169,7 @@ module alu_ex(
                 en      : i_vld[i] && (ops[i].cond_branch || ops[i].uncond_branch),
                 btq_idx : ops[i].btq_idx,
                 take    : tmp_take[i],
-                tgt     : tmp_res[i]
+                tgt     : addr2w(tmp_res[i])
             };
 
         end
@@ -320,8 +322,7 @@ module stage_ex_p4 (
                 btq_idx : rs_in.fu_dat_alu[i].btq_idx,
 
                 inst    : rs_in.fu_dat_alu[i].inst,
-                PC      : w2addr(rs_in.fu_dat_alu[i].PC),
-                NPC     : w2addr(rs_in.fu_dat_alu[i].PC + 1),
+                PC      : rs_in.fu_dat_alu[i].PC,
 
                 opa_select  : rs_in.fu_dat_alu[i].opa_select,
                 opb_select  : rs_in.fu_dat_alu[i].opb_select,

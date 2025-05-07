@@ -18,8 +18,7 @@ typedef struct packed {
     BTQ_IDX         btq_idx;
 
     INST inst;
-    ADDR PC;
-    ADDR NPC;
+    WADDR PC;
 
     ALU_OPA_SELECT opa_select;
     ALU_OPB_SELECT opb_select;

@@ -18,7 +18,7 @@ module retire (
     output retire2btq btq_out,
 
     output logic flush,
-    output ADDR  corrected_PC,
+    output WADDR corrected_PC,
     output logic [`N-1:0] branch_taken,
     output retire_final retire_exec
 );
@@ -36,7 +36,7 @@ module retire (
     ADDR  mispred_target;
 
     logic flush_n;
-    ADDR  corrected_PC_n;
+    WADDR corrected_PC_n;
 
     logic [`N-1:0] branch_taken_n;
 
@@ -77,7 +77,7 @@ module retire (
                 mispred = 1;
                 mispred_target = btq_in.dat[btq_rd_cnt].take
                     ? btq_in.dat[btq_rd_cnt].tgt
-                    : w2addr(btq_in.dat[btq_rd_cnt].PC + 1);
+                    : btq_in.dat[btq_rd_cnt].PC + 1;
                 branch_taken_n[i] = btq_in.dat[btq_rd_cnt].take;
 
                 ++btq_rd_cnt;

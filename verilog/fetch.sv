@@ -45,7 +45,7 @@ module stage_if_p4 (
         end
 
         for (int unsigned i = 0; i < `N; ++i) begin
-            woff = mem_out_PCs[i][2];
+            woff = PC_n[i][0];
 
             f_dat[i] = '{
                 inst    : mem_in_data[i].word_level[woff],
@@ -79,7 +79,7 @@ module stage_if_p4 (
         if (reset) begin
             PC_reg <= 0;                    // initial PC value is 0 (the memory address where our program starts)
         end else if (flush) begin
-            PC_reg <= addr2w(r_in.corrected_PC);    // update to a taken branch (does not depend on valid bit)...
+            PC_reg <= r_in.corrected_PC;    // update to a taken branch (does not depend on valid bit)...
         end else begin
             PC_reg <= PC_n[f_cnt];          // ...or transition to next PC if valid
         end

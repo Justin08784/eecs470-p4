@@ -151,7 +151,7 @@ module cpu (
     retire2btq retire_2_btq;
 
     retire_final    retire_exec;
-    ADDR            corrected_PC;
+    WADDR           corrected_PC;
 
     retire retire0 (
 `ifdef DEBUG

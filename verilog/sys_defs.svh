@@ -511,7 +511,7 @@ typedef struct packed {
     ADDR    pred_tgt;
 
     logic   take;
-    ADDR    tgt;   // can we actually store [29:0], since bottom bits of address are 0s anyways?
+    WADDR   tgt;   // can we actually store [29:0], since bottom bits of address are 0s anyways?
 } BTQ_ENTRY;
 
 typedef struct packed {
@@ -535,7 +535,7 @@ typedef struct packed {
         BTQ_IDX btq_idx; 
             // Entries to which we are completing
         logic   take;
-        ADDR    tgt;
+        WADDR   tgt;
     } [`NUM_FU_ALU-1:0] dat;
 } execute2btq;
 
