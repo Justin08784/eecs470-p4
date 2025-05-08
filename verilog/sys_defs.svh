@@ -601,11 +601,9 @@ typedef struct packed {
     // branch
     logic           is_brch;
     BTQ_IDX         btq_idx;
-    logic           cond_branch;// cond or uncond? (valid only if is_brch)
-
-    // halt
-    logic           halt;       // Is this a halt?
-} RS_ALU_ENTRY;
+    logic           cond_branch;
+    logic           uncond_branch;
+} RS_ALU_PAYLOAD;
 
 typedef struct packed {
     int             id;
@@ -617,17 +615,17 @@ typedef struct packed {
     logic           t2_rdy;
     ROB_IDX         rob_idx;
     MULT_FUNC       func;
-} RS_MULT_ENTRY;
+} RS_MULT_PAYLOAD;
 
 typedef struct packed {
     /* FIXME: stubbed */
     int             id;
-} RS_LOAD_ENTRY;
+} RS_LOAD_PAYLOAD;
 
 typedef struct packed {
     /* FIXME: stubbed */
     int             id;
-} RS_STOR_ENTRY;
+} RS_STOR_PAYLOAD;
 
 typedef struct packed {
     int             id; // debug only; unique insn identifier
@@ -786,7 +784,7 @@ typedef struct packed {
     logic       [`NUM_FU_STORE-1:0]  fu_en_store;
     logic       [`NUM_FU_LOAD-1:0]   fu_en_load;
 
-    ID_RESULT   [`NUM_FU_ALU-1:0]    fu_dat_alu;
+    RS_ALU_PAYLOAD [`NUM_FU_ALU-1:0]    fu_dat_alu;
     ID_RESULT   [`NUM_FU_MULT-1:0]   fu_dat_mult;
     ID_RESULT   [`NUM_FU_STORE-1:0]  fu_dat_store;
     ID_RESULT   [`NUM_FU_LOAD-1:0]   fu_dat_load;

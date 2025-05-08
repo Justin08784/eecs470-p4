@@ -1,21 +1,22 @@
 `include "sys_defs.svh"
 
 typedef struct packed {
-    logic busy;
-    logic issd;
-    struct packed {
-        PHYS_REG_IDX t1;
-        PHYS_REG_IDX t2;
-        logic t1_rdy;
-        logic t2_rdy;
-    } dat;
-} _RS_ENTRY_STUB;
+    PHYS_REG_IDX t1;
+    PHYS_REG_IDX t2;
+    logic t1_rdy;
+    logic t2_rdy;
+} _RS_PAYLOAD_STUB;
 
 /*
 * Generic RS partition
 * */
 module rs_part #(
-    type        ENTRY=_RS_ENTRY_STUB,
+    type PAYLOAD=_RS_PAYLOAD_STUB,
+    type ENTRY = struct packed {
+        logic busy;
+        logic issd;
+        PAYLOAD dat;
+    },
     parameter   N=`N,
     parameter   PART_SZ=1,
     parameter   NUM_FU=1,
@@ -28,7 +29,7 @@ module rs_part #(
     // dispatch
     input  struct packed {
         logic   [$clog2(`N):0]  en_cnt;
-        ENTRY   [`N-1:0]        dat;
+        PAYLOAD [`N-1:0]        dat;
     } d_in,
 
     output struct packed {
@@ -53,7 +54,7 @@ module rs_part #(
         // logic   [NUM_FU-1:0]    iss_en;
         // ENTRY   [NUM_FU-1:0]    iss_dat;
         logic   [NUM_FU-1:0]    fu_en;
-        ENTRY   [NUM_FU-1:0]    fu_dat;
+        PAYLOAD [NUM_FU-1:0]    fu_dat;
     } ex_out,
     /*
     * NOTE: causally, fu_rdy -> iss_vld -> cdb_gnt -> iss_en, iss_dat
@@ -277,294 +278,69 @@ module rs #(parameter
     // complete (CDB)
     input execute2complete_tag  ctag_in
 );
-    RS_ENTRY [RS_SZ-1:0]       entries; // ms1 test: remove one RS entry (caught)
-
-    logic [RS_SZ-1:0] busy_vec;
-    logic [RS_SZ-1:0] issd_vec;
-    logic [RS_SZ-1:0] t1_rdy_vec;
-    logic [RS_SZ-1:0] t2_rdy_vec;
-    generate
-    for (genvar i = 0; i < RS_SZ; i++) begin : gen_vecs // ms1 test: make loop count RS_SZ-1 instead of RS_SZ (caught)
-        assign busy_vec[i] = entries[i].busy; // ms1 test: make busy_vec sequential instead of combinational (caught)
-        assign issd_vec[i] = entries[i].issued;
-        assign t1_rdy_vec[i] = entries[i].dat.t1_rdy;
-        assign t2_rdy_vec[i] = entries[i].dat.t2_rdy;
-    end
-    endgenerate
-
-    // SECTION: cdb completion
-    logic [`N-1:0][RS_SZ-1:0] to_t1_rdy_per_cpl;
-    logic [`N-1:0][RS_SZ-1:0] to_t2_rdy_per_cpl;
-    logic [RS_SZ-1:0] to_t1_rdy;
-    logic [RS_SZ-1:0] to_t2_rdy;
+    RS_ALU_PAYLOAD [`N-1:0] tmp_dat_alu;
     always_comb begin
-        to_t1_rdy_per_cpl = '0;
-        to_t2_rdy_per_cpl = '0;
-        foreach(to_t1_rdy_per_cpl[n, rs]) begin
-            if (!ctag_in.en[n])
-                continue;
-            to_t1_rdy_per_cpl[n][rs] = entries[rs].dat.t1 == ctag_in.ts[n]
-                && ctag_in.ts[n] != '0;
-            to_t2_rdy_per_cpl[n][rs] = entries[rs].dat.t2 == ctag_in.ts[n]
-                && ctag_in.ts[n] != '0;
-        end
+        foreach (d_in.d_dat[i]) begin
+            tmp_dat_alu[i] = '{
+                id          : d_in.d_dat[i].id,
 
-        to_t1_rdy = '0;
-        to_t2_rdy = '0;
-        foreach(to_t1_rdy_per_cpl[n, rs]) begin
-            to_t1_rdy[rs] |= to_t1_rdy_per_cpl[n][rs];
-            to_t2_rdy[rs] |= to_t2_rdy_per_cpl[n][rs];
-        end
-    end
+                PC          : d_in.d_dat[i].PC,
+                inst        : d_in.d_dat[i].inst,
 
-    // SECTION: Issue 
-    // operand readiness
-    logic [RS_SZ-1:0] can_issue;                   
-    // operand readiness per FU type
-    logic [FU_IDX_NUM-1:0][RS_SZ-1:0] can_issues;
-    always_comb begin
-        can_issues = '0;
-        for (int rs = 0, FU_IDX fu = 0; rs < RS_SZ; ++rs) begin
-            can_issue[rs] = busy_vec[rs]
-                && !entries[rs].issued // ms1 test: remove "!" from entries[rs].issued (caught)
-                && (entries[rs].dat.t1_rdy || to_t1_rdy[rs]) // [ADDRESSED] ms1 test: remove "|| to_t1_rdy[rs]" (not caught) 
-                && (entries[rs].dat.t2_rdy || to_t2_rdy[rs]);
+                t           : d_in.d_dat[i].t,
+                t1          : d_in.d_dat[i].t1,
+                t2          : d_in.d_dat[i].t2,
+                t1_rdy      : d_in.d_dat[i].t1_rdy,
+                t2_rdy      : d_in.d_dat[i].t2_rdy,
+                rob_idx     : d_in.d_dat[i].rob_idx,
 
-            fu = entries[rs].dat.fu_idx;
-            can_issues[fu][rs] = can_issue[rs];
+                opa_select  : d_in.d_dat[i].opa_select,
+                opb_select  : d_in.d_dat[i].opb_select,
+                alu_func    : d_in.d_dat[i].alu_func,
+
+                is_brch     : d_in.d_dat[i].is_brch,
+                btq_idx     : d_in.d_dat[i].btq_idx,
+                cond_branch     : d_in.d_dat[i].cond_branch,
+                uncond_branch   : d_in.d_dat[i].uncond_branch
+            };
         end
     end
 
-    // select issue lines per FU type
-    logic [NUM_FU_ALU-1:0]  [RS_SZ-1:0] gbus_can_issue_alu; // gbus = grant bus
-    logic [NUM_FU_MULT-1:0] [RS_SZ-1:0] gbus_can_issue_mult;
-    logic [NUM_FU_LOAD-1:0] [RS_SZ-1:0] gbus_can_issue_load;
-    logic [NUM_FU_STORE-1:0][RS_SZ-1:0] gbus_can_issue_store;
-    psel_gen #(
-        .WIDTH  (RS_SZ),
-        .REQS   (NUM_FU_ALU)
-    ) sel_iss_alu (
-        .req    (can_issues[FU_ALU]),
-        .gnt_bus(gbus_can_issue_alu)
-    );
-    psel_gen #(
-        .WIDTH  (RS_SZ),
-        .REQS   (NUM_FU_MULT)
-    ) sel_iss_mult (
-        .req    (can_issues[FU_MULT]),
-        .gnt_bus(gbus_can_issue_mult)
-    );
-    psel_gen #(
-        .WIDTH  (RS_SZ),
-        .REQS   (NUM_FU_LOAD)
-    ) sel_iss_load (
-        .req    (can_issues[FU_LOAD]),
-        .gnt_bus(gbus_can_issue_load)
-    );
-    psel_gen #(
-        .WIDTH  (RS_SZ),
-        .REQS   (NUM_FU_STORE)
-    ) sel_iss_store (
-        .req    (can_issues[FU_STORE]),
-        .gnt_bus(gbus_can_issue_store)
+    rs_part #(
+        .PAYLOAD    (RS_ALU_PAYLOAD),
+        .PART_SZ    (RS_ALU_SZ),
+        .NUM_FU     (`NUM_FU_ALU),
+        .ISS_CDB_ARB(`FALSE)
+    ) rs_alu (
+        .clock  (clock),
+        .reset  (reset),
+        .flush  (flush),
+
+        .d_in   ('{
+            en_cnt  : d_in.d_en_cnt,
+            dat     : tmp_dat_alu
+        }),
+        .d_out  (d_out.rs_rdy_scnt),
+
+        .ex_in  ('{
+            fu_rdy      : ex_in.fu_rdy_alu,
+            fu_cdb_gnt  : ex_in.fu_cdb_gnt_alu
+        }),
+        .ex_out ('{
+            ex_out.fu_vld_alu,
+            ex_out.fu_en_alu,
+            ex_out.fu_dat_alu
+        }),
+
+        .ctag_in(ctag_in)
+
     );
 
-    // select available FUs
-    logic [NUM_FU_ALU-1:0]  [NUM_FU_ALU-1:0]    gbus_fu_rdy_alu;
-    logic [NUM_FU_MULT-1:0] [NUM_FU_MULT-1:0]   gbus_fu_rdy_mult;
-    logic [NUM_FU_LOAD-1:0] [NUM_FU_LOAD-1:0]   gbus_fu_rdy_load;
-    logic [NUM_FU_STORE-1:0][NUM_FU_STORE-1:0]  gbus_fu_rdy_store;
-    psel_gen #(
-        .WIDTH  (NUM_FU_ALU),
-        .REQS   (NUM_FU_ALU)
-    ) sel_rdy_alu (
-        .req    (ex_in.fu_rdy_alu),
-        .gnt_bus(gbus_fu_rdy_alu)
-    );
-    psel_gen #(
-        .WIDTH  (NUM_FU_MULT),
-        .REQS   (NUM_FU_MULT)
-    ) sel_rdy_mult (
-        .req    (ex_in.fu_rdy_mult),
-        .gnt_bus(gbus_fu_rdy_mult)
-    );
-    psel_gen #(
-        .WIDTH  (NUM_FU_LOAD),
-        .REQS   (NUM_FU_LOAD)
-    ) sel_rdy_load (
-        .req    (ex_in.fu_rdy_load),
-        .gnt_bus(gbus_fu_rdy_load)
-    );     
-    psel_gen #(
-        .WIDTH  (NUM_FU_STORE),
-        .REQS   (NUM_FU_STORE)
-    ) sel_rdy_store (
-        .req    (ex_in.fu_rdy_store),
-        .gnt_bus(gbus_fu_rdy_store)
-    );
-
-    // assign FUs to issuables
-    logic [RS_SZ-1:0] to_issue;
-    logic [NUM_FU_ALU-1:0]  [RS_SZ-1:0] fu2issuer_alu;
-    logic [NUM_FU_MULT-1:0] [RS_SZ-1:0] fu2issuer_mult;
-    logic [NUM_FU_LOAD-1:0] [RS_SZ-1:0] fu2issuer_load;
-    logic [NUM_FU_STORE-1:0][RS_SZ-1:0] fu2issuer_store;
-
-    always_comb begin
-        to_issue        = '0;
-        fu2issuer_alu   = '0;
-        fu2issuer_mult  = '0;
-        fu2issuer_load  = '0;
-        fu2issuer_store = '0;
-        ex_out.fu_vld_alu   = '0;
-        ex_out.fu_en_alu    = '0;
-        ex_out.fu_en_mult   = '0;
-        ex_out.fu_en_store  = '0;
-        ex_out.fu_en_load   = '0;
-
-        foreach (gbus_fu_rdy_alu[i, j]) begin
-            if (gbus_fu_rdy_alu[i][j]) begin
-                fu2issuer_alu[j]    |= gbus_can_issue_alu[i];
-                /*
-                This feels expensive. Isn't there a more efficient way to check
-                if a gnt_bus row is actually used?
-                \/ \/ \/ \/
-                */
-                ex_out.fu_vld_alu[j]    = |gbus_can_issue_alu[i];
-                /* WARNING: There is an entire CDB arbitration between these two lines...
-                ALU insns can only issue if they ALSO win (early) CDB arbitration! */
-                ex_out.fu_en_alu[j]     = ex_out.fu_vld_alu[j] && ex_in.fu_cdb_gnt_alu[j];
-                to_issue            |= ex_in.fu_cdb_gnt_alu[j] ? gbus_can_issue_alu[i] : '0;
-            end
-        end
-        foreach (gbus_fu_rdy_mult[i, j]) begin
-            if (gbus_fu_rdy_mult[i][j]) begin
-                fu2issuer_mult[j]   |= gbus_can_issue_mult[i];
-                ex_out.fu_en_mult[j]    = |gbus_can_issue_mult[i]; // [MISSING] ms1 test: change i to j (not caught)
-                to_issue            |= gbus_can_issue_mult[i];
-            end
-        end
-        foreach (gbus_fu_rdy_load[i, j]) begin
-            if (gbus_fu_rdy_load[i][j]) begin
-                fu2issuer_load[j]   |= gbus_can_issue_load[i];
-                ex_out.fu_en_load[j]    = |gbus_can_issue_load[i];
-                to_issue            |= gbus_can_issue_load[i];
-
-            end
-        end
-        foreach (gbus_fu_rdy_store[i, j]) begin
-            if (gbus_fu_rdy_store[i][j]) begin
-                fu2issuer_store[j]  |= gbus_can_issue_store[i];
-                ex_out.fu_en_store[j]   = |gbus_can_issue_store[i];
-                to_issue            |= gbus_can_issue_store[i];
-            end
-        end
-    end
-
-    always_comb begin
-        ex_out.fu_dat_alu   = '0;
-        ex_out.fu_dat_mult  = '0;
-        ex_out.fu_dat_store = '0;
-        ex_out.fu_dat_load  = '0;
-        foreach (fu2issuer_alu[fu, rs]) begin
-            if (fu2issuer_alu[fu][rs]) begin // [MISSING] ms1 test: Remove "!" from if condition (not caught)
-                ex_out.fu_dat_alu[fu] |= entries[rs].dat;
-            end
-        end
-        foreach (fu2issuer_mult[fu, rs]) begin
-            if (fu2issuer_mult[fu][rs]) begin
-                ex_out.fu_dat_mult[fu] |= entries[rs].dat;
-            end
-        end
-        foreach (fu2issuer_load[fu, rs]) begin
-            if (fu2issuer_load[fu][rs]) begin
-                ex_out.fu_dat_load[fu] |= entries[rs].dat;
-            end
-        end
-        foreach (fu2issuer_store[fu, rs]) begin
-            if (fu2issuer_store[fu][rs]) begin
-                ex_out.fu_dat_store[fu] |= entries[rs].dat;
-            end
-        end
-    end
-
-    // SECTION: Dispatch
-    // compute free entries
-    logic [RS_SZ-1:0] free_entries;
-    assign free_entries = 
-        ~busy_vec
-        | issd_vec; // an issued insn will go to EX and free its entry
-
-    // select free entries
-    logic [N-1:0][RS_SZ-1:0] gbus_free;
-    psel_gen #(
-        .WIDTH(RS_SZ),
-        .REQS(N)
-    ) sel_free_entries (
-        .req    (free_entries),
-        .gnt_bus(gbus_free)
-    );
-
-    logic [N-1:0][RS_SZ-1:0] d2entry;
-    always_comb begin
-        d2entry = '0;
-        foreach (d2entry[i]) begin
-            if (i < d_in.d_en_cnt) begin
-                d2entry[i] |= gbus_free[i];
-            end
-        end
-        d_out.rs_rdy_scnt = $countones({|gbus_free[0], |gbus_free[1]});
-    end
-
-
-    always_ff @(posedge clock) begin
-        if (reset || flush) begin
-            entries  <= '0;
-        end else begin
-            // SECTION: Compute next state
-            for (int rs = 0; rs < RS_SZ; ++rs) begin
-                entries[rs].dat.t1_rdy <= entries[rs].dat.t1_rdy | to_t1_rdy[rs];
-                entries[rs].dat.t2_rdy <= entries[rs].dat.t2_rdy | to_t2_rdy[rs]; // [ADDRESSED] ms1 test: change |= to = (not caught)
-                /*
-                TODO: Ask Bradley! This change is not breaking because t2_rdy is 
-                ALREADY incorporated into the value of to_t2_rdy, which means an
-                assignment behaves identically to 'or' assignment here. i.e. logically redundant
-                This is because to_t2_rdy is initialized to t2_rdy, instead of 0;
-                if we did the latter, it would break as intended. So can we get
-                our points back here? */
-
-                // issuing
-                if (to_issue[rs])
-                    entries[rs].issued <= 1;
-
-                // going to EX; clear entry
-                if (entries[rs].issued)
-                    entries[rs].busy <= 0; // only clear busy bit
-
-                for (int n = 0; n < N; ++n) begin
-                    if (!d2entry[n][rs])
-                        continue;
-                    entries[rs].busy   <= 1;
-                    entries[rs].issued <= 0;
-                    entries[rs].dat    <= d_in.d_dat[n];
-                end
-            end
-
-        end
-    end
-
-    `ifdef DEBUG
-    assign dbg = ' {
-        // internal state
-        entries, // ms1 test: remove one RS entry (caught)
-        // I/O
-        d_in,
-        d_out,
-        ex_in,
-        ex_out,
-        ctag_in
-    };
-    `endif
-
+    assign ex_out.fu_en_mult    = '0;
+    assign ex_out.fu_en_load    = '0;
+    assign ex_out.fu_en_store   = '0;
+    assign ex_out.fu_dat_mult    = '0;
+    assign ex_out.fu_dat_load    = '0;
+    assign ex_out.fu_dat_store   = '0;
 
 endmodule
