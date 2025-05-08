@@ -575,6 +575,56 @@ typedef enum logic [1:0] {
 `define FU_IDX_NUM 4
 
 typedef struct packed {
+    // general
+    int             id; // debug only; unique insn identifier
+
+    WADDR           PC;
+    INST            inst;
+    // IDEA: carry the imm (decode it in stage_id) instead of inst
+
+    PHYS_REG_IDX    t;
+    PHYS_REG_IDX    t1;
+    PHYS_REG_IDX    t2;
+    logic           t1_rdy; // completed? should we rename to cpl for consistency?
+    logic           t2_rdy;
+    ROB_IDX         rob_idx;
+
+    ALU_OPA_SELECT  opa_select; // ALU opa mux select (ALU_OPA_xxx *)
+    ALU_OPB_SELECT  opb_select; // ALU opb mux select (ALU_OPB_xxx *)
+    ALU_FUNC        alu_func;   // ALU function select (ALU_xxx *)
+
+    // branch
+    logic           is_brch;
+    BTQ_IDX         btq_idx;
+    logic           cond_branch;// cond or uncond? (valid only if is_brch)
+
+    // halt
+    logic           halt;       // Is this a halt?
+} RS_ALU_ENTRY;
+
+typedef struct packed {
+    int             id;
+
+    PHYS_REG_IDX    t;
+    PHYS_REG_IDX    t1;
+    PHYS_REG_IDX    t2;
+    logic           t1_rdy;
+    logic           t2_rdy;
+    ROB_IDX         rob_idx;
+    MULT_FUNC       func;
+} RS_MULT_ENTRY;
+
+typedef struct packed {
+    /* FIXME: stubbed */
+    int             id;
+} RS_LOAD_ENTRY;
+
+typedef struct packed {
+    /* FIXME: stubbed */
+    int             id;
+} RS_STOR_ENTRY;
+
+typedef struct packed {
     int             id; // debug only; unique insn identifier
 
     PHYS_REG_IDX    t;
