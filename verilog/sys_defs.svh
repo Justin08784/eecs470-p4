@@ -864,8 +864,6 @@ typedef struct packed {
     decode2fetch    d_in;
     fetch2decode    d_out;
     retire2fetch    r_in;
-    ADDR        [`N-1:0]    mem_out_PCs;
-    MEM_BLOCK   [`N-1:0]    mem_in_data;
     // submodule
     // DBG_icache      dbg_icache;
 } DBG_fetch;

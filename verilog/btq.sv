@@ -123,9 +123,7 @@ module btq #(
         used,
         r_in,
         r_out,
-        ex_in,
-        d_in,
-        d_out
+        ex_in
     };
 `endif
 
@@ -284,4 +282,6 @@ endmodule
 //         d_out
 //     };
 // `endif
+// 
+// endmodule
 

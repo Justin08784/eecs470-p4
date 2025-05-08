@@ -165,3 +165,200 @@ module rob #(
     `endif
 
 endmodule
+
+
+// `include "sys_defs.svh"
+
+// module rob #(
+//     parameter ROB_SZ = `ROB_SZ,  // num elements
+//     parameter N=`N
+// ) (
+//     `ifdef DEBUG
+//     output  DBG_rob dbg,
+//     `endif
+
+//     input clock, reset, flush,
+
+//     // retire (read)
+//     output rob2retire r_out,
+//     input  retire_final r_in,
+
+//     // complete (write)
+//     input  execute2complete_dat cdat_in,
+
+//     // dispatch (write)
+//     output rob2dispatch d_out,
+//     input  dispatch2rob d_in
+// );
+//     localparam NUM_DPORTS = N; // dispatch ports (in-order)
+//     localparam NUM_RPORTS = N; // retire ports (in-order)
+//     localparam NUM_CPORTS = N; // complete ports (*OUT-OF-ORDER*)
+
+//     /* Intermediate buffers */
+//     dispatch2rob    d2r_pipe;
+//     retire_final    r2d_pipe;
+//     always_ff @(posedge clock) begin
+//         if (reset || flush) begin
+//             d2r_pipe    <= '0;
+//             r2d_pipe    <= '0;
+//         end else begin
+//             d2r_pipe    <= d_in;
+//             r2d_pipe    <= r_in;
+//         end
+//     end
+
+//     /* Write "queue" */
+//     logic [$clog2(ROB_SZ)-1:0]  wq_tail;
+//     logic [$clog2(ROB_SZ):0]    wq_free;
+//     logic [$clog2(NUM_DPORTS):0]wr_cnt;
+//     assign wr_cnt = d_in.d_en_cnt;
+
+//     logic [$clog2(ROB_SZ):0]    free;
+//     logic [$clog2(4*`N):0]      rsvd;
+//     logic [$clog2(NUM_DPORTS):0]free_scnt;
+//     assign free_scnt = `MIN(free - rsvd, NUM_DPORTS);
+
+//     always_comb begin
+//         logic [NUM_DPORTS-1:0][$clog2(ROB_SZ)-1:0] wq_didxs;
+//         for (int unsigned i = 0; i < NUM_DPORTS; ++i)
+//             wq_didxs[i] = (wq_tail + i) % ROB_SZ;
+
+//         // handle dispatch (outs)
+//         d_out = '{
+//             rob_rdy_scnt : free_scnt,
+//             rob_idxs     : wq_didxs
+//         };
+//     end
+
+//     always_ff @(posedge clock) begin
+//         if (reset || flush) begin
+//             wq_tail <= '0;
+//             wq_free <= ROB_SZ;
+
+//             free    <= ROB_SZ;
+//             rsvd    <= 0;
+//         end else begin
+//             if (wr_cnt > wq_free)
+//                 $error("BTQ overflow!");
+//             wq_tail <= (wq_tail + wr_cnt) % ROB_SZ;
+//             wq_free <= wq_free  + r2d_pipe.r_en_cnt - wr_cnt;
+
+//             free    <= free - wr_cnt + r2d_pipe.r_en_cnt;
+//             rsvd    <= rsvd - wr_cnt + d_in.alloc_en_cnt;
+//         end
+//     end
+
+//     /* Read queue */
+//     logic [$clog2(NUM_RPORTS):0]    used_scnt;
+
+//     logic [$clog2(ROB_SZ)-1:0]  head;
+//     logic [$clog2(ROB_SZ)-1:0]  tail;
+
+//     ROB_ENTRY [ROB_SZ-1:0]      state;
+//     logic [$clog2(ROB_SZ):0]    used;
+//     /*
+//     FIXME: can just make rsvd [$clog2(ROB_SZ):0] to be safe but I'm trying to
+//     match it exactly with the max number of insns that can have reservations:
+//     sz(alloc_buf) + sz(rename_buf) = 4*`N.
+//     */
+
+//     logic [NUM_RPORTS-1:0][$clog2(ROB_SZ)-1:0] rtre_idxs;
+//     logic [NUM_DPORTS-1:0][$clog2(ROB_SZ)-1:0] comm_idxs;
+
+//     assign used_scnt    = `MIN(used, NUM_RPORTS);
+
+//     always_comb begin
+//         for (int unsigned i = 0; i < NUM_RPORTS; ++i)
+//             rtre_idxs[i] = (head + i) % ROB_SZ;
+//         for (int unsigned i = 0; i < NUM_DPORTS; ++i)
+//             comm_idxs[i] = (tail + i) % ROB_SZ;
+
+//         // handle retire (outs)
+//         r_out = '0;
+//         r_out.r_vld_cnt = used_scnt;
+//         for (int unsigned i = 0; i < used_scnt; ++i) begin
+//             /* preview mode–– just display all valid entries in read window even
+//             if not all will get retired this cycle */
+//             r_out.entries[i] = state[rtre_idxs[i]];
+//         end
+//     end
+
+//     always_ff @(posedge clock) begin
+//         if (reset || flush) begin
+//             used    <= 0;
+
+//             head    <= 0;
+//             tail    <= 0;
+//             state   <= '0;
+//         end else begin
+// `ifndef SYNTH
+//             if (r_out.r_vld_cnt > used + d2r_pipe.d_en_cnt)
+//                 $error("ROB underflow!");
+// `endif
+//             used    <= used + d2r_pipe.d_en_cnt - r_in.r_en_cnt;
+
+//             head    <= (head + r_in.r_en_cnt) % ROB_SZ;
+//             tail    <= (tail + d2r_pipe.d_en_cnt) % ROB_SZ;
+//             // handle complete (ins)
+//             for (int unsigned i = 0, int cur_idx = 0; i < NUM_CPORTS; ++i) begin
+//                 cur_idx = cdat_in.rob_idxs[i];
+
+//                 /* V1: This doesn't actually update the cpl bit... */
+//                 // state[cur_idx].cpl <= state[cur_idx].cpl || cdat_in.en[i];
+//                 /* V2: ...but this one does???! Make this make sense? */
+//                 if (cdat_in.en[i])
+//                     state[cur_idx].cpl <= 1;
+//                 /*
+//                 V1 is incorrect due to the following edge case:
+//                 If the same `rob_idx`appears multiple times in the CDB (e.g., [0, 0]),
+//                 and only the first entry has `c_en[i] == 1`, the second will
+//                 overwrite the intended update.
+
+//                 For example: c_rob_idxs = [0, 0], c_en = [1, 0]
+//                   - i = 0: state[0].cpl <= 0 || 1 -> schedules state[0].cpl = 1
+//                   - i = 1: state[0].cpl <= 0 || 0 -> *overwrites* with state[0].cpl = 0
+
+//                 This edge case seems only possible (as far as we can tell) for rob_idx 0,
+//                 since the CDB defaults to 0 at the start of each cycle.
+//                 */
+//             end
+
+//             // handle dispatch (ins)
+//             for (int unsigned i = 0, int cur_idx = 0; i < NUM_DPORTS; ++i) begin
+//                 if (i >= d2r_pipe.d_en_cnt)
+//                     continue;
+//                 cur_idx = comm_idxs[i];
+//                 state[cur_idx] <= '{
+//                     cpl     : 0,
+//                     is_brch : d2r_pipe.is_brch[i],
+//                     wr_mem  : d2r_pipe.wr_mem[i],
+//                     rd_mem  : d2r_pipe.rd_mem[i],
+//                     tag     : d2r_pipe.tag[i],
+//                     t_old   : d2r_pipe.t_old[i],
+//                     dst     : d2r_pipe.dst[i],
+//                     halt    : d2r_pipe.halt[i],
+//                     illegal : d2r_pipe.illegal[i]
+//                 };
+//             end
+//         end
+//     end
+
+// `ifdef DEBUG
+//     assign dbg = '{
+//         // internal state
+//         state,
+//         head,
+//         tail,
+//         used,
+//         free,
+//         rsvd,
+//         // I/O
+//         r_out,
+//         r_in,
+//         cdat_in,
+//         d_out,
+//         d_in
+//     };
+// `endif
+
+// endmodule

@@ -142,9 +142,7 @@ module stage_if_p4 (
         flush : flush,
         d_in  : d_in,
         d_out : d_out,
-        r_in  : r_in,
-        mem_out_PCs : mem_out_PCs, 
-        mem_in_data : mem_in_data
+        r_in  : r_in
     };
 `endif
 

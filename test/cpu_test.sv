@@ -329,7 +329,7 @@ module testbench;
             for (int i = 0, int cur_idx = 0; i < `N; ++i) begin
                 if (i >= verisimpleV.rob_0.d_in.d_en_cnt)
                     break;
-                cur_idx = verisimpleV.rob_0.comm_idxs[i];
+                cur_idx = verisimpleV.rob_0.d_out.rob_idxs[i];
                 rob_debug[cur_idx] = '{
                     id      : verisimpleV.rs_0.d_in.d_dat[i].id,
                     halt    : verisimpleV.rob_0.d_in.halt[i],
@@ -605,8 +605,6 @@ module testbench;
         retire2btq           r_in;
         btq2retire           r_out;
         execute2btq          ex_in;
-        dispatch2btq         d_in;
-        btq2dispatch         d_out;
 
         state   = dbg_btq.state;
         head    = dbg_btq.head;
@@ -615,8 +613,6 @@ module testbench;
         r_in    = dbg_btq.r_in;
         r_out   = dbg_btq.r_out;
         ex_in   = dbg_btq.ex_in;
-        d_in    = dbg_btq.d_in;
-        d_out   = dbg_btq.d_out;
 
         $display(">> BTQ >>");
         for (int i = 0; i < `BTQ_SZ; ++i) begin
@@ -714,21 +710,15 @@ module testbench;
         decode2fetch    d_in;
         fetch2decode    d_out;
         retire2fetch    r_in;
-        ADDR        [`N-1:0] mem_out_PCs;
-        MEM_BLOCK   [`N-1:0] mem_in_data;
 
         flush       = dbg_fetch.flush;
         d_in        = dbg_fetch.d_in;
         d_out       = dbg_fetch.d_out;
         r_in        = dbg_fetch.r_in;
-        mem_out_PCs = dbg_fetch.mem_out_PCs;
-        mem_in_data = dbg_fetch.mem_in_data;
 
         $display(">> Fetch >>");
         $display("r_in: {flush: %b, corrected_PC: 0x%x}", flush, r_in.corrected_PC);
         $display("d_out: {f_en_cnt: %b, dat: [%x, %x]}", d_out.f_en_cnt, d_out.f_dat[0], d_out.f_dat[1]);
-        $display("PCs:  %x", mem_out_PCs);
-        $display("Imem_data: %x", mem_in_data);
         $display("<< Fetch <<");
     endtask
 
@@ -780,8 +770,6 @@ module testbench;
         dispatch2rob          rob_out;
         free_list2dispatch    free_in;
         dispatch2free_list    free_out;
-        btq2dispatch          btq_in;
-        dispatch2btq          btq_out;
         execute2complete_tag  ctag_in;
         map_table2dispatch    map_in;
         dispatch2map_table    map_out;
@@ -794,15 +782,11 @@ module testbench;
         rob_out    = dbg_dispatch.rob_out;
         free_in    = dbg_dispatch.free_in;
         free_out   = dbg_dispatch.free_out;
-        btq_in     = dbg_dispatch.btq_in;
-        btq_out    = dbg_dispatch.btq_out;
         ctag_in    = dbg_dispatch.ctag_in;
         map_in     = dbg_dispatch.map_in;
         map_out    = dbg_dispatch.map_out;
 
         $display("  %3d | >> Dispatch >>", $time);
-        $display("r_in.btq_rdy_scnt: %d",   btq_in.btq_rdy_scnt);
-        $display("btq_in.btq_rdy_scnt: %d",   btq_in.btq_rdy_scnt);
         $display("rob_in.rob_rdy_scnt: %d",  rob_in.rob_rdy_scnt);
         $display("decode_in.d_vld_scnt: %d",  decode_in.d_vld_scnt);
         $display("free_in.free_rdy_scnt: %d [%d, %d]",  free_in.free_rdy_scnt, free_in.d_ts[0], free_in.d_ts[1]);
@@ -1211,7 +1195,7 @@ module testbench;
         $display("  %3d | >> EXECUTE", $time);
 
         for (int i = 0; i < `NUM_FU_ALU; ++i) begin
-            $display("alu_iss[%0d]: rdy: %b, vld: %b, t: %2d, t1: %2d, t2: %2d, rob_idx: %2d, btq_idx: %2d, inst: 0x%x, PC: 0x%x, NPC: 0x%x, cond_branch: %b, uncond_branch: %b",
+            $display("alu_iss[%0d]: rdy: %b, vld: %b, t: %2d, t1: %2d, t2: %2d, rob_idx: %2d, btq_idx: %2d, inst: 0x%x, PC: 0x%x, cond_branch: %b, uncond_branch: %b",
                 i,
                 dbg_execute.iss.i_rdy.alu[i],
                 dbg_execute.iss.o_vld.alu[i],
@@ -1222,7 +1206,6 @@ module testbench;
                 dbg_execute.iss.o_dat.alu[i].btq_idx,
                 dbg_execute.iss.o_dat.alu[i].inst,
                 dbg_execute.iss.o_dat.alu[i].PC,
-                dbg_execute.iss.o_dat.alu[i].NPC,
                 dbg_execute.iss.o_dat.alu[i].cond_branch,
                 dbg_execute.iss.o_dat.alu[i].uncond_branch
             );
