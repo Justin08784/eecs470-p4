@@ -574,6 +574,11 @@ typedef enum logic [1:0] {
 } FU_IDX;
 `define FU_IDX_NUM 4
 
+parameter RS_ALU_SZ     = 8;
+parameter RS_MULT_SZ    = 8;
+parameter RS_LOAD_SZ    = 4;
+parameter RS_STOR_SZ    = 4;
+parameter RS_SZ         = RS_ALU_SZ + RS_MULT_SZ; // FIXME: add brch, load, stor
 typedef struct packed {
     // general
     int             id; // debug only; unique insn identifier

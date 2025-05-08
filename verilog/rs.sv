@@ -1,6 +1,53 @@
 `include "sys_defs.svh"
 
 /*
+* Generic RS partition
+* */
+module rs_part #(
+    type        ENTRY=logic,
+    parameter   NUM_FU=1,
+    parameter   ISS_CDB_ARB=`FALSE
+) (
+    input clock,
+    input reset,
+    input flush,
+
+    // dispatch
+    input  struct packed {
+        logic   [$clog2(`N):0]  en_cnt;
+        ENTRY   [`N-1:0]        dat;
+    } d_in,
+
+    output struct packed {
+        logic   [$clog2(`N):0]  rdy_scnt;
+    } d_out,
+
+    // issue
+    input  struct packed {
+        logic   [NUM_FU-1:0]    fu_rdy;
+        logic   [NUM_FU-1:0]    cdb_gnt; // 1-cycle insns need to win CDB arb. to issue
+    } ex_in,
+
+    output struct packed {
+        /* Requested by issue arbiter
+        (only ALU/BRCH needs gnt by CDB arbiter to 'en')*/
+        logic   [NUM_FU-1:0]    iss_vld;
+
+        /* Selected for issue */
+        logic   [NUM_FU-1:0]    iss_en;
+        ENTRY   [NUM_FU-1:0]    iss_dat;
+    } ex_out,
+    /*
+    * NOTE: causally, fu_rdy -> iss_vld -> cdb_gnt -> iss_en, iss_dat
+    * */
+
+    // complete (CDB)
+    input execute2complete_tag  ctag_in
+);
+endmodule;
+
+
+/*
 TODO:
 - Do w->r forwarding optimization tricks like those you used in fifo/rob?
 (in particular, combinationally updating entries_n seems incredibly expensive.
