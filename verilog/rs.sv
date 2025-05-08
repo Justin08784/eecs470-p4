@@ -1,10 +1,23 @@
 `include "sys_defs.svh"
 
+typedef struct packed {
+    logic busy;
+    logic issd;
+    struct packed {
+        PHYS_REG_IDX t1;
+        PHYS_REG_IDX t2;
+        logic t1_rdy;
+        logic t2_rdy;
+    } dat;
+} _RS_ENTRY_STUB;
+
 /*
 * Generic RS partition
 * */
 module rs_part #(
-    type        ENTRY=logic,
+    type        ENTRY=_RS_ENTRY_STUB,
+    parameter   N=`N,
+    parameter   PART_SZ=1,
     parameter   NUM_FU=1,
     parameter   ISS_CDB_ARB=`FALSE
 ) (
@@ -25,17 +38,22 @@ module rs_part #(
     // issue
     input  struct packed {
         logic   [NUM_FU-1:0]    fu_rdy;
-        logic   [NUM_FU-1:0]    cdb_gnt; // 1-cycle insns need to win CDB arb. to issue
+
+        // logic   [NUM_FU-1:0]    cdb_gnt;
+        logic   [NUM_FU-1:0]    fu_cdb_gnt; // 1-cycle insns need to win CDB arb. to issue
     } ex_in,
 
     output struct packed {
         /* Requested by issue arbiter
         (only ALU/BRCH needs gnt by CDB arbiter to 'en')*/
-        logic   [NUM_FU-1:0]    iss_vld;
+        // logic   [NUM_FU-1:0]    iss_vld;
+        logic   [NUM_FU-1:0]    fu_vld;
 
         /* Selected for issue */
-        logic   [NUM_FU-1:0]    iss_en;
-        ENTRY   [NUM_FU-1:0]    iss_dat;
+        // logic   [NUM_FU-1:0]    iss_en;
+        // ENTRY   [NUM_FU-1:0]    iss_dat;
+        logic   [NUM_FU-1:0]    fu_en;
+        ENTRY   [NUM_FU-1:0]    fu_dat;
     } ex_out,
     /*
     * NOTE: causally, fu_rdy -> iss_vld -> cdb_gnt -> iss_en, iss_dat
@@ -44,6 +62,172 @@ module rs_part #(
     // complete (CDB)
     input execute2complete_tag  ctag_in
 );
+    ENTRY [PART_SZ-1:0] entries; // ms1 test: remove one RS entry (caught)
+
+    logic [PART_SZ-1:0] busy_vec;
+    logic [PART_SZ-1:0] issd_vec;
+    logic [PART_SZ-1:0] t1_rdy_vec;
+    logic [PART_SZ-1:0] t2_rdy_vec;
+    generate
+    for (genvar i = 0; i < PART_SZ; i++) begin : gen_vecs // ms1 test: make loop count PART_SZ-1 instead of PART_SZ (caught)
+        assign busy_vec[i] = entries[i].busy; // ms1 test: make busy_vec sequential instead of combinational (caught)
+        assign issd_vec[i] = entries[i].issd;
+        assign t1_rdy_vec[i] = entries[i].dat.t1_rdy;
+        assign t2_rdy_vec[i] = entries[i].dat.t2_rdy;
+    end
+    endgenerate
+
+    // SECTION: cdb completion
+    logic [`N-1:0][PART_SZ-1:0] to_t1_rdy_per_cpl;
+    logic [`N-1:0][PART_SZ-1:0] to_t2_rdy_per_cpl;
+    logic [PART_SZ-1:0] to_t1_rdy;
+    logic [PART_SZ-1:0] to_t2_rdy;
+    always_comb begin
+        to_t1_rdy_per_cpl = '0;
+        to_t2_rdy_per_cpl = '0;
+        foreach(to_t1_rdy_per_cpl[n, rs]) begin
+            if (!ctag_in.en[n])
+                continue;
+            to_t1_rdy_per_cpl[n][rs] = entries[rs].dat.t1 == ctag_in.ts[n]
+                && ctag_in.ts[n] != '0;
+            to_t2_rdy_per_cpl[n][rs] = entries[rs].dat.t2 == ctag_in.ts[n]
+                && ctag_in.ts[n] != '0;
+        end
+
+        to_t1_rdy = '0;
+        to_t2_rdy = '0;
+        foreach(to_t1_rdy_per_cpl[n, rs]) begin
+            to_t1_rdy[rs] |= to_t1_rdy_per_cpl[n][rs];
+            to_t2_rdy[rs] |= to_t2_rdy_per_cpl[n][rs];
+        end
+    end
+
+    // SECTION: Issue 
+    // operand readiness
+    logic [PART_SZ-1:0] can_issue;
+    always_comb begin
+        can_issue = '0;
+        for (int rs = 0; rs < PART_SZ; ++rs) begin
+            can_issue[rs] = busy_vec[rs]
+                && !entries[rs].issd // ms1 test: remove "!" from entries[rs].issd (caught)
+                && (entries[rs].dat.t1_rdy || to_t1_rdy[rs]) // [ADDRESSED] ms1 test: remove "|| to_t1_rdy[rs]" (not caught) 
+                && (entries[rs].dat.t2_rdy || to_t2_rdy[rs]);
+        end
+    end
+
+    // select issue lines
+    logic [NUM_FU-1:0][PART_SZ-1:0] gbus_can_issue;
+    psel_gen #(
+        .WIDTH  (PART_SZ),
+        .REQS   (NUM_FU)
+    ) sel_iss (
+        .req    (can_issue),
+        .gnt_bus(gbus_can_issue)
+    );
+
+    // select available FUs
+    logic [NUM_FU-1:0][NUM_FU-1:0]  gbus_fu_rdy;
+    psel_gen #(
+        .WIDTH  (NUM_FU),
+        .REQS   (NUM_FU)
+    ) sel_rdy_alu (
+        .req    (ex_in.fu_rdy),
+        .gnt_bus(gbus_fu_rdy)
+    );
+
+    // assign FUs to issuables
+    logic [PART_SZ-1:0] to_issue;
+    logic [NUM_FU-1:0][PART_SZ-1:0] fu2issuer;
+
+    always_comb begin
+        to_issue    = '0;
+        fu2issuer   = '0;
+        ex_out.fu_vld   = '0;
+        ex_out.fu_en    = '0;
+
+        foreach (gbus_fu_rdy[i, j]) begin
+            if (gbus_fu_rdy[i][j]) begin
+                fu2issuer[j]    |= gbus_can_issue[i];
+
+                ex_out.fu_vld[j]    = |gbus_can_issue[i];
+                /* WARNING: There is an entire CDB arbitration between these two lines...
+                ALU insns can only issue if they ALSO win (early) CDB arbitration! */
+                ex_out.fu_en[j]     = ex_out.fu_vld[j] && ex_in.fu_cdb_gnt[j];
+                to_issue            |= ex_in.fu_cdb_gnt[j] ? gbus_can_issue[i] : '0;
+            end
+        end
+    end
+
+    always_comb begin
+        ex_out.fu_dat   = '0;
+        foreach (fu2issuer[fu, rs]) begin
+            if (fu2issuer[fu][rs]) begin // [MISSING] ms1 test: Remove "!" from if condition (not caught)
+                ex_out.fu_dat[fu] |= entries[rs].dat;
+            end
+        end
+    end
+
+    // SECTION: Dispatch
+    // compute free entries
+    logic [PART_SZ-1:0] free_entries;
+    assign free_entries = 
+        ~busy_vec
+        | issd_vec; // an issued insn will go to EX and free its entry
+
+    // select free entries
+    logic [N-1:0][PART_SZ-1:0] gbus_free;
+    psel_gen #(
+        .WIDTH(PART_SZ),
+        .REQS(N)
+    ) sel_free_entries (
+        .req    (free_entries),
+        .gnt_bus(gbus_free)
+    );
+
+    logic [N-1:0][PART_SZ-1:0] d2entry;
+    always_comb begin
+        logic [N-1:0] any_gbus_free;
+        d2entry = '0;
+        foreach (d2entry[i]) begin
+            if (i < d_in.en_cnt) begin
+                d2entry[i] |= gbus_free[i];
+            end
+        end
+
+        foreach (gbus_free[n])
+            any_gbus_free[n] = |gbus_free[n];
+        d_out.rdy_scnt = $countones(any_gbus_free);
+    end
+
+
+    always_ff @(posedge clock) begin
+        if (reset || flush) begin
+            entries  <= '0;
+        end else begin
+            // SECTION: Compute next state
+            for (int rs = 0; rs < PART_SZ; ++rs) begin
+                entries[rs].dat.t1_rdy <= entries[rs].dat.t1_rdy | to_t1_rdy[rs];
+                entries[rs].dat.t2_rdy <= entries[rs].dat.t2_rdy | to_t2_rdy[rs]; // [ADDRESSED] ms1 test: change |= to = (not caught)
+
+                // issuing
+                if (to_issue[rs])
+                    entries[rs].issd <= 1;
+
+                // going to EX; clear entry
+                if (entries[rs].issd)
+                    entries[rs].busy <= 0; // only clear busy bit
+
+                for (int n = 0; n < N; ++n) begin
+                    if (!d2entry[n][rs])
+                        continue;
+                    entries[rs].busy    <= 1;
+                    entries[rs].issd    <= 0;
+                    entries[rs].dat     <= d_in.dat[n];
+                end
+            end
+
+        end
+    end
 endmodule;
 
 
