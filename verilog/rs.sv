@@ -32,9 +32,7 @@ module rs_part #(
         PAYLOAD [`N-1:0]        dat;
     } d_in,
 
-    output struct packed {
-        logic   [$clog2(`N):0]  rdy_scnt;
-    } d_out,
+    output logic [$clog2(`N):0] d_out_rdy_scnt,
 
     // issue
     input  struct packed {
@@ -44,18 +42,16 @@ module rs_part #(
         logic   [NUM_FU-1:0]    fu_cdb_gnt; // 1-cycle insns need to win CDB arb. to issue
     } ex_in,
 
-    output struct packed {
-        /* Requested by issue arbiter
-        (only ALU/BRCH needs gnt by CDB arbiter to 'en')*/
-        // logic   [NUM_FU-1:0]    iss_vld;
-        logic   [NUM_FU-1:0]    fu_vld;
+    /* Requested by issue arbiter
+    (only ALU/BRCH needs gnt by CDB arbiter to 'en')*/
+    // logic   [NUM_FU-1:0]    iss_vld;
+    output logic   [NUM_FU-1:0] ex_out_fu_vld,
 
-        /* Selected for issue */
-        // logic   [NUM_FU-1:0]    iss_en;
-        // ENTRY   [NUM_FU-1:0]    iss_dat;
-        logic   [NUM_FU-1:0]    fu_en;
-        PAYLOAD [NUM_FU-1:0]    fu_dat;
-    } ex_out,
+    /* Selected for issue */
+    // logic   [NUM_FU-1:0]    iss_en;
+    // ENTRY   [NUM_FU-1:0]    iss_dat;
+    output logic   [NUM_FU-1:0] ex_out_fu_en,
+    output PAYLOAD [NUM_FU-1:0] ex_out_fu_dat,
     /*
     * NOTE: causally, fu_rdy -> iss_vld -> cdb_gnt -> iss_en, iss_dat
     * */
@@ -143,27 +139,27 @@ module rs_part #(
     always_comb begin
         to_issue    = '0;
         fu2issuer   = '0;
-        ex_out.fu_vld   = '0;
-        ex_out.fu_en    = '0;
+        ex_out_fu_vld   = '0;
+        ex_out_fu_en    = '0;
 
         foreach (gbus_fu_rdy[i, j]) begin
             if (gbus_fu_rdy[i][j]) begin
                 fu2issuer[j]    |= gbus_can_issue[i];
 
-                ex_out.fu_vld[j]    = |gbus_can_issue[i];
+                ex_out_fu_vld[j]    = |gbus_can_issue[i];
                 /* WARNING: There is an entire CDB arbitration between these two lines...
                 ALU insns can only issue if they ALSO win (early) CDB arbitration! */
-                ex_out.fu_en[j]     = ex_out.fu_vld[j] && ex_in.fu_cdb_gnt[j];
+                ex_out_fu_en[j]     = ex_out_fu_vld[j] && ex_in.fu_cdb_gnt[j];
                 to_issue            |= ex_in.fu_cdb_gnt[j] ? gbus_can_issue[i] : '0;
             end
         end
     end
 
     always_comb begin
-        ex_out.fu_dat   = '0;
+        ex_out_fu_dat   = '0;
         foreach (fu2issuer[fu, rs]) begin
             if (fu2issuer[fu][rs]) begin // [MISSING] ms1 test: Remove "!" from if condition (not caught)
-                ex_out.fu_dat[fu] |= entries[rs].dat;
+                ex_out_fu_dat[fu] |= entries[rs].dat;
             end
         end
     end
@@ -197,7 +193,7 @@ module rs_part #(
 
         foreach (gbus_free[n])
             any_gbus_free[n] = |gbus_free[n];
-        d_out.rdy_scnt = $countones(any_gbus_free);
+        d_out_rdy_scnt = $countones(any_gbus_free);
     end
 
 
@@ -320,17 +316,15 @@ module rs #(parameter
             en_cnt  : d_in.d_en_cnt,
             dat     : tmp_dat_alu
         }),
-        .d_out  (d_out.rs_rdy_scnt),
+        .d_out_rdy_scnt (d_out.rs_rdy_scnt),
 
         .ex_in  ('{
             fu_rdy      : ex_in.fu_rdy_alu,
             fu_cdb_gnt  : ex_in.fu_cdb_gnt_alu
         }),
-        .ex_out ('{
-            ex_out.fu_vld_alu,
-            ex_out.fu_en_alu,
-            ex_out.fu_dat_alu
-        }),
+        .ex_out_fu_vld  (ex_out.fu_vld_alu),
+        .ex_out_fu_en   (ex_out.fu_en_alu),
+        .ex_out_fu_dat  (ex_out.fu_dat_alu),
 
         .ctag_in(ctag_in)
 
