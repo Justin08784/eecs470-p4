@@ -90,7 +90,6 @@ module alu_ex(
         // insn metadata/operands
 
     /* BACKEND */
-    output execute2btq                  o_btq_out,
     output CPL_CAND [`NUM_FU_ALU-1:0]   o_cands
 );
     ALU_OPS [`NUM_FU_ALU-1:0] ops;
@@ -165,14 +164,6 @@ module alu_ex(
             };
 
             assign o_cands[i] = tmp_data[i];
-
-            assign o_btq_out.dat[i] = '{
-                en      : i_vld[i] && (ops[i].cond_branch || ops[i].uncond_branch),
-                btq_idx : ops[i].btq_idx,
-                take    : tmp_take[i],
-                tgt     : addr2w(tmp_res[i])
-            };
-
         end
     endgenerate
 endmodule
@@ -558,6 +549,39 @@ module stage_ex_p4 (
                 .o_dat (iss.o_dat.str[i])
             );
         end
+
+        for (genvar i = 0; i < `NUM_FU_BRU; ++i) begin : gen_bru_sbufs
+            assign iss.i_dat.bru[i] = '{
+                t       : rs_in.fu_dat_bru[i].t,
+                t1      : rs_in.fu_dat_bru[i].t1,
+                t2      : rs_in.fu_dat_bru[i].t2,
+                rob_idx : rs_in.fu_dat_bru[i].rob_idx,
+                btq_idx : rs_in.fu_dat_bru[i].btq_idx,
+
+                inst    : rs_in.fu_dat_bru[i].inst,
+                PC      : rs_in.fu_dat_bru[i].PC,
+
+                opa_select  : rs_in.fu_dat_bru[i].opa_select,
+                opb_select  : rs_in.fu_dat_bru[i].opb_select,
+                cond_branch : rs_in.fu_dat_bru[i].cond_branch,
+                uncond_branch : rs_in.fu_dat_bru[i].uncond_branch
+            };
+
+            assign iss.i_rdy.bru[i] = 1;
+            flop #(
+                .WIDTH($bits(ID_BRU_VIEW))
+            ) sbuf_bru (
+                .clock (clock),
+                .reset (reset),
+                .flush (flush),
+
+                .i_vld (rs_in.fu_en_bru[i]),
+                .i_dat (iss.i_dat.bru[i]),
+
+                .o_vld (iss.o_vld.bru[i]),
+                .o_dat (iss.o_dat.bru[i])
+            );
+        end
     endgenerate
 
     /* >> ======== STAGE 2: PRF Read ======== >> */
@@ -587,10 +611,10 @@ module stage_ex_p4 (
             prf_out.t2s.str[i]    = iss.o_dat.str[i].t2; 
         end
         foreach (iss.o_vld.bru[i]) begin
-            prf_out.en1s.bru[i]   = '0; // FIXME
-            prf_out.en2s.bru[i]   = '0;
-            prf_out.t1s.bru[i]    = '0;
-            prf_out.t2s.bru[i]    = '0; 
+            prf_out.en1s.bru[i]   = iss.o_vld.bru[i];
+            prf_out.en2s.bru[i]   = iss.o_vld.bru[i];
+            prf_out.t1s.bru[i]    = iss.o_dat.bru[i].t1; 
+            prf_out.t2s.bru[i]    = iss.o_dat.bru[i].t2; 
         end
     end
 
@@ -623,6 +647,13 @@ module stage_ex_p4 (
                 rs1 : prf_in.v1s.str[i],
                 rs2 : prf_in.v2s.str[i],
                 dat : iss.o_dat.str[i]
+            };
+        end
+        foreach (iss.o_vld.bru[i]) begin
+            regs.i_dat.bru[i] = '{
+                rs1 : prf_in.v1s.bru[i],
+                rs2 : prf_in.v2s.bru[i],
+                dat : iss.o_dat.bru[i]
             };
         end
     end
@@ -719,6 +750,27 @@ module stage_ex_p4 (
             );
             assign regs.o_dat.str[i] = str_snoop(raw, cdat_out);
         end
+
+        assign regs.i_rdy.bru = '1;
+        for (genvar i = 0; i < `NUM_FU_BRU; ++i) begin : gen_bru_rbufs
+            /* Unlike mul, lod, str, we *shouldn't* need snooping to feed back
+            into rbuf (via i_snoop) because we *should* never stall post issue. */
+            BRU_REGS raw;
+            flop #(
+                .WIDTH($bits(BRU_REGS))
+            ) rbuf_bru (
+                .clock (clock),
+                .reset (reset),
+                .flush (flush),
+
+                .i_vld (iss.o_vld.bru[i]),
+                .i_dat (regs.i_dat.bru[i]),
+
+                .o_vld (regs.o_vld.bru[i]),
+                .o_dat (raw)
+            );
+            assign regs.o_dat.bru[i] = bru_snoop(raw, cdat_out);
+        end
     endgenerate
 
     /* >> ======== STAGE ?: (early) CDB arbitration ======== >> */
@@ -727,7 +779,6 @@ module stage_ex_p4 (
 
     `BY_FU(CPL_CAND) cands;
     assign cands.str = '0; // alu, mul, lod set by respective *_ex's
-    assign cands.bru = '0; // FIXME
     CPL_CAND [`NUM_FU_TOTAL-1:0] cands_flat;
     assign cands_flat = cands;
 
@@ -744,7 +795,7 @@ module stage_ex_p4 (
     // cdb_req.lod set by lod_ex
     assign cdb_req.lod = '0; // FIXME
     assign cdb_req.str = '0;
-    assign cdb_req.bru = '0; // FIXME
+    assign cdb_req.bru = rs_in.fu_vld_bru;
     `BY_FU(logic) cdb_gnt;
 
     psel_gen #(
@@ -759,7 +810,6 @@ module stage_ex_p4 (
     /* >> ======== STAGE 3: Execution ======== >> */
     // Includes operand decode/CDB bypass just before 1st cycle of execution.
 
-    execute2btq btq_out_n;
     alu_ex alu_ex0 (
         .clock  (clock),
         .reset  (reset),
@@ -768,7 +818,6 @@ module stage_ex_p4 (
         .i_vld  (regs.o_vld.alu),
         .i_regs (regs.o_dat.alu),
 
-        .o_btq_out(btq_out_n),
         .o_cands(cands.alu)
     );
 
@@ -791,6 +840,19 @@ module stage_ex_p4 (
         .o_cands(cands.mul)
     );
 
+    execute2btq btq_out_n;
+    bru_ex bru_ex0 (
+        .clock  (clock),
+        .reset  (reset),
+        .flush  (flush),
+
+        .i_vld  (regs.o_vld.bru),
+        .i_regs (regs.o_dat.bru),
+
+        .o_btq_out(btq_out_n),
+        .o_cands(cands.bru)
+    );
+
     /* >> ======== STAGE 4/?: CDB data/tag broadcast ======== >> */
     // Tag broadcast occurs with CDB arbitration
     // Data broadcast is the final stage of the execute pipeline.
@@ -799,17 +861,19 @@ module stage_ex_p4 (
     always_comb begin
         rs_out = '{
             fu_cdb_gnt_alu  : cdb_gnt.alu,
-            fu_cdb_gnt_bru  : '0, // FIXME
+            fu_cdb_gnt_bru  : cdb_gnt.bru,
 
             fu_rdy_alu      : iss.i_rdy.alu,
             fu_rdy_mult     : iss.i_rdy.mul,
             fu_rdy_load     : iss.i_rdy.lod,
             fu_rdy_store    : iss.i_rdy.str,
-            fu_rdy_bru      : '0 // FIXME
+            fu_rdy_bru      : iss.i_rdy.bru
         };
 
         foreach (rs_in.fu_dat_alu[i])
             ctag_ts.alu[i] = rs_in.fu_dat_alu[i].t;
+        foreach (rs_in.fu_dat_bru[i])
+            ctag_ts.bru[i] = rs_in.fu_dat_bru[i].t;
         ctag_ts_flat = ctag_ts;
 
         ctag_out_n = '0;

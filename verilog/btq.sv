@@ -25,7 +25,7 @@ module btq #(
 );
     localparam NUM_DPORTS = N; // dispatch ports (in-order)
     localparam NUM_RPORTS = N; // retire ports (in-order)
-    localparam NUM_CPORTS = `NUM_FU_ALU; // complete ports (*OUT-OF-ORDER*)
+    localparam NUM_CPORTS = `NUM_FU_BRU; // complete ports (*OUT-OF-ORDER*)
 
     BTQ_ENTRY [BTQ_SZ-1:0]      state;
     logic [$clog2(BTQ_SZ)-1:0]  head;

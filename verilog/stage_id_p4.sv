@@ -51,12 +51,14 @@ module decoder_p4 (
                 opb_select = OPB_IS_U_IMM;
             end
             `RV32_JAL: begin
+                fu_idx        = FU_BRU;
                 has_dest      = `TRUE;
                 opa_select    = OPA_IS_PC;
                 opb_select    = OPB_IS_J_IMM;
                 uncond_branch = `TRUE;
             end
             `RV32_JALR: begin
+                fu_idx        = FU_BRU;
                 has_dest      = `TRUE;
                 opa_select    = OPA_IS_RS1;
                 opb_select    = OPB_IS_I_IMM;
@@ -64,6 +66,7 @@ module decoder_p4 (
             end
             `RV32_BEQ, `RV32_BNE, `RV32_BLT, `RV32_BGE,
             `RV32_BLTU, `RV32_BGEU: begin
+                fu_idx      = FU_BRU;
                 opa_select  = OPA_IS_PC;
                 opb_select  = OPB_IS_B_IMM;
                 cond_branch = `TRUE;
