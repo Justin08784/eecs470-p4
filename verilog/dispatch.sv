@@ -239,9 +239,18 @@ module dispatch #(parameter
 
     // handle rs output 
     always_comb begin
-        commit_en_cnt   = `MIN(rename_vld_scnt, rs_in.alu_rdy_scnt);
-        foreach (rs_out.alu_en[i])
-            rs_out.alu_en[i] = i < commit_en_cnt;
+        // logic [`FU_IDX_NUM-1:0][`N-1:0] en_by_fu;
+        // foreach (en_by_fu[f][n]) begin
+
+        // end
+
+        logic [`N-1:0] commit_en;
+        foreach (commit_en[i])
+            commit_en[i] = (i < rename_vld_scnt)
+                && rs_in.rdy_sbus[FU_ALU][i];
+
+        commit_en_cnt       = $countones(commit_en);
+        rs_out.en[FU_ALU]   = commit_en;
         rs_out.dat    = '0;
 
         for (int i = 0; i < `N; i++) begin

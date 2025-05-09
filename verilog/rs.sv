@@ -27,10 +27,10 @@ module rs_part #(
     input flush,
 
     // dispatch
-    input  logic   [`N-1:0]     d_in_en,
-    input  PAYLOAD [`N-1:0]     d_in_dat,
+    input  logic    [N-1:0]     d_in_en,
+    input  PAYLOAD  [N-1:0]     d_in_dat,
 
-    output logic [$clog2(`N):0] d_out_rdy_scnt,
+    output logic    [N-1:0]     d_out_rdy_sbus,
 
     // issue
     input  logic   [NUM_FU-1:0] ex_in_fu_rdy,
@@ -179,7 +179,6 @@ module rs_part #(
 
     logic [N-1:0][PART_SZ-1:0] d2entry;
     always_comb begin
-        logic [N-1:0] any_gbus_free;
         d2entry = '0;
         foreach (d2entry[i]) begin
             if (d_in_en[i]) begin
@@ -188,8 +187,7 @@ module rs_part #(
         end
 
         foreach (gbus_free[n])
-            any_gbus_free[n] = |gbus_free[n];
-        d_out_rdy_scnt = $countones(any_gbus_free);
+            d_out_rdy_sbus[n] = |gbus_free[n];
     end
 
 
@@ -308,9 +306,9 @@ module rs #(parameter
         .reset  (reset),
         .flush  (flush),
 
-        .d_in_en        (d_in.alu_en),
+        .d_in_en        (d_in.en[FU_ALU]),
         .d_in_dat       (tmp_dat_alu),
-        .d_out_rdy_scnt (d_out.alu_rdy_scnt),
+        .d_out_rdy_sbus (d_out.rdy_sbus[FU_ALU]),
 
         .ex_in_fu_rdy       (ex_in.fu_rdy_alu),
         .ex_in_fu_cdb_gnt   (ex_in.fu_cdb_gnt_alu),
@@ -321,10 +319,6 @@ module rs #(parameter
 
         .ctag_in(ctag_in)
     );
-
-    // assign d_out.mult_rdy_scnt = '0;
-    // assign d_out.load_rdy_scnt = '0;
-    // assign d_out.stor_rdy_scnt = '0;
 
     assign ex_out.fu_en_mult    = '0;
     assign ex_out.fu_en_load    = '0;

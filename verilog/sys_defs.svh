@@ -699,7 +699,7 @@ typedef struct packed {
     /* Alloc */
     /* Rename */
     /* Commit */
-    logic   [`N-1:0] alu_en;
+    logic   [`FU_IDX_NUM-1:0][`N-1:0] en;
     // logic   [`N-1:0] mult_en;
     // logic   [`N-1:0] load_en;
     // logic   [`N-1:0] stor_en;
@@ -772,10 +772,7 @@ typedef struct packed {
 
 // By RS
 typedef struct packed {
-    logic       [$clog2(`N):0] alu_rdy_scnt;
-    logic       [$clog2(`N):0] mult_rdy_scnt;
-    logic       [$clog2(`N):0] load_rdy_scnt;
-    logic       [$clog2(`N):0] stor_rdy_scnt;
+    logic   [`FU_IDX_NUM-1:0][`N-1:0] rdy_sbus;
         // - From: RS
 } rs2dispatch;
 
