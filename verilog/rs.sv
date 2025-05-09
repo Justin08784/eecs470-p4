@@ -142,11 +142,16 @@ module rs_part #(
             if (gbus_fu_rdy[i][j]) begin
                 fu2issuer[j]    |= gbus_can_issue[i];
 
-                ex_out_fu_vld[j]    = |gbus_can_issue[i];
-                /* WARNING: There is an entire CDB arbitration between these two lines...
-                ALU insns can only issue if they ALSO win (early) CDB arbitration! */
-                ex_out_fu_en[j]     = ex_out_fu_vld[j] && ex_in_fu_cdb_gnt[j];
-                to_issue            |= ex_in_fu_cdb_gnt[j] ? gbus_can_issue[i] : '0;
+                if (ISS_CDB_ARB) begin
+                    ex_out_fu_vld[j]    = |gbus_can_issue[i];
+                    /* WARNING: There is an entire CDB arbitration between these two lines...
+                    ALU insns can only issue if they ALSO win (early) CDB arbitration! */
+                    ex_out_fu_en[j]     = ex_out_fu_vld[j] && ex_in_fu_cdb_gnt[j];
+                    to_issue            |= ex_in_fu_cdb_gnt[j] ? gbus_can_issue[i] : '0;
+                end else begin
+                    ex_out_fu_en[j]     = |gbus_can_issue[i];
+                    to_issue            |= gbus_can_issue[i];
+                end
             end
         end
     end
@@ -296,11 +301,28 @@ module rs #(parameter
         end
     end
 
+    RS_MULT_PAYLOAD [`N-1:0] tmp_dat_mult;
+    always_comb begin
+        foreach (d_in.dat[i]) begin
+            tmp_dat_mult[i] = '{
+                id          : d_in.dat[i].id,
+
+                t           : d_in.dat[i].t,
+                t1          : d_in.dat[i].t1,
+                t2          : d_in.dat[i].t2,
+                t1_rdy      : d_in.dat[i].t1_rdy,
+                t2_rdy      : d_in.dat[i].t2_rdy,
+                rob_idx     : d_in.dat[i].rob_idx,
+                func        : d_in.dat[i].inst.r.funct3
+            };
+        end
+    end
+
     rs_part #(
         .PAYLOAD    (RS_ALU_PAYLOAD),
         .PART_SZ    (RS_ALU_SZ),
         .NUM_FU     (`NUM_FU_ALU),
-        .ISS_CDB_ARB(`FALSE)
+        .ISS_CDB_ARB(`TRUE)
     ) rs_alu (
         .clock  (clock),
         .reset  (reset),
@@ -320,10 +342,37 @@ module rs #(parameter
         .ctag_in(ctag_in)
     );
 
-    assign ex_out.fu_en_mult    = '0;
+    rs_part #(
+        .PAYLOAD    (RS_MULT_PAYLOAD),
+        .PART_SZ    (RS_MULT_SZ),
+        .NUM_FU     (`NUM_FU_MULT),
+        .ISS_CDB_ARB(`FALSE)
+    ) rs_mult (
+        .clock  (clock),
+        .reset  (reset),
+        .flush  (flush),
+
+        .d_in_en        (d_in.en[FU_MULT]),
+        .d_in_dat       (tmp_dat_mult),
+        .d_out_rdy_sbus (d_out.rdy_sbus[FU_MULT]),
+
+        .ex_in_fu_rdy       (ex_in.fu_rdy_mult),
+        .ex_in_fu_cdb_gnt   (),
+
+        .ex_out_fu_vld  (),
+        .ex_out_fu_en   (ex_out.fu_en_mult),
+        .ex_out_fu_dat  (ex_out.fu_dat_mult),
+
+        .ctag_in(ctag_in)
+    );
+
+    // default rdy_sbus for partitions not yet defined
+    assign d_out.rdy_sbus[FU_LOAD]  = '0;
+    assign d_out.rdy_sbus[FU_STORE] = '0;
+    assign d_out.rdy_sbus[FU_BRCH]  = '0;
+
     assign ex_out.fu_en_load    = '0;
     assign ex_out.fu_en_store   = '0;
-    assign ex_out.fu_dat_mult    = '0;
     assign ex_out.fu_dat_load    = '0;
     assign ex_out.fu_dat_store   = '0;
 

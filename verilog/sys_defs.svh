@@ -566,13 +566,14 @@ typedef struct packed {
 } dispatch2btq;
 
 // Reservation station stuff
-typedef enum logic [1:0] {
-    FU_ALU  = 2'b00,
-    FU_MULT = 2'b01,
-    FU_LOAD = 2'b10,
-    FU_STORE = 2'b11
+typedef enum logic [2:0] {
+    FU_ALU      = 'd0,
+    FU_MULT     = 'd1,
+    FU_LOAD     = 'd2,
+    FU_STORE    = 'd3,
+    FU_BRCH     = 'd4
 } FU_IDX;
-`define FU_IDX_NUM 4
+`define FU_IDX_NUM 5
 
 parameter RS_ALU_SZ     = 8;
 parameter RS_MULT_SZ    = 8;
@@ -787,8 +788,8 @@ typedef struct packed {
     logic       [`NUM_FU_STORE-1:0]  fu_en_store;
     logic       [`NUM_FU_LOAD-1:0]   fu_en_load;
 
-    RS_ALU_PAYLOAD [`NUM_FU_ALU-1:0]    fu_dat_alu;
-    ID_RESULT   [`NUM_FU_MULT-1:0]   fu_dat_mult;
+    RS_ALU_PAYLOAD  [`NUM_FU_ALU-1:0]    fu_dat_alu;
+    RS_MULT_PAYLOAD [`NUM_FU_MULT-1:0]   fu_dat_mult;
     ID_RESULT   [`NUM_FU_STORE-1:0]  fu_dat_store;
     ID_RESULT   [`NUM_FU_LOAD-1:0]   fu_dat_load;
 } rs2execute;

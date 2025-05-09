@@ -239,20 +239,30 @@ module dispatch #(parameter
 
     // handle rs output 
     always_comb begin
-        // logic [`FU_IDX_NUM-1:0][`N-1:0] en_by_fu;
-        // foreach (en_by_fu[f][n]) begin
-
-        // end
-
+        logic [`FU_IDX_NUM-1:0][`N-1:0] en_by_fu;
+        logic [`N-1:0] rename_vld;
         logic [`N-1:0] commit_en;
-        foreach (commit_en[i])
-            commit_en[i] = (i < rename_vld_scnt)
-                && rs_in.rdy_sbus[FU_ALU][i];
+
+        foreach (rename_vld[n])
+            rename_vld[n] = n < rename_vld_scnt;
+        foreach (en_by_fu[f, n]) begin
+            en_by_fu[f][n] = rename_vld[n]
+                && commit_in[n].dat.fu_idx == f
+                && rs_in.rdy_sbus[f][n];
+        end
+
+        commit_en   = '0;
+        foreach (en_by_fu[f, n])
+            commit_en[n] |= en_by_fu[f][n];
+        for (int n = 1; n < `N; ++n)
+            commit_en[n] &= commit_en[n - 1];
 
         commit_en_cnt       = $countones(commit_en);
-        rs_out.en[FU_ALU]   = commit_en;
-        rs_out.dat    = '0;
+        foreach (rs_out.en[f]) begin
+            rs_out.en[f]    = commit_en & en_by_fu[f];
+        end
 
+        rs_out.dat    = '0;
         for (int i = 0; i < `N; i++) begin
             rs_out.dat[i] = commit_in[i].dat;
             rs_out.dat[i].rob_idx = rob_in.rob_idxs[i];
