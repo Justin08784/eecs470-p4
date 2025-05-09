@@ -46,6 +46,7 @@
 `define NUM_FU_LOAD 1
 `define LD_BAY_SZ 2 //num load bays in the FU
 `define NUM_FU_STORE 1
+`define NUM_FU_BRU 1
 // `define NUM_FU_TOTAL `NUM_FU_ALU + `NUM_FU_MULT + `NUM_FU_LOAD + `NUM_FU_STORE
 `define NUM_FU_TOTAL `NUM_FU_ALU + `NUM_FU_MULT + `NUM_FU_LOAD + `NUM_FU_STORE
 
@@ -571,7 +572,7 @@ typedef enum logic [2:0] {
     FU_MULT     = 'd1,
     FU_LOAD     = 'd2,
     FU_STORE    = 'd3,
-    FU_BRCH     = 'd4
+    FU_BRU      = 'd4
 } FU_IDX;
 `define FU_IDX_NUM 5
 
@@ -579,6 +580,7 @@ parameter RS_ALU_SZ     = 8;
 parameter RS_MULT_SZ    = 8;
 parameter RS_LOAD_SZ    = 4;
 parameter RS_STOR_SZ    = 4;
+parameter RS_BRU_SZ     = 4;
 parameter RS_SZ         = RS_ALU_SZ + RS_MULT_SZ; // FIXME: add brch, load, stor
 typedef struct packed {
     // general

@@ -369,7 +369,7 @@ module rs #(parameter
     // default rdy_sbus for partitions not yet defined
     assign d_out.rdy_sbus[FU_LOAD]  = '0;
     assign d_out.rdy_sbus[FU_STORE] = '0;
-    assign d_out.rdy_sbus[FU_BRCH]  = '0;
+    assign d_out.rdy_sbus[FU_BRU]  = '0;
 
     assign ex_out.fu_en_load    = '0;
     assign ex_out.fu_en_store   = '0;

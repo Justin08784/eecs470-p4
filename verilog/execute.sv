@@ -254,6 +254,125 @@ module mul_ex(
     endgenerate
 endmodule
 
+module bru (
+    input DATA      opa,
+    input DATA      opb,
+    input DATA      rs1,
+    input DATA      rs2,
+    input [2:0]     branch_func, // Which branch condition to check
+
+    output logic    take, // True/False condition result
+    output DATA     result
+);
+
+    assign result = opa + opb;
+
+    always_comb begin
+        case (branch_func)
+            3'b000:  take = signed'(rs1) == signed'(rs2); // BEQ
+            3'b001:  take = signed'(rs1) != signed'(rs2); // BNE
+            3'b100:  take = signed'(rs1) <  signed'(rs2); // BLT
+            3'b101:  take = signed'(rs1) >= signed'(rs2); // BGE
+            3'b110:  take = rs1 <  rs2;                    // BLTU
+            3'b111:  take = rs1 >= rs2;                   // BGEU
+            default: take = `FALSE;
+        endcase
+    end
+
+endmodule // bru
+
+module bru_ex(
+    input clock,
+    input reset,
+    input flush,
+
+    /* FRONTEND */
+    logic [`NUM_FU_BRU-1:0]             i_vld,
+    input  BRU_REGS [`NUM_FU_BRU-1:0]   i_regs,
+        // insn metadata/operands
+
+    /* BACKEND */
+    output execute2btq                  o_btq_out,
+    output CPL_CAND [`NUM_FU_BRU-1:0]   o_cands
+);
+    BRU_OPS [`NUM_FU_BRU-1:0] ops;
+    ADDR    [`NUM_FU_BRU-1:0] pc_addrs, npc_addrs;
+    always_comb begin
+        DATA opa, opb;
+        foreach(ops[i]) begin
+            pc_addrs[i]     = w2addr(i_regs[i].dat.PC);
+            npc_addrs[i]    = w2addr(i_regs[i].dat.PC + 1);
+            // BRU opA mux
+            case (i_regs[i].dat.opa_select)
+                OPA_IS_PC:   opa = pc_addrs[i];
+                OPA_IS_RS1:  opa = i_regs[i].rs1;
+                default:     opa = 32'hdeadface; // dead face
+            endcase
+
+            // BRU opB mux
+            case (i_regs[i].dat.opb_select)
+                OPB_IS_I_IMM: opb = `RV32_signext_Iimm(i_regs[i].dat.inst);
+                OPB_IS_B_IMM: opb = `RV32_signext_Bimm(i_regs[i].dat.inst);
+                OPB_IS_J_IMM: opb = `RV32_signext_Jimm(i_regs[i].dat.inst);
+                default:      opb = 32'hfacefeed; // face feed
+            endcase
+            ops[i] = '{
+                opa         : opa,
+                opb         : opb,
+                rs1         : i_regs[i].rs1,
+                rs2         : i_regs[i].rs2,
+                branch_func : i_regs[i].dat.inst.b.funct3,
+                cond_branch     : i_regs[i].dat.cond_branch,
+                uncond_branch   : i_regs[i].dat.uncond_branch,
+
+                t           : i_regs[i].dat.t,
+                rob_idx     : i_regs[i].dat.rob_idx,
+                btq_idx     : i_regs[i].dat.btq_idx
+            };
+        end
+    end
+
+    // execute
+    generate
+        CPL_CAND    [`NUM_FU_BRU-1:0] tmp_data;
+        DATA        [`NUM_FU_BRU-1:0] tmp_res;
+        logic       [`NUM_FU_BRU-1:0] cond_take, tmp_take;
+        for (genvar i = 0; i < `NUM_FU_BRU; ++i) begin : gen_brus
+            bru bru_0 ( 
+                // Inputs
+                .opa        (ops[i].opa),
+                .opb        (ops[i].opb),
+                .rs1        (ops[i].rs1),
+                .rs2        (ops[i].rs2),
+                .branch_func(ops[i].branch_func), // Which branch condition to check
+
+                // Output (directly to cdat_out)
+                .take(cond_take[i]), // True/False condition result (will return FALSE if branch is low)
+                .result(tmp_res[i]) // will return 32'hfacebeec if branch is high
+            );
+
+            assign tmp_take[i] = ops[i].uncond_branch
+                || (ops[i].cond_branch && cond_take[i]);
+
+            assign tmp_data[i] = '{
+                t       : ops[i].t,
+                rob_idx : ops[i].rob_idx,
+                data    : tmp_take[i] ? npc_addrs[i] : tmp_res[i]
+            };
+
+            assign o_cands[i] = tmp_data[i];
+
+            assign o_btq_out.dat[i] = '{
+                en      : i_vld[i] && (ops[i].cond_branch || ops[i].uncond_branch),
+                btq_idx : ops[i].btq_idx,
+                take    : tmp_take[i],
+                tgt     : addr2w(tmp_res[i])
+            };
+
+        end
+    endgenerate
+endmodule
+
 module stage_ex_p4 (
 `ifdef DEBUG
     input print_en,

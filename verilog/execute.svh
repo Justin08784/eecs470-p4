@@ -66,6 +66,21 @@ typedef struct packed {
 } ID_STR_VIEW;
 
 typedef struct packed {
+    PHYS_REG_IDX    t;
+    PHYS_REG_IDX    t1;
+    PHYS_REG_IDX    t2;
+    ROB_IDX         rob_idx;
+    BTQ_IDX         btq_idx;
+
+    INST inst;
+    WADDR PC;
+    logic    cond_branch;
+    logic    uncond_branch;
+    ALU_OPA_SELECT opa_select;
+    ALU_OPB_SELECT opb_select;
+} ID_BRU_VIEW;
+
+typedef struct packed {
     DATA rs1;
     DATA rs2;
     ID_ALU_VIEW dat;
@@ -84,6 +99,11 @@ typedef struct packed {
     DATA rs2;
     ID_STR_VIEW dat;
 } STR_REGS;
+typedef struct packed {
+    DATA rs1;
+    DATA rs2;
+    ID_BRU_VIEW dat;
+} BRU_REGS;
 
 /* Operand data needed for each FU type */
 typedef struct packed {
@@ -106,6 +126,18 @@ typedef struct packed {
     PHYS_REG_IDX    t;
     ROB_IDX         rob_idx;
 } MUL_OPS;
+
+typedef struct packed {
+    DATA            opa, opb;
+    DATA            rs1, rs2;
+    logic   [2:0]   branch_func; // Which branch condition to check
+    logic           cond_branch;
+    logic           uncond_branch;
+
+    PHYS_REG_IDX    t;
+    ROB_IDX         rob_idx;
+    BTQ_IDX         btq_idx;
+} BRU_OPS;
 
 /* CDB snooping/bypassing functions */
 function automatic ALU_REGS alu_snoop(
@@ -159,6 +191,22 @@ function automatic STR_REGS str_snoop(
     input execute2complete_dat cdat
 );
     STR_REGS rv = v;
+    foreach (cdat.en[n]) begin
+        if (!cdat.en[n] || cdat.ts[n] == '0)
+            continue;
+        if (rv.dat.t1 == cdat.ts[n])
+            rv.rs1 = cdat.data[n];
+        if (rv.dat.t2 == cdat.ts[n])
+            rv.rs2 = cdat.data[n];
+    end
+    return rv;
+endfunction
+
+function automatic BRU_REGS bru_snoop(
+    input BRU_REGS v,
+    input execute2complete_dat cdat
+);
+    BRU_REGS rv = v;
     foreach (cdat.en[n]) begin
         if (!cdat.en[n] || cdat.ts[n] == '0)
             continue;
