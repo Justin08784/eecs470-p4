@@ -419,5 +419,4 @@ module rs #(parameter
     assign ex_out.fu_en_store   = '0;
     assign ex_out.fu_dat_load    = '0;
     assign ex_out.fu_dat_store   = '0;
-
 endmodule
