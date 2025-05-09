@@ -699,14 +699,17 @@ typedef struct packed {
     /* Alloc */
     /* Rename */
     /* Commit */
-    logic       [$clog2(`N):0] d_en_cnt;
+    logic   [`N-1:0] alu_en;
+    // logic   [`N-1:0] mult_en;
+    // logic   [`N-1:0] load_en;
+    // logic   [`N-1:0] stor_en;
         // - To: RS
         // - Number of enabled dispatch lines? (replacement for d_vld)
         // - Question: permit
         // 1) only N dispatches, OR
         // 2) a different limit number of dispatches DIS_MAX: N ≤ DIS_MAX ≤ RS_SZ
         // (DIS_MAX will be a new sys_defs.svh constant) ?
-    ID_RESULT   [`N-1:0] d_dat; //shouldn't have dispatch feed to RS,
+    ID_RESULT   [`N-1:0] dat; //shouldn't have dispatch feed to RS,
         // - To: RS               //should come directly from dispatch
 } dispatch2rs;
 
@@ -770,9 +773,9 @@ typedef struct packed {
 // By RS
 typedef struct packed {
     logic       [$clog2(`N):0] alu_rdy_scnt;
-    // logic       [$clog2(`N):0] mult_rdy_scnt;
-    // logic       [$clog2(`N):0] load_rdy_scnt;
-    // logic       [$clog2(`N):0] stor_rdy_scnt;
+    logic       [$clog2(`N):0] mult_rdy_scnt;
+    logic       [$clog2(`N):0] load_rdy_scnt;
+    logic       [$clog2(`N):0] stor_rdy_scnt;
         // - From: RS
 } rs2dispatch;
 

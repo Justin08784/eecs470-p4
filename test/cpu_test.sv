@@ -270,13 +270,13 @@ module testbench;
                     break;
                 cur_idx = verisimpleV.rob_0.comm_idxs[i];
                 rob_debug[cur_idx] = '{
-                    id      : verisimpleV.rs_0.d_in.d_dat[i].id,
+                    id      : verisimpleV.rs_0.d_in.dat[i].id,
                     halt    : verisimpleV.rob_0.d_in.halt[i],
                     illegal : verisimpleV.rob_0.d_in.illegal[i],
                     is_brch : verisimpleV.rob_0.d_in.is_brch[i],
                     rd_mem  : verisimpleV.rob_0.d_in.rd_mem[i],
                     wr_mem  : verisimpleV.rob_0.d_in.wr_mem[i],
-                    NPC     : w2addr(verisimpleV.rs_0.d_in.d_dat[i].PC + 1)
+                    NPC     : w2addr(verisimpleV.rs_0.d_in.dat[i].PC + 1)
                 };
             end
 `endif // SYNTH
@@ -936,8 +936,8 @@ module testbench;
         ctag_in = dbg_rs.ctag_in;
 
         $display("  | >> RS >>");
-        print_id_result(d_in.d_dat[0]);
-        print_id_result(d_in.d_dat[1]);
+        print_id_result(d_in.dat[0]);
+        print_id_result(d_in.dat[1]);
         for (int i = 0; i < `RS_SZ; ++i) begin
             string fu_name;
             get_fu_name(entries[i].dat.fu_idx, fu_name);

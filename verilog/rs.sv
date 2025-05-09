@@ -27,8 +27,8 @@ module rs_part #(
     input flush,
 
     // dispatch
-    input  logic   [$clog2(`N):0]  d_in_en_cnt,
-    input  PAYLOAD [`N-1:0]        d_in_dat,
+    input  logic   [`N-1:0]     d_in_en,
+    input  PAYLOAD [`N-1:0]     d_in_dat,
 
     output logic [$clog2(`N):0] d_out_rdy_scnt,
 
@@ -182,7 +182,7 @@ module rs_part #(
         logic [N-1:0] any_gbus_free;
         d2entry = '0;
         foreach (d2entry[i]) begin
-            if (i < d_in_en_cnt) begin
+            if (d_in_en[i]) begin
                 d2entry[i] |= gbus_free[i];
             end
         end
@@ -272,28 +272,28 @@ module rs #(parameter
 );
     RS_ALU_PAYLOAD [`N-1:0] tmp_dat_alu;
     always_comb begin
-        foreach (d_in.d_dat[i]) begin
+        foreach (d_in.dat[i]) begin
             tmp_dat_alu[i] = '{
-                id          : d_in.d_dat[i].id,
+                id          : d_in.dat[i].id,
 
-                PC          : d_in.d_dat[i].PC,
-                inst        : d_in.d_dat[i].inst,
+                PC          : d_in.dat[i].PC,
+                inst        : d_in.dat[i].inst,
 
-                t           : d_in.d_dat[i].t,
-                t1          : d_in.d_dat[i].t1,
-                t2          : d_in.d_dat[i].t2,
-                t1_rdy      : d_in.d_dat[i].t1_rdy,
-                t2_rdy      : d_in.d_dat[i].t2_rdy,
-                rob_idx     : d_in.d_dat[i].rob_idx,
+                t           : d_in.dat[i].t,
+                t1          : d_in.dat[i].t1,
+                t2          : d_in.dat[i].t2,
+                t1_rdy      : d_in.dat[i].t1_rdy,
+                t2_rdy      : d_in.dat[i].t2_rdy,
+                rob_idx     : d_in.dat[i].rob_idx,
 
-                opa_select  : d_in.d_dat[i].opa_select,
-                opb_select  : d_in.d_dat[i].opb_select,
-                alu_func    : d_in.d_dat[i].alu_func,
+                opa_select  : d_in.dat[i].opa_select,
+                opb_select  : d_in.dat[i].opb_select,
+                alu_func    : d_in.dat[i].alu_func,
 
-                is_brch     : d_in.d_dat[i].is_brch,
-                btq_idx     : d_in.d_dat[i].btq_idx,
-                cond_branch     : d_in.d_dat[i].cond_branch,
-                uncond_branch   : d_in.d_dat[i].uncond_branch
+                is_brch     : d_in.dat[i].is_brch,
+                btq_idx     : d_in.dat[i].btq_idx,
+                cond_branch     : d_in.dat[i].cond_branch,
+                uncond_branch   : d_in.dat[i].uncond_branch
             };
         end
     end
@@ -308,7 +308,7 @@ module rs #(parameter
         .reset  (reset),
         .flush  (flush),
 
-        .d_in_en_cnt    (d_in.d_en_cnt),
+        .d_in_en        (d_in.alu_en),
         .d_in_dat       (tmp_dat_alu),
         .d_out_rdy_scnt (d_out.alu_rdy_scnt),
 

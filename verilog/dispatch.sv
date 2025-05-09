@@ -240,18 +240,19 @@ module dispatch #(parameter
     // handle rs output 
     always_comb begin
         commit_en_cnt   = `MIN(rename_vld_scnt, rs_in.alu_rdy_scnt);
-        rs_out.d_en_cnt = commit_en_cnt;
-        rs_out.d_dat    = '0;
+        foreach (rs_out.alu_en[i])
+            rs_out.alu_en[i] = i < commit_en_cnt;
+        rs_out.dat    = '0;
 
         for (int i = 0; i < `N; i++) begin
-            rs_out.d_dat[i] = commit_in[i].dat;
-            rs_out.d_dat[i].rob_idx = rob_in.rob_idxs[i];
+            rs_out.dat[i] = commit_in[i].dat;
+            rs_out.dat[i].rob_idx = rob_in.rob_idxs[i];
             for (int c = 0; c < `N; ++c) begin
-                rs_out.d_dat[i].t1_rdy |= ctag_in.en[c] & (ctag_in.ts[c] == commit_in[i].dat.t1);
-                rs_out.d_dat[i].t2_rdy |= ctag_in.en[c] & (ctag_in.ts[c] == commit_in[i].dat.t2);
+                rs_out.dat[i].t1_rdy |= ctag_in.en[c] & (ctag_in.ts[c] == commit_in[i].dat.t1);
+                rs_out.dat[i].t2_rdy |= ctag_in.en[c] & (ctag_in.ts[c] == commit_in[i].dat.t2);
             end
-            rs_out.d_dat[i].t1_rdy |= cpl_lst[commit_in[i].dat.t1];
-            rs_out.d_dat[i].t2_rdy |= cpl_lst[commit_in[i].dat.t2];
+            rs_out.dat[i].t1_rdy |= cpl_lst[commit_in[i].dat.t1];
+            rs_out.dat[i].t2_rdy |= cpl_lst[commit_in[i].dat.t2];
         end
     end
 
