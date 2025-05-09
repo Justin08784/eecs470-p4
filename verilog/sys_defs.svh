@@ -600,12 +600,6 @@ typedef struct packed {
     ALU_OPA_SELECT  opa_select; // ALU opa mux select (ALU_OPA_xxx *)
     ALU_OPB_SELECT  opb_select; // ALU opb mux select (ALU_OPB_xxx *)
     ALU_FUNC        alu_func;   // ALU function select (ALU_xxx *)
-
-    // branch
-    logic           is_brch;
-    BTQ_IDX         btq_idx;
-    logic           cond_branch;
-    logic           uncond_branch;
 } RS_ALU_PAYLOAD;
 
 typedef struct packed {

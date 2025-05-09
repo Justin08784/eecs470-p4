@@ -15,7 +15,6 @@ typedef struct packed {
     PHYS_REG_IDX    t1;
     PHYS_REG_IDX    t2;
     ROB_IDX         rob_idx;
-    BTQ_IDX         btq_idx;
 
     INST inst;
     WADDR PC;
@@ -23,8 +22,6 @@ typedef struct packed {
     ALU_OPA_SELECT opa_select;
     ALU_OPB_SELECT opb_select;
     ALU_FUNC alu_func;
-    logic    cond_branch;
-    logic    uncond_branch;
 } ID_ALU_VIEW;
 
 typedef struct packed {
@@ -110,13 +107,9 @@ typedef struct packed {
     DATA            opa, opb;
     DATA            rs1, rs2;
     ALU_FUNC        alu_func;
-    logic   [2:0]   branch_func; // Which branch condition to check
-    logic           cond_branch;
-    logic           uncond_branch;
 
     PHYS_REG_IDX    t;
     ROB_IDX         rob_idx;
-    BTQ_IDX         btq_idx;
 } ALU_OPS;
 
 typedef struct packed {

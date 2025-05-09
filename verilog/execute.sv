@@ -41,9 +41,7 @@ module alu (
     input DATA      rs1,
     input DATA      rs2,
     input ALU_FUNC  alu_func,
-    input [2:0]     branch_func, // Which branch condition to check
 
-    output logic    take, // True/False condition result
     output DATA     result
 );
 
@@ -63,19 +61,6 @@ module alu (
             default:  result = 32'hfacebeec;
         endcase
     end
-
-    always_comb begin
-        case (branch_func)
-            3'b000:  take = signed'(rs1) == signed'(rs2); // BEQ
-            3'b001:  take = signed'(rs1) != signed'(rs2); // BNE
-            3'b100:  take = signed'(rs1) <  signed'(rs2); // BLT
-            3'b101:  take = signed'(rs1) >= signed'(rs2); // BGE
-            3'b110:  take = rs1 <  rs2;                    // BLTU
-            3'b111:  take = rs1 >= rs2;                   // BGEU
-            default: take = `FALSE;
-        endcase
-    end
-
 endmodule // alu
 
 
@@ -124,12 +109,8 @@ module alu_ex(
                 opa         : opa,
                 opb         : opb,
                 alu_func    : i_regs[i].dat.alu_func,
-                branch_func : i_regs[i].dat.inst.b.funct3,
                 t           : i_regs[i].dat.t,
-                rob_idx     : i_regs[i].dat.rob_idx,
-                btq_idx     : i_regs[i].dat.btq_idx,
-                cond_branch     : i_regs[i].dat.cond_branch,
-                uncond_branch   : i_regs[i].dat.uncond_branch
+                rob_idx     : i_regs[i].dat.rob_idx
             };
         end
     end
@@ -138,7 +119,6 @@ module alu_ex(
     generate
         CPL_CAND    [`NUM_FU_ALU-1:0] tmp_data;
         DATA        [`NUM_FU_ALU-1:0] tmp_res;
-        logic       [`NUM_FU_ALU-1:0] cond_take, tmp_take;
         for (genvar i = 0; i < `NUM_FU_ALU; ++i) begin : gen_alus
             alu alu_0 ( 
                 // Inputs
@@ -147,20 +127,15 @@ module alu_ex(
                 .rs1        (ops[i].rs1),
                 .rs2        (ops[i].rs2),
                 .alu_func   (ops[i].alu_func),
-                .branch_func(ops[i].branch_func), // Which branch condition to check
 
                 // Output (directly to cdat_out)
-                .take(cond_take[i]), // True/False condition result (will return FALSE if branch is low)
                 .result(tmp_res[i]) // will return 32'hfacebeec if branch is high
             );
-
-            assign tmp_take[i] = ops[i].uncond_branch
-                || (ops[i].cond_branch && cond_take[i]);
 
             assign tmp_data[i] = '{
                 t       : ops[i].t,
                 rob_idx : ops[i].rob_idx,
-                data    : tmp_take[i] ? npc_addrs[i] : tmp_res[i]
+                data    : tmp_res[i]
             };
 
             assign o_cands[i] = tmp_data[i];
@@ -432,16 +407,13 @@ module stage_ex_p4 (
                 t1      : rs_in.fu_dat_alu[i].t1,
                 t2      : rs_in.fu_dat_alu[i].t2,
                 rob_idx : rs_in.fu_dat_alu[i].rob_idx,
-                btq_idx : rs_in.fu_dat_alu[i].btq_idx,
 
                 inst    : rs_in.fu_dat_alu[i].inst,
                 PC      : rs_in.fu_dat_alu[i].PC,
 
                 opa_select  : rs_in.fu_dat_alu[i].opa_select,
                 opb_select  : rs_in.fu_dat_alu[i].opb_select,
-                alu_func    : rs_in.fu_dat_alu[i].alu_func,
-                cond_branch : rs_in.fu_dat_alu[i].cond_branch,
-                uncond_branch : rs_in.fu_dat_alu[i].uncond_branch
+                alu_func    : rs_in.fu_dat_alu[i].alu_func
             };
 
             assign iss.i_rdy.alu[i] = 1;

@@ -291,12 +291,7 @@ module rs #(parameter
 
                 opa_select  : d_in.dat[i].opa_select,
                 opb_select  : d_in.dat[i].opb_select,
-                alu_func    : d_in.dat[i].alu_func,
-
-                is_brch     : d_in.dat[i].is_brch,
-                btq_idx     : d_in.dat[i].btq_idx,
-                cond_branch     : d_in.dat[i].cond_branch,
-                uncond_branch   : d_in.dat[i].uncond_branch
+                alu_func    : d_in.dat[i].alu_func
             };
         end
     end
