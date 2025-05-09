@@ -48,7 +48,7 @@
 `define NUM_FU_STORE 1
 `define NUM_FU_BRU 1
 // `define NUM_FU_TOTAL `NUM_FU_ALU + `NUM_FU_MULT + `NUM_FU_LOAD + `NUM_FU_STORE
-`define NUM_FU_TOTAL `NUM_FU_ALU + `NUM_FU_MULT + `NUM_FU_LOAD + `NUM_FU_STORE
+`define NUM_FU_TOTAL `NUM_FU_ALU + `NUM_FU_MULT + `NUM_FU_LOAD + `NUM_FU_STORE + `NUM_FU_BRU
 
 // number of mult stages (2, 4) (you likely don't need 8)
 `define MULT_STAGES 16
@@ -537,7 +537,7 @@ typedef struct packed {
             // Entries to which we are completing
         logic   take;
         WADDR   tgt;
-    } [`NUM_FU_ALU-1:0] dat;
+    } [`NUM_FU_BRU-1:0] dat;
 } execute2btq;
 
 typedef struct packed {
@@ -629,6 +629,29 @@ typedef struct packed {
     /* FIXME: stubbed */
     int             id;
 } RS_STOR_PAYLOAD;
+
+typedef struct packed {
+    // general
+    int             id; // debug only; unique insn identifier
+
+    WADDR           PC;
+    INST            inst;
+    // IDEA: carry the imm (decode it in stage_id) instead of inst
+
+    PHYS_REG_IDX    t;
+    PHYS_REG_IDX    t1;
+    PHYS_REG_IDX    t2;
+    logic           t1_rdy; // completed? should we rename to cpl for consistency?
+    logic           t2_rdy;
+    ROB_IDX         rob_idx;
+
+    ALU_OPA_SELECT  opa_select; // ALU opa mux select (ALU_OPA_xxx *)
+    ALU_OPB_SELECT  opb_select; // ALU opb mux select (ALU_OPB_xxx *)
+
+    BTQ_IDX         btq_idx;
+    logic           cond_branch;
+    logic           uncond_branch;
+} RS_BRU_PAYLOAD;
 
 typedef struct packed {
     int             id; // debug only; unique insn identifier
@@ -783,17 +806,20 @@ typedef struct packed {
     /* Requested by issue arbiter 
     (only ALU needs gnt by CDB arbiter to 'en')*/
     logic       [`NUM_FU_ALU-1:0]    fu_vld_alu;
+    logic       [`NUM_FU_BRU-1:0]    fu_vld_bru;
 
     /* Selected for issue */
     logic       [`NUM_FU_ALU-1:0]    fu_en_alu;
     logic       [`NUM_FU_MULT-1:0]   fu_en_mult;
     logic       [`NUM_FU_STORE-1:0]  fu_en_store;
     logic       [`NUM_FU_LOAD-1:0]   fu_en_load;
+    logic       [`NUM_FU_BRU-1:0]    fu_en_bru;
 
     RS_ALU_PAYLOAD  [`NUM_FU_ALU-1:0]    fu_dat_alu;
     RS_MULT_PAYLOAD [`NUM_FU_MULT-1:0]   fu_dat_mult;
     ID_RESULT   [`NUM_FU_STORE-1:0]  fu_dat_store;
     ID_RESULT   [`NUM_FU_LOAD-1:0]   fu_dat_load;
+    RS_BRU_PAYLOAD  [`NUM_FU_BRU-1:0]    fu_dat_bru;
 } rs2execute;
 
 // By ROB
@@ -823,8 +849,10 @@ typedef struct packed {
     logic       [`NUM_FU_MULT-1:0]   fu_rdy_mult;
     logic       [`NUM_FU_STORE-1:0]  fu_rdy_store;
     logic       [`NUM_FU_LOAD-1:0]   fu_rdy_load;
+    logic       [`NUM_FU_BRU-1:0]    fu_rdy_bru;
 
     logic       [`NUM_FU_ALU-1:0]    fu_cdb_gnt_alu; // 1-cycle insns need to win CDB arb. to issue
+    logic       [`NUM_FU_BRU-1:0]    fu_cdb_gnt_bru; // 1-cycle insns need to win CDB arb. to issue
 } execute2rs;
 
 typedef struct packed {
@@ -872,6 +900,7 @@ struct packed { \
     type [`NUM_FU_MULT-1:0]  mul; \
     type [`NUM_FU_LOAD-1:0]  lod; \
     type [`NUM_FU_STORE-1:0] str; \
+    type [`NUM_FU_BRU-1:0]   bru; \
 }
 
 typedef struct packed {

@@ -318,6 +318,32 @@ module rs #(parameter
         end
     end
 
+    RS_BRU_PAYLOAD [`N-1:0] tmp_dat_bru;
+    always_comb begin
+        foreach (d_in.dat[i]) begin
+            tmp_dat_bru[i] = '{
+                id          : d_in.dat[i].id,
+
+                PC          : d_in.dat[i].PC,
+                inst        : d_in.dat[i].inst,
+
+                t           : d_in.dat[i].t,
+                t1          : d_in.dat[i].t1,
+                t2          : d_in.dat[i].t2,
+                t1_rdy      : d_in.dat[i].t1_rdy,
+                t2_rdy      : d_in.dat[i].t2_rdy,
+                rob_idx     : d_in.dat[i].rob_idx,
+
+                opa_select  : d_in.dat[i].opa_select,
+                opb_select  : d_in.dat[i].opb_select,
+
+                btq_idx     : d_in.dat[i].btq_idx,
+                cond_branch     : d_in.dat[i].cond_branch,
+                uncond_branch   : d_in.dat[i].uncond_branch
+            };
+        end
+    end
+
     rs_part #(
         .PAYLOAD    (RS_ALU_PAYLOAD),
         .PART_SZ    (RS_ALU_SZ),
@@ -366,10 +392,33 @@ module rs #(parameter
         .ctag_in(ctag_in)
     );
 
+    rs_part #(
+        .PAYLOAD    (RS_BRU_PAYLOAD),
+        .PART_SZ    (RS_BRU_SZ),
+        .NUM_FU     (`NUM_FU_BRU),
+        .ISS_CDB_ARB(`TRUE)
+    ) rs_bru (
+        .clock  (clock),
+        .reset  (reset),
+        .flush  (flush),
+
+        .d_in_en        (d_in.en[FU_BRU]),
+        .d_in_dat       (tmp_dat_bru),
+        .d_out_rdy_sbus (d_out.rdy_sbus[FU_BRU]),
+
+        .ex_in_fu_rdy       (ex_in.fu_rdy_bru),
+        .ex_in_fu_cdb_gnt   (ex_in.fu_cdb_gnt_bru),
+
+        .ex_out_fu_vld  (ex_out.fu_vld_bru),
+        .ex_out_fu_en   (ex_out.fu_en_bru),
+        .ex_out_fu_dat  (ex_out.fu_dat_bru),
+
+        .ctag_in(ctag_in)
+    );
+
     // default rdy_sbus for partitions not yet defined
     assign d_out.rdy_sbus[FU_LOAD]  = '0;
     assign d_out.rdy_sbus[FU_STORE] = '0;
-    assign d_out.rdy_sbus[FU_BRU]  = '0;
 
     assign ex_out.fu_en_load    = '0;
     assign ex_out.fu_en_store   = '0;

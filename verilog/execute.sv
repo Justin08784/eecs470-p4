@@ -407,6 +407,7 @@ module stage_ex_p4 (
             ID_MUL_VIEW [`NUM_FU_MULT-1:0]  mul;
             ID_LOD_VIEW [`NUM_FU_LOAD-1:0]  lod;
             ID_STR_VIEW [`NUM_FU_STORE-1:0] str;
+            ID_BRU_VIEW [`NUM_FU_BRU-1:0]   bru;
         } i_dat, o_dat;
     } iss;
 
@@ -418,6 +419,7 @@ module stage_ex_p4 (
             MUL_REGS [`NUM_FU_MULT-1:0]  mul;
             LOD_REGS [`NUM_FU_LOAD-1:0]  lod;
             STR_REGS [`NUM_FU_STORE-1:0] str;
+            BRU_REGS [`NUM_FU_BRU-1:0]   bru;
         } i_dat, o_dat;
     } regs;
     
@@ -584,6 +586,12 @@ module stage_ex_p4 (
             prf_out.t1s.str[i]    = iss.o_dat.str[i].t1; 
             prf_out.t2s.str[i]    = iss.o_dat.str[i].t2; 
         end
+        foreach (iss.o_vld.bru[i]) begin
+            prf_out.en1s.bru[i]   = '0; // FIXME
+            prf_out.en2s.bru[i]   = '0;
+            prf_out.t1s.bru[i]    = '0;
+            prf_out.t2s.bru[i]    = '0; 
+        end
     end
 
     struct packed {
@@ -719,6 +727,7 @@ module stage_ex_p4 (
 
     `BY_FU(CPL_CAND) cands;
     assign cands.str = '0; // alu, mul, lod set by respective *_ex's
+    assign cands.bru = '0; // FIXME
     CPL_CAND [`NUM_FU_TOTAL-1:0] cands_flat;
     assign cands_flat = cands;
 
@@ -735,6 +744,7 @@ module stage_ex_p4 (
     // cdb_req.lod set by lod_ex
     assign cdb_req.lod = '0; // FIXME
     assign cdb_req.str = '0;
+    assign cdb_req.bru = '0; // FIXME
     `BY_FU(logic) cdb_gnt;
 
     psel_gen #(
@@ -789,11 +799,13 @@ module stage_ex_p4 (
     always_comb begin
         rs_out = '{
             fu_cdb_gnt_alu  : cdb_gnt.alu,
+            fu_cdb_gnt_bru  : '0, // FIXME
 
             fu_rdy_alu      : iss.i_rdy.alu,
             fu_rdy_mult     : iss.i_rdy.mul,
             fu_rdy_load     : iss.i_rdy.lod,
-            fu_rdy_store    : iss.i_rdy.str
+            fu_rdy_store    : iss.i_rdy.str,
+            fu_rdy_bru      : '0 // FIXME
         };
 
         foreach (rs_in.fu_dat_alu[i])

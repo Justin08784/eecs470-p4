@@ -1150,7 +1150,7 @@ module testbench;
         $display("  %3d | >> EXECUTE", $time);
 
         for (int i = 0; i < `NUM_FU_ALU; ++i) begin
-            $display("alu_iss[%0d]: rdy: %b, vld: %b, t: %2d, t1: %2d, t2: %2d, rob_idx: %2d, btq_idx: %2d, inst: 0x%x, PC: 0x%x, NPC: 0x%x, cond_branch: %b, uncond_branch: %b",
+            $display("alu_iss[%0d]: rdy: %b, vld: %b, t: %2d, t1: %2d, t2: %2d, rob_idx: %2d, btq_idx: %2d, inst: 0x%x, PC: 0x%x, cond_branch: %b, uncond_branch: %b",
                 i,
                 dbg_execute.iss.i_rdy.alu[i],
                 dbg_execute.iss.o_vld.alu[i],
@@ -1161,7 +1161,6 @@ module testbench;
                 dbg_execute.iss.o_dat.alu[i].btq_idx,
                 dbg_execute.iss.o_dat.alu[i].inst,
                 dbg_execute.iss.o_dat.alu[i].PC,
-                dbg_execute.iss.o_dat.alu[i].NPC,
                 dbg_execute.iss.o_dat.alu[i].cond_branch,
                 dbg_execute.iss.o_dat.alu[i].uncond_branch
             );
