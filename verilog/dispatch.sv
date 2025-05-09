@@ -251,6 +251,7 @@ module dispatch #(parameter
         commit_en   = '0;
         foreach (en_by_fu[f, n])
             commit_en[n] |= en_by_fu[f][n];
+        // enforce in-order dispatch
         for (int n = 1; n < `N; ++n)
             commit_en[n] &= commit_en[n - 1];
 
