@@ -240,13 +240,10 @@ module dispatch #(parameter
     // handle rs output 
     always_comb begin
         logic [`FU_IDX_NUM-1:0][`N-1:0] en_by_fu;
-        logic [`N-1:0] rename_vld;
         logic [`N-1:0] commit_en;
 
-        foreach (rename_vld[n])
-            rename_vld[n] = n < rename_vld_scnt;
         foreach (en_by_fu[f, n]) begin
-            en_by_fu[f][n] = rename_vld[n]
+            en_by_fu[f][n] = (n < rename_vld_scnt)
                 && commit_in[n].dat.fu_idx == f
                 && rs_in.rdy_sbus[f][n];
         end
