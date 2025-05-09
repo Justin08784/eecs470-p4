@@ -683,20 +683,114 @@ module stage_ex_p4 (
 
         ctag_out_n = '0;
         cdat_out_n = '0;
-        foreach(cdb2fu_gbus_shr[_, c, f]) begin
-            if (cdb2fu_gbus[c][f]) begin
-                ctag_out_n.en[c]  |= 1;
-                ctag_out_n.ts[c]  |= ctag_ts_flat[f];
+        // foreach(cdb2fu_gbus_shr[_, c, f]) begin
+        //     if (cdb2fu_gbus[c][f]) begin
+        //         ctag_out_n.en[c]  |= 1;
+        //         ctag_out_n.ts[c]  |= ctag_ts_flat[f];
+        //     end
+
+        //     if (cdb2fu_gbus_shr[1][c][f]) begin
+        //         cdat_out_n.en[c]        |= 1;
+        //         cdat_out_n.ts[c]        |= cands_flat[f].t;
+        //         cdat_out_n.rob_idxs[c]  |= cands_flat[f].rob_idx;
+        //         cdat_out_n.data[c]      |= cands_flat[f].data;
+        //     end
+
+        // end
+
+        for (int c = 0; c < `N; ++c) begin : sel_cdb_tag
+            unique casez (cdb2fu_gbus[c])
+            (1<<0): begin
+                ctag_out_n.en[c]       = 1;
+                ctag_out_n.ts[c]       = ctag_ts_flat[0];
             end
 
-            if (cdb2fu_gbus_shr[1][c][f]) begin
-                cdat_out_n.en[c]        |= 1;
-                cdat_out_n.ts[c]        |= cands_flat[f].t;
-                cdat_out_n.rob_idxs[c]  |= cands_flat[f].rob_idx;
-                cdat_out_n.data[c]      |= cands_flat[f].data;
+            (1<<1): begin
+                ctag_out_n.en[c]       = 1;
+                ctag_out_n.ts[c]       = ctag_ts_flat[1];
             end
 
+            (1<<2): begin
+                ctag_out_n.en[c]       = 1;
+                ctag_out_n.ts[c]       = ctag_ts_flat[2];
+            end
+
+            (1<<3): begin
+                ctag_out_n.en[c]       = 1;
+                ctag_out_n.ts[c]       = ctag_ts_flat[3];
+            end
+
+            (1<<4): begin
+                ctag_out_n.en[c]       = 1;
+                ctag_out_n.ts[c]       = ctag_ts_flat[4];
+            end
+
+            default:;
+            endcase
         end
+
+        for (int c = 0; c < `N; ++c) begin : sel_cdb_data
+            unique casez (cdb2fu_gbus_shr[1][c])
+            (1<<0): begin
+                cdat_out_n.en[c]       = 1;
+                cdat_out_n.ts[c]       = cands_flat[0].t;
+                cdat_out_n.rob_idxs[c] = cands_flat[0].rob_idx;
+                cdat_out_n.data[c]     = cands_flat[0].data;
+            end
+
+            (1<<1): begin
+                cdat_out_n.en[c]       = 1;
+                cdat_out_n.ts[c]       = cands_flat[1].t;
+                cdat_out_n.rob_idxs[c] = cands_flat[1].rob_idx;
+                cdat_out_n.data[c]     = cands_flat[1].data;
+            end
+
+            (1<<2): begin
+                cdat_out_n.en[c]       = 1;
+                cdat_out_n.ts[c]       = cands_flat[2].t;
+                cdat_out_n.rob_idxs[c] = cands_flat[2].rob_idx;
+                cdat_out_n.data[c]     = cands_flat[2].data;
+            end
+
+            (1<<3): begin
+                cdat_out_n.en[c]       = 1;
+                cdat_out_n.ts[c]       = cands_flat[3].t;
+                cdat_out_n.rob_idxs[c] = cands_flat[3].rob_idx;
+                cdat_out_n.data[c]     = cands_flat[3].data;
+            end
+
+            (1<<4): begin
+                cdat_out_n.en[c]       = 1;
+                cdat_out_n.ts[c]       = cands_flat[4].t;
+                cdat_out_n.rob_idxs[c] = cands_flat[4].rob_idx;
+                cdat_out_n.data[c]     = cands_flat[4].data;
+            end
+
+            default:;
+            endcase
+        end
+
+        // for (int c = 0; c < `N; ++c) begin
+        //     for (int f = 0; f < `NUM_FU_TOTAL; ++f) begin
+        //         if (cdb2fu_gbus[c][f]) begin
+        //             ctag_out_n.en[c] = 1;
+        //             ctag_out_n.ts[c] = ctag_ts_flat[f];
+        //             break;
+        //         end
+        //     end
+        // end
+
+        // for (int c = 0; c < `N; ++c) begin
+        //     for (int f = 0; f < `NUM_FU_TOTAL; ++f) begin
+        //         if (cdb2fu_gbus_shr[1][c][f]) begin
+        //             cdat_out_n.en[c]        = 1;
+        //             cdat_out_n.ts[c]        = cands_flat[f].t;
+        //             cdat_out_n.rob_idxs[c]  = cands_flat[f].rob_idx;
+        //             cdat_out_n.data[c]      = cands_flat[f].data;
+        //             break;
+        //         end
+        //     end
+        // end
     end
 
     always_ff @(posedge clock) begin

@@ -239,7 +239,7 @@ module dispatch #(parameter
 
     // handle rs output 
     always_comb begin
-        commit_en_cnt   = `MIN(rename_vld_scnt, rs_in.rs_rdy_scnt);
+        commit_en_cnt   = `MIN(rename_vld_scnt, rs_in.alu_rdy_scnt);
         rs_out.d_en_cnt = commit_en_cnt;
         rs_out.d_dat    = '0;
 

@@ -27,20 +27,16 @@ module rs_part #(
     input flush,
 
     // dispatch
-    input  struct packed {
-        logic   [$clog2(`N):0]  en_cnt;
-        PAYLOAD [`N-1:0]        dat;
-    } d_in,
+    input  logic   [$clog2(`N):0]  d_in_en_cnt,
+    input  PAYLOAD [`N-1:0]        d_in_dat,
 
     output logic [$clog2(`N):0] d_out_rdy_scnt,
 
     // issue
-    input  struct packed {
-        logic   [NUM_FU-1:0]    fu_rdy;
+    input  logic   [NUM_FU-1:0] ex_in_fu_rdy,
 
-        // logic   [NUM_FU-1:0]    cdb_gnt;
-        logic   [NUM_FU-1:0]    fu_cdb_gnt; // 1-cycle insns need to win CDB arb. to issue
-    } ex_in,
+    // logic   [NUM_FU-1:0]    cdb_gnt;
+    input  logic   [NUM_FU-1:0] ex_in_fu_cdb_gnt, // 1-cycle insns need to win CDB arb. to issue
 
     /* Requested by issue arbiter
     (only ALU/BRCH needs gnt by CDB arbiter to 'en')*/
@@ -128,7 +124,7 @@ module rs_part #(
         .WIDTH  (NUM_FU),
         .REQS   (NUM_FU)
     ) sel_rdy_alu (
-        .req    (ex_in.fu_rdy),
+        .req    (ex_in_fu_rdy),
         .gnt_bus(gbus_fu_rdy)
     );
 
@@ -149,8 +145,8 @@ module rs_part #(
                 ex_out_fu_vld[j]    = |gbus_can_issue[i];
                 /* WARNING: There is an entire CDB arbitration between these two lines...
                 ALU insns can only issue if they ALSO win (early) CDB arbitration! */
-                ex_out_fu_en[j]     = ex_out_fu_vld[j] && ex_in.fu_cdb_gnt[j];
-                to_issue            |= ex_in.fu_cdb_gnt[j] ? gbus_can_issue[i] : '0;
+                ex_out_fu_en[j]     = ex_out_fu_vld[j] && ex_in_fu_cdb_gnt[j];
+                to_issue            |= ex_in_fu_cdb_gnt[j] ? gbus_can_issue[i] : '0;
             end
         end
     end
@@ -186,7 +182,7 @@ module rs_part #(
         logic [N-1:0] any_gbus_free;
         d2entry = '0;
         foreach (d2entry[i]) begin
-            if (i < d_in.en_cnt) begin
+            if (i < d_in_en_cnt) begin
                 d2entry[i] |= gbus_free[i];
             end
         end
@@ -219,7 +215,7 @@ module rs_part #(
                         continue;
                     entries[rs].busy    <= 1;
                     entries[rs].issd    <= 0;
-                    entries[rs].dat     <= d_in.dat[n];
+                    entries[rs].dat     <= d_in_dat[n];
                 end
             end
 
@@ -312,23 +308,23 @@ module rs #(parameter
         .reset  (reset),
         .flush  (flush),
 
-        .d_in   ('{
-            en_cnt  : d_in.d_en_cnt,
-            dat     : tmp_dat_alu
-        }),
-        .d_out_rdy_scnt (d_out.rs_rdy_scnt),
+        .d_in_en_cnt    (d_in.d_en_cnt),
+        .d_in_dat       (tmp_dat_alu),
+        .d_out_rdy_scnt (d_out.alu_rdy_scnt),
 
-        .ex_in  ('{
-            fu_rdy      : ex_in.fu_rdy_alu,
-            fu_cdb_gnt  : ex_in.fu_cdb_gnt_alu
-        }),
+        .ex_in_fu_rdy       (ex_in.fu_rdy_alu),
+        .ex_in_fu_cdb_gnt   (ex_in.fu_cdb_gnt_alu),
+
         .ex_out_fu_vld  (ex_out.fu_vld_alu),
         .ex_out_fu_en   (ex_out.fu_en_alu),
         .ex_out_fu_dat  (ex_out.fu_dat_alu),
 
         .ctag_in(ctag_in)
-
     );
+
+    // assign d_out.mult_rdy_scnt = '0;
+    // assign d_out.load_rdy_scnt = '0;
+    // assign d_out.stor_rdy_scnt = '0;
 
     assign ex_out.fu_en_mult    = '0;
     assign ex_out.fu_en_load    = '0;

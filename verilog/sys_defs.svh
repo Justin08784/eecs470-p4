@@ -45,7 +45,7 @@
 `define NUM_FU_MULT 1
 `define NUM_FU_LOAD 1
 `define LD_BAY_SZ 2 //num load bays in the FU
-`define NUM_FU_STORE 2
+`define NUM_FU_STORE 1
 // `define NUM_FU_TOTAL `NUM_FU_ALU + `NUM_FU_MULT + `NUM_FU_LOAD + `NUM_FU_STORE
 `define NUM_FU_TOTAL `NUM_FU_ALU + `NUM_FU_MULT + `NUM_FU_LOAD + `NUM_FU_STORE
 
@@ -69,7 +69,7 @@
 ///////////////////////////////
 /* How can we implement this in the Makefile? */
 // comment out to enable synth only constructions
-// `define SYNTH
+`define SYNTH
 
 `ifndef SYNTH
 // comment out to disable DEBUG:
@@ -769,7 +769,10 @@ typedef struct packed {
 
 // By RS
 typedef struct packed {
-    logic       [$clog2(`N):0] rs_rdy_scnt;
+    logic       [$clog2(`N):0] alu_rdy_scnt;
+    // logic       [$clog2(`N):0] mult_rdy_scnt;
+    // logic       [$clog2(`N):0] load_rdy_scnt;
+    // logic       [$clog2(`N):0] stor_rdy_scnt;
         // - From: RS
 } rs2dispatch;
 
