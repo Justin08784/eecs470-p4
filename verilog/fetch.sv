@@ -155,20 +155,20 @@ module btb #(parameter
 
         // retire
         foreach (btq_in.en[i]) begin
-            SID sid;
-            TAG tag;
+            LOC loc;
             WAY way;
 
             if (!btq_in.en[i])
                 continue;
-            sid = get_sid(btq_in.pc[i]);
-            tag = get_tag(btq_in.pc[i]);
-            way = wr_ways[sid];
+            loc = locate(hdr, btq_in.pc[i]);
+            if (loc.hit) // dedup (dont insert if already there)
+                continue;
+            way = wr_ways[loc.sid];
 
-            hdr_n.vld[sid][way] = 1;
-            hdr_n.tag[sid][way] = tag;
-            hdr_n.lru[sid] = !way;
-            tgt_n[sid][way] = btq_in.tgt[i];
+            hdr_n.vld[loc.sid][way] = 1;
+            hdr_n.tag[loc.sid][way] = loc.tag;
+            hdr_n.lru[loc.sid] = !way;
+            tgt_n[loc.sid][way] = btq_in.tgt[i];
         end
     end
 
@@ -196,7 +196,7 @@ module btb #(parameter
                 $display("  %1d: {tag: 0x%x tgt: %x} ",
                     w,
                     hdr.tag[s][w],
-                    tgt[s][w]
+                    w2addr(tgt[s][w])
                 );
             end
         end
