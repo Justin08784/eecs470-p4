@@ -159,6 +159,8 @@ module btb #(parameter
             TAG tag;
             WAY way;
 
+            if (!btq_in.en[i])
+                continue;
             sid = get_sid(btq_in.pc[i]);
             tag = get_tag(btq_in.pc[i]);
             way = wr_ways[sid];
