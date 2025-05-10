@@ -17,16 +17,21 @@ module btb #(parameter
     localparam NUM_SETS = NUM_LINES / ASSOC;
 
     localparam SID_BITS     = $clog2(NUM_SETS);
-    localparam TAG_BITS     = $bits(WADDR) - SID_BITS;
+    localparam TAG_SKIMP    = 3;
+    /*
+    TAG_SKIMP = how many bits to drop from the full tag that is required to
+    eliminate aliases (0 for no alias).
+
+    Increasing will result in more aliases, but acceptable for
+    BTB since they are speculative. Can be worth to save area and logic.
+    */
+    localparam TAG_BITS     = $bits(WADDR) - SID_BITS - TAG_SKIMP;
     typedef logic [SID_BITS-1:0] SID;
-    /*NOTE: We don't need a full tag. The BTB doesn't need
-    perfect accuracy since it is a predictor anyways. Can
-    use smaller tag and save area.  */
     typedef logic [TAG_BITS-1:0] TAG;
     typedef logic [$clog2(ASSOC)-1:0]   WAY;
 
     function automatic TAG get_tag(input WADDR waddr);
-        return waddr[$bits(WADDR)-1:SID_BITS];
+        return waddr[SID_BITS+TAG_BITS-1:SID_BITS];
     endfunction
     function automatic SID get_sid(input WADDR waddr);
         return waddr[SID_BITS-1:0];
