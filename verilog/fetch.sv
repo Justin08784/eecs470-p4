@@ -163,6 +163,16 @@ module btb #(parameter
             loc = locate(hdr, btq_in.pc[i]);
             if (loc.hit) // dedup (dont insert if already there)
                 continue;
+            /*
+            FIXME: If two writes collide to the same index, then
+            they will write to the same wr_way. Solution: allow
+            only 1 branch to update the predictor states.
+
+            Have a PUQ (predictor update queue), which can accept
+            N retiring branches (to absorb bursts), but can only write
+            1 update to the predictors. If PUQ is full, branch retire
+            must stall (send backpressure to retire).
+            */
             way = wr_ways[loc.sid];
 
             hdr_n.vld[loc.sid][way] = 1;
