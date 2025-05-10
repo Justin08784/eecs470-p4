@@ -10,52 +10,6 @@
 
 `include "sys_defs.svh"
 
-/*
-- unsure about correctness of call/ret checking; make sure to
-test thoroughly with progs with function calls
-- TODO: move this to icache refill path and store the 4 bits in
-the icache metadata
-*/
-module predecoder (
-    input  INST     inst,
-
-    output logic    call,
-    output logic    ret,
-    output logic    cond_branch,
-    output logic    uncond_branch
-);
-    always_comb begin
-        REG_IDX rd;
-        call            = `FALSE;
-        ret             = `FALSE;
-        cond_branch     = `FALSE;
-        uncond_branch   = `FALSE;
-        rd = inst.r.rd;
-
-        casez (inst)
-            `RV32_JAL: begin
-                uncond_branch = `TRUE;
-                call = (rd == 5'd1) || (rd == 5'd5);
-            end
-
-            `RV32_JALR: begin
-                uncond_branch = `TRUE;
-                call = (rd == 5'd1) || (rd == 5'd5);
-                ret  = (rd         == `ZERO_REG)    &&
-                       (inst.r.rs1 == 5'd1)         &&   // rs1 lives in same bit‑slice for I‑type
-                       (inst.i.imm == 12'd0);
-            end
-
-            `RV32_BEQ, `RV32_BNE, `RV32_BLT, `RV32_BGE,
-            `RV32_BLTU, `RV32_BGEU: begin
-                cond_branch = `TRUE;
-                // stage_ex uses inst.b.funct3 as the branch function
-            end
-            default:;
-        endcase // casez (inst)
-    end // always
-endmodule // predecoder
-
 module btb #(parameter
     NUM_LINES=256
 ) (
@@ -235,8 +189,8 @@ module stage_if_p4 (
 
     input   retire2fetch r_in,
 
-    output  ADDR        [`N-1:0] mem_out_PCs,
-    input   MEM_BLOCK   [`N-1:0] mem_in_data
+    output  fetch2mem   mem_out,
+    input   mem2fetch   mem_in
 );
     WADDR PC_reg;       // base PC for this cycle
     WADDR [`N:0] PC_n;  // PC_n[m] := next PC if we fetch "m" this cycle (inaccurate past the 1st branch)
@@ -253,14 +207,14 @@ module stage_if_p4 (
         PC_n[0] = PC_reg;
         for (int i = 0; i < `N; ++i) begin
             PC_n[i + 1] = PC_reg + i + 1;
-            mem_out_PCs[i] = w2addr(PC_n[i]);
+            mem_out.PCs[i] = w2addr(PC_n[i]);
         end
 
         for (int unsigned i = 0; i < `N; ++i) begin
             woff = PC_n[i][0];
 
             f_dat[i] = '{
-                inst    : mem_in_data[i].word_level[woff],
+                inst    : mem_in.data[i].word_level[woff],
                 PC      : PC_n[i],
                 pred    : 1'b0,
                 pred_tgt: '0
