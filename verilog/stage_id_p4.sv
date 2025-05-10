@@ -290,7 +290,9 @@ module stage_id_p4 (
         wr_fifo = '0;
         for (int unsigned i = 0; i < `N; ++i) begin
             wr_fifo[i] = '{
+`ifdef DEBUG
                 id          : insn_id + i,
+`endif
 
                 t           : '0,
                 t1          : '0,

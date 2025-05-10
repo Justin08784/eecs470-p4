@@ -599,8 +599,9 @@ parameter RS_STOR_SZ    = 4;
 parameter RS_BRU_SZ     = 4;
 parameter RS_SZ         = RS_ALU_SZ + RS_MULT_SZ; // FIXME: add brch, load, stor
 typedef struct packed {
-    // general
+`ifdef DEBUG
     int             id; // debug only; unique insn identifier
+`endif
 
     WADDR           PC;
     INST            inst;
@@ -619,7 +620,9 @@ typedef struct packed {
 } RS_ALU_PAYLOAD;
 
 typedef struct packed {
+`ifdef DEBUG
     int             id;
+`endif
 
     PHYS_REG_IDX    t;
     PHYS_REG_IDX    t1;
@@ -631,18 +634,25 @@ typedef struct packed {
 } RS_MULT_PAYLOAD;
 
 typedef struct packed {
-    /* FIXME: stubbed */
+`ifdef DEBUG
     int             id;
+`endif
+    /* FIXME: stubbed */
+    logic _dummy;
 } RS_LOAD_PAYLOAD;
 
 typedef struct packed {
-    /* FIXME: stubbed */
+`ifdef DEBUG
     int             id;
+`endif
+    /* FIXME: stubbed */
+    logic _dummy;
 } RS_STOR_PAYLOAD;
 
 typedef struct packed {
-    // general
-    int             id; // debug only; unique insn identifier
+`ifdef DEBUG
+    int             id;
+`endif
 
     WADDR           PC;
     INST            inst;
@@ -664,7 +674,9 @@ typedef struct packed {
 } RS_BRU_PAYLOAD;
 
 typedef struct packed {
-    int             id; // debug only; unique insn identifier
+`ifdef DEBUG
+    int             id;
+`endif
 
     PHYS_REG_IDX    t;
     PHYS_REG_IDX    t1;
@@ -713,7 +725,6 @@ typedef struct packed {
 } fetch2decode;
 
 typedef struct packed {
-    logic [`N-1:0] en;
     WADDR [`N-1:0] pc;
 } fetch2btb;
 

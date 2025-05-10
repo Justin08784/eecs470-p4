@@ -277,7 +277,9 @@ module rs #(parameter
     always_comb begin
         foreach (d_in.dat[i]) begin
             tmp_dat_alu[i] = '{
+`ifdef DEBUG
                 id          : d_in.dat[i].id,
+`endif
 
                 PC          : d_in.dat[i].PC,
                 inst        : d_in.dat[i].inst,
@@ -300,7 +302,9 @@ module rs #(parameter
     always_comb begin
         foreach (d_in.dat[i]) begin
             tmp_dat_mult[i] = '{
+`ifdef DEBUG
                 id          : d_in.dat[i].id,
+`endif
 
                 t           : d_in.dat[i].t,
                 t1          : d_in.dat[i].t1,
@@ -317,7 +321,9 @@ module rs #(parameter
     always_comb begin
         foreach (d_in.dat[i]) begin
             tmp_dat_bru[i] = '{
+`ifdef DEBUG
                 id          : d_in.dat[i].id,
+`endif
 
                 PC          : d_in.dat[i].PC,
                 inst        : d_in.dat[i].inst,

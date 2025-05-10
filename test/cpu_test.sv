@@ -278,7 +278,9 @@ module testbench;
 
     // shadow ROB containing only debug info
     typedef struct packed {
+`ifdef DEBUG
         int   id;
+`endif
         logic is_brch;
         logic wr_mem;
         logic rd_mem;
@@ -331,7 +333,9 @@ module testbench;
                     break;
                 cur_idx = verisimpleV.rob_0.comm_idxs[i];
                 rob_debug[cur_idx] = '{
+`ifdef DEBUG
                     id      : verisimpleV.rs_0.d_in.dat[i].id,
+`endif
                     halt    : verisimpleV.rob_0.d_in.halt[i],
                     illegal : verisimpleV.rob_0.d_in.illegal[i],
                     is_brch : verisimpleV.rob_0.d_in.is_brch[i],
@@ -392,7 +396,9 @@ module testbench;
 
 `ifndef SYNTH
             cur_idx = verisimpleV.rob_0.rtre_idxs[n];
+`ifdef DEBUG
             id      = rob_debug[cur_idx].id;
+`endif
             pc      = rob_debug[cur_idx].NPC - 4;
             block   = memory.unified_memory[pc[31:3]];
             inst    = block.word_level[pc[2]];

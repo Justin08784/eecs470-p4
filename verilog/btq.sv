@@ -85,8 +85,10 @@ module btq #(
 
         f_out.en = !puq_empty;
     end
+
+    localparam PUQ_SZ = 3;
     fifo #(
-        .DEPTH(`BTQ_SZ),
+        .DEPTH(PUQ_SZ),
         .WIDTH($bits(PUQ_ENTRY)),
         .NUM_RPORTS(1),
         .NUM_WPORTS(NUM_RPORTS),

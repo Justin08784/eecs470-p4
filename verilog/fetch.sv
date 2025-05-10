@@ -56,8 +56,6 @@ module stage_if_p4 (
                        || mem_in.insn_md[i][woff].uncond_branch);
 
             f2btb.pc[i] = PC_n[i];
-            f2btb.en[i] = is_brch[i];
-                // or should we just do: (i < f_cnt) && is_brch[i] ?
 
             pred[i]     = is_brch[i] && btb2f.vld[i];
             pred_tgt[i] = btb2f.tgt[i];
@@ -112,7 +110,7 @@ module stage_if_p4 (
         .NUM_WPORTS(`N),
         .ENABLE_INTR_FWD(`FALSE),
         .INSTANCE_ID(2)
-    ) dut (
+    ) insn_buf (
         .clock      (clock),
         .reset      (reset),
         .flush      (flush),
@@ -141,7 +139,8 @@ module stage_if_p4 (
         flush : flush,
         d_in  : d_in,
         d_out : d_out,
-        r_in  : r_in
+        r_in  : r_in,
+        puq_in: puq_in
     };
 `endif
 

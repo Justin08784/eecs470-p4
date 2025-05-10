@@ -86,7 +86,7 @@ module btb #(parameter
 
         // fetch
         f_out = '0;
-        foreach (f_in.en[i]) begin
+        foreach (f_in.pc[i]) begin
             LOC loc;
             loc = locate(hdr, f_in.pc[i]);
             f_out.vld[i] = loc.hit;
