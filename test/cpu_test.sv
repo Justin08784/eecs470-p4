@@ -714,21 +714,15 @@ module testbench;
         decode2fetch    d_in;
         fetch2decode    d_out;
         retire2fetch    r_in;
-        ADDR        [`N-1:0] mem_out_PCs;
-        MEM_BLOCK   [`N-1:0] mem_in_data;
 
         flush       = dbg_fetch.flush;
         d_in        = dbg_fetch.d_in;
         d_out       = dbg_fetch.d_out;
         r_in        = dbg_fetch.r_in;
-        mem_out_PCs = dbg_fetch.mem_out_PCs;
-        mem_in_data = dbg_fetch.mem_in_data;
 
         $display(">> Fetch >>");
         $display("r_in: {flush: %b, corrected_PC: 0x%x}", flush, r_in.corrected_PC);
         $display("d_out: {f_en_cnt: %b, dat: [%x, %x]}", d_out.f_en_cnt, d_out.f_dat[0], d_out.f_dat[1]);
-        $display("PCs:  %x", mem_out_PCs);
-        $display("Imem_data: %x", mem_in_data);
         $display("<< Fetch <<");
     endtask
 
@@ -1211,7 +1205,7 @@ module testbench;
         $display("  %3d | >> EXECUTE", $time);
 
         for (int i = 0; i < `NUM_FU_ALU; ++i) begin
-            $display("alu_iss[%0d]: rdy: %b, vld: %b, t: %2d, t1: %2d, t2: %2d, rob_idx: %2d, btq_idx: %2d, inst: 0x%x, PC: 0x%x, cond_branch: %b, uncond_branch: %b",
+            $display("alu_iss[%0d]: rdy: %b, vld: %b, t: %2d, t1: %2d, t2: %2d, rob_idx: %2d, inst: 0x%x, PC: 0x%x",
                 i,
                 dbg_execute.iss.i_rdy.alu[i],
                 dbg_execute.iss.o_vld.alu[i],
@@ -1219,11 +1213,8 @@ module testbench;
                 dbg_execute.iss.o_dat.alu[i].t1,
                 dbg_execute.iss.o_dat.alu[i].t2,
                 dbg_execute.iss.o_dat.alu[i].rob_idx,
-                dbg_execute.iss.o_dat.alu[i].btq_idx,
                 dbg_execute.iss.o_dat.alu[i].inst,
-                dbg_execute.iss.o_dat.alu[i].PC,
-                dbg_execute.iss.o_dat.alu[i].cond_branch,
-                dbg_execute.iss.o_dat.alu[i].uncond_branch
+                dbg_execute.iss.o_dat.alu[i].PC
             );
         end
 
@@ -1241,14 +1232,13 @@ module testbench;
         end
 
         for (int i = 0; i < `NUM_FU_ALU; ++i) begin
-            $display("regs.o_dat.alu[%0d]: bsy: %b, rs1: 0x%x, rs2: 0x%x t: %2d, rob_idx: %2d, btq_idx: %2d",
+            $display("regs.o_dat.alu[%0d]: bsy: %b, rs1: 0x%x, rs2: 0x%x t: %2d, rob_idx: %2d",
                 i,
                 dbg_execute.regs.o_vld.alu[i],
                 dbg_execute.regs.o_dat.alu[i].rs1,
                 dbg_execute.regs.o_dat.alu[i].rs2,
                 dbg_execute.regs.o_dat.alu[i].dat.t,
-                dbg_execute.regs.o_dat.alu[i].dat.rob_idx,
-                dbg_execute.regs.o_dat.alu[i].dat.btq_idx
+                dbg_execute.regs.o_dat.alu[i].dat.rob_idx
             );
         end
 
@@ -1384,6 +1374,9 @@ module testbench;
 
     endtask
 
+    task print_btb;
+        verisimpleV.fetch_0.btb0.print_btb();
+    endtask
 
 
     task print_custom_data;
@@ -1393,6 +1386,7 @@ module testbench;
             return;
 
         // $display("  | >> CYCLE: %3d (t: %3d)", clock_count-1, $time);
+        print_btb();
         // print_fetch();
         // print_icache();
         // print_decode();

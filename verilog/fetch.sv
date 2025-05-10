@@ -177,6 +177,27 @@ module btb #(parameter
             tgt <= tgt_n;
         end
     end
+
+`ifdef DEBUG
+    task automatic print_btb();
+        for (int s = 0; s < NUM_SETS; ++s) begin
+            if (!(|hdr.vld[s]))
+                continue;
+            $display("set[%2d]:", s);
+            for (int w = 0; w < ASSOC; ++w) begin
+                if (!hdr.vld[s][w]) begin
+                    $display("  %1d:", w);
+                    continue;
+                end
+                $display("  %1d: {tag: 0x%x tgt: %x} ",
+                    w,
+                    hdr.tag[s][w],
+                    tgt[s][w]
+                );
+            end
+        end
+    endtask
+`endif
 endmodule
 
 
@@ -312,8 +333,7 @@ module stage_if_p4 (
         d_in  : d_in,
         d_out : d_out,
         r_in  : r_in,
-        mem_out_PCs : mem_out_PCs, 
-        mem_in_data : mem_in_data
+        btq_in:btq_in
     };
 `endif
 
