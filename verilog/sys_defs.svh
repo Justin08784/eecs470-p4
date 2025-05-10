@@ -520,6 +520,12 @@ typedef struct packed {
 } btq2fetch;
 
 typedef struct packed {
+    logic [`N-1:0] en;
+    WADDR [`N-1:0] pc;
+    WADDR [`N-1:0] tgt;
+} btq2btb;
+
+typedef struct packed {
     logic   [$clog2(`N):0]  btq_rdy_scnt;
     BTQ_IDX [`N-1:0]        btq_idxs;
 } btq2dispatch;
@@ -699,6 +705,16 @@ typedef struct packed {
     logic       [$clog2(`N):0]  f_en_cnt;
     IF_ID_PACKET    [`N-1:0]    f_dat;
 } fetch2decode;
+
+typedef struct packed {
+    logic [`N-1:0] en;
+    WADDR [`N-1:0] pc;
+} fetch2btb;
+
+typedef struct packed {
+    logic [`N-1:0] vld; // i.e. hit?
+    WADDR [`N-1:0] tgt;
+} btb2fetch;
 
 // By decode
 typedef struct packed {

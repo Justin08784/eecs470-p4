@@ -307,6 +307,7 @@ CPU_SOURCES = verilog/cpu.sv \
 			  verilog/fetch.sv \
 			  verilog/execute.sv \
 			  verilog/btq.sv \
+			  verilog/btb.sv \
 			  verilog/skid_buffer.sv \
 			  verilog/retire.sv \
 			  verilog/victim.sv \
