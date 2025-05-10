@@ -10,6 +10,20 @@
 
 `include "sys_defs.svh"
 
+typedef struct packed {
+    logic [`N-1:0] en;
+    WADDR [`N-1:0] pc;
+} fetch2btb;
+typedef struct packed {
+    logic [`N-1:0] vld; // i.e. hit?
+    WADDR [`N-1:0] tgt;
+} btb2fetch;
+typedef struct packed {
+    logic [`N-1:0] en;
+    WADDR [`N-1:0] pc;
+    WADDR [`N-1:0] tgt;
+} retire2btb;
+
 module btb #(parameter
     NUM_LINES=256
 ) (
@@ -17,21 +31,11 @@ module btb #(parameter
     input reset,
 
     // query (fetch)
-    input struct packed {
-        logic [`N-1:0] en;
-        WADDR [`N-1:0] pc;
-    } f_in,
-    output struct packed {
-        logic [`N-1:0] vld; // i.e. hit?
-        WADDR [`N-1:0] tgt;
-    } f_out,
+    input   fetch2btb   f_in,
+    output  btb2fetch   f_out,
 
     // write (retire)
-    input struct packed {
-        logic [`N-1:0] en;
-        WADDR [`N-1:0] pc;
-        WADDR [`N-1:0] tgt;
-    } r_in
+    input   retire2btb  r_in
 );
     localparam ASSOC = 2;
     localparam NUM_SETS = NUM_LINES / ASSOC;
@@ -199,25 +203,63 @@ module stage_if_p4 (
     IF_ID_PACKET [`N-1:0]   f_dat;
 
     always_comb begin
-        logic woff;
-
         d_out.f_en_cnt = `MIN(used_scnt, d_in.d_rdy_cnt);
-        f_cnt = free_scnt;
 
         PC_n[0] = PC_reg;
         for (int i = 0; i < `N; ++i) begin
             PC_n[i + 1] = PC_reg + i + 1;
             mem_out.PCs[i] = w2addr(PC_n[i]);
         end
+    end
+
+    fetch2btb f2btb;
+    btb2fetch btb2f;
+    logic [`N-1:0] is_brch;
+    logic [`N-1:0] pred;
+    WADDR [`N-1:0] pred_tgt;
+    always_comb begin
+        logic woff;
+        foreach (is_brch[i]) begin
+            woff = PC_n[i][0];
+            is_brch[i] = (mem_in.insn_md[i][woff].cond_branch
+                       || mem_in.insn_md[i][woff].uncond_branch);
+
+            f2btb.pc[i] = PC_n[i];
+            f2btb.en[i] = is_brch[i];
+                // or should we just do: (i < f_cnt) && is_brch[i] ?
+
+            pred[i]     = is_brch[i] && btb2f.vld[i];
+            pred_tgt[i] = btb2f.tgt[i];
+        end
+    end
+    btb btb0 (
+        .clock(clock),
+        .reset(reset),
+
+        .f_in (f2btb),
+        .f_out(btb2f),
+
+        .r_in ('0) // FIXME
+    );
+
+    always_comb begin
+        // stop fetching beyond the first predicted taken branch
+        for (f_cnt = 0; f_cnt < free_scnt; ++f_cnt) begin
+            if (pred[f_cnt]) begin
+                ++f_cnt;
+                break;
+            end
+        end
 
         for (int unsigned i = 0; i < `N; ++i) begin
+            logic woff;
             woff = PC_n[i][0];
 
             f_dat[i] = '{
                 inst    : mem_in.data[i].word_level[woff],
                 PC      : PC_n[i],
-                pred    : 1'b0,
-                pred_tgt: '0
+                pred    : pred[i],
+                pred_tgt: pred_tgt[i]
             };
         end
     end
@@ -246,8 +288,10 @@ module stage_if_p4 (
             PC_reg <= 0;                    // initial PC value is 0 (the memory address where our program starts)
         end else if (flush) begin
             PC_reg <= r_in.corrected_PC;    // update to a taken branch (does not depend on valid bit)...
-        end else begin
-            PC_reg <= PC_n[f_cnt];          // ...or transition to next PC if valid
+        end else begin                      // ...or transition to next PC if valid
+            PC_reg <= 
+                f_cnt == 0    ? PC_reg :
+                pred[f_cnt-1] ? pred_tgt[f_cnt-1] : PC_n[f_cnt];
         end
     end
 
