@@ -125,6 +125,7 @@ module btb #(parameter
         end
     end
 
+
 `ifdef DEBUG
     task automatic print_btb();
         for (int s = 0; s < NUM_SETS; ++s) begin
