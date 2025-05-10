@@ -244,9 +244,12 @@ module stage_if_p4 (
 
     always_comb begin
         // stop fetching beyond the first predicted taken branch
-        for (f_cnt = 0; f_cnt < free_scnt; ++f_cnt) begin
-            if (pred[f_cnt]) begin
-                ++f_cnt;
+        f_cnt = 0;
+        for (int i = 0; i < `N; ++i) begin
+            if (i >= free_scnt)
+                break;
+            f_cnt = i + 1;
+            if (pred[i]) begin
                 break;
             end
         end
