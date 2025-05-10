@@ -38,6 +38,7 @@ module retire (
     WADDR corrected_PC_n;
 
     always_comb begin
+        logic [$clog2(`N):0] puq_credits;
         mispred = 0;
         mispred_target = '0;
 
@@ -46,6 +47,7 @@ module retire (
         btq_out = '0;
 
 
+        puq_credits = btq_in.puq_rdy_scnt;
         for (int i = 0; i < rob_in.r_vld_cnt; ++i) begin
             if (!rob_in.entries[i].cpl)
                 break;
@@ -61,10 +63,21 @@ module retire (
             //     break;
             // end
 
-            ++r_en_cnt;
 
-            if (!rob_in.entries[i].is_brch)
+            if (!rob_in.entries[i].is_brch) begin
+                ++r_en_cnt;
                 continue;
+            end
+
+            /* is a branch... */
+            if (puq_credits > 0) begin
+                --puq_credits;
+                ++r_en_cnt;
+            end else begin
+                // puq at capacity; cannot retire
+                break;
+            end
+            
 
             if (btq_in.dat[btq_rd_cnt].pred != btq_in.dat[btq_rd_cnt].take) begin
                 // is mispred?

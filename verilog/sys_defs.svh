@@ -513,17 +513,22 @@ typedef struct packed {
 } BTQ_ENTRY;
 
 typedef struct packed {
-    logic   [`N-1:0]    en;
-    logic   [`N-1:0]    take;
-    WADDR   [`N-1:0]    pc;
-    WADDR   [`N-1:0]    tgt;
-} btq2fetch;
+    logic take;
+    WADDR pc;
+    WADDR tgt;
+} PUQ_ENTRY;
 
 typedef struct packed {
-    logic [`N-1:0] en;
-    WADDR [`N-1:0] pc;
-    WADDR [`N-1:0] tgt;
-} btq2btb;
+    logic       en;
+    PUQ_ENTRY   dat;
+} puq2fetch;
+
+
+typedef struct packed {
+    logic en;
+    WADDR pc;
+    WADDR tgt;
+} puq2btb;
 
 typedef struct packed {
     logic   [$clog2(`N):0]  btq_rdy_scnt;
@@ -531,7 +536,8 @@ typedef struct packed {
 } btq2dispatch;
 
 typedef struct packed {
-    logic   [$clog2(`N):0]  used_scnt; // FIXME: This is actually unused?
+    logic   [$clog2(`N):0]  btq_used_scnt;
+    logic   [$clog2(`N):0]  puq_rdy_scnt;
     BTQ_ENTRY [`N-1:0]      dat;
 } btq2retire;
 
@@ -974,7 +980,7 @@ typedef struct packed {
     decode2fetch    d_in;
     fetch2decode    d_out;
     retire2fetch    r_in;
-    btq2fetch       btq_in;
+    puq2fetch       puq_in;
     // submodule
 } DBG_fetch;
 

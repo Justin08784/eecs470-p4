@@ -20,7 +20,7 @@ module btq #(
     input  execute2btq  ex_in,
 
     // fetch (bp update)
-    output btq2fetch    f_out,
+    output puq2fetch    f_out,
 
     // dispatch (write)
     input  dispatch2btq d_in,
@@ -52,8 +52,7 @@ module btq #(
             d_idxs[i] = (tail + i) % BTQ_SZ;
 
         // handle retire (outs)
-        r_out = '0;
-        r_out.used_scnt = `MIN(used, NUM_RPORTS);
+        r_out.btq_used_scnt = `MIN(used, NUM_RPORTS);
         for (int unsigned i = 0; i < NUM_RPORTS; ++i)
             r_out.dat[i] = state[r_idxs[i]];
 
@@ -75,20 +74,39 @@ module btq #(
         };
     end
 
-    btq2fetch f_out_n;
+    logic puq_empty;
+    PUQ_ENTRY [NUM_RPORTS-1:0] tmp_puq_in;
     always_comb begin
-        f_out_n = '0;
         for (int i = 0; i < NUM_RPORTS; ++i) begin
-            f_out_n.en[i]   = i < rd_cnt;
-            f_out_n.take[i] = state[r_idxs[i]].take;
-            f_out_n.pc[i]   = state[r_idxs[i]].PC;
-            f_out_n.tgt[i]  = state[r_idxs[i]].tgt;
+            tmp_puq_in[i].take = state[r_idxs[i]].take;
+            tmp_puq_in[i].pc   = state[r_idxs[i]].PC;
+            tmp_puq_in[i].tgt  = state[r_idxs[i]].tgt;
         end
+
+        f_out.en = !puq_empty;
     end
+    fifo #(
+        .DEPTH(`BTQ_SZ),
+        .WIDTH($bits(PUQ_ENTRY)),
+        .NUM_RPORTS(1),
+        .NUM_WPORTS(NUM_RPORTS),
+        .ENABLE_INTR_FWD(`FALSE),
+        .INSTANCE_ID(2)
+    ) puq ( // predictor update queue
+        .clock      (clock),
+        .reset      (reset),
+        .flush      ('0),
+        .wr_en_cnt  (rd_cnt),
+        .wr_data    (tmp_puq_in),
+        .rd_en_cnt  (f_out.en),
+        .rd_data    (f_out.dat),
+        .free_scnt  (r_out.puq_rdy_scnt),
+        .used_scnt  (),
+        .empty      (puq_empty)
+    );
 
     always_ff @(posedge clock) begin
         if (reset || flush) begin
-            f_out   <= '0;
             used    <= 0;
             head    <= 0;
             tail    <= 0;
@@ -98,7 +116,6 @@ module btq #(
                 $error("BTQ overflow!");
             if (rd_cnt > used)
                 $error("BTQ underflow!");
-            f_out   <= f_out_n;
             used    <= used + wr_cnt - rd_cnt;
             head    <= (head + rd_cnt) % BTQ_SZ;
             tail    <= (tail + wr_cnt) % BTQ_SZ;
