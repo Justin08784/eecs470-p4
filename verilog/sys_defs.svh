@@ -55,9 +55,6 @@
 // Justin: funny enough we need at least 8 or else multiply is on critical path
 
 
-`define BTB_ENTRIES 256
-`define BTB_TAG_WIDTH 12
-
 `define BHT_ENTRIES 256
 `define HISTORY_BITS 8
 `define PHT_ENTRIES 256
