@@ -19,6 +19,9 @@ module btq #(
     // complete (write)
     input  execute2btq  ex_in,
 
+    // fetch (bp update)
+    output btq2fetch    f_out,
+
     // dispatch (write)
     input  dispatch2btq d_in,
     output btq2dispatch d_out
@@ -72,8 +75,20 @@ module btq #(
         };
     end
 
+    btq2fetch f_out_n;
+    always_comb begin
+        f_out_n = '0;
+        for (int i = 0; i < NUM_RPORTS; ++i) begin
+            f_out_n.en[i]   = i < rd_cnt;
+            f_out_n.take[i] = state[r_idxs[i]].take;
+            f_out_n.pc[i]   = state[r_idxs[i]].PC;
+            f_out_n.tgt[i]  = state[r_idxs[i]].tgt;
+        end
+    end
+
     always_ff @(posedge clock) begin
         if (reset || flush) begin
+            f_out   <= '0;
             used    <= 0;
             head    <= 0;
             tail    <= 0;
@@ -83,6 +98,7 @@ module btq #(
                 $error("BTQ overflow!");
             if (rd_cnt > used)
                 $error("BTQ underflow!");
+            f_out   <= f_out_n;
             used    <= used + wr_cnt - rd_cnt;
             head    <= (head + rd_cnt) % BTQ_SZ;
             tail    <= (tail + wr_cnt) % BTQ_SZ;

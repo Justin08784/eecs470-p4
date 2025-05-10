@@ -19,7 +19,6 @@ module retire (
 
     output logic flush,
     output WADDR corrected_PC,
-    output logic [`N-1:0] branch_taken,
     output retire_final retire_exec
 );
     logic [$clog2(`N):0] r_en_cnt;
@@ -38,17 +37,12 @@ module retire (
     logic flush_n;
     WADDR corrected_PC_n;
 
-    logic [`N-1:0] branch_taken_n;
-
     always_comb begin
         mispred = 0;
         mispred_target = '0;
 
         r_en_cnt    = 0;
         btq_rd_cnt  = 0;
-
-        branch_taken_n = '0;
-
         btq_out = '0;
 
 
@@ -78,7 +72,6 @@ module retire (
                 mispred_target = btq_in.dat[btq_rd_cnt].take
                     ? btq_in.dat[btq_rd_cnt].tgt
                     : btq_in.dat[btq_rd_cnt].PC + 1;
-                branch_taken_n[i] = btq_in.dat[btq_rd_cnt].take;
 
                 ++btq_rd_cnt;
                 break;
@@ -88,12 +81,9 @@ module retire (
             ) begin
                 mispred = 1;
                 mispred_target = btq_in.dat[btq_rd_cnt].tgt;
-                branch_taken_n[i] = 1'b1;
 
                 ++btq_rd_cnt;
                 break;
-            end else begin
-                branch_taken_n[i] = btq_in.dat[btq_rd_cnt].take;
             end
             ++btq_rd_cnt;
         end
@@ -138,12 +128,10 @@ module retire (
             control path cannot retrigger. */
             flush        <= '0;
             corrected_PC <= '0;
-            branch_taken <= '0;
         end else begin
 /* ======================================== */
             flush        <= flush_n;
             corrected_PC <= corrected_PC_n;
-            branch_taken <= branch_taken_n;
 /* ======================================== */
         end
     end

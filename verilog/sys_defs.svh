@@ -513,6 +513,13 @@ typedef struct packed {
 } BTQ_ENTRY;
 
 typedef struct packed {
+    logic   [`N-1:0]    en;
+    logic   [`N-1:0]    take;
+    WADDR   [`N-1:0]    pc;
+    WADDR   [`N-1:0]    tgt;
+} btq2fetch;
+
+typedef struct packed {
     logic   [$clog2(`N):0]  btq_rdy_scnt;
     BTQ_IDX [`N-1:0]        btq_idxs;
 } btq2dispatch;

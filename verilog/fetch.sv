@@ -22,7 +22,7 @@ typedef struct packed {
     logic [`N-1:0] en;
     WADDR [`N-1:0] pc;
     WADDR [`N-1:0] tgt;
-} retire2btb;
+} btq2btb;
 
 module btb #(parameter
     NUM_LINES=256
@@ -35,7 +35,7 @@ module btb #(parameter
     output  btb2fetch   f_out,
 
     // write (retire)
-    input   retire2btb  r_in
+    input   btq2btb     btq_in
 );
     localparam ASSOC = 2;
     localparam NUM_SETS = NUM_LINES / ASSOC;
@@ -152,19 +152,19 @@ module btb #(parameter
         end
 
         // retire
-        foreach (r_in.en[i]) begin
+        foreach (btq_in.en[i]) begin
             SID sid;
             TAG tag;
             WAY way;
 
-            sid = get_sid(r_in.pc[i]);
-            tag = get_tag(r_in.pc[i]);
+            sid = get_sid(btq_in.pc[i]);
+            tag = get_tag(btq_in.pc[i]);
             way = wr_ways[sid];
 
             hdr_n.vld[sid][way] = 1;
             hdr_n.tag[sid][way] = tag;
             hdr_n.lru[sid] = !way;
-            tgt_n[sid][way] = r_in.tgt[i];
+            tgt_n[sid][way] = btq_in.tgt[i];
         end
     end
 
@@ -192,6 +192,7 @@ module stage_if_p4 (
     output  fetch2decode d_out,
 
     input   retire2fetch r_in,
+    input   btq2fetch    btq_in,
 
     output  fetch2mem   mem_out,
     input   mem2fetch   mem_in
@@ -239,7 +240,11 @@ module stage_if_p4 (
         .f_in (f2btb),
         .f_out(btb2f),
 
-        .r_in ('0) // FIXME
+        .btq_in('{
+            en  : btq_in.en,
+            pc  : btq_in.pc,
+            tgt : btq_in.tgt
+        })
     );
 
     always_comb begin
