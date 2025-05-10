@@ -233,6 +233,13 @@ module stage_if_p4 (
             pred_tgt[i] = btb2f.tgt[i];
         end
     end
+
+    btq2btb btq_2_btb;
+    assign btq_2_btb = '{
+        en  : btq_in.en,
+        pc  : btq_in.pc,
+        tgt : btq_in.tgt
+    };
     btb btb0 (
         .clock(clock),
         .reset(reset),
@@ -240,11 +247,7 @@ module stage_if_p4 (
         .f_in (f2btb),
         .f_out(btb2f),
 
-        .btq_in('{
-            en  : btq_in.en,
-            pc  : btq_in.pc,
-            tgt : btq_in.tgt
-        })
+        .btq_in(btq_2_btb)
     );
 
     always_comb begin
