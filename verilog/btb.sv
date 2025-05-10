@@ -75,42 +75,6 @@ module btb #(parameter
         };
     endfunction
 
-    logic [NUM_SETS-1:0] evict;
-    logic [NUM_SETS-1:0][ASSOC-1:0] free_gnts;
-    WAY   [NUM_SETS-1:0] free_ways;
-    WAY   [NUM_SETS-1:0] wr_ways;
-    generate
-    for (genvar s = 0; s < NUM_SETS; ++s) begin : gen_sel_free
-        psel_gen #(
-            .WIDTH(ASSOC),
-            .REQS(1)
-        ) sel_free (
-            .req (~hdr.vld[s]),
-            .gnt (free_gnts[s])
-        );
-    end
-    endgenerate
-
-    always_comb begin
-        foreach (evict[s])
-            evict[s] = !(|free_gnts[s]);
-
-        free_ways = '0;
-        foreach (free_gnts[s, w]) begin
-            if (!free_gnts[s][w])
-                continue;
-            free_ways[s] |= w;
-        end
-
-        wr_ways = '0;
-        foreach (wr_ways[s]) begin
-            wr_ways[s] = evict[s]
-                ? hdr.lru[s]    // overwrite a line
-                : free_ways[s];  // free entry available
-        end
-    end
-
-
     always_comb begin
         hdr_n = hdr;
         tgt_n = tgt;
@@ -136,7 +100,7 @@ module btb #(parameter
             loc = locate(hdr, puq_in.pc);
             if (!loc.hit) begin // dedup (dont insert if already there)
                 WAY way;
-                way = wr_ways[loc.sid];
+                way = hdr.lru[loc.sid];
 
                 hdr_n.vld[loc.sid][way] = 1;
                 hdr_n.tag[loc.sid][way] = loc.tag;
