@@ -147,8 +147,10 @@ module btb #(parameter
             f_out.vld[i] = loc.hit;
             f_out.tgt[i] = tgt[loc.sid][loc.way];
 
-            if (f_in.en[i] && loc.hit)
-                hdr_n.lru[loc.sid] = !loc.way;
+            /* Unsure: btb reads during fetch should not update
+            lru, since they're speculative right? */
+            // if (f_in.en[i] && loc.hit)
+            //     hdr_n.lru[loc.sid] = !loc.way;
         end
 
         // retire
