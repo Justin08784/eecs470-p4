@@ -130,7 +130,6 @@ module testbench;
     DBG_mt          dbg_mt;
     DBG_prf         dbg_prf;
     DBG_rob         dbg_rob;
-    DBG_rs          dbg_rs;
     DBG_sq          dbg_sq;
     DBG_retire      dbg_retire;
     DBG_execute     dbg_execute;
@@ -172,7 +171,6 @@ module testbench;
         .dbg_mt         (dbg_mt),
         .dbg_prf        (dbg_prf),
         .dbg_rob        (dbg_rob),
-        .dbg_rs         (dbg_rs),
         .dbg_sq         (dbg_sq),
         .dbg_retire     (dbg_retire),
 `endif
@@ -560,47 +558,6 @@ module testbench;
 
 
 `ifdef DEBUG
-    // OPTIONAL: Print our your data here
-    // It will go to the $program.log file
-    function print_id_result(input ID_RESULT x);
-        $display("ID_RESULT: id=%3d t=%2d t1=%2d t2=%2d t1_rdy=%b t2_rdy=%b fu_idx=%2d rob_idx=%2d btq_idx=%2d is_brch:%b inst=%h PC=%h opa_select=%1d opb_select=%1d dest_reg_idx=%2d alu_func=%1d mult=%b rd_mem=%b wr_mem=%b cond_branch=%b uncond_branch=%b halt=%b illegal=%b csr_op=%b",
-            x.id,
-            x.t,
-            x.t1,
-            x.t2,
-            x.t1_rdy,
-            x.t2_rdy,
-            x.fu_idx,
-            x.rob_idx,
-            x.btq_idx,
-            x.is_brch,
-            x.inst,
-            x.PC,
-            x.opa_select,
-            x.opb_select,
-            x.dest_reg_idx,
-            x.alu_func,
-            x.mult,
-            x.rd_mem,
-            x.wr_mem,
-            x.cond_branch,
-            x.uncond_branch,
-            x.halt,
-            x.illegal,
-            x.csr_op
-        );
-    endfunction
-
-    function get_fu_name(input FU_IDX fu_idx, output string name);
-        case (fu_idx)
-            FU_ALU:     name = "ALU";
-            FU_MULT:    name = "MULT";
-            FU_LOAD:    name = "LOAD";
-            FU_STORE:   name = "STORE";
-            default:    name = "Unknown FU";
-        endcase
-    endfunction
-
     task print_btq;
         // internal state
         BTQ_ENTRY [`BTQ_SZ-1:0]      state;
@@ -653,7 +610,7 @@ module testbench;
             );
         end
         $display("r_in: rd_cnt %d", r_in.rd_cnt);
-        $display("r_out: used_scnt: %0d", r_out.used_scnt);
+        $display("r_out: used_scnt: %0d", r_out.btq_used_scnt);
         for (int i = 0; i < `N; ++i) begin
             $display("r_out[%d]: tgt: %x, pred: %b, take: %b",
                 i,
@@ -980,53 +937,7 @@ module testbench;
     endtask
 
     task print_rs;
-        // internal state
-        RS_ENTRY [`RS_SZ-1:0] entries; // ms1 test: remove one RS entry (caught)
-        // I/O
-        dispatch2rs d_in;
-        rs2dispatch d_out;
-        execute2rs  ex_in;
-        rs2execute  ex_out;
-        execute2complete_tag ctag_in;
-
-        entries = dbg_rs.entries;
-        d_in    = dbg_rs.d_in;
-        d_out   = dbg_rs.d_out;
-        ex_in   = dbg_rs.ex_in;
-        ex_out  = dbg_rs.ex_out;
-        ctag_in = dbg_rs.ctag_in;
-
-        $display("  | >> RS >>");
-        print_id_result(d_in.dat[0]);
-        print_id_result(d_in.dat[1]);
-        for (int i = 0; i < `RS_SZ; ++i) begin
-            string fu_name;
-            get_fu_name(entries[i].dat.fu_idx, fu_name);
-
-            if (!entries[i].busy) begin
-                $display("Entry [%2d]:", i);
-                continue;
-            end
-
-            $display("Entry [%2d]: pc=0x%x, id=%3d (%x), busy=%b, issued=%b, t=%2d, t1=%2d, t2=%2d, t1_rdy=%b, t2_rdy=%b, fu=%s(%2d)",
-                i, 
-                entries[i].dat.PC,
-                entries[i].dat.id, 
-                entries[i].dat.inst,
-                entries[i].busy, 
-                entries[i].issued, 
-                entries[i].dat.t, 
-                entries[i].dat.t1, 
-                entries[i].dat.t2, 
-                entries[i].dat.t1_rdy, 
-                entries[i].dat.t2_rdy, 
-
-                entries[i].busy ? fu_name : "*",
-                entries[i].dat.fu_idx
-            );
-        end
-        $display("  | << RS <<");
-
+        verisimpleV.rs_0.print_rs();
     endtask
 
     task print_sq;
@@ -1421,7 +1332,7 @@ module testbench;
         //      mem2proc_data,
         //      mem2proc_data_tag
         // );
-        // print_rs();
+        print_rs();
         // print_execute();
         // print_dcache();
         // print_sq();

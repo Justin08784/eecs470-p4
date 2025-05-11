@@ -622,6 +622,8 @@ typedef struct packed {
 typedef struct packed {
 `ifdef DEBUG
     int             id;
+    WADDR           PC;
+    INST            inst;
 `endif
 
     PHYS_REG_IDX    t;
@@ -636,6 +638,8 @@ typedef struct packed {
 typedef struct packed {
 `ifdef DEBUG
     int             id;
+    WADDR           PC;
+    INST            inst;
 `endif
     /* FIXME: stubbed */
     logic _dummy;
@@ -644,6 +648,8 @@ typedef struct packed {
 typedef struct packed {
 `ifdef DEBUG
     int             id;
+    WADDR           PC;
+    INST            inst;
 `endif
     /* FIXME: stubbed */
     logic _dummy;
@@ -1124,6 +1130,47 @@ typedef struct packed {
 } DBG_fl;
 
 `ifdef DEBUG
+// OPTIONAL: Print our your data here
+// It will go to the $program.log file
+function print_id_result(input ID_RESULT x);
+    $display("ID_RESULT: id=%3d t=%2d t1=%2d t2=%2d t1_rdy=%b t2_rdy=%b fu_idx=%2d rob_idx=%2d btq_idx=%2d is_brch:%b inst=%h PC=%h opa_select=%1d opb_select=%1d dest_reg_idx=%2d alu_func=%1d mult=%b rd_mem=%b wr_mem=%b cond_branch=%b uncond_branch=%b halt=%b illegal=%b csr_op=%b",
+        x.id,
+        x.t,
+        x.t1,
+        x.t2,
+        x.t1_rdy,
+        x.t2_rdy,
+        x.fu_idx,
+        x.rob_idx,
+        x.btq_idx,
+        x.is_brch,
+        x.inst,
+        x.PC,
+        x.opa_select,
+        x.opb_select,
+        x.dest_reg_idx,
+        x.alu_func,
+        x.mult,
+        x.rd_mem,
+        x.wr_mem,
+        x.cond_branch,
+        x.uncond_branch,
+        x.halt,
+        x.illegal,
+        x.csr_op
+    );
+endfunction
+
+function get_fu_name(input FU_IDX fu_idx, output string name);
+    case (fu_idx)
+        FU_ALU:     name = "ALU";
+        FU_MULT:    name = "MULT";
+        FU_LOAD:    name = "LOAD";
+        FU_STORE:   name = "STORE";
+        default:    name = "Unknown FU";
+    endcase
+endfunction
+
 function automatic string dbg_mem_cmd(input MEM_COMMAND cmd);
     string rv;
     case (cmd)

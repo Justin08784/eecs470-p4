@@ -42,7 +42,6 @@ module cpu (
     output DBG_mt       dbg_mt,
     output DBG_prf      dbg_prf,
     output DBG_rob      dbg_rob,
-    output DBG_rs       dbg_rs,
     output DBG_sq       dbg_sq,
     output DBG_retire   dbg_retire,
 `endif 
@@ -203,9 +202,6 @@ module cpu (
     prf2execute     prf_2_ex;
 
     rs rs_0(
-`ifdef DEBUG
-        .dbg        (dbg_rs),
-`endif
         .clock  (clock),
         .reset  (reset),
         .flush  (flush),

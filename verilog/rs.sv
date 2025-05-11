@@ -6,17 +6,35 @@ typedef struct packed {
     logic t1_rdy;
     logic t2_rdy;
 } _RS_PAYLOAD_STUB;
+typedef struct packed {
+    logic busy;
+    logic issd;
+    _RS_PAYLOAD_STUB dat;
+} _RS_ENTRY_STUB;
+
+typedef struct packed {
+    logic busy;
+    logic issd;
+    RS_ALU_PAYLOAD dat;
+} RS_ALU_ENTRY;
+typedef struct packed {
+    logic busy;
+    logic issd;
+    RS_MULT_PAYLOAD dat;
+} RS_MULT_ENTRY;
+typedef struct packed {
+    logic busy;
+    logic issd;
+    RS_BRU_PAYLOAD dat;
+} RS_BRU_ENTRY;
 
 /*
 * Generic RS partition
 * */
 module rs_part #(
     type PAYLOAD=_RS_PAYLOAD_STUB,
-    type ENTRY = struct packed {
-        logic busy;
-        logic issd;
-        PAYLOAD dat;
-    },
+    type ENTRY  =_RS_ENTRY_STUB,
+    parameter   FU=FU_ALU,
     parameter   N=`N,
     parameter   PART_SZ=1,
     parameter   NUM_FU=1,
@@ -245,10 +263,6 @@ module rs #(parameter
     NUM_FU_LOAD=`NUM_FU_LOAD,
     NUM_FU_STORE=`NUM_FU_STORE
 ) (
-    `ifdef DEBUG
-    output DBG_rs dbg,
-    `endif
-
     input clock,
     input reset,
     input flush,
@@ -304,6 +318,8 @@ module rs #(parameter
             tmp_dat_mult[i] = '{
 `ifdef DEBUG
                 id          : d_in.dat[i].id,
+                PC          : d_in.dat[i].PC,
+                inst        : d_in.dat[i].inst,
 `endif
 
                 t           : d_in.dat[i].t,
@@ -346,7 +362,9 @@ module rs #(parameter
     end
 
     rs_part #(
+        .FU         (FU_ALU),
         .PAYLOAD    (RS_ALU_PAYLOAD),
+        .ENTRY      (RS_ALU_ENTRY),
         .PART_SZ    (RS_ALU_SZ),
         .NUM_FU     (`NUM_FU_ALU),
         .ISS_CDB_ARB(`TRUE)
@@ -370,11 +388,13 @@ module rs #(parameter
     );
 
     rs_part #(
+        .FU         (FU_MULT),
         .PAYLOAD    (RS_MULT_PAYLOAD),
+        .ENTRY      (RS_MULT_ENTRY),
         .PART_SZ    (RS_MULT_SZ),
         .NUM_FU     (`NUM_FU_MULT),
         .ISS_CDB_ARB(`FALSE)
-    ) rs_mult (
+    ) rs_mul (
         .clock  (clock),
         .reset  (reset),
         .flush  (flush),
@@ -394,7 +414,9 @@ module rs #(parameter
     );
 
     rs_part #(
+        .FU         (FU_BRU),
         .PAYLOAD    (RS_BRU_PAYLOAD),
+        .ENTRY      (RS_BRU_ENTRY),
         .PART_SZ    (RS_BRU_SZ),
         .NUM_FU     (`NUM_FU_BRU),
         .ISS_CDB_ARB(`TRUE)
@@ -425,4 +447,93 @@ module rs #(parameter
     assign ex_out.fu_en_store   = '0;
     assign ex_out.fu_dat_load    = '0;
     assign ex_out.fu_dat_store   = '0;
+
+`ifdef DEBUG
+    task automatic print_rs_alu(input RS_ALU_ENTRY [RS_ALU_SZ-1:0] entries);
+        for (int i = 0; i < RS_ALU_SZ; ++i) begin
+            if (!entries[i].busy) begin
+                $display("rs_alu[%2d]:", i);
+                continue;
+            end
+            $display("rs_alu[%2d]: {iss:%b} pc=0x%x, id=%3d (%x), t=%2d, t1=%2d%c, t2=%2d%c, rob_idx=%2d",
+                i, 
+
+                entries[i].issd, 
+                entries[i].dat.PC,
+                entries[i].dat.id, 
+                entries[i].dat.inst,
+
+                entries[i].dat.t, 
+                entries[i].dat.t1, 
+                entries[i].dat.t1_rdy ? "+" : " ", 
+                entries[i].dat.t2, 
+                entries[i].dat.t2_rdy ? "+" : " ", 
+                entries[i].dat.rob_idx
+            );
+        end
+    endtask
+
+    task automatic print_rs_mul(input RS_MULT_ENTRY [RS_MULT_SZ-1:0] entries);
+        for (int i = 0; i < RS_MULT_SZ; ++i) begin
+            if (!entries[i].busy) begin
+                $display("rs_mul[%2d]:", i);
+                continue;
+            end
+            $display("rs_mul[%2d]: {iss:%b} pc=0x%x, id=%3d (%x), t=%2d, t1=%2d%c, t2=%2d%c, rob_idx=%2d",
+                i, 
+
+                entries[i].issd, 
+                entries[i].dat.PC,
+                entries[i].dat.id, 
+                entries[i].dat.inst,
+
+                entries[i].dat.t, 
+                entries[i].dat.t1, 
+                entries[i].dat.t1_rdy ? "+" : " ", 
+                entries[i].dat.t2, 
+                entries[i].dat.t2_rdy ? "+" : " ", 
+                entries[i].dat.rob_idx
+            );
+        end
+    endtask
+
+    task automatic print_rs_bru(input RS_BRU_ENTRY [RS_BRU_SZ-1:0] entries);
+        for (int i = 0; i < RS_BRU_SZ; ++i) begin
+            if (!entries[i].busy) begin
+                $display("rs_bru[%2d]:", i);
+                continue;
+            end
+            $display("rs_bru[%2d]: {iss:%b} pc=0x%x, id=%3d (%x), t=%2d, t1=%2d%c, t2=%2d%c, rob_idx=%2d",
+                i, 
+
+                entries[i].issd, 
+                entries[i].dat.PC,
+                entries[i].dat.id, 
+                entries[i].dat.inst,
+
+                entries[i].dat.t, 
+                entries[i].dat.t1, 
+                entries[i].dat.t1_rdy ? "+" : " ", 
+                entries[i].dat.t2, 
+                entries[i].dat.t2_rdy ? "+" : " ", 
+                entries[i].dat.rob_idx
+            );
+        end
+    endtask
+
+    task automatic print_rs;
+        $display("  | >> RS >>");
+        for (int n = 0; n < `N; ++n)
+            print_id_result(d_in.dat[n]);
+        $display("      >> RS_ALU");
+        print_rs_alu(rs_alu.entries);
+        $display("      >> RS_MUL");
+        print_rs_mul(rs_mul.entries);
+        $display("      >> RS_BRU");
+        print_rs_bru(rs_bru.entries);
+
+        $display("  | << RS <<");
+
+    endtask
+`endif
 endmodule
