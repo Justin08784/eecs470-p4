@@ -18,10 +18,11 @@ module stage_if_p4 (
     input   clock,
     input   reset,
     input   flush,
+    input   WADDR flush_PC,
+
     input   decode2fetch d_in,
     output  fetch2decode d_out,
 
-    input   retire2fetch r_in,
     input   puq2fetch    puq_in,
 
     output  fetch2mem   mem_out,
@@ -126,7 +127,7 @@ module stage_if_p4 (
         if (reset) begin
             PC_reg <= 0;                    // initial PC value is 0 (the memory address where our program starts)
         end else if (flush) begin
-            PC_reg <= r_in.corrected_PC;    // update to a taken branch (does not depend on valid bit)...
+            PC_reg <= flush_PC;    // update to a taken branch (does not depend on valid bit)...
         end else begin                      // ...or transition to next PC if valid
             PC_reg <= 
                 f_cnt == 0    ? PC_reg :
@@ -139,7 +140,6 @@ module stage_if_p4 (
         flush : flush,
         d_in  : d_in,
         d_out : d_out,
-        r_in  : r_in,
         puq_in: puq_in
     };
 `endif

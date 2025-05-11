@@ -5,6 +5,15 @@
 Retire (Manager)
 ================================================
 */
+typedef enum logic [2:0] {
+    RET_GEN = 'd0,
+    RET_HLT = 'd1,
+    RET_ILL = 'd2,
+    RET_LOD = 'd3,
+    RET_STR = 'd4,
+    RET_BRU = 'd5
+} RETIRE_OP;
+
 module retire (
 `ifdef DEBUG
     output DBG_retire dbg,
@@ -18,39 +27,45 @@ module retire (
     output retire2btq btq_out,
 
     output logic flush,
-    output WADDR corrected_PC,
+    output WADDR flush_PC,
     output retire_final retire_exec
 );
+    // decode retire operations
+    RETIRE_OP [`N-1:0] ret;
+    always_comb begin
+        foreach (ret[i]) begin
+            ret[i] = RET_GEN;
+            if (rob_in.entries[i].halt)
+                ret[i] = RET_HLT;
+            else if (rob_in.entries[i].illegal)
+                ret[i] = RET_ILL;
+            else if (rob_in.entries[i].rd_mem)
+                ret[i] = RET_LOD;
+            else if (rob_in.entries[i].wr_mem)
+                ret[i] = RET_STR;
+            else if (rob_in.entries[i].is_brch)
+                ret[i] = RET_BRU;
+        end
+    end
+
+    // general retire
     logic [$clog2(`N):0] r_en_cnt;
+
+    // bru retire
     logic [$clog2(`N):0] btq_rd_cnt;
-
-    PHYS_REG_IDX [`N-1:0] tmp_tag;
-    PHYS_REG_IDX [`N-1:0] tmp_t_old;
-    REG_IDX      [`N-1:0] tmp_dst;
-    logic        [`N-1:0] tmp_halt;
-    logic        [`N-1:0] tmp_illegal;
-    logic        [`N-1:0] tmp_is_brch;
-
     logic mispred;
-    ADDR  mispred_target;
-
-    logic flush_n;
-    WADDR corrected_PC_n;
+    WADDR mispred_tgt;
+    logic [$clog2(`N):0] puq_credits;
 
     always_comb begin
-        logic [$clog2(`N):0] puq_credits;
-        mispred = 0;
-        mispred_target = '0;
-
         r_en_cnt    = 0;
+
+        mispred     = 1'b0;
+        mispred_tgt = '0;
         btq_rd_cnt  = 0;
-        btq_out = '0;
-
-
         puq_credits = btq_in.puq_rdy_scnt;
+
         for (int i = 0; i < rob_in.r_vld_cnt; ++i) begin
-            if (!rob_in.entries[i].cpl)
-                break;
             // if (rob_in.entries[i].halt && (!sq_in.sq_ret_complete || i != 0)) begin
             //     /* A halt may retire IFF 
             //     a) The ret buffer is empty (i.e. retired to memory) 
@@ -62,73 +77,101 @@ module retire (
             //     */
             //     break;
             // end
-
-
-            if (!rob_in.entries[i].is_brch) begin
+            if (!rob_in.entries[i].cpl)
+                break;
+            unique case (ret[i])
+            RET_GEN: begin
                 ++r_en_cnt;
-                continue;
             end
+            RET_HLT: begin
+                ++r_en_cnt;
+            end
+            RET_ILL: begin
+                ++r_en_cnt;
+            end
+            RET_LOD: begin
+                ++r_en_cnt;
+            end
+            RET_STR: begin
+                ++r_en_cnt;
+            end
+            RET_BRU: begin
+                logic pred, take, corr_tgt;
+                WADDR npc, tgt;
 
-            /* is a branch... */
-            if (puq_credits > 0) begin
+                pred    = btq_in.dat[btq_rd_cnt].pred;
+                take    = btq_in.dat[btq_rd_cnt].take;
+                corr_tgt= btq_in.dat[btq_rd_cnt].pred_tgt == btq_in.dat[btq_rd_cnt].tgt;
+                npc     = btq_in.dat[btq_rd_cnt].PC + 1;
+                tgt     = btq_in.dat[btq_rd_cnt].tgt;
+
+                if (puq_credits == 0)
+                    break;
                 --puq_credits;
                 ++r_en_cnt;
-            end else begin
-                // puq at capacity; cannot retire
-                break;
-            end
-            
-
-            if (btq_in.dat[btq_rd_cnt].pred != btq_in.dat[btq_rd_cnt].take) begin
-                // is mispred?
-                mispred = 1;
-                mispred_target = btq_in.dat[btq_rd_cnt].take
-                    ? btq_in.dat[btq_rd_cnt].tgt
-                    : btq_in.dat[btq_rd_cnt].PC + 1;
-
                 ++btq_rd_cnt;
-                break;
-            end else if (
-                btq_in.dat[btq_rd_cnt].take
-                && (btq_in.dat[btq_rd_cnt].pred_tgt != btq_in.dat[btq_rd_cnt].tgt)
-            ) begin
-                mispred = 1;
-                mispred_target = btq_in.dat[btq_rd_cnt].tgt;
 
-                ++btq_rd_cnt;
-                break;
+                unique casez ({pred, take, corr_tgt})
+                3'b010,
+                3'b011,
+                3'b110: begin
+                    mispred = 1;
+                    mispred_tgt = tgt;
+                    break;
+                end
+
+                3'b100,
+                3'b101: begin
+                    mispred = 1;
+                    mispred_tgt = npc;
+                    break;
+                end
+
+                default:;
+                endcase
             end
-            ++btq_rd_cnt;
+            endcase
         end
+    end
 
-        flush_n         = mispred;
-        corrected_PC_n  = mispred_target;
-
-        for (int i = 0; i < `N; ++i) begin
-            tmp_tag[i]     = rob_in.entries[i].tag;
-            tmp_t_old[i]   = rob_in.entries[i].t_old;
-            tmp_dst[i]     = rob_in.entries[i].dst;
-            tmp_halt[i]    = rob_in.entries[i].halt;
-            tmp_illegal[i] = rob_in.entries[i].illegal;
-            tmp_is_brch[i] = rob_in.entries[i].is_brch;
-        end
+    logic flush_n;
+    WADDR flush_PC_n;
+    always_comb begin
+        flush_n     = mispred;
+        flush_PC_n  = mispred_tgt;
 
         /* Retire should not act while flush is high */
         btq_out = flush ? '0 : '{
             rd_cnt : btq_rd_cnt
         };
+    end
+
+    always_comb begin
+        PHYS_REG_IDX [`N-1:0] tag;
+        PHYS_REG_IDX [`N-1:0] t_old;
+        REG_IDX      [`N-1:0] dst;
+        logic        [`N-1:0] halt;
+        logic        [`N-1:0] illegal;
+        logic        [`N-1:0] is_brch;
+
+        for (int i = 0; i < `N; ++i) begin
+            tag[i]     = rob_in.entries[i].tag;
+            t_old[i]   = rob_in.entries[i].t_old;
+            dst[i]     = rob_in.entries[i].dst;
+            halt[i]    = rob_in.entries[i].halt;
+            illegal[i] = rob_in.entries[i].illegal;
+        end
 
         retire_exec = flush ? '0 : '{
             // only the count *may* be adjusted
             r_en_cnt : r_en_cnt,
 
             // the rest of the fields stay the same
-            tag      : tmp_tag,
-            t_old    : tmp_t_old,
-            dst      : tmp_dst,
-            halt     : tmp_halt,
-            illegal  : tmp_illegal,
-            is_brch  : tmp_is_brch
+            tag      : tag,
+            t_old    : t_old,
+            dst      : dst,
+            halt     : halt,
+            illegal  : illegal
         };
 
     end
@@ -139,24 +182,24 @@ module retire (
 
             Pulse flush for 1 cycle. Ensures branches on mispredicted
             control path cannot retrigger. */
-            flush        <= '0;
-            corrected_PC <= '0;
+            flush       <= '0;
+            flush_PC    <= '0;
         end else begin
 /* ======================================== */
-            flush        <= flush_n;
-            corrected_PC <= corrected_PC_n;
+            flush       <= flush_n;
+            flush_PC    <= flush_PC_n;
 /* ======================================== */
         end
     end
 
-    `ifdef DEBUG
+`ifdef DEBUG
     assign dbg = '{
         rob_in,
         btq_in,
         btq_out,
         mispred,
-        mispred_target,
+        mispred_tgt,
         retire_exec
     };
-    `endif
+`endif
 endmodule

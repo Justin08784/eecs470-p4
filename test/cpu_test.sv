@@ -676,15 +676,13 @@ module testbench;
         logic           flush;
         decode2fetch    d_in;
         fetch2decode    d_out;
-        retire2fetch    r_in;
 
         flush       = dbg_fetch.flush;
         d_in        = dbg_fetch.d_in;
         d_out       = dbg_fetch.d_out;
-        r_in        = dbg_fetch.r_in;
 
         $display(">> Fetch >>");
-        $display("r_in: {flush: %b, corrected_PC: 0x%x}", flush, r_in.corrected_PC);
+        // $display("r_in: {flush: %b, corrected_PC: 0x%x}", flush, r_in.corrected_PC);
         $display("d_out: {f_en_cnt: %b, dat: [%x, %x]}", d_out.f_en_cnt, d_out.f_dat[0], d_out.f_dat[1]);
         $display("<< Fetch <<");
     endtask

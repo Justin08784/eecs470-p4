@@ -50,6 +50,7 @@ module cpu (
 );
     /* Global controls*/
     logic flush;
+    WADDR flush_PC;
 
 
     /* Memory stubs */
@@ -66,7 +67,6 @@ module cpu (
     /* >> ==== Fetch ==== >> */
     fetch2decode f_2_decode;
     decode2fetch decode_2_f;
-    retire2fetch retire_2_f;
     puq2fetch    puq_2_f;
 
     stage_if_p4 fetch_0(
@@ -75,15 +75,15 @@ module cpu (
 `endif
         .clock  (clock),
         .reset  (reset),
-        .flush  (flush),
+        .flush   (flush),
+        .flush_PC(flush_PC),
 
         .d_in   (decode_2_f),
         .d_out  (f_2_decode),
-        .r_in   (retire_2_f),
         .puq_in (puq_2_f),
 
-        .mem_out    (f2mem),
-        .mem_in     (mem2f)
+        .mem_out(f2mem),
+        .mem_in (mem2f)
     );
 
 
@@ -152,7 +152,6 @@ module cpu (
     retire2btq retire_2_btq;
 
     retire_final    retire_exec;
-    WADDR           corrected_PC;
 
     retire retire0 (
 `ifdef DEBUG
@@ -165,12 +164,11 @@ module cpu (
         .btq_in (btq_2_retire),
         .btq_out(retire_2_btq),
 
-        .retire_exec    (retire_exec),
+        .retire_exec(retire_exec),
 
-        .flush          (flush),
-        .corrected_PC   (corrected_PC)
+        .flush      (flush),
+        .flush_PC   (flush_PC)
     );
-    assign retire_2_f = '{corrected_PC : corrected_PC};
 
 
     /* >> ==== Branch target queue (BTQ) ==== >> */

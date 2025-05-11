@@ -408,7 +408,6 @@ module stage_id_p4 (
             need to check && (i < prvw_vld_cnt) for either condition!
             */
             d_out.prvw_has_dests[i] = d_out.d_dat[i].dest_reg_idx != `ZERO_REG;
-            d_out.prvw_is_brch[i]   = d_out.d_dat[i].is_brch;
         end
     end
 

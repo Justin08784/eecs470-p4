@@ -557,18 +557,13 @@ typedef struct packed {
 } execute2btq;
 
 typedef struct packed {
-    logic [$clog2(`N):0]        r_en_cnt; // final final
-    PHYS_REG_IDX [`N-1:0]       tag;
-    PHYS_REG_IDX [`N-1:0]       t_old;
-    REG_IDX      [`N-1:0]       dst;
-    logic        [`N-1:0]       halt;
-    logic        [`N-1:0]       illegal;
-    logic        [`N-1:0]       is_brch;
+    logic [$clog2(`N):0]    r_en_cnt; // final final
+    PHYS_REG_IDX [`N-1:0]   tag;
+    PHYS_REG_IDX [`N-1:0]   t_old;
+    REG_IDX      [`N-1:0]   dst;
+    logic        [`N-1:0]   halt;
+    logic        [`N-1:0]   illegal;
 } retire_final;
-
-typedef struct packed {
-    WADDR  corrected_PC;
-} retire2fetch;
 
 typedef struct packed {
     /* Alloc */
@@ -760,7 +755,6 @@ typedef struct packed {
 typedef struct packed {
     logic       [$clog2(`N):0]  d_vld_scnt;
     logic       [`N-1:0]  prvw_has_dests;
-    logic       [`N-1:0]  prvw_is_brch;
     ID_RESULT   [`N-1:0]        d_dat;
 } decode2dispatch;
 
@@ -996,7 +990,6 @@ typedef struct packed {
     logic           flush;
     decode2fetch    d_in;
     fetch2decode    d_out;
-    retire2fetch    r_in;
     puq2fetch       puq_in;
     // submodule
 } DBG_fetch;
