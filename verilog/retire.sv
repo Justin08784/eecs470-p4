@@ -34,17 +34,12 @@ module retire (
     RETIRE_OP [`N-1:0] ret;
     always_comb begin
         foreach (ret[i]) begin
-            ret[i] = RET_GEN;
-            if (rob_in.entries[i].halt)
-                ret[i] = RET_HLT;
-            else if (rob_in.entries[i].illegal)
-                ret[i] = RET_ILL;
-            else if (rob_in.entries[i].rd_mem)
-                ret[i] = RET_LOD;
-            else if (rob_in.entries[i].wr_mem)
-                ret[i] = RET_STR;
-            else if (rob_in.entries[i].is_brch)
-                ret[i] = RET_BRU;
+            if      (rob_in.entries[i].halt)    ret[i] = RET_HLT;
+            else if (rob_in.entries[i].illegal) ret[i] = RET_ILL;
+            else if (rob_in.entries[i].rd_mem)  ret[i] = RET_LOD;
+            else if (rob_in.entries[i].wr_mem)  ret[i] = RET_STR;
+            else if (rob_in.entries[i].is_brch) ret[i] = RET_BRU;
+            else                                ret[i] = RET_GEN;
         end
     end
 
@@ -66,44 +61,30 @@ module retire (
         puq_credits = btq_in.puq_rdy_scnt;
 
         for (int i = 0; i < rob_in.r_vld_cnt; ++i) begin
-            // if (rob_in.entries[i].halt && (!sq_in.sq_ret_complete || i != 0)) begin
-            //     /* A halt may retire IFF 
-            //     a) The ret buffer is empty (i.e. retired to memory) 
-            //     b) The halt is at the head of the ROB (i.e. i == 0). 
-
-            //     (b. addresses the edge case where instructions in the same retire
-            //     batch, before the halt, are stores. Next cycle the ret buffer
-            //     will not be empty.)
-            //     */
-            //     break;
-            // end
             if (!rob_in.entries[i].cpl)
                 break;
+
             unique case (ret[i])
-            RET_GEN: begin
-                ++r_en_cnt;
-            end
-            RET_HLT: begin
-                ++r_en_cnt;
-            end
-            RET_ILL: begin
-                ++r_en_cnt;
-            end
-            RET_LOD: begin
-                ++r_en_cnt;
-            end
+            RET_GEN,
+            RET_HLT,
+            RET_ILL,
+            RET_LOD,
             RET_STR: begin
                 ++r_en_cnt;
             end
-            RET_BRU: begin
-                logic pred, take, corr_tgt;
-                WADDR npc, tgt;
 
-                pred    = btq_in.dat[btq_rd_cnt].pred;
-                take    = btq_in.dat[btq_rd_cnt].take;
-                corr_tgt= btq_in.dat[btq_rd_cnt].pred_tgt == btq_in.dat[btq_rd_cnt].tgt;
-                npc     = btq_in.dat[btq_rd_cnt].PC + 1;
-                tgt     = btq_in.dat[btq_rd_cnt].tgt;
+            RET_BRU: begin
+                logic pred;
+                logic take;
+                logic corr_tgt;
+                WADDR npc;
+                WADDR tgt;
+
+                pred     = btq_in.dat[btq_rd_cnt].pred;
+                take     = btq_in.dat[btq_rd_cnt].take;
+                corr_tgt = btq_in.dat[btq_rd_cnt].pred_tgt == btq_in.dat[btq_rd_cnt].tgt;
+                npc      = btq_in.dat[btq_rd_cnt].PC + 1;
+                tgt      = btq_in.dat[btq_rd_cnt].tgt;
 
                 if (puq_credits == 0)
                     break;
@@ -152,7 +133,6 @@ module retire (
         REG_IDX      [`N-1:0] dst;
         logic        [`N-1:0] halt;
         logic        [`N-1:0] illegal;
-        logic        [`N-1:0] is_brch;
 
         for (int i = 0; i < `N; ++i) begin
             tag[i]     = rob_in.entries[i].tag;
@@ -173,7 +153,6 @@ module retire (
             halt     : halt,
             illegal  : illegal
         };
-
     end
 
     always_ff @(posedge clock) begin
