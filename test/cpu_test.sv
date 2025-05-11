@@ -837,6 +837,16 @@ module testbench;
         ex_out  = dbg_prf.ex_out;
     endtask
 
+    function get_rob_fu_name(input ROB_ENTRY entry, output string name);
+        if (entry.is_brch) 
+            name = "BRU";
+        else if (entry.wr_mem)
+            name = "STR";
+        else if (entry.rd_mem)
+            name = "LOD";
+        else
+            name = "INT";
+    endfunction
     task print_rob;
         ROB_ENTRY [`ROB_SZ-1:0]     state;
         logic [$clog2(`ROB_SZ)-1:0]  head;
@@ -890,18 +900,16 @@ module testbench;
         end
 
         rob_vld = '0;
-        for (int cnt = 0; cnt <= used; ++cnt)
+        for (int cnt = 0; cnt < used; ++cnt)
             rob_vld[(head + cnt) % `ROB_SZ] = 1;
 
         // FIXME: This print is wrong. Consider if head-tail span wraps around. Then we break too early.
         // Also fix for any circular FIFO, including BTQ.
-        for (int i = 0; i < `ROB_SZ; ++i) begin
+        for (int i = 0; i < `ROB_SZ / 2; ++i) begin
+            string ls, rs, name;
+
             t_dup = 0;
             told_dup = 0;
-            if (!rob_vld[i]) begin
-                $display("Rob[%2d]: ", i);
-                continue;
-            end
             for (int j = 0; j < `ROB_SZ; ++j) begin
                 if (!rob_vld[j] || i == j)
                     continue;
@@ -910,28 +918,50 @@ module testbench;
                 if (state[i].t_old == state[j].t_old && state[i].t_old != '0)
                     told_dup |= 1;
             end
-            $display("Rob[%2d]: cpl %b, t: %2d, t_old: %2d, dst: %2d, is_brch: %b, wr_mem: %b, rd_mem: %b, halt: %0b, illegal: %0b <t_dup:%b, told_dup:%b> %s",
-                i,
-                state[i].cpl,
-                state[i].tag,
-                state[i].t_old,
-                state[i].dst,
-                state[i].is_brch,
-                state[i].wr_mem,
-                state[i].rd_mem,
-                state[i].halt,
-                state[i].illegal,
-                t_dup,
-                told_dup,
-                (i == head && head == tail) 
-                    ? " << h/t"
-                    : (i == head) 
-                        ? " << h" 
-                        : (i == tail)
-                            ? " << t"
-                            : ""
-            );
+
+            get_rob_fu_name(state[i], name);
+            if (rob_vld[i])
+                ls = $sformatf("Rob[%2d]: {cpl:%b, hlt:%b}, %s, dst:%2d (%2d->%2d)",
+                    i,
+                    state[i].cpl,
+                    state[i].halt,
+                    // state[i].illegal,
+                    name,
+                    state[i].dst,
+                    state[i].t_old,
+                    state[i].tag
+                    // state[i].is_brch,
+                    // state[i].wr_mem,
+                    // state[i].rd_mem,
+                    // t_dup,
+                    // told_dup
+                );
+            else
+                ls = $sformatf("Rob[%2d]:", i);
+
+            get_rob_fu_name(state[i+32], name);
+            if (rob_vld[i+32])
+                rs = $sformatf("Rob[%2d]: {cpl:%b, hlt:%b}, %s, dst:%2d (%2d->%2d),",
+                    i+32,
+                    state[i+32].cpl,
+                    state[i+32].halt,
+                    // state[i+32].illegal,
+                    name,
+                    state[i+32].dst,
+                    state[i+32].t_old,
+                    state[i+32].tag
+                    // state[i].is_brch,
+                    // state[i].wr_mem,
+                    // state[i].rd_mem,
+                    // t_dup,
+                    // told_dup
+                );
+            else
+                rs = $sformatf("Rob[%2d]:", i+32);
+
+           $display("%-50s | %-50s", ls, rs); 
         end
+
         $display("  | << ROB <<");
 
     endtask
@@ -1307,7 +1337,7 @@ module testbench;
         // print_fetch();
         // print_icache();
         // print_decode();
-        // print_rob();
+        print_rob();
         // print_fl();
         // print_dispatch();
         // print_map_table();

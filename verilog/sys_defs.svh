@@ -1164,9 +1164,10 @@ endfunction
 function get_fu_name(input FU_IDX fu_idx, output string name);
     case (fu_idx)
         FU_ALU:     name = "ALU";
-        FU_MULT:    name = "MULT";
-        FU_LOAD:    name = "LOAD";
-        FU_STORE:   name = "STORE";
+        FU_MULT:    name = "MUL";
+        FU_LOAD:    name = "LOD";
+        FU_STORE:   name = "STR";
+        FU_BRU:     name = "BRU";
         default:    name = "Unknown FU";
     endcase
 endfunction
