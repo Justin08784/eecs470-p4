@@ -129,15 +129,19 @@ module dispatch #(parameter
 
     /* >> ==== 2. Rename Stage ==== >> */
 
+    logic [`N-1:0] is_brch;
     always_comb begin
         logic [$clog2(`N):0] lim_cnt_btq;
+        foreach(is_brch[i])
+            is_brch[i] = rename_in[i].fu_idx == FU_BRU;
+
         rename_en_cnt = alloc_vld_scnt;
 
         lim_cnt_btq = 0;
         for (int i = 0, int used_cnt = 0; i < `N; ++i) begin
-            if (used_cnt + rename_in[i].is_brch > btq_in.btq_rdy_scnt)
+            if (used_cnt + is_brch[i] > btq_in.btq_rdy_scnt)
                 break;
-            used_cnt += rename_in[i].is_brch;
+            used_cnt += is_brch[i];
             ++lim_cnt_btq;
         end
         rename_en_cnt = `MIN(lim_cnt_btq, rename_en_cnt);
@@ -147,11 +151,8 @@ module dispatch #(parameter
 
     // handle btq output
     always_comb begin
-        logic [`N-1:0] is_brch;
         foreach(rename_en[i])
             rename_en[i] = i < rename_en_cnt;
-        foreach(is_brch[i])
-            is_brch[i] = rename_in[i].is_brch;
 
         btq_out.en_cnt = $countones(rename_en & is_brch);
     end
@@ -197,11 +198,11 @@ module dispatch #(parameter
                 || rename_in[i].cond_branch;
             rd_src2s[i] = rename_in[i].opb_select == OPB_IS_RS2
                 || rename_in[i].cond_branch
-                || rename_in[i].wr_mem;
+                || rename_in[i].fu_idx == FU_STORE;
             tmp_alloc2rename[i].dat.t1_rdy  = !rd_src1s[i];
             tmp_alloc2rename[i].dat.t2_rdy  = !rd_src2s[i];
 
-            if (rename_in[i].is_brch) begin
+            if (is_brch[i]) begin
                 tmp_alloc2rename[i].dat.btq_idx = btq_in.btq_idxs[btq_wr_idx];
 
                 btq_out.PC[btq_wr_idx]       = rename_in[i].PC;
@@ -279,9 +280,7 @@ module dispatch #(parameter
 
         for (int i = 0; i < `N; i++) begin
             //handling src tags
-            rob_out.is_brch[i]  = commit_in[i].dat.is_brch;
-            rob_out.wr_mem[i]   = commit_in[i].dat.wr_mem;
-            rob_out.rd_mem[i]   = commit_in[i].dat.rd_mem;
+            rob_out.fu_idx[i]   = commit_in[i].dat.fu_idx;
             rob_out.tag[i]      = commit_in[i].dat.t;
             rob_out.t_old[i]    = commit_in[i].t_old;
             //handling dest register

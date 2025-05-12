@@ -289,7 +289,6 @@ module bru_ex(
                 rs2         : i_regs[i].rs2,
                 branch_func : i_regs[i].dat.inst.b.funct3,
                 cond_branch     : i_regs[i].dat.cond_branch,
-                uncond_branch   : i_regs[i].dat.uncond_branch,
 
                 t           : i_regs[i].dat.t,
                 rob_idx     : i_regs[i].dat.rob_idx,
@@ -317,8 +316,7 @@ module bru_ex(
                 .result(tmp_res[i]) // will return 32'hfacebeec if branch is high
             );
 
-            assign tmp_take[i] = ops[i].uncond_branch
-                || (ops[i].cond_branch && cond_take[i]);
+            assign tmp_take[i] = !ops[i].cond_branch || cond_take[i];
 
             assign tmp_data[i] = '{
                 t       : ops[i].t,
@@ -329,7 +327,7 @@ module bru_ex(
             assign o_cands[i] = tmp_data[i];
 
             assign o_btq_out.dat[i] = '{
-                en      : i_vld[i] && (ops[i].cond_branch || ops[i].uncond_branch),
+                en      : i_vld[i],
                 btq_idx : ops[i].btq_idx,
                 take    : tmp_take[i],
                 tgt     : addr2w(tmp_res[i])
@@ -535,8 +533,7 @@ module stage_ex_p4 (
 
                 opa_select  : rs_in.fu_dat_bru[i].opa_select,
                 opb_select  : rs_in.fu_dat_bru[i].opb_select,
-                cond_branch : rs_in.fu_dat_bru[i].cond_branch,
-                uncond_branch : rs_in.fu_dat_bru[i].uncond_branch
+                cond_branch : rs_in.fu_dat_bru[i].cond_branch
             };
 
             assign iss.i_rdy.bru[i] = 1;

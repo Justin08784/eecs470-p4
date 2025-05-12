@@ -133,9 +133,7 @@ module rob #(
                 cur_idx = comm_idxs[i];
                 state[cur_idx] <= '{
                     cpl     : 0,
-                    is_brch : d_in.is_brch[i],
-                    wr_mem  : d_in.wr_mem[i],
-                    rd_mem  : d_in.rd_mem[i],
+                    fu_idx  : d_in.fu_idx[i],
                     tag     : d_in.tag[i],
                     t_old   : d_in.t_old[i],
                     dst     : d_in.dst[i],

@@ -34,12 +34,18 @@ module retire (
     RETIRE_OP [`N-1:0] ret;
     always_comb begin
         foreach (ret[i]) begin
-            if      (rob_in.entries[i].halt)    ret[i] = RET_HLT;
-            else if (rob_in.entries[i].illegal) ret[i] = RET_ILL;
-            else if (rob_in.entries[i].rd_mem)  ret[i] = RET_LOD;
-            else if (rob_in.entries[i].wr_mem)  ret[i] = RET_STR;
-            else if (rob_in.entries[i].is_brch) ret[i] = RET_BRU;
-            else                                ret[i] = RET_GEN;
+            ret[i] = RET_GEN;
+
+            unique case (rob_in.entries[i].fu_idx)
+            FU_LOAD:    ret[i] = RET_LOD;
+            FU_STORE:   ret[i] = RET_STR;
+            FU_BRU:     ret[i] = RET_BRU;
+            endcase
+
+            if (rob_in.entries[i].illegal)
+                ret[i] = RET_ILL;
+            else if (rob_in.entries[i].halt)
+                ret[i] = RET_HLT;
         end
     end
 

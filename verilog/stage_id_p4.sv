@@ -15,7 +15,7 @@ module decoder_p4 (
     output ALU_OPB_SELECT opb_select,
     output logic          has_dest, // if there is a destination register
     output ALU_FUNC       alu_func,
-    output logic          mult, rd_mem, wr_mem, cond_branch, uncond_branch,
+    output logic          cond_branch,
     output logic          csr_op, // used for CSR operations, we only use this as a cheap way to get the return code out
     output logic          halt,   // non-zero on a halt
     output logic          illegal // non-zero on an illegal instruction
@@ -31,11 +31,7 @@ module decoder_p4 (
         alu_func      = ALU_ADD;
         has_dest      = `FALSE;
         csr_op        = `FALSE;
-        mult          = `FALSE;
-        rd_mem        = `FALSE;
-        wr_mem        = `FALSE;
         cond_branch   = `FALSE;
-        uncond_branch = `FALSE;
         halt          = `FALSE;
         illegal       = `FALSE;
 
@@ -55,14 +51,12 @@ module decoder_p4 (
                 has_dest      = `TRUE;
                 opa_select    = OPA_IS_PC;
                 opb_select    = OPB_IS_J_IMM;
-                uncond_branch = `TRUE;
             end
             `RV32_JALR: begin
                 fu_idx        = FU_BRU;
                 has_dest      = `TRUE;
                 opa_select    = OPA_IS_RS1;
                 opb_select    = OPB_IS_I_IMM;
-                uncond_branch = `TRUE;
             end
             `RV32_BEQ, `RV32_BNE, `RV32_BLT, `RV32_BGE,
             `RV32_BLTU, `RV32_BGEU: begin
@@ -75,22 +69,18 @@ module decoder_p4 (
             `RV32_MULHU: begin
                 fu_idx     = FU_MULT;
                 has_dest   = `TRUE;
-                mult       = `TRUE;
             end
             `RV32_MULHSU: begin
                 fu_idx     = FU_MULT;
                 has_dest   = `TRUE;
-                mult       = `TRUE;
             end
             `RV32_MULH: begin
                 fu_idx     = FU_MULT;
                 has_dest   = `TRUE;
-                mult       = `TRUE;
             end
             `RV32_MUL: begin //, `RV32_MULH, `RV32_MULHSU, `RV32_MULHU: begin
                 fu_idx     = FU_MULT;
                 has_dest   = `TRUE;
-                mult       = `TRUE;
                 // stage_ex uses inst.r.funct3 as the mult function
             end
             `RV32_LB, `RV32_LH, `RV32_LW,
@@ -98,13 +88,11 @@ module decoder_p4 (
                 fu_idx     = FU_LOAD;
                 has_dest   = `TRUE;
                 opb_select = OPB_IS_I_IMM;
-                rd_mem     = `TRUE;
                 // stage_ex uses inst.r.funct3 as the load size and signedness
             end
             `RV32_SB, `RV32_SH, `RV32_SW: begin
                 fu_idx     = FU_STORE;
                 opb_select = OPB_IS_S_IMM;
-                wr_mem     = `TRUE;
                 // stage_ex uses inst.r.funct3 as the store size
             end
             `RV32_ADDI: begin
@@ -274,11 +262,7 @@ module stage_id_p4 (
             .opb_select    (tmp[i].opb_select),
             .alu_func      (tmp[i].alu_func),
             .has_dest      (has_dest_reg[i]),
-            .mult          (tmp[i].mult),
-            .rd_mem        (tmp[i].rd_mem),
-            .wr_mem        (tmp[i].wr_mem),
             .cond_branch   (tmp[i].cond_branch),
-            .uncond_branch (tmp[i].uncond_branch),
             .csr_op        (tmp[i].csr_op),
             .halt          (tmp[i].halt),
             .illegal       (tmp[i].illegal)
@@ -303,7 +287,6 @@ module stage_id_p4 (
                 fu_idx      : tmp[i].fu_idx,
                 rob_idx     : '0,
                 btq_idx     : '0,
-                is_brch   : tmp[i].cond_branch || tmp[i].uncond_branch,
 
                 pred        : f_in.f_dat[i].pred,
                 pred_tgt    : f_in.f_dat[i].pred_tgt,
@@ -316,11 +299,7 @@ module stage_id_p4 (
 
                 dest_reg_idx    : (has_dest_reg[i]) ? f_in.f_dat[i].inst.r.rd : `ZERO_REG,
                 alu_func        : tmp[i].alu_func,
-                mult            : tmp[i].mult,
-                rd_mem          : tmp[i].rd_mem,
-                wr_mem          : tmp[i].wr_mem,
                 cond_branch     : tmp[i].cond_branch,
-                uncond_branch   : tmp[i].uncond_branch,
                 halt            : tmp[i].halt,
                 illegal         : tmp[i].illegal,
                 csr_op          : tmp[i].csr_op

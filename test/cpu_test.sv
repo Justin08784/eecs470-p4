@@ -279,9 +279,7 @@ module testbench;
 `ifdef DEBUG
         int   id;
 `endif
-        logic is_brch;
-        logic wr_mem;
-        logic rd_mem;
+        FU_IDX fu_idx;
         logic halt;
         logic illegal;
         ADDR NPC;
@@ -336,9 +334,7 @@ module testbench;
 `endif
                     halt    : verisimpleV.rob_0.d_in.halt[i],
                     illegal : verisimpleV.rob_0.d_in.illegal[i],
-                    is_brch : verisimpleV.rob_0.d_in.is_brch[i],
-                    rd_mem  : verisimpleV.rob_0.d_in.rd_mem[i],
-                    wr_mem  : verisimpleV.rob_0.d_in.wr_mem[i],
+                    fu_idx  : verisimpleV.rob_0.d_in.fu_idx[i],
                     NPC     : w2addr(verisimpleV.rs_0.d_in.dat[i].PC + 1)
                 };
             end

@@ -388,73 +388,6 @@ typedef struct packed {
 } IF_ID_PACKET;
 
 /**
- * ID_EX Packet:
- * Data exchanged from the ID to the EX stage
- */
-typedef struct packed {
-    INST inst;
-    ADDR PC;
-    ADDR NPC; // PC + 4
-
-    DATA rs1_value; // reg A value
-    DATA rs2_value; // reg B value
-
-    ALU_OPA_SELECT opa_select; // ALU opa mux select (ALU_OPA_xxx *)
-    ALU_OPB_SELECT opb_select; // ALU opb mux select (ALU_OPB_xxx *)
-
-    REG_IDX  dest_reg_idx;  // destination (writeback) register index
-    ALU_FUNC alu_func;      // ALU function select (ALU_xxx *)
-    logic    mult;          // Is inst a multiply instruction?
-    logic    rd_mem;        // Does inst read memory?
-    logic    wr_mem;        // Does inst write memory?
-    logic    cond_branch;   // Is inst a conditional branch?
-    logic    uncond_branch; // Is inst an unconditional branch?
-    logic    halt;          // Is this a halt?
-    logic    illegal;       // Is this instruction illegal?
-    logic    csr_op;        // Is this a CSR operation? (we only used this as a cheap way to get return code)
-
-    logic    valid;
-} ID_EX_PACKET;
-
-/**
- * EX_MEM Packet:
- * Data exchanged from the EX to the MEM stage
- */
-typedef struct packed {
-    DATA alu_result;
-    ADDR NPC;
-
-    logic    take_branch; // Is this a taken branch?
-    // Pass-through from decode stage
-    DATA     rs2_value;
-    logic    rd_mem;
-    logic    wr_mem;
-    REG_IDX  dest_reg_idx;
-    logic    halt;
-    logic    illegal;
-    logic    csr_op;
-    logic    rd_unsigned; // Whether proc2Dmem_data is signed or unsigned
-    MEM_SIZE mem_size;
-    logic    valid;
-} EX_MEM_PACKET;
-
-/**
- * MEM_WB Packet:
- * Data exchanged from the MEM to the WB stage
- *
- * Does not include data sent from the MEM stage to memory
- */
-typedef struct packed {
-    DATA    result;
-    ADDR    NPC;
-    REG_IDX dest_reg_idx; // writeback destination (ZERO_REG if no writeback)
-    logic   take_branch;
-    logic   halt;    // not used by wb stage
-    logic   illegal; // not used by wb stage
-    logic   valid;
-} MEM_WB_PACKET;
-
-/**
  * Commit Packet:
  * This is an output of the processor and used in the testbench for counting
  * committed instructions
@@ -472,16 +405,23 @@ typedef struct packed {
 } COMMIT_PACKET;
 
 // ROB stuff
+typedef enum logic [2:0] {
+    FU_ALU      = 'd0,
+    FU_MULT     = 'd1,
+    FU_LOAD     = 'd2,
+    FU_STORE    = 'd3,
+    FU_BRU      = 'd4
+} FU_IDX;
+`define FU_IDX_NUM 5
+
 typedef logic [$clog2(`ROB_SZ)-1:0] ROB_IDX;
 typedef struct packed {
     logic cpl;
     logic [$clog2(`PHYS_REG_SZ_R10K)-1:0] tag;
     logic [$clog2(`PHYS_REG_SZ_R10K)-1:0] t_old;
     REG_IDX dst;
-    
-    logic is_brch;
-    logic wr_mem;
-    logic rd_mem;
+
+    FU_IDX fu_idx;
     logic halt;
     logic illegal;
 } ROB_ENTRY;
@@ -578,15 +518,6 @@ typedef struct packed {
 } dispatch2btq;
 
 // Reservation station stuff
-typedef enum logic [2:0] {
-    FU_ALU      = 'd0,
-    FU_MULT     = 'd1,
-    FU_LOAD     = 'd2,
-    FU_STORE    = 'd3,
-    FU_BRU      = 'd4
-} FU_IDX;
-`define FU_IDX_NUM 5
-
 parameter RS_ALU_SZ     = 8;
 parameter RS_MULT_SZ    = 8;
 parameter RS_LOAD_SZ    = 4;
@@ -671,7 +602,6 @@ typedef struct packed {
 
     BTQ_IDX         btq_idx;
     logic           cond_branch;
-    logic           uncond_branch;
 } RS_BRU_PAYLOAD;
 
 typedef struct packed {
@@ -687,7 +617,6 @@ typedef struct packed {
     FU_IDX          fu_idx;
     ROB_IDX         rob_idx;
     BTQ_IDX         btq_idx;
-    logic           is_brch; // Is inst a branch?
 
     logic           pred;
     WADDR           pred_tgt;
@@ -701,16 +630,10 @@ typedef struct packed {
 
     REG_IDX  dest_reg_idx;  // destination (writeback) register index
     ALU_FUNC alu_func;      // ALU function select (ALU_xxx *)
-    logic    mult;          // Is inst a multiply instruction?
-    logic    rd_mem;        // Does inst read memory?
-    logic    wr_mem;        // Does inst write memory?
-    logic    cond_branch;   // Is inst a conditional branch?
-    logic    uncond_branch; // Is inst an unconditional branch?
+    logic    cond_branch;   // Is inst a conditional branch? (0 = not branch OR not cond_branch, 1 = cond_branch)
     logic    halt;          // Is this a halt?
     logic    illegal;       // Is this instruction illegal?
     logic    csr_op;        // Is this a CSR operation? (we only used this as a cheap way to get return code)
-
-    // logic    valid;
 } ID_RESULT;
 
 typedef struct packed {
@@ -797,10 +720,8 @@ typedef struct packed {
         // - IMPORTANT: Set from lowest indices in program-order. NO GAPS!!!
     //THESE ARE NOT COMING FROM DISPATCH, GET THESE FROM MAP TABLE
     //(ONLY HERE FOR CURRENT ROB TESTBENCH)
+    FU_IDX  [`N-1:0] fu_idx;
     REG_IDX [`N-1:0] dst;
-    logic [`N-1:0] is_brch;
-    logic [`N-1:0] wr_mem;
-    logic [`N-1:0] rd_mem;
     logic [`N-1:0] halt;
     logic [`N-1:0] illegal;
 } dispatch2rob;

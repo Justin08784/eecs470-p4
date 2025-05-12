@@ -71,8 +71,7 @@ typedef struct packed {
 
     INST inst;
     WADDR PC;
-    logic    cond_branch;
-    logic    uncond_branch;
+    logic          cond_branch;
     ALU_OPA_SELECT opa_select;
     ALU_OPB_SELECT opb_select;
 } ID_BRU_VIEW;
@@ -125,7 +124,6 @@ typedef struct packed {
     DATA            rs1, rs2;
     logic   [2:0]   branch_func; // Which branch condition to check
     logic           cond_branch;
-    logic           uncond_branch;
 
     PHYS_REG_IDX    t;
     ROB_IDX         rob_idx;

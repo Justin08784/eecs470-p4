@@ -355,8 +355,7 @@ module rs #(parameter
                 opb_select  : d_in.dat[i].opb_select,
 
                 btq_idx     : d_in.dat[i].btq_idx,
-                cond_branch     : d_in.dat[i].cond_branch,
-                uncond_branch   : d_in.dat[i].uncond_branch
+                cond_branch : d_in.dat[i].cond_branch
             };
         end
     end
