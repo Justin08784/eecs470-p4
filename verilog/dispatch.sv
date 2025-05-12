@@ -165,7 +165,9 @@ module dispatch #(parameter
         for (int i = 0; i < rename_en_cnt; i++) begin
             //handling dest register
             map_out.ts[i]       = rename_in[i].t;
-            map_out.dsts[i]     = rename_in[i].dest_reg_idx;
+            map_out.dsts[i]     = rename_in[i].has_dst
+                ? rename_in[i].inst.r.rd
+                : `ZERO_REG;
             //handling src tags
             map_out.src1s[i]    = rename_in[i].inst.r.rs1;
             map_out.src2s[i]    = rename_in[i].inst.r.rs2;
@@ -284,7 +286,9 @@ module dispatch #(parameter
             rob_out.tag[i]      = commit_in[i].dat.t;
             rob_out.t_old[i]    = commit_in[i].t_old;
             //handling dest register
-            rob_out.dst[i]      = commit_in[i].dat.dest_reg_idx;
+            rob_out.dst[i]      = commit_in[i].dat.has_dst
+                ? commit_in[i].dat.inst.r.rd
+                : `ZERO_REG;
 
             rob_out.halt[i]     = commit_in[i].dat.halt;
             rob_out.illegal[i]  = commit_in[i].dat.illegal;

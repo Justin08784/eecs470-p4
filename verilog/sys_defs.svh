@@ -625,11 +625,12 @@ typedef struct packed {
     INST inst;
     WADDR PC;
 
-    ALU_OPA_SELECT opa_select; // ALU opa mux select (ALU_OPA_xxx *)
-    ALU_OPB_SELECT opb_select; // ALU opb mux select (ALU_OPB_xxx *)
+    ALU_FUNC        alu_func;   // ALU function select (ALU_xxx *)
+    ALU_OPA_SELECT  opa_select; // ALU opa mux select (ALU_OPA_xxx *)
+    ALU_OPB_SELECT  opb_select; // ALU opb mux select (ALU_OPB_xxx *)
 
-    REG_IDX  dest_reg_idx;  // destination (writeback) register index
-    ALU_FUNC alu_func;      // ALU function select (ALU_xxx *)
+    logic    has_dst;       // does insn have destination register?
+
     logic    cond_branch;   // Is inst a conditional branch? (0 = not branch OR not cond_branch, 1 = cond_branch)
     logic    halt;          // Is this a halt?
     logic    illegal;       // Is this instruction illegal?

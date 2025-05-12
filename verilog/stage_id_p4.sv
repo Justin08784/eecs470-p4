@@ -241,7 +241,7 @@ module stage_id_p4 (
     assign f_out.d_rdy_cnt  = free_scnt;
     assign d_out.d_vld_scnt = used_scnt;
 
-    logic [`N-1:0] has_dest_reg;
+    logic [`N-1:0] tmp_has_dst;
     int insn_id;
 
     ID_RESULT [`N-1:0] tmp;
@@ -261,7 +261,7 @@ module stage_id_p4 (
             .opa_select    (tmp[i].opa_select),
             .opb_select    (tmp[i].opb_select),
             .alu_func      (tmp[i].alu_func),
-            .has_dest      (has_dest_reg[i]),
+            .has_dest      (tmp_has_dst[i]),
             .cond_branch   (tmp[i].cond_branch),
             .csr_op        (tmp[i].csr_op),
             .halt          (tmp[i].halt),
@@ -294,15 +294,15 @@ module stage_id_p4 (
                 inst        : f_in.f_dat[i].inst,
                 PC          : f_in.f_dat[i].PC,
 
-                opa_select      : tmp[i].opa_select,
-                opb_select      : tmp[i].opb_select,
+                opa_select  : tmp[i].opa_select,
+                opb_select  : tmp[i].opb_select,
 
-                dest_reg_idx    : (has_dest_reg[i]) ? f_in.f_dat[i].inst.r.rd : `ZERO_REG,
-                alu_func        : tmp[i].alu_func,
-                cond_branch     : tmp[i].cond_branch,
-                halt            : tmp[i].halt,
-                illegal         : tmp[i].illegal,
-                csr_op          : tmp[i].csr_op
+                has_dst     : tmp_has_dst[i],
+                alu_func    : tmp[i].alu_func,
+                cond_branch : tmp[i].cond_branch,
+                halt        : tmp[i].halt,
+                illegal     : tmp[i].illegal,
+                csr_op      : tmp[i].csr_op
             };
         end
 
@@ -386,7 +386,7 @@ module stage_id_p4 (
             NOTE: rd_data entries beyond prvw_vld_cnt are '0, and so we dont
             need to check && (i < prvw_vld_cnt) for either condition!
             */
-            d_out.prvw_has_dests[i] = d_out.d_dat[i].dest_reg_idx != `ZERO_REG;
+            d_out.prvw_has_dests[i] = d_out.d_dat[i].has_dst;
         end
     end
 
