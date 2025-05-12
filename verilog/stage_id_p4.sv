@@ -277,16 +277,7 @@ module stage_id_p4 (
 `ifdef DEBUG
                 id          : insn_id + i,
 `endif
-
-                t           : '0,
-                t1          : '0,
-                t2          : '0,
-                t1_rdy      : '0,
-                t2_rdy      : '0,
-
                 fu_idx      : tmp[i].fu_idx,
-                rob_idx     : '0,
-                btq_idx     : '0,
 
                 pred        : f_in.f_dat[i].pred,
                 pred_tgt    : f_in.f_dat[i].pred_tgt,
@@ -398,14 +389,14 @@ module stage_id_p4 (
         end
     end
 
-    `ifdef DEBUG
+`ifdef DEBUG
     assign dbg = '{
         f_in,
         f_out,
         d_in,
         d_out
     };
-    `endif
+`endif
 
 endmodule // stage_id
 

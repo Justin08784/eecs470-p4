@@ -1,10 +1,5 @@
 `include "sys_defs.svh"
 
-typedef struct packed {
-    PHYS_REG_IDX    t_old;
-    ID_RESULT       dat;
-} RENAME_COMMIT_PKT;
-
 module dispatch #(parameter 
     N=`N
 ) (
@@ -84,13 +79,42 @@ module dispatch #(parameter
         free_out.free_d_en_cnt = num_alloc_preg;
     end
 
-    ID_RESULT [`N-1:0] tmp_decode2alloc;
+    ALLOC_RENAME_PKT [`N-1:0] tmp_decode2alloc;
     always_comb begin
         int rd_idx;
 
         tmp_decode2alloc = '0;
-        for (int i = 0; i < `N; ++i)
-            tmp_decode2alloc[i] = d_in.d_dat[i];
+        for (int i = 0; i < `N; ++i) begin
+            // logic [$bits(ALLOC_RENAME_PKT)-$bits(ID_RESULT)-1:0] diff;
+            // diff = '0;
+            // tmp_decode2alloc[i] = ALLOC_RENAME_PKT'({d_in.d_dat[i], diff});
+            tmp_decode2alloc[i] = '{
+                // from ID_RESULT
+`ifdef DEBUG
+                id          : d_in.d_dat[i].id,
+`endif
+                PC          : d_in.d_dat[i].PC,
+                inst        : d_in.d_dat[i].inst,
+                fu_idx      : d_in.d_dat[i].fu_idx,
+
+                pred        : d_in.d_dat[i].pred,
+                pred_tgt    : d_in.d_dat[i].pred_tgt,
+
+                alu_func    : d_in.d_dat[i].alu_func,
+                opa_select  : d_in.d_dat[i].opa_select,
+                opb_select  : d_in.d_dat[i].opb_select,
+
+                has_dst     : d_in.d_dat[i].has_dst,
+                cond_branch : d_in.d_dat[i].cond_branch,
+                halt        : d_in.d_dat[i].halt,
+                illegal     : d_in.d_dat[i].illegal,
+                csr_op      : d_in.d_dat[i].csr_op,
+
+                // alloc
+                t           : '0
+            };
+
+        end
 
         //handling dest tags
         rd_idx = 0;
@@ -102,7 +126,7 @@ module dispatch #(parameter
         end
     end
 
-    ID_RESULT [`N-1:0]  rename_in;
+    ALLOC_RENAME_PKT [`N-1:0]  rename_in;
     logic [$clog2(N):0] rename_vld_scnt;
     logic [$clog2(N):0] rename_rdy_scnt;
     logic [$clog2(N):0] rename_en_cnt;
@@ -110,7 +134,7 @@ module dispatch #(parameter
     fifo #(
         .INSTANCE_ID(39),
         .DEPTH(2*`N),
-        .WIDTH($bits(ID_RESULT)),
+        .WIDTH($bits(ALLOC_RENAME_PKT)),
         .NUM_RPORTS(`N),
         .NUM_WPORTS(`N),
         .ENABLE_INTR_FWD(`FALSE)
@@ -188,12 +212,46 @@ module dispatch #(parameter
         btq_out.pred_tgt    = '0;
 
         for (int i = 0; i < `N; ++i) begin
-            tmp_alloc2rename[i].dat         = rename_in[i];
+            // logic [$bits(RENAME_COMMIT_PKT)-$bits(ALLOC_RENAME_PKT)-1:0] diff;
+            // diff = '0;
+            // tmp_alloc2rename[i] = RENAME_COMMIT_PKT'({rename_in[i], diff});
+            tmp_alloc2rename[i] = '{
+                // from ID_RESULT
+`ifdef DEBUG
+                id          : rename_in[i].id,
+`endif
+                PC          : rename_in[i].PC,
+                inst        : rename_in[i].inst,
+                fu_idx      : rename_in[i].fu_idx,
 
-            tmp_alloc2rename[i].dat.t       = map_out.ts[i];
-            tmp_alloc2rename[i].t_old       = map_in.ts_old[i];
-            tmp_alloc2rename[i].dat.t1      = map_in.t1s[i];
-            tmp_alloc2rename[i].dat.t2      = map_in.t2s[i];
+                pred        : rename_in[i].pred,
+                pred_tgt    : rename_in[i].pred_tgt,
+
+                alu_func    : rename_in[i].alu_func,
+                opa_select  : rename_in[i].opa_select,
+                opb_select  : rename_in[i].opb_select,
+
+                has_dst     : rename_in[i].has_dst,
+                cond_branch : rename_in[i].cond_branch,
+                halt        : rename_in[i].halt,
+                illegal     : rename_in[i].illegal,
+                csr_op      : rename_in[i].csr_op,
+
+                // alloc
+                t           : rename_in[i].t,
+                // rename
+                t_old       : '0,
+                t1          : '0,
+                t2          : '0,
+                t1_rdy      : '0,
+                t2_rdy      : '0,
+                btq_idx     : '0
+            };
+
+            tmp_alloc2rename[i].t       = map_out.ts[i];
+            tmp_alloc2rename[i].t_old   = map_in.ts_old[i];
+            tmp_alloc2rename[i].t1      = map_in.t1s[i];
+            tmp_alloc2rename[i].t2      = map_in.t2s[i];
 
             // actually need src tags?
             rd_src1s[i] = rename_in[i].opa_select == OPA_IS_RS1
@@ -201,11 +259,11 @@ module dispatch #(parameter
             rd_src2s[i] = rename_in[i].opb_select == OPB_IS_RS2
                 || rename_in[i].cond_branch
                 || rename_in[i].fu_idx == FU_STORE;
-            tmp_alloc2rename[i].dat.t1_rdy  = !rd_src1s[i];
-            tmp_alloc2rename[i].dat.t2_rdy  = !rd_src2s[i];
+            tmp_alloc2rename[i].t1_rdy  = !rd_src1s[i];
+            tmp_alloc2rename[i].t2_rdy  = !rd_src2s[i];
 
             if (is_brch[i]) begin
-                tmp_alloc2rename[i].dat.btq_idx = btq_in.btq_idxs[btq_wr_idx];
+                tmp_alloc2rename[i].btq_idx  = btq_in.btq_idxs[btq_wr_idx];
 
                 btq_out.PC[btq_wr_idx]       = rename_in[i].PC;
                 btq_out.pred[btq_wr_idx]     = rename_in[i].pred;
@@ -247,7 +305,7 @@ module dispatch #(parameter
 
         foreach (en_by_fu[f, n]) begin
             en_by_fu[f][n] = (n < rename_vld_scnt)
-                && commit_in[n].dat.fu_idx == f
+                && commit_in[n].fu_idx == f
                 && rs_in.rdy_sbus[f][n];
         end
 
@@ -265,14 +323,51 @@ module dispatch #(parameter
 
         rs_out.dat    = '0;
         for (int i = 0; i < `N; i++) begin
-            rs_out.dat[i] = commit_in[i].dat;
+            // logic [$bits(COMMIT_RS_PKT)-$bits(RENAME_COMMIT_PKT)-1:0] diff;
+            // diff = '0;
+            // rs_out.dat[i] = COMMIT_RS_PKT'({commit_in[i], diff});
+            rs_out.dat[i] = '{
+                // from ID_RESULT
+`ifdef DEBUG
+                id          : commit_in[i].id,
+`endif
+                PC          : commit_in[i].PC,
+                inst        : commit_in[i].inst,
+                fu_idx      : commit_in[i].fu_idx,
+
+                pred        : commit_in[i].pred,
+                pred_tgt    : commit_in[i].pred_tgt,
+
+                alu_func    : commit_in[i].alu_func,
+                opa_select  : commit_in[i].opa_select,
+                opb_select  : commit_in[i].opb_select,
+
+                has_dst     : commit_in[i].has_dst,
+                cond_branch : commit_in[i].cond_branch,
+                halt        : commit_in[i].halt,
+                illegal     : commit_in[i].illegal,
+                csr_op      : commit_in[i].csr_op,
+
+                // alloc
+                t           : commit_in[i].t,
+                // rename
+                t_old       : commit_in[i].t_old,
+                t1          : commit_in[i].t1,
+                t2          : commit_in[i].t2,
+                t1_rdy      : commit_in[i].t1_rdy,
+                t2_rdy      : commit_in[i].t2_rdy,
+                btq_idx     : commit_in[i].btq_idx,
+                // commit
+                rob_idx     : '0
+            };
+
             rs_out.dat[i].rob_idx = rob_in.rob_idxs[i];
             for (int c = 0; c < `N; ++c) begin
-                rs_out.dat[i].t1_rdy |= ctag_in.en[c] & (ctag_in.ts[c] == commit_in[i].dat.t1);
-                rs_out.dat[i].t2_rdy |= ctag_in.en[c] & (ctag_in.ts[c] == commit_in[i].dat.t2);
+                rs_out.dat[i].t1_rdy |= ctag_in.en[c] & (ctag_in.ts[c] == commit_in[i].t1);
+                rs_out.dat[i].t2_rdy |= ctag_in.en[c] & (ctag_in.ts[c] == commit_in[i].t2);
             end
-            rs_out.dat[i].t1_rdy |= cpl_lst[commit_in[i].dat.t1];
-            rs_out.dat[i].t2_rdy |= cpl_lst[commit_in[i].dat.t2];
+            rs_out.dat[i].t1_rdy |= cpl_lst[commit_in[i].t1];
+            rs_out.dat[i].t2_rdy |= cpl_lst[commit_in[i].t2];
         end
     end
 
@@ -282,16 +377,16 @@ module dispatch #(parameter
 
         for (int i = 0; i < `N; i++) begin
             //handling src tags
-            rob_out.fu_idx[i]   = commit_in[i].dat.fu_idx;
-            rob_out.tag[i]      = commit_in[i].dat.t;
+            rob_out.fu_idx[i]   = commit_in[i].fu_idx;
+            rob_out.tag[i]      = commit_in[i].t;
             rob_out.t_old[i]    = commit_in[i].t_old;
             //handling dest register
-            rob_out.dst[i]      = commit_in[i].dat.has_dst
-                ? commit_in[i].dat.inst.r.rd
+            rob_out.dst[i]      = commit_in[i].has_dst
+                ? commit_in[i].inst.r.rd
                 : `ZERO_REG;
 
-            rob_out.halt[i]     = commit_in[i].dat.halt;
-            rob_out.illegal[i]  = commit_in[i].dat.illegal;
+            rob_out.halt[i]     = commit_in[i].halt;
+            rob_out.illegal[i]  = commit_in[i].illegal;
         end
     end
 

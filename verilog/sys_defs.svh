@@ -604,38 +604,126 @@ typedef struct packed {
     logic           cond_branch;
 } RS_BRU_PAYLOAD;
 
+/* 
+The following structs are enrichments of the previous.
+ID_RESULT -> ALLOC_RENAME_PKT -> RENAME_COMMIT_PKT -> COMMIT_RS_PKT
+*/
 typedef struct packed {
 `ifdef DEBUG
     int             id;
 `endif
-
-    PHYS_REG_IDX    t;
-    PHYS_REG_IDX    t1;
-    PHYS_REG_IDX    t2;
-    logic           t1_rdy; // completed? should we rename to cpl for consistency?
-    logic           t2_rdy;
+    WADDR           PC;
+    INST            inst;
     FU_IDX          fu_idx;
-    ROB_IDX         rob_idx;
-    BTQ_IDX         btq_idx;
 
     logic           pred;
     WADDR           pred_tgt;
-
-    /* from ID_EX_PACKET */
-    INST inst;
-    WADDR PC;
 
     ALU_FUNC        alu_func;   // ALU function select (ALU_xxx *)
     ALU_OPA_SELECT  opa_select; // ALU opa mux select (ALU_OPA_xxx *)
     ALU_OPB_SELECT  opb_select; // ALU opb mux select (ALU_OPB_xxx *)
 
-    logic    has_dst;       // does insn have destination register?
-
-    logic    cond_branch;   // Is inst a conditional branch? (0 = not branch OR not cond_branch, 1 = cond_branch)
-    logic    halt;          // Is this a halt?
-    logic    illegal;       // Is this instruction illegal?
-    logic    csr_op;        // Is this a CSR operation? (we only used this as a cheap way to get return code)
+    logic           has_dst;    // does insn have destination register?
+    logic           cond_branch;// Is inst a conditional branch? (0 = not branch OR not cond_branch, 1 = cond_branch)
+    logic           halt;       // Is this a halt?
+    logic           illegal;    // Is this instruction illegal?
+    logic           csr_op;     // Is this a CSR operation? (we only used this as a cheap way to get return code)
 } ID_RESULT;
+
+typedef struct packed {
+    // from ID_RESULT
+`ifdef DEBUG
+    int             id;
+`endif
+    WADDR           PC;
+    INST            inst;
+    FU_IDX          fu_idx;
+
+    logic           pred;
+    WADDR           pred_tgt;
+
+    ALU_FUNC        alu_func;   // ALU function select (ALU_xxx *)
+    ALU_OPA_SELECT  opa_select; // ALU opa mux select (ALU_OPA_xxx *)
+    ALU_OPB_SELECT  opb_select; // ALU opb mux select (ALU_OPB_xxx *)
+
+    logic           has_dst;    // does insn have destination register?
+    logic           cond_branch;// Is inst a conditional branch? (0 = not branch OR not cond_branch, 1 = cond_branch)
+    logic           halt;       // Is this a halt?
+    logic           illegal;    // Is this instruction illegal?
+    logic           csr_op;     // Is this a CSR operation? (we only used this as a cheap way to get return code)
+
+    // alloc
+    PHYS_REG_IDX    t;
+} ALLOC_RENAME_PKT;
+
+typedef struct packed {
+    // from ID_RESULT
+`ifdef DEBUG
+    int             id;
+`endif
+    WADDR           PC;
+    INST            inst;
+    FU_IDX          fu_idx;
+
+    logic           pred;
+    WADDR           pred_tgt;
+
+    ALU_FUNC        alu_func;   // ALU function select (ALU_xxx *)
+    ALU_OPA_SELECT  opa_select; // ALU opa mux select (ALU_OPA_xxx *)
+    ALU_OPB_SELECT  opb_select; // ALU opb mux select (ALU_OPB_xxx *)
+
+    logic           has_dst;    // does insn have destination register?
+    logic           cond_branch;// Is inst a conditional branch? (0 = not branch OR not cond_branch, 1 = cond_branch)
+    logic           halt;       // Is this a halt?
+    logic           illegal;    // Is this instruction illegal?
+    logic           csr_op;     // Is this a CSR operation? (we only used this as a cheap way to get return code)
+
+    // alloc
+    PHYS_REG_IDX    t;
+    // rename
+    PHYS_REG_IDX    t_old;
+    PHYS_REG_IDX    t1;
+    PHYS_REG_IDX    t2;
+    logic           t1_rdy;
+    logic           t2_rdy;
+    BTQ_IDX         btq_idx;
+} RENAME_COMMIT_PKT;
+
+typedef struct packed {
+    // from ID_RESULT
+`ifdef DEBUG
+    int             id;
+`endif
+    WADDR           PC;
+    INST            inst;
+    FU_IDX          fu_idx;
+
+    logic           pred;
+    WADDR           pred_tgt;
+
+    ALU_FUNC        alu_func;   // ALU function select (ALU_xxx *)
+    ALU_OPA_SELECT  opa_select; // ALU opa mux select (ALU_OPA_xxx *)
+    ALU_OPB_SELECT  opb_select; // ALU opb mux select (ALU_OPB_xxx *)
+
+    logic           has_dst;    // does insn have destination register?
+    logic           cond_branch;// Is inst a conditional branch? (0 = not branch OR not cond_branch, 1 = cond_branch)
+    logic           halt;       // Is this a halt?
+    logic           illegal;    // Is this instruction illegal?
+    logic           csr_op;     // Is this a CSR operation? (we only used this as a cheap way to get return code)
+
+    // alloc
+    PHYS_REG_IDX    t;
+    // rename
+    PHYS_REG_IDX    t_old; // should be unused in RS
+    PHYS_REG_IDX    t1;
+    PHYS_REG_IDX    t2;
+    logic           t1_rdy;
+    logic           t2_rdy;
+    BTQ_IDX         btq_idx;
+    // commit
+    ROB_IDX         rob_idx;
+} COMMIT_RS_PKT; // purely combinational
+
 
 typedef struct packed {
     logic           busy;
@@ -703,7 +791,7 @@ typedef struct packed {
         // 1) only N dispatches, OR
         // 2) a different limit number of dispatches DIS_MAX: N ≤ DIS_MAX ≤ RS_SZ
         // (DIS_MAX will be a new sys_defs.svh constant) ?
-    ID_RESULT   [`N-1:0] dat; //shouldn't have dispatch feed to RS,
+    COMMIT_RS_PKT [`N-1:0] dat; //shouldn't have dispatch feed to RS,
         // - To: RS               //should come directly from dispatch
 } dispatch2rs;
 
@@ -783,8 +871,8 @@ typedef struct packed {
 
     RS_ALU_PAYLOAD  [`NUM_FU_ALU-1:0]    fu_dat_alu;
     RS_MULT_PAYLOAD [`NUM_FU_MULT-1:0]   fu_dat_mult;
-    ID_RESULT   [`NUM_FU_STORE-1:0]  fu_dat_store;
-    ID_RESULT   [`NUM_FU_LOAD-1:0]   fu_dat_load;
+    RS_ALU_PAYLOAD  [`NUM_FU_STORE-1:0]  fu_dat_store;
+    RS_ALU_PAYLOAD  [`NUM_FU_LOAD-1:0]   fu_dat_load;
     RS_BRU_PAYLOAD  [`NUM_FU_BRU-1:0]    fu_dat_bru;
 } rs2execute;
 
