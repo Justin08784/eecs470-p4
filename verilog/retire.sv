@@ -34,12 +34,11 @@ module retire (
     RETIRE_OP [`N-1:0] ret;
     always_comb begin
         foreach (ret[i]) begin
-            ret[i] = RET_GEN;
-
             unique case (rob_in.entries[i].fu_idx)
             FU_LOAD:    ret[i] = RET_LOD;
             FU_STORE:   ret[i] = RET_STR;
             FU_BRU:     ret[i] = RET_BRU;
+            default:    ret[i] = RET_GEN;
             endcase
 
             if (rob_in.entries[i].illegal)
