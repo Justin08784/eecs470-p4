@@ -92,9 +92,7 @@ module alu_ex(
             endcase
 
             // ALU opB mux
-            opb = i_regs[i].opb_is_rs2
-                ? i_regs[i].rs2
-                : i_regs[i].imm32b;
+            opb = i_regs[i].opb;
 
             ops[i] = '{
                 opa         : opa,
@@ -579,6 +577,9 @@ module stage_ex_p4 (
     always_comb begin
         foreach (iss.o_vld.alu[i]) begin
             DATA imm32b;
+            logic opb_is_rs2;
+
+            opb_is_rs2 = iss.o_dat.alu[i].opb_select == OPB_IS_RS2;
             case (iss.o_dat.alu[i].opb_select)
                 OPB_IS_RS2:   imm32b =  '0;
                 OPB_IS_I_IMM: imm32b = `RV32_signext_Iimm(iss.o_dat.alu[i].inst);
@@ -591,14 +592,15 @@ module stage_ex_p4 (
 
             regs.i_dat.alu[i] = '{
                 rs1 : prf_in.v1s.alu[i],
-                rs2 : prf_in.v2s.alu[i],
+                opb : opb_is_rs2
+                    ? prf_in.v2s.alu[i]
+                    : imm32b,
                 t1  : iss.o_dat.alu[i].t1,
                 t2  : iss.o_dat.alu[i].t2,
 
                 PC          : iss.o_dat.alu[i].PC,
                 opa_select  : iss.o_dat.alu[i].opa_select,
-                opb_is_rs2  : iss.o_dat.alu[i].opb_select == OPB_IS_RS2,
-                imm32b      : imm32b,
+                opb_is_rs2  : opb_is_rs2,
                 alu_func    : iss.o_dat.alu[i].alu_func,
 
                 t           : iss.o_dat.alu[i].t,
