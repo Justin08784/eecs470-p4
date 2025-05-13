@@ -4,10 +4,6 @@ module rob #(
     parameter ROB_SZ = `ROB_SZ,  // num elements
     parameter N=`N
 ) (
-    `ifdef DEBUG
-    output  DBG_rob dbg,
-    `endif 
-
     input clock, reset, flush,
 
     // retire (read)
