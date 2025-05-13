@@ -20,7 +20,7 @@ typedef struct packed {
 typedef struct packed {
     logic busy;
     logic issd;
-    RS_MULT_PAYLOAD dat;
+    RS_MUL_PAYLOAD dat;
 } RS_MULT_ENTRY;
 typedef struct packed {
     logic busy;
@@ -258,8 +258,8 @@ module rs #(parameter
     N=`N,
     FU_IDX_NUM=`FU_IDX_NUM,
     NUM_FU_ALU=`NUM_FU_ALU,
-    NUM_FU_MULT=`NUM_FU_MULT,
-    NUM_FU_LOAD=`NUM_FU_LOAD,
+    NUM_FU_MUL=`NUM_FU_MUL,
+    NUM_FU_LOD=`NUM_FU_LOD,
     NUM_FU_STR=`NUM_FU_STR
 ) (
     input clock,
@@ -311,7 +311,7 @@ module rs #(parameter
         end
     end
 
-    RS_MULT_PAYLOAD [`N-1:0] tmp_dat_mult;
+    RS_MUL_PAYLOAD [`N-1:0] tmp_dat_mult;
     always_comb begin
         foreach (d_in.dat[i]) begin
             tmp_dat_mult[i] = '{
@@ -386,27 +386,27 @@ module rs #(parameter
     );
 
     rs_part #(
-        .FU         (FU_MULT),
-        .PAYLOAD    (RS_MULT_PAYLOAD),
+        .FU         (FU_MUL),
+        .PAYLOAD    (RS_MUL_PAYLOAD),
         .ENTRY      (RS_MULT_ENTRY),
-        .PART_SZ    (RS_MULT_SZ),
-        .NUM_FU     (`NUM_FU_MULT),
+        .PART_SZ    (RS_MUL_SZ),
+        .NUM_FU     (`NUM_FU_MUL),
         .ISS_CDB_ARB(`FALSE)
     ) rs_mul (
         .clock  (clock),
         .reset  (reset),
         .flush  (flush),
 
-        .d_in_en        (d_in.en[FU_MULT]),
+        .d_in_en        (d_in.en[FU_MUL]),
         .d_in_dat       (tmp_dat_mult),
-        .d_out_rdy_sbus (d_out.rdy_sbus[FU_MULT]),
+        .d_out_rdy_sbus (d_out.rdy_sbus[FU_MUL]),
 
-        .ex_in_fu_rdy       (ex_in.fu_rdy_mult),
+        .ex_in_fu_rdy       (ex_in.fu_rdy_mul),
         .ex_in_fu_cdb_gnt   (),
 
         .ex_out_fu_vld  (),
-        .ex_out_fu_en   (ex_out.fu_en_mult),
-        .ex_out_fu_dat  (ex_out.fu_dat_mult),
+        .ex_out_fu_en   (ex_out.fu_en_mul),
+        .ex_out_fu_dat  (ex_out.fu_dat_mul),
 
         .ctag_in(ctag_in)
     );
@@ -438,12 +438,12 @@ module rs #(parameter
     );
 
     // default rdy_sbus for partitions not yet defined
-    assign d_out.rdy_sbus[FU_LOAD]  = '0;
+    assign d_out.rdy_sbus[FU_LOD]  = '0;
     assign d_out.rdy_sbus[FU_STR] = '0;
 
-    assign ex_out.fu_en_load    = '0;
+    assign ex_out.fu_en_lod    = '0;
     assign ex_out.fu_en_str     = '0;
-    assign ex_out.fu_dat_load   = '0;
+    assign ex_out.fu_dat_lod   = '0;
     assign ex_out.fu_dat_str    = '0;
 
 `ifdef DEBUG
@@ -471,8 +471,8 @@ module rs #(parameter
         end
     endtask
 
-    task automatic print_rs_mul(input RS_MULT_ENTRY [RS_MULT_SZ-1:0] entries);
-        for (int i = 0; i < RS_MULT_SZ; ++i) begin
+    task automatic print_rs_mul(input RS_MULT_ENTRY [RS_MUL_SZ-1:0] entries);
+        for (int i = 0; i < RS_MUL_SZ; ++i) begin
             if (!entries[i].busy) begin
                 $display("rs_mul[%2d]:", i);
                 continue;

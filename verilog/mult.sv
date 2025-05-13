@@ -5,7 +5,7 @@ typedef struct packed {
     logic [63:0]    sum;
     logic [63:0]    mplier;
     logic [63:0]    mcand;
-    MULT_FUNC       func;
+    MUL_FUNC        func;
     PHYS_REG_IDX    t;
     ROB_IDX         rob_idx;
 } MUL_PKT;
@@ -27,7 +27,7 @@ module mult #(
 ) (
     input clock, reset, flush,
     input DATA rs1, rs2,
-    input MULT_FUNC func,
+    input MUL_FUNC func,
     input PHYS_REG_IDX  i_t,
     input ROB_IDX       i_rob_idx,
 
@@ -71,22 +71,22 @@ module mult #(
     
     // instantiate an array of mult_stage modules
     // this uses concatenation syntax for internal wiring, see lab 2 slides
-    logic   [`MULT_STAGES:0] vlds;
-    logic   [`MULT_STAGES:0] rdys;
-    MUL_PKT [`MULT_STAGES:0] pkts;
+    logic   [`MUL_STAGES:0] vlds;
+    logic   [`MUL_STAGES:0] rdys;
+    MUL_PKT [`MUL_STAGES:0] pkts;
 
     always_comb begin
         vlds[0] = i_vld;
         i_rdy   = rdys[0];
         pkts[0] = i_pkt;
 
-        o_vld               = vlds[`MULT_STAGES];
-        rdys[`MULT_STAGES]  = o_rdy;
-        o_pkt               = pkts[`MULT_STAGES];
+        o_vld               = vlds[`MUL_STAGES];
+        rdys[`MUL_STAGES]   = o_rdy;
+        o_pkt               = pkts[`MUL_STAGES];
     end
 
-    for (genvar i = 0; i < `MULT_STAGES; ++i) begin : gen_stages
-        if (i < `MULT_STAGES-4) begin
+    for (genvar i = 0; i < `MUL_STAGES; ++i) begin : gen_stages
+        if (i < `MUL_STAGES-4) begin
             mult_stage #(
                 .MODE(O_SKID)
             ) mstage (
@@ -102,7 +102,7 @@ module mult #(
                 .o_dat(pkts[i+1])
             );
 
-        end else if (i == `MULT_STAGES-4) begin
+        end else if (i == `MUL_STAGES-4) begin
             // stage just before CDB arbiter; guard upstream with ppln_skid
             mult_stage #(
                 .MODE(O_PSKID)
@@ -120,7 +120,7 @@ module mult #(
             );
             assign ctag_t = pkts[i+1].t;
 
-        end else if (i == `MULT_STAGES-3) begin
+        end else if (i == `MUL_STAGES-3) begin
             // stage just after CDB arbiter; since arb. is done, may advance unconditionally
             mult_stage #(
                 .MODE(O_FLOP)
@@ -135,7 +135,7 @@ module mult #(
                 .o_dat(pkts[i+1])
             );
 
-        end else if (i < `MULT_STAGES-1) begin
+        end else if (i < `MUL_STAGES-1) begin
             mult_stage #(
                 .MODE(O_FLOP)
             ) mstage (
@@ -149,7 +149,7 @@ module mult #(
                 .o_dat(pkts[i+1])
             );
 
-        end else if (i == `MULT_STAGES-1) begin
+        end else if (i == `MUL_STAGES-1) begin
             // do not buffer here; latch result directly into CDB data bus (cdat_out)
 
             mult_stage #(
@@ -184,7 +184,7 @@ module mult #(
     // always_ff @(posedge clock) begin
     //     if (!reset && ID == 0) begin
     //         $display("  %3d | >> mul%0d >>", $time, ID);
-    //         for (int unsigned i = 0; i < `MULT_STAGES+1; ++i) begin
+    //         for (int unsigned i = 0; i < `MUL_STAGES+1; ++i) begin
     //             $display("– sum: %x, mplier: %x, mcand: %x, func: %0d, tag: %2d, rob_idx: %2d",
     //                 pkts[i].sum,
     //                 pkts[i].mplier,
@@ -216,7 +216,7 @@ module mult_stage #(
     output MUL_PKT  o_dat
 );
 
-    parameter SHIFT = 64/`MULT_STAGES;
+    parameter SHIFT = 64/`MUL_STAGES;
 
     logic [63:0] partial_product, shifted_mplier, shifted_mcand;
     MUL_PKT tmp_dat;

@@ -136,22 +136,22 @@ module mul_ex(
     input flush,
 
     /* FRONTEND */
-    output logic    [`NUM_FU_MULT-1:0]  i_rdy,
+    output logic    [`NUM_FU_MUL-1:0]  i_rdy,
         // ready to accept from regs.o_dat.mul?
-    input  logic    [`NUM_FU_MULT-1:0]  i_vld,
+    input  logic    [`NUM_FU_MUL-1:0]  i_vld,
         // insns to accept from regs.o_dat.mul
-    input  MUL_REGS [`NUM_FU_MULT-1:0]  i_regs,
+    input  MUL_REGS [`NUM_FU_MUL-1:0]  i_regs,
         // insn metadata/operands
 
     /* Early CDB arbitration */
-    output logic [`NUM_FU_MULT-1:0]     cdb_req,
-    output PHYS_REG_IDX [`NUM_FU_MULT-1:0] ctag_ts,
-    input  logic [`NUM_FU_MULT-1:0]     cdb_gnt,
+    output logic [`NUM_FU_MUL-1:0]     cdb_req,
+    output PHYS_REG_IDX [`NUM_FU_MUL-1:0] ctag_ts,
+    input  logic [`NUM_FU_MUL-1:0]     cdb_gnt,
 
     /* BACKEND */
-    output CPL_CAND [`NUM_FU_MULT-1:0]  o_cands
+    output CPL_CAND [`NUM_FU_MUL-1:0]  o_cands
 );
-    MUL_OPS [`NUM_FU_MULT-1:0] ops;
+    MUL_OPS [`NUM_FU_MUL-1:0] ops;
     always_comb begin
         foreach (ops[i]) begin
             ops[i] = '{
@@ -166,12 +166,12 @@ module mul_ex(
 
     // execute
     generate
-        DATA        [`NUM_FU_MULT-1:0] tmp_res;
-        PHYS_REG_IDX[`NUM_FU_MULT-1:0] tmp_t;
-        ROB_IDX     [`NUM_FU_MULT-1:0] tmp_rob_idx;
+        DATA        [`NUM_FU_MUL-1:0] tmp_res;
+        PHYS_REG_IDX[`NUM_FU_MUL-1:0] tmp_t;
+        ROB_IDX     [`NUM_FU_MUL-1:0] tmp_rob_idx;
 
-        logic       [`NUM_FU_MULT-1:0] cpl_buf_rdy;
-        for (genvar i = 0; i < `NUM_FU_MULT; ++i) begin : gen_mults
+        logic       [`NUM_FU_MUL-1:0] cpl_buf_rdy;
+        for (genvar i = 0; i < `NUM_FU_MUL; ++i) begin : gen_mults
             mult #(
                 .ID(i)
             ) mult_0 ( 
@@ -348,8 +348,8 @@ module stage_ex_p4 (
         `BY_FU(logic)   o_vld;
         struct packed {
             ID_ALU_VIEW [`NUM_FU_ALU-1:0]   alu;
-            ID_MUL_VIEW [`NUM_FU_MULT-1:0]  mul;
-            ID_LOD_VIEW [`NUM_FU_LOAD-1:0]  lod;
+            ID_MUL_VIEW [`NUM_FU_MUL-1:0]   mul;
+            ID_LOD_VIEW [`NUM_FU_LOD-1:0]   lod;
             ID_STR_VIEW [`NUM_FU_STR-1:0]   str;
             ID_BRU_VIEW [`NUM_FU_BRU-1:0]   bru;
         } i_dat, o_dat;
@@ -360,8 +360,8 @@ module stage_ex_p4 (
         `BY_FU(logic) o_vld;
         struct packed {
             ALU_REGS [`NUM_FU_ALU-1:0]  alu;
-            MUL_REGS [`NUM_FU_MULT-1:0] mul;
-            LOD_REGS [`NUM_FU_LOAD-1:0] lod;
+            MUL_REGS [`NUM_FU_MUL-1:0]  mul;
+            LOD_REGS [`NUM_FU_LOD-1:0]  lod;
             STR_REGS [`NUM_FU_STR-1:0]  str;
             BRU_REGS [`NUM_FU_BRU-1:0]  bru;
         } i_dat, o_dat;
@@ -410,13 +410,13 @@ module stage_ex_p4 (
             );
         end
         
-        for (genvar i = 0; i < `NUM_FU_MULT; ++i) begin : gen_mul_sbufs
+        for (genvar i = 0; i < `NUM_FU_MUL; ++i) begin : gen_mul_sbufs
             assign iss.i_dat.mul[i] = '{
-                t       : rs_in.fu_dat_mult[i].t,
-                t1      : rs_in.fu_dat_mult[i].t1,
-                t2      : rs_in.fu_dat_mult[i].t2,
-                rob_idx : rs_in.fu_dat_mult[i].rob_idx,
-                func    : rs_in.fu_dat_mult[i].func
+                t       : rs_in.fu_dat_mul[i].t,
+                t1      : rs_in.fu_dat_mul[i].t1,
+                t2      : rs_in.fu_dat_mul[i].t2,
+                rob_idx : rs_in.fu_dat_mul[i].rob_idx,
+                func    : rs_in.fu_dat_mul[i].func
             };
 
             ppln_skid #(
@@ -426,7 +426,7 @@ module stage_ex_p4 (
                 .reset (reset),
                 .flush (flush),
 
-                .i_vld (rs_in.fu_en_mult[i]),
+                .i_vld (rs_in.fu_en_mul[i]),
                 .i_rdy (iss.i_rdy.mul[i]),
                 .i_dat (iss.i_dat.mul[i]),
 
@@ -436,20 +436,20 @@ module stage_ex_p4 (
             );
         end
 
-        for (genvar i = 0; i < `NUM_FU_LOAD; ++i) begin : gen_lod_sbufs
+        for (genvar i = 0; i < `NUM_FU_LOD; ++i) begin : gen_lod_sbufs
             assign iss.i_dat.lod[i] = '{
-                t       : rs_in.fu_dat_load[i].t,
-                t1      : rs_in.fu_dat_load[i].t1,
-                opb     : `RV32_signext_Iimm(rs_in.fu_dat_load[i].inst),
+                t       : rs_in.fu_dat_lod[i].t,
+                t1      : rs_in.fu_dat_lod[i].t1,
+                opb     : `RV32_signext_Iimm(rs_in.fu_dat_lod[i].inst),
 
                 // >> FIXME
                 sq_idx  : '0,
                 lq_idx  : '0,
                 // << FIXME
 
-                rob_idx : rs_in.fu_dat_load[i].rob_idx,
-                mem_size: MEM_SIZE'(rs_in.fu_dat_load[i].inst.r.funct3[1:0]),
-                rd_unsigned : rs_in.fu_dat_load[i].inst.r.funct3[2]
+                rob_idx : rs_in.fu_dat_lod[i].rob_idx,
+                mem_size: MEM_SIZE'(rs_in.fu_dat_lod[i].inst.r.funct3[1:0]),
+                rd_unsigned : rs_in.fu_dat_lod[i].inst.r.funct3[2]
             };
 
             ppln_skid #(
@@ -459,7 +459,7 @@ module stage_ex_p4 (
                 .reset (reset),
                 .flush (flush),
 
-                .i_vld (rs_in.fu_en_load[i]),
+                .i_vld (rs_in.fu_en_lod[i]),
                 .i_rdy (iss.i_rdy.lod[i]),
                 .i_dat (iss.i_dat.lod[i]),
 
@@ -680,7 +680,7 @@ module stage_ex_p4 (
             assign regs.o_dat.alu[i] = alu_snoop(raw, cdat_out);
         end
 
-        for (genvar i = 0; i < `NUM_FU_MULT; ++i) begin : gen_mul_rbufs
+        for (genvar i = 0; i < `NUM_FU_MUL; ++i) begin : gen_mul_rbufs
             /* Even if we are stalled, we must snoop the CDB to make sure
             we don't miss the 1 cycle bypass window. */
             MUL_REGS raw;
@@ -705,7 +705,7 @@ module stage_ex_p4 (
             assign regs.o_dat.mul[i] = mul_snoop(raw, cdat_out);
         end
 
-        for (genvar i = 0; i < `NUM_FU_LOAD; ++i) begin : gen_lod_rbufs
+        for (genvar i = 0; i < `NUM_FU_LOD; ++i) begin : gen_lod_rbufs
             LOD_REGS raw;
             skid #(
                 .ENABLE_SNOOP(`TRUE),
@@ -864,8 +864,8 @@ module stage_ex_p4 (
             fu_cdb_gnt_bru  : cdb_gnt.bru,
 
             fu_rdy_alu      : iss.i_rdy.alu,
-            fu_rdy_mult     : iss.i_rdy.mul,
-            fu_rdy_load     : iss.i_rdy.lod,
+            fu_rdy_mul      : iss.i_rdy.mul,
+            fu_rdy_lod      : iss.i_rdy.lod,
             fu_rdy_str      : iss.i_rdy.str,
             fu_rdy_bru      : iss.i_rdy.bru
         };
@@ -942,7 +942,7 @@ module stage_ex_p4 (
             );
         end
 
-        for (int i = 0; i < `NUM_FU_MULT; ++i) begin
+        for (int i = 0; i < `NUM_FU_MUL; ++i) begin
             $display("mul_iss[%0d]: rdy: %b, vld: %b, t: %2d, t1: %2d, t2: %2d, rob_idx: %2d, func: 0x%x",
                 i,
                 iss.i_rdy.mul[i],
@@ -966,7 +966,7 @@ module stage_ex_p4 (
             );
         end
 
-        for (int i = 0; i < `NUM_FU_MULT; ++i) begin
+        for (int i = 0; i < `NUM_FU_MUL; ++i) begin
             $display("regs.o_dat.mul[%0d]: bsy: %b, rs1: 0x%x, rs2: 0x%x t: %2d, rob_idx: %2d",
                 i,
                 regs.o_vld.mul[i],
@@ -979,9 +979,9 @@ module stage_ex_p4 (
 
         // $display("c_out: rdy_alu:{%b} rdy_mult:{%b} rdy_store:{%b} rdy_load:{%b}",
         //     rs_out.fu_rdy_alu,
-        //     rs_out.fu_rdy_mult,
+        //     rs_out.fu_rdy_mul,
         //     rs_out.fu_rdy_str,
-        //     rs_out.fu_rdy_load,
+        //     rs_out.fu_rdy_lod,
         // );
 
         $display("\ncdb_req: alu:{%b} mul:{%b} lod:{%b} str:{%b}", cdb_req.alu, cdb_req.mul, cdb_req.lod, cdb_req.str);

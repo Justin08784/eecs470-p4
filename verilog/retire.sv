@@ -32,7 +32,7 @@ module retire (
     always_comb begin
         foreach (ret[i]) begin
             unique case (rob_in.entries[i].fu_idx)
-            FU_LOAD:ret[i] = RET_LOD;
+            FU_LOD: ret[i] = RET_LOD;
             FU_STR: ret[i] = RET_STR;
             FU_BRU: ret[i] = RET_BRU;
             default:ret[i] = RET_GEN;

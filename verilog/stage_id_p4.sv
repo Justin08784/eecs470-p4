@@ -67,25 +67,25 @@ module decoder_p4 (
                 // stage_ex uses inst.b.funct3 as the branch function
             end
             `RV32_MULHU: begin
-                fu_idx     = FU_MULT;
+                fu_idx     = FU_MUL;
                 has_dest   = `TRUE;
             end
             `RV32_MULHSU: begin
-                fu_idx     = FU_MULT;
+                fu_idx     = FU_MUL;
                 has_dest   = `TRUE;
             end
             `RV32_MULH: begin
-                fu_idx     = FU_MULT;
+                fu_idx     = FU_MUL;
                 has_dest   = `TRUE;
             end
             `RV32_MUL: begin //, `RV32_MULH, `RV32_MULHSU, `RV32_MULHU: begin
-                fu_idx     = FU_MULT;
+                fu_idx     = FU_MUL;
                 has_dest   = `TRUE;
                 // stage_ex uses inst.r.funct3 as the mult function
             end
             `RV32_LB, `RV32_LH, `RV32_LW,
             `RV32_LBU, `RV32_LHU: begin
-                fu_idx     = FU_LOAD;
+                fu_idx     = FU_LOD;
                 has_dest   = `TRUE;
                 opb_select = OPB_IS_I_IMM;
                 // stage_ex uses inst.r.funct3 as the load size and signedness

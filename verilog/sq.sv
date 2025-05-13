@@ -6,7 +6,7 @@ module sq #(parameter
     N=`N,
     LSQ_SZ=`LSQ_SZ,
     NUM_FU_STR=`NUM_FU_STR,
-    NUM_FU_LOAD=`NUM_FU_LOAD,
+    NUM_FU_LOD=`NUM_FU_LOD,
     LD_BAY_SZ=`LD_BAY_SZ
 ) (
 `ifdef DEBUG

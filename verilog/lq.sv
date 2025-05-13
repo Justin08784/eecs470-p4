@@ -5,7 +5,7 @@ module lq #(parameter
     N=`N,
     LSQ_SZ=`LSQ_SZ,
     NUM_FU_STR=`NUM_FU_STR,
-    NUM_FU_LOAD=`LD_BAY_SZ
+    NUM_FU_LOD=`LD_BAY_SZ
 ) (
 `ifdef DEBUG
     output DBG_lq dbg,

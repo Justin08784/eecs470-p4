@@ -43,15 +43,15 @@
 
 // functional units (you should decide if you want more or fewer types of FUs)
 `define NUM_FU_ALU 2
-`define NUM_FU_MULT 1
-`define NUM_FU_LOAD 1
+`define NUM_FU_MUL 1
+`define NUM_FU_LOD 1
 `define LD_BAY_SZ 2 //num load bays in the FU
 `define NUM_FU_STR 1
 `define NUM_FU_BRU 1
-`define NUM_FU_TOTAL `NUM_FU_ALU + `NUM_FU_MULT + `NUM_FU_LOAD + `NUM_FU_STR + `NUM_FU_BRU
+`define NUM_FU_TOTAL `NUM_FU_ALU + `NUM_FU_MUL + `NUM_FU_LOD + `NUM_FU_STR + `NUM_FU_BRU
 
 // number of mult stages (2, 4) (you likely don't need 8)
-`define MULT_STAGES 16
+`define MUL_STAGES 16
 // Justin: funny enough we need at least 8 or else multiply is on critical path
 
 ///////////////////////////////
@@ -345,7 +345,7 @@ typedef enum logic [2:0] {
     M_MULH,
     M_MULHSU,
     M_MULHU
-} MULT_FUNC;
+} MUL_FUNC;
 
 ////////////////////////////////
 // ---- Datapath Packets ---- //
@@ -387,8 +387,8 @@ typedef struct packed {
 // ROB stuff
 typedef enum logic [2:0] {
     FU_ALU  = 'd0,
-    FU_MULT = 'd1,
-    FU_LOAD = 'd2,
+    FU_MUL = 'd1,
+    FU_LOD = 'd2,
     FU_STR  = 'd3,
     FU_BRU  = 'd4
 } FU_IDX;
@@ -471,8 +471,8 @@ typedef struct packed {
 
 // Reservation station stuff
 parameter RS_ALU_SZ     = 8;
-parameter RS_MULT_SZ    = 8;
-parameter RS_LOAD_SZ    = 4;
+parameter RS_MUL_SZ    = 8;
+parameter RS_LOD_SZ    = 4;
 parameter RS_STOR_SZ    = 4;
 parameter RS_BRU_SZ     = 4;
 typedef struct packed {
@@ -509,8 +509,8 @@ typedef struct packed {
     logic           t1_rdy;
     logic           t2_rdy;
     ROB_IDX         rob_idx;
-    MULT_FUNC       func;
-} RS_MULT_PAYLOAD;
+    MUL_FUNC       func;
+} RS_MUL_PAYLOAD;
 
 typedef struct packed {
 `ifdef DEBUG
@@ -805,15 +805,15 @@ typedef struct packed {
 
     /* Selected for issue */
     logic       [`NUM_FU_ALU-1:0]   fu_en_alu;
-    logic       [`NUM_FU_MULT-1:0]  fu_en_mult;
+    logic       [`NUM_FU_MUL-1:0]  fu_en_mul;
     logic       [`NUM_FU_STR-1:0]   fu_en_str;
-    logic       [`NUM_FU_LOAD-1:0]  fu_en_load;
+    logic       [`NUM_FU_LOD-1:0]  fu_en_lod;
     logic       [`NUM_FU_BRU-1:0]   fu_en_bru;
 
     RS_ALU_PAYLOAD  [`NUM_FU_ALU-1:0]   fu_dat_alu;
-    RS_MULT_PAYLOAD [`NUM_FU_MULT-1:0]  fu_dat_mult;
+    RS_MUL_PAYLOAD [`NUM_FU_MUL-1:0]  fu_dat_mul;
     RS_ALU_PAYLOAD  [`NUM_FU_STR-1:0]   fu_dat_str;
-    RS_ALU_PAYLOAD  [`NUM_FU_LOAD-1:0]  fu_dat_load;
+    RS_ALU_PAYLOAD  [`NUM_FU_LOD-1:0]  fu_dat_lod;
     RS_BRU_PAYLOAD  [`NUM_FU_BRU-1:0]   fu_dat_bru;
 } rs2execute;
 
@@ -838,9 +838,9 @@ typedef struct packed {
 // By Execute
 typedef struct packed {
     logic       [`NUM_FU_ALU-1:0]   fu_rdy_alu;
-    logic       [`NUM_FU_MULT-1:0]  fu_rdy_mult;
+    logic       [`NUM_FU_MUL-1:0]  fu_rdy_mul;
     logic       [`NUM_FU_STR-1:0]   fu_rdy_str;
-    logic       [`NUM_FU_LOAD-1:0]  fu_rdy_load;
+    logic       [`NUM_FU_LOD-1:0]  fu_rdy_lod;
     logic       [`NUM_FU_BRU-1:0]   fu_rdy_bru;
 
     logic       [`NUM_FU_ALU-1:0]   fu_cdb_gnt_alu; // 1-cycle insns need to win CDB arb. to issue
@@ -881,8 +881,8 @@ typedef struct packed {
 `define BY_FU(type) \
 struct packed { \
     type [`NUM_FU_ALU-1:0]  alu; \
-    type [`NUM_FU_MULT-1:0] mul; \
-    type [`NUM_FU_LOAD-1:0] lod; \
+    type [`NUM_FU_MUL-1:0] mul; \
+    type [`NUM_FU_LOD-1:0] lod; \
     type [`NUM_FU_STR-1:0]  str; \
     type [`NUM_FU_BRU-1:0]  bru; \
 }
@@ -936,8 +936,8 @@ endfunction
 function get_fu_name(input FU_IDX fu_idx, output string name);
     case (fu_idx)
         FU_ALU:  name = "ALU";
-        FU_MULT: name = "MUL";
-        FU_LOAD: name = "LOD";
+        FU_MUL: name = "MUL";
+        FU_LOD: name = "LOD";
         FU_STR:  name = "STR";
         FU_BRU:  name = "BRU";
         default: name = "Unknown FU";

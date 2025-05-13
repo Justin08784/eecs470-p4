@@ -29,7 +29,7 @@ typedef struct packed {
     PHYS_REG_IDX    t1;
     PHYS_REG_IDX    t2;
     ROB_IDX         rob_idx;
-    MULT_FUNC       func;
+    MUL_FUNC        func;
 } ID_MUL_VIEW;
 
 typedef struct packed {
@@ -99,7 +99,7 @@ typedef struct packed {
     PHYS_REG_IDX    t1;
     PHYS_REG_IDX    t2;
 
-    MULT_FUNC       func;
+    MUL_FUNC        func;
 
     PHYS_REG_IDX    t;
     ROB_IDX         rob_idx;
@@ -144,7 +144,7 @@ typedef struct packed {
 typedef struct packed {
     DATA            rs1;
     DATA            rs2;
-    MULT_FUNC       func;
+    MUL_FUNC        func;
 
     PHYS_REG_IDX    t;
     ROB_IDX         rob_idx;
@@ -254,8 +254,8 @@ typedef struct packed {
         `BY_FU(logic)   o_vld;
         struct packed {
             ID_ALU_VIEW [`NUM_FU_ALU-1:0]   alu;
-            ID_MUL_VIEW [`NUM_FU_MULT-1:0]  mul;
-            ID_LOD_VIEW [`NUM_FU_LOAD-1:0]  lod;
+            ID_MUL_VIEW [`NUM_FU_MUL-1:0]   mul;
+            ID_LOD_VIEW [`NUM_FU_LOD-1:0]   lod;
             ID_STR_VIEW [`NUM_FU_STR-1:0]   str;
         } i_dat, o_dat;
     } iss;
@@ -265,8 +265,8 @@ typedef struct packed {
         `BY_FU(logic) o_vld;
         struct packed {
             ALU_REGS [`NUM_FU_ALU-1:0]  alu;
-            MUL_REGS [`NUM_FU_MULT-1:0] mul;
-            LOD_REGS [`NUM_FU_LOAD-1:0] lod;
+            MUL_REGS [`NUM_FU_MUL-1:0]  mul;
+            LOD_REGS [`NUM_FU_LOD-1:0]  lod;
             STR_REGS [`NUM_FU_STR-1:0]  str;
         } i_dat, o_dat;
     } regs;
