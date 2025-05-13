@@ -55,16 +55,16 @@ module dispatch #(parameter
 
         lim_cnt_free = 0;
         for (int i = 0, int used_cnt = 0; i < `N; ++i) begin
-            if (used_cnt + d_in.prvw_has_dests[i] > free_in.free_rdy_scnt)
+            if (used_cnt + d_in.d_dat[i].has_dst > free_in.free_rdy_scnt)
                 break;
-            used_cnt += d_in.prvw_has_dests[i];
+            used_cnt += d_in.d_dat[i].has_dst;
             ++lim_cnt_free;
         end
         alloc_en_cnt = `MIN(lim_cnt_free, alloc_en_cnt);
         alloc_en_cnt = `MIN(alloc_rdy_scnt, alloc_en_cnt);
 
         d_out.dispatch_en_cnt  = alloc_en_cnt;
-        rob_out.alloc_en_cnt        = alloc_en_cnt;
+        rob_out.alloc_en_cnt   = alloc_en_cnt;
     end
 
     //logic for free list
@@ -73,7 +73,7 @@ module dispatch #(parameter
     always_comb begin
         //determining how many instructions have a dest reg
         foreach (bus_alloc_preg[i])
-            bus_alloc_preg[i] = (i < alloc_en_cnt) && d_in.prvw_has_dests[i]; 
+            bus_alloc_preg[i] = (i < alloc_en_cnt) && d_in.d_dat[i].has_dst; 
 
         num_alloc_preg = $countones(bus_alloc_preg);
         free_out.free_d_en_cnt = num_alloc_preg;

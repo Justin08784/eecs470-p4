@@ -361,25 +361,9 @@ module stage_id_p4 (
         .wr_data    (wr_fifo),
         .rd_en_cnt  (d_in.dispatch_en_cnt),
         .rd_data    (d_out.d_dat),
-        /*
-        TODO: prvw_vld_cnt and used_scnt seem to do the same thing. This makes
-        the dispatch_cnt computation in dispatch.sv not perfectly optimal.
-        Find the minimal solution.
-        */
-        .prvw_vld_cnt (prvw_vld_cnt),
         .free_scnt  (free_scnt),
         .used_scnt  (used_scnt)
     );
-
-    always_comb begin
-        for (int i = 0; i < `N; ++i) begin
-            /*
-            NOTE: rd_data entries beyond prvw_vld_cnt are '0, and so we dont
-            need to check && (i < prvw_vld_cnt) for either condition!
-            */
-            d_out.prvw_has_dests[i] = d_out.d_dat[i].has_dst;
-        end
-    end
 
     always_ff @(posedge clock) begin
         if (reset) begin
