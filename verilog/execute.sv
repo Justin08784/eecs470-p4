@@ -38,8 +38,6 @@ ops in this category, so we wouldn't know)
 module alu (
     input DATA      opa,
     input DATA      opb,
-    input DATA      rs1,
-    input DATA      rs2,
     input ALU_FUNC  alu_func,
 
     output DATA     result
@@ -82,10 +80,10 @@ module alu_ex(
     always_comb begin
         DATA opa, opb;
         foreach(ops[i]) begin
-            pc_addrs[i]     = w2addr(i_regs[i].dat.PC);
-            npc_addrs[i]    = w2addr(i_regs[i].dat.PC + 1);
+            pc_addrs[i]     = w2addr(i_regs[i].PC);
+            npc_addrs[i]    = w2addr(i_regs[i].PC + 1);
             // ALU opA mux
-            case (i_regs[i].dat.opa_select)
+            case (i_regs[i].opa_select)
                 OPA_IS_RS1:  opa = i_regs[i].rs1;
                 OPA_IS_NPC:  opa = npc_addrs[i];
                 OPA_IS_PC:   opa = pc_addrs[i];
@@ -94,23 +92,16 @@ module alu_ex(
             endcase
 
             // ALU opB mux
-            case (i_regs[i].dat.opb_select)
-                OPB_IS_RS2:   opb =  i_regs[i].rs2;
-                OPB_IS_I_IMM: opb = `RV32_signext_Iimm(i_regs[i].dat.inst);
-                OPB_IS_S_IMM: opb = `RV32_signext_Simm(i_regs[i].dat.inst);
-                OPB_IS_B_IMM: opb = `RV32_signext_Bimm(i_regs[i].dat.inst);
-                OPB_IS_U_IMM: opb = `RV32_signext_Uimm(i_regs[i].dat.inst);
-                OPB_IS_J_IMM: opb = `RV32_signext_Jimm(i_regs[i].dat.inst);
-                default:      opb = 32'hfacefeed; // face feed
-            endcase
+            opb = i_regs[i].opb_is_rs2
+                ? i_regs[i].rs2
+                : i_regs[i].imm32b;
+
             ops[i] = '{
-                rs1         : i_regs[i].rs1,
-                rs2         : i_regs[i].rs2,
                 opa         : opa,
                 opb         : opb,
-                alu_func    : i_regs[i].dat.alu_func,
-                t           : i_regs[i].dat.t,
-                rob_idx     : i_regs[i].dat.rob_idx
+                alu_func    : i_regs[i].alu_func,
+                t           : i_regs[i].t,
+                rob_idx     : i_regs[i].rob_idx
             };
         end
     end
@@ -124,8 +115,6 @@ module alu_ex(
                 // Inputs
                 .opa        (ops[i].opa),
                 .opb        (ops[i].opb),
-                .rs1        (ops[i].rs1),
-                .rs2        (ops[i].rs2),
                 .alu_func   (ops[i].alu_func),
 
                 // Output (directly to cdat_out)
@@ -170,11 +159,10 @@ module mul_ex(
             ops[i] = '{
                 rs1     : i_regs[i].rs1,
                 rs2     : i_regs[i].rs2,
-                func    : i_regs[i].dat.func,
-                t       : i_regs[i].dat.t,
-                rob_idx : i_regs[i].dat.rob_idx
+                func    : i_regs[i].func,
+                t       : i_regs[i].t,
+                rob_idx : i_regs[i].rob_idx
             };
-            // $display("MULT_FUNC: %0d", i_regs[i].dat.func);
         end
     end
 
@@ -266,33 +254,31 @@ module bru_ex(
     always_comb begin
         DATA opa, opb;
         foreach(ops[i]) begin
-            pc_addrs[i]     = w2addr(i_regs[i].dat.PC);
-            npc_addrs[i]    = w2addr(i_regs[i].dat.PC + 1);
+            pc_addrs[i]     = w2addr(i_regs[i].PC);
+            npc_addrs[i]    = w2addr(i_regs[i].PC + 1);
             // BRU opA mux
-            case (i_regs[i].dat.opa_select)
+            case (i_regs[i].opa_select)
                 OPA_IS_PC:   opa = pc_addrs[i];
                 OPA_IS_RS1:  opa = i_regs[i].rs1;
                 default:     opa = 32'hdeadface; // dead face
             endcase
 
             // BRU opB mux
-            case (i_regs[i].dat.opb_select)
-                OPB_IS_I_IMM: opb = `RV32_signext_Iimm(i_regs[i].dat.inst);
-                OPB_IS_B_IMM: opb = `RV32_signext_Bimm(i_regs[i].dat.inst);
-                OPB_IS_J_IMM: opb = `RV32_signext_Jimm(i_regs[i].dat.inst);
-                default:      opb = 32'hfacefeed; // face feed
-            endcase
+            opb = i_regs[i].opb_is_rs2
+                ? i_regs[i].rs2
+                : i_regs[i].imm32b;
+
             ops[i] = '{
                 opa         : opa,
                 opb         : opb,
                 rs1         : i_regs[i].rs1,
                 rs2         : i_regs[i].rs2,
-                branch_func : i_regs[i].dat.inst.b.funct3,
-                cond_branch     : i_regs[i].dat.cond_branch,
+                func        : i_regs[i].func,
+                cond_branch : i_regs[i].cond_branch,
 
-                t           : i_regs[i].dat.t,
-                rob_idx     : i_regs[i].dat.rob_idx,
-                btq_idx     : i_regs[i].dat.btq_idx
+                t           : i_regs[i].t,
+                rob_idx     : i_regs[i].rob_idx,
+                btq_idx     : i_regs[i].btq_idx
             };
         end
     end
@@ -309,11 +295,11 @@ module bru_ex(
                 .opb        (ops[i].opb),
                 .rs1        (ops[i].rs1),
                 .rs2        (ops[i].rs2),
-                .branch_func(ops[i].branch_func), // Which branch condition to check
+                .branch_func(ops[i].func),
 
                 // Output (directly to cdat_out)
-                .take(cond_take[i]), // True/False condition result (will return FALSE if branch is low)
-                .result(tmp_res[i]) // will return 32'hfacebeec if branch is high
+                .take       (cond_take[i]),
+                .result     (tmp_res[i])
             );
 
             assign tmp_take[i] = !ops[i].cond_branch || cond_take[i];
@@ -592,17 +578,44 @@ module stage_ex_p4 (
     } ex;
     always_comb begin
         foreach (iss.o_vld.alu[i]) begin
+            DATA imm32b;
+            case (iss.o_dat.alu[i].opb_select)
+                OPB_IS_RS2:   imm32b =  '0;
+                OPB_IS_I_IMM: imm32b = `RV32_signext_Iimm(iss.o_dat.alu[i].inst);
+                OPB_IS_S_IMM: imm32b = `RV32_signext_Simm(iss.o_dat.alu[i].inst);
+                OPB_IS_B_IMM: imm32b = `RV32_signext_Bimm(iss.o_dat.alu[i].inst);
+                OPB_IS_U_IMM: imm32b = `RV32_signext_Uimm(iss.o_dat.alu[i].inst);
+                OPB_IS_J_IMM: imm32b = `RV32_signext_Jimm(iss.o_dat.alu[i].inst);
+                default:      imm32b = 32'hfacefeed; // face feed
+            endcase
+
             regs.i_dat.alu[i] = '{
                 rs1 : prf_in.v1s.alu[i],
                 rs2 : prf_in.v2s.alu[i],
-                dat : iss.o_dat.alu[i]
+                t1  : iss.o_dat.alu[i].t1,
+                t2  : iss.o_dat.alu[i].t2,
+
+                PC          : iss.o_dat.alu[i].PC,
+                opa_select  : iss.o_dat.alu[i].opa_select,
+                opb_is_rs2  : iss.o_dat.alu[i].opb_select == OPB_IS_RS2,
+                imm32b      : imm32b,
+                alu_func    : iss.o_dat.alu[i].alu_func,
+
+                t           : iss.o_dat.alu[i].t,
+                rob_idx     : iss.o_dat.alu[i].rob_idx
             };
         end
         foreach (iss.o_vld.mul[i]) begin
             regs.i_dat.mul[i] = '{
                 rs1 : prf_in.v1s.mul[i],
                 rs2 : prf_in.v2s.mul[i],
-                dat : iss.o_dat.mul[i]
+                t1  : iss.o_dat.mul[i].t1,
+                t2  : iss.o_dat.mul[i].t2,
+
+                func    : iss.o_dat.mul[i].func,
+
+                t       : iss.o_dat.mul[i].t,
+                rob_idx : iss.o_dat.mul[i].rob_idx
             };
         end
         foreach (iss.o_vld.lod[i]) begin
@@ -619,10 +632,30 @@ module stage_ex_p4 (
             };
         end
         foreach (iss.o_vld.bru[i]) begin
+            DATA imm32b;
+            case (iss.o_dat.bru[i].opb_select)
+                OPB_IS_I_IMM: imm32b = `RV32_signext_Iimm(iss.o_dat.bru[i].inst);
+                OPB_IS_B_IMM: imm32b = `RV32_signext_Bimm(iss.o_dat.bru[i].inst);
+                OPB_IS_J_IMM: imm32b = `RV32_signext_Jimm(iss.o_dat.bru[i].inst);
+                default:      imm32b = 32'hfacefeed; // face feed
+            endcase
+
             regs.i_dat.bru[i] = '{
                 rs1 : prf_in.v1s.bru[i],
                 rs2 : prf_in.v2s.bru[i],
-                dat : iss.o_dat.bru[i]
+                t1  : iss.o_dat.bru[i].t1,
+                t2  : iss.o_dat.bru[i].t2,
+
+                PC          : iss.o_dat.bru[i].PC,
+                opa_select  : iss.o_dat.bru[i].opa_select,
+                opb_is_rs2  : iss.o_dat.bru[i].opb_select == OPB_IS_RS2,
+                imm32b      : imm32b,
+                func        : iss.o_dat.bru[i].inst.b.funct3,
+                cond_branch : iss.o_dat.bru[i].cond_branch,
+
+                t           : iss.o_dat.bru[i].t,
+                rob_idx     : iss.o_dat.bru[i].rob_idx,
+                btq_idx     : iss.o_dat.bru[i].btq_idx
             };
         end
     end

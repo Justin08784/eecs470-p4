@@ -77,14 +77,30 @@ typedef struct packed {
 } ID_BRU_VIEW;
 
 typedef struct packed {
-    DATA rs1;
-    DATA rs2;
-    ID_ALU_VIEW dat;
+    DATA            rs1;
+    DATA            rs2;
+    PHYS_REG_IDX    t1;
+    PHYS_REG_IDX    t2;
+
+    WADDR           PC;
+    ALU_OPA_SELECT  opa_select;
+    logic           opb_is_rs2;
+    INST            imm32b;
+    ALU_FUNC        alu_func;
+
+    PHYS_REG_IDX    t;
+    ROB_IDX         rob_idx;
 } ALU_REGS;
 typedef struct packed {
-    DATA rs1;
-    DATA rs2;
-    ID_MUL_VIEW dat;
+    DATA            rs1;
+    DATA            rs2;
+    PHYS_REG_IDX    t1;
+    PHYS_REG_IDX    t2;
+
+    MULT_FUNC       func;
+
+    PHYS_REG_IDX    t;
+    ROB_IDX         rob_idx;
 } MUL_REGS;
 typedef struct packed {
     DATA rs1;
@@ -96,15 +112,27 @@ typedef struct packed {
     ID_STR_VIEW dat;
 } STR_REGS;
 typedef struct packed {
-    DATA rs1;
-    DATA rs2;
-    ID_BRU_VIEW dat;
+    DATA            rs1;
+    DATA            rs2;
+    PHYS_REG_IDX    t1;
+    PHYS_REG_IDX    t2;
+
+    WADDR           PC;
+    ALU_OPA_SELECT  opa_select;
+    logic           opb_is_rs2;
+    INST            imm32b;
+    logic           cond_branch;
+    logic   [2:0]   func;       // Which branch condition to check
+
+    PHYS_REG_IDX    t;
+    ROB_IDX         rob_idx;
+    BTQ_IDX         btq_idx;
 } BRU_REGS;
 
 /* Operand data needed for each FU type */
 typedef struct packed {
-    DATA            opa, opb;
-    DATA            rs1, rs2;
+    DATA            opa;
+    DATA            opb;
     ALU_FUNC        alu_func;
 
     PHYS_REG_IDX    t;
@@ -112,17 +140,20 @@ typedef struct packed {
 } ALU_OPS;
 
 typedef struct packed {
-    DATA        rs1, rs2;
-    MULT_FUNC   func;
+    DATA            rs1;
+    DATA            rs2;
+    MULT_FUNC       func;
 
     PHYS_REG_IDX    t;
     ROB_IDX         rob_idx;
 } MUL_OPS;
 
 typedef struct packed {
-    DATA            opa, opb;
-    DATA            rs1, rs2;
-    logic   [2:0]   branch_func; // Which branch condition to check
+    DATA            opa;
+    DATA            opb;
+    DATA            rs1;
+    DATA            rs2;
+    logic   [2:0]   func;   // Which branch condition to check
     logic           cond_branch;
 
     PHYS_REG_IDX    t;
@@ -139,9 +170,9 @@ function automatic ALU_REGS alu_snoop(
     foreach (cdat.en[n]) begin
         if (!cdat.en[n] || cdat.ts[n] == '0)
             continue;
-        if (rv.dat.t1 == cdat.ts[n])
+        if (rv.t1 == cdat.ts[n])
             rv.rs1 = cdat.data[n];
-        if (rv.dat.t2 == cdat.ts[n])
+        if (rv.t2 == cdat.ts[n])
             rv.rs2 = cdat.data[n];
     end
     return rv;
@@ -155,9 +186,9 @@ function automatic MUL_REGS mul_snoop(
     foreach (cdat.en[n]) begin
         if (!cdat.en[n] || cdat.ts[n] == '0)
             continue;
-        if (rv.dat.t1 == cdat.ts[n])
+        if (rv.t1 == cdat.ts[n])
             rv.rs1 = cdat.data[n];
-        if (rv.dat.t2 == cdat.ts[n])
+        if (rv.t2 == cdat.ts[n])
             rv.rs2 = cdat.data[n];
     end
     return rv;
@@ -201,9 +232,9 @@ function automatic BRU_REGS bru_snoop(
     foreach (cdat.en[n]) begin
         if (!cdat.en[n] || cdat.ts[n] == '0)
             continue;
-        if (rv.dat.t1 == cdat.ts[n])
+        if (rv.t1 == cdat.ts[n])
             rv.rs1 = cdat.data[n];
-        if (rv.dat.t2 == cdat.ts[n])
+        if (rv.t2 == cdat.ts[n])
             rv.rs2 = cdat.data[n];
     end
     return rv;
