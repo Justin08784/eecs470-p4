@@ -123,9 +123,6 @@ module testbench;
 
     DBG_dcache      dbg_dcache;
     DBG_btq         dbg_btq;
-    DBG_fetch       dbg_fetch;
-    DBG_decode      dbg_decode;
-    DBG_dispatch    dbg_dispatch;
     DBG_lq          dbg_lq;
     DBG_mt          dbg_mt;
     DBG_prf         dbg_prf;
@@ -164,9 +161,6 @@ module testbench;
         .dbg_execute    (dbg_execute),
         .dbg_fl         (dbg_fl),
         .dbg_btq        (dbg_btq),
-        .dbg_fetch      (dbg_fetch),
-        .dbg_decode     (dbg_decode),
-        .dbg_dispatch   (dbg_dispatch),
         .dbg_lq         (dbg_lq),
         .dbg_mt         (dbg_mt),
         .dbg_prf        (dbg_prf),
@@ -325,17 +319,17 @@ module testbench;
             // Add new dispatches to rob
             // TODO: Should this be cleared on branch mispredict?
             for (int i = 0, int cur_idx = 0; i < `N; ++i) begin
-                if (i >= verisimpleV.rob_0.d_in.d_en_cnt)
+                if (i >= verisimpleV.rob0.d_in.d_en_cnt)
                     break;
-                cur_idx = verisimpleV.rob_0.comm_idxs[i];
+                cur_idx = verisimpleV.rob0.comm_idxs[i];
                 rob_debug[cur_idx] = '{
 `ifdef DEBUG
-                    id      : verisimpleV.rs_0.d_in.dat[i].id,
+                    id      : verisimpleV.rs0.d_in.dat[i].id,
 `endif
-                    halt    : verisimpleV.rob_0.d_in.halt[i],
-                    illegal : verisimpleV.rob_0.d_in.illegal[i],
-                    fu_idx  : verisimpleV.rob_0.d_in.fu_idx[i],
-                    NPC     : w2addr(verisimpleV.rs_0.d_in.dat[i].PC + 1)
+                    halt    : verisimpleV.rob0.d_in.halt[i],
+                    illegal : verisimpleV.rob0.d_in.illegal[i],
+                    fu_idx  : verisimpleV.rob0.d_in.fu_idx[i],
+                    NPC     : w2addr(verisimpleV.rs0.d_in.dat[i].PC + 1)
                 };
             end
 `endif // SYNTH
@@ -389,18 +383,18 @@ module testbench;
             illegal = committed_insts[n].illegal;
 
 `ifndef SYNTH
-            cur_idx = verisimpleV.rob_0.rtre_idxs[n];
+            cur_idx = verisimpleV.rob0.rtre_idxs[n];
 `ifdef DEBUG
             id      = rob_debug[cur_idx].id;
 `endif
             pc      = rob_debug[cur_idx].NPC - 4;
             block   = memory.unified_memory[pc[31:3]];
             inst    = block.word_level[pc[2]];
-            reg_idx = verisimpleV.rob_0.r_out.entries[n].dst;
+            reg_idx = verisimpleV.rob0.r_out.entries[n].dst;
             tag     = verisimpleV.retire_exec.tag[n];
             t_old   = verisimpleV.retire_exec.t_old[n];
-            data    = verisimpleV.prf_0.file[
-                verisimpleV.rob_0.r_out.entries[n].tag
+            data    = verisimpleV.prf0.file[
+                verisimpleV.rob0.r_out.entries[n].tag
             ];
             // print the committed instructions to the writeback output file
             if (reg_idx == `ZERO_REG) begin
@@ -614,95 +608,6 @@ module testbench;
         $display("<< BTQ <<");
     endtask
 
-    task print_fetch;
-        logic           flush;
-        decode2fetch    d_in;
-        fetch2decode    d_out;
-
-        flush       = dbg_fetch.flush;
-        d_in        = dbg_fetch.d_in;
-        d_out       = dbg_fetch.d_out;
-
-        $display(">> Fetch >>");
-        // $display("r_in: {flush: %b, corrected_PC: 0x%x}", flush, r_in.corrected_PC);
-        $display("d_out: {f_en_cnt: %b, dat: [%x, %x]}", d_out.f_en_cnt, d_out.f_dat[0], d_out.f_dat[1]);
-        $display("<< Fetch <<");
-    endtask
-
-    task print_decode;
-        fetch2decode    f_in;
-        decode2fetch    f_out;
-        dispatch2decode d_in;
-        decode2dispatch d_out;
-
-        f_in    = dbg_decode.f_in;
-        f_out   = dbg_decode.f_out;
-        d_in    = dbg_decode.d_in;
-        d_out   = dbg_decode.d_out;
-
-        $display(">> ID >>", $time);
-        // $display("  %3d | FIFO: {used_scnt: %d, free_scnt: %d}",
-        //     $time,
-        //     used_scnt,
-        //     free_scnt
-        // );
-        $display("f_in:  {f_en_cnt: %d, PC: [%x, %x], inst: [%x, %x]}",
-            f_in.f_en_cnt,
-            f_in.f_en_cnt > 0 ? f_in.f_dat[0].PC : 0,
-            f_in.f_en_cnt > 1 ? f_in.f_dat[1].PC : 0,
-            f_in.f_en_cnt > 0 ? f_in.f_dat[0].inst : 0,
-            f_in.f_en_cnt > 1 ? f_in.f_dat[1].inst : 0,
-        );
-
-        $display("d_out: {d_en_cnt: %d, PC: [%x, %x], inst: [%x, %x]}",
-            d_in.dispatch_en_cnt,
-            d_out.d_dat[0].PC, 
-            d_out.d_dat[1].PC,
-            d_out.d_dat[0].inst, 
-            d_out.d_dat[1].inst
-        );
-        print_id_result(d_out.d_dat[0]);
-        print_id_result(d_out.d_dat[1]);
-        // $display("d_out.d_dat[0]: %b", d_out.d_dat[0]);
-        // $display("d_out.d_dat[1]: %b", d_out.d_dat[1]);
-        $display("<< ID <<", $time);
-    endtask
-
-    task print_dispatch;
-        decode2dispatch       decode_in;
-        dispatch2decode       decode_out;
-        rs2dispatch           rs_in;
-        dispatch2rs           rs_out;
-        rob2dispatch          rob_in;
-        dispatch2rob          rob_out;
-        free_list2dispatch    free_in;
-        dispatch2free_list    free_out;
-        execute2complete_tag  ctag_in;
-        map_table2dispatch    map_in;
-        dispatch2map_table    map_out;
-
-        decode_in  = dbg_dispatch.decode_in;
-        decode_out = dbg_dispatch.decode_out;
-        rs_in      = dbg_dispatch.rs_in;
-        rs_out     = dbg_dispatch.rs_out;
-        rob_in     = dbg_dispatch.rob_in;
-        rob_out    = dbg_dispatch.rob_out;
-        free_in    = dbg_dispatch.free_in;
-        free_out   = dbg_dispatch.free_out;
-        ctag_in    = dbg_dispatch.ctag_in;
-        map_in     = dbg_dispatch.map_in;
-        map_out    = dbg_dispatch.map_out;
-
-        $display("  %3d | >> Dispatch >>", $time);
-        // $display("r_in.btq_rdy_scnt: %d",   btq_in.btq_rdy_scnt);
-        // $display("btq_in.btq_rdy_scnt: %d",   btq_in.btq_rdy_scnt);
-        $display("rob_in.rob_rdy_scnt: %d",  rob_in.rob_rdy_scnt);
-        $display("decode_in.d_vld_scnt: %d",  decode_in.d_vld_scnt);
-        $display("free_in.free_rdy_scnt: %d [%d, %d]",  free_in.free_rdy_scnt, free_in.d_ts[0], free_in.d_ts[1]);
-        $display("decode_in.prvw_has_dests: %b", decode_in.prvw_has_dests);
-        $display("  %3d | << Dispatch <<", $time);
-    endtask
-
     task print_map_table();
         struct packed {
             PHYS_REG_IDX t;
@@ -805,12 +710,12 @@ module testbench;
 
         $display("  | >> ROB >>");
         $display("fl: en_cnt: %d, [%2d, %2d] fldup: %b",
-            verisimpleV.free_list_0.free_cnt,
-            verisimpleV.free_list_0.told_packed[0],
-            verisimpleV.free_list_0.told_packed[1],
-            verisimpleV.free_list_0.told_packed[0]
-            ==verisimpleV.free_list_0.told_packed[1]
-            &&verisimpleV.free_list_0.told_packed[0]!=0
+            verisimpleV.free_list0.free_cnt,
+            verisimpleV.free_list0.told_packed[0],
+            verisimpleV.free_list0.told_packed[1],
+            verisimpleV.free_list0.told_packed[0]
+            ==verisimpleV.free_list0.told_packed[1]
+            &&verisimpleV.free_list0.told_packed[0]!=0
         );
         $display("r_out: vld_cnt: %d", r_out.r_vld_cnt);
         for (int i = 0; i < `N; ++i) begin
@@ -895,7 +800,7 @@ module testbench;
     endtask
 
     task print_rs;
-        verisimpleV.rs_0.print_rs();
+        verisimpleV.rs0.print_rs();
     endtask
 
     task print_sq;
@@ -1249,8 +1154,20 @@ module testbench;
 
     endtask
 
+    task print_fetch;
+        verisimpleV.fetch0.print_fetch();
+    endtask
+
     task print_btb;
-        verisimpleV.fetch_0.btb0.print_btb();
+        verisimpleV.fetch0.btb0.print_btb();
+    endtask
+
+    task print_decode;
+        verisimpleV.decode0.print_decode();
+    endtask
+
+    task print_dispatch;
+        verisimpleV.dispatch0.print_dispatch();
     endtask
 
 

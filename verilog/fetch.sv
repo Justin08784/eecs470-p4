@@ -11,10 +11,6 @@
 `include "sys_defs.svh"
 
 module stage_if_p4 (
-`ifdef DEBUG
-    output  DBG_fetch dbg,
-`endif
-
     input   clock,
     input   reset,
     input   flush,
@@ -169,12 +165,12 @@ module stage_if_p4 (
     end
 
 `ifdef DEBUG
-    assign dbg = '{
-        flush : flush,
-        d_in  : d_in,
-        d_out : d_out,
-        btq_in: btq_in
-    };
+    task print_fetch;
+        $display(">> Fetch >>");
+        $display("flush: %b, flush_PC: 0x%x", flush, flush_PC);
+        $display("d_out: {f_en_cnt: %b, dat: [%x, %x]}", d_out.f_en_cnt, d_out.f_dat[0], d_out.f_dat[1]);
+        $display("<< Fetch <<");
+    endtask
 `endif
 
 endmodule // stage_if

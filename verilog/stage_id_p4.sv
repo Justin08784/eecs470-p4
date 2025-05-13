@@ -217,10 +217,6 @@ endmodule // decoder
 
 
 module stage_id_p4 (
-    `ifdef DEBUG
-    output DBG_decode dbg,
-    `endif
-
     input              clock,           // system clock
     input              reset,           // system reset
     input              flush,
@@ -372,12 +368,35 @@ module stage_id_p4 (
     end
 
 `ifdef DEBUG
-    assign dbg = '{
-        f_in,
-        f_out,
-        d_in,
-        d_out
-    };
+    task print_decode;
+        $display(">> ID >>", $time);
+        // $display("  %3d | FIFO: {used_scnt: %d, free_scnt: %d}",
+        //     $time,
+        //     used_scnt,
+        //     free_scnt
+        // );
+        $display("f_in:  {f_en_cnt: %d, PC: [%x, %x], inst: [%x, %x]}",
+            f_in.f_en_cnt,
+            f_in.f_en_cnt > 0 ? f_in.f_dat[0].PC : 0,
+            f_in.f_en_cnt > 1 ? f_in.f_dat[1].PC : 0,
+            f_in.f_en_cnt > 0 ? f_in.f_dat[0].inst : 0,
+            f_in.f_en_cnt > 1 ? f_in.f_dat[1].inst : 0,
+        );
+
+        $display("d_out: {d_en_cnt: %d, PC: [%x, %x], inst: [%x, %x]}",
+            d_in.dispatch_en_cnt,
+            d_out.d_dat[0].PC, 
+            d_out.d_dat[1].PC,
+            d_out.d_dat[0].inst, 
+            d_out.d_dat[1].inst
+        );
+        print_id_result(d_out.d_dat[0]);
+        print_id_result(d_out.d_dat[1]);
+        // $display("d_out.d_dat[0]: %b", d_out.d_dat[0]);
+        // $display("d_out.d_dat[1]: %b", d_out.d_dat[1]);
+        $display("<< ID <<", $time);
+    endtask
+
 `endif
 
 endmodule // stage_id

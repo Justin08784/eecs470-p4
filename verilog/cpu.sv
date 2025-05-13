@@ -35,9 +35,6 @@ module cpu (
     output DBG_execute  dbg_execute,
     output DBG_fl       dbg_fl,
     output DBG_btq      dbg_btq,
-    output DBG_fetch    dbg_fetch,
-    output DBG_decode   dbg_decode,
-    output DBG_dispatch dbg_dispatch,
     output DBG_lq       dbg_lq,
     output DBG_mt       dbg_mt,
     output DBG_prf      dbg_prf,
@@ -70,10 +67,7 @@ module cpu (
     btq2fetch    btq_2_f;
     fetch2btq    f_2_btq;
 
-    stage_if_p4 fetch_0(
-`ifdef DEBUG
-        .dbg    (dbg_fetch),
-`endif
+    stage_if_p4 fetch0 (
         .clock  (clock),
         .reset  (reset),
         .flush   (flush),
@@ -93,10 +87,7 @@ module cpu (
     decode2dispatch de_2_disp;
     dispatch2decode disp_2_de;
 
-    stage_id_p4 decoder0 (
-`ifdef DEBUG
-        .dbg    (dbg_decode),
-`endif
+    stage_id_p4 decode0 (
         .clock  (clock),
         .reset  (reset),
         .flush  (flush),
@@ -120,11 +111,7 @@ module cpu (
     execute2complete_tag ex_2_ctag;
     execute2complete_dat ex_2_cdat;
 
-    dispatch dispatcher(
-`ifdef DEBUG
-        .dbg        (dbg_dispatch),
-`endif
-
+    dispatch dispatch0 (
         .clock      (clock),
         .reset      (reset),
         .flush      (flush),
@@ -172,7 +159,7 @@ module cpu (
     /* >> ==== Branch target queue (BTQ) ==== >> */
     execute2btq ex_2_btq;
 
-    btq btq_0(
+    btq btq0(
 `ifdef DEBUG
         .dbg    (dbg_btq),
 `endif
@@ -196,7 +183,7 @@ module cpu (
     execute2prf     ex_2_prf;
     prf2execute     prf_2_ex;
 
-    rs rs_0(
+    rs rs0(
         .clock  (clock),
         .reset  (reset),
         .flush  (flush),
@@ -213,7 +200,7 @@ module cpu (
     rob #(
         .ROB_SZ(`ROB_SZ),
         .N(`N)
-    ) rob_0 (
+    ) rob0 (
 `ifdef DEBUG
         .dbg        (dbg_rob),
 `endif
@@ -231,7 +218,7 @@ module cpu (
 
 
     /* >> ==== Execute ==== >> */
-    stage_ex_p4 ex_0 (
+    stage_ex_p4 ex0 (
 `ifdef DEBUG
         .dbg        (dbg_execute),
         .print_en   (print_en),
@@ -258,7 +245,7 @@ module cpu (
 
     map_table #(
         .N(`N)
-    ) map_table_0 (
+    ) map_table0 (
 `ifdef DEBUG
         .dbg    (dbg_mt),
 `endif
@@ -275,7 +262,7 @@ module cpu (
     /* >> ==== Architectural map (table) ==== >> */
     arch_map #(
         .N(`N)
-    ) arch_map_0 (
+    ) arch_map0 (
         .clock  (clock),
         .reset  (reset),
         .flush  (flush),
@@ -288,7 +275,7 @@ module cpu (
     /* >> ==== Free list ==== >> */
     free_list #(
         .N(`N)
-    ) free_list_0 (
+    ) free_list0 (
 `ifdef DEBUG
         .dbg    (dbg_fl),
 `endif
@@ -315,7 +302,7 @@ module cpu (
     prf #(
         .N(`N),
         .BYPASS_EN(1)
-    ) prf_0 (
+    ) prf0 (
 `ifdef DEBUG
         .dbg_file   (dbg_file),
 `endif

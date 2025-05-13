@@ -3,9 +3,6 @@
 module dispatch #(parameter 
     N=`N
 ) (
-`ifdef DEBUG
-    output DBG_dispatch dbg,
-`endif
     input   clock,
     input   reset,
     input   flush,
@@ -355,19 +352,16 @@ module dispatch #(parameter
     end
 
 `ifdef DEBUG
-    assign dbg = '{
-        d_in,
-        d_out,
-        rs_in,
-        rs_out,
-        rob_in,
-        rob_out,
-        free_in,
-        free_out,
-        ctag_in,
-        map_in,
-        map_out
-    };
+    task print_dispatch;
+        $display("  %3d | >> Dispatch >>", $time);
+        // $display("r_in.btq_rdy_scnt: %d",   btq_in.btq_rdy_scnt);
+        // $display("btq_in.btq_rdy_scnt: %d",   btq_in.btq_rdy_scnt);
+        $display("rob_in.rob_rdy_scnt: %d",  rob_in.rob_rdy_scnt);
+        $display("d_in.d_vld_scnt: %d",  d_in.d_vld_scnt);
+        $display("free_in.free_rdy_scnt: %d [%d, %d]",  free_in.free_rdy_scnt, free_in.d_ts[0], free_in.d_ts[1]);
+        $display("d_in.prvw_has_dests: %b", d_in.prvw_has_dests);
+        $display("  %3d | << Dispatch <<", $time);
+    endtask
 `endif
 
 endmodule

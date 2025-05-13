@@ -48,20 +48,11 @@
 `define LD_BAY_SZ 2 //num load bays in the FU
 `define NUM_FU_STORE 1
 `define NUM_FU_BRU 1
-// `define NUM_FU_TOTAL `NUM_FU_ALU + `NUM_FU_MULT + `NUM_FU_LOAD + `NUM_FU_STORE
 `define NUM_FU_TOTAL `NUM_FU_ALU + `NUM_FU_MULT + `NUM_FU_LOAD + `NUM_FU_STORE + `NUM_FU_BRU
 
 // number of mult stages (2, 4) (you likely don't need 8)
 `define MULT_STAGES 16
 // Justin: funny enough we need at least 8 or else multiply is on critical path
-
-
-`define BHT_ENTRIES 256
-`define HISTORY_BITS 8
-`define PHT_ENTRIES 256
-//`define HISTORY_BITS 8
-
-`define PREFETCH_CAP 24 // <- how far ahead we can prefetch
 
 ///////////////////////////////
 // --- Compil. Controls ---- //
@@ -72,7 +63,7 @@
 
 `ifndef SYNTH
 // comment out to disable DEBUG:
-// `define DEBUG
+`define DEBUG
 // comment to disable clock cycle print
 // `define CYCLE_PRINT
 `endif
