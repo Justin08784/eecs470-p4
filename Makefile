@@ -240,7 +240,7 @@ build/prf.simv: $(PRF_FILES)
 build/prf.cov: $(PRF_FILES)
 build/prf.vg: $(PRF_FILES)
 
-FETCH_FILES = verilog/sys_defs.svh verilog/mem.sv verilog/icache.sv verilog/memDP.sv
+FETCH_FILES = verilog/sys_defs.svh verilog/mem.sv verilog/memDP.sv
 build/fetch.simv: $(FETCH_FILES)
 build/fetch.cov: $(FETCH_FILES)
 build/fetch.vg: $(FETCH_FILES)
@@ -267,11 +267,6 @@ build/victim.simv: $(VICTIM_FILES)
 build/victim.cov: $(VICTIM_FILES)
 synth/victim.vg: $(VICTIM_FILES)
 
-POST_RET_BUFFER_FILES = verilog/sys_defs.svh
-build/post_ret_buffer.simv: $(POST_RET_BUFFER_FILES)
-build/post_ret_buffer.cov: $(POST_RET_BUFFER_FILES)
-synth/post_ret_buffer.vg: $(POST_RET_BUFFER_FILES)
-
 #################################
 # ---- Main CPU Definition ---- #
 #################################
@@ -291,7 +286,6 @@ CPU_TESTBENCH = test/pipeline_print.c \
 # verilog/cpu.sv is implicit
 CPU_SOURCES = verilog/cpu.sv \
 			  verilog/regfile.sv \
-              verilog/icache.sv \
               verilog/memDP.sv \
 			  verilog/mult.sv \
 			  verilog/rs.sv \

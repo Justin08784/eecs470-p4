@@ -72,7 +72,7 @@
 
 `ifndef SYNTH
 // comment out to disable DEBUG:
-`define DEBUG
+// `define DEBUG
 // comment to disable clock cycle print
 // `define CYCLE_PRINT
 `endif
@@ -90,7 +90,7 @@
 // word and register sizes
 typedef logic [31:0] ADDR;
 typedef logic [31:0] DATA;
-typedef logic [4:0] REG_IDX;
+typedef logic [4:0]  REG_IDX;
 
 typedef logic [15:0] BADDR;
 typedef logic [14:0] HADDR;
@@ -163,10 +163,6 @@ typedef logic [$clog2(`PHYS_REG_SZ_R10K)-1:0] PHYS_REG_IDX;
 `define NUM_MEM_TAGS 15
 typedef logic [3:0] MEM_TAG;
 
-// icache definitions
-`define ICACHE_LINES 32
-`define ICACHE_LINE_BITS $clog2(`ICACHE_LINES)
-
 //dcache definitions
 `define DCACHE_LINES 32
 
@@ -196,11 +192,6 @@ typedef enum logic [1:0] {
 } MEM_COMMAND;
 
 // icache tag struct
-typedef struct packed {
-    logic [12-`ICACHE_LINE_BITS:0] tags;
-    logic                          valid;
-} ICACHE_TAG;
-
 typedef union packed {
     logic [3:0][7:0]  byte_level;
     logic [1:0][15:0] half_level;
@@ -397,9 +388,6 @@ typedef struct packed {
  * some slight changes
  */
 typedef struct packed {
-    // ADDR    NPC;
-    // DATA    data;
-    // REG_IDX reg_idx;
     logic   halt;
     logic   illegal;
     logic   valid;
@@ -417,20 +405,17 @@ typedef enum logic [2:0] {
 
 typedef logic [$clog2(`ROB_SZ)-1:0] ROB_IDX;
 typedef struct packed {
-    logic cpl;
-    logic [$clog2(`PHYS_REG_SZ_R10K)-1:0] tag;
-    logic [$clog2(`PHYS_REG_SZ_R10K)-1:0] t_old;
-    REG_IDX dst;
+    logic           cpl;
+    PHYS_REG_IDX    tag;
+    PHYS_REG_IDX    t_old;
+    REG_IDX         dst;
 
-    FU_IDX fu_idx;
-    logic halt;
-    logic illegal;
+    FU_IDX          fu_idx;
+    logic           halt;
+    logic           illegal;
 } ROB_ENTRY;
 
-//allowing one bit greater than strictly necessary 
-//so that we can use values above what we will see 
-//in the LSQ as the initial value for SQ_IDX in 
-//dispatch if a load comes before the first store
+
 typedef logic [$clog2(`LSQ_SZ)-1:0] LSQ_IDX; 
 typedef struct packed {
     logic _dummy;
@@ -443,7 +428,6 @@ typedef struct packed {
 // BTQ stuff
 // By btq
 typedef struct packed {
-
     WADDR   PC;
     logic   pred;
     WADDR   pred_tgt;
@@ -691,12 +675,6 @@ typedef struct packed {
 } COMMIT_RS_PKT; // purely combinational
 
 
-typedef struct packed {
-    logic           busy;
-    logic           issued;
-    ID_RESULT       dat;
-} RS_ENTRY;
-
 // By Fetch
 typedef struct packed {
     logic       [$clog2(`N):0]  f_en_cnt;
@@ -756,7 +734,7 @@ typedef struct packed {
 // By Dispatch
 typedef struct packed {
     // NOTE: This is the only place where a transaction is
-    // RECIEVER-decided!!! (i.e. receiver broadcasts enable signals)
+    // RECEIVER-decided!!! (i.e. receiver broadcasts enable signals)
     logic       [$clog2(`N):0]  dispatch_en_cnt;
 } dispatch2decode;
 
@@ -765,9 +743,6 @@ typedef struct packed {
     /* Rename */
     /* Commit */
     logic   [`FU_IDX_NUM-1:0][`N-1:0] en;
-    // logic   [`N-1:0] mult_en;
-    // logic   [`N-1:0] load_en;
-    // logic   [`N-1:0] stor_en;
         // - To: RS
         // - Number of enabled dispatch lines? (replacement for d_vld)
         // - Question: permit
@@ -780,22 +755,20 @@ typedef struct packed {
 
 typedef struct packed {
     /* Alloc */
-    logic   [$clog2(`N):0]  alloc_en_cnt;
+    logic [$clog2(`N):0] alloc_en_cnt;
     /* Rename */
     /* Commit */
-    logic   [$clog2(`N):0]  d_en_cnt;
+    logic [$clog2(`N):0] d_en_cnt;
         // To: ROB
         // - Number of enabled dispatch lines?
-    logic [`N-1:0][$clog2(`PHYS_REG_SZ_R10K)-1:0] tag;
-    logic [`N-1:0][$clog2(`PHYS_REG_SZ_R10K)-1:0] t_old;
+    PHYS_REG_IDX [`N-1:0] tag;
+    PHYS_REG_IDX [`N-1:0] t_old;
         // From: dispatch
         // - IMPORTANT: Set from lowest indices in program-order. NO GAPS!!!
-    //THESE ARE NOT COMING FROM DISPATCH, GET THESE FROM MAP TABLE
-    //(ONLY HERE FOR CURRENT ROB TESTBENCH)
     FU_IDX  [`N-1:0] fu_idx;
     REG_IDX [`N-1:0] dst;
-    logic [`N-1:0] halt;
-    logic [`N-1:0] illegal;
+    logic   [`N-1:0] halt;
+    logic   [`N-1:0] illegal;
 } dispatch2rob;
 
 typedef struct packed {
@@ -817,17 +790,11 @@ typedef struct packed {
     PHYS_REG_IDX  [`N-1:0] ts;
         // To: Map table
         // - IMPORTANT: Set from lowest indices in program-order. NO GAPS!!!
-    // THIS WILL BE 1 CLOCK CYCLE BEHIND. THIS IS DESIRED SO THAT
-    // TAGS ARE APPLIED AT THE CORRECT TIMES (paired with free list tag output)
-    // (means that tags will be applied when the dispatched insts actually get
-    // to RS/ROB)
 } dispatch2map_table;
 
-// By Map Table
 
+// By Map Table
 typedef struct packed {
-    logic        [`N-1:0] cpl1s;
-    logic        [`N-1:0] cpl2s;
     PHYS_REG_IDX [`N-1:0] t1s;
     PHYS_REG_IDX [`N-1:0] t2s;
     PHYS_REG_IDX [`N-1:0] ts_old;
@@ -861,15 +828,12 @@ typedef struct packed {
 
 // By ROB
 typedef struct packed {
-    logic    [$clog2(`N):0]     rob_rdy_scnt;
+    logic   [$clog2(`N):0] rob_rdy_scnt;
         // From: ROB
         // saturating counter for number of free rob entries
-    ROB_IDX [`N-1:0]            rob_idxs; //not needed, but putting here for testbench
+    ROB_IDX [`N-1:0] rob_idxs;
         // To: dispatch
         // rob idxs of entries that can be allocated this cycle
-        // Option 1: This
-        // Option 2: expose HEAD pointer and let dispatcher generate these
-        // (main concern with option 2 is it could be wrong? idk)
 } rob2dispatch;
 
 typedef struct packed {
@@ -893,15 +857,11 @@ typedef struct packed {
 } execute2rs;
 
 typedef struct packed {
-    /* TODO: Better to make this a union, with shared c_en and is_brch
-    at the top, and union over non-branch and branch-specific stuff? */
     logic           [`N-1:0] en;
     PHYS_REG_IDX    [`N-1:0] ts;
 } execute2complete_tag;
 
 typedef struct packed {
-    /* TODO: Better to make this a union, with shared c_en and is_brch
-    at the top, and union over non-branch and branch-specific stuff? */
     logic           [`N-1:0] en;
     PHYS_REG_IDX    [`N-1:0] ts;
         // - From: EX
@@ -919,10 +879,6 @@ typedef struct packed {
     PHYS_REG_IDX [`N-1:0]   d_ts;
         // From: Free list
         // - newly allocated pregs
-        // THIS WILL BE 1 CLOCK CYCLE BEHIND. THIS IS DESIRED SO THAT
-        // TAGS ARE APPLIED AT THE CORRECT TIMES (paired with map table output)
-        // (means that tags will be applied when the dispatched insts actually get
-        // to RS/ROB)
 } free_list2dispatch;
 
 // By Arch Map
@@ -952,31 +908,7 @@ typedef struct packed{
     `BY_FU(DATA)    v2s;
 } prf2execute;
 
-typedef struct packed {
-    ADDR  addr;
-    logic valid;
-} MSHR_entry;
-
 /* DEBUG STRUCTS */
-typedef struct packed {
-    // internal state
-    logic changed_addr;
-    logic [12-`ICACHE_LINE_BITS:0] current_tag,   last_tag,   write_tag;
-    logic [`ICACHE_LINE_BITS -1:0] current_index, last_index, write_index;
-    logic                          got_mem_data;
-    MSHR_entry [15:0] MSHR;
-    ICACHE_TAG [`ICACHE_LINES-1:0] icache_tags;
-    // I/O
-    MEM_TAG   Imem2proc_transaction_tag;
-    MEM_BLOCK Imem2proc_data;
-    MEM_TAG   Imem2proc_data_tag;
-    ADDR proc2Icache_addr;
-    MEM_COMMAND proc2Imem_command;
-    ADDR        proc2Imem_addr;
-    MEM_BLOCK Icache_data_out;
-    logic     Icache_valid_out;
-} DBG_icache;
-
 typedef struct packed {
     // internal state
     // I/O

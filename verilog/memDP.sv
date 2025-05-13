@@ -29,8 +29,6 @@ module memDP
     input        [READ_PORTS-1:0][$clog2(DEPTH)-1:0] raddr,  // Read address
     output logic [READ_PORTS-1:0][WIDTH        -1:0] rdata,  // Read data
 
-    input ICACHE_TAG [`ICACHE_LINES-1:0] tags,
-
     // ------------------------------------------------------------ //
     //                      Write interface                         //
     // ------------------------------------------------------------ //

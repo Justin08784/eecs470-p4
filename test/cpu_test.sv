@@ -614,56 +614,6 @@ module testbench;
         $display("<< BTQ <<");
     endtask
 
-    // task print_icache();
-    //     DBG_icache dbg_icache;
-
-    //     // internal state
-    //     logic changed_addr;
-    //     logic [12-`ICACHE_LINE_BITS:0] current_tag,   last_tag,   write_tag;
-    //     logic [`ICACHE_LINE_BITS -1:0] current_index, last_index, write_index;
-    //     logic                          got_mem_data;
-    //     MSHR_entry [15:0] MSHR;
-    //     ICACHE_TAG [`ICACHE_LINES-1:0] icache_tags;
-    //     // I/O
-    //     MEM_TAG   Imem2proc_transaction_tag;
-    //     MEM_BLOCK Imem2proc_data;
-    //     MEM_TAG   Imem2proc_data_tag;
-    //     ADDR proc2Icache_addr;
-    //     MEM_COMMAND proc2Imem_command;
-    //     ADDR        proc2Imem_addr;
-    //     MEM_BLOCK Icache_data_out;
-    //     logic     Icache_valid_out;
-
-    //     dbg_icache = dbg_fetch.dbg_icache;
-    //     changed_addr                = dbg_icache.changed_addr;
-    //     current_tag                 = dbg_icache.current_tag;
-    //     last_tag                    = dbg_icache.last_tag;
-    //     write_tag                   = dbg_icache.write_tag;
-    //     current_index               = dbg_icache.current_index;
-    //     last_index                  = dbg_icache.last_index;
-    //     write_index                 = dbg_icache.write_index;
-    //     got_mem_data                = dbg_icache.got_mem_data;
-    //     MSHR                        = dbg_icache.MSHR;
-    //     icache_tags                 = dbg_icache.icache_tags;
-    //     // I/O
-    //     Imem2proc_transaction_tag   = dbg_icache.Imem2proc_transaction_tag;
-    //     Imem2proc_data              = dbg_icache.Imem2proc_data;
-    //     Imem2proc_data_tag          = dbg_icache.Imem2proc_data_tag;
-    //     proc2Icache_addr            = dbg_icache.proc2Icache_addr;
-    //     proc2Imem_command           = dbg_icache.proc2Imem_command;
-    //     proc2Imem_addr              = dbg_icache.proc2Imem_addr;
-    //     Icache_data_out             = dbg_icache.Icache_data_out;
-    //     Icache_valid_out            = dbg_icache.Icache_valid_out;
-
-    //     $display("  | >> ICACHE >>", $time);
-    //     $display("tags: {cur: %x, last: %x, wr: %x}", current_tag, last_tag, write_tag);
-    //     $display("read: {en %b, addr: %x, data: %x}", 1'b1, current_index, Icache_data_out);
-    //     $display("writ: {en %b, addr: %x, data: %x}", got_mem_data, write_index, Imem2proc_data);
-    //     $display("changed_addr: %b, proc2Imem_command: %1d, proc2Imem_addr: %x", changed_addr, proc2Imem_command, proc2Imem_addr);
-    //     $display("last: {tag: %x, idx: %x} -> curr {tag: %x, idx: %x} <changed: %b>", last_tag, last_index, current_tag, current_index, changed_addr);
-    //     $display("  | << ICACHE <<", $time);
-    // endtask
-
     task print_fetch;
         logic           flush;
         decode2fetch    d_in;
