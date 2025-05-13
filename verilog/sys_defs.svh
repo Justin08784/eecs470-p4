@@ -46,9 +46,9 @@
 `define NUM_FU_MULT 1
 `define NUM_FU_LOAD 1
 `define LD_BAY_SZ 2 //num load bays in the FU
-`define NUM_FU_STORE 1
+`define NUM_FU_STR 1
 `define NUM_FU_BRU 1
-`define NUM_FU_TOTAL `NUM_FU_ALU + `NUM_FU_MULT + `NUM_FU_LOAD + `NUM_FU_STORE + `NUM_FU_BRU
+`define NUM_FU_TOTAL `NUM_FU_ALU + `NUM_FU_MULT + `NUM_FU_LOAD + `NUM_FU_STR + `NUM_FU_BRU
 
 // number of mult stages (2, 4) (you likely don't need 8)
 `define MULT_STAGES 16
@@ -177,9 +177,9 @@ typedef enum logic [1:0] {
 
 // Memory bus commands
 typedef enum logic [1:0] {
-    MEM_NONE   = 2'h0,
-    MEM_LOAD   = 2'h1,
-    MEM_STORE  = 2'h2
+    MEM_NONE = 2'h0,
+    MEM_LOAD = 2'h1,
+    MEM_STORE= 2'h2
 } MEM_COMMAND;
 
 // icache tag struct
@@ -386,11 +386,11 @@ typedef struct packed {
 
 // ROB stuff
 typedef enum logic [2:0] {
-    FU_ALU      = 'd0,
-    FU_MULT     = 'd1,
-    FU_LOAD     = 'd2,
-    FU_STORE    = 'd3,
-    FU_BRU      = 'd4
+    FU_ALU  = 'd0,
+    FU_MULT = 'd1,
+    FU_LOAD = 'd2,
+    FU_STR  = 'd3,
+    FU_BRU  = 'd4
 } FU_IDX;
 `define FU_IDX_NUM 5
 
@@ -800,21 +800,21 @@ typedef struct packed {
 typedef struct packed {
     /* Requested by issue arbiter 
     (only ALU needs gnt by CDB arbiter to 'en')*/
-    logic       [`NUM_FU_ALU-1:0]    fu_vld_alu;
-    logic       [`NUM_FU_BRU-1:0]    fu_vld_bru;
+    logic       [`NUM_FU_ALU-1:0]   fu_vld_alu;
+    logic       [`NUM_FU_BRU-1:0]   fu_vld_bru;
 
     /* Selected for issue */
-    logic       [`NUM_FU_ALU-1:0]    fu_en_alu;
-    logic       [`NUM_FU_MULT-1:0]   fu_en_mult;
-    logic       [`NUM_FU_STORE-1:0]  fu_en_store;
-    logic       [`NUM_FU_LOAD-1:0]   fu_en_load;
-    logic       [`NUM_FU_BRU-1:0]    fu_en_bru;
+    logic       [`NUM_FU_ALU-1:0]   fu_en_alu;
+    logic       [`NUM_FU_MULT-1:0]  fu_en_mult;
+    logic       [`NUM_FU_STR-1:0]   fu_en_str;
+    logic       [`NUM_FU_LOAD-1:0]  fu_en_load;
+    logic       [`NUM_FU_BRU-1:0]   fu_en_bru;
 
-    RS_ALU_PAYLOAD  [`NUM_FU_ALU-1:0]    fu_dat_alu;
-    RS_MULT_PAYLOAD [`NUM_FU_MULT-1:0]   fu_dat_mult;
-    RS_ALU_PAYLOAD  [`NUM_FU_STORE-1:0]  fu_dat_store;
-    RS_ALU_PAYLOAD  [`NUM_FU_LOAD-1:0]   fu_dat_load;
-    RS_BRU_PAYLOAD  [`NUM_FU_BRU-1:0]    fu_dat_bru;
+    RS_ALU_PAYLOAD  [`NUM_FU_ALU-1:0]   fu_dat_alu;
+    RS_MULT_PAYLOAD [`NUM_FU_MULT-1:0]  fu_dat_mult;
+    RS_ALU_PAYLOAD  [`NUM_FU_STR-1:0]   fu_dat_str;
+    RS_ALU_PAYLOAD  [`NUM_FU_LOAD-1:0]  fu_dat_load;
+    RS_BRU_PAYLOAD  [`NUM_FU_BRU-1:0]   fu_dat_bru;
 } rs2execute;
 
 // By ROB
@@ -837,14 +837,14 @@ typedef struct packed {
 
 // By Execute
 typedef struct packed {
-    logic       [`NUM_FU_ALU-1:0]    fu_rdy_alu;
-    logic       [`NUM_FU_MULT-1:0]   fu_rdy_mult;
-    logic       [`NUM_FU_STORE-1:0]  fu_rdy_store;
-    logic       [`NUM_FU_LOAD-1:0]   fu_rdy_load;
-    logic       [`NUM_FU_BRU-1:0]    fu_rdy_bru;
+    logic       [`NUM_FU_ALU-1:0]   fu_rdy_alu;
+    logic       [`NUM_FU_MULT-1:0]  fu_rdy_mult;
+    logic       [`NUM_FU_STR-1:0]   fu_rdy_str;
+    logic       [`NUM_FU_LOAD-1:0]  fu_rdy_load;
+    logic       [`NUM_FU_BRU-1:0]   fu_rdy_bru;
 
-    logic       [`NUM_FU_ALU-1:0]    fu_cdb_gnt_alu; // 1-cycle insns need to win CDB arb. to issue
-    logic       [`NUM_FU_BRU-1:0]    fu_cdb_gnt_bru; // 1-cycle insns need to win CDB arb. to issue
+    logic       [`NUM_FU_ALU-1:0]   fu_cdb_gnt_alu; // 1-cycle insns need to win CDB arb. to issue
+    logic       [`NUM_FU_BRU-1:0]   fu_cdb_gnt_bru; // 1-cycle insns need to win CDB arb. to issue
 } execute2rs;
 
 typedef struct packed {
@@ -880,11 +880,11 @@ typedef struct packed {
 
 `define BY_FU(type) \
 struct packed { \
-    type [`NUM_FU_ALU-1:0]   alu; \
-    type [`NUM_FU_MULT-1:0]  mul; \
-    type [`NUM_FU_LOAD-1:0]  lod; \
-    type [`NUM_FU_STORE-1:0] str; \
-    type [`NUM_FU_BRU-1:0]   bru; \
+    type [`NUM_FU_ALU-1:0]  alu; \
+    type [`NUM_FU_MULT-1:0] mul; \
+    type [`NUM_FU_LOAD-1:0] lod; \
+    type [`NUM_FU_STR-1:0]  str; \
+    type [`NUM_FU_BRU-1:0]  bru; \
 }
 
 typedef struct packed {
@@ -935,21 +935,21 @@ endfunction
 
 function get_fu_name(input FU_IDX fu_idx, output string name);
     case (fu_idx)
-        FU_ALU:     name = "ALU";
-        FU_MULT:    name = "MUL";
-        FU_LOAD:    name = "LOD";
-        FU_STORE:   name = "STR";
-        FU_BRU:     name = "BRU";
-        default:    name = "Unknown FU";
+        FU_ALU:  name = "ALU";
+        FU_MULT: name = "MUL";
+        FU_LOAD: name = "LOD";
+        FU_STR:  name = "STR";
+        FU_BRU:  name = "BRU";
+        default: name = "Unknown FU";
     endcase
 endfunction
 
 function automatic string dbg_mem_cmd(input MEM_COMMAND cmd);
     string rv;
     case (cmd)
-        MEM_NONE:   rv = "NONE";
-        MEM_STORE:  rv = "STOR";
-        MEM_LOAD:   rv = "LOAD";
+        MEM_NONE:  rv = "NONE";
+        MEM_STORE: rv = "STOR";
+        MEM_LOAD:  rv = "LOAD";
     endcase
     return rv;
 endfunction

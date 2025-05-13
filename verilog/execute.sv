@@ -350,7 +350,7 @@ module stage_ex_p4 (
             ID_ALU_VIEW [`NUM_FU_ALU-1:0]   alu;
             ID_MUL_VIEW [`NUM_FU_MULT-1:0]  mul;
             ID_LOD_VIEW [`NUM_FU_LOAD-1:0]  lod;
-            ID_STR_VIEW [`NUM_FU_STORE-1:0] str;
+            ID_STR_VIEW [`NUM_FU_STR-1:0]   str;
             ID_BRU_VIEW [`NUM_FU_BRU-1:0]   bru;
         } i_dat, o_dat;
     } iss;
@@ -359,11 +359,11 @@ module stage_ex_p4 (
         `BY_FU(logic) i_rdy;
         `BY_FU(logic) o_vld;
         struct packed {
-            ALU_REGS [`NUM_FU_ALU-1:0]   alu;
-            MUL_REGS [`NUM_FU_MULT-1:0]  mul;
-            LOD_REGS [`NUM_FU_LOAD-1:0]  lod;
-            STR_REGS [`NUM_FU_STORE-1:0] str;
-            BRU_REGS [`NUM_FU_BRU-1:0]   bru;
+            ALU_REGS [`NUM_FU_ALU-1:0]  alu;
+            MUL_REGS [`NUM_FU_MULT-1:0] mul;
+            LOD_REGS [`NUM_FU_LOAD-1:0] lod;
+            STR_REGS [`NUM_FU_STR-1:0]  str;
+            BRU_REGS [`NUM_FU_BRU-1:0]  bru;
         } i_dat, o_dat;
     } regs;
     
@@ -469,18 +469,18 @@ module stage_ex_p4 (
             );
         end
 
-        for (genvar i = 0; i < `NUM_FU_STORE; ++i) begin : gen_str_sbufs
+        for (genvar i = 0; i < `NUM_FU_STR; ++i) begin : gen_str_sbufs
             assign iss.i_dat.str[i] = '{
-                t1      : rs_in.fu_dat_store[i].t1,
-                t2      : rs_in.fu_dat_store[i].t2,
-                opb     : `RV32_signext_Simm(rs_in.fu_dat_store[i].inst),
+                t1      : rs_in.fu_dat_str[i].t1,
+                t2      : rs_in.fu_dat_str[i].t2,
+                opb     : `RV32_signext_Simm(rs_in.fu_dat_str[i].inst),
 
                 // >> FIXME
                 sq_idx  : '0,
                 // << FIXME
 
-                rob_idx : rs_in.fu_dat_store[i].rob_idx,
-                mem_size: MEM_SIZE'(rs_in.fu_dat_store[i].inst.r.funct3[1:0])
+                rob_idx : rs_in.fu_dat_str[i].rob_idx,
+                mem_size: MEM_SIZE'(rs_in.fu_dat_str[i].inst.r.funct3[1:0])
             };
 
             ppln_skid #(
@@ -490,7 +490,7 @@ module stage_ex_p4 (
                 .reset (reset),
                 .flush (flush),
 
-                .i_vld (rs_in.fu_en_store[i]),
+                .i_vld (rs_in.fu_en_str[i]),
                 .i_rdy (iss.i_rdy.str[i]),
                 .i_dat (iss.i_dat.str[i]),
 
@@ -728,7 +728,7 @@ module stage_ex_p4 (
             assign regs.o_dat.lod[i] = lod_snoop(raw, cdat_out);
         end
 
-        for (genvar i = 0; i < `NUM_FU_STORE; ++i) begin : gen_str_rbufs
+        for (genvar i = 0; i < `NUM_FU_STR; ++i) begin : gen_str_rbufs
             STR_REGS raw;
             skid #(
                 .ENABLE_SNOOP(`TRUE),
@@ -866,7 +866,7 @@ module stage_ex_p4 (
             fu_rdy_alu      : iss.i_rdy.alu,
             fu_rdy_mult     : iss.i_rdy.mul,
             fu_rdy_load     : iss.i_rdy.lod,
-            fu_rdy_store    : iss.i_rdy.str,
+            fu_rdy_str      : iss.i_rdy.str,
             fu_rdy_bru      : iss.i_rdy.bru
         };
 
@@ -980,7 +980,7 @@ module stage_ex_p4 (
         // $display("c_out: rdy_alu:{%b} rdy_mult:{%b} rdy_store:{%b} rdy_load:{%b}",
         //     rs_out.fu_rdy_alu,
         //     rs_out.fu_rdy_mult,
-        //     rs_out.fu_rdy_store,
+        //     rs_out.fu_rdy_str,
         //     rs_out.fu_rdy_load,
         // );
 

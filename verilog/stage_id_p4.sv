@@ -91,7 +91,7 @@ module decoder_p4 (
                 // stage_ex uses inst.r.funct3 as the load size and signedness
             end
             `RV32_SB, `RV32_SH, `RV32_SW: begin
-                fu_idx     = FU_STORE;
+                fu_idx     = FU_STR;
                 opb_select = OPB_IS_S_IMM;
                 // stage_ex uses inst.r.funct3 as the store size
             end

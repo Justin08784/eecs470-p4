@@ -5,7 +5,7 @@
 module sq #(parameter 
     N=`N,
     LSQ_SZ=`LSQ_SZ,
-    NUM_FU_STORE=`NUM_FU_STORE,
+    NUM_FU_STR=`NUM_FU_STR,
     NUM_FU_LOAD=`NUM_FU_LOAD,
     LD_BAY_SZ=`LD_BAY_SZ
 ) (

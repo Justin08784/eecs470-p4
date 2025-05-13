@@ -216,7 +216,7 @@ module dispatch #(parameter
                 || rename_in[i].cond_branch;
             rd_src2s[i] = rename_in[i].opb_select == OPB_IS_RS2
                 || rename_in[i].cond_branch
-                || rename_in[i].fu_idx == FU_STORE;
+                || rename_in[i].fu_idx == FU_STR;
             tmp_alloc2rename[i].t1_rdy  = !rd_src1s[i];
             tmp_alloc2rename[i].t2_rdy  = !rd_src2s[i];
         end

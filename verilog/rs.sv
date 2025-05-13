@@ -260,7 +260,7 @@ module rs #(parameter
     NUM_FU_ALU=`NUM_FU_ALU,
     NUM_FU_MULT=`NUM_FU_MULT,
     NUM_FU_LOAD=`NUM_FU_LOAD,
-    NUM_FU_STORE=`NUM_FU_STORE
+    NUM_FU_STR=`NUM_FU_STR
 ) (
     input clock,
     input reset,
@@ -439,12 +439,12 @@ module rs #(parameter
 
     // default rdy_sbus for partitions not yet defined
     assign d_out.rdy_sbus[FU_LOAD]  = '0;
-    assign d_out.rdy_sbus[FU_STORE] = '0;
+    assign d_out.rdy_sbus[FU_STR] = '0;
 
     assign ex_out.fu_en_load    = '0;
-    assign ex_out.fu_en_store   = '0;
-    assign ex_out.fu_dat_load    = '0;
-    assign ex_out.fu_dat_store   = '0;
+    assign ex_out.fu_en_str     = '0;
+    assign ex_out.fu_dat_load   = '0;
+    assign ex_out.fu_dat_str    = '0;
 
 `ifdef DEBUG
     task automatic print_rs_alu(input RS_ALU_ENTRY [RS_ALU_SZ-1:0] entries);
