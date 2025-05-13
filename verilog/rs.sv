@@ -256,7 +256,6 @@ reads.)
 
 module rs #(parameter 
     N=`N,
-    RS_SZ=`RS_SZ,
     FU_IDX_NUM=`FU_IDX_NUM,
     NUM_FU_ALU=`NUM_FU_ALU,
     NUM_FU_MULT=`NUM_FU_MULT,

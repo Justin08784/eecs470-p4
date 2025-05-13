@@ -30,8 +30,9 @@
 
 // sizes
 `define ROB_SZ 64
-`define RS_SZ  16
-`define BTQ_SZ 8
+`define BTQ_SZ 16
+    /* BTQ_SZ doubled (form 8). This improved CPI on tight loop
+    programs like branchy.s and branchy_nested.s */
 `define PHYS_REG_SZ_P6 32
 `define PHYS_REG_SZ_R10K (32 + `ROB_SZ)
 
@@ -499,7 +500,6 @@ parameter RS_MULT_SZ    = 8;
 parameter RS_LOAD_SZ    = 4;
 parameter RS_STOR_SZ    = 4;
 parameter RS_BRU_SZ     = 4;
-parameter RS_SZ         = RS_ALU_SZ + RS_MULT_SZ; // FIXME: add brch, load, stor
 typedef struct packed {
 `ifdef DEBUG
     int             id; // debug only; unique insn identifier
@@ -1065,17 +1065,6 @@ typedef struct packed {
     rob2dispatch d_out;
     dispatch2rob d_in;
 } DBG_rob;
-
-typedef struct packed {
-    // internal state
-    RS_ENTRY [`RS_SZ-1:0] entries; // ms1 test: remove one RS entry (caught)
-    // I/O
-    dispatch2rs d_in;
-    rs2dispatch d_out;
-    execute2rs  ex_in;
-    rs2execute  ex_out;
-    execute2complete_tag ctag_in;
-} DBG_rs;
 
 typedef struct packed {
     logic _dummy;
