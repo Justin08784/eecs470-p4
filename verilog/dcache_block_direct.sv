@@ -495,8 +495,8 @@ module dcache_block (
             .BYPASS_EN (0)
         ) set_i (
             .dbg  (dbg_memDP[s]),
-            .clock(clock),
-            .reset(reset),
+            .clock,
+            .reset,
             .re   (1'b1),
             .raddr(rway[s]),
             .rdata(rdat[s]),

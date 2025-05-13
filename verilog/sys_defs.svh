@@ -800,21 +800,21 @@ typedef struct packed {
 typedef struct packed {
     /* Requested by issue arbiter 
     (only ALU needs gnt by CDB arbiter to 'en')*/
-    logic       [`NUM_FU_ALU-1:0]   fu_vld_alu;
-    logic       [`NUM_FU_BRU-1:0]   fu_vld_bru;
+    logic [`NUM_FU_ALU-1:0] fu_vld_alu;
+    logic [`NUM_FU_BRU-1:0] fu_vld_bru;
 
     /* Selected for issue */
-    logic       [`NUM_FU_ALU-1:0]   fu_en_alu;
-    logic       [`NUM_FU_MUL-1:0]  fu_en_mul;
-    logic       [`NUM_FU_STR-1:0]   fu_en_str;
-    logic       [`NUM_FU_LOD-1:0]  fu_en_lod;
-    logic       [`NUM_FU_BRU-1:0]   fu_en_bru;
+    logic [`NUM_FU_ALU-1:0] fu_en_alu;
+    logic [`NUM_FU_MUL-1:0] fu_en_mul;
+    logic [`NUM_FU_STR-1:0] fu_en_str;
+    logic [`NUM_FU_LOD-1:0] fu_en_lod;
+    logic [`NUM_FU_BRU-1:0] fu_en_bru;
 
-    RS_ALU_PAYLOAD  [`NUM_FU_ALU-1:0]   fu_dat_alu;
-    RS_MUL_PAYLOAD [`NUM_FU_MUL-1:0]  fu_dat_mul;
-    RS_ALU_PAYLOAD  [`NUM_FU_STR-1:0]   fu_dat_str;
-    RS_ALU_PAYLOAD  [`NUM_FU_LOD-1:0]  fu_dat_lod;
-    RS_BRU_PAYLOAD  [`NUM_FU_BRU-1:0]   fu_dat_bru;
+    RS_ALU_PAYLOAD [`NUM_FU_ALU-1:0] fu_dat_alu;
+    RS_MUL_PAYLOAD [`NUM_FU_MUL-1:0] fu_dat_mul;
+    RS_ALU_PAYLOAD [`NUM_FU_STR-1:0] fu_dat_str;
+    RS_ALU_PAYLOAD [`NUM_FU_LOD-1:0] fu_dat_lod;
+    RS_BRU_PAYLOAD [`NUM_FU_BRU-1:0] fu_dat_bru;
 } rs2execute;
 
 // By ROB
@@ -881,8 +881,8 @@ typedef struct packed {
 `define BY_FU(type) \
 struct packed { \
     type [`NUM_FU_ALU-1:0]  alu; \
-    type [`NUM_FU_MUL-1:0] mul; \
-    type [`NUM_FU_LOD-1:0] lod; \
+    type [`NUM_FU_MUL-1:0]  mul; \
+    type [`NUM_FU_LOD-1:0]  lod; \
     type [`NUM_FU_STR-1:0]  str; \
     type [`NUM_FU_BRU-1:0]  bru; \
 }

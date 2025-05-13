@@ -54,10 +54,10 @@ module cpu (
     fetch2btq    f_2_btq;
 
     stage_if_p4 fetch0 (
-        .clock  (clock),
-        .reset  (reset),
-        .flush   (flush),
-        .flush_PC(flush_PC),
+        .clock,
+        .reset,
+        .flush,
+        .flush_PC,
 
         .d_in   (decode_2_f),
         .d_out  (f_2_decode),
@@ -74,9 +74,9 @@ module cpu (
     dispatch2decode disp_2_de;
 
     stage_id_p4 decode0 (
-        .clock  (clock),
-        .reset  (reset),
-        .flush  (flush),
+        .clock,
+        .reset,
+        .flush,
 
         .f_in   (f_2_decode),
         .f_out  (decode_2_f),
@@ -98,9 +98,9 @@ module cpu (
     execute2complete_dat ex_2_cdat;
 
     dispatch dispatch0 (
-        .clock      (clock),
-        .reset      (reset),
-        .flush      (flush),
+        .clock,
+        .reset,
+        .flush,
 
         .d_in       (de_2_disp),
         .d_out      (disp_2_de),
@@ -125,17 +125,17 @@ module cpu (
     retire_final    retire_exec;
 
     retire retire0 (
-        .clock  (clock),
-        .reset  (reset),
+        .clock,
+        .reset,
 
         .rob_in (rob_2_retire),
         .btq_in (btq_2_retire),
         .btq_out(retire_2_btq),
 
-        .retire_exec(retire_exec),
+        .retire_exec,
 
-        .flush      (flush),
-        .flush_PC   (flush_PC)
+        .flush,
+        .flush_PC
     );
 
 
@@ -143,9 +143,9 @@ module cpu (
     execute2btq ex_2_btq;
 
     btq btq0(
-        .clock  (clock),
-        .reset  (reset),
-        .flush  (flush),
+        .clock,
+        .reset,
+        .flush,
 
         .ex_in  (ex_2_btq),
 
@@ -163,9 +163,9 @@ module cpu (
     prf2execute     prf_2_ex;
 
     rs rs0(
-        .clock  (clock),
-        .reset  (reset),
-        .flush  (flush),
+        .clock,
+        .reset,
+        .flush,
  
         .d_in   (dispatch_2_rs),
         .d_out  (rs_2_dispatch),
@@ -180,9 +180,9 @@ module cpu (
         .ROB_SZ(`ROB_SZ),
         .N(`N)
     ) rob0 (
-        .clock      (clock),
-        .reset      (reset),
-        .flush      (flush),
+        .clock,
+        .reset,
+        .flush,
 
         .r_in       (retire_exec),
         .r_out      (rob_2_retire),
@@ -195,9 +195,9 @@ module cpu (
 
     /* >> ==== Execute ==== >> */
     stage_ex_p4 ex0 (
-        .clock      (clock),
-        .reset      (reset),
-        .flush      (flush),
+        .clock,
+        .reset,
+        .flush,
 
         .rs_in      (rs_2_ex),
         .rs_out     (ex_2_rs),
@@ -224,11 +224,11 @@ module cpu (
         .N(`N)
     ) map_table0 (
 `ifdef DEBUG
-        .dbg_prf(dbg_prf),
+        .dbg_prf,
 `endif
-        .clock  (clock),
-        .reset  (reset),
-        .flush  (flush),
+        .clock,
+        .reset,
+        .flush,
 
         .am_in  (am_2_mt),
         .d_in   (dispatch_2_map),
@@ -240,9 +240,9 @@ module cpu (
     arch_map #(
         .N(`N)
     ) arch_map0 (
-        .clock  (clock),
-        .reset  (reset),
-        .flush  (flush),
+        .clock,
+        .reset,
+        .flush,
 
         .mt_out (am_2_mt),
         .r_in   (retire_exec)
@@ -253,9 +253,9 @@ module cpu (
     free_list #(
         .N(`N)
     ) free_list0 (
-        .clock  (clock),
-        .reset  (reset),
-        .flush  (flush),
+        .clock,
+        .reset,
+        .flush,
         .r_in   (retire_exec),
         .d_in   (dispatch_2_fl),
         .d_out  (fl_2_dispatch)
@@ -269,7 +269,7 @@ module cpu (
 `ifdef DEBUG
         .dbg_file   (dbg_prf.file),
 `endif
-        .clock      (clock),
+        .clock,
         /* 
         Here each X_BY_FU type is coerced into a flat X array type
         This convenience is why we opt to avoid wrapping these I/Os into

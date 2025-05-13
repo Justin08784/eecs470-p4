@@ -247,17 +247,17 @@ module mult_stage #(
             skid #(
                 .WIDTH($bits(MUL_PKT))
             ) skid_0 (
-                .clock(clock),
-                .reset(reset),
-                .flush(flush),
+                .clock,
+                .reset,
+                .flush,
                 
-                .i_vld(i_vld),
-                .i_rdy(i_rdy),
+                .i_vld,
+                .i_rdy,
                 .i_dat(tmp_dat),
 
-                .o_vld(o_vld),
-                .o_rdy(o_rdy),
-                .o_dat(o_dat)
+                .o_vld,
+                .o_rdy,
+                .o_dat
             );
         end
 
@@ -265,17 +265,17 @@ module mult_stage #(
             ppln_skid #(
                 .WIDTH($bits(MUL_PKT))
             ) skid_0 (
-                .clock(clock),
-                .reset(reset),
-                .flush(flush),
+                .clock,
+                .reset,
+                .flush,
                 
-                .i_vld(i_vld),
-                .i_rdy(i_rdy),
+                .i_vld,
+                .i_rdy,
                 .i_dat(tmp_dat),
 
-                .o_vld(o_vld),
-                .o_rdy(o_rdy),
-                .o_dat(o_dat)
+                .o_vld,
+                .o_rdy,
+                .o_dat
             );
         end
 
@@ -285,15 +285,15 @@ module mult_stage #(
             flop #(
                 .WIDTH($bits(MUL_PKT))
             ) flop_0 (
-                .clock(clock),
-                .reset(reset),
-                .flush(flush),
+                .clock,
+                .reset,
+                .flush,
                 
-                .i_vld(i_vld),
+                .i_vld,
                 .i_dat(tmp_dat),
 
-                .o_vld(o_vld),
-                .o_dat(o_dat)
+                .o_vld,
+                .o_dat
             );
         end
         endcase

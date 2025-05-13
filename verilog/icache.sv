@@ -105,8 +105,8 @@ module icache (
         .READ_PORTS(1),
         .BYPASS_EN (0))
     icache_mem (
-        .clock(clock),
-        .reset(reset),
+        .clock,
+        .reset,
         .re   (1'b1),
         .raddr(current_index),
         .rdata(Icache_data_out),

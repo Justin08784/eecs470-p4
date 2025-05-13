@@ -225,8 +225,8 @@ module dcache_basic (
                 // `ifdef DEBUG
                 // .dbg(dbg_state[s]),
                 // `endif
-                .clock(clock),
-                .reset(reset),
+                .clock,
+                .reset,
                 .re   (ren [s]),
                 .raddr(rway[s]),
                 .rdata(rdat[s]),
@@ -652,8 +652,8 @@ module dcache_simper (
         .READ_PORTS(1),
         .BYPASS_EN (0)
     ) set_i (
-        .clock(clock),
-        .reset(reset),
+        .clock,
+        .reset,
         .re   (ren ),
         .raddr(rway),
         .rdata(rdat),

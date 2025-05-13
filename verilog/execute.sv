@@ -175,9 +175,9 @@ module mul_ex(
             mult #(
                 .ID(i)
             ) mult_0 ( 
-                .clock  (clock),
-                .reset  (reset),
-                .flush  (flush),
+                .clock,
+                .reset,
+                .flush,
 
                 .i_vld  (i_vld[i]),
                 .i_rdy  (i_rdy[i]),

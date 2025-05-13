@@ -104,9 +104,9 @@ module free_list #(parameter
 `ifdef DEBUG
         .dbg(dbg_fifo),
 `endif
-        .clock(clock),
-        .reset(reset),
-        .flush(flush),
+        .clock,
+        .reset,
+        .flush,
 
         .wr_en_cnt(free_cnt),
         .wr_data(told_packed),

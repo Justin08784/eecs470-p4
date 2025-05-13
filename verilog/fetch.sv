@@ -67,8 +67,8 @@ module stage_if_p4 (
         tgt : btq_in.puq_dat.tgt
     };
     btb btb0 (
-        .clock(clock),
-        .reset(reset),
+        .clock,
+        .reset,
 
         .f_in (f2btb),
         .f_out(btb2f),
@@ -141,9 +141,9 @@ module stage_if_p4 (
         .ENABLE_INTR_FWD(`FALSE),
         .INSTANCE_ID(2)
     ) insn_buf (
-        .clock      (clock),
-        .reset      (reset),
-        .flush      (flush),
+        .clock,
+        .reset,
+        .flush,
         .wr_en_cnt  (f_cnt),
         .wr_data    (f_dat),
         .rd_en_cnt  (d_out.f_en_cnt),
