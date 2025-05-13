@@ -20,7 +20,7 @@ module btq #(
     input  execute2btq  ex_in,
 
     // fetch (bp update)
-    output puq2fetch    f_out,
+    output btq2fetch    f_out,
 
     // dispatch (write)
     input  dispatch2btq d_in,
@@ -83,7 +83,7 @@ module btq #(
             tmp_puq_in[i].tgt  = state[r_idxs[i]].tgt;
         end
 
-        f_out.en = !puq_empty;
+        f_out.puq_en = !puq_empty;
     end
 
     localparam PUQ_SZ = 3;
@@ -100,8 +100,8 @@ module btq #(
         .flush      ('0),
         .wr_en_cnt  (rd_cnt),
         .wr_data    (tmp_puq_in),
-        .rd_en_cnt  (f_out.en),
-        .rd_data    (f_out.dat),
+        .rd_en_cnt  (f_out.puq_en),
+        .rd_data    (f_out.puq_dat),
         .free_scnt  (r_out.puq_rdy_scnt),
         .used_scnt  (),
         .empty      (puq_empty)

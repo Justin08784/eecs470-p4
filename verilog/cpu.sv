@@ -67,7 +67,7 @@ module cpu (
     /* >> ==== Fetch ==== >> */
     fetch2decode f_2_decode;
     decode2fetch decode_2_f;
-    puq2fetch    puq_2_f;
+    btq2fetch    btq_2_f;
 
     stage_if_p4 fetch_0(
 `ifdef DEBUG
@@ -80,7 +80,7 @@ module cpu (
 
         .d_in   (decode_2_f),
         .d_out  (f_2_decode),
-        .puq_in (puq_2_f),
+        .btq_in (btq_2_f),
 
         .mem_out(f2mem),
         .mem_in (mem2f)
@@ -184,7 +184,7 @@ module cpu (
         .flush  (flush),
 
         .ex_in  (ex_2_btq),
-        .f_out  (puq_2_f),
+        .f_out  (btq_2_f),
 
         .r_in   (retire_2_btq),
         .r_out  (btq_2_retire),

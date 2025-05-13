@@ -23,7 +23,7 @@ module stage_if_p4 (
     input   decode2fetch d_in,
     output  fetch2decode d_out,
 
-    input   puq2fetch    puq_in,
+    input   btq2fetch   btq_in,
 
     output  fetch2mem   mem_out,
     input   mem2fetch   mem_in
@@ -65,9 +65,9 @@ module stage_if_p4 (
 
     puq2btb puq_2_btb;
     assign puq_2_btb = '{
-        en  : puq_in.en,
-        pc  : puq_in.dat.pc,
-        tgt : puq_in.dat.tgt
+        en  : btq_in.puq_en,
+        pc  : btq_in.puq_dat.pc,
+        tgt : btq_in.puq_dat.tgt
     };
     btb btb0 (
         .clock(clock),
@@ -140,7 +140,7 @@ module stage_if_p4 (
         flush : flush,
         d_in  : d_in,
         d_out : d_out,
-        puq_in: puq_in
+        btq_in: btq_in
     };
 `endif
 

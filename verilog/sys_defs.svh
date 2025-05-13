@@ -459,12 +459,6 @@ typedef struct packed {
 } PUQ_ENTRY;
 
 typedef struct packed {
-    logic       en;
-    PUQ_ENTRY   dat;
-} puq2fetch;
-
-
-typedef struct packed {
     logic en;
     WADDR pc;
     WADDR tgt;
@@ -738,6 +732,11 @@ typedef struct packed {
 } fetch2decode;
 
 typedef struct packed {
+    logic       puq_en;
+    PUQ_ENTRY   puq_dat;
+} btq2fetch;
+
+typedef struct packed {
     WADDR [`N-1:0] pc;
 } fetch2btb;
 
@@ -1000,7 +999,7 @@ typedef struct packed {
     logic           flush;
     decode2fetch    d_in;
     fetch2decode    d_out;
-    puq2fetch       puq_in;
+    btq2fetch       btq_in;
     // submodule
 } DBG_fetch;
 
