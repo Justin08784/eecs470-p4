@@ -63,7 +63,7 @@
 
 `ifndef SYNTH
 // comment out to disable DEBUG:
-`define DEBUG
+// `define DEBUG
 // comment to disable clock cycle print
 // `define CYCLE_PRINT
 `endif

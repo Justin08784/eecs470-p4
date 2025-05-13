@@ -8,9 +8,6 @@ Free List
 module free_list #(parameter 
     N=`N
 ) (
-    `ifdef DEBUG
-    output DBG_fl dbg,
-    `endif
     input clock, reset, flush,
     // retire
     input retire_final r_in,
@@ -104,9 +101,9 @@ module free_list #(parameter
         .ENABLE_INTR_FWD(`FALSE),
         .RESET_STATE(RESET_STATE)
     ) lst (
-        `ifdef DEBUG
+`ifdef DEBUG
         .dbg(dbg_fifo),
-        `endif
+`endif
         .clock(clock),
         .reset(reset),
         .flush(flush),
@@ -121,43 +118,48 @@ module free_list #(parameter
         .used_scnt(d_out.free_rdy_scnt)
     );
 
-    `ifdef DEBUG
-    assign dbg = '{
-        r_in:r_in,
-        d_in:d_in,
-        d_out:d_out,
-        fifo: '{
-            head:   dbg_fifo.head,
-            tail:   dbg_fifo.tail,
-            state:  dbg_fifo.state,
-            used:   dbg_fifo.used
-        }
-    };
-    `endif
+`ifdef DEBUG
+    task print_fl();
+        logic [`ROB_SZ-1:0] fl_vld;
+        logic dup;
+        logic [$clog2(DEPTH)-1:0]       head;
+        logic [$clog2(DEPTH)-1:0]       tail;
+        logic [DEPTH-1:0][WIDTH-1:0]    state;
+        logic [$clog2(DEPTH):0]         used;
+        head = dbg_fifo.head;
+        tail = dbg_fifo.tail;
+        state= dbg_fifo.state;
+        used = dbg_fifo.used;
 
-    // debugging
-    // always_ff @(posedge clock) begin
-    //     if (!reset) begin
-    //         $display("  %3d | >> Free list >>", $time);
-    //         $display("rob2retire: {r_en_cnt: %d, [(t: %0d, told: %0d, dst: %0d), (t: %0d, told: %0d, dst: %0d)]}",
-    //             r_in.r_en_cnt,
-    //             r_in.tag[0],
-    //             r_in.t_old[0],
-    //             r_in.dst[0],
-    //             r_in.tag[1],
-    //             r_in.t_old[1],
-    //             r_in.dst[1]
-    //         );
-    //         $display("d_in:  {d_en_cnt: %d}",
-    //             d_in.free_d_en_cnt
-    //         );
-    //         $display("d_out: {free_rdy_scnt: %d, [%0d, %0d]}",
-    //             d_out.free_rdy_scnt,
-    //             d_out.d_ts[0],
-    //             d_out.d_ts[1]
-    //         );
-    //         $display("  %3d | << Free list <<", $time);
-    //     end
-    // end
+        $display("  | >> FL >>");
 
+        fl_vld = '0;
+        for (int cnt = 0; cnt < used; ++cnt)
+            fl_vld[(head + cnt) % FL_DEPTH] = 1;
+
+        for (int i = 0; i < FL_DEPTH / 2; ++i) begin
+            string ls, rs, name;
+            if (!fl_vld[i])
+                ls = $sformatf("Fl[%2d]: ", i);
+            else
+                ls = $sformatf("Fl[%2d]: %2d",
+                    i,
+                    state[i]
+                );
+
+            if (!fl_vld[i+32])
+                rs = $sformatf("Fl[%2d]: ", i+32);
+            else
+                rs = $sformatf("Fl[%2d]: %2d",
+                    i+32,
+                    state[i+32]
+                );
+
+           $display("%-12s | %-12s", ls, rs); 
+        end
+        $display("  | << FL <<");
+
+    endtask
+
+`endif
 endmodule

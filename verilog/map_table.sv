@@ -14,9 +14,10 @@ Map Table
 module map_table #(parameter 
     N=`N
 ) (
-
 `ifdef DEBUG
-    output DBG_mt dbg,
+    input struct packed {
+        logic [`PHYS_REG_SZ_R10K-1:0][$bits(DATA)-1:0] file;
+    } dbg_prf,
 `endif
     input  clock,
     input  reset,
@@ -71,12 +72,50 @@ module map_table #(parameter
     end
 
 `ifdef DEBUG
-    assign dbg = '{
-        entries,
-        am_in,
-        d_in,
-        d_out
-    };
+    task print_map_table();
+        $display(">> MT >>", $time);
+        $display("dis_in:   {en_cnt: %d, [(%0d->%0d, %d, %d), (%0d->%0d, %d, %d)]}",
+            d_in.en_cnt,
+            d_in.dsts[0],
+            d_in.ts[0],
+            d_in.src1s[0],
+            d_in.src2s[0],
+            d_in.dsts[1],
+            d_in.ts[1],
+            d_in.src1s[1],
+            d_in.src2s[1]
+        );
+        $display("dis_out:  {en_cnt: %d, [(told: %0d, t1: %0d, t2: %0d), (told: %0d, t1: %0d, t2: %0d)]}",
+            d_in.en_cnt,
+            d_out.ts_old[0],
+            d_out.t1s[0],
+            d_out.t2s[0],
+
+            d_out.ts_old[1],
+            d_out.t1s[1],
+            d_out.t2s[1]
+        );
+        for (int r = 0; r < `NUM_ARCH_REG; ++r) begin
+            logic duplicate;
+            duplicate = 0;
+            for (int rp = 0; rp < `NUM_ARCH_REG; ++rp) begin
+                if (rp != r && entries[rp] == entries[r]) begin
+                    duplicate = 1;
+                    break;
+                end
+            end
+            $display("mt[%2d]: t=%3d, v=%x :::: am[%2d]: t=%3d, v=%x  (has_dup: %b)",
+                r,
+                entries[r],
+                dbg_prf.file[entries[r]],
+                r, 
+                am_in.entries[r],
+                dbg_prf.file[am_in.entries[r]],
+                duplicate
+            );
+        end
+        $display("<< MT <<", $time);
+    endtask
 `endif
 
 endmodule

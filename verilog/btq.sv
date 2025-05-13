@@ -5,9 +5,6 @@ module btq #(
     parameter BTQ_SZ = `BTQ_SZ,  // num elements
     parameter N=`N
 ) (
-`ifdef DEBUG
-    output DBG_btq dbg,
-`endif 
     input  clock,
     input  reset,
     input  flush,
@@ -146,15 +143,48 @@ module btq #(
     end
 
 `ifdef DEBUG
-    assign dbg = '{
-        state,
-        head,
-        tail,
-        used,
-        r_in,
-        r_out,
-        ex_in
-    };
+    task print_btq;
+        $display(">> BTQ >>");
+        for (int i = 0; i < `BTQ_SZ; ++i) begin
+            $display("BTQ [%0d]: tgt: %x, pred: %b, take: %b%s",
+                i,
+                state[i].tgt,
+                state[i].pred,
+                state[i].take,
+                (i == head && head == tail) 
+                    ? " << h/t"
+                    : (i == head) 
+                        ? " << h" 
+                        : (i == tail)
+                            ? " << t"
+                            : ""
+            );
+            if (i == tail)
+                break;
+        end
+
+        for (int i = 0; i < `N; ++i) begin
+            $display("ex_in[%0d]: en: %b, btq_idx: %d, take: %b, tgt: %x",
+                i,
+                ex_in.dat[i].en,
+                ex_in.dat[i].btq_idx,
+                ex_in.dat[i].take,
+                ex_in.dat[i].tgt
+            );
+        end
+        $display("r_in: rd_cnt %d", r_in.rd_cnt);
+        $display("r_out: used_scnt: %0d", r_out.btq_used_scnt);
+        for (int i = 0; i < `N; ++i) begin
+            $display("r_out[%d]: tgt: %x, pred: %b, take: %b",
+                i,
+                r_out.dat[i].tgt,
+                r_out.dat[i].pred,
+                r_out.dat[i].take
+            );
+        end
+        $display("<< BTQ <<");
+    endtask
+
 `endif
 
 endmodule

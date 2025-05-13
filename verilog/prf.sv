@@ -1,16 +1,14 @@
 `include "sys_defs.svh"
 
 module prf #(
-    parameter WIDTH      = $bits(DATA),
-    parameter DEPTH      = `PHYS_REG_SZ_R10K,
-    parameter N = 2,
-    parameter BYPASS_EN  = 0,   // 0: Read data will update at positive edge
-    parameter NUM_RPORTS = `NUM_FU_TOTAL // 1: Read data will update combinationally if
-                               //    write to same address
-   )(
-    `ifdef DEBUG
+    parameter WIDTH = $bits(DATA),
+    parameter DEPTH = `PHYS_REG_SZ_R10K,
+    parameter N     = 2,
+    parameter NUM_RPORTS = `NUM_FU_TOTAL
+) (
+`ifdef DEBUG
     output logic [DEPTH-1:0][WIDTH-1:0] dbg_file,
-    `endif
+`endif
     input clock, //reset, flush, // QUESTION: do we need reset? or should we force write to happen before read at the same addr?
 
     // complete (write)
@@ -42,11 +40,7 @@ module prf #(
         //   THERE CANT BE ANOTHER IDIOT WRITING TO THE SAME PREG CAN IT? So this 
         //   seems to be a non-issue after all. Remember, another insn can only have
         //   same dst in r10k after the one writing to it RETIRES.
-
-
-    // dispatch ??
 );
-
     logic [DEPTH-1:0][WIDTH-1:0] file;
 
     // Read ports
@@ -87,8 +81,11 @@ module prf #(
         end
     end
 
-    `ifdef DEBUG
+`ifdef DEBUG
     assign dbg_file = file;
-    `endif
+    task print_prf;
+        $display("TODO: impl print_prf");
+    endtask
+`endif
 
 endmodule

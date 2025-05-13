@@ -15,9 +15,6 @@ typedef enum logic [2:0] {
 } RETIRE_OP;
 
 module retire (
-`ifdef DEBUG
-    output DBG_retire dbg,
-`endif
     input  clock, reset,
 
     input  rob2retire rob_in,
@@ -177,13 +174,20 @@ module retire (
     end
 
 `ifdef DEBUG
-    assign dbg = '{
-        rob_in,
-        btq_in,
-        btq_out,
-        mispred,
-        mispred_tgt,
-        retire_exec
-    };
+    task print_retire;
+        $display("  | >> retire >>");
+        for (int i = 0; i < `N; ++i) begin
+            $display("btq_out [%0d]: tgt: %x, pred: %b, take: %b",
+                i,
+                btq_in.dat[i].tgt,
+                btq_in.dat[i].pred,
+                btq_in.dat[i].take
+            );
+        end
+        $display("btq_rd_cnt: %0d", btq_out.rd_cnt);
+
+        $display("retire_exec.r_en_cnt: %0d", retire_exec.r_en_cnt);
+        $display("  | << retire <<");
+    endtask
 `endif
 endmodule

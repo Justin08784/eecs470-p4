@@ -29,20 +29,6 @@ module cpu (
     output MEM_SIZE     proc2mem_size,    // Data size sent to memory
 
     output DBG_dcache   dbg_dcache,
-
-`ifdef DEBUG
-    input  logic        print_en, // high iff current cycle in dbg cycle range
-    output DBG_execute  dbg_execute,
-    output DBG_fl       dbg_fl,
-    output DBG_btq      dbg_btq,
-    output DBG_lq       dbg_lq,
-    output DBG_mt       dbg_mt,
-    output DBG_prf      dbg_prf,
-    output DBG_rob      dbg_rob,
-    output DBG_sq       dbg_sq,
-    output DBG_retire   dbg_retire,
-`endif 
-
     output COMMIT_PACKET [`N-1:0] committed_insts
 );
     /* Global controls*/
@@ -139,9 +125,6 @@ module cpu (
     retire_final    retire_exec;
 
     retire retire0 (
-`ifdef DEBUG
-        .dbg    (dbg_retire),
-`endif
         .clock  (clock),
         .reset  (reset),
 
@@ -160,10 +143,6 @@ module cpu (
     execute2btq ex_2_btq;
 
     btq btq0(
-`ifdef DEBUG
-        .dbg    (dbg_btq),
-`endif
-
         .clock  (clock),
         .reset  (reset),
         .flush  (flush),
@@ -201,9 +180,6 @@ module cpu (
         .ROB_SZ(`ROB_SZ),
         .N(`N)
     ) rob0 (
-`ifdef DEBUG
-        .dbg        (dbg_rob),
-`endif
         .clock      (clock),
         .reset      (reset),
         .flush      (flush),
@@ -219,10 +195,6 @@ module cpu (
 
     /* >> ==== Execute ==== >> */
     stage_ex_p4 ex0 (
-`ifdef DEBUG
-        .dbg        (dbg_execute),
-        .print_en   (print_en),
-`endif
         .clock      (clock),
         .reset      (reset),
         .flush      (flush),
@@ -242,12 +214,17 @@ module cpu (
 
     /* >> ==== Map table ==== >> */
     arch_map2map_table am_2_mt;
+`ifdef DEBUG
+    struct packed {
+        logic [`PHYS_REG_SZ_R10K-1:0][$bits(DATA)-1:0] file;
+    } dbg_prf;
+`endif
 
     map_table #(
         .N(`N)
     ) map_table0 (
 `ifdef DEBUG
-        .dbg    (dbg_mt),
+        .dbg_prf(dbg_prf),
 `endif
         .clock  (clock),
         .reset  (reset),
@@ -276,9 +253,6 @@ module cpu (
     free_list #(
         .N(`N)
     ) free_list0 (
-`ifdef DEBUG
-        .dbg    (dbg_fl),
-`endif
         .clock  (clock),
         .reset  (reset),
         .flush  (flush),
@@ -289,22 +263,11 @@ module cpu (
 
 
     /* >> ==== Physical register file (PRF) ==== >> */
-`ifdef DEBUG
-    logic [`PHYS_REG_SZ_R10K-1:0][$bits(DATA)-1:0] dbg_file;
-    assign dbg_prf = '{
-        file    : dbg_file,
-        cdat_in : ex_2_cdat,
-        ex_in   : ex_2_prf,
-        ex_out  : prf_2_ex
-    };
-`endif
-
     prf #(
-        .N(`N),
-        .BYPASS_EN(1)
+        .N(`N)
     ) prf0 (
 `ifdef DEBUG
-        .dbg_file   (dbg_file),
+        .dbg_file   (dbg_prf.file),
 `endif
         .clock      (clock),
         /* 

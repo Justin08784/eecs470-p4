@@ -144,22 +144,98 @@ module rob #(
         end
     end
     
-    `ifdef DEBUG
-    assign dbg = '{
-        // internal state
-        state,
-        head,
-        tail,
-        used,
-        free,
-        rsvd,
-        // I/O
-        r_out,
-        r_in,
-        cdat_in,
-        d_out,
-        d_in
-    };
-    `endif
+`ifdef DEBUG
+    task print_rob;
+        logic [`ROB_SZ-1:0] rob_vld;
+        logic t_dup, told_dup;
+
+        $display("  | >> ROB >>");
+        $display("fl: en_cnt: %d, [%2d, %2d] fldup: %b",
+            verisimpleV.free_list0.free_cnt,
+            verisimpleV.free_list0.told_packed[0],
+            verisimpleV.free_list0.told_packed[1],
+            verisimpleV.free_list0.told_packed[0]
+            ==verisimpleV.free_list0.told_packed[1]
+            &&verisimpleV.free_list0.told_packed[0]!=0
+        );
+        $display("r_out: vld_cnt: %d", r_out.r_vld_cnt);
+        for (int i = 0; i < `N; ++i) begin
+            string name;
+            get_fu_name(r_out.entries[i].fu_idx, name);
+            $display("r_out[%d]: tag: %d, t_old: %d, dst: %d, fu_idx: %s, halt: %d, illegal: %d",
+                i,
+                r_out.entries[i].tag,
+                r_out.entries[i].t_old,
+                r_out.entries[i].dst,
+                name,
+                r_out.entries[i].halt,
+                r_out.entries[i].illegal
+            );
+        end
+
+        rob_vld = '0;
+        for (int cnt = 0; cnt < used; ++cnt)
+            rob_vld[(head + cnt) % `ROB_SZ] = 1;
+
+        for (int i = 0; i < `ROB_SZ / 2; ++i) begin
+            string ls, rs, name;
+
+            t_dup = 0;
+            told_dup = 0;
+            for (int j = 0; j < `ROB_SZ; ++j) begin
+                if (!rob_vld[j] || i == j)
+                    continue;
+                if (state[i].tag == state[j].tag && state[i].tag != '0)
+                    t_dup |= 1;
+                if (state[i].t_old == state[j].t_old && state[i].t_old != '0)
+                    told_dup |= 1;
+            end
+
+            get_fu_name(state[i].fu_idx, name);
+            if (rob_vld[i])
+                ls = $sformatf("Rob[%2d]: {cpl:%b, hlt:%b}, %s, dst:%2d (%2d->%2d)",
+                    i,
+                    state[i].cpl,
+                    state[i].halt,
+                    // state[i].illegal,
+                    name,
+                    state[i].dst,
+                    state[i].t_old,
+                    state[i].tag
+                    // state[i].is_brch,
+                    // state[i].wr_mem,
+                    // state[i].rd_mem,
+                    // t_dup,
+                    // told_dup
+                );
+            else
+                ls = $sformatf("Rob[%2d]:", i);
+
+            get_fu_name(state[i+32].fu_idx, name);
+            if (rob_vld[i+32])
+                rs = $sformatf("Rob[%2d]: {cpl:%b, hlt:%b}, %s, dst:%2d (%2d->%2d),",
+                    i+32,
+                    state[i+32].cpl,
+                    state[i+32].halt,
+                    // state[i+32].illegal,
+                    name,
+                    state[i+32].dst,
+                    state[i+32].t_old,
+                    state[i+32].tag
+                    // state[i].is_brch,
+                    // state[i].wr_mem,
+                    // state[i].rd_mem,
+                    // t_dup,
+                    // told_dup
+                );
+            else
+                rs = $sformatf("Rob[%2d]:", i+32);
+
+           $display("%-50s | %-50s", ls, rs); 
+        end
+
+        $display("  | << ROB <<");
+    endtask
+`endif
 
 endmodule

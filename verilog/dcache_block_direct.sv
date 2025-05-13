@@ -667,26 +667,77 @@ module dcache_block (
 
   
     assign dbg = '{
-`ifdef DEBUG
-        mem_in_transaction_tag  : mem_in_transaction_tag,
-        mem_in_data             : mem_in_data,
-        mem_in_data_tag         : mem_in_data_tag,
-
-        mem_out_command : mem_out_command,
-        mem_out_addr    : mem_out_addr,
-        mem_out_data    : mem_out_data,
-
-        ld_in   : ld_in,
-        ld_out  : ld_out,
-
-        sq_in   : sq_in,
-        sq_out  : sq_out,
-
-        mshr    : mshr,
-`endif
         hdr     : hdr,
         memDP   : dbg_memDP
     };
+
+`ifdef DEBUG
+    task print_dcache;
+        $display("  | >> DCACHE >>");
+        $display("mem_in: {txn_tag: %2d, data_tag: %2d, data: %x}",
+            mem_in_transaction_tag,
+            mem_in_data_tag,
+            mem_in_data
+        );
+
+        $display("mem_ot: {cmd: %s, addr: %x, data: %x}",
+            dbg_mem_cmd(mem_out_command),
+            mem_out_addr,
+            mem_out_data
+        );
+
+        $display("ld_in: vld: %b, addr: 0x%x", ld_in.vld, ld_in.addr);
+        $display("ld_ot: status: %s, tag: %2d, dat: 0x%x, ldb: %x",
+            dbg_ld_status(ld_out.status),
+            ld_out.tag,
+            ld_out.dat,
+            ld_out.ldb
+        );
+
+        $display("sq_in: vld: %b, addr: 0x%x, size: %s, dat: %1d",
+            sq_in.vld,
+            sq_in.addr,
+            dbg_mem_size(sq_in.size),
+            sq_in.dat
+        );
+        $display("sq_ot: status: %s",
+            dbg_st_status(sq_out.status)
+        );
+
+        $display("");
+        $display("mshr: {");
+        $display("  status: %s\n  wr_mem: %b\n  miss_tag: %2d\n  addr: 0x%x\n  mem_data: 0x%x\n  mem_size: %s",
+            dbg_mshr_status(mshr.status),
+            mshr.wr_mem,
+            mshr.miss_tag,
+            mshr.addr,
+            mshr.mem_data,
+            dbg_mem_size(mshr.mem_size)
+        );
+        $display("}");
+
+        $display("");
+        for (int s = 0; s < NUM_SETS; ++s) begin
+            $display("set[%2d]:", s);
+            for (int w = 0; w < ASSOC; ++w) begin
+                if (!hdr.vld[s][w]) begin
+                    $display("  blk[%1d]: ", w);
+                    continue;
+                end
+                $display("  blk[%1d]: {vld: %b, dirty: %b, tag: 0x%x} data: %x, (addr: 0x%x)",
+                    w,
+                    hdr.vld     [s][w],
+                    hdr.dirty   [s][w],
+                    hdr.tag     [s][w],
+                    dbg_memDP   [s][w],
+                    {hdr.tag[s][w], SID'(s), 3'b000}
+                );
+            end
+        end
+
+        $display("  | << DCACHE <<");
+    endtask
+`endif
 
 
 endmodule
