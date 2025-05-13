@@ -26,10 +26,6 @@ module dispatch #(parameter
     input   free_list2dispatch free_in,
     output  dispatch2free_list free_out,
 
-    // BTQ
-    input   btq2dispatch btq_in,
-    output  dispatch2btq btq_out,
-
     // CDB (completions)
     input   execute2complete_tag ctag_in,
 
@@ -97,9 +93,6 @@ module dispatch #(parameter
                 inst        : d_in.d_dat[i].inst,
                 fu_idx      : d_in.d_dat[i].fu_idx,
 
-                pred        : d_in.d_dat[i].pred,
-                pred_tgt    : d_in.d_dat[i].pred_tgt,
-
                 alu_func    : d_in.d_dat[i].alu_func,
                 opa_select  : d_in.d_dat[i].opa_select,
                 opb_select  : d_in.d_dat[i].opb_select,
@@ -109,6 +102,7 @@ module dispatch #(parameter
                 halt        : d_in.d_dat[i].halt,
                 illegal     : d_in.d_dat[i].illegal,
                 csr_op      : d_in.d_dat[i].csr_op,
+                btq_idx     : d_in.d_dat[i].btq_idx,
 
                 // alloc
                 t           : '0
@@ -153,32 +147,9 @@ module dispatch #(parameter
 
     /* >> ==== 2. Rename Stage ==== >> */
 
-    logic [`N-1:0] is_brch;
     always_comb begin
-        logic [$clog2(`N):0] lim_cnt_btq;
-        foreach(is_brch[i])
-            is_brch[i] = rename_in[i].fu_idx == FU_BRU;
-
         rename_en_cnt = alloc_vld_scnt;
-
-        lim_cnt_btq = 0;
-        for (int i = 0, int used_cnt = 0; i < `N; ++i) begin
-            if (used_cnt + is_brch[i] > btq_in.btq_rdy_scnt)
-                break;
-            used_cnt += is_brch[i];
-            ++lim_cnt_btq;
-        end
-        rename_en_cnt = `MIN(lim_cnt_btq, rename_en_cnt);
-
         rename_en_cnt = `MIN(rename_rdy_scnt, rename_en_cnt);
-    end
-
-    // handle btq output
-    always_comb begin
-        foreach(rename_en[i])
-            rename_en[i] = i < rename_en_cnt;
-
-        btq_out.en_cnt = $countones(rename_en & is_brch);
     end
 
     // handle map table output 
@@ -202,15 +173,8 @@ module dispatch #(parameter
     always_comb begin
         logic [`N-1:0] rd_src1s;
         logic [`N-1:0] rd_src2s;
-        logic [$clog2(`N):0] btq_wr_idx;
 
         tmp_alloc2rename = '0;
-        btq_wr_idx  = 0;
-
-        btq_out.PC          = '0;
-        btq_out.pred        = '0;
-        btq_out.pred_tgt    = '0;
-
         for (int i = 0; i < `N; ++i) begin
             // logic [$bits(RENAME_COMMIT_PKT)-$bits(ALLOC_RENAME_PKT)-1:0] diff;
             // diff = '0;
@@ -224,9 +188,6 @@ module dispatch #(parameter
                 inst        : rename_in[i].inst,
                 fu_idx      : rename_in[i].fu_idx,
 
-                pred        : rename_in[i].pred,
-                pred_tgt    : rename_in[i].pred_tgt,
-
                 alu_func    : rename_in[i].alu_func,
                 opa_select  : rename_in[i].opa_select,
                 opb_select  : rename_in[i].opb_select,
@@ -236,6 +197,7 @@ module dispatch #(parameter
                 halt        : rename_in[i].halt,
                 illegal     : rename_in[i].illegal,
                 csr_op      : rename_in[i].csr_op,
+                btq_idx     : rename_in[i].btq_idx,
 
                 // alloc
                 t           : rename_in[i].t,
@@ -244,8 +206,7 @@ module dispatch #(parameter
                 t1          : '0,
                 t2          : '0,
                 t1_rdy      : '0,
-                t2_rdy      : '0,
-                btq_idx     : '0
+                t2_rdy      : '0
             };
 
             tmp_alloc2rename[i].t       = map_out.ts[i];
@@ -261,15 +222,6 @@ module dispatch #(parameter
                 || rename_in[i].fu_idx == FU_STORE;
             tmp_alloc2rename[i].t1_rdy  = !rd_src1s[i];
             tmp_alloc2rename[i].t2_rdy  = !rd_src2s[i];
-
-            if (is_brch[i]) begin
-                tmp_alloc2rename[i].btq_idx  = btq_in.btq_idxs[btq_wr_idx];
-
-                btq_out.PC[btq_wr_idx]       = rename_in[i].PC;
-                btq_out.pred[btq_wr_idx]     = rename_in[i].pred;
-                btq_out.pred_tgt[btq_wr_idx] = rename_in[i].pred_tgt;
-                ++btq_wr_idx;
-            end
         end
     end
 
@@ -335,9 +287,6 @@ module dispatch #(parameter
                 inst        : commit_in[i].inst,
                 fu_idx      : commit_in[i].fu_idx,
 
-                pred        : commit_in[i].pred,
-                pred_tgt    : commit_in[i].pred_tgt,
-
                 alu_func    : commit_in[i].alu_func,
                 opa_select  : commit_in[i].opa_select,
                 opb_select  : commit_in[i].opb_select,
@@ -347,6 +296,7 @@ module dispatch #(parameter
                 halt        : commit_in[i].halt,
                 illegal     : commit_in[i].illegal,
                 csr_op      : commit_in[i].csr_op,
+                btq_idx     : commit_in[i].btq_idx,
 
                 // alloc
                 t           : commit_in[i].t,
@@ -356,7 +306,6 @@ module dispatch #(parameter
                 t2          : commit_in[i].t2,
                 t1_rdy      : commit_in[i].t1_rdy,
                 t2_rdy      : commit_in[i].t2_rdy,
-                btq_idx     : commit_in[i].btq_idx,
                 // commit
                 rob_idx     : '0
             };
@@ -415,8 +364,6 @@ module dispatch #(parameter
         rob_out,
         free_in,
         free_out,
-        btq_in,
-        btq_out,
         ctag_in,
         map_in,
         map_out

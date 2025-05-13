@@ -279,9 +279,6 @@ module stage_id_p4 (
 `endif
                 fu_idx      : tmp[i].fu_idx,
 
-                pred        : f_in.f_dat[i].pred,
-                pred_tgt    : f_in.f_dat[i].pred_tgt,
-
                 inst        : f_in.f_dat[i].inst,
                 PC          : f_in.f_dat[i].PC,
 
@@ -293,7 +290,8 @@ module stage_id_p4 (
                 cond_branch : tmp[i].cond_branch,
                 halt        : tmp[i].halt,
                 illegal     : tmp[i].illegal,
-                csr_op      : tmp[i].csr_op
+                csr_op      : tmp[i].csr_op,
+                btq_idx     : f_in.f_dat[i].btq_idx
             };
         end
 

@@ -24,6 +24,7 @@ module stage_if_p4 (
     output  fetch2decode d_out,
 
     input   btq2fetch   btq_in,
+    output  fetch2btq   btq_out,
 
     output  fetch2mem   mem_out,
     input   mem2fetch   mem_in
@@ -80,6 +81,10 @@ module stage_if_p4 (
     );
 
     always_comb begin
+        logic [$clog2(`N):0] lim_cnt_btq;
+        logic [`N-1:0] f_en;
+        logic [$clog2(`N):0] btq_wr_idx;
+
         // stop fetching beyond the first predicted taken branch
         f_cnt = 0;
         for (int i = 0; i < `N; ++i) begin
@@ -91,6 +96,15 @@ module stage_if_p4 (
             end
         end
 
+        lim_cnt_btq = 0;
+        for (int i = 0, int used_cnt = 0; i < `N; ++i) begin
+            if (used_cnt + is_brch[i] > btq_in.btq_rdy_scnt)
+                break;
+            used_cnt += is_brch[i];
+            ++lim_cnt_btq;
+        end
+        f_cnt = `MIN(lim_cnt_btq, f_cnt);
+
         for (int unsigned i = 0; i < `N; ++i) begin
             logic woff;
             woff = PC_n[i][0];
@@ -98,10 +112,29 @@ module stage_if_p4 (
             f_dat[i] = '{
                 inst    : mem_in.data[i].word_level[woff],
                 PC      : PC_n[i],
-                pred    : pred[i],
-                pred_tgt: pred_tgt[i]
+                btq_idx : '0 // filled below
             };
         end
+
+        // handle btq output
+        btq_out = '0;
+        btq_wr_idx = 0;
+        foreach (f_en[i])
+            f_en[i] = i < f_cnt;
+
+        btq_out.en_cnt = $countones(f_en & is_brch);
+        for (int i = 0; i < `N; ++i) begin
+            if (!is_brch[i])
+                continue;
+            f_dat[i].btq_idx  = btq_in.btq_idxs[btq_wr_idx];
+
+            btq_out.PC[btq_wr_idx]       = PC_n[i];
+            btq_out.pred[btq_wr_idx]     = pred[i];
+            btq_out.pred_tgt[btq_wr_idx] = pred_tgt[i];
+            ++btq_wr_idx;
+        end
+
+
     end
 
     fifo #(

@@ -379,12 +379,12 @@ typedef enum logic [2:0] {
  * IF_ID Packet:
  * Data exchanged from the IF to the ID stage
  */
+typedef logic [$clog2(`BTQ_SZ)-1:0] BTQ_IDX;
 typedef struct packed {
     INST  inst;
     WADDR PC;
 
-    logic   pred;
-    WADDR   pred_tgt;
+    BTQ_IDX btq_idx;
 } IF_ID_PACKET;
 
 /**
@@ -441,7 +441,6 @@ typedef struct packed {
 
 // BTQ stuff
 // By btq
-typedef logic [$clog2(`BTQ_SZ)-1:0] BTQ_IDX;
 typedef struct packed {
 
     WADDR   PC;
@@ -463,11 +462,6 @@ typedef struct packed {
     WADDR pc;
     WADDR tgt;
 } puq2btb;
-
-typedef struct packed {
-    logic   [$clog2(`N):0]  btq_rdy_scnt;
-    BTQ_IDX [`N-1:0]        btq_idxs;
-} btq2dispatch;
 
 typedef struct packed {
     logic   [$clog2(`N):0]  btq_used_scnt;
@@ -498,18 +492,6 @@ typedef struct packed {
     logic        [`N-1:0]   halt;
     logic        [`N-1:0]   illegal;
 } retire_final;
-
-typedef struct packed {
-    /* Alloc */
-    /* Rename */
-    /* Commit */
-    logic   [$clog2(`N):0] en_cnt;
-        // How many branch instructions dispatching?
-        // Sender must ensure branch insns packed to lowest indices.
-    WADDR   [`N-1:0]    PC;
-    WADDR   [`N-1:0]    pred_tgt;
-    logic   [`N-1:0]    pred;
-} dispatch2btq;
 
 // Reservation station stuff
 parameter RS_ALU_SZ     = 8;
@@ -610,9 +592,6 @@ typedef struct packed {
     INST            inst;
     FU_IDX          fu_idx;
 
-    logic           pred;
-    WADDR           pred_tgt;
-
     ALU_FUNC        alu_func;   // ALU function select (ALU_xxx *)
     ALU_OPA_SELECT  opa_select; // ALU opa mux select (ALU_OPA_xxx *)
     ALU_OPB_SELECT  opb_select; // ALU opb mux select (ALU_OPB_xxx *)
@@ -622,6 +601,7 @@ typedef struct packed {
     logic           halt;       // Is this a halt?
     logic           illegal;    // Is this instruction illegal?
     logic           csr_op;     // Is this a CSR operation? (we only used this as a cheap way to get return code)
+    BTQ_IDX         btq_idx;
 } ID_RESULT;
 
 typedef struct packed {
@@ -633,9 +613,6 @@ typedef struct packed {
     INST            inst;
     FU_IDX          fu_idx;
 
-    logic           pred;
-    WADDR           pred_tgt;
-
     ALU_FUNC        alu_func;   // ALU function select (ALU_xxx *)
     ALU_OPA_SELECT  opa_select; // ALU opa mux select (ALU_OPA_xxx *)
     ALU_OPB_SELECT  opb_select; // ALU opb mux select (ALU_OPB_xxx *)
@@ -645,6 +622,7 @@ typedef struct packed {
     logic           halt;       // Is this a halt?
     logic           illegal;    // Is this instruction illegal?
     logic           csr_op;     // Is this a CSR operation? (we only used this as a cheap way to get return code)
+    BTQ_IDX         btq_idx;
 
     // alloc
     PHYS_REG_IDX    t;
@@ -659,9 +637,6 @@ typedef struct packed {
     INST            inst;
     FU_IDX          fu_idx;
 
-    logic           pred;
-    WADDR           pred_tgt;
-
     ALU_FUNC        alu_func;   // ALU function select (ALU_xxx *)
     ALU_OPA_SELECT  opa_select; // ALU opa mux select (ALU_OPA_xxx *)
     ALU_OPB_SELECT  opb_select; // ALU opb mux select (ALU_OPB_xxx *)
@@ -671,6 +646,7 @@ typedef struct packed {
     logic           halt;       // Is this a halt?
     logic           illegal;    // Is this instruction illegal?
     logic           csr_op;     // Is this a CSR operation? (we only used this as a cheap way to get return code)
+    BTQ_IDX         btq_idx;
 
     // alloc
     PHYS_REG_IDX    t;
@@ -680,7 +656,6 @@ typedef struct packed {
     PHYS_REG_IDX    t2;
     logic           t1_rdy;
     logic           t2_rdy;
-    BTQ_IDX         btq_idx;
 } RENAME_COMMIT_PKT;
 
 typedef struct packed {
@@ -692,9 +667,6 @@ typedef struct packed {
     INST            inst;
     FU_IDX          fu_idx;
 
-    logic           pred;
-    WADDR           pred_tgt;
-
     ALU_FUNC        alu_func;   // ALU function select (ALU_xxx *)
     ALU_OPA_SELECT  opa_select; // ALU opa mux select (ALU_OPA_xxx *)
     ALU_OPB_SELECT  opb_select; // ALU opb mux select (ALU_OPB_xxx *)
@@ -704,6 +676,7 @@ typedef struct packed {
     logic           halt;       // Is this a halt?
     logic           illegal;    // Is this instruction illegal?
     logic           csr_op;     // Is this a CSR operation? (we only used this as a cheap way to get return code)
+    BTQ_IDX         btq_idx;
 
     // alloc
     PHYS_REG_IDX    t;
@@ -713,7 +686,6 @@ typedef struct packed {
     PHYS_REG_IDX    t2;
     logic           t1_rdy;
     logic           t2_rdy;
-    BTQ_IDX         btq_idx;
     // commit
     ROB_IDX         rob_idx;
 } COMMIT_RS_PKT; // purely combinational
@@ -732,9 +704,21 @@ typedef struct packed {
 } fetch2decode;
 
 typedef struct packed {
+    logic   [$clog2(`N):0]  btq_rdy_scnt;
+    BTQ_IDX [`N-1:0]        btq_idxs;
+
     logic       puq_en;
     PUQ_ENTRY   puq_dat;
 } btq2fetch;
+
+typedef struct packed {
+    logic   [$clog2(`N):0] en_cnt;
+        // How many branch instructions dispatching?
+        // Sender must ensure branch insns packed to lowest indices.
+    WADDR   [`N-1:0]    PC;
+    WADDR   [`N-1:0]    pred_tgt;
+    logic   [`N-1:0]    pred;
+} fetch2btq;
 
 typedef struct packed {
     WADDR [`N-1:0] pc;
@@ -1023,8 +1007,6 @@ typedef struct packed {
     dispatch2rob rob_out;
     free_list2dispatch free_in;
     dispatch2free_list free_out;
-    btq2dispatch btq_in;
-    dispatch2btq btq_out;
     execute2complete_tag ctag_in;
     map_table2dispatch map_in;
     dispatch2map_table map_out;
@@ -1040,8 +1022,6 @@ typedef struct packed {
     retire2btq           r_in;
     btq2retire           r_out;
     execute2btq          ex_in;
-    dispatch2btq         d_in;
-    btq2dispatch         d_out;
 } DBG_btq;
 
 typedef struct packed {

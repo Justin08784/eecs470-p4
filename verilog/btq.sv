@@ -19,14 +19,11 @@ module btq #(
     // complete (write)
     input  execute2btq  ex_in,
 
-    // fetch (bp update)
-    output btq2fetch    f_out,
-
-    // dispatch (write)
-    input  dispatch2btq d_in,
-    output btq2dispatch d_out
+    // fetch
+    input  fetch2btq    f_in,
+    output btq2fetch    f_out
 );
-    localparam NUM_DPORTS = N; // dispatch ports (in-order)
+    localparam NUM_FPORTS = N; // fetch ports (in-order)
     localparam NUM_RPORTS = N; // retire ports (in-order)
     localparam NUM_CPORTS = `NUM_FU_BRU; // complete ports (*OUT-OF-ORDER*)
 
@@ -38,40 +35,38 @@ module btq #(
     logic [$clog2(BTQ_SZ):0]    free;
     assign free = BTQ_SZ - used;
 
-    logic [$clog2(NUM_DPORTS):0]    wr_cnt;
+    logic [$clog2(NUM_FPORTS):0]    wr_cnt;
     logic [$clog2(NUM_RPORTS):0]    rd_cnt;
-    assign wr_cnt = d_in.en_cnt;
+    assign wr_cnt = f_in.en_cnt;
     assign rd_cnt = r_in.rd_cnt;
 
     logic [NUM_RPORTS-1:0][$clog2(BTQ_SZ)-1:0] r_idxs;
-    logic [NUM_DPORTS-1:0][$clog2(BTQ_SZ)-1:0] d_idxs;
+    logic [NUM_FPORTS-1:0][$clog2(BTQ_SZ)-1:0] f_idxs;
     always_comb begin
         for (int unsigned i = 0; i < NUM_RPORTS; ++i)
             r_idxs[i] = (head + i) % BTQ_SZ;
-        for (int unsigned i = 0; i < NUM_DPORTS; ++i)
-            d_idxs[i] = (tail + i) % BTQ_SZ;
+        for (int unsigned i = 0; i < NUM_FPORTS; ++i)
+            f_idxs[i] = (tail + i) % BTQ_SZ;
 
         // handle retire (outs)
         r_out.btq_used_scnt = `MIN(used, NUM_RPORTS);
         for (int unsigned i = 0; i < NUM_RPORTS; ++i)
             r_out.dat[i] = state[r_idxs[i]];
 
-        // handle dispatch (outs)
+        // handle fetch (outs)
         /*
         TODO: This tradeoff needs consideration for performance
         Option 1: 
-        d_out.btq_rdy_scnt = `MIN(free + rd_cnt, NUM_DPORTS);
-        + avoids dispatch stalls when BTQ is full if N branches retire per cycle
+        f_out.btq_rdy_scnt = `MIN(free + rd_cnt, NUM_FPORTS);
+        + avoids fetch stalls when BTQ is full if N branches retire per cycle
         - longer combinational delay due to dependency on rd_cnt
 
         Option 2: 
-        d_out.btq_rdy_scnt = `MIN(free, NUM_DPORTS);
+        f_out.btq_rdy_scnt = `MIN(free, NUM_FPORTS);
         (opposite of above points)
         */
-        d_out = '{
-            btq_rdy_scnt : `MIN(free, NUM_DPORTS),
-            btq_idxs     : d_idxs
-        };
+        f_out.btq_rdy_scnt = `MIN(free, NUM_FPORTS);
+        f_out.btq_idxs     = f_idxs;
     end
 
     logic puq_empty;
@@ -132,16 +127,16 @@ module btq #(
                 state[idx].take <= ex_in.dat[i].take;
             end
 
-            // handle dispatch (ins)
-            for (int i = 0, int idx = 0; i < NUM_DPORTS; ++i) begin
-                idx = d_idxs[i];
+            // handle fetch (ins)
+            for (int i = 0, int idx = 0; i < NUM_FPORTS; ++i) begin
+                idx = f_idxs[i];
                 if (i >= wr_cnt)
                     continue;
 
                 state[idx] <= '{
-                    PC      : d_in.PC[i],
-                    pred    : d_in.pred[i],
-                    pred_tgt: d_in.pred_tgt[i],
+                    PC      : f_in.PC[i],
+                    pred    : f_in.pred[i],
+                    pred_tgt: f_in.pred_tgt[i],
 
                     take    : '0,
                     tgt     : '0
@@ -159,8 +154,8 @@ module btq #(
         r_in,
         r_out,
         ex_in,
-        d_in,
-        d_out
+        f_in,
+        f_out
     };
 `endif
 
