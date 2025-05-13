@@ -153,9 +153,7 @@ module btq #(
         used,
         r_in,
         r_out,
-        ex_in,
-        f_in,
-        f_out
+        ex_in
     };
 `endif
 

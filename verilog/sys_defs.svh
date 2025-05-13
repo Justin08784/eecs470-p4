@@ -72,7 +72,7 @@
 
 `ifndef SYNTH
 // comment out to disable DEBUG:
-// `define DEBUG
+`define DEBUG
 // comment to disable clock cycle print
 // `define CYCLE_PRINT
 `endif
@@ -1104,31 +1104,19 @@ typedef struct packed {
 // OPTIONAL: Print our your data here
 // It will go to the $program.log file
 function print_id_result(input ID_RESULT x);
-    $display("ID_RESULT: id=%3d t=%2d t1=%2d t2=%2d t1_rdy=%b t2_rdy=%b fu_idx=%2d rob_idx=%2d btq_idx=%2d is_brch:%b inst=%h PC=%h opa_select=%1d opb_select=%1d dest_reg_idx=%2d alu_func=%1d mult=%b rd_mem=%b wr_mem=%b cond_branch=%b uncond_branch=%b halt=%b illegal=%b csr_op=%b",
+    $display("ID_RESULT: id=%3d PC=%h fu_idx=%2d inst=%h opa_select=%1d opb_select=%1d alu_func=%1d cond_branch=%b halt=%b illegal=%b csr_op=%b btq_idx=%2d ",
         x.id,
-        x.t,
-        x.t1,
-        x.t2,
-        x.t1_rdy,
-        x.t2_rdy,
-        x.fu_idx,
-        x.rob_idx,
-        x.btq_idx,
-        x.is_brch,
-        x.inst,
         x.PC,
+        x.fu_idx,
+        x.inst,
         x.opa_select,
         x.opb_select,
-        x.dest_reg_idx,
         x.alu_func,
-        x.mult,
-        x.rd_mem,
-        x.wr_mem,
         x.cond_branch,
-        x.uncond_branch,
         x.halt,
         x.illegal,
-        x.csr_op
+        x.csr_op,
+        x.btq_idx
     );
 endfunction
 

@@ -564,8 +564,6 @@ module testbench;
         retire2btq           r_in;
         btq2retire           r_out;
         execute2btq          ex_in;
-        dispatch2btq         d_in;
-        btq2dispatch         d_out;
 
         state   = dbg_btq.state;
         head    = dbg_btq.head;
@@ -574,8 +572,6 @@ module testbench;
         r_in    = dbg_btq.r_in;
         r_out   = dbg_btq.r_out;
         ex_in   = dbg_btq.ex_in;
-        d_in    = dbg_btq.d_in;
-        d_out   = dbg_btq.d_out;
 
         $display(">> BTQ >>");
         for (int i = 0; i < `BTQ_SZ; ++i) begin
@@ -731,8 +727,6 @@ module testbench;
         dispatch2rob          rob_out;
         free_list2dispatch    free_in;
         dispatch2free_list    free_out;
-        btq2dispatch          btq_in;
-        dispatch2btq          btq_out;
         execute2complete_tag  ctag_in;
         map_table2dispatch    map_in;
         dispatch2map_table    map_out;
@@ -745,15 +739,13 @@ module testbench;
         rob_out    = dbg_dispatch.rob_out;
         free_in    = dbg_dispatch.free_in;
         free_out   = dbg_dispatch.free_out;
-        btq_in     = dbg_dispatch.btq_in;
-        btq_out    = dbg_dispatch.btq_out;
         ctag_in    = dbg_dispatch.ctag_in;
         map_in     = dbg_dispatch.map_in;
         map_out    = dbg_dispatch.map_out;
 
         $display("  %3d | >> Dispatch >>", $time);
-        $display("r_in.btq_rdy_scnt: %d",   btq_in.btq_rdy_scnt);
-        $display("btq_in.btq_rdy_scnt: %d",   btq_in.btq_rdy_scnt);
+        // $display("r_in.btq_rdy_scnt: %d",   btq_in.btq_rdy_scnt);
+        // $display("btq_in.btq_rdy_scnt: %d",   btq_in.btq_rdy_scnt);
         $display("rob_in.rob_rdy_scnt: %d",  rob_in.rob_rdy_scnt);
         $display("decode_in.d_vld_scnt: %d",  decode_in.d_vld_scnt);
         $display("free_in.free_rdy_scnt: %d [%d, %d]",  free_in.free_rdy_scnt, free_in.d_ts[0], free_in.d_ts[1]);
@@ -831,16 +823,6 @@ module testbench;
         ex_out  = dbg_prf.ex_out;
     endtask
 
-    function get_rob_fu_name(input ROB_ENTRY entry, output string name);
-        if (entry.is_brch) 
-            name = "BRU";
-        else if (entry.wr_mem)
-            name = "STR";
-        else if (entry.rd_mem)
-            name = "LOD";
-        else
-            name = "INT";
-    endfunction
     task print_rob;
         ROB_ENTRY [`ROB_SZ-1:0]     state;
         logic [$clog2(`ROB_SZ)-1:0]  head;
@@ -882,14 +864,16 @@ module testbench;
         );
         $display("r_out: vld_cnt: %d", r_out.r_vld_cnt);
         for (int i = 0; i < `N; ++i) begin
-            $display("r_out[%d]: tag: %d, t_old: %d, dst: %d, halt: %d, illegal: %d, is_brch: %d",
+            string name;
+            get_fu_name(r_out.entries[i].fu_idx, name);
+            $display("r_out[%d]: tag: %d, t_old: %d, dst: %d, fu_idx: %s, halt: %d, illegal: %d",
                 i,
                 r_out.entries[i].tag,
                 r_out.entries[i].t_old,
                 r_out.entries[i].dst,
+                name,
                 r_out.entries[i].halt,
-                r_out.entries[i].illegal,
-                r_out.entries[i].is_brch
+                r_out.entries[i].illegal
             );
         end
 
@@ -913,7 +897,7 @@ module testbench;
                     told_dup |= 1;
             end
 
-            get_rob_fu_name(state[i], name);
+            get_fu_name(state[i].fu_idx, name);
             if (rob_vld[i])
                 ls = $sformatf("Rob[%2d]: {cpl:%b, hlt:%b}, %s, dst:%2d (%2d->%2d)",
                     i,
@@ -933,7 +917,7 @@ module testbench;
             else
                 ls = $sformatf("Rob[%2d]:", i);
 
-            get_rob_fu_name(state[i+32], name);
+            get_fu_name(state[i+32].fu_idx, name);
             if (rob_vld[i+32])
                 rs = $sformatf("Rob[%2d]: {cpl:%b, hlt:%b}, %s, dst:%2d (%2d->%2d),",
                     i+32,
@@ -1173,13 +1157,13 @@ module testbench;
         end
 
         for (int i = 0; i < `NUM_FU_ALU; ++i) begin
-            $display("regs.o_dat.alu[%0d]: bsy: %b, rs1: 0x%x, rs2: 0x%x t: %2d, rob_idx: %2d",
+            $display("regs.o_dat.alu[%0d]: bsy: %b, rs1: 0x%x, opb: 0x%x t: %2d, rob_idx: %2d",
                 i,
                 dbg_execute.regs.o_vld.alu[i],
                 dbg_execute.regs.o_dat.alu[i].rs1,
-                dbg_execute.regs.o_dat.alu[i].rs2,
-                dbg_execute.regs.o_dat.alu[i].dat.t,
-                dbg_execute.regs.o_dat.alu[i].dat.rob_idx
+                dbg_execute.regs.o_dat.alu[i].opb,
+                dbg_execute.regs.o_dat.alu[i].t,
+                dbg_execute.regs.o_dat.alu[i].rob_idx
             );
         end
 
@@ -1189,8 +1173,8 @@ module testbench;
                 dbg_execute.regs.o_vld.mul[i],
                 dbg_execute.regs.o_dat.mul[i].rs1,
                 dbg_execute.regs.o_dat.mul[i].rs2,
-                dbg_execute.regs.o_dat.mul[i].dat.t,
-                dbg_execute.regs.o_dat.mul[i].dat.rob_idx
+                dbg_execute.regs.o_dat.mul[i].t,
+                dbg_execute.regs.o_dat.mul[i].rob_idx
             );
         end
 
