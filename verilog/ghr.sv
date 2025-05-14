@@ -70,7 +70,7 @@ module ghr #(
     always_ff @(posedge clock) begin
         if (reset) begin
             rslv <= '1;
-            hist <= (DEPTH)'hACE1; // heuristic seed to avoid cold start
+            hist <= 'hACE1; // heuristic seed to avoid cold start
             base <= DEPTH-1;
 
         end else if (flush) begin
