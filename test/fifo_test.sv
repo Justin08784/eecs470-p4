@@ -84,6 +84,7 @@ module fifo_test();
     ) dut (
         .clock      (clock),
         .reset      (reset),
+        .flush      ('0),
         .wr_en_cnt  (wr_en_cnt),
         .wr_data    (wr_data),
         .rd_en_cnt  (rd_en_cnt),

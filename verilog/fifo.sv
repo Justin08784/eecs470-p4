@@ -74,12 +74,42 @@ module fifo #(
     logic [$clog2(DEPTH)-1:0]       tail;
     logic [DEPTH-1:0][WIDTH-1:0]    state;
     logic [$clog2(DEPTH):0]         used, free;
-
     logic [NUM_RPORTS-1:0][$clog2(DEPTH)-1:0] rd_idxs;
     logic [NUM_WPORTS-1:0][$clog2(DEPTH)-1:0] wr_idxs;
 
-    assign free         = DEPTH - used;
-    assign free_scnt    = `MIN(free, NUM_WPORTS);
+    ring_ctr #(
+        .DEPTH(DEPTH),
+        .WIDTH(WIDTH),
+        .RPORTS(NUM_RPORTS),
+        .WPORTS(NUM_WPORTS),
+        .FLUSH_MODE(FLUSH_MODE),
+        .INSTANCE_ID(INSTANCE_ID),
+        .RESET_STATE('{
+            head : RESET_STATE.head,
+            tail : RESET_STATE.tail,
+            used : RESET_STATE.used
+        })
+    ) ring_ctr0 (
+        .clock,
+        .reset,
+        .flush,
+        .flush_tail,
+
+        .rd_en_cnt,
+        .wr_en_cnt,
+
+        .head,
+        .tail,
+        .rd_idxs,
+        .wr_idxs,
+
+        .used,
+        .free,
+        .used_scnt(), // DO NOT wire. Will compute this ourselves.
+        .free_scnt
+
+    );
+
     assign used_scnt    = ENABLE_INTR_FWD 
         ? `MIN(used + wr_en_cnt, NUM_RPORTS)
         : `MIN(used, NUM_RPORTS);
@@ -88,10 +118,6 @@ module fifo #(
 
     logic [NUM_RPORTS-1:0] fwd_dat;
     always_comb begin
-        for (int i = 0; i < NUM_RPORTS; ++i)
-            rd_idxs[i] = incr(head, i);
-        for (int i = 0; i < NUM_WPORTS; ++i)
-            wr_idxs[i] = incr(tail, i);
         for (int i = 0; i < NUM_RPORTS; ++i)
             fwd_dat[i] = i >= used && ENABLE_INTR_FWD;
 
@@ -108,26 +134,16 @@ module fifo #(
 
     always_ff @(posedge clock) begin
         if (reset) begin
-            used    <= RESET_STATE.used;
-            head    <= RESET_STATE.head;
-            tail    <= RESET_STATE.tail;
             state   <= RESET_STATE.state;
         end else if (flush) begin
             unique case (FLUSH_MODE)
             FIFO_FLUSH_HEAD: begin
-                used    <= DEPTH;
-                tail    <= head;
             end
 
             FIFO_FLUSH_CHECK: begin
-                used    <= used - distance(flush_tail, tail);
-                tail    <= flush_tail;
             end
 
             default: begin
-                used    <= RESET_STATE.used;
-                head    <= RESET_STATE.head;
-                tail    <= RESET_STATE.tail;
                 state   <= RESET_STATE.state;
             end
             endcase
@@ -136,9 +152,6 @@ module fifo #(
                 $error("FIFO overflow! instance: %d", INSTANCE_ID);
             if (rd_en_cnt > (ENABLE_INTR_FWD ? used + wr_en_cnt : used))
                 $error("FIFO underflow! instance: %d", INSTANCE_ID);
-            used    <= used + wr_en_cnt - rd_en_cnt;
-            head    <= incr(head, rd_en_cnt);
-            tail    <= incr(tail, wr_en_cnt);
             for (int unsigned i = 0; i < NUM_WPORTS; ++i) begin
                 if (i >= wr_en_cnt) // suppresses oob index warning
                     continue;

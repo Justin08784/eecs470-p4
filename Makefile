@@ -213,7 +213,7 @@ build/rob.simv: $(ROB_FILES)
 build/rob.cov: $(ROB_FILES)
 synth/rob.vg: $(ROB_FILES)
 
-FIFO_FILES = verilog/sys_defs.svh
+FIFO_FILES = verilog/sys_defs.svh verilog/ring_ctr.sv
 build/fifo.simv: $(FIFO_FILES)
 build/fifo.cov: $(FIFO_FILES)
 synth/fifo.vg: $(FIFO_FILES)

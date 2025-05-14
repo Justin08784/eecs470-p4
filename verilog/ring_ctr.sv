@@ -1,10 +1,10 @@
 // pointer engine for fifos/ring buffers. no data storage
-module ring_ptr #(
+module ring_ctr #(
     parameter int DEPTH=2,
     parameter int WIDTH=1,
     parameter int RPORTS=1,
     parameter int WPORTS=1,
-    parameter int FLUSH_MODE=RING_FLUSH_RESET,
+    parameter int FLUSH_MODE=FIFO_FLUSH_RESET,
     type PTR = logic [$clog2(DEPTH)-1:0],
     type CNT = logic [$clog2(DEPTH):0],
     type RING_PTR_STATE = struct packed {
@@ -25,8 +25,8 @@ module ring_ptr #(
 
     output  PTR     head,
     output  PTR     tail,
-    output  logic   [RPORTS-1:0]        rd_idxs,
-    output  logic   [WPORTS-1:0]        wr_idxs,
+    output  PTR     [RPORTS-1:0]        rd_idxs,
+    output  PTR     [WPORTS-1:0]        wr_idxs,
 
     output  CNT     used,
     output  CNT     free,
@@ -54,6 +54,15 @@ module ring_ptr #(
             wr_idxs[i] = incr(tail, i);
     end
 
+    initial begin
+        $display("id:%d, head: %d, tail: %d, used: %d",
+        INSTANCE_ID,
+        RESET_STATE.head,
+        RESET_STATE.tail,
+        RESET_STATE.used
+        );
+    end
+
     always_ff @(posedge clock) begin
         if (reset) begin
             used <= RESET_STATE.used;
@@ -62,12 +71,12 @@ module ring_ptr #(
 
         end else if (flush) begin
             unique case (FLUSH_MODE)
-            RING_FLUSH_HEAD: begin
+            FIFO_FLUSH_HEAD: begin
                 used <= DEPTH;
                 tail <= head;
             end
 
-            RING_FLUSH_CHECK: begin
+            FIFO_FLUSH_CHECK: begin
                 used <= used - distance(flush_tail, tail);
                 tail <= flush_tail;
             end

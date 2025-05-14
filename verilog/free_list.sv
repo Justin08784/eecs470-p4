@@ -128,6 +128,11 @@ module free_list #(parameter
         used = lst.used;
 
         $display("  | >> FL >>");
+        $display("head: %d, tail: %d, used: %d",
+        lst.head,
+        lst.tail,
+        lst.used
+        );
 
         fl_vld = '0;
         for (int cnt = 0; cnt < used; ++cnt)
