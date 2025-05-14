@@ -297,6 +297,7 @@ CPU_SOURCES = verilog/cpu.sv \
 			  verilog/prf.sv \
 			  verilog/free_list.sv \
 			  verilog/stage_id_p4.sv \
+			  verilog/ring_ctr.sv \
 			  verilog/fifo.sv \
 			  verilog/fetch.sv \
 			  verilog/execute.sv \
