@@ -805,6 +805,13 @@ typedef struct packed {
 } rs2dispatch;
 
 typedef struct packed {
+    logic bypass1;
+    logic bypass2;
+    logic [$clog2(`N)-1:0] cdb_idx1;
+    logic [$clog2(`N)-1:0] cdb_idx2;
+} BYPASS_TAG;
+
+typedef struct packed {
     /* Requested by issue arbiter 
     (only ALU needs gnt by CDB arbiter to 'en')*/
     logic [`NUM_FU_ALU-1:0] fu_vld_alu;
@@ -822,6 +829,9 @@ typedef struct packed {
     RS_ALU_PAYLOAD [`NUM_FU_STR-1:0] fu_dat_str;
     RS_ALU_PAYLOAD [`NUM_FU_LOD-1:0] fu_dat_lod;
     RS_BRU_PAYLOAD [`NUM_FU_BRU-1:0] fu_dat_bru;
+
+    BYPASS_TAG [`NUM_FU_ALU-1:0] bytag_alu;
+    BYPASS_TAG [`NUM_FU_BRU-1:0] bytag_bru;
 } rs2execute;
 
 // By ROB

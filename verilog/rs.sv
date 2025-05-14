@@ -66,6 +66,7 @@ module rs_part #(
     // ENTRY   [NUM_FU-1:0]    iss_dat;
     output logic   [NUM_FU-1:0] ex_out_fu_en,
     output PAYLOAD [NUM_FU-1:0] ex_out_fu_dat,
+    output BYPASS_TAG [NUM_FU-1:0] ex_out_bytag,
     /*
     * NOTE: causally, fu_rdy -> iss_vld -> cdb_gnt -> iss_en, iss_dat
     * */
@@ -146,6 +147,24 @@ module rs_part #(
         .gnt_bus(gbus_fu_rdy)
     );
 
+
+    function automatic BYPASS_TAG get_bytag (
+        input int rs
+    );
+        BYPASS_TAG tag = '0;
+        for (int n = 0; n < N; ++n) begin
+            if (to_t1_rdy_per_cpl[n][rs]) begin
+                tag.bypass1     |= 1; // TODO: What about zero reg? A matching zero reg should not count as a valid wakeup!
+                tag.cdb_idx1    |= n; // This should be okay. Two insns cannot have the same destination tag! There is a $fatal check for this in execute.sv
+            end
+            if (to_t2_rdy_per_cpl[n][rs]) begin
+                tag.bypass2     |= 1;
+                tag.cdb_idx2    |= n;
+            end
+        end
+        return tag;
+    endfunction
+
     // assign FUs to issuables
     logic [PART_SZ-1:0] to_issue;
     logic [NUM_FU-1:0][PART_SZ-1:0] fu2issuer;
@@ -176,9 +195,11 @@ module rs_part #(
 
     always_comb begin
         ex_out_fu_dat   = '0;
+        ex_out_bytag    = '0;
         foreach (fu2issuer[fu, rs]) begin
             if (fu2issuer[fu][rs]) begin // [MISSING] ms1 test: Remove "!" from if condition (not caught)
                 ex_out_fu_dat[fu] |= entries[rs].dat;
+                ex_out_bytag[fu]  |= get_bytag(rs);
             end
         end
     end
@@ -381,6 +402,7 @@ module rs #(parameter
         .ex_out_fu_vld  (ex_out.fu_vld_alu),
         .ex_out_fu_en   (ex_out.fu_en_alu),
         .ex_out_fu_dat  (ex_out.fu_dat_alu),
+        .ex_out_bytag   (ex_out.bytag_alu),
 
         .ctag_in(ctag_in)
     );
@@ -407,6 +429,7 @@ module rs #(parameter
         .ex_out_fu_vld  (),
         .ex_out_fu_en   (ex_out.fu_en_mul),
         .ex_out_fu_dat  (ex_out.fu_dat_mul),
+        .ex_out_bytag   (),
 
         .ctag_in(ctag_in)
     );
@@ -433,6 +456,7 @@ module rs #(parameter
         .ex_out_fu_vld  (ex_out.fu_vld_bru),
         .ex_out_fu_en   (ex_out.fu_en_bru),
         .ex_out_fu_dat  (ex_out.fu_dat_bru),
+        .ex_out_bytag   (ex_out.bytag_bru),
 
         .ctag_in(ctag_in)
     );

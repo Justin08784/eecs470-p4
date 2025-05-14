@@ -381,6 +381,7 @@ module stage_ex_p4 (
         */
         for (genvar i = 0; i < `NUM_FU_ALU; ++i) begin : gen_alu_sbufs
             assign iss.i_dat.alu[i] = '{
+                bytag   : rs_in.bytag_alu[i],
                 t       : rs_in.fu_dat_alu[i].t,
                 t1      : rs_in.fu_dat_alu[i].t1,
                 t2      : rs_in.fu_dat_alu[i].t2,
@@ -502,6 +503,7 @@ module stage_ex_p4 (
 
         for (genvar i = 0; i < `NUM_FU_BRU; ++i) begin : gen_bru_sbufs
             assign iss.i_dat.bru[i] = '{
+                bytag   : rs_in.bytag_bru[i],
                 t       : rs_in.fu_dat_bru[i].t,
                 t1      : rs_in.fu_dat_bru[i].t1,
                 t2      : rs_in.fu_dat_bru[i].t2,
@@ -587,12 +589,11 @@ module stage_ex_p4 (
             endcase
 
             regs.i_dat.alu[i] = '{
+                bytag : iss.o_dat.alu[i].bytag,
                 rs1 : prf_in.v1s.alu[i],
                 opb : opb_is_rs2
                     ? prf_in.v2s.alu[i]
                     : imm32b,
-                t1  : iss.o_dat.alu[i].t1,
-                t2  : iss.o_dat.alu[i].t2,
 
                 PC          : iss.o_dat.alu[i].PC,
                 opa_select  : iss.o_dat.alu[i].opa_select,
@@ -639,10 +640,9 @@ module stage_ex_p4 (
             endcase
 
             regs.i_dat.bru[i] = '{
+                bytag : iss.o_dat.bru[i].bytag,
                 rs1 : prf_in.v1s.bru[i],
                 rs2 : prf_in.v2s.bru[i],
-                t1  : iss.o_dat.bru[i].t1,
-                t2  : iss.o_dat.bru[i].t2,
 
                 PC          : iss.o_dat.bru[i].PC,
                 opa_select  : iss.o_dat.bru[i].opa_select,

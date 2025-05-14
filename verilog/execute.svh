@@ -11,6 +11,7 @@ typedef struct packed {
 
 /* Slices (or "views") of ID_RESULT needed for each FU type */
 typedef struct packed {
+    BYPASS_TAG      bytag;
     PHYS_REG_IDX    t;
     PHYS_REG_IDX    t1;
     PHYS_REG_IDX    t2;
@@ -63,6 +64,7 @@ typedef struct packed {
 } ID_STR_VIEW;
 
 typedef struct packed {
+    BYPASS_TAG      bytag;
     PHYS_REG_IDX    t;
     PHYS_REG_IDX    t1;
     PHYS_REG_IDX    t2;
@@ -77,13 +79,12 @@ typedef struct packed {
 } ID_BRU_VIEW;
 
 typedef struct packed {
+    BYPASS_TAG      bytag;
     DATA            rs1;
     union packed {
         DATA    rs2;
         DATA    imm32b;
     } opb;
-    PHYS_REG_IDX    t1;
-    PHYS_REG_IDX    t2;
 
     WADDR           PC;
     ALU_OPA_SELECT  opa_select;
@@ -114,10 +115,9 @@ typedef struct packed {
     ID_STR_VIEW dat;
 } STR_REGS;
 typedef struct packed {
+    BYPASS_TAG      bytag;
     DATA            rs1;
     DATA            rs2;
-    PHYS_REG_IDX    t1;
-    PHYS_REG_IDX    t2;
 
     WADDR           PC;
     ALU_OPA_SELECT  opa_select;
@@ -169,15 +169,10 @@ function automatic ALU_REGS alu_snoop(
     input execute2complete_dat cdat
 );
     ALU_REGS rv = v;
-    foreach (cdat.en[n]) begin
-        if (!cdat.en[n] || cdat.ts[n] == '0)
-            continue;
-        if (rv.t1 == cdat.ts[n])
-            rv.rs1 = cdat.data[n];
-        if (rv.opb_is_rs2
-        && (rv.t2 == cdat.ts[n]))
-            rv.opb = cdat.data[n];
-    end
+    if (rv.bytag.bypass1)
+        rv.rs1 = cdat.data[rv.bytag.cdb_idx1];
+    if (rv.bytag.bypass2 && rv.opb_is_rs2)
+        rv.opb = cdat.data[rv.bytag.cdb_idx2];
     return rv;
 endfunction
 
@@ -232,14 +227,10 @@ function automatic BRU_REGS bru_snoop(
     input execute2complete_dat cdat
 );
     BRU_REGS rv = v;
-    foreach (cdat.en[n]) begin
-        if (!cdat.en[n] || cdat.ts[n] == '0)
-            continue;
-        if (rv.t1 == cdat.ts[n])
-            rv.rs1 = cdat.data[n];
-        if (rv.t2 == cdat.ts[n])
-            rv.rs2 = cdat.data[n];
-    end
+    if (rv.bytag.bypass1)
+        rv.rs1 = cdat.data[rv.bytag.cdb_idx1];
+    if (rv.bytag.bypass2)
+        rv.rs2 = cdat.data[rv.bytag.cdb_idx2];
     return rv;
 endfunction
 
