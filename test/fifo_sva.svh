@@ -17,6 +17,7 @@ module fifo_sva #(
     },
     parameter int unsigned NUM_RPORTS, // also cap for used_scnt
     parameter int unsigned NUM_WPORTS, // also cap for free_scnt
+    parameter logic ENABLE_INTR_FWD =`FALSE,
     parameter FIFO_STATE RESET_STATE = '{default:0}
 ) (
     // inputs
@@ -145,7 +146,9 @@ module fifo_sva #(
 
         property used_scnt_correct;
             disable iff (reset)
-            used_scnt == used < NUM_RPORTS ? used : NUM_RPORTS;
+            used_scnt == (ENABLE_INTR_FWD
+                ? `MIN(used + wr_en_cnt, NUM_RPORTS)
+                : `MIN(used, NUM_RPORTS));
         endproperty
 
         property free_scnt_correct;

@@ -40,7 +40,6 @@ module fifo_test();
     logic   [NUM_RPORTS-1:0][WIDTH-1:0] rd_data;
     logic   [$clog2(NUM_WPORTS):0]      free_scnt;
     logic   [$clog2(NUM_RPORTS):0]      used_scnt;
-    logic   [$clog2(NUM_RPORTS):0]      prvw_vld_cnt;
     
     // Variable to count values written to FIFO
     int cnt;
@@ -61,7 +60,7 @@ module fifo_test();
     logic DEBUG = 1;
     always @(posedge clock) begin
         if (DEBUG) begin
-            $display("  %3d | d_in: [%d, %d]   wr_en_cnt: %d  rd_en_cnt: %d  |  d_out: [%d, %d]   used_scnt: %2d  free_scnt: %2d  prvw_vld_cnt: %0d",
+            $display("  %3d | d_in: [%d, %d]   wr_en_cnt: %d  rd_en_cnt: %d  |  d_out: [%d, %d]   used_scnt: %2d  free_scnt: %2d",
                 $time,
                 wr_en_cnt > 0 ? wr_data[0] : 0,
                 wr_en_cnt > 1 ? wr_data[1] : 0,
@@ -70,8 +69,7 @@ module fifo_test();
                 rd_data[0], 
                 rd_data[1], 
                 used_scnt, 
-                free_scnt,
-                prvw_vld_cnt);
+                free_scnt);
         end
     end
     
@@ -91,7 +89,6 @@ module fifo_test();
         .rd_en_cnt  (rd_en_cnt),
         .rd_data    (rd_data),
         .free_scnt  (free_scnt),
-        .prvw_vld_cnt(prvw_vld_cnt),
         .used_scnt  (used_scnt)
     );
 
@@ -99,7 +96,8 @@ module fifo_test();
         .DEPTH(DEPTH),
         .WIDTH(WIDTH),
         .NUM_RPORTS(NUM_RPORTS),
-        .NUM_WPORTS(NUM_WPORTS)
+        .NUM_WPORTS(NUM_WPORTS),
+        .ENABLE_INTR_FWD(`TRUE)
     ) sva (
         .clock      (clock),
         .reset      (reset),
@@ -112,6 +110,9 @@ module fifo_test();
     );
 
     initial begin
+        int used;
+        int free;
+
         $display("\nStart Testbench");
         clock = 0;
         reset = 1;
@@ -343,18 +344,36 @@ module fifo_test();
         // ---------- Test 16 ---------- //
         $display("\nTest 16: Randomized stress testing");
         DEBUG = 0; // disable debugs
+
+        used = 0;
+        free = DEPTH;
         for (int i = 0; i < 10000; ++i) begin
-            if (free_scnt < NUM_WPORTS) begin
-                wr_en_cnt = $urandom_range(`MIN(NUM_WPORTS, free_scnt + NUM_RPORTS), 0);
-            end else begin
-                wr_en_cnt = $urandom_range(NUM_WPORTS, 0);
+            int rd_min_cnt;
+            /*
+            write up to the port width, plus as many extra words as can be created
+            by a same-cycle read (at most NUM_RPORTS).
+
+            (you can intentionally overflow the current free space,
+            but never by more than what could be drained in the same cycle)
+            */
+            wr_en_cnt = $urandom_range(`MIN(free + NUM_RPORTS, NUM_WPORTS), 0);
+
+            /*
+            mandatory minimum number of reads to make space for writes (if more
+            writes were requested than available free slots) 
+            */
+            rd_min_cnt = free < wr_en_cnt ? wr_en_cnt - free : 0;
+            rd_en_cnt = $urandom_range(`MIN(used + wr_en_cnt, NUM_RPORTS), rd_min_cnt);
+
+            if ($urandom_range(10, 1) == 1) begin
+                // stall randomly
+                wr_en_cnt = 0;
+                rd_en_cnt = 0;
             end
 
-            if (free_scnt < wr_en_cnt) begin
-                rd_en_cnt = $urandom_range(`MIN(NUM_RPORTS, used_scnt + wr_en_cnt), wr_en_cnt - free_scnt);
-            end else begin
-                rd_en_cnt = $urandom_range(`MIN(NUM_RPORTS, used_scnt + wr_en_cnt), 0);
-            end
+            used += wr_en_cnt - rd_en_cnt;
+            free += rd_en_cnt - wr_en_cnt;
+
             @(negedge clock);
             wr_en_cnt = 0;
             rd_en_cnt = 0;
