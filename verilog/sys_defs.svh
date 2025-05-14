@@ -347,6 +347,12 @@ typedef enum logic [2:0] {
     M_MULHU
 } MUL_FUNC;
 
+typedef enum logic [0:1] {
+    FIFO_FLUSH_RESET = 0, // default
+    FIFO_FLUSH_HEAD  = 1, // wind tail to head
+    FIFO_FLUSH_CHECK = 2  // wind tail to checkpoint
+} FIFO_FLUSH_MODE;
+
 ////////////////////////////////
 // ---- Datapath Packets ---- //
 ////////////////////////////////

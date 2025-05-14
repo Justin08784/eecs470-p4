@@ -90,20 +90,16 @@ module free_list #(parameter
     end
    
 
-    FIFO_STATE dbg_fifo;
     fifo #(
         .INSTANCE_ID(0),
         .DEPTH(DEPTH),
         .WIDTH(WIDTH),
         .NUM_RPORTS(`N),
         .NUM_WPORTS(`N),
-        .ENABLE_FREE_LIST_MODE(`TRUE),
+        .FLUSH_MODE(FIFO_FLUSH_HEAD),
         .ENABLE_INTR_FWD(`FALSE),
         .RESET_STATE(RESET_STATE)
     ) lst (
-`ifdef DEBUG
-        .dbg(dbg_fifo),
-`endif
         .clock,
         .reset,
         .flush,
@@ -126,10 +122,10 @@ module free_list #(parameter
         logic [$clog2(DEPTH)-1:0]       tail;
         logic [DEPTH-1:0][WIDTH-1:0]    state;
         logic [$clog2(DEPTH):0]         used;
-        head = dbg_fifo.head;
-        tail = dbg_fifo.tail;
-        state= dbg_fifo.state;
-        used = dbg_fifo.used;
+        head = lst.head;
+        tail = lst.tail;
+        state= lst.state;
+        used = lst.used;
 
         $display("  | >> FL >>");
 

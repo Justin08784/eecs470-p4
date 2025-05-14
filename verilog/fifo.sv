@@ -1,17 +1,17 @@
 `include "sys_defs.svh"
 
 module fifo #(
-    parameter int unsigned DEPTH=`ROB_SZ,       // num elements
-    parameter int unsigned WIDTH=$bits(PHYS_REG_IDX),       // num bits per element
+    parameter int DEPTH=`ROB_SZ,            // num elements
+    parameter int WIDTH=$bits(PHYS_REG_IDX),// num bits per element
     type FIFO_STATE = struct packed {
-        logic [$clog2(DEPTH)-1:0] head;
-        logic [$clog2(DEPTH)-1:0] tail;
-        logic [DEPTH-1:0][WIDTH-1:0] state;
-        logic [$clog2(DEPTH):0]   used;
-        // logic [$clog2(DEPTH):0]   free;
+        logic [$clog2(DEPTH)-1:0]   head;
+        logic [$clog2(DEPTH)-1:0]   tail;
+        logic [DEPTH-1:0][WIDTH-1:0]state;
+        logic [$clog2(DEPTH):0]     used;
     },
-    parameter int unsigned NUM_RPORTS=`N, // also cap for used_scnt
-    parameter int unsigned NUM_WPORTS=`N, // also cap for free_scnt
+    parameter int FLUSH_MODE=FIFO_FLUSH_RESET,
+    parameter int NUM_RPORTS=`N, // also cap for used_scnt
+    parameter int NUM_WPORTS=`N, // also cap for free_scnt
 
     /* UPDATE: Prevew has been made the default mode! The consumer may read as
     many as they wish from rd_data. If they consume some rd_data they are obliged to
@@ -38,21 +38,19 @@ module fifo #(
     /*
     If free list mode is disabled, flush behaves the same as reset.
     */
-    parameter logic ENABLE_FREE_LIST_MODE=`FALSE,
     parameter int INSTANCE_ID=-1,
     parameter FIFO_STATE RESET_STATE='{default:0}
 ) (
-    output FIFO_STATE dbg,
     input                                           clock, 
     input                                           reset,
     input                                           flush,
+    input   logic   [$clog2(DEPTH)-1:0]             flush_tail,
 
     input   logic   [$clog2(NUM_WPORTS):0]          wr_en_cnt,
     input   logic   [NUM_WPORTS-1:0][WIDTH-1:0]     wr_data,
 
-    input   logic   [$clog2(NUM_RPORTS):0]          rd_en_cnt, //
+    input   logic   [$clog2(NUM_RPORTS):0]          rd_en_cnt,
     output  logic   [NUM_RPORTS-1:0][WIDTH-1:0]     rd_data,
-    output  logic   [$clog2(NUM_RPORTS):0]          prvw_vld_cnt, // how many entries "previewed" in rd_data are valid
 
     output  logic                                   empty,
     output  logic                                   full,
@@ -70,21 +68,13 @@ module fifo #(
     logic [NUM_RPORTS-1:0][$clog2(DEPTH)-1:0] rd_idxs;
     logic [NUM_WPORTS-1:0][$clog2(DEPTH)-1:0] wr_idxs;
 
-    assign dbg = '{
-        head:head,
-        tail:tail,
-        state:state,
-        used:used
-    };
-
     assign free         = DEPTH - used;
     assign free_scnt    = `MIN(free, NUM_WPORTS);
-    assign used_scnt    = `MIN(used, NUM_RPORTS);
+    assign used_scnt    = ENABLE_INTR_FWD 
+        ? `MIN(used + wr_en_cnt, NUM_RPORTS)
+        : `MIN(used, NUM_RPORTS);
     assign empty        = used == 0;
     assign full         = used == DEPTH;
-    assign prvw_vld_cnt = ENABLE_INTR_FWD 
-        ? `MIN(used + wr_en_cnt, NUM_RPORTS)
-        : used_scnt;
 
     // Version 1:
     // always_comb begin
@@ -111,16 +101,16 @@ module fifo #(
     // Version 2:
     logic [NUM_RPORTS-1:0] fwd_dat;
     always_comb begin
-        for (int unsigned i = 0; i < NUM_RPORTS; ++i)
+        for (int i = 0; i < NUM_RPORTS; ++i)
             rd_idxs[i] = (head + i) % DEPTH;
-        for (int unsigned i = 0; i < NUM_WPORTS; ++i)
+        for (int i = 0; i < NUM_WPORTS; ++i)
             wr_idxs[i] = (tail + i) % DEPTH;
-        for (int unsigned i = 0; i < NUM_RPORTS; ++i)
+        for (int i = 0; i < NUM_RPORTS; ++i)
             fwd_dat[i] = i >= used && ENABLE_INTR_FWD;
 
         // fwding logic
         for (int unsigned i = 0; i < NUM_RPORTS; ++i) begin
-            if (i >= prvw_vld_cnt) begin
+            if (i >= used_scnt) begin
                 rd_data[i] = '0;
             end else if (fwd_dat[i] && (i - used) < wr_en_cnt) begin
                 rd_data[i] = wr_data[i - used];
@@ -137,16 +127,26 @@ module fifo #(
             tail    <= RESET_STATE.tail;
             state   <= RESET_STATE.state;
         end else if (flush) begin
-            if (ENABLE_FREE_LIST_MODE) begin
-                // advance tail to head and mark entire FIFO as used (i.e. full with entries)
+            unique case (FLUSH_MODE)
+            FIFO_FLUSH_HEAD: begin
                 used    <= DEPTH;
                 tail    <= head;
-            end else begin
+            end
+
+            FIFO_FLUSH_CHECK: begin
+                logic [$clog2(DEPTH):0] diff;
+                diff    = (tail - flush_tail) % DEPTH;
+                used    <= used - diff;
+                tail    <= flush_tail;
+            end
+
+            default: begin
                 used    <= RESET_STATE.used;
                 head    <= RESET_STATE.head;
                 tail    <= RESET_STATE.tail;
                 state   <= RESET_STATE.state;
             end
+            endcase
         end else begin
             if (wr_en_cnt > (ENABLE_INTR_FWD ? free + rd_en_cnt : free))
                 $error("FIFO overflow! instance: %d", INSTANCE_ID);
