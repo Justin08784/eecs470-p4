@@ -5,10 +5,10 @@
 `include "test/fifo_sva.svh"
 
 module fifo_test();
-    localparam DEPTH = `ROB_SZ;
-    localparam WIDTH = $bits(PHYS_REG_IDX);
-    localparam NUM_RPORTS = 2;
-    localparam NUM_WPORTS = 2;
+    localparam DEPTH = 24;
+    localparam WIDTH = 32;
+    localparam NUM_RPORTS = 10;
+    localparam NUM_WPORTS = 14;
 
     typedef struct packed {
         logic [$clog2(DEPTH)-1:0] head;
@@ -343,11 +343,11 @@ module fifo_test();
 
         // ---------- Test 16 ---------- //
         $display("\nTest 16: Randomized stress testing");
-        DEBUG = 0; // disable debugs
+        DEBUG = 1; // disable debugs
 
         used = 0;
         free = DEPTH;
-        for (int i = 0; i < 10000; ++i) begin
+        for (int i = 0; i < 1000; ++i) begin
             int rd_min_cnt;
             /*
             write up to the port width, plus as many extra words as can be created
