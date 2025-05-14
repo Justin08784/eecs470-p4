@@ -572,18 +572,18 @@ module testbench;
             return;
 
         $display("  | >> CYCLE: %3d (t: %3d)", clock_count-1, $time);
-        print_btb();
-        print_fetch();
-        print_decode();
+        // print_btb();
+        // print_fetch();
+        // print_decode();
         print_rob();
         print_fl();
-        print_dispatch();
-        print_map_table();
-        print_prf();
-        print_btq();
+        // print_dispatch();
+        // print_map_table();
+        // print_prf();
+        // print_btq();
         print_rs();
-        print_execute();
-        print_dcache();
+        // print_execute();
+        // print_dcache();
         print_retire();
         $display("  | << CYCLE: %3d (t: %3d)", clock_count-1, $time);
 
