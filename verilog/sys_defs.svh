@@ -448,7 +448,6 @@ typedef struct packed {
 } puq2btb;
 
 typedef struct packed {
-    logic   [$clog2(`N):0]  btq_used_scnt;
     logic   [$clog2(`N):0]  puq_rdy_scnt;
     BTQ_ENTRY [`N-1:0]      dat;
 } btq2retire;

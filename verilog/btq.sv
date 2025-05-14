@@ -28,41 +28,43 @@ module btq #(
     logic [$clog2(BTQ_SZ)-1:0]  head;
     logic [$clog2(BTQ_SZ)-1:0]  tail;
     logic [$clog2(BTQ_SZ):0]    used;
-
     logic [$clog2(BTQ_SZ):0]    free;
-    assign free = BTQ_SZ - used;
-
-    logic [$clog2(NUM_FPORTS):0]    wr_cnt;
-    logic [$clog2(NUM_RPORTS):0]    rd_cnt;
-    assign wr_cnt = f_in.en_cnt;
-    assign rd_cnt = r_in.rd_cnt;
 
     logic [NUM_RPORTS-1:0][$clog2(BTQ_SZ)-1:0] r_idxs;
     logic [NUM_FPORTS-1:0][$clog2(BTQ_SZ)-1:0] f_idxs;
-    always_comb begin
-        for (int unsigned i = 0; i < NUM_RPORTS; ++i)
-            r_idxs[i] = (head + i) % BTQ_SZ;
-        for (int unsigned i = 0; i < NUM_FPORTS; ++i)
-            f_idxs[i] = (tail + i) % BTQ_SZ;
 
+    ring_ctr #(
+        .DEPTH(BTQ_SZ),
+        .WIDTH($bits(BTQ_ENTRY)),
+        .RPORTS(NUM_RPORTS),
+        .WPORTS(NUM_FPORTS),
+        .FLUSH_MODE(FIFO_FLUSH_RESET)
+    ) ring_ctr0 (
+        .clock,
+        .reset,
+        .flush,
+        .flush_tail ('0),
+
+        .rd_en_cnt  (r_in.rd_cnt),
+        .wr_en_cnt  (f_in.en_cnt),
+
+        .head,
+        .tail,
+        .rd_idxs    (r_idxs),
+        .wr_idxs    (f_idxs),
+
+        .used,
+        .free,
+        .used_scnt(),
+        .free_scnt(f_out.btq_rdy_scnt)
+    );
+
+    always_comb begin
         // handle retire (outs)
-        r_out.btq_used_scnt = `MIN(used, NUM_RPORTS);
         for (int unsigned i = 0; i < NUM_RPORTS; ++i)
             r_out.dat[i] = state[r_idxs[i]];
 
         // handle fetch (outs)
-        /*
-        TODO: This tradeoff needs consideration for performance
-        Option 1: 
-        f_out.btq_rdy_scnt = `MIN(free + rd_cnt, NUM_FPORTS);
-        + avoids fetch stalls when BTQ is full if N branches retire per cycle
-        - longer combinational delay due to dependency on rd_cnt
-
-        Option 2: 
-        f_out.btq_rdy_scnt = `MIN(free, NUM_FPORTS);
-        (opposite of above points)
-        */
-        f_out.btq_rdy_scnt = `MIN(free, NUM_FPORTS);
         f_out.btq_idxs     = f_idxs;
     end
 
@@ -90,7 +92,7 @@ module btq #(
         .clock      (clock),
         .reset      (reset),
         .flush      ('0),
-        .wr_en_cnt  (rd_cnt),
+        .wr_en_cnt  (r_in.rd_cnt),
         .wr_data    (tmp_puq_in),
         .rd_en_cnt  (f_out.puq_en),
         .rd_data    (f_out.puq_dat),
@@ -101,18 +103,12 @@ module btq #(
 
     always_ff @(posedge clock) begin
         if (reset || flush) begin
-            used    <= 0;
-            head    <= 0;
-            tail    <= 0;
             state   <= '0;
         end else begin
-            if (wr_cnt > free)
+            if (f_in.en_cnt > free)
                 $error("BTQ overflow!");
-            if (rd_cnt > used)
+            if (r_in.rd_cnt > used)
                 $error("BTQ underflow!");
-            used    <= used + wr_cnt - rd_cnt;
-            head    <= (head + rd_cnt) % BTQ_SZ;
-            tail    <= (tail + wr_cnt) % BTQ_SZ;
 
             // handle complete (ins)
             for (int i = 0, int idx = 0; i < NUM_CPORTS; ++i) begin
@@ -127,7 +123,7 @@ module btq #(
             // handle fetch (ins)
             for (int i = 0, int idx = 0; i < NUM_FPORTS; ++i) begin
                 idx = f_idxs[i];
-                if (i >= wr_cnt)
+                if (i >= f_in.en_cnt)
                     continue;
 
                 state[idx] <= '{
@@ -173,7 +169,6 @@ module btq #(
             );
         end
         $display("r_in: rd_cnt %d", r_in.rd_cnt);
-        $display("r_out: used_scnt: %0d", r_out.btq_used_scnt);
         for (int i = 0; i < `N; ++i) begin
             $display("r_out[%d]: tgt: %x, pred: %b, take: %b",
                 i,
