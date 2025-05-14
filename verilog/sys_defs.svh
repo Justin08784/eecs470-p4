@@ -40,6 +40,8 @@
 `define BRANCH_PRED_SZ xx
 `define LSQ_SZ 12
 `define SQ_RET_BUF_SZ 4
+parameter GHR_LEN = 8;
+`define NUM_BRANCH_CHECKPOINTS 8
 
 // functional units (you should decide if you want more or fewer types of FUs)
 `define NUM_FU_ALU 2
