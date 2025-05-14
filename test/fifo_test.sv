@@ -343,7 +343,7 @@ module fifo_test();
 
         // ---------- Test 16 ---------- //
         $display("\nTest 16: Randomized stress testing");
-        DEBUG = 1; // disable debugs
+        DEBUG = 0; // disable debugs
 
         used = 0;
         free = DEPTH;

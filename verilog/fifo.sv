@@ -60,6 +60,16 @@ module fifo #(
     /*NOTE: By removing rd_valid, wr_valid, we force the caller to make sure
     the enabled cnts are correct. */
 );
+    typedef logic [$clog2(DEPTH)-1:0] PTR;
+    function automatic PTR incr(input PTR ptr, input int unsigned step);
+        logic [$clog2(DEPTH):0] carry;
+        carry = ptr + step;
+        return (carry >= DEPTH) ? carry - DEPTH : carry[$bits(PTR)-1:0];
+    endfunction
+    function automatic PTR distance(input PTR x, input PTR y);
+        return (y >= x) ? (y - x) : (y + DEPTH - x);
+    endfunction
+
     logic [$clog2(DEPTH)-1:0]       head;
     logic [$clog2(DEPTH)-1:0]       tail;
     logic [DEPTH-1:0][WIDTH-1:0]    state;
@@ -76,43 +86,19 @@ module fifo #(
     assign empty        = used == 0;
     assign full         = used == DEPTH;
 
-    // Version 1:
-    // always_comb begin
-    //     for (int unsigned i = 0; i < NUM_RPORTS; ++i)
-    //         rd_idxs[i] = (head + i) % DEPTH;
-    //     for (int unsigned i = 0; i < NUM_WPORTS; ++i)
-    //         wr_idxs[i] = (tail + i) % DEPTH;
-
-
-    //     rd_data = '0;
-    //     // fwd if read matches a write; last write wins
-    //     for (int unsigned i = 0; i < NUM_RPORTS; ++i) begin
-    //         if (i >= rd_en_cnt) // suppresses oob index warning
-    //             continue;
-    //         rd_data[i] = state[rd_idxs[i]];
-    //         for (int unsigned j = 0; j < NUM_WPORTS; ++j) begin
-    //             if (j >= wr_en_cnt || rd_idxs[i] != wr_idxs[j]) // j >= ... suppresses oob index warning
-    //                 continue;
-    //             rd_data[i] = wr_data[j];
-    //         end
-    //     end
-    // end
-
-    // Version 2:
     logic [NUM_RPORTS-1:0] fwd_dat;
     always_comb begin
         for (int i = 0; i < NUM_RPORTS; ++i)
-            rd_idxs[i] = (head + i) % DEPTH;
+            rd_idxs[i] = incr(head, i);
         for (int i = 0; i < NUM_WPORTS; ++i)
-            wr_idxs[i] = (tail + i) % DEPTH;
+            wr_idxs[i] = incr(tail, i);
         for (int i = 0; i < NUM_RPORTS; ++i)
             fwd_dat[i] = i >= used && ENABLE_INTR_FWD;
 
-        // fwding logic
         for (int unsigned i = 0; i < NUM_RPORTS; ++i) begin
             if (i >= used_scnt) begin
                 rd_data[i] = '0;
-            end else if (fwd_dat[i] && (i - used) < wr_en_cnt) begin
+            end else if (fwd_dat[i] && (i - used) < wr_en_cnt) begin // fwding logic
                 rd_data[i] = wr_data[i - used];
             end else begin
                 rd_data[i] = state[rd_idxs[i]];
@@ -134,9 +120,7 @@ module fifo #(
             end
 
             FIFO_FLUSH_CHECK: begin
-                logic [$clog2(DEPTH):0] diff;
-                diff    = (tail - flush_tail) % DEPTH;
-                used    <= used - diff;
+                used    <= used - distance(flush_tail, tail);
                 tail    <= flush_tail;
             end
 
@@ -153,8 +137,8 @@ module fifo #(
             if (rd_en_cnt > (ENABLE_INTR_FWD ? used + wr_en_cnt : used))
                 $error("FIFO underflow! instance: %d", INSTANCE_ID);
             used    <= used + wr_en_cnt - rd_en_cnt;
-            head    <= (head + rd_en_cnt) % DEPTH;
-            tail    <= (tail + wr_en_cnt) % DEPTH;
+            head    <= incr(head, rd_en_cnt);
+            tail    <= incr(tail, wr_en_cnt);
             for (int unsigned i = 0; i < NUM_WPORTS; ++i) begin
                 if (i >= wr_en_cnt) // suppresses oob index warning
                     continue;
