@@ -96,7 +96,7 @@
 # there should be no need to change anything for project 3
 
 # this is a global clock period variable used in the tcl script and referenced in testbenches
-export CLOCK_PERIOD = 30.0
+export CLOCK_PERIOD = 5.0
 
 # the Verilog Compiler command and arguments
 VCS =  vcs -sverilog -xprop=tmerge +vc -Mupdate -Mdir=build/csrc -line -full64 -kdb -lca -nc \
@@ -285,6 +285,7 @@ CPU_TESTBENCH = test/pipeline_print.c \
 
 # verilog/cpu.sv is implicit
 CPU_SOURCES = verilog/cpu.sv \
+			  verilog/checkpoints.sv \
 			  verilog/regfile.sv \
               verilog/memDP.sv \
 			  verilog/mult.sv \
