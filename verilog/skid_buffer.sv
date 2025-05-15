@@ -77,8 +77,9 @@ module skid #(
 
     always_comb begin
         i_rdy = !vld || o_rdy;
-        o_dat = dat;
         o_vld = vld;
+        o_msk = msk;
+        o_dat = dat;
     end
 
     logic i_kill, kill;
@@ -233,8 +234,8 @@ module ppln_skid #(
 
     always_comb begin
         i_rdy = rdy;
-        o_dat = dat;
         o_vld = dat_vld;
         o_msk = dat_msk;
+        o_dat = dat;
     end
 endmodule
