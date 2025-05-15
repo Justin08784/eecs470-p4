@@ -178,7 +178,7 @@ module ppln_skid #(
             rdy <= 1;
             dat <= '0; dat_vld <= 1'b0; dat_msk <= '0;
             tmp <= '0; tmp_vld <= 1'b0; tmp_msk <= '0;
-        end else if (flush) begin
+        end else begin
             case (s)
             PIPE: begin // tmp is not full (i.e. at most dat is full)
                 if (o_rdy || !(dat_vld && !dat_kill)) begin
@@ -186,12 +186,16 @@ module ppln_skid #(
                     rdy     <= 1;
 
                     dat     <= i_dat;
-                    dat_vld <= i_vld & !i_kill;
+                    dat_vld <= i_vld && !i_kill;
                     dat_msk <= i_msk & ~clmsk;
-                end else if (i_vld && !i_kill) begin
-                    // go SKID
-                    s       <= SKID;
-                    rdy     <= 0;
+                end else begin
+                    if (i_vld && !i_kill) begin
+                        // go SKID
+                        s       <= SKID;
+                        rdy     <= 0;
+                    end
+
+                    dat_msk <= dat_msk & ~clmsk;
 
                     tmp     <= i_dat;
                     tmp_vld <= i_vld && !i_kill;
@@ -205,48 +209,24 @@ module ppln_skid #(
                     rdy     <= 1;
 
                     dat     <= tmp;
-                    dat_vld <= tmp_vld;
+                    dat_vld <= !tmp_kill; // implicitly: tmp_vld && !tmp_kill (SKID means tmp_vld)
                     dat_msk <= tmp_msk & ~clmsk;
-                end else if (tmp_kill) begin
-                    // just invalidate tmp
-                    s       <= PIPE;
-                    rdy     <= 1;
 
                     tmp_vld <= 1'b0;
+                end else begin
+                    if (tmp_kill) begin
+                        // go to pipe
+                        s       <= PIPE;
+                        rdy     <= 1;
+                    end
+
+                    dat_msk <= dat_msk & ~clmsk;
+
+                    tmp_vld <= !tmp_kill; // implicitly: tmp_vld && !tmp_kill (SKID means tmp_vld)
+                    tmp_msk <= tmp_msk & ~clmsk;
                 end
             end
             endcase
-
-        end else begin
-            case (s)
-            PIPE: begin // tmp is not full (i.e. at most dat is full)
-                if (o_rdy || !dat_vld) begin
-                    rdy     <= 1;
-
-                    dat     <= i_dat;
-                    dat_vld <= i_vld;
-                    dat_msk <= i_msk & ~clmsk;
-                end else if (i_vld) begin
-                    s       <= SKID;
-                    rdy     <= 0;
-
-                    tmp     <= i_dat;
-                    tmp_vld <= i_vld;
-                    tmp_msk <= i_msk & ~clmsk;
-                end
-            end
-            SKID: begin // tmp is full
-                if (o_rdy) begin
-                    s       <= PIPE;
-                    rdy     <= 1;
-
-                    dat     <= tmp;
-                    dat_vld <= tmp_vld;
-                    dat_msk <= tmp_msk & ~clmsk;
-                end
-            end
-            endcase
-
         end
     end
 

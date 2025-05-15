@@ -217,7 +217,7 @@ module skid_buffer_test();
             vld : 1,
             rdy : 1,
             dat : 1,
-            tmp : '0
+            tmp : 'hdeadbeef
         });
 
         setup_pipe_has1();
