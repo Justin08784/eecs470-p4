@@ -1,31 +1,49 @@
 `include "sys_defs.svh"
 
 module flop #(
+    parameter int FLUSH_MODE=SKID_FLUSH_RESET,
     parameter int unsigned WIDTH
 ) (
     input   clock, 
     input   reset,
     input   flush,
+    BMASK   clmsk, // kill mask iff flush high
 
     input   logic   i_vld,
+    input   BMASK   i_msk,
     input   logic   [WIDTH-1:0] i_dat,
 
     output  logic   o_vld,
+    output  BMASK   o_msk,
     output  logic   [WIDTH-1:0] o_dat
 );
     logic vld;
+    BMASK msk;
     logic [WIDTH-1:0] dat;
+
+    logic kill;
+    always_comb begin
+        unique case (FLUSH_MODE)
+            SKID_FLUSH_MASK:    kill = flush && |(i_msk & clmsk);
+            SKID_FLUSH_IGNORE:  kill = 1'b0;
+            default:            kill = flush;
+        endcase
+    end
+
     always_ff @(posedge clock) begin
-        if (reset || flush) begin
+        if (reset || kill) begin
             vld <= 0;
+            msk <= '0;
             dat <= '0;
         end else begin
             vld <= i_vld;
+            msk <= i_msk & ~clmsk;
             dat <= i_dat;
         end
     end
 
     assign o_vld = vld;
+    assign o_msk = msk;
     assign o_dat = dat;
 endmodule
 

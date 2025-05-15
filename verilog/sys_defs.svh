@@ -356,6 +356,12 @@ typedef enum logic [0:1] {
     FIFO_FLUSH_CHECK = 2  // wind tail to checkpoint
 } FIFO_FLUSH_MODE;
 
+typedef enum logic [0:1] {
+    SKID_FLUSH_RESET  = 0,
+    SKID_FLUSH_MASK   = 1,
+    SKID_FLUSH_IGNORE = 2
+} SKID_FLUSH_MODE;
+
 ////////////////////////////////
 // ---- Datapath Packets ---- //
 ////////////////////////////////
