@@ -122,67 +122,138 @@ module skid #(
     end
 endmodule
 
-typedef enum logic {
-    PIPE = 0,
-    SKID = 1
-} STATUS;
-
 module ppln_skid #(
+    type STATUS = enum logic {
+        PIPE,
+        SKID
+    },
+    parameter int FLUSH_MODE=SKID_FLUSH_RESET,
     parameter int unsigned WIDTH
 ) (
     input   clock, 
     input   reset,
     input   flush,
+    BMASK   clmsk, // kill mask iff flush high
 
     input   logic   i_vld,
     output  logic   i_rdy,
+    input   BMASK   i_msk,
     input   logic   [WIDTH-1:0] i_dat,
 
     output  logic   o_vld,
     input   logic   o_rdy,
+    output  BMASK   o_msk,
     output  logic   [WIDTH-1:0] o_dat
 );
     STATUS s;
-    logic vld, rdy; 
-        // vld = is dat, i.e. pipeline reg, busy/occupied?
+    logic dat_vld, tmp_vld, rdy; 
         // rdy = can we accept data?
     logic [WIDTH-1:0] dat, tmp;
+    BMASK dat_msk, tmp_msk;
+
+    logic i_kill, tmp_kill, dat_kill;
+    always_comb begin
+        unique case (FLUSH_MODE)
+        SKID_FLUSH_MASK:    begin
+            i_kill  = flush && |(i_msk   & clmsk);
+            tmp_kill= flush && |(tmp_msk & clmsk);
+            dat_kill= flush && |(dat_msk & clmsk);
+        end
+        SKID_FLUSH_IGNORE:  begin
+            i_kill  = 1'b0;
+            tmp_kill= 1'b0;
+            dat_kill= 1'b0;
+        end
+        default:            begin
+            i_kill  = flush;
+            tmp_kill= flush;
+            dat_kill= flush;
+        end
+        endcase
+    end
 
     always_ff @(posedge clock) begin
-        if (reset || flush) begin
+        if (reset) begin
             s   <= PIPE;
-            vld <= 0;
             rdy <= 1;
-            dat <= '0;
-            tmp <= '0;
+            dat <= '0; dat_vld <= 1'b0; dat_msk <= '0;
+            tmp <= '0; tmp_vld <= 1'b0; tmp_msk <= '0;
+        end else if (flush) begin
+            case (s)
+            PIPE: begin // tmp is not full (i.e. at most dat is full)
+                if (o_rdy || !(dat_vld && !dat_kill)) begin
+                    // normal accept path
+                    rdy     <= 1;
+
+                    dat     <= i_dat;
+                    dat_vld <= i_vld & !i_kill;
+                    dat_msk <= i_msk & ~clmsk;
+                end else if (i_vld && !i_kill) begin
+                    // go SKID
+                    s       <= SKID;
+                    rdy     <= 0;
+
+                    tmp     <= i_dat;
+                    tmp_vld <= i_vld && !i_kill;
+                    tmp_msk <= i_msk & ~clmsk;
+                end
+            end
+            SKID: begin // tmp is full
+                if (o_rdy || dat_kill) begin
+                    // promote tmp to pipe
+                    s       <= PIPE;
+                    rdy     <= 1;
+
+                    dat     <= tmp;
+                    dat_vld <= tmp_vld;
+                    dat_msk <= tmp_msk & ~clmsk;
+                end else if (tmp_kill) begin
+                    // just invalidate tmp
+                    s       <= PIPE;
+                    rdy     <= 1;
+
+                    tmp_vld <= 1'b0;
+                end
+            end
+            endcase
+
         end else begin
             case (s)
             PIPE: begin // tmp is not full (i.e. at most dat is full)
-            if (o_rdy || !vld) begin
-                dat <= i_dat;
-                vld <= i_vld;
-                rdy <= 1;
-            end else if (i_vld) begin
-                tmp <= i_dat;
-                rdy <= 0;
-                s   <= SKID;
-            end
+                if (o_rdy || !dat_vld) begin
+                    rdy     <= 1;
+
+                    dat     <= i_dat;
+                    dat_vld <= i_vld;
+                    dat_msk <= i_msk & ~clmsk;
+                end else if (i_vld) begin
+                    s       <= SKID;
+                    rdy     <= 0;
+
+                    tmp     <= i_dat;
+                    tmp_vld <= i_vld;
+                    tmp_msk <= i_msk & ~clmsk;
+                end
             end
             SKID: begin // tmp is full
-            if (o_rdy) begin
-                dat <= tmp;
-                vld <= 1;
-                rdy <= 1;
-                s   <= PIPE;
-            end
+                if (o_rdy) begin
+                    s       <= PIPE;
+                    rdy     <= 1;
+
+                    dat     <= tmp;
+                    dat_vld <= tmp_vld;
+                    dat_msk <= tmp_msk & ~clmsk;
+                end
             end
             endcase
+
         end
     end
 
     always_comb begin
         i_rdy = rdy;
         o_dat = dat;
-        o_vld = vld;
+        o_vld = dat_vld;
+        o_msk = dat_msk;
     end
 endmodule
