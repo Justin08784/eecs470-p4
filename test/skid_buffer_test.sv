@@ -43,10 +43,18 @@ module skid_buffer_test();
 
         .o_vld  (o_vld),
         .o_rdy  (o_rdy),
-        .o_dat  (o_dat),
-
-        .dbg    (state_dbg)
+        .o_dat  (o_dat)
     );
+
+    always_comb begin
+        state_dbg = '{
+            s   : dut.s,
+            vld : dut.vld,
+            rdy : dut.rdy,
+            dat : dut.dat,
+            tmp : dut.tmp
+        };
+    end
 
     task wr(
         input int v

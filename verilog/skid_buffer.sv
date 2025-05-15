@@ -2,7 +2,7 @@
 
 module flop #(
     parameter int FLUSH_MODE=SKID_FLUSH_RESET,
-    parameter int unsigned WIDTH
+    parameter int unsigned WIDTH=1
 ) (
     input   clock, 
     input   reset,
@@ -48,35 +48,32 @@ module flop #(
 endmodule
 
 module skid #(
-    parameter int unsigned WIDTH,
-    parameter logic ENABLE_SNOOP = `FALSE,
-    type SKID_STATE = struct packed {
-        logic vld;
-        logic [WIDTH-1:0] dat;
-    }
+    parameter int unsigned WIDTH=1,
+    parameter int FLUSH_MODE=SKID_FLUSH_RESET,
+    parameter logic ENABLE_SNOOP = `FALSE
 ) (
     input   clock, 
     input   reset,
     input   flush,
+    BMASK   clmsk, // kill mask iff flush high
 
     input   logic   i_vld,
     output  logic   i_rdy,
+    input   BMASK   i_msk,
     input   logic   [WIDTH-1:0] i_dat,
 
     output  logic   o_vld,
     input   logic   o_rdy,
+    output  BMASK   o_msk,
     output  logic   [WIDTH-1:0] o_dat,
 
-    input   logic   [WIDTH-1:0] i_snoop, // post-snooping
-
-    output  SKID_STATE dbg
+    input   logic   [WIDTH-1:0] i_snoop // post-snooping
 );
     logic vld; 
         // vld = is dat, i.e. pipeline reg, busy/occupied?
         // rdy = can we accept data?
+    BMASK msk;
     logic [WIDTH-1:0] dat;
-
-    assign dbg = '{vld, dat};
 
     always_comb begin
         i_rdy = !vld || o_rdy;
@@ -84,20 +81,43 @@ module skid #(
         o_vld = vld;
     end
 
+    logic i_kill, dat_kill;
+    always_comb begin
+        unique case (FLUSH_MODE)
+        SKID_FLUSH_MASK:    begin
+            i_kill  = flush && |(i_msk & clmsk);
+            dat_kill= flush && |(msk   & clmsk);
+        end
+        SKID_FLUSH_IGNORE:  begin
+            i_kill  = 1'b0;
+            dat_kill= 1'b0;
+        end
+        default:            begin
+            i_kill  = flush;
+            dat_kill= flush;
+        end
+        endcase
+    end
+
     always_ff @(posedge clock) begin
-        if (reset || flush) begin
-            vld <= 0;
+        // ---- clear conditions ----
+        if ( reset
+        || ( i_rdy && i_kill)
+        || (!i_rdy && dat_kill)) begin
+            vld <= 1'b0;
+            msk <= '0;
             dat <= '0;
-        end else if (i_rdy) begin
-            dat <= i_dat;
+        // ---- normal acceptance path ----
+        end else if (i_rdy) begin // i_rdy && !i_kill
             vld <= i_vld;
-        end else if (ENABLE_SNOOP) begin
-            if (!(vld && !o_rdy)) begin
-                // should be (vld && !o_rdy), right?
-                $error("skid: snoop: unexpected");
-                $fatal;
-            end
-            dat <= i_snoop;
+            msk <= i_msk & ~clmsk;
+            dat <= i_dat;
+        // ---- hold / snoop path ----
+        end else begin
+            assert (vld && !o_rdy) else $fatal("skid: snoop: unexpected");
+            msk <= msk & ~clmsk;
+            if (ENABLE_SNOOP)
+                dat <= i_snoop;
         end
     end
 endmodule
@@ -108,12 +128,7 @@ typedef enum logic {
 } STATUS;
 
 module ppln_skid #(
-    parameter int unsigned WIDTH,
-    type SKID_STATE = struct packed {
-        logic s;
-        logic vld, rdy;
-        logic [WIDTH-1:0] dat, tmp;
-    }
+    parameter int unsigned WIDTH
 ) (
     input   clock, 
     input   reset,
@@ -125,17 +140,13 @@ module ppln_skid #(
 
     output  logic   o_vld,
     input   logic   o_rdy,
-    output  logic   [WIDTH-1:0] o_dat,
-
-    output  SKID_STATE dbg
+    output  logic   [WIDTH-1:0] o_dat
 );
     STATUS s;
     logic vld, rdy; 
         // vld = is dat, i.e. pipeline reg, busy/occupied?
         // rdy = can we accept data?
     logic [WIDTH-1:0] dat, tmp;
-
-    assign dbg = '{s, vld, rdy, dat, tmp};
 
     always_ff @(posedge clock) begin
         if (reset || flush) begin
