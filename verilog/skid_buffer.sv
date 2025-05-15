@@ -24,19 +24,19 @@ module flop #(
     logic kill;
     always_comb begin
         unique case (FLUSH_MODE)
-            SKID_FLUSH_MASK:    kill = flush && |(i_msk & clmsk);
-            SKID_FLUSH_IGNORE:  kill = 1'b0;
-            default:            kill = flush;
+        SKID_FLUSH_MASK:    kill = flush && |(i_msk & clmsk);
+        SKID_FLUSH_IGNORE:  kill = 1'b0;
+        default:            kill = flush;
         endcase
     end
 
     always_ff @(posedge clock) begin
-        if (reset || kill) begin
+        if (reset) begin
             vld <= 0;
             msk <= '0;
             dat <= '0;
         end else begin
-            vld <= i_vld;
+            vld <= i_vld && !kill;
             msk <= i_msk & ~clmsk;
             dat <= i_dat;
         end
@@ -81,43 +81,44 @@ module skid #(
         o_vld = vld;
     end
 
-    logic i_kill, dat_kill;
+    logic i_kill, kill;
     always_comb begin
         unique case (FLUSH_MODE)
         SKID_FLUSH_MASK:    begin
             i_kill  = flush && |(i_msk & clmsk);
-            dat_kill= flush && |(msk   & clmsk);
+            kill    = flush && |(msk   & clmsk);
         end
         SKID_FLUSH_IGNORE:  begin
             i_kill  = 1'b0;
-            dat_kill= 1'b0;
+            kill    = 1'b0;
         end
         default:            begin
             i_kill  = flush;
-            dat_kill= flush;
+            kill    = flush;
         end
         endcase
     end
 
     always_ff @(posedge clock) begin
-        // ---- clear conditions ----
-        if ( reset
-        || ( i_rdy && i_kill)
-        || (!i_rdy && dat_kill)) begin
+        if (reset) begin
             vld <= 1'b0;
             msk <= '0;
             dat <= '0;
+
         // ---- normal acceptance path ----
-        end else if (i_rdy) begin // i_rdy && !i_kill
-            vld <= i_vld;
+        end else if (i_rdy) begin
+            vld <= i_vld && !i_kill;
             msk <= i_msk & ~clmsk;
             dat <= i_dat;
+
         // ---- hold / snoop path ----
         end else begin
             assert (vld && !o_rdy) else $fatal("skid: snoop: unexpected");
+            vld <= vld && !kill;
             msk <= msk & ~clmsk;
             if (ENABLE_SNOOP)
                 dat <= i_snoop;
+
         end
     end
 endmodule
