@@ -42,7 +42,6 @@ module mt_snaps #(
 
 ) (
     input   clock,
-    input   reset,
 
     // read
     input   BMASK rmsk,
@@ -71,23 +70,18 @@ module mt_snaps #(
     end
 
     always_ff @(posedge clock) begin
-        if (reset) begin
-            foreach (snaps[i, r])
-                snaps[i][r] <= r;
-        end else begin
-            for (int n = 0; n < uen_cnt; ++n) begin
-                if (udst[n] == `ZERO_REG)
-                    continue;
-                foreach (snaps[i])
-                    snaps[i][udst[n]] <= ut[n];
-            end
+        for (int n = 0; n < uen_cnt; ++n) begin
+            if (udst[n] == `ZERO_REG)
+                continue;
+            foreach (snaps[i])
+                snaps[i][udst[n]] <= ut[n];
+        end
 
-            for (int n = 0; n < wen_cnt; ++n) begin
-                for (int i = 0; i < BMASK_LEN; ++i) begin
-                    if (!wmsk[n][i])
-                        continue;
-                    snaps[i] <= wdat[n];
-                end
+        for (int n = 0; n < wen_cnt; ++n) begin
+            for (int i = 0; i < BMASK_LEN; ++i) begin
+                if (!wmsk[n][i])
+                    continue;
+                snaps[i] <= wdat[n];
             end
         end
 
