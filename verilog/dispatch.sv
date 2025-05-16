@@ -6,6 +6,7 @@ module dispatch #(parameter
     input   clock,
     input   reset,
     input   flush,
+    output  dispatch2bman   bman_out,
 
     // DECODE
     input   decode2dispatch d_in,

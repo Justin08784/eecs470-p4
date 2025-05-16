@@ -736,12 +736,32 @@ typedef struct packed {
     ID_RESULT   [`N-1:0]        d_dat;
 } decode2dispatch;
 
+// By Arch Map
+`define NUM_ARCH_REG 32
+typedef struct packed {
+    PHYS_REG_IDX [`NUM_ARCH_REG-1:0] entries;
+} arch_map2map_table;
+
 // By Dispatch
 typedef struct packed {
     // NOTE: This is the only place where a transaction is
     // RECEIVER-decided!!! (i.e. receiver broadcasts enable signals)
     logic       [$clog2(`N):0]  dispatch_en_cnt;
 } dispatch2decode;
+
+typedef struct packed {
+    logic [$clog2(`N):0] en_cnt;
+    logic [`N-1:0][$clog2(`BTQ_SZ)-1:0] btq_tail;
+    logic [`N-1:0][$clog2(`ROB_SZ)-1:0] fl_tail;
+    logic [`N-1:0][$clog2(`ROB_SZ)-1:0] rob_tail;
+    PHYS_REG_IDX [`N-1:0][`NUM_ARCH_REG-1:0] mt;
+} dispatch2bman;
+
+typedef struct packed {
+    logic [$clog2(`N):0] rdy_scnt;
+    BMASK [`N-1:0] b1hot_n;
+    BMASK [`N:0] bmask_n;
+} bman2dispatch;
 
 typedef struct packed {
     /* Alloc */
@@ -895,12 +915,6 @@ typedef struct packed {
         // From: Free list
         // - newly allocated pregs
 } free_list2dispatch;
-
-// By Arch Map
-`define NUM_ARCH_REG 32
-typedef struct packed {
-    PHYS_REG_IDX [`NUM_ARCH_REG-1:0] entries;
-} arch_map2map_table;
 
 `define BY_FU(type) \
 struct packed { \

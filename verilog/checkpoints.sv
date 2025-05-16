@@ -87,3 +87,107 @@ module mt_snaps #(
 
     end
 endmodule
+
+module branch_manager (
+    input   clock,
+    input   reset,
+    input   flush,
+    input   BMASK clmsk,
+
+    // alloc
+    input   dispatch2bman dis_in,
+    output  bman2dispatch dis_out
+);
+    BMASK bmask_reg;
+    
+    BMASK [`N-1:0]  b1hot_n;
+    BMASK [`N:0]    bmask_n;
+    psel_gen #(
+        .WIDTH  (BMASK_LEN),
+        .REQS   (`N)
+    ) sel_b1hot (
+        .req    (~bmask_reg),
+        .gnt_bus(b1hot_n)
+    );
+
+    generate
+    assign bmask_n[0] = bmask_reg;
+    assign dis_out.bmask_n[0] = bmask_n[0];
+    for (genvar n = 0; n < `N; ++n) begin : gen_bnext
+        assign dis_out.b1hot_n[n]       = b1hot_n[n];
+        assign dis_out.bmask_n[n + 1]   = bmask_n[n] | b1hot_n[n];
+    end
+    endgenerate
+    always_comb begin
+        dis_out.rdy_scnt = `N;
+        for (int n = 0; n < `N; ++n) begin
+            if (|b1hot_n[n])
+                continue;
+            dis_out.rdy_scnt = n;
+            break;
+        end
+    end
+
+    general_snaps #(
+        .WIDTH($clog2(`BTQ_SZ)+1)
+    ) btq_tails (
+        .clock,
+
+        // TODO >>
+        .rmsk   (),
+        .rdat   (),
+        // TODO <<
+
+        .wen_cnt(dis_in.en_cnt),
+        .wmsk   (b1hot_n),
+        .wdat   (dis_in.btq_tail)
+    );
+
+    general_snaps #(
+        .WIDTH($clog2(`ROB_SZ)+1)
+    ) fl_tails (
+        .clock,
+
+        // TODO >>
+        .rmsk   (),
+        .rdat   (),
+        // TODO <<
+
+        .wen_cnt(dis_in.en_cnt),
+        .wmsk   (b1hot_n),
+        .wdat   (dis_in.fl_tail)
+    );
+
+    general_snaps #(
+        .WIDTH($clog2(`ROB_SZ)+1)
+    ) rob_tails (
+        .clock,
+
+        // TODO >>
+        .rmsk   (),
+        .rdat   (),
+        // TODO <<
+
+        .wen_cnt(dis_in.en_cnt),
+        .wmsk   (b1hot_n),
+        .wdat   (dis_in.rob_tail)
+    );
+
+    mt_snaps (
+        .clock,
+
+        // TODO >>
+        .rmsk   (),
+        .rdat   (),
+
+        .uen_cnt(),
+        .udst   (),
+        .ut     (),
+        // TODO <<
+
+        .wen_cnt(dis_in.en_cnt),
+        .wmsk   (b1hot_n),
+        .wdat   (dis_in.mt)
+    );
+
+endmodule
