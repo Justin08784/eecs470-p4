@@ -183,4 +183,23 @@ module branch_manager (
         end
     end
 
+    always_ff @(posedge clock) begin
+        if (reset) begin
+            bmask_reg <= '0;
+        end else if (flush) begin
+            bmask_reg <= bmask_reg & ~clmsk;
+        end else begin
+            bmask_reg <= bmask_n[dis_in.snap_en_cnt] & ~clmsk;
+        end
+    end
+
+    assign snap_out = '{
+        b1hot_n     : b1hot_n,
+        // pass throughs
+        snap_en_cnt : dis_in.snap_en_cnt,
+        btq_tail    : dis_in.btq_tail,
+        fl_tail     : dis_in.fl_tail,
+        rob_tail    : dis_in.rob_tail
+    };
+
 endmodule
