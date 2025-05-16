@@ -183,34 +183,4 @@ module branch_manager (
         end
     end
 
-    general_snaps #(
-        .WIDTH($clog2(`BTQ_SZ))
-    ) btq_tails (
-        .clock,
-
-        // TODO >>
-        .rmsk   (clmsk),
-        .rdat   (snap_out.btq_tail),
-        // TODO <<
-
-        .wen_cnt(dis_in.snap_en_cnt),
-        .wmsk   (b1hot_n),
-        .wdat   (dis_in.btq_tail)
-    );
-
-    general_snaps #(
-        .WIDTH($clog2(`ROB_SZ))
-    ) rob_tails (
-        .clock,
-
-        // TODO >>
-        .rmsk   (clmsk),
-        .rdat   (snap_out.rob_tail),
-        // TODO <<
-
-        .wen_cnt(dis_in.snap_en_cnt),
-        .wmsk   (b1hot_n),
-        .wdat   (dis_in.rob_tail)
-    );
-
 endmodule

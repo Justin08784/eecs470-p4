@@ -762,12 +762,11 @@ typedef struct packed {
 typedef struct packed {
     logic [$clog2(`N):0] snap_en_cnt;
     BMASK [`N-1:0] b1hot_n;
-} bman2map_table;
 
-typedef struct packed {
-    logic [$clog2(`BTQ_SZ)-1:0] btq_tail;
-    logic [$clog2(`ROB_SZ)-1:0] fl_tail;
-    logic [$clog2(`ROB_SZ)-1:0] rob_tail;
+    logic [`N-1:0][$clog2(`BTQ_SZ)-1:0] btq_tail;
+    logic [`N-1:0][$clog2(`ROB_SZ)-1:0] fl_tail;
+    logic [`N-1:0][$clog2(`ROB_SZ)-1:0] rob_tail;
+    // mt checkpoints are handled locally by map_table
 } bman2snap_bus;
 
 typedef struct packed {

@@ -5,7 +5,7 @@ module rob #(
     parameter N=`N
 ) (
     input clock, reset, flush,
-    input logic [$clog2(ROB_SZ)-1:0] snap_tail,
+    input  BMASK clmsk,
 
     // retire (read)
     output rob2retire r_out,
@@ -15,6 +15,7 @@ module rob #(
     input  execute2complete_dat cdat_in,
 
     // dispatch (write)
+    input  bman2snap_bus snap_in, // alloc snapshot
     output rob2dispatch d_out,
     input  dispatch2rob d_in
 );
@@ -26,6 +27,7 @@ module rob #(
 
     logic [$clog2(ROB_SZ)-1:0]  head;
     logic [$clog2(ROB_SZ)-1:0]  tail;
+    logic [$clog2(ROB_SZ)-1:0]  snap;
 
     ROB_ENTRY [ROB_SZ-1:0]      state;
     logic [$clog2(ROB_SZ):0]    used, free;
@@ -49,7 +51,7 @@ module rob #(
         .clock,
         .reset,
         .flush,
-        .flush_tail ('0), // FIXME
+        .flush_tail (snap),
 
         .rd_en_cnt  (r_in.r_en_cnt),
         .wr_en_cnt  (d_in.d_en_cnt),
@@ -63,6 +65,19 @@ module rob #(
         .free,
         .used_scnt,
         .free_scnt() // DO NOT wire. Will compute this ourselves.
+    );
+
+    general_snaps #(
+        .WIDTH($clog2(`ROB_SZ))
+    ) rob_tails (
+        .clock,
+
+        .rmsk   (clmsk),
+        .rdat   (snap),
+
+        .wen_cnt(snap_in.snap_en_cnt),
+        .wmsk   (snap_in.b1hot_n),
+        .wdat   (snap_in.rob_tail)
     );
 
     assign free_scnt    = `MIN(free - rsvd, NUM_DPORTS);

@@ -8,7 +8,7 @@ module btq #(
     input  clock,
     input  reset,
     input  flush,
-    input  logic [$clog2(BTQ_SZ)-1:0]  snap_tail,
+    input  BMASK clmsk,
 
     // retire
     input  retire2btq   r_in,
@@ -16,6 +16,9 @@ module btq #(
 
     // complete (write)
     input  execute2btq  ex_in,
+
+    // dispatch (alloc snapshot)
+    input  bman2snap_bus snap_in,
 
     // fetch
     input  fetch2btq    f_in,
@@ -28,6 +31,7 @@ module btq #(
     BTQ_ENTRY [BTQ_SZ-1:0]      state;
     logic [$clog2(BTQ_SZ)-1:0]  head;
     logic [$clog2(BTQ_SZ)-1:0]  tail;
+    logic [$clog2(BTQ_SZ)-1:0]  snap;
     logic [$clog2(BTQ_SZ):0]    used;
     logic [$clog2(BTQ_SZ):0]    free;
 
@@ -44,7 +48,7 @@ module btq #(
         .clock,
         .reset,
         .flush,
-        .flush_tail ('0), // FIXME
+        .flush_tail (snap),
 
         .rd_en_cnt  (r_in.rd_cnt),
         .wr_en_cnt  (f_in.en_cnt),
@@ -58,6 +62,19 @@ module btq #(
         .free,
         .used_scnt(),
         .free_scnt(f_out.btq_rdy_scnt)
+    );
+
+    general_snaps #(
+        .WIDTH($clog2(`BTQ_SZ))
+    ) btq_tails (
+        .clock,
+
+        .rmsk   (clmsk),
+        .rdat   (snap),
+
+        .wen_cnt(snap_in.snap_en_cnt),
+        .wmsk   (snap_in.b1hot_n),
+        .wdat   (snap_in.btq_tail)
     );
 
     always_comb begin

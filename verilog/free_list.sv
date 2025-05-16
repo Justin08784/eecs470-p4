@@ -11,6 +11,8 @@ module free_list #(parameter
     localparam WIDTH = $bits(PHYS_REG_IDX)
 ) (
     input clock, reset, flush,
+    input BMASK clmsk,
+
     // retire
     input retire_final r_in,
 
@@ -18,6 +20,8 @@ module free_list #(parameter
     // issue ??
 
     // dispatch
+    input  bman2snap_bus snap_in, // alloc snapshot
+
     input dispatch2free_list d_in,
     
     output free_list2dispatch d_out
@@ -90,6 +94,7 @@ module free_list #(parameter
     end
    
 
+    logic [$clog2(DEPTH)-1:0] snap, tail;
     fifo #(
         .INSTANCE_ID(0),
         .DEPTH(DEPTH),
@@ -103,10 +108,11 @@ module free_list #(parameter
         .clock,
         .reset,
         .flush,
-        .flush_tail('0), // FIXME
+        .flush_tail(snap),
 
         .wr_en_cnt(free_cnt),
         .wr_data(told_packed),
+        .tail,
 
         .rd_en_cnt(d_in.free_d_en_cnt),
         .rd_data(d_out.d_ts),
@@ -114,6 +120,20 @@ module free_list #(parameter
         .free_scnt(), // do we need this? how would even retire return more pregs than in existence?
         .used_scnt(d_out.free_rdy_scnt)
     );
+
+    fl_snaps fl_tails0 (
+        .clock,
+
+        .rmsk   (clmsk),
+        .rdat   (snap),
+
+        .uen_cnt(free_cnt),
+
+        .wen_cnt(snap_in.snap_en_cnt),
+        .wmsk   (snap_in.b1hot_n),
+        .wdat   ({N{tail}})
+    );
+
 
 `ifdef DEBUG
     task print_fl();
