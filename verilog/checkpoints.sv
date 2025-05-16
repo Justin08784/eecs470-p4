@@ -37,6 +37,59 @@ module general_snaps #(
     end
 endmodule
 
+module fl_snaps #(
+    parameter int DEPTH = `ROB_SZ,
+    type PTR = logic [$clog2(DEPTH)-1:0],
+    type CNT = logic [$clog2(DEPTH):0]
+) (
+    input   clock,
+
+    // read
+    input   BMASK   rmsk,
+    output  PTR     rdat,
+
+    // retire updates
+    input   logic   [$clog2(`N):0] uen_cnt,
+
+    // write line
+    input   logic   [$clog2(`N):0] wen_cnt,
+    input   BMASK   [`N-1:0] wmsk,
+    input   PTR     [`N-1:0] wdat
+);
+    PTR [BMASK_LEN-1:0] snaps, snaps_n;
+    function automatic PTR incr(input PTR p, input int unsigned k);
+        logic [$clog2(DEPTH):0] carry;
+        carry = p + k;
+        return (carry >= DEPTH) ? carry - DEPTH : carry[$bits(PTR)-1:0];
+    endfunction
+
+    always_comb begin
+        rdat = '0;
+        foreach (rmsk[i]) begin
+            if (!rmsk[i])
+                continue;
+            rdat = snaps[i];
+            break;
+        end
+
+        snaps_n = snaps;
+        for (int n = 0; n < wen_cnt; ++n) begin
+            for (int i = 0; i < BMASK_LEN; ++i) begin
+                if (!wmsk[n][i])
+                    continue;
+                snaps_n[i] = wdat[n];
+            end
+        end
+
+        foreach (snaps_n[i])
+            snaps_n[i] = incr(snaps_n[i], uen_cnt);
+    end
+
+    always_ff @(posedge clock) begin
+        snaps <= snaps_n;
+    end
+endmodule
+
 
 module mt_snaps #(
 
@@ -143,21 +196,6 @@ module branch_manager (
         .wen_cnt(dis_in.snap_en_cnt),
         .wmsk   (b1hot_n),
         .wdat   (dis_in.btq_tail)
-    );
-
-    general_snaps #(
-        .WIDTH($clog2(`ROB_SZ))
-    ) fl_tails (
-        .clock,
-
-        // TODO >>
-        .rmsk   (clmsk),
-        .rdat   (snap_out.fl_tail),
-        // TODO <<
-
-        .wen_cnt(dis_in.snap_en_cnt),
-        .wmsk   (b1hot_n),
-        .wdat   (dis_in.fl_tail)
     );
 
     general_snaps #(
