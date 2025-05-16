@@ -75,8 +75,8 @@ module rob #(
         .rmsk   (clmsk),
         .rdat   (snap),
 
-        .wen_cnt(snap_in.snap_en_cnt),
-        .wmsk   (snap_in.b1hot_n),
+        .wen_cnt(snap_in.comm_en_cnt),
+        .wmsk   (snap_in.comm_b1hot_n),
         .wdat   (snap_in.rob_tail)
     );
 

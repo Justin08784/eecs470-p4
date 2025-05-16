@@ -198,7 +198,9 @@ module branch_manager (
         // pass throughs
         snap_en_cnt : dis_in.snap_en_cnt,
         btq_tail    : dis_in.btq_tail,
-        fl_tail     : dis_in.fl_tail,
+        // fl_tail     : dis_in.fl_tail,
+        comm_en_cnt : dis_in.comm_en_cnt,
+        comm_b1hot_n: dis_in.comm_b1hot_n,
         rob_tail    : dis_in.rob_tail
     };
 
