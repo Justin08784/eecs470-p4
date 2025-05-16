@@ -239,7 +239,7 @@ module bru_ex(
     input flush,
 
     /* FRONTEND */
-    logic [`NUM_FU_BRU-1:0]             i_vld,
+    input  logic [`NUM_FU_BRU-1:0]      i_vld,
     input  BRU_REGS [`NUM_FU_BRU-1:0]   i_regs,
         // insn metadata/operands
 
