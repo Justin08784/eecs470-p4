@@ -750,12 +750,25 @@ typedef struct packed {
 } dispatch2decode;
 
 typedef struct packed {
-    logic [$clog2(`N):0] en_cnt;
+    logic [$clog2(`N):0] snap_en_cnt;
+    // rename
     logic [`N-1:0][$clog2(`BTQ_SZ)-1:0] btq_tail;
     logic [`N-1:0][$clog2(`ROB_SZ)-1:0] fl_tail;
+    // commit
     logic [`N-1:0][$clog2(`ROB_SZ)-1:0] rob_tail;
-    PHYS_REG_IDX [`N-1:0][`NUM_ARCH_REG-1:0] mt;
+    // mt checkpoints are handled locally by map_table
 } dispatch2bman;
+
+typedef struct packed {
+    logic [$clog2(`N):0] snap_en_cnt;
+    BMASK [`N-1:0] b1hot_n;
+} bman2map_table;
+
+typedef struct packed {
+    logic [$clog2(`BTQ_SZ)-1:0] btq_tail;
+    logic [$clog2(`ROB_SZ)-1:0] fl_tail;
+    logic [$clog2(`ROB_SZ)-1:0] rob_tail;
+} bman2snap_bus;
 
 typedef struct packed {
     logic [$clog2(`N):0] rdy_scnt;
@@ -914,6 +927,8 @@ typedef struct packed {
     PHYS_REG_IDX [`N-1:0]   d_ts;
         // From: Free list
         // - newly allocated pregs
+
+    logic [`N-1:0][$clog2(`ROB_SZ)-1:0] fl_tail;
 } free_list2dispatch;
 
 `define BY_FU(type) \
