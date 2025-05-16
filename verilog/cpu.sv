@@ -189,6 +189,7 @@ module cpu (
         .clock,
         .reset,
         .flush,
+        .clmsk('0), // FIXME
  
         .d_in   (dispatch_2_rs),
         .d_out  (rs_2_dispatch),

@@ -1,6 +1,7 @@
 `include "sys_defs.svh"
 
 typedef struct packed {
+    BMASK bmask;
     PHYS_REG_IDX t1;
     PHYS_REG_IDX t2;
     logic t1_rdy;
@@ -43,6 +44,7 @@ module rs_part #(
     input clock,
     input reset,
     input flush,
+    input  BMASK    clmsk,
 
     // dispatch
     input  logic    [N-1:0]     d_in_en,
@@ -74,6 +76,11 @@ module rs_part #(
     // complete (CDB)
     input execute2complete_tag  ctag_in
 );
+    /*
+    Flush contract:
+    - Reject all dispatches
+    - Issue non-killed ready entries
+    */
     ENTRY [PART_SZ-1:0] entries; // ms1 test: remove one RS entry (caught)
 
     logic [PART_SZ-1:0] busy_vec;
@@ -114,6 +121,13 @@ module rs_part #(
         end
     end
 
+    // SECTION: kill terms
+    logic [PART_SZ-1:0] kill;
+    always_comb begin
+        for (int rs = 0; rs < PART_SZ; ++rs)
+            kill[rs]  = flush && |(entries[rs].dat.bmask & clmsk);
+    end
+
     // SECTION: Issue 
     // operand readiness
     logic [PART_SZ-1:0] can_issue;
@@ -121,6 +135,7 @@ module rs_part #(
         can_issue = '0;
         for (int rs = 0; rs < PART_SZ; ++rs) begin
             can_issue[rs] = busy_vec[rs]
+                && !kill[rs]
                 && !entries[rs].issd // ms1 test: remove "!" from entries[rs].issd (caught)
                 && (entries[rs].dat.t1_rdy || to_t1_rdy[rs]) // [ADDRESSED] ms1 test: remove "|| to_t1_rdy[rs]" (not caught) 
                 && (entries[rs].dat.t2_rdy || to_t2_rdy[rs]);
@@ -236,23 +251,26 @@ module rs_part #(
 
 
     always_ff @(posedge clock) begin
-        if (reset || flush) begin
+        if (reset) begin
             entries  <= '0;
         end else begin
             // SECTION: Compute next state
             for (int rs = 0; rs < PART_SZ; ++rs) begin
                 entries[rs].dat.t1_rdy <= entries[rs].dat.t1_rdy | to_t1_rdy[rs];
                 entries[rs].dat.t2_rdy <= entries[rs].dat.t2_rdy | to_t2_rdy[rs]; // [ADDRESSED] ms1 test: change |= to = (not caught)
+                entries[rs].dat.bmask  <= entries[rs].dat.bmask & ~clmsk; // any resolved (pred/mispred) clear its b1hot
 
                 // issuing
                 if (to_issue[rs])
                     entries[rs].issd <= 1;
 
-                // going to EX; clear entry
-                if (entries[rs].issd)
+                // going to EX or flush kill; clear entry
+                if (entries[rs].issd || kill[rs])
                     entries[rs].busy <= 0; // only clear busy bit
 
                 for (int n = 0; n < N; ++n) begin
+                    if (flush) // frontend is killed unconditionally; disable ALL dispatches during flush
+                        break;
                     if (!d2entry[n][rs])
                         continue;
                     entries[rs].busy    <= 1;
@@ -286,6 +304,7 @@ module rs #(parameter
     input clock,
     input reset,
     input flush,
+    input BMASK clmsk,
 
     // dispatch
     /*
@@ -395,6 +414,7 @@ module rs #(parameter
         .clock  (clock),
         .reset  (reset),
         .flush  (flush),
+        .clmsk  (clmsk),
 
         .d_in_en        (d_in.en[FU_ALU]),
         .d_in_dat       (tmp_dat_alu),
@@ -422,6 +442,7 @@ module rs #(parameter
         .clock  (clock),
         .reset  (reset),
         .flush  (flush),
+        .clmsk  (clmsk),
 
         .d_in_en        (d_in.en[FU_MUL]),
         .d_in_dat       (tmp_dat_mult),
@@ -449,6 +470,7 @@ module rs #(parameter
         .clock  (clock),
         .reset  (reset),
         .flush  (flush),
+        .clmsk  (clmsk),
 
         .d_in_en        (d_in.en[FU_BRU]),
         .d_in_dat       (tmp_dat_bru),
@@ -481,10 +503,11 @@ module rs #(parameter
                 $display("rs_alu[%2d]:", i);
                 continue;
             end
-            $display("rs_alu[%2d]: {iss:%b} pc=0x%x, id=%3d (%x), t=%2d, t1=%2d%c, t2=%2d%c, rob_idx=%2d",
+            $display("rs_alu[%2d]: {iss:%b, bmask: %b} pc=0x%x, id=%3d (%x), t=%2d, t1=%2d%c, t2=%2d%c, rob_idx=%2d",
                 i, 
 
                 entries[i].issd, 
+                entries[i].dat.bmask, 
                 entries[i].dat.PC,
                 entries[i].dat.id, 
                 entries[i].dat.inst,
@@ -505,10 +528,11 @@ module rs #(parameter
                 $display("rs_mul[%2d]:", i);
                 continue;
             end
-            $display("rs_mul[%2d]: {iss:%b} pc=0x%x, id=%3d (%x), t=%2d, t1=%2d%c, t2=%2d%c, rob_idx=%2d",
+            $display("rs_mul[%2d]: {iss:%b, bmask: %b} pc=0x%x, id=%3d (%x), t=%2d, t1=%2d%c, t2=%2d%c, rob_idx=%2d",
                 i, 
 
                 entries[i].issd, 
+                entries[i].dat.bmask, 
                 entries[i].dat.PC,
                 entries[i].dat.id, 
                 entries[i].dat.inst,
@@ -529,10 +553,11 @@ module rs #(parameter
                 $display("rs_bru[%2d]:", i);
                 continue;
             end
-            $display("rs_bru[%2d]: {iss:%b} pc=0x%x, id=%3d (%x), t=%2d, t1=%2d%c, t2=%2d%c, rob_idx=%2d",
+            $display("rs_bru[%2d]: {iss:%b, bmask: %b} pc=0x%x, id=%3d (%x), t=%2d, t1=%2d%c, t2=%2d%c, rob_idx=%2d, b1hot: %b",
                 i, 
 
                 entries[i].issd, 
+                entries[i].dat.bmask, 
                 entries[i].dat.PC,
                 entries[i].dat.id, 
                 entries[i].dat.inst,
@@ -542,7 +567,8 @@ module rs #(parameter
                 entries[i].dat.t1_rdy ? "+" : " ", 
                 entries[i].dat.t2, 
                 entries[i].dat.t2_rdy ? "+" : " ", 
-                entries[i].dat.rob_idx
+                entries[i].dat.rob_idx,
+                entries[i].dat.b1hot
             );
         end
     endtask
