@@ -49,11 +49,11 @@ module fifo #(
 
     input   logic   [$clog2(NUM_WPORTS):0]          wr_en_cnt,
     input   logic   [NUM_WPORTS-1:0][WIDTH-1:0]     wr_data,
-    output  PTR     [NUM_WPORTS-1:0]                wr_idxs,
+    output  PTR                                     tail,
 
     input   logic   [$clog2(NUM_RPORTS):0]          rd_en_cnt,
     output  logic   [NUM_RPORTS-1:0][WIDTH-1:0]     rd_data,
-    output  PTR     [NUM_RPORTS-1:0]                rd_idxs,
+    output  PTR                                     head,
 
     output  logic                                   empty,
     output  logic                                   full,
@@ -72,10 +72,11 @@ module fifo #(
         return (y >= x) ? (y - x) : (y + DEPTH - x);
     endfunction
 
-    logic [$clog2(DEPTH)-1:0]       head;
-    logic [$clog2(DEPTH)-1:0]       tail;
     logic [DEPTH-1:0][WIDTH-1:0]    state;
     logic [$clog2(DEPTH):0]         used, free;
+
+    PTR [NUM_WPORTS-1:0] wr_idxs;
+    PTR [NUM_RPORTS-1:0] rd_idxs;
 
     ring_ctr #(
         .DEPTH(DEPTH),

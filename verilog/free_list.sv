@@ -6,7 +6,9 @@ Free List
 ================================================
 */
 module free_list #(parameter 
-    N=`N
+    N=`N,
+    localparam DEPTH = `ROB_SZ,
+    localparam WIDTH = $bits(PHYS_REG_IDX)
 ) (
     input clock, reset, flush,
     // retire
@@ -20,8 +22,6 @@ module free_list #(parameter
     
     output free_list2dispatch d_out
 );
-    localparam DEPTH = `ROB_SZ;
-    localparam WIDTH = $bits(PHYS_REG_IDX);
     typedef struct packed {
         logic [$clog2(DEPTH)-1:0]       head;
         logic [$clog2(DEPTH)-1:0]       tail;
@@ -96,13 +96,14 @@ module free_list #(parameter
         .WIDTH(WIDTH),
         .NUM_RPORTS(`N),
         .NUM_WPORTS(`N),
-        .FLUSH_MODE(FIFO_FLUSH_HEAD),
+        .FLUSH_MODE(FIFO_FLUSH_HEAD), // FIXME
         .ENABLE_INTR_FWD(`FALSE),
         .RESET_STATE(RESET_STATE)
     ) lst (
         .clock,
         .reset,
         .flush,
+        .flush_tail('0), // FIXME
 
         .wr_en_cnt(free_cnt),
         .wr_data(told_packed),
