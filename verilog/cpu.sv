@@ -34,6 +34,7 @@ module cpu (
     /* Global controls*/
     logic flush;
     WADDR flush_PC;
+    BMASK clmsk;
 
 
     /* Memory stubs */
@@ -130,7 +131,7 @@ module cpu (
         .clock,
         .reset,
         .flush,
-        .clmsk('0),
+        .clmsk,
 
         .dis_in (rnme_2_bman),
         .dis_out(bman_2_rnme)
@@ -166,7 +167,7 @@ module cpu (
         .clock,
         .reset,
         .flush,
-        .clmsk('0),
+        .clmsk,
         .snap_in(rnme_2_snap),
 
         .ex_in  (ex_2_btq),
@@ -205,7 +206,7 @@ module cpu (
         .clock,
         .reset,
         .flush,
-        .clmsk('0),
+        .clmsk,
         .snap_in(comm_2_snap),
 
         .r_in       (retire_exec),
@@ -222,6 +223,7 @@ module cpu (
         .clock,
         .reset,
         .flush,
+        .clmsk,
 
         .rs_in      (rs_2_ex),
         .rs_out     (ex_2_rs),
@@ -253,7 +255,7 @@ module cpu (
         .clock,
         .reset,
         .flush,
-        .clmsk('0),
+        .clmsk,
         .snap_in(rnme_2_snap),
 
         .am_in  (am_2_mt),
@@ -282,7 +284,7 @@ module cpu (
         .clock,
         .reset,
         .flush,
-        .clmsk('0),
+        .clmsk,
         .snap_in(rnme_2_snap),
         .r_in   (retire_exec),
         .d_in   (dispatch_2_fl),

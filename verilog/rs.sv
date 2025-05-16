@@ -314,6 +314,7 @@ module rs #(parameter
 `ifdef DEBUG
                 id          : d_in.dat[i].id,
 `endif
+                bmask       : d_in.dat[i].bmask,
 
                 PC          : d_in.dat[i].PC,
                 inst        : d_in.dat[i].inst,
@@ -341,6 +342,7 @@ module rs #(parameter
                 PC          : d_in.dat[i].PC,
                 inst        : d_in.dat[i].inst,
 `endif
+                bmask       : d_in.dat[i].bmask,
 
                 t           : d_in.dat[i].t,
                 t1          : d_in.dat[i].t1,
@@ -360,6 +362,8 @@ module rs #(parameter
 `ifdef DEBUG
                 id          : d_in.dat[i].id,
 `endif
+                b1hot       : d_in.dat[i].b1hot,
+                bmask       : d_in.dat[i].bmask,
 
                 PC          : d_in.dat[i].PC,
                 inst        : d_in.dat[i].inst,

@@ -405,6 +405,7 @@ module dispatch #(parameter
             rnme_snap_prefix_cnt[1],
             rnme_snap_prefix_cnt[2]
         );
+        $display("bman_in.snap_rdy_scnt: %1d", bman_in.snap_rdy_scnt);
         $display("bman_out.snap_en_cnt: %1d", bman_out.snap_en_cnt);
         $display("rnme_snap_out.snap_en: %b", rnme_snap_out.snap_en);
         $display("rob_in.rob_rdy_scnt: %d",  rob_in.rob_rdy_scnt);

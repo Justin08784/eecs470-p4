@@ -66,7 +66,7 @@ typedef logic [BMASK_LEN-1:0] BMASK;
 
 `ifndef SYNTH
 // comment out to disable DEBUG:
-`define DEBUG
+// `define DEBUG
 // comment to disable clock cycle print
 // `define CYCLE_PRINT
 `endif
@@ -493,6 +493,7 @@ typedef struct packed {
 `ifdef DEBUG
     int             id; // debug only; unique insn identifier
 `endif
+    BMASK           bmask;
 
     WADDR           PC;
     INST            inst;
@@ -516,6 +517,7 @@ typedef struct packed {
     WADDR           PC;
     INST            inst;
 `endif
+    BMASK           bmask;
 
     PHYS_REG_IDX    t;
     PHYS_REG_IDX    t1;
@@ -550,6 +552,8 @@ typedef struct packed {
 `ifdef DEBUG
     int             id;
 `endif
+    BMASK           b1hot;
+    BMASK           bmask;
 
     WADDR           PC;
     INST            inst;

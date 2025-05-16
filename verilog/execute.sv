@@ -237,6 +237,7 @@ module bru_ex(
     input clock,
     input reset,
     input flush,
+    output BMASK clmsk,
 
     /* FRONTEND */
     input  logic [`NUM_FU_BRU-1:0]      i_vld,
@@ -247,6 +248,10 @@ module bru_ex(
     output execute2btq                  o_btq_out,
     output CPL_CAND [`NUM_FU_BRU-1:0]   o_cands
 );
+    initial begin
+        assert (`NUM_FU_BRU == 1) else $fatal("bru_ex: assumes 1 BRU");
+    end
+
     BRU_OPS [`NUM_FU_BRU-1:0] ops;
     ADDR    [`NUM_FU_BRU-1:0] pc_addrs, npc_addrs;
     always_comb begin
@@ -319,12 +324,17 @@ module bru_ex(
 
         end
     endgenerate
+
+    assign clmsk = i_vld[0]
+        ? i_regs[0].b1hot
+        : '0;
 endmodule
 
 module stage_ex_p4 (
     input clock,
     input reset,
     input flush,
+    output  BMASK clmsk,
 
     input   rs2execute rs_in,
     output  execute2rs rs_out,
@@ -382,6 +392,8 @@ module stage_ex_p4 (
         for (genvar i = 0; i < `NUM_FU_ALU; ++i) begin : gen_alu_sbufs
             assign iss.i_dat.alu[i] = '{
                 bytag   : rs_in.bytag_alu[i],
+                bmask   : rs_in.fu_dat_alu[i].bmask,
+
                 t       : rs_in.fu_dat_alu[i].t,
                 t1      : rs_in.fu_dat_alu[i].t1,
                 t2      : rs_in.fu_dat_alu[i].t2,
@@ -413,6 +425,8 @@ module stage_ex_p4 (
         
         for (genvar i = 0; i < `NUM_FU_MUL; ++i) begin : gen_mul_sbufs
             assign iss.i_dat.mul[i] = '{
+                bmask   : rs_in.fu_dat_mul[i].bmask,
+
                 t       : rs_in.fu_dat_mul[i].t,
                 t1      : rs_in.fu_dat_mul[i].t1,
                 t2      : rs_in.fu_dat_mul[i].t2,
@@ -504,6 +518,9 @@ module stage_ex_p4 (
         for (genvar i = 0; i < `NUM_FU_BRU; ++i) begin : gen_bru_sbufs
             assign iss.i_dat.bru[i] = '{
                 bytag   : rs_in.bytag_bru[i],
+                bmask   : rs_in.fu_dat_bru[i].bmask,
+                b1hot   : rs_in.fu_dat_bru[i].b1hot,
+
                 t       : rs_in.fu_dat_bru[i].t,
                 t1      : rs_in.fu_dat_bru[i].t1,
                 t2      : rs_in.fu_dat_bru[i].t2,
@@ -590,6 +607,8 @@ module stage_ex_p4 (
 
             regs.i_dat.alu[i] = '{
                 bytag : iss.o_dat.alu[i].bytag,
+                bmask : iss.o_dat.alu[i].bmask,
+
                 rs1 : prf_in.v1s.alu[i],
                 opb : opb_is_rs2
                     ? prf_in.v2s.alu[i]
@@ -606,6 +625,8 @@ module stage_ex_p4 (
         end
         foreach (iss.o_vld.mul[i]) begin
             regs.i_dat.mul[i] = '{
+                bmask : iss.o_dat.mul[i].bmask,
+
                 rs1 : prf_in.v1s.mul[i],
                 rs2 : prf_in.v2s.mul[i],
                 t1  : iss.o_dat.mul[i].t1,
@@ -641,6 +662,10 @@ module stage_ex_p4 (
 
             regs.i_dat.bru[i] = '{
                 bytag : iss.o_dat.bru[i].bytag,
+                bmask : iss.o_dat.bru[i].bmask,
+                b1hot : iss.o_dat.bru[i].b1hot,
+
+
                 rs1 : prf_in.v1s.bru[i],
                 rs2 : prf_in.v2s.bru[i],
 
@@ -845,6 +870,7 @@ module stage_ex_p4 (
         .clock  (clock),
         .reset  (reset),
         .flush  (flush),
+        .clmsk,
 
         .i_vld  (regs.o_vld.bru),
         .i_regs (regs.o_dat.bru),
