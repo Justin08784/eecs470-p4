@@ -106,7 +106,6 @@ module alu_ex(
 
     // execute
     generate
-        CPL_CAND    [`NUM_FU_ALU-1:0] tmp_data;
         DATA        [`NUM_FU_ALU-1:0] tmp_res;
         for (genvar i = 0; i < `NUM_FU_ALU; ++i) begin : gen_alus
             alu alu_0 ( 
@@ -116,16 +115,15 @@ module alu_ex(
                 .alu_func   (ops[i].alu_func),
 
                 // Output (directly to cdat_out)
-                .result(tmp_res[i]) // will return 32'hfacebeec if branch is high
+                .result     (tmp_res[i])
             );
 
-            assign tmp_data[i] = '{
+            assign o_cands[i] = '{
+                vld     : i_vld[i],
                 t       : ops[i].t,
                 rob_idx : ops[i].rob_idx,
                 data    : tmp_res[i]
             };
-
-            assign o_cands[i] = tmp_data[i];
         end
     endgenerate
 endmodule
@@ -155,6 +153,7 @@ module mul_ex(
     always_comb begin
         foreach (ops[i]) begin
             ops[i] = '{
+                bmask   : i_regs[i].bmask,
                 rs1     : i_regs[i].rs1,
                 rs2     : i_regs[i].rs2,
                 func    : i_regs[i].func,
@@ -167,10 +166,10 @@ module mul_ex(
     // execute
     generate
         DATA        [`NUM_FU_MUL-1:0] tmp_res;
+        logic       [`NUM_FU_MUL-1:0] tmp_vld;
         PHYS_REG_IDX[`NUM_FU_MUL-1:0] tmp_t;
         ROB_IDX     [`NUM_FU_MUL-1:0] tmp_rob_idx;
 
-        logic       [`NUM_FU_MUL-1:0] cpl_buf_rdy;
         for (genvar i = 0; i < `NUM_FU_MUL; ++i) begin : gen_mults
             mult #(
                 .ID(i)
@@ -184,6 +183,7 @@ module mul_ex(
                 .rs1    (ops[i].rs1),
                 .rs2    (ops[i].rs2),
                 .func   (ops[i].func),
+                .i_bmask(ops[i].bmask),
                 .i_t    (ops[i].t),
                 .i_rob_idx(ops[i].rob_idx),
 
@@ -192,12 +192,14 @@ module mul_ex(
                 .cdb_gnt(cdb_gnt[i]),
 
                 // Output (directly to cdat_out)
+                .o_vld  (tmp_vld[i]),
                 .o_t    (tmp_t[i]),
                 .o_rob_idx(tmp_rob_idx[i]),
                 .result (tmp_res[i])
             );
 
             assign o_cands[i] = '{
+                vld     : tmp_vld[i],
                 t       : tmp_t[i],
                 rob_idx : tmp_rob_idx[i],
                 data    : tmp_res[i]
@@ -288,7 +290,6 @@ module bru_ex(
 
     // execute
     generate
-        CPL_CAND    [`NUM_FU_BRU-1:0] tmp_data;
         DATA        [`NUM_FU_BRU-1:0] tmp_res;
         logic       [`NUM_FU_BRU-1:0] cond_take, tmp_take;
         for (genvar i = 0; i < `NUM_FU_BRU; ++i) begin : gen_brus
@@ -307,13 +308,12 @@ module bru_ex(
 
             assign tmp_take[i] = !ops[i].cond_branch || cond_take[i];
 
-            assign tmp_data[i] = '{
+            assign o_cands[i] = '{
+                vld     : i_vld[i],
                 t       : ops[i].t,
                 rob_idx : ops[i].rob_idx,
                 data    : tmp_take[i] ? npc_addrs[i] : tmp_res[i]
             };
-
-            assign o_cands[i] = tmp_data[i];
 
             assign o_btq_out.dat[i] = '{
                 en      : i_vld[i],
@@ -846,7 +846,7 @@ module stage_ex_p4 (
         .o_cands(cands.alu)
     );
 
-    `BY_FU(PHYS_REG_IDX) ctag_ts;
+    `BY_FU(PHYS_REG_IDX) ctag_ts; // FIXME: do we need selective flush this?
     PHYS_REG_IDX [`NUM_FU_TOTAL-1:0] ctag_ts_flat;
 
     mul_ex mul_ex0 (
@@ -911,7 +911,7 @@ module stage_ex_p4 (
             end
 
             if (cdb2fu_gbus_shr[1][c][f]) begin
-                cdat_out_n.en[c]        |= 1;
+                cdat_out_n.en[c]        |= cands_flat[f].vld;
                 cdat_out_n.ts[c]        |= cands_flat[f].t;
                 cdat_out_n.rob_idxs[c]  |= cands_flat[f].rob_idx;
                 cdat_out_n.data[c]      |= cands_flat[f].data;

@@ -4,6 +4,7 @@
 `include "sys_defs.svh"
 
 typedef struct packed {
+    logic vld;
     PHYS_REG_IDX t;
     ROB_IDX rob_idx;
     DATA data;
@@ -156,6 +157,8 @@ typedef struct packed {
 } ALU_OPS;
 
 typedef struct packed {
+    BMASK           bmask;
+
     DATA            rs1;
     DATA            rs2;
     MUL_FUNC        func;

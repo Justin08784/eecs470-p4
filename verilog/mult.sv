@@ -6,6 +6,7 @@ typedef struct packed {
     logic [63:0]    mplier;
     logic [63:0]    mcand;
     MUL_FUNC        func;
+    BMASK           bmask;
     PHYS_REG_IDX    t;
     ROB_IDX         rob_idx;
 } MUL_PKT;
@@ -28,6 +29,7 @@ module mult #(
     input clock, reset, flush,
     input DATA rs1, rs2,
     input MUL_FUNC func,
+    input BMASK         i_bmask,
     input PHYS_REG_IDX  i_t,
     input ROB_IDX       i_rob_idx,
 
@@ -64,6 +66,7 @@ module mult #(
             mplier  : i_mplier,
             mcand   : i_mcand,
             func    : func,
+            bmask   : i_bmask,
             t       : i_t,
             rob_idx : i_rob_idx
         };
@@ -230,6 +233,7 @@ module mult_stage #(
             mplier  : shifted_mplier,
             mcand   : shifted_mcand,
             func    : i_dat.func,
+            bmask   : i_dat.bmask,
             t       : i_dat.t,
             rob_idx : i_dat.rob_idx
         };

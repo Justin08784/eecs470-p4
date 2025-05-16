@@ -577,7 +577,7 @@ module testbench;
         // print_decode();
         print_rob();
         print_fl();
-        // print_dispatch();
+        print_dispatch();
         // print_map_table();
         // print_prf();
         // print_btq();
