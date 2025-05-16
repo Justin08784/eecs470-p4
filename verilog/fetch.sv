@@ -76,11 +76,18 @@ module stage_if_p4 (
         .puq_in(puq_2_btb)
     );
 
-    always_comb begin
-        logic [$clog2(`N):0] lim_cnt_btq;
-        logic [`N-1:0] f_en;
-        logic [$clog2(`N):0] btq_wr_idx;
+    logic [`N:0][$clog2(`N):0] btq_prefix_cnt;
+    logic [$clog2(`N):0] btq_lim_cnt;
+    compactor #(
+        .WIDTH(`N)
+    ) comp_btq (
+        .req        (is_brch),
+        .rdy        (btq_in.btq_rdy_scnt),
+        .gnt_cnt    (btq_lim_cnt),
+        .prefix_cnt (btq_prefix_cnt)
+    );
 
+    always_comb begin
         // stop fetching beyond the first predicted taken branch
         f_cnt = 0;
         for (int i = 0; i < `N; ++i) begin
@@ -92,14 +99,6 @@ module stage_if_p4 (
             end
         end
 
-        lim_cnt_btq = 0;
-        for (int i = 0, int used_cnt = 0; i < `N; ++i) begin
-            if (used_cnt + is_brch[i] > btq_in.btq_rdy_scnt)
-                break;
-            used_cnt += is_brch[i];
-            ++lim_cnt_btq;
-        end
-        f_cnt = `MIN(lim_cnt_btq, f_cnt);
 
         for (int unsigned i = 0; i < `N; ++i) begin
             logic woff;
@@ -114,20 +113,14 @@ module stage_if_p4 (
 
         // handle btq output
         btq_out = '0;
-        btq_wr_idx = 0;
-        foreach (f_en[i])
-            f_en[i] = i < f_cnt;
-
-        btq_out.en_cnt = $countones(f_en & is_brch);
+        f_cnt = `MIN(btq_lim_cnt, f_cnt);
+        btq_out.en_cnt = btq_prefix_cnt[f_cnt];
         for (int i = 0; i < `N; ++i) begin
-            if (!is_brch[i])
-                continue;
-            f_dat[i].btq_idx  = btq_in.btq_idxs[btq_wr_idx];
+            f_dat[i].btq_idx = btq_in.btq_idxs[btq_prefix_cnt[i]];
 
-            btq_out.PC[btq_wr_idx]       = PC_n[i];
-            btq_out.pred[btq_wr_idx]     = pred[i];
-            btq_out.pred_tgt[btq_wr_idx] = pred_tgt[i];
-            ++btq_wr_idx;
+            btq_out.PC      [btq_prefix_cnt[i]] = PC_n[i];
+            btq_out.pred    [btq_prefix_cnt[i]] = pred[i];
+            btq_out.pred_tgt[btq_prefix_cnt[i]] = pred_tgt[i];
         end
 
 

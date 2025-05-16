@@ -7,6 +7,10 @@ module dispatch #(parameter
     input   reset,
     input   flush,
 
+    // branch manager
+    input   bman2dispatch bman_in,
+    output  dispatch2bman bman_out,
+
     // DECODE
     input   decode2dispatch d_in,
     output  dispatch2decode d_out,
@@ -39,37 +43,31 @@ module dispatch #(parameter
     logic [$clog2(N):0] alloc_vld_scnt;
 
     // Gate by availability
+    logic [`N-1:0] has_dst;
+    logic [`N:0][$clog2(`N):0] free_prefix_cnt;
+    logic [$clog2(`N):0] free_lim_cnt;
+    compactor #(
+        .WIDTH(`N)
+    ) comp_free (
+        .req        (has_dst),
+        .rdy        (free_in.free_rdy_scnt),
+        .gnt_cnt    (free_lim_cnt),
+        .prefix_cnt (free_prefix_cnt)
+    );
+
     always_comb begin
-        logic [$clog2(N):0] lim_cnt_free;
+        foreach (has_dst[n])
+            has_dst[n] = d_in.d_dat[n].has_dst;
 
         // TODO: Is syntheizer smart enough to transform this MIN compute into a tree?
         alloc_en_cnt = d_in.d_vld_scnt;
         alloc_en_cnt = `MIN(rob_in.rob_rdy_scnt, alloc_en_cnt);
-
-        lim_cnt_free = 0;
-        for (int i = 0, int used_cnt = 0; i < `N; ++i) begin
-            if (used_cnt + d_in.d_dat[i].has_dst > free_in.free_rdy_scnt)
-                break;
-            used_cnt += d_in.d_dat[i].has_dst;
-            ++lim_cnt_free;
-        end
-        alloc_en_cnt = `MIN(lim_cnt_free, alloc_en_cnt);
+        alloc_en_cnt = `MIN(free_lim_cnt, alloc_en_cnt);
         alloc_en_cnt = `MIN(alloc_rdy_scnt, alloc_en_cnt);
 
         d_out.dispatch_en_cnt  = alloc_en_cnt;
         rob_out.alloc_en_cnt   = alloc_en_cnt;
-    end
-
-    //logic for free list
-    logic [N-1:0]           bus_alloc_preg;
-    logic [$clog2(N):0]     num_alloc_preg;
-    always_comb begin
-        //determining how many instructions have a dest reg
-        foreach (bus_alloc_preg[i])
-            bus_alloc_preg[i] = (i < alloc_en_cnt) && d_in.d_dat[i].has_dst; 
-
-        num_alloc_preg = $countones(bus_alloc_preg);
-        free_out.free_d_en_cnt = num_alloc_preg;
+        free_out.free_d_en_cnt = free_prefix_cnt[alloc_en_cnt];
     end
 
     ALLOC_RENAME_PKT [`N-1:0] tmp_decode2alloc;
@@ -102,18 +100,11 @@ module dispatch #(parameter
                 btq_idx     : d_in.d_dat[i].btq_idx,
 
                 // alloc
-                t           : '0
+                t   : has_dst[i]
+                    ? free_in.d_ts[free_prefix_cnt[i]]
+                    : '0
             };
 
-        end
-
-        //handling dest tags
-        rd_idx = 0;
-        for (int i = 0; i < N; ++i) begin
-            if (bus_alloc_preg[i]) begin
-                tmp_decode2alloc[i].t |= free_in.d_ts[rd_idx];
-                ++rd_idx;
-            end
         end
     end
 

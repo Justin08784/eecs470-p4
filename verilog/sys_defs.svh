@@ -972,6 +972,32 @@ typedef struct packed {
     } fifo;
 } DBG_fl;
 
+module compactor #(
+    parameter int WIDTH=`N,
+    type CNT=logic [$clog2(WIDTH):0]
+) (
+    input   logic [WIDTH-1:0] req, // in-order, sparse
+    input   CNT rdy,
+    output  CNT gnt_cnt,
+    output  CNT [WIDTH:0] prefix_cnt
+        // prefix_cnt[i] "left-compacted index" for the i-th lane.
+        // (valid iff req[i])
+);
+    // NOTE: upgrade prefix_cnt to a tree adder if speed needed
+    assign prefix_cnt[0] = '0;
+    for (genvar i = 0; i < WIDTH; ++i)
+        assign prefix_cnt[i+1] = prefix_cnt[i] + req[i];
+
+    always_comb begin
+        gnt_cnt = 0;
+        for (int i = 0; i < WIDTH; ++i) begin
+            if (prefix_cnt[i] + req[i] > rdy)
+                break;
+            gnt_cnt = i + 1;
+        end
+    end
+endmodule
+
 `ifdef DEBUG
 // OPTIONAL: Print our your data here
 // It will go to the $program.log file
