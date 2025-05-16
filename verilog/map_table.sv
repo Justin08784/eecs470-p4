@@ -28,7 +28,7 @@ module map_table #(parameter
     input  arch_map2map_table am_in,
 
     // dispatch
-    input  bman2snap_bus      snap_in,
+    input  rename2snap_bus      snap_in,
     input  dispatch2map_table d_in,
     output map_table2dispatch d_out, 
 
@@ -79,7 +79,7 @@ module map_table #(parameter
         .udst   (r_in.dst),
         .ut     (r_in.tag),
 
-        .wen_cnt(snap_in.snap_en_cnt),
+        .wen    (snap_in.snap_en),
         .wmsk   (snap_in.b1hot_n),
         .wdat   (entries_n[`N-1:0])
     );

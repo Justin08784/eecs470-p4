@@ -8,8 +8,11 @@ module dispatch #(parameter
     input   flush,
 
     // branch manager
-    input   bman2dispatch bman_in,
-    output  dispatch2bman bman_out,
+    input   bman2rename bman_in,
+    output  rename2bman bman_out,
+    // snapshot bus
+    output  rename2snap_bus rnme_snap_out,
+    output  comm2snap_bus   comm_snap_out,
 
     // DECODE
     input   decode2dispatch d_in,
@@ -135,9 +138,27 @@ module dispatch #(parameter
 
     /* >> ==== 2. Rename Stage ==== >> */
 
+    logic [`N-1:0] rnme_is_brch;
+    logic [`N:0][$clog2(`N):0] rnme_snap_prefix_cnt;
+    logic [$clog2(`N):0] rnme_snap_lim_cnt;
+    compactor #(
+        .WIDTH(`N)
+    ) comp_rnme_snap (
+        .req        (rnme_is_brch),
+        .rdy        (bman_in.snap_rdy_scnt),
+        .gnt_cnt    (rnme_snap_lim_cnt),
+        .prefix_cnt (rnme_snap_prefix_cnt)
+    );
+
     always_comb begin
+        foreach (rnme_is_brch[n])
+            rnme_is_brch[n] = rename_in[n].fu_idx == FU_BRU;
+
         rename_en_cnt = alloc_vld_scnt;
         rename_en_cnt = `MIN(rename_rdy_scnt, rename_en_cnt);
+        rename_en_cnt = `MIN(rnme_snap_lim_cnt, rename_en_cnt);
+        bman_out = '0; // FIXME: disable
+        // bman_out.snap_en_cnt = rnme_snap_prefix_cnt[rename_en_cnt];
     end
 
     // handle map table output 
@@ -190,6 +211,8 @@ module dispatch #(parameter
                 // alloc
                 t           : rename_in[i].t,
                 // rename
+                b1hot       : '0,
+                bmask       : '0,
                 t_old       : '0,
                 t1          : '0,
                 t2          : '0,
@@ -202,6 +225,9 @@ module dispatch #(parameter
             tmp_alloc2rename[i].t1      = map_in.t1s[i];
             tmp_alloc2rename[i].t2      = map_in.t2s[i];
 
+            tmp_alloc2rename[i].b1hot = bman_in.b1hot_n[rnme_snap_prefix_cnt[i]];
+            tmp_alloc2rename[i].bmask = bman_in.bmask_n[rnme_snap_prefix_cnt[i]];
+
             // actually need src tags?
             rd_src1s[i] = rename_in[i].opa_select == OPA_IS_RS1
                 || rename_in[i].cond_branch;
@@ -210,6 +236,12 @@ module dispatch #(parameter
                 || rename_in[i].fu_idx == FU_STR;
             tmp_alloc2rename[i].t1_rdy  = !rd_src1s[i];
             tmp_alloc2rename[i].t2_rdy  = !rd_src2s[i];
+        end
+
+        for (int i = 0; i < `N; ++i) begin
+            rnme_snap_out.snap_en[i] = rnme_is_brch[i] && (i < rename_en_cnt);
+            rnme_snap_out.b1hot_n[i] = bman_in.b1hot_n[rnme_snap_prefix_cnt[i]]; // only valid if snap_en
+            rnme_snap_out.btq_tail[i]= rename_in[i].btq_idx;
         end
     end
 
@@ -238,10 +270,24 @@ module dispatch #(parameter
 
     /* >> ==== 3. Commit Stage ==== >> */
 
+    logic [`N-1:0] comm_is_brch;
+    logic [`N:0][$clog2(`N):0] comm_snap_prefix_cnt;
+    compactor #(
+        .WIDTH(`N)
+    ) comp_comm_snap (
+        .req        (comm_is_brch),
+        .rdy        (),
+        .gnt_cnt    (),
+        .prefix_cnt (comm_snap_prefix_cnt)
+    );
+
     // handle rs output 
     always_comb begin
         logic [`FU_IDX_NUM-1:0][`N-1:0] en_by_fu;
         logic [`N-1:0] commit_en;
+
+        foreach (comm_is_brch[n])
+            comm_is_brch[n] = commit_in[n].fu_idx == FU_BRU;
 
         foreach (en_by_fu[f, n]) begin
             en_by_fu[f][n] = (n < rename_vld_scnt)
@@ -289,6 +335,8 @@ module dispatch #(parameter
                 // alloc
                 t           : commit_in[i].t,
                 // rename
+                b1hot       : commit_in[i].b1hot,
+                bmask       : commit_in[i].bmask,
                 t_old       : commit_in[i].t_old,
                 t1          : commit_in[i].t1,
                 t2          : commit_in[i].t2,
@@ -305,6 +353,10 @@ module dispatch #(parameter
             end
             rs_out.dat[i].t1_rdy |= cpl_lst[commit_in[i].t1];
             rs_out.dat[i].t2_rdy |= cpl_lst[commit_in[i].t2];
+
+            comm_snap_out.snap_en[i]= comm_is_brch[i] && (i < commit_en_cnt);
+            comm_snap_out.b1hot_n[i]= commit_in[i].b1hot; // only valid if snap_en
+            comm_snap_out.rob_tail[i]=rob_in.rob_idxs[i];
         end
     end
 

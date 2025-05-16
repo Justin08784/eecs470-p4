@@ -96,8 +96,10 @@ module cpu (
     map_table2dispatch map_2_dispatch;
     execute2complete_tag ex_2_ctag;
     execute2complete_dat ex_2_cdat;
-    dispatch2bman dis_2_bman;
-    bman2dispatch bman_2_dis;
+    rename2bman rnme_2_bman;
+    bman2rename bman_2_rnme;
+    rename2snap_bus rnme_2_snap;
+    comm2snap_bus   comm_2_snap;
 
     dispatch dispatch0 (
         .clock,
@@ -114,24 +116,24 @@ module cpu (
         .free_out   (dispatch_2_fl),
         .map_in     (map_2_dispatch),
         .map_out    (dispatch_2_map),
-        .bman_in    (bman_2_dis),
-        .bman_out   (dis_2_bman),
+        .bman_in    (bman_2_rnme),
+        .bman_out   (rnme_2_bman),
+        .rnme_snap_out (rnme_2_snap),
+        .comm_snap_out (comm_2_snap),
 
         .ctag_in    (ex_2_ctag)
     );
 
 
     /* >> ==== Branch manager ==== >> */
-    bman2snap_bus bman_2_snap;
     branch_manager bman (
         .clock,
         .reset,
         .flush,
         .clmsk('0),
 
-        .dis_in(dis_2_bman),
-        .dis_out(bman_2_dis),
-        .snap_out(bman_2_snap)
+        .dis_in (rnme_2_bman),
+        .dis_out(bman_2_rnme)
     );
 
 
@@ -165,7 +167,7 @@ module cpu (
         .reset,
         .flush,
         .clmsk('0),
-        .snap_in(bman_2_snap),
+        .snap_in(rnme_2_snap),
 
         .ex_in  (ex_2_btq),
 
@@ -204,7 +206,7 @@ module cpu (
         .reset,
         .flush,
         .clmsk('0),
-        .snap_in(bman_2_snap),
+        .snap_in(comm_2_snap),
 
         .r_in       (retire_exec),
         .r_out      (rob_2_retire),
@@ -252,7 +254,7 @@ module cpu (
         .reset,
         .flush,
         .clmsk('0),
-        .snap_in(bman_2_snap),
+        .snap_in(rnme_2_snap),
 
         .am_in  (am_2_mt),
         .d_in   (dispatch_2_map),
@@ -281,7 +283,7 @@ module cpu (
         .reset,
         .flush,
         .clmsk('0),
-        .snap_in(bman_2_snap),
+        .snap_in(rnme_2_snap),
         .r_in   (retire_exec),
         .d_in   (dispatch_2_fl),
         .d_out  (fl_2_dispatch)

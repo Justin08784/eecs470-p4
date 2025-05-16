@@ -15,7 +15,7 @@ module rob #(
     input  execute2complete_dat cdat_in,
 
     // dispatch (write)
-    input  bman2snap_bus snap_in, // alloc snapshot
+    input  comm2snap_bus snap_in, // alloc snapshot
     output rob2dispatch d_out,
     input  dispatch2rob d_in
 );
@@ -75,8 +75,8 @@ module rob #(
         .rmsk   (clmsk),
         .rdat   (snap),
 
-        .wen_cnt(snap_in.comm_en_cnt),
-        .wmsk   (snap_in.comm_b1hot_n),
+        .wen    (snap_in.snap_en),
+        .wmsk   (snap_in.b1hot_n),
         .wdat   (snap_in.rob_tail)
     );
 

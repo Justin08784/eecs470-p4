@@ -640,6 +640,8 @@ typedef struct packed {
     // alloc
     PHYS_REG_IDX    t;
     // rename
+    BMASK           b1hot;
+    BMASK           bmask;
     PHYS_REG_IDX    t_old;
     PHYS_REG_IDX    t1;
     PHYS_REG_IDX    t2;
@@ -670,6 +672,8 @@ typedef struct packed {
     // alloc
     PHYS_REG_IDX    t;
     // rename
+    BMASK           b1hot;
+    BMASK           bmask;
     PHYS_REG_IDX    t_old; // should be unused in RS
     PHYS_REG_IDX    t1;
     PHYS_REG_IDX    t2;
@@ -751,36 +755,27 @@ typedef struct packed {
 
 typedef struct packed {
     logic [$clog2(`N):0] snap_en_cnt;
-    // rename
-    logic [`N-1:0][$clog2(`BTQ_SZ)-1:0] btq_tail;
-    // mt, fl checkpoints are handled locally
-
-    // commit
-    logic [$clog2(`N):0] comm_en_cnt;
-    BMASK [`N-1:0] comm_b1hot_n;
-    logic [`N-1:0][$clog2(`ROB_SZ)-1:0] rob_tail;
-} dispatch2bman;
+} rename2bman;
 
 typedef struct packed {
-    logic [$clog2(`N):0] snap_en_cnt;
-    BMASK [`N-1:0] b1hot_n;
+    logic [$clog2(`N):0] snap_rdy_scnt;
+    BMASK [`N-1:0]  b1hot_n;
+    BMASK [`N:0]    bmask_n;
+} bman2rename;
 
-    // rename
+typedef struct packed {
+    logic [`N-1:0] snap_en;
+    BMASK [`N-1:0] b1hot_n;
     logic [`N-1:0][$clog2(`BTQ_SZ)-1:0] btq_tail;
     // logic [`N-1:0][$clog2(`ROB_SZ)-1:0] fl_tail;
     // mt, fl checkpoints are handled locally
-
-    // commit
-    logic [$clog2(`N):0] comm_en_cnt;
-    BMASK [`N-1:0] comm_b1hot_n;
-    logic [`N-1:0][$clog2(`ROB_SZ)-1:0] rob_tail;
-} bman2snap_bus;
+} rename2snap_bus;
 
 typedef struct packed {
-    logic [$clog2(`N):0] rdy_scnt;
+    logic [`N-1:0] snap_en;
     BMASK [`N-1:0] b1hot_n;
-    BMASK [`N:0] bmask_n;
-} bman2dispatch;
+    logic [`N-1:0][$clog2(`ROB_SZ)-1:0] rob_tail;
+} comm2snap_bus;
 
 typedef struct packed {
     /* Alloc */

@@ -10,7 +10,7 @@ module general_snaps #(
     output  logic [WIDTH-1:0] rdat,
 
     // write line
-    input   logic [$clog2(`N):0] wen_cnt,
+    input   logic [`N-1:0] wen,
     input   BMASK [`N-1:0] wmsk,
     input   logic [`N-1:0][WIDTH-1:0] wdat
 );
@@ -27,7 +27,9 @@ module general_snaps #(
     end
 
     always_ff @(posedge clock) begin
-        for (int n = 0; n < wen_cnt; ++n) begin
+        for (int n = 0; n < `N; ++n) begin
+            if (!wen[n])
+                continue;
             for (int i = 0; i < BMASK_LEN; ++i) begin
                 if (!wmsk[n][i])
                     continue;
@@ -52,7 +54,7 @@ module fl_snaps #(
     input   logic   [$clog2(`N):0] uen_cnt,
 
     // write line
-    input   logic   [$clog2(`N):0] wen_cnt,
+    input   logic   [`N-1:0] wen,
     input   BMASK   [`N-1:0] wmsk,
     input   PTR     [`N-1:0] wdat
 );
@@ -73,7 +75,9 @@ module fl_snaps #(
         end
 
         snaps_n = snaps;
-        for (int n = 0; n < wen_cnt; ++n) begin
+        for (int n = 0; n < `N; ++n) begin
+            if (!wen[n])
+                continue;
             for (int i = 0; i < BMASK_LEN; ++i) begin
                 if (!wmsk[n][i])
                     continue;
@@ -106,7 +110,7 @@ module mt_snaps #(
     input   PHYS_REG_IDX[`N-1:0] ut,
 
     // write line
-    input   logic [$clog2(`N):0] wen_cnt,
+    input   logic [`N-1:0] wen,
     input   BMASK [`N-1:0] wmsk,
     input   PHYS_REG_IDX [`N-1:0][`NUM_ARCH_REG-1:0] wdat
 );
@@ -123,7 +127,9 @@ module mt_snaps #(
     end
 
     always_ff @(posedge clock) begin
-        for (int n = 0; n < wen_cnt; ++n) begin
+        for (int n = 0; n < `N; ++n) begin
+            if (!wen[n])
+                continue;
             for (int i = 0; i < BMASK_LEN; ++i) begin
                 if (!wmsk[n][i])
                     continue;
@@ -148,10 +154,8 @@ module branch_manager (
     input   BMASK clmsk,
 
     // alloc
-    input   dispatch2bman dis_in,
-    output  bman2dispatch dis_out,
-
-    output  bman2snap_bus snap_out
+    input   rename2bman dis_in,
+    output  bman2rename dis_out
 );
     BMASK bmask_reg;
     
@@ -174,11 +178,11 @@ module branch_manager (
     end
     endgenerate
     always_comb begin
-        dis_out.rdy_scnt = `N;
+        dis_out.snap_rdy_scnt = `N;
         for (int n = 0; n < `N; ++n) begin
             if (|b1hot_n[n])
                 continue;
-            dis_out.rdy_scnt = n;
+            dis_out.snap_rdy_scnt = n;
             break;
         end
     end
@@ -192,16 +196,5 @@ module branch_manager (
             bmask_reg <= bmask_n[dis_in.snap_en_cnt] & ~clmsk;
         end
     end
-
-    assign snap_out = '{
-        b1hot_n     : b1hot_n,
-        // pass throughs
-        snap_en_cnt : dis_in.snap_en_cnt,
-        btq_tail    : dis_in.btq_tail,
-        // fl_tail     : dis_in.fl_tail,
-        comm_en_cnt : dis_in.comm_en_cnt,
-        comm_b1hot_n: dis_in.comm_b1hot_n,
-        rob_tail    : dis_in.rob_tail
-    };
 
 endmodule

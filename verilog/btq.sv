@@ -18,7 +18,7 @@ module btq #(
     input  execute2btq  ex_in,
 
     // dispatch (alloc snapshot)
-    input  bman2snap_bus snap_in,
+    input  rename2snap_bus snap_in,
 
     // fetch
     input  fetch2btq    f_in,
@@ -72,7 +72,7 @@ module btq #(
         .rmsk   (clmsk),
         .rdat   (snap),
 
-        .wen_cnt(snap_in.snap_en_cnt),
+        .wen    (snap_in.snap_en),
         .wmsk   (snap_in.b1hot_n),
         .wdat   (snap_in.btq_tail)
     );

@@ -20,7 +20,7 @@ module free_list #(parameter
     // issue ??
 
     // dispatch
-    input  bman2snap_bus snap_in, // alloc snapshot
+    input  rename2snap_bus snap_in, // alloc snapshot
 
     input dispatch2free_list d_in,
     
@@ -129,7 +129,7 @@ module free_list #(parameter
 
         .uen_cnt(free_cnt),
 
-        .wen_cnt(snap_in.snap_en_cnt),
+        .wen    (snap_in.snap_en),
         .wmsk   (snap_in.b1hot_n),
         .wdat   ({N{tail}})
     );
