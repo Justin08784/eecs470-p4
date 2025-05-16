@@ -24,7 +24,7 @@ module flop #(
     logic kill;
     always_comb begin
         unique case (FLUSH_MODE)
-        SKID_FLUSH_MASK:    kill = flush && |(i_msk & clmsk);
+        SKID_FLUSH_MASK:    kill = flush && |(msk & clmsk);
         SKID_FLUSH_IGNORE:  kill = 1'b0;
         default:            kill = flush;
         endcase
@@ -36,14 +36,14 @@ module flop #(
             msk <= '0;
             dat <= '0;
         end else begin
-            vld <= i_vld && !kill;
-            msk <= i_msk & ~clmsk;
+            vld <= i_vld;
+            msk <= i_msk;
             dat <= i_dat;
         end
     end
 
-    assign o_vld = vld;
-    assign o_msk = msk;
+    assign o_vld = vld && !kill;
+    assign o_msk = msk & ~clmsk;
     assign o_dat = dat;
 endmodule
 
@@ -75,30 +75,19 @@ module skid #(
     BMASK msk;
     logic [WIDTH-1:0] dat;
 
-    always_comb begin
-        i_rdy = !vld || o_rdy;
-        o_vld = vld;
-        o_msk = msk;
-        o_dat = dat;
-    end
-
-    logic i_kill, kill;
+    logic kill;
     always_comb begin
         unique case (FLUSH_MODE)
-        SKID_FLUSH_MASK:    begin
-            i_kill  = flush && |(i_msk & clmsk);
-            kill    = flush && |(msk   & clmsk);
-        end
-        SKID_FLUSH_IGNORE:  begin
-            i_kill  = 1'b0;
-            kill    = 1'b0;
-        end
-        default:            begin
-            i_kill  = flush;
-            kill    = flush;
-        end
+        SKID_FLUSH_MASK:    kill = flush && |(msk & clmsk);
+        SKID_FLUSH_IGNORE:  kill = 1'b0;
+        default:            kill = flush;
         endcase
     end
+
+    assign i_rdy = !vld || o_rdy || kill;
+    assign o_vld = vld && !kill;
+    assign o_msk = msk & ~clmsk;
+    assign o_dat = dat;
 
     always_ff @(posedge clock) begin
         if (reset) begin
@@ -108,14 +97,13 @@ module skid #(
 
         // ---- normal acceptance path ----
         end else if (i_rdy) begin
-            vld <= i_vld && !i_kill;
-            msk <= i_msk & ~clmsk;
+            vld <= i_vld;
+            msk <= i_msk;
             dat <= i_dat;
 
         // ---- hold / snoop path ----
         end else begin
-            assert (vld && !o_rdy) else $fatal("skid: snoop: unexpected");
-            vld <= vld && !kill;
+            assert (vld && !o_rdy && !kill) else $fatal("skid: snoop: unexpected");
             msk <= msk & ~clmsk;
             if (ENABLE_SNOOP)
                 dat <= i_snoop;
@@ -137,9 +125,9 @@ module ppln_skid #(
     input   flush,
     BMASK   clmsk, // kill mask iff flush high
 
-    input   logic   i_vld,
+    input   logic   i_vld, // MUST incorporate current cycle flush kill status
     output  logic   i_rdy,
-    input   BMASK   i_msk,
+    input   BMASK   i_msk, // MUST incorporate current cycle clmsk
     input   logic   [WIDTH-1:0] i_dat,
 
     output  logic   o_vld,
@@ -148,50 +136,54 @@ module ppln_skid #(
     output  logic   [WIDTH-1:0] o_dat
 );
     STATUS s;
-    logic dat_vld, tmp_vld, rdy; 
+    logic vld, rdy; 
         // rdy = can we accept data?
     logic [WIDTH-1:0] dat, tmp;
     BMASK dat_msk, tmp_msk;
 
-    logic i_kill, tmp_kill, dat_kill;
+    logic tmp_kill, dat_kill;
     always_comb begin
         unique case (FLUSH_MODE)
         SKID_FLUSH_MASK:    begin
-            i_kill  = flush && |(i_msk   & clmsk);
             tmp_kill= flush && |(tmp_msk & clmsk);
             dat_kill= flush && |(dat_msk & clmsk);
         end
         SKID_FLUSH_IGNORE:  begin
-            i_kill  = 1'b0;
             tmp_kill= 1'b0;
             dat_kill= 1'b0;
         end
         default:            begin
-            i_kill  = flush;
             tmp_kill= flush;
             dat_kill= flush;
         end
         endcase
     end
 
+    assign i_rdy = rdy;
+    assign o_vld = vld && !dat_kill;
+    assign o_msk = dat_msk & ~clmsk;
+    assign o_dat = dat;
+
     always_ff @(posedge clock) begin
         if (reset) begin
             s   <= PIPE;
+            vld <= 0; 
             rdy <= 1;
-            dat <= '0; dat_vld <= 1'b0; dat_msk <= '0;
-            tmp <= '0; tmp_vld <= 1'b0; tmp_msk <= '0;
+
+            dat <= '0; dat_msk <= '0;
+            tmp <= '0; tmp_msk <= '0;
         end else begin
             case (s)
             PIPE: begin // tmp is not full (i.e. at most dat is full)
-                if (o_rdy || !(dat_vld && !dat_kill)) begin
+                if (o_rdy || !(vld && !dat_kill)) begin
                     // normal accept path
                     rdy     <= 1;
 
+                    vld     <= i_vld;
                     dat     <= i_dat;
-                    dat_vld <= i_vld && !i_kill;
-                    dat_msk <= i_msk & ~clmsk;
+                    dat_msk <= i_msk;
                 end else begin
-                    if (i_vld && !i_kill) begin
+                    if (i_vld) begin
                         // go SKID
                         s       <= SKID;
                         rdy     <= 0;
@@ -200,8 +192,7 @@ module ppln_skid #(
                     dat_msk <= dat_msk & ~clmsk;
 
                     tmp     <= i_dat;
-                    tmp_vld <= i_vld && !i_kill;
-                    tmp_msk <= i_msk & ~clmsk;
+                    tmp_msk <= i_msk;
                 end
             end
             SKID: begin // tmp is full
@@ -210,11 +201,9 @@ module ppln_skid #(
                     s       <= PIPE;
                     rdy     <= 1;
 
+                    vld     <= !tmp_kill;
                     dat     <= tmp;
-                    dat_vld <= !tmp_kill; // implicitly: tmp_vld && !tmp_kill (SKID means tmp_vld)
                     dat_msk <= tmp_msk & ~clmsk;
-
-                    tmp_vld <= 1'b0;
                 end else begin
                     if (tmp_kill) begin
                         // go to pipe
@@ -223,19 +212,10 @@ module ppln_skid #(
                     end
 
                     dat_msk <= dat_msk & ~clmsk;
-
-                    tmp_vld <= !tmp_kill; // implicitly: tmp_vld && !tmp_kill (SKID means tmp_vld)
                     tmp_msk <= tmp_msk & ~clmsk;
                 end
             end
             endcase
         end
-    end
-
-    always_comb begin
-        i_rdy = rdy;
-        o_vld = dat_vld;
-        o_msk = dat_msk;
-        o_dat = dat;
     end
 endmodule

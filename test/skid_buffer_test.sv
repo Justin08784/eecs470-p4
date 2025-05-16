@@ -49,7 +49,7 @@ module skid_buffer_test();
     always_comb begin
         state_dbg = '{
             s   : dut.s,
-            vld : dut.dat_vld,
+            vld : dut.vld,
             rdy : dut.rdy,
             dat : dut.dat,
             tmp : dut.tmp
