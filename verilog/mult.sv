@@ -27,6 +27,8 @@ module mult #(
     parameter int unsigned ID
 ) (
     input clock, reset, flush,
+    input BMASK clmsk,
+
     input DATA rs1, rs2,
     input MUL_FUNC func,
     input BMASK         i_bmask,
@@ -96,6 +98,7 @@ module mult #(
                 .clock (clock),
                 .reset (reset),
                 .flush (flush),
+                .clmsk,
 
                 .i_vld(vlds[i]),
                 .i_rdy(rdys[i]),
@@ -113,6 +116,7 @@ module mult #(
                 .clock (clock),
                 .reset (reset),
                 .flush (flush),
+                .clmsk,
 
                 .i_vld(vlds[i]),
                 .i_rdy(rdys[i]),
@@ -131,6 +135,7 @@ module mult #(
                 .clock (clock),
                 .reset (reset),
                 .flush (flush),
+                .clmsk,
 
                 .i_vld(cdb_gnt),
                 .i_dat(pkts[i]),
@@ -145,6 +150,7 @@ module mult #(
                 .clock (clock),
                 .reset (reset),
                 .flush (flush),
+                .clmsk,
 
                 .i_vld(vlds[i]),
                 .i_dat(pkts[i]),
@@ -161,6 +167,7 @@ module mult #(
                 .clock (clock),
                 .reset (reset),
                 .flush (flush),
+                .clmsk,
 
                 .i_vld(vlds[i]),
                 .i_dat(pkts[i]),
@@ -209,6 +216,8 @@ module mult_stage #(
     parameter MODE = O_SKID
 ) (
     input clock, reset, flush,
+    input BMASK     clmsk,
+
     input MUL_PKT   i_dat,
 
     input  logic    i_vld,  // replacement for start
@@ -254,6 +263,7 @@ module mult_stage #(
                 .clock,
                 .reset,
                 .flush,
+                .clmsk,
                 
                 .i_vld,
                 .i_rdy,
@@ -272,6 +282,7 @@ module mult_stage #(
                 .clock,
                 .reset,
                 .flush,
+                .clmsk,
                 
                 .i_vld,
                 .i_rdy,
@@ -292,6 +303,7 @@ module mult_stage #(
                 .clock,
                 .reset,
                 .flush,
+                .clmsk,
                 
                 .i_vld,
                 .i_dat(tmp_dat),
