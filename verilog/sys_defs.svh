@@ -66,7 +66,7 @@ typedef logic [BMASK_LEN-1:0] BMASK;
 
 `ifndef SYNTH
 // comment out to disable DEBUG:
-// `define DEBUG
+`define DEBUG
 // comment to disable clock cycle print
 // `define CYCLE_PRINT
 `endif
@@ -736,7 +736,6 @@ typedef struct packed {
 
 typedef struct packed {
     logic       [$clog2(`N):0]  d_vld_scnt;
-    logic       [`N-1:0]  prvw_has_dests;
     ID_RESULT   [`N-1:0]        d_dat;
 } decode2dispatch;
 

@@ -169,15 +169,13 @@ module branch_manager (
         .gnt_bus(b1hot_n)
     );
 
-    generate
-    assign bmask_n[0] = bmask_reg;
-    assign dis_out.bmask_n[0] = bmask_n[0];
-    for (genvar n = 0; n < `N; ++n) begin : gen_bnext
-        assign dis_out.b1hot_n[n]       = b1hot_n[n];
-        assign dis_out.bmask_n[n + 1]   = bmask_n[n] | b1hot_n[n];
-    end
-    endgenerate
     always_comb begin
+        bmask_n[0] = bmask_reg;
+        for (int n = 0; n < `N; ++n)
+            bmask_n[n + 1] = bmask_n[n] | b1hot_n[n];
+
+        dis_out.b1hot_n = b1hot_n;
+        dis_out.bmask_n = bmask_n;
         dis_out.snap_rdy_scnt = `N;
         for (int n = 0; n < `N; ++n) begin
             if (|b1hot_n[n])

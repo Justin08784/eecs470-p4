@@ -157,8 +157,8 @@ module dispatch #(parameter
         rename_en_cnt = alloc_vld_scnt;
         rename_en_cnt = `MIN(rename_rdy_scnt, rename_en_cnt);
         rename_en_cnt = `MIN(rnme_snap_lim_cnt, rename_en_cnt);
-        bman_out = '0; // FIXME: disable
-        // bman_out.snap_en_cnt = rnme_snap_prefix_cnt[rename_en_cnt];
+        // bman_out = '0; // FIXME: disable
+        bman_out.snap_en_cnt = rnme_snap_prefix_cnt[rename_en_cnt];
     end
 
     // handle map table output 
@@ -399,10 +399,17 @@ module dispatch #(parameter
         $display("  %3d | >> Dispatch >>", $time);
         // $display("r_in.btq_rdy_scnt: %d",   btq_in.btq_rdy_scnt);
         // $display("btq_in.btq_rdy_scnt: %d",   btq_in.btq_rdy_scnt);
+        $display("BMAN: bmask: %b", bman_in.bmask_n[0]);
+        $display("rspc: {%1d, %1d, %1d}", 
+            rnme_snap_prefix_cnt[0],
+            rnme_snap_prefix_cnt[1],
+            rnme_snap_prefix_cnt[2]
+        );
+        $display("bman_out.snap_en_cnt: %1d", bman_out.snap_en_cnt);
+        $display("rnme_snap_out.snap_en: %b", rnme_snap_out.snap_en);
         $display("rob_in.rob_rdy_scnt: %d",  rob_in.rob_rdy_scnt);
         $display("d_in.d_vld_scnt: %d",  d_in.d_vld_scnt);
         $display("free_in.free_rdy_scnt: %d [%d, %d]",  free_in.free_rdy_scnt, free_in.d_ts[0], free_in.d_ts[1]);
-        $display("d_in.prvw_has_dests: %b", d_in.prvw_has_dests);
         $display("  %3d | << Dispatch <<", $time);
     endtask
 `endif
