@@ -13,7 +13,6 @@ typedef struct packed {
 /* Slices (or "views") of ID_RESULT needed for each FU type */
 typedef struct packed {
     BYPASS_TAG      bytag;
-    BMASK           bmask;
 
     PHYS_REG_IDX    t;
     PHYS_REG_IDX    t1;
@@ -29,8 +28,6 @@ typedef struct packed {
 } ID_ALU_VIEW;
 
 typedef struct packed {
-    BMASK           bmask;
-
     PHYS_REG_IDX    t;
     PHYS_REG_IDX    t1;
     PHYS_REG_IDX    t2;
@@ -70,7 +67,6 @@ typedef struct packed {
 
 typedef struct packed {
     BYPASS_TAG      bytag;
-    BMASK           bmask;
     BMASK           b1hot;
 
     PHYS_REG_IDX    t;
@@ -88,8 +84,6 @@ typedef struct packed {
 
 typedef struct packed {
     BYPASS_TAG      bytag;
-    BMASK           bmask;
-
     DATA            rs1;
     union packed {
         DATA    rs2;
@@ -105,8 +99,6 @@ typedef struct packed {
     ROB_IDX         rob_idx;
 } ALU_REGS;
 typedef struct packed {
-    BMASK           bmask;
-
     DATA            rs1;
     DATA            rs2;
     PHYS_REG_IDX    t1;
@@ -128,7 +120,6 @@ typedef struct packed {
 } STR_REGS;
 typedef struct packed {
     BYPASS_TAG      bytag;
-    BMASK           bmask;
     BMASK           b1hot;
 
     DATA            rs1;

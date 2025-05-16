@@ -131,6 +131,7 @@ module mul_ex(
         // insns to accept from regs.o_dat.mul
     input  MUL_REGS [`NUM_FU_MUL-1:0]  i_regs,
         // insn metadata/operands
+    input  BMASK    [`NUM_FU_MUL-1:0]  i_bmask,
 
     /* Early CDB arbitration */
     output logic [`NUM_FU_MUL-1:0]     cdb_req,
@@ -160,7 +161,7 @@ module mul_ex(
                 .rs1    (i_regs[i].rs1),
                 .rs2    (i_regs[i].rs2),
                 .func   (i_regs[i].func),
-                .i_bmask(i_regs[i].bmask),
+                .i_bmask(i_bmask[i]),
                 .i_t    (i_regs[i].t),
                 .i_rob_idx(i_regs[i].rob_idx),
 
@@ -319,6 +320,9 @@ module stage_ex_p4 (
     struct packed {
         `BY_FU(logic)   i_rdy;
         `BY_FU(logic)   o_vld;
+
+        `BY_FU(BMASK)   o_msk;
+
         struct packed {
             ID_ALU_VIEW [`NUM_FU_ALU-1:0]   alu;
             ID_MUL_VIEW [`NUM_FU_MUL-1:0]   mul;
@@ -331,6 +335,9 @@ module stage_ex_p4 (
     struct packed {
         `BY_FU(logic) i_rdy;
         `BY_FU(logic) o_vld;
+
+        `BY_FU(BMASK) o_msk;
+
         struct packed {
             ALU_REGS [`NUM_FU_ALU-1:0]  alu;
             MUL_REGS [`NUM_FU_MUL-1:0]  mul;
@@ -355,7 +362,6 @@ module stage_ex_p4 (
         for (genvar i = 0; i < `NUM_FU_ALU; ++i) begin : gen_alu_sbufs
             assign iss.i_dat.alu[i] = '{
                 bytag   : rs_in.bytag_alu[i],
-                bmask   : rs_in.fu_dat_alu[i].bmask,
 
                 t       : rs_in.fu_dat_alu[i].t,
                 t1      : rs_in.fu_dat_alu[i].t1,
@@ -377,19 +383,20 @@ module stage_ex_p4 (
                 .clock (clock),
                 .reset (reset),
                 .flush (flush),
+                .clmsk,
 
                 .i_vld (rs_in.fu_en_alu[i]),
+                .i_msk (rs_in.fu_dat_alu[i].bmask),
                 .i_dat (iss.i_dat.alu[i]),
 
                 .o_vld (iss.o_vld.alu[i]),
+                .o_msk (iss.o_msk.alu[i]),
                 .o_dat (iss.o_dat.alu[i])
             );
         end
         
         for (genvar i = 0; i < `NUM_FU_MUL; ++i) begin : gen_mul_sbufs
             assign iss.i_dat.mul[i] = '{
-                bmask   : rs_in.fu_dat_mul[i].bmask,
-
                 t       : rs_in.fu_dat_mul[i].t,
                 t1      : rs_in.fu_dat_mul[i].t1,
                 t2      : rs_in.fu_dat_mul[i].t2,
@@ -403,13 +410,16 @@ module stage_ex_p4 (
                 .clock (clock),
                 .reset (reset),
                 .flush (flush),
+                .clmsk,
 
                 .i_vld (rs_in.fu_en_mul[i]),
                 .i_rdy (iss.i_rdy.mul[i]),
+                .i_msk (rs_in.fu_dat_mul[i].bmask),
                 .i_dat (iss.i_dat.mul[i]),
 
                 .o_vld (iss.o_vld.mul[i]),
                 .o_rdy (regs.i_rdy.mul[i]),
+                .o_msk (iss.o_msk.mul[i]),
                 .o_dat (iss.o_dat.mul[i])
             );
         end
@@ -436,13 +446,16 @@ module stage_ex_p4 (
                 .clock (clock),
                 .reset (reset),
                 .flush (flush),
+                .clmsk,
 
                 .i_vld (rs_in.fu_en_lod[i]),
                 .i_rdy (iss.i_rdy.lod[i]),
+                .i_msk (rs_in.fu_dat_lod[i].bmask),
                 .i_dat (iss.i_dat.lod[i]),
 
                 .o_vld (iss.o_vld.lod[i]),
                 .o_rdy (regs.i_rdy.lod[i]),
+                .o_msk (iss.o_msk.lod[i]),
                 .o_dat (iss.o_dat.lod[i])
             );
         end
@@ -467,13 +480,16 @@ module stage_ex_p4 (
                 .clock (clock),
                 .reset (reset),
                 .flush (flush),
+                .clmsk,
 
                 .i_vld (rs_in.fu_en_str[i]),
                 .i_rdy (iss.i_rdy.str[i]),
+                .i_msk (rs_in.fu_dat_str[i].bmask),
                 .i_dat (iss.i_dat.str[i]),
 
                 .o_vld (iss.o_vld.str[i]),
                 .o_rdy (regs.i_rdy.str[i]),
+                .o_msk (iss.o_msk.str[i]),
                 .o_dat (iss.o_dat.str[i])
             );
         end
@@ -481,7 +497,6 @@ module stage_ex_p4 (
         for (genvar i = 0; i < `NUM_FU_BRU; ++i) begin : gen_bru_sbufs
             assign iss.i_dat.bru[i] = '{
                 bytag   : rs_in.bytag_bru[i],
-                bmask   : rs_in.fu_dat_bru[i].bmask,
                 b1hot   : rs_in.fu_dat_bru[i].b1hot,
 
                 t       : rs_in.fu_dat_bru[i].t,
@@ -505,11 +520,14 @@ module stage_ex_p4 (
                 .clock (clock),
                 .reset (reset),
                 .flush (flush),
+                .clmsk,
 
                 .i_vld (rs_in.fu_en_bru[i]),
+                .i_msk (rs_in.fu_dat_bru[i].bmask),
                 .i_dat (iss.i_dat.bru[i]),
 
                 .o_vld (iss.o_vld.bru[i]),
+                .o_msk (iss.o_msk.bru[i]),
                 .o_dat (iss.o_dat.bru[i])
             );
         end
@@ -570,7 +588,6 @@ module stage_ex_p4 (
 
             regs.i_dat.alu[i] = '{
                 bytag : iss.o_dat.alu[i].bytag,
-                bmask : iss.o_dat.alu[i].bmask,
 
                 rs1 : prf_in.v1s.alu[i],
                 opb : opb_is_rs2
@@ -588,8 +605,6 @@ module stage_ex_p4 (
         end
         foreach (iss.o_vld.mul[i]) begin
             regs.i_dat.mul[i] = '{
-                bmask : iss.o_dat.mul[i].bmask,
-
                 rs1 : prf_in.v1s.mul[i],
                 rs2 : prf_in.v2s.mul[i],
                 t1  : iss.o_dat.mul[i].t1,
@@ -625,9 +640,7 @@ module stage_ex_p4 (
 
             regs.i_dat.bru[i] = '{
                 bytag : iss.o_dat.bru[i].bytag,
-                bmask : iss.o_dat.bru[i].bmask,
                 b1hot : iss.o_dat.bru[i].b1hot,
-
 
                 rs1 : prf_in.v1s.bru[i],
                 rs2 : prf_in.v2s.bru[i],
@@ -658,11 +671,14 @@ module stage_ex_p4 (
                 .clock (clock),
                 .reset (reset),
                 .flush (flush),
+                .clmsk,
 
                 .i_vld (iss.o_vld.alu[i]),
+                .i_msk (iss.o_msk.alu[i]),
                 .i_dat (regs.i_dat.alu[i]),
 
                 .o_vld (regs.o_vld.alu[i]),
+                .o_msk (regs.o_msk.alu[i]),
                 .o_dat (raw)
             );
             assign regs.o_dat.alu[i] = alu_snoop(raw, cdat_out);
@@ -679,15 +695,18 @@ module stage_ex_p4 (
                 .clock (clock),
                 .reset (reset),
                 .flush (flush),
+                .clmsk,
 
                 .i_snoop(regs.o_dat.mul[i]),
 
                 .i_vld (iss.o_vld.mul[i]),
                 .i_rdy (regs.i_rdy.mul[i]),
+                .i_msk (iss.o_msk.mul[i]),
                 .i_dat (regs.i_dat.mul[i]),
 
                 .o_vld (regs.o_vld.mul[i]),
                 .o_rdy (ex.i_rdy.mul[i]),
+                .o_msk (regs.o_msk.mul[i]),
                 .o_dat (raw)
             );
             assign regs.o_dat.mul[i] = mul_snoop(raw, cdat_out);
@@ -702,15 +721,18 @@ module stage_ex_p4 (
                 .clock (clock),
                 .reset (reset),
                 .flush (flush),
+                .clmsk,
 
                 .i_snoop(regs.o_dat.lod[i]),
 
                 .i_vld (iss.o_vld.lod[i]),
                 .i_rdy (regs.i_rdy.lod[i]),
+                .i_msk (iss.o_msk.lod[i]),
                 .i_dat (regs.i_dat.lod[i]),
 
                 .o_vld (regs.o_vld.lod[i]),
                 .o_rdy (ex.i_rdy.lod[i]),
+                .o_msk (regs.o_msk.lod[i]),
                 .o_dat (raw)
             );
             assign regs.o_dat.lod[i] = lod_snoop(raw, cdat_out);
@@ -725,15 +747,18 @@ module stage_ex_p4 (
                 .clock (clock),
                 .reset (reset),
                 .flush (flush),
+                .clmsk,
 
                 .i_snoop(regs.o_dat.str[i]),
 
                 .i_vld (iss.o_vld.str[i]),
                 .i_rdy (regs.i_rdy.str[i]),
+                .i_msk (iss.o_msk.str[i]),
                 .i_dat (regs.i_dat.str[i]),
 
                 .o_vld (regs.o_vld.str[i]),
                 .o_rdy (ex.i_rdy.str[i]),
+                .o_msk (regs.o_msk.str[i]),
                 .o_dat (raw)
             );
             assign regs.o_dat.str[i] = str_snoop(raw, cdat_out);
@@ -750,11 +775,14 @@ module stage_ex_p4 (
                 .clock (clock),
                 .reset (reset),
                 .flush (flush),
+                .clmsk,
 
                 .i_vld (iss.o_vld.bru[i]),
+                .i_msk (iss.o_msk.bru[i]),
                 .i_dat (regs.i_dat.bru[i]),
 
                 .o_vld (regs.o_vld.bru[i]),
+                .o_msk (regs.o_msk.bru[i]),
                 .o_dat (raw)
             );
             assign regs.o_dat.bru[i] = bru_snoop(raw, cdat_out);
@@ -802,6 +830,7 @@ module stage_ex_p4 (
         .clock  (clock),
         .reset  (reset),
         .flush  (flush),
+        .clmsk,
 
         .i_vld  (regs.o_vld.alu),
         .i_regs (regs.o_dat.alu),
@@ -816,8 +845,10 @@ module stage_ex_p4 (
         .clock  (clock),
         .reset  (reset),
         .flush  (flush),
+        .clmsk,
 
         .i_vld  (regs.o_vld.mul),
+        .i_bmask(regs.o_msk.mul),
         .i_regs (regs.o_dat.mul),
         .i_rdy  (ex.i_rdy.mul),
 
