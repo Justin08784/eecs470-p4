@@ -8,6 +8,7 @@ module btq #(
     input  clock,
     input  reset,
     input  flush,
+    input  logic [$clog2(BTQ_SZ)-1:0]  snap_tail,
 
     // retire
     input  retire2btq   r_in,
@@ -38,12 +39,12 @@ module btq #(
         .WIDTH($bits(BTQ_ENTRY)),
         .RPORTS(NUM_RPORTS),
         .WPORTS(NUM_FPORTS),
-        .FLUSH_MODE(FIFO_FLUSH_RESET)
+        .FLUSH_MODE(FIFO_FLUSH_RESET) // FIXME
     ) ring_ctr0 (
         .clock,
         .reset,
         .flush,
-        .flush_tail ('0),
+        .flush_tail ('0), // FIXME
 
         .rd_en_cnt  (r_in.rd_cnt),
         .wr_en_cnt  (f_in.en_cnt),

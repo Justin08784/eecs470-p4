@@ -70,13 +70,6 @@ module mt_snaps #(
     end
 
     always_ff @(posedge clock) begin
-        for (int n = 0; n < uen_cnt; ++n) begin
-            if (udst[n] == `ZERO_REG)
-                continue;
-            foreach (snaps[i])
-                snaps[i][udst[n]] <= ut[n];
-        end
-
         for (int n = 0; n < wen_cnt; ++n) begin
             for (int i = 0; i < BMASK_LEN; ++i) begin
                 if (!wmsk[n][i])
@@ -85,6 +78,13 @@ module mt_snaps #(
             end
         end
 
+        // QUESTION: does this ensure retires are applied onto same-cycle new snapshots?
+        for (int n = 0; n < uen_cnt; ++n) begin
+            if (udst[n] == `ZERO_REG)
+                continue;
+            foreach (snaps[i])
+                snaps[i][udst[n]] <= ut[n];
+        end
     end
 endmodule
 
@@ -96,7 +96,9 @@ module branch_manager (
 
     // alloc
     input   dispatch2bman dis_in,
-    output  bman2dispatch dis_out
+    output  bman2dispatch dis_out,
+
+    output  bman2snap_bus snap_out
 );
     BMASK bmask_reg;
     
@@ -129,65 +131,48 @@ module branch_manager (
     end
 
     general_snaps #(
-        .WIDTH($clog2(`BTQ_SZ)+1)
+        .WIDTH($clog2(`BTQ_SZ))
     ) btq_tails (
         .clock,
 
         // TODO >>
-        .rmsk   (),
-        .rdat   (),
+        .rmsk   (clmsk),
+        .rdat   (snap_out.btq_tail),
         // TODO <<
 
-        .wen_cnt(dis_in.en_cnt),
+        .wen_cnt(dis_in.snap_en_cnt),
         .wmsk   (b1hot_n),
         .wdat   (dis_in.btq_tail)
     );
 
     general_snaps #(
-        .WIDTH($clog2(`ROB_SZ)+1)
+        .WIDTH($clog2(`ROB_SZ))
     ) fl_tails (
         .clock,
 
         // TODO >>
-        .rmsk   (),
-        .rdat   (),
+        .rmsk   (clmsk),
+        .rdat   (snap_out.fl_tail),
         // TODO <<
 
-        .wen_cnt(dis_in.en_cnt),
+        .wen_cnt(dis_in.snap_en_cnt),
         .wmsk   (b1hot_n),
         .wdat   (dis_in.fl_tail)
     );
 
     general_snaps #(
-        .WIDTH($clog2(`ROB_SZ)+1)
+        .WIDTH($clog2(`ROB_SZ))
     ) rob_tails (
         .clock,
 
         // TODO >>
-        .rmsk   (),
-        .rdat   (),
+        .rmsk   (clmsk),
+        .rdat   (snap_out.rob_tail),
         // TODO <<
 
-        .wen_cnt(dis_in.en_cnt),
+        .wen_cnt(dis_in.snap_en_cnt),
         .wmsk   (b1hot_n),
         .wdat   (dis_in.rob_tail)
-    );
-
-    mt_snaps (
-        .clock,
-
-        // TODO >>
-        .rmsk   (),
-        .rdat   (),
-
-        .uen_cnt(),
-        .udst   (),
-        .ut     (),
-        // TODO <<
-
-        .wen_cnt(dis_in.en_cnt),
-        .wmsk   (b1hot_n),
-        .wdat   (dis_in.mt)
     );
 
 endmodule

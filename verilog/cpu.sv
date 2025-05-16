@@ -117,6 +117,19 @@ module cpu (
     );
 
 
+    /* >> ==== Branch manager ==== >> */
+    branch_manager bman (
+        .clock,
+        .reset,
+        .flush,
+        .clmsk('0),
+
+        .dis_in('0),
+        .dis_out(),
+        .snap_out()
+    );
+
+
     /* >> ==== Retire ==== >> */
     rob2retire rob_2_retire;
     btq2retire btq_2_retire;

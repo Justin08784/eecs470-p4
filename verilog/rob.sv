@@ -5,6 +5,7 @@ module rob #(
     parameter N=`N
 ) (
     input clock, reset, flush,
+    input logic [$clog2(ROB_SZ)-1:0] snap_tail,
 
     // retire (read)
     output rob2retire r_out,
@@ -43,12 +44,12 @@ module rob #(
         .WIDTH($bits(ROB_ENTRY)),
         .RPORTS(NUM_RPORTS),
         .WPORTS(NUM_DPORTS),
-        .FLUSH_MODE(FIFO_FLUSH_RESET)
+        .FLUSH_MODE(FIFO_FLUSH_RESET) // FIXME
     ) ring_ctr0 (
         .clock,
         .reset,
         .flush,
-        .flush_tail ('0),
+        .flush_tail ('0), // FIXME
 
         .rd_en_cnt  (r_in.r_en_cnt),
         .wr_en_cnt  (d_in.d_en_cnt),
