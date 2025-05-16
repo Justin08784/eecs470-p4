@@ -75,32 +75,23 @@ module alu_ex(
     /* BACKEND */
     output CPL_CAND [`NUM_FU_ALU-1:0]   o_cands
 );
-    ALU_OPS [`NUM_FU_ALU-1:0] ops;
-    ADDR    [`NUM_FU_ALU-1:0] pc_addrs, npc_addrs;
+    ADDR [`NUM_FU_ALU-1:0] pc_addrs, npc_addrs;
+    DATA [`NUM_FU_ALU-1:0] opa, opb;
     always_comb begin
-        DATA opa, opb;
-        foreach(ops[i]) begin
+        foreach(opa[i]) begin
             pc_addrs[i]     = w2addr(i_regs[i].PC);
             npc_addrs[i]    = w2addr(i_regs[i].PC + 1);
             // ALU opA mux
             case (i_regs[i].opa_select)
-                OPA_IS_RS1:  opa = i_regs[i].rs1;
-                OPA_IS_NPC:  opa = npc_addrs[i];
-                OPA_IS_PC:   opa = pc_addrs[i];
-                OPA_IS_ZERO: opa = 0;
-                default:     opa = 32'hdeadface; // dead face
+                OPA_IS_RS1:  opa[i] = i_regs[i].rs1;
+                OPA_IS_NPC:  opa[i] = npc_addrs[i];
+                OPA_IS_PC:   opa[i] = pc_addrs[i];
+                OPA_IS_ZERO: opa[i] = 0;
+                default:     opa[i] = 32'hdeadface; // dead face
             endcase
 
             // ALU opB mux
-            opb = i_regs[i].opb;
-
-            ops[i] = '{
-                opa         : opa,
-                opb         : opb,
-                alu_func    : i_regs[i].alu_func,
-                t           : i_regs[i].t,
-                rob_idx     : i_regs[i].rob_idx
-            };
+            opb[i] = i_regs[i].opb;
         end
     end
 
@@ -110,9 +101,9 @@ module alu_ex(
         for (genvar i = 0; i < `NUM_FU_ALU; ++i) begin : gen_alus
             alu alu_0 ( 
                 // Inputs
-                .opa        (ops[i].opa),
-                .opb        (ops[i].opb),
-                .alu_func   (ops[i].alu_func),
+                .opa        (opa[i]),
+                .opb        (opb[i]),
+                .alu_func   (i_regs[i].alu_func),
 
                 // Output (directly to cdat_out)
                 .result     (tmp_res[i])
@@ -120,8 +111,8 @@ module alu_ex(
 
             assign o_cands[i] = '{
                 vld     : i_vld[i],
-                t       : ops[i].t,
-                rob_idx : ops[i].rob_idx,
+                t       : i_regs[i].t,
+                rob_idx : i_regs[i].rob_idx,
                 data    : tmp_res[i]
             };
         end
@@ -149,20 +140,6 @@ module mul_ex(
     /* BACKEND */
     output CPL_CAND [`NUM_FU_MUL-1:0]  o_cands
 );
-    MUL_OPS [`NUM_FU_MUL-1:0] ops;
-    always_comb begin
-        foreach (ops[i]) begin
-            ops[i] = '{
-                bmask   : i_regs[i].bmask,
-                rs1     : i_regs[i].rs1,
-                rs2     : i_regs[i].rs2,
-                func    : i_regs[i].func,
-                t       : i_regs[i].t,
-                rob_idx : i_regs[i].rob_idx
-            };
-        end
-    end
-
     // execute
     generate
         DATA        [`NUM_FU_MUL-1:0] tmp_res;
@@ -180,12 +157,12 @@ module mul_ex(
 
                 .i_vld  (i_vld[i]),
                 .i_rdy  (i_rdy[i]),
-                .rs1    (ops[i].rs1),
-                .rs2    (ops[i].rs2),
-                .func   (ops[i].func),
-                .i_bmask(ops[i].bmask),
-                .i_t    (ops[i].t),
-                .i_rob_idx(ops[i].rob_idx),
+                .rs1    (i_regs[i].rs1),
+                .rs2    (i_regs[i].rs2),
+                .func   (i_regs[i].func),
+                .i_bmask(i_regs[i].bmask),
+                .i_t    (i_regs[i].t),
+                .i_rob_idx(i_regs[i].rob_idx),
 
                 .cdb_req(cdb_req[i]),
                 .ctag_t (ctag_ts[i]),
@@ -254,37 +231,23 @@ module bru_ex(
         assert (`NUM_FU_BRU == 1) else $fatal("bru_ex: assumes 1 BRU");
     end
 
-    BRU_OPS [`NUM_FU_BRU-1:0] ops;
     ADDR    [`NUM_FU_BRU-1:0] pc_addrs, npc_addrs;
+    DATA    [`NUM_FU_BRU-1:0] opa, opb;
     always_comb begin
-        DATA opa, opb;
-        foreach(ops[i]) begin
+        foreach(opa[i]) begin
             pc_addrs[i]     = w2addr(i_regs[i].PC);
             npc_addrs[i]    = w2addr(i_regs[i].PC + 1);
             // BRU opA mux
             case (i_regs[i].opa_select)
-                OPA_IS_PC:   opa = pc_addrs[i];
-                OPA_IS_RS1:  opa = i_regs[i].rs1;
-                default:     opa = 32'hdeadface; // dead face
+                OPA_IS_PC:   opa[i] = pc_addrs[i];
+                OPA_IS_RS1:  opa[i] = i_regs[i].rs1;
+                default:     opa[i] = 32'hdeadface; // dead face
             endcase
 
             // BRU opB mux
-            opb = i_regs[i].opb_is_rs2
+            opb[i] = i_regs[i].opb_is_rs2
                 ? i_regs[i].rs2
                 : i_regs[i].imm32b;
-
-            ops[i] = '{
-                opa         : opa,
-                opb         : opb,
-                rs1         : i_regs[i].rs1,
-                rs2         : i_regs[i].rs2,
-                func        : i_regs[i].func,
-                cond_branch : i_regs[i].cond_branch,
-
-                t           : i_regs[i].t,
-                rob_idx     : i_regs[i].rob_idx,
-                btq_idx     : i_regs[i].btq_idx
-            };
         end
     end
 
@@ -295,29 +258,29 @@ module bru_ex(
         for (genvar i = 0; i < `NUM_FU_BRU; ++i) begin : gen_brus
             bru bru_0 ( 
                 // Inputs
-                .opa        (ops[i].opa),
-                .opb        (ops[i].opb),
-                .rs1        (ops[i].rs1),
-                .rs2        (ops[i].rs2),
-                .branch_func(ops[i].func),
+                .opa        (opa[i]),
+                .opb        (opb[i]),
+                .rs1        (i_regs[i].rs1),
+                .rs2        (i_regs[i].rs2),
+                .branch_func(i_regs[i].func),
 
                 // Output (directly to cdat_out)
                 .take       (cond_take[i]),
                 .result     (tmp_res[i])
             );
 
-            assign tmp_take[i] = !ops[i].cond_branch || cond_take[i];
+            assign tmp_take[i] = !i_regs[i].cond_branch || cond_take[i];
 
             assign o_cands[i] = '{
                 vld     : i_vld[i],
-                t       : ops[i].t,
-                rob_idx : ops[i].rob_idx,
+                t       : i_regs[i].t,
+                rob_idx : i_regs[i].rob_idx,
                 data    : tmp_take[i] ? npc_addrs[i] : tmp_res[i]
             };
 
             assign o_btq_out.dat[i] = '{
                 en      : i_vld[i],
-                btq_idx : ops[i].btq_idx,
+                btq_idx : i_regs[i].btq_idx,
                 take    : tmp_take[i],
                 tgt     : addr2w(tmp_res[i])
             };

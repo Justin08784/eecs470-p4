@@ -146,40 +146,6 @@ typedef struct packed {
     BTQ_IDX         btq_idx;
 } BRU_REGS;
 
-/* Operand data needed for each FU type */
-typedef struct packed {
-    DATA            opa;
-    DATA            opb;
-    ALU_FUNC        alu_func;
-
-    PHYS_REG_IDX    t;
-    ROB_IDX         rob_idx;
-} ALU_OPS;
-
-typedef struct packed {
-    BMASK           bmask;
-
-    DATA            rs1;
-    DATA            rs2;
-    MUL_FUNC        func;
-
-    PHYS_REG_IDX    t;
-    ROB_IDX         rob_idx;
-} MUL_OPS;
-
-typedef struct packed {
-    DATA            opa;
-    DATA            opb;
-    DATA            rs1;
-    DATA            rs2;
-    logic   [2:0]   func;   // Which branch condition to check
-    logic           cond_branch;
-
-    PHYS_REG_IDX    t;
-    ROB_IDX         rob_idx;
-    BTQ_IDX         btq_idx;
-} BRU_OPS;
-
 /* CDB snooping/bypassing functions */
 function automatic ALU_REGS alu_snoop(
     input ALU_REGS v,
