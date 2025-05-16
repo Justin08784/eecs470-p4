@@ -39,18 +39,21 @@ module fifo #(
     If free list mode is disabled, flush behaves the same as reset.
     */
     parameter int INSTANCE_ID=-1,
-    parameter FIFO_STATE RESET_STATE='{default:0}
+    parameter FIFO_STATE RESET_STATE='{default:0},
+    type PTR = logic [$clog2(DEPTH)-1:0]
 ) (
     input                                           clock, 
     input                                           reset,
     input                                           flush,
-    input   logic   [$clog2(DEPTH)-1:0]             flush_tail,
+    input   PTR                                     flush_tail,
 
     input   logic   [$clog2(NUM_WPORTS):0]          wr_en_cnt,
     input   logic   [NUM_WPORTS-1:0][WIDTH-1:0]     wr_data,
+    output  PTR     [NUM_WPORTS-1:0]                wr_idxs,
 
     input   logic   [$clog2(NUM_RPORTS):0]          rd_en_cnt,
     output  logic   [NUM_RPORTS-1:0][WIDTH-1:0]     rd_data,
+    output  PTR     [NUM_RPORTS-1:0]                rd_idxs,
 
     output  logic                                   empty,
     output  logic                                   full,
@@ -60,7 +63,6 @@ module fifo #(
     /*NOTE: By removing rd_valid, wr_valid, we force the caller to make sure
     the enabled cnts are correct. */
 );
-    typedef logic [$clog2(DEPTH)-1:0] PTR;
     function automatic PTR incr(input PTR ptr, input int unsigned step);
         logic [$clog2(DEPTH):0] carry;
         carry = ptr + step;
@@ -74,8 +76,6 @@ module fifo #(
     logic [$clog2(DEPTH)-1:0]       tail;
     logic [DEPTH-1:0][WIDTH-1:0]    state;
     logic [$clog2(DEPTH):0]         used, free;
-    logic [NUM_RPORTS-1:0][$clog2(DEPTH)-1:0] rd_idxs;
-    logic [NUM_WPORTS-1:0][$clog2(DEPTH)-1:0] wr_idxs;
 
     ring_ctr #(
         .DEPTH(DEPTH),
