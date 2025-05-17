@@ -285,7 +285,7 @@ module testbench;
             for (int i = 0, int cur_idx = 0; i < `N; ++i) begin
                 if (i >= verisimpleV.rob0.d_in.d_en_cnt)
                     break;
-                cur_idx = verisimpleV.rob0.comm_idxs[i];
+                cur_idx = verisimpleV.rob0.comm_idxs_n[i];
                 rob_debug[cur_idx] = '{
 `ifdef DEBUG
                     id      : verisimpleV.rs0.d_in.dat[i].id,
@@ -347,7 +347,7 @@ module testbench;
             illegal = committed_insts[n].illegal;
 
 `ifndef SYNTH
-            cur_idx = verisimpleV.rob0.rtre_idxs[n];
+            cur_idx = verisimpleV.rob0.rtre_idxs_n[n];
 `ifdef DEBUG
             id      = rob_debug[cur_idx].id;
 `endif

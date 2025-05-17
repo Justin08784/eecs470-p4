@@ -152,15 +152,17 @@ module rob #(
                 snap_in.rob_tail[i]
             );
         end
-        $display("fl: en_cnt: %d, [%2d, %2d] fldup: %b",
-            verisimpleV.free_list0.free_cnt,
-            verisimpleV.free_list0.told_packed[0],
-            verisimpleV.free_list0.told_packed[1],
-            verisimpleV.free_list0.told_packed[0]
-            ==verisimpleV.free_list0.told_packed[1]
-            &&verisimpleV.free_list0.told_packed[0]!=0
-        );
+        // $display("fl: en_cnt: %d, [%2d, %2d] fldup: %b",
+        //     verisimpleV.free_list0.free_cnt,
+        //     verisimpleV.free_list0.told_packed[0],
+        //     verisimpleV.free_list0.told_packed[1],
+        //     verisimpleV.free_list0.told_packed[0]
+        //     ==verisimpleV.free_list0.told_packed[1]
+        //     &&verisimpleV.free_list0.told_packed[0]!=0
+        // );
+
         $display("r_out: vld_cnt: %d", r_out.r_vld_cnt);
+        $display("head: %2d, tail: %2d, used: %2d", head, tail, used);
         for (int i = 0; i < `N; ++i) begin
             string name;
             get_fu_name(r_out.entries[i].fu_idx, name);

@@ -69,30 +69,32 @@ module ring_ctr #(
             head <= RESET_STATE.head;
             tail <= RESET_STATE.tail;
 
+        end else if (flush) begin
+            unique case (FLUSH_MODE)
+            FIFO_FLUSH_SNAP_HEAD: begin
+                used <= used + distance(flush_snap, head) + wr_en_cnt;
+                head <= flush_snap;
+                tail <= wr_idxs_n[wr_en_cnt];
+            end
+
+            FIFO_FLUSH_SNAP_TAIL: begin
+                used <= used - distance(flush_snap, tail) - rd_en_cnt;
+                head <= rd_idxs_n[rd_en_cnt];
+                tail <= flush_snap;
+            end
+
+            default: begin
+                used <= RESET_STATE.used;
+                head <= RESET_STATE.head;
+                tail <= RESET_STATE.tail;
+            end
+            endcase
+
         end else begin
             used <= used + wr_en_cnt - rd_en_cnt;
             head <= rd_idxs_n[rd_en_cnt];
             tail <= wr_idxs_n[wr_en_cnt];
 
-            if (flush) begin
-                unique case (FLUSH_MODE)
-                FIFO_FLUSH_SNAP_HEAD: begin
-                    used <= used + distance(flush_snap, head);
-                    head <= flush_snap;
-                end
-
-                FIFO_FLUSH_SNAP_TAIL: begin
-                    used <= used - distance(flush_snap, tail);
-                    tail <= flush_snap;
-                end
-
-                default: begin
-                    used <= RESET_STATE.used;
-                    head <= RESET_STATE.head;
-                    tail <= RESET_STATE.tail;
-                end
-                endcase
-            end
         end
     end
 
