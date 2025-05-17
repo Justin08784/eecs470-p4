@@ -324,8 +324,6 @@ module cpu (
     always_comb begin
         committed_insts = '0;
         foreach(committed_insts[i]) begin
-            if (flush) // system is flushing; CANNOT COMMIT!
-                break;
             if (i >= retire_exec.r_en_cnt)
                 continue;
             committed_insts[i].valid      = 1;
