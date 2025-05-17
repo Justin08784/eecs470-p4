@@ -214,6 +214,7 @@ module rs_part #(
         foreach (fu2issuer[fu, rs]) begin
             if (fu2issuer[fu][rs]) begin // [MISSING] ms1 test: Remove "!" from if condition (not caught)
                 ex_out_fu_dat[fu] |= entries[rs].dat;
+                ex_out_fu_dat[fu].bmask &= ~clmsk;
                 ex_out_bytag[fu]  |= get_bytag(rs);
             end
         end

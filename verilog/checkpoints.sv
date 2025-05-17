@@ -174,8 +174,9 @@ module branch_manager (
         for (int n = 0; n < `N; ++n)
             cum_b1hot_n[n+1] = cum_b1hot_n[n] | b1hot_n[n];
 
+        bmask_n[0] = bmask_reg & ~clmsk;
         for (int n = 0; n < `N+1; ++n)
-            bmask_n[n] = bmask_reg | cum_b1hot_n[n];
+            bmask_n[n] = bmask_n[0] | cum_b1hot_n[n];
 
         dis_out.b1hot_n = b1hot_n;
         dis_out.bmask_n = bmask_n;
@@ -210,7 +211,7 @@ module branch_manager (
                 dep_table[i] <= dep_table[i] & ~clmsk;
 
         end else begin
-            bmask_reg <= bmask_n[dis_in.snap_en_cnt] & ~clmsk;
+            bmask_reg <= bmask_n[dis_in.snap_en_cnt];
 
             for (int i = 0; i < BMASK_LEN; ++i)
                 dep_table[i] <= (dep_table[i] & ~clmsk) | cum_b1hot_n[dis_in.snap_en_cnt];

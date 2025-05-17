@@ -106,6 +106,7 @@ module cpu (
         .clock,
         .reset,
         .flush,
+        .clmsk,
 
         .d_in       (de_2_disp),
         .d_out      (disp_2_de),

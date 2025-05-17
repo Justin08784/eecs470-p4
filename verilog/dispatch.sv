@@ -6,6 +6,7 @@ module dispatch #(parameter
     input   clock,
     input   reset,
     input   flush,
+    input   BMASK clmsk,
 
     // branch manager
     input   bman2rename bman_in,
@@ -343,7 +344,7 @@ module dispatch #(parameter
                 t           : commit_in[i].t,
                 // rename
                 b1hot       : commit_in[i].b1hot,
-                bmask       : commit_in[i].bmask,
+                bmask       : commit_in[i].bmask & ~clmsk,
                 t_old       : commit_in[i].t_old,
                 t1          : commit_in[i].t1,
                 t2          : commit_in[i].t2,
