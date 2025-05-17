@@ -575,8 +575,9 @@ module rs #(parameter
 
     task automatic print_rs;
         $display("  | >> RS >>");
+        $display("flush: %b, clmsk: %b", flush, clmsk);
         for (int n = 0; n < `N; ++n)
-            print_id_result(d_in.dat[n]);
+            print_commit_rs_pkt(d_in.dat[n]);
         $display("      >> RS_ALU");
         print_rs_alu(rs_alu.entries);
         $display("      >> RS_MUL");

@@ -1024,6 +1024,25 @@ function print_id_result(input ID_RESULT x);
     );
 endfunction
 
+function print_commit_rs_pkt(input COMMIT_RS_PKT x);
+    $display("COMMIT_RS_PKT: {bmask: %b} id=%3d PC=%h fu_idx=%2d inst=%h opa_select=%1d opb_select=%1d alu_func=%1d cond_branch=%b halt=%b illegal=%b csr_op=%b btq_idx=%2d b1hot=%b",
+        x.bmask,
+        x.id,
+        x.PC,
+        x.fu_idx,
+        x.inst,
+        x.opa_select,
+        x.opb_select,
+        x.alu_func,
+        x.cond_branch,
+        x.halt,
+        x.illegal,
+        x.csr_op,
+        x.btq_idx,
+        x.b1hot
+    );
+endfunction
+
 function get_fu_name(input FU_IDX fu_idx, output string name);
     case (fu_idx)
         FU_ALU:  name = "ALU";

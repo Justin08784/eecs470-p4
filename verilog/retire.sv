@@ -123,14 +123,14 @@ module retire (
 `ifdef DEBUG
     task print_retire;
         $display("  | >> retire >>");
-        for (int i = 0; i < `N; ++i) begin
-            $display("btq_out [%0d]: tgt: %x, pred: %b, take: %b",
-                i,
-                btq_in.dat[i].tgt,
-                btq_in.dat[i].pred,
-                btq_in.dat[i].take
-            );
-        end
+        // for (int i = 0; i < `N; ++i) begin
+        //     $display("btq_out [%0d]: tgt: %x, pred: %b, take: %b",
+        //         i,
+        //         btq_in.dat[i].tgt,
+        //         btq_in.dat[i].pred,
+        //         btq_in.dat[i].take
+        //     );
+        // end
         $display("btq_rd_cnt: %0d", btq_out.rd_cnt);
 
         $display("retire_exec.r_en_cnt: %0d", retire_exec.r_en_cnt);
