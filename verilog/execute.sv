@@ -343,10 +343,12 @@ module bru_ex(
 
     always_ff @(posedge clock) begin
         if (reset) begin
+            clmsk       <= '0;
             flush       <= '0;
             flush_PC    <= '0;
         end else begin
 /* ======================================== */
+            clmsk       <= clmsk_n;
             flush       <= flush_n;
             flush_PC    <= flush_PC_n;
 /* ======================================== */
