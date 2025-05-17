@@ -16,6 +16,7 @@ module btq #(
 
     // complete (write)
     input  execute2btq  ex_in,
+    output btq2execute  ex_out,
 
     // dispatch (alloc snapshot)
     input  rename2snap_bus snap_in,
@@ -136,6 +137,14 @@ module btq #(
 
                 state[idx].tgt  <= ex_in.dat[i].tgt;
                 state[idx].take <= ex_in.dat[i].take;
+            end
+
+            // handle reads (execute)
+            for (int i = 0; i < `NUM_FU_BRU; ++i) begin
+                int idx;
+                idx = ex_in.btq_idx[i];
+                ex_out.pred[i]      <= state[idx].pred;
+                ex_out.pred_tgt[i]  <= state[idx].pred_tgt;
             end
 
             // handle fetch (ins)

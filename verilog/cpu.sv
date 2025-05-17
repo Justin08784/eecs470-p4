@@ -153,15 +153,13 @@ module cpu (
         .btq_in (btq_2_retire),
         .btq_out(retire_2_btq),
 
-        .retire_exec,
-
-        .flush,
-        .flush_PC
+        .retire_exec
     );
 
 
     /* >> ==== Branch target queue (BTQ) ==== >> */
     execute2btq ex_2_btq;
+    btq2execute btq_2_ex;
 
     btq btq0(
         .clock,
@@ -171,6 +169,7 @@ module cpu (
         .snap_in(rnme_2_snap),
 
         .ex_in  (ex_2_btq),
+        .ex_out (btq_2_ex),
 
         .r_in   (retire_2_btq),
         .r_out  (btq_2_retire),
@@ -189,7 +188,7 @@ module cpu (
         .clock,
         .reset,
         .flush,
-        .clmsk('0), // FIXME
+        .clmsk,
  
         .d_in   (dispatch_2_rs),
         .d_out  (rs_2_dispatch),
@@ -224,6 +223,7 @@ module cpu (
         .clock,
         .reset,
         .flush,
+        .flush_PC,
         .clmsk,
 
         .rs_in      (rs_2_ex),
@@ -232,6 +232,7 @@ module cpu (
         .prf_in     (prf_2_ex),
         .prf_out    (ex_2_prf),
 
+        .btq_in     (btq_2_ex),
         .btq_out    (ex_2_btq),
 
         .ctag_out   (ex_2_ctag),

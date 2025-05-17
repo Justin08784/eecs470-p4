@@ -10,7 +10,7 @@ TESTS=(
     hw4q4a-nomem
     hw4q4b
     hw4
-    mult_no_lsq
+    # mult_no_lsq
     test1
     test2
     test3

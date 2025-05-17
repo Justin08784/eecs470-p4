@@ -456,7 +456,6 @@ typedef struct packed {
 
 typedef struct packed {
     logic   [$clog2(`N):0]  puq_rdy_scnt;
-    BTQ_ENTRY [`N-1:0]      dat;
 } btq2retire;
 
 typedef struct packed {
@@ -464,6 +463,9 @@ typedef struct packed {
 } retire2btq;
 
 typedef struct packed {
+    // for reading
+    BTQ_IDX [`NUM_FU_BRU-1:0] btq_idx;
+
     struct packed {
         logic   en;
         // BTQ-specific completion stuff
@@ -473,6 +475,12 @@ typedef struct packed {
         WADDR   tgt;
     } [`NUM_FU_BRU-1:0] dat;
 } execute2btq;
+
+typedef struct packed {
+    // WADDR [`NUM_FU_BRU-1:0] PC; // Does BRU need to carry PC if we can supply it like so?
+    logic [`NUM_FU_BRU-1:0] pred;
+    WADDR [`NUM_FU_BRU-1:0] pred_tgt;
+} btq2execute;
 
 typedef struct packed {
     logic [$clog2(`N):0]    r_en_cnt; // final final
