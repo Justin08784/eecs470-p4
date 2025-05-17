@@ -93,6 +93,14 @@ module btq #(
         end
 
         f_out.puq_en = !puq_empty;
+
+        // handle reads (execute)
+        for (int i = 0; i < `NUM_FU_BRU; ++i) begin
+            int idx;
+            idx = ex_in.btq_idx[i];
+            ex_out.pred[i]     = state[idx].pred;
+            ex_out.pred_tgt[i] = state[idx].pred_tgt;
+        end
     end
 
     localparam PUQ_SZ = 3;
@@ -147,14 +155,6 @@ module btq #(
             end
 `endif
 
-            // handle reads (execute)
-            for (int i = 0; i < `NUM_FU_BRU; ++i) begin
-                int idx;
-                idx = ex_in.btq_idx[i];
-                ex_out.pred[i]      <= state[idx].pred;
-                ex_out.pred_tgt[i]  <= state[idx].pred_tgt;
-            end
-
             // handle fetch (ins)
             for (int i = 0, int idx = 0; i < NUM_FPORTS; ++i) begin
                 idx = f_idxs_n[i];
@@ -190,11 +190,11 @@ module btq #(
 
         for (int i = 0; i < BTQ_SZ; ++i) begin
             if (!btq_vld[i]) begin
-                $display("BTQ [%2d]:", i);
+                $display("BTQ[%2d]:", i);
                 continue;
             end
 
-            $write("BTQ [%2d]: pred: %b, pred_tgt: %x, take: %b, tgt: %x, ",
+            $write("BTQ[%2d]: pred: %b, pred_tgt: %x, take: %b, tgt: %x, ",
                 i,
                 state[i].pred,
                 state[i].pred_tgt,
