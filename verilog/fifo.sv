@@ -46,14 +46,17 @@ module fifo #(
     input                                           reset,
     input                                           flush,
     input   PTR                                     flush_snap,
+    input   BMASK                                   clmsk,
 
     input   logic   [$clog2(NUM_WPORTS):0]          wr_en_cnt,
     input   logic   [NUM_WPORTS-1:0][WIDTH-1:0]     wr_data,
+    input   BMASK   [NUM_WPORTS-1:0]                wr_bmask,
     output  PTR                                     tail,
     output  PTR     [NUM_WPORTS:0]                  wr_idxs_n,
 
     input   logic   [$clog2(NUM_RPORTS):0]          rd_en_cnt,
     output  logic   [NUM_RPORTS-1:0][WIDTH-1:0]     rd_data,
+    output  BMASK   [NUM_RPORTS-1:0]                rd_bmask,
     output  PTR                                     head,
     output  PTR     [NUM_RPORTS:0]                  rd_idxs_n,
 
@@ -75,6 +78,7 @@ module fifo #(
     endfunction
 
     logic [DEPTH-1:0][WIDTH-1:0]    state;
+    BMASK [DEPTH-1:0]               bmask;
     logic [$clog2(DEPTH):0]         used, free;
 
     ring_ctr #(
@@ -124,10 +128,13 @@ module fifo #(
         for (int unsigned i = 0; i < NUM_RPORTS; ++i) begin
             if (i >= used_scnt) begin
                 rd_data[i] = '0;
+                rd_bmask[i] = '0;
             end else if (fwd_dat[i] && (i - used) < wr_en_cnt) begin // fwding logic
                 rd_data[i] = wr_data[i - used];
+                rd_bmask[i] = wr_bmask[i - used]; // does this need ~clmsk?
             end else begin
                 rd_data[i] = state[rd_idxs_n[i]];
+                rd_bmask[i] = bmask[rd_idxs_n[i]] & ~clmsk;
             end
         end
     end
@@ -140,10 +147,15 @@ module fifo #(
                 $error("FIFO overflow! instance: %d", INSTANCE_ID);
             if (rd_en_cnt > (ENABLE_INTR_FWD ? used + wr_en_cnt : used))
                 $error("FIFO underflow! instance: %d", INSTANCE_ID);
+
+            for (int i = 0; i < DEPTH; ++i)
+                bmask[i] <= bmask[i] & ~clmsk;
+
             for (int unsigned i = 0; i < NUM_WPORTS; ++i) begin
                 if (i >= wr_en_cnt) // suppresses oob index warning
                     continue;
                 state[wr_idxs_n[i]] <= wr_data[i];
+                bmask[wr_idxs_n[i]] <= wr_bmask[i];
             end
         end
     end

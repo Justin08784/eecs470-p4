@@ -657,7 +657,6 @@ typedef struct packed {
     PHYS_REG_IDX    t;
     // rename
     BMASK           b1hot;
-    BMASK           bmask;
     PHYS_REG_IDX    t_old;
     PHYS_REG_IDX    t1;
     PHYS_REG_IDX    t2;

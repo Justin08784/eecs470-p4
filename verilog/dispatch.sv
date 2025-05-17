@@ -179,6 +179,7 @@ module dispatch #(parameter
     end
 
     RENAME_COMMIT_PKT [`N-1:0] tmp_alloc2rename;
+    BMASK             [`N-1:0] tmp_alloc2rename_bmask;
     always_comb begin
         logic [`N-1:0] rd_src1s;
         logic [`N-1:0] rd_src2s;
@@ -212,7 +213,6 @@ module dispatch #(parameter
                 t           : rename_in[i].t,
                 // rename
                 b1hot       : '0,
-                bmask       : '0,
                 t_old       : '0,
                 t1          : '0,
                 t2          : '0,
@@ -226,7 +226,7 @@ module dispatch #(parameter
             tmp_alloc2rename[i].t2      = map_in.t2s[i];
 
             tmp_alloc2rename[i].b1hot = bman_in.b1hot_n[rnme_snap_prefix_cnt[i]];
-            tmp_alloc2rename[i].bmask = bman_in.bmask_n[rnme_snap_prefix_cnt[i]];
+            tmp_alloc2rename_bmask[i] = bman_in.bmask_n[rnme_snap_prefix_cnt[i]];
 
             // actually need src tags?
             rd_src1s[i] = rename_in[i].opa_select == OPA_IS_RS1
@@ -253,6 +253,7 @@ module dispatch #(parameter
     end
 
     RENAME_COMMIT_PKT [`N-1:0]  commit_in;
+    BMASK [`N-1:0] commit_in_bmask;
     logic [$clog2(N):0] commit_en_cnt;
     logic [`N-1:0]      commit_en;
     fifo #(
@@ -267,10 +268,14 @@ module dispatch #(parameter
         .clock      (clock),
         .reset      (reset),
         .flush      (flush),
+        .clmsk      (clmsk),
+
         .wr_en_cnt  (rename_en_cnt),
         .wr_data    (tmp_alloc2rename),
+        .wr_bmask   (tmp_alloc2rename_bmask),
         .rd_en_cnt  (commit_en_cnt),
         .rd_data    (commit_in),
+        .rd_bmask   (commit_in_bmask),
 
         .free_scnt  (rename_rdy_scnt),
         .used_scnt  (rename_vld_scnt)
@@ -344,7 +349,7 @@ module dispatch #(parameter
                 t           : commit_in[i].t,
                 // rename
                 b1hot       : commit_in[i].b1hot,
-                bmask       : commit_in[i].bmask & ~clmsk,
+                bmask       : commit_in_bmask[i],
                 t_old       : commit_in[i].t_old,
                 t1          : commit_in[i].t1,
                 t2          : commit_in[i].t2,
