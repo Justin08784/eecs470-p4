@@ -48,13 +48,20 @@ module decoder_p4 (
             end
             `RV32_JAL: begin
                 fu_idx        = FU_BRU;
-                has_dest      = `TRUE;
+                /*
+                FIXME. Okay what the fuck. j with x0 destination was allocating pregs.
+                It's surely because of this. What the fuck? Is their decoder wrong???
+                */
+                has_dest      = inst.r.rd != `ZERO_REG;
                 opa_select    = OPA_IS_PC;
                 opb_select    = OPB_IS_J_IMM;
             end
             `RV32_JALR: begin
                 fu_idx        = FU_BRU;
-                has_dest      = `TRUE;
+                /*
+                FIXME. Same situation. See above.
+                */
+                has_dest      = inst.r.rd != `ZERO_REG;
                 opa_select    = OPA_IS_RS1;
                 opb_select    = OPB_IS_I_IMM;
             end
