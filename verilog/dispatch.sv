@@ -242,6 +242,9 @@ module dispatch #(parameter
             rnme_snap_out.b1hot_n[i] = bman_in.b1hot_n[rnme_snap_prefix_cnt[i]]; // only valid if snap_en
 
             rnme_snap_out.fl_head[i] = rename_in[i].fl_head_snap;
+`ifdef DEBUG
+            rnme_snap_out.btq_idx[i] = rename_in[i].btq_idx;
+`endif
             rnme_snap_out.btq_tail[i]= rename_in[i].btq_idx + 1 >= `BTQ_SZ ?
                 0 :
                 rename_in[i].btq_idx + 1;
@@ -406,7 +409,7 @@ module dispatch #(parameter
         $display("  %3d | >> Dispatch >>", $time);
         // $display("r_in.btq_rdy_scnt: %d",   btq_in.btq_rdy_scnt);
         // $display("btq_in.btq_rdy_scnt: %d",   btq_in.btq_rdy_scnt);
-        $display("BMAN: bmask: %b", bman_in.bmask_n[0]);
+        $display("BMAN: bmask: %b (alloc: %2d)", bman_in.bmask_n[0], $countones(bman_in.bmask_n[0]));
         $display("rspc: {%1d, %1d, %1d}", 
             rnme_snap_prefix_cnt[0],
             rnme_snap_prefix_cnt[1],

@@ -133,7 +133,19 @@ module btq #(
 
                 state[idx].tgt  <= ex_in.dat[i].tgt;
                 state[idx].take <= ex_in.dat[i].take;
+`ifdef DEBUG
+                state[idx].b1hot<= '0;
+`endif
             end
+
+            // mark alloc'd bmask (debug only)
+`ifdef DEBUG
+            for (int i = 0; i < N; ++i) begin
+                if (!snap_in.snap_en[i])
+                    continue;
+                state[snap_in.btq_idx[i]].b1hot <= snap_in.b1hot_n[i];
+            end
+`endif
 
             // handle reads (execute)
             for (int i = 0; i < `NUM_FU_BRU; ++i) begin
@@ -150,6 +162,9 @@ module btq #(
                     continue;
 
                 state[idx] <= '{
+`ifdef DEBUG
+                    b1hot   : '0,
+`endif
                     PC      : f_in.PC[i],
                     pred    : f_in.pred[i],
                     pred_tgt: f_in.pred_tgt[i],
@@ -178,13 +193,19 @@ module btq #(
                 $display("BTQ [%2d]:", i);
                 continue;
             end
-            $display("BTQ [%2d]: pred: %b, pred_tgt: %x, take: %b, tgt: %x",
+
+            $write("BTQ [%2d]: pred: %b, pred_tgt: %x, take: %b, tgt: %x, ",
                 i,
                 state[i].pred,
                 state[i].pred_tgt,
                 state[i].take,
                 state[i].tgt
             );
+
+            if(|state[i].b1hot)
+                $display("b1hot: %b", state[i].b1hot);
+            else
+                $display("b1hot:");
         end
 
         for (int i = 0; i < `NUM_FU_BRU; ++i) begin

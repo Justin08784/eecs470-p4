@@ -434,6 +434,9 @@ typedef struct packed {
 // BTQ stuff
 // By btq
 typedef struct packed {
+`ifdef DEBUG
+    BMASK   b1hot;
+`endif
     WADDR   PC;
     logic   pred;
     WADDR   pred_tgt;
@@ -778,6 +781,9 @@ typedef struct packed {
 typedef struct packed {
     logic [`N-1:0] snap_en;
     BMASK [`N-1:0] b1hot_n;
+`ifdef DEBUG
+    logic [`N-1:0][$clog2(`BTQ_SZ)-1:0] btq_idx;
+`endif
     logic [`N-1:0][$clog2(`BTQ_SZ)-1:0] btq_tail;
     logic [`N-1:0][$clog2(`ROB_SZ)-1:0] fl_head;
     // mt checkpoints are handled locally
