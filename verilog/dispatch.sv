@@ -387,7 +387,7 @@ module dispatch #(parameter
     end
 
     always_ff @(posedge clock) begin
-        if (reset || flush) begin
+        if (reset) begin
             cpl_lst <= '1;
         end else begin
             for (int i = 0; i < map_out.en_cnt; ++i) begin

@@ -985,7 +985,7 @@ module stage_ex_p4 (
     end
 
     always_ff @(posedge clock) begin
-        if (reset || flush) begin
+        if (reset) begin
             cdb2fu_gbus_shr <= '0;
             cdb_gnt_shr     <= '0;
             ctag_out        <= '0;
