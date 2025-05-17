@@ -313,7 +313,7 @@ module bru_ex(
         pred     = btq_in.pred[0];
         take     = o_btq_out.dat[0].take;
         corr_tgt = btq_in.pred_tgt[0] == o_btq_out.dat[0].tgt;
-        npc      = npc_addrs[0];
+        npc      = i_regs[0].PC + 1;
         tgt      = o_btq_out.dat[0].tgt;
 
         unique casez ({pred, take, corr_tgt})
