@@ -892,7 +892,7 @@ typedef struct packed {
     logic   [$clog2(`N):0] rob_rdy_scnt;
         // From: ROB
         // saturating counter for number of free rob entries
-    ROB_IDX [`N-1:0] rob_idxs_n;
+    ROB_IDX [`N:0] rob_idxs_n;
         // To: dispatch
         // rob idxs of entries that can be allocated this cycle
 } rob2dispatch;

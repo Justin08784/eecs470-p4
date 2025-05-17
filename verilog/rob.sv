@@ -144,6 +144,14 @@ module rob #(
         logic t_dup, told_dup;
 
         $display("  | >> ROB >>");
+        for (int i = 0; i < `N; ++i) begin
+            $display("snap_in[%1d]: en: %b, b1hot_n: %b, rob_tail: %2d",
+                i,
+                snap_in.snap_en[i],
+                snap_in.b1hot_n[i],
+                snap_in.rob_tail[i]
+            );
+        end
         $display("fl: en_cnt: %d, [%2d, %2d] fldup: %b",
             verisimpleV.free_list0.free_cnt,
             verisimpleV.free_list0.told_packed[0],
