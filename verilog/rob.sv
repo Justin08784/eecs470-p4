@@ -46,7 +46,7 @@ module rob #(
         .WIDTH($bits(ROB_ENTRY)),
         .RPORTS(NUM_RPORTS),
         .WPORTS(NUM_DPORTS),
-        .FLUSH_MODE(FIFO_FLUSH_RESET) // FIXME
+        .FLUSH_MODE(FIFO_FLUSH_CHECK)
     ) ring_ctr0 (
         .clock,
         .reset,
@@ -100,7 +100,7 @@ module rob #(
     end
 
     always_ff @(posedge clock) begin
-        if (reset || flush) begin
+        if (reset) begin
             rsvd    <= 0;
             state   <= '0;
         end else begin

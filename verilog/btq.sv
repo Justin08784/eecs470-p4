@@ -44,7 +44,7 @@ module btq #(
         .WIDTH($bits(BTQ_ENTRY)),
         .RPORTS(NUM_RPORTS),
         .WPORTS(NUM_FPORTS),
-        .FLUSH_MODE(FIFO_FLUSH_RESET) // FIXME
+        .FLUSH_MODE(FIFO_FLUSH_CHECK)
     ) ring_ctr0 (
         .clock,
         .reset,
@@ -79,10 +79,6 @@ module btq #(
     );
 
     always_comb begin
-        // handle retire (outs)
-        for (int unsigned i = 0; i < NUM_RPORTS; ++i)
-            r_out.dat[i] = state[r_idxs[i]];
-
         // handle fetch (outs)
         f_out.btq_idxs     = f_idxs;
     end
@@ -121,7 +117,7 @@ module btq #(
     );
 
     always_ff @(posedge clock) begin
-        if (reset || flush) begin
+        if (reset) begin
             state   <= '0;
         end else begin
             if (f_in.en_cnt > free)
@@ -196,14 +192,14 @@ module btq #(
             );
         end
         $display("r_in: rd_cnt %d", r_in.rd_cnt);
-        for (int i = 0; i < `N; ++i) begin
-            $display("r_out[%d]: tgt: %x, pred: %b, take: %b",
-                i,
-                r_out.dat[i].tgt,
-                r_out.dat[i].pred,
-                r_out.dat[i].take
-            );
-        end
+        // for (int i = 0; i < `N; ++i) begin
+        //     $display("r_out[%d]: tgt: %x, pred: %b, take: %b",
+        //         i,
+        //         r_out.dat[i].tgt,
+        //         r_out.dat[i].pred,
+        //         r_out.dat[i].take
+        //     );
+        // end
         $display("<< BTQ <<");
     endtask
 

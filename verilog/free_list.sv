@@ -101,7 +101,7 @@ module free_list #(parameter
         .WIDTH(WIDTH),
         .NUM_RPORTS(`N),
         .NUM_WPORTS(`N),
-        .FLUSH_MODE(FIFO_FLUSH_HEAD), // FIXME
+        .FLUSH_MODE(FIFO_FLUSH_CHECK),
         .ENABLE_INTR_FWD(`FALSE),
         .RESET_STATE(RESET_STATE)
     ) lst (

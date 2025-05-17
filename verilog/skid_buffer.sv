@@ -1,7 +1,7 @@
 `include "sys_defs.svh"
 
 module flop #(
-    parameter int FLUSH_MODE=SKID_FLUSH_RESET,
+    parameter int FLUSH_MODE=SKID_FLUSH_MASK,
     parameter int unsigned WIDTH=1
 ) (
     input   clock, 
@@ -49,7 +49,7 @@ endmodule
 
 module skid #(
     parameter int unsigned WIDTH=1,
-    parameter int FLUSH_MODE=SKID_FLUSH_RESET,
+    parameter int FLUSH_MODE=SKID_FLUSH_MASK,
     parameter logic ENABLE_SNOOP = `FALSE
 ) (
     input   clock, 
@@ -117,7 +117,7 @@ module ppln_skid #(
         PIPE,
         SKID
     },
-    parameter int FLUSH_MODE=SKID_FLUSH_RESET,
+    parameter int FLUSH_MODE=SKID_FLUSH_MASK,
     parameter int unsigned WIDTH
 ) (
     input   clock, 

@@ -122,6 +122,7 @@ module dispatch #(parameter
         .WIDTH($bits(ALLOC_RENAME_PKT)),
         .NUM_RPORTS(`N),
         .NUM_WPORTS(`N),
+        .FLUSH_MODE(FIFO_FLUSH_RESET),
         .ENABLE_INTR_FWD(`FALSE)
     ) alloc_buf (
         .clock      (clock),
@@ -157,7 +158,6 @@ module dispatch #(parameter
         rename_en_cnt = alloc_vld_scnt;
         rename_en_cnt = `MIN(rename_rdy_scnt, rename_en_cnt);
         rename_en_cnt = `MIN(rnme_snap_lim_cnt, rename_en_cnt);
-        // bman_out = '0; // FIXME: disable
         bman_out.snap_en_cnt = rnme_snap_prefix_cnt[rename_en_cnt];
     end
 
@@ -254,6 +254,7 @@ module dispatch #(parameter
         .WIDTH($bits(RENAME_COMMIT_PKT)),
         .NUM_RPORTS(`N),
         .NUM_WPORTS(`N),
+        .FLUSH_MODE(FIFO_FLUSH_RESET),
         .ENABLE_INTR_FWD(`FALSE)
     ) rename_buf (
         .clock      (clock),

@@ -344,6 +344,7 @@ module stage_id_p4 (
         .WIDTH($bits(ID_RESULT)),
         .NUM_RPORTS(`N),
         .NUM_WPORTS(`N),
+        .FLUSH_MODE(FIFO_FLUSH_RESET),
         /* Disable internal forwarding just to make it 100% clear to the synthesizer
         that there are no dependencies between fetch and dispatch (across decode).*/
         .ENABLE_INTR_FWD(`FALSE)

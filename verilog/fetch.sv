@@ -131,6 +131,7 @@ module stage_if_p4 (
         .WIDTH($bits(IF_ID_PACKET)),
         .NUM_RPORTS(`N),
         .NUM_WPORTS(`N),
+        .FLUSH_MODE(FIFO_FLUSH_RESET),
         .ENABLE_INTR_FWD(`FALSE),
         .INSTANCE_ID(2)
     ) insn_buf (

@@ -136,18 +136,6 @@ module fifo #(
     always_ff @(posedge clock) begin
         if (reset) begin
             state   <= RESET_STATE.state;
-        end else if (flush) begin
-            unique case (FLUSH_MODE)
-            FIFO_FLUSH_HEAD: begin
-            end
-
-            FIFO_FLUSH_CHECK: begin
-            end
-
-            default: begin
-                state   <= RESET_STATE.state;
-            end
-            endcase
         end else begin
             if (wr_en_cnt > (ENABLE_INTR_FWD ? free + rd_en_cnt : free))
                 $error("FIFO overflow! instance: %d", INSTANCE_ID);

@@ -73,7 +73,7 @@ module map_table #(parameter
         .clock,
 
         .rmsk   (clmsk),
-        .rdat   (snap), // TODO: wire
+        .rdat   (snap),
 
         .uen_cnt(r_in.r_en_cnt),
         .udst   (r_in.dst),
@@ -90,12 +90,9 @@ module map_table #(parameter
             for (int r = 1; r < `NUM_ARCH_REG; ++r)
                 entries[r] <= r;
 
-        end else if (`FALSE && flush) begin // FIXME
-            entries <= snap;
-
         end else if (flush) begin
             for (int r = 1; r < `NUM_ARCH_REG; ++r)
-                entries[r] <= am_in.entries[r];
+                entries[r] <= snap[r];
 
         end else begin
             entries <= entries_n[d_in.en_cnt];
