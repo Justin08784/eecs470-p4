@@ -163,26 +163,28 @@ module btq #(
 
 `ifdef DEBUG
     task print_btq;
+        logic [BTQ_SZ-1:0] btq_vld;
+
         $display(">> BTQ >>");
-        for (int i = 0; i < `BTQ_SZ; ++i) begin
-            $display("BTQ [%0d]: tgt: %x, pred: %b, take: %b%s",
+        btq_vld = '0;
+        for (int cnt = 0; cnt < used; ++cnt)
+            btq_vld[(head + cnt) % BTQ_SZ] = 1;
+
+        for (int i = 0; i < BTQ_SZ; ++i) begin
+            if (!btq_vld[i]) begin
+                $display("BTQ [%2d]:", i);
+                continue;
+            end
+            $display("BTQ [%2d]: pred: %b, pred_tgt: %x, take: %b, tgt: %x",
                 i,
-                state[i].tgt,
                 state[i].pred,
+                state[i].pred_tgt,
                 state[i].take,
-                (i == head && head == tail) 
-                    ? " << h/t"
-                    : (i == head) 
-                        ? " << h" 
-                        : (i == tail)
-                            ? " << t"
-                            : ""
+                state[i].tgt
             );
-            if (i == tail)
-                break;
         end
 
-        for (int i = 0; i < `N; ++i) begin
+        for (int i = 0; i < `NUM_FU_BRU; ++i) begin
             $display("ex_in[%0d]: en: %b, btq_idx: %d, take: %b, tgt: %x",
                 i,
                 ex_in.dat[i].en,
@@ -191,15 +193,8 @@ module btq #(
                 ex_in.dat[i].tgt
             );
         end
+
         $display("r_in: rd_cnt %d", r_in.rd_cnt);
-        // for (int i = 0; i < `N; ++i) begin
-        //     $display("r_out[%d]: tgt: %x, pred: %b, take: %b",
-        //         i,
-        //         r_out.dat[i].tgt,
-        //         r_out.dat[i].pred,
-        //         r_out.dat[i].take
-        //     );
-        // end
         $display("<< BTQ <<");
     endtask
 
