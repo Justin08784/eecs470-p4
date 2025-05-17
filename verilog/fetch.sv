@@ -126,6 +126,14 @@ module stage_if_p4 (
 
     end
 
+    // always_ff @(posedge clock) begin
+    //     $display("reset: %b, btq_out.en_cnt: %d, f_cnt: %d", reset, btq_out.en_cnt, f_cnt);
+    //     $display("fluck: %b", fluck);
+    //     for (int i = 0; i < `N+1; ++i)
+    //         $display("> btq_prefix_cnt[%1d]: %1d", i, btq_prefix_cnt[i]);
+    // end
+
+
     fifo #(
         .DEPTH(2*`N),
         .WIDTH($bits(IF_ID_PACKET)),
@@ -160,7 +168,15 @@ module stage_if_p4 (
 
 `ifdef DEBUG
     task print_fetch;
+        logic [2*`N-1:0] insn_buf_vld;
+
         $display(">> Fetch >>");
+        // insn_buf_vld = '0;
+        // for (int cnt = 0; cnt < insn_buf.used; ++cnt)
+        //     insn_buf_vld[(insn_buf.head + cnt) % (2*`N)] = 1;
+        // $display("insn_buf_vld: %b", insn_buf_vld);
+        // for (int i = 0; i < `N; ++i)
+        //     $display("[%1d]: %1d", i, btq_prefix_cnt[i]);
         $display("flush: %b, flush_PC: 0x%x", flush, flush_PC);
         $display("d_out: {f_en_cnt: %b, dat: [%x, %x]}", d_out.f_en_cnt, d_out.f_dat[0], d_out.f_dat[1]);
         $display("<< Fetch <<");
