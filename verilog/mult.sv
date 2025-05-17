@@ -6,7 +6,6 @@ typedef struct packed {
     logic [63:0]    mplier;
     logic [63:0]    mcand;
     MUL_FUNC        func;
-    BMASK           bmask;
     PHYS_REG_IDX    t;
     ROB_IDX         rob_idx;
 } MUL_PKT;
@@ -68,7 +67,6 @@ module mult #(
             mplier  : i_mplier,
             mcand   : i_mcand,
             func    : func,
-            bmask   : i_bmask,
             t       : i_t,
             rob_idx : i_rob_idx
         };
@@ -77,11 +75,13 @@ module mult #(
     // instantiate an array of mult_stage modules
     // this uses concatenation syntax for internal wiring, see lab 2 slides
     logic   [`MUL_STAGES:0] vlds;
+    BMASK   [`MUL_STAGES:0] msks;
     logic   [`MUL_STAGES:0] rdys;
     MUL_PKT [`MUL_STAGES:0] pkts;
 
     always_comb begin
         vlds[0] = i_vld;
+        msks[0] = i_bmask;
         i_rdy   = rdys[0];
         pkts[0] = i_pkt;
 
@@ -102,9 +102,12 @@ module mult #(
 
                 .i_vld(vlds[i]),
                 .i_rdy(rdys[i]),
+                .i_msk(msks[i]),
                 .i_dat(pkts[i]),
+
                 .o_vld(vlds[i+1]),
                 .o_rdy(rdys[i+1]),
+                .o_msk(msks[i+1]),
                 .o_dat(pkts[i+1])
             );
 
@@ -120,9 +123,12 @@ module mult #(
 
                 .i_vld(vlds[i]),
                 .i_rdy(rdys[i]),
+                .i_msk(msks[i]),
                 .i_dat(pkts[i]),
+
                 .o_vld(cdb_req),
                 .o_rdy(cdb_gnt),
+                .o_msk(msks[i+1]),
                 .o_dat(pkts[i+1])
             );
             assign ctag_t = pkts[i+1].t;
@@ -138,8 +144,11 @@ module mult #(
                 .clmsk,
 
                 .i_vld(cdb_gnt),
+                .i_msk(msks[i]),
                 .i_dat(pkts[i]),
+
                 .o_vld(vlds[i+1]),
+                .o_msk(msks[i+1]),
                 .o_dat(pkts[i+1])
             );
 
@@ -153,8 +162,11 @@ module mult #(
                 .clmsk,
 
                 .i_vld(vlds[i]),
+                .i_msk(msks[i]),
                 .i_dat(pkts[i]),
+
                 .o_vld(vlds[i+1]),
+                .o_msk(msks[i+1]),
                 .o_dat(pkts[i+1])
             );
 
@@ -170,8 +182,11 @@ module mult #(
                 .clmsk,
 
                 .i_vld(vlds[i]),
+                .i_msk(msks[i]),
                 .i_dat(pkts[i]),
+
                 .o_vld(vlds[i+1]),
+                .o_msk(msks[i+1]),
                 .o_dat(pkts[i+1])
             );
 
@@ -221,8 +236,11 @@ module mult_stage #(
     input MUL_PKT   i_dat,
 
     input  logic    i_vld,  // replacement for start
+    input  BMASK    i_msk,
     output logic    i_rdy,
+
     input  logic    o_rdy,
+    output BMASK    o_msk,
     output logic    o_vld,  // replacement for done
 
     output MUL_PKT  o_dat
@@ -242,7 +260,6 @@ module mult_stage #(
             mplier  : shifted_mplier,
             mcand   : shifted_mcand,
             func    : i_dat.func,
-            bmask   : i_dat.bmask,
             t       : i_dat.t,
             rob_idx : i_dat.rob_idx
         };
@@ -267,10 +284,12 @@ module mult_stage #(
                 
                 .i_vld,
                 .i_rdy,
+                .i_msk,
                 .i_dat(tmp_dat),
 
                 .o_vld,
                 .o_rdy,
+                .o_msk,
                 .o_dat
             );
         end
@@ -286,10 +305,12 @@ module mult_stage #(
                 
                 .i_vld,
                 .i_rdy,
+                .i_msk,
                 .i_dat(tmp_dat),
 
                 .o_vld,
                 .o_rdy,
+                .o_msk,
                 .o_dat
             );
         end
@@ -306,9 +327,11 @@ module mult_stage #(
                 .clmsk,
                 
                 .i_vld,
+                .i_msk,
                 .i_dat(tmp_dat),
 
                 .o_vld,
+                .o_msk,
                 .o_dat
             );
         end
