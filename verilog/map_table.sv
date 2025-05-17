@@ -94,6 +94,12 @@ module map_table #(parameter
             for (int r = 1; r < `NUM_ARCH_REG; ++r)
                 entries[r] <= snap[r];
 
+            for (int n = 0; n < r_in.r_en_cnt; ++n) begin
+                if (r_in.dst[n] == `ZERO_REG)
+                    continue;
+                entries[r_in.dst[n]] <= r_in.tag[n];
+            end
+
         end else begin
             entries <= entries_n[d_in.en_cnt];
 `ifndef SYNTH
