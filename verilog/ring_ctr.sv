@@ -18,15 +18,15 @@ module ring_ctr #(
     input   clock,
     input   reset,
     input   flush,
-    input   PTR     flush_tail,
+    input   PTR     flush_snap,
 
     input   logic   [$clog2(RPORTS):0]  rd_en_cnt,
     input   logic   [$clog2(WPORTS):0]  wr_en_cnt,
 
     output  PTR     head,
     output  PTR     tail,
-    output  PTR     [RPORTS-1:0]        rd_idxs,
-    output  PTR     [WPORTS-1:0]        wr_idxs,
+    output  PTR     [RPORTS:0]          rd_idxs_n,
+    output  PTR     [WPORTS:0]          wr_idxs_n,
 
     output  CNT     used,
     output  CNT     free,
@@ -38,7 +38,7 @@ module ring_ctr #(
         carry = p + k;
         return (carry >= DEPTH) ? carry - DEPTH : carry[$bits(PTR)-1:0];
     endfunction
-    function automatic PTR distance(input PTR x, input PTR y);
+    function automatic CNT distance(input PTR x, input PTR y);
         return (y >= x) ? (y - x) : (y + DEPTH - x);
     endfunction
 
@@ -48,10 +48,10 @@ module ring_ctr #(
         used_scnt = `MIN(used, RPORTS);
         free_scnt = `MIN(free, WPORTS);
 
-        for (int i = 0; i < RPORTS; ++i)
-            rd_idxs[i] = incr(head, i);
-        for (int i = 0; i < WPORTS; ++i)
-            wr_idxs[i] = incr(tail, i);
+        for (int i = 0; i < RPORTS+1; ++i)
+            rd_idxs_n[i] = incr(head, i);
+        for (int i = 0; i < WPORTS+1; ++i)
+            wr_idxs_n[i] = incr(tail, i);
     end
 
     initial begin
@@ -69,30 +69,30 @@ module ring_ctr #(
             head <= RESET_STATE.head;
             tail <= RESET_STATE.tail;
 
-        end else if (flush) begin
-            unique case (FLUSH_MODE)
-            FIFO_FLUSH_HEAD: begin
-                used <= DEPTH;
-                tail <= head;
-            end
-
-            FIFO_FLUSH_CHECK: begin
-                used <= used - distance(flush_tail, tail);
-                tail <= flush_tail;
-            end
-
-            default: begin
-                used <= RESET_STATE.used;
-                head <= RESET_STATE.head;
-                tail <= RESET_STATE.tail;
-            end
-            endcase
-
         end else begin
             used <= used + wr_en_cnt - rd_en_cnt;
-            head <= incr(head, rd_en_cnt);
-            tail <= incr(tail, wr_en_cnt);
+            head <= rd_idxs_n[rd_en_cnt];
+            tail <= wr_idxs_n[wr_en_cnt];
 
+            if (flush) begin
+                unique case (FLUSH_MODE)
+                FIFO_FLUSH_SNAP_HEAD: begin
+                    used <= used + distance(flush_snap, head);
+                    head <= flush_snap;
+                end
+
+                FIFO_FLUSH_SNAP_TAIL: begin
+                    used <= used - distance(flush_snap, tail);
+                    tail <= flush_snap;
+                end
+
+                default: begin
+                    used <= RESET_STATE.used;
+                    head <= RESET_STATE.head;
+                    tail <= RESET_STATE.tail;
+                end
+                endcase
+            end
         end
     end
 

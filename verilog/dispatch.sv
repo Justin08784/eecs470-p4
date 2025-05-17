@@ -103,9 +103,8 @@ module dispatch #(parameter
                 btq_idx     : d_in.d_dat[i].btq_idx,
 
                 // alloc
-                t   : has_dst[i]
-                    ? free_in.d_ts[free_prefix_cnt[i]]
-                    : '0
+                t           : has_dst[i] ? free_in.d_ts[free_prefix_cnt[i]] : '0,
+                fl_head_snap: free_in.fl_heads_n[free_prefix_cnt[i]]
             };
 
         end
@@ -241,7 +240,11 @@ module dispatch #(parameter
         for (int i = 0; i < `N; ++i) begin
             rnme_snap_out.snap_en[i] = rnme_is_brch[i] && (i < rename_en_cnt);
             rnme_snap_out.b1hot_n[i] = bman_in.b1hot_n[rnme_snap_prefix_cnt[i]]; // only valid if snap_en
-            rnme_snap_out.btq_tail[i]= rename_in[i].btq_idx;
+
+            rnme_snap_out.fl_head[i] = rename_in[i].fl_head_snap;
+            rnme_snap_out.btq_tail[i]= rename_in[i].btq_idx + 1 >= `BTQ_SZ ?
+                0 :
+                rename_in[i].btq_idx + 1;
         end
     end
 
@@ -347,7 +350,7 @@ module dispatch #(parameter
                 rob_idx     : '0
             };
 
-            rs_out.dat[i].rob_idx = rob_in.rob_idxs[i];
+            rs_out.dat[i].rob_idx = rob_in.rob_idxs_n[i];
             for (int c = 0; c < `N; ++c) begin
                 rs_out.dat[i].t1_rdy |= ctag_in.en[c] & (ctag_in.ts[c] == commit_in[i].t1);
                 rs_out.dat[i].t2_rdy |= ctag_in.en[c] & (ctag_in.ts[c] == commit_in[i].t2);
@@ -357,7 +360,10 @@ module dispatch #(parameter
 
             comm_snap_out.snap_en[i]= comm_is_brch[i] && (i < commit_en_cnt);
             comm_snap_out.b1hot_n[i]= commit_in[i].b1hot; // only valid if snap_en
-            comm_snap_out.rob_tail[i]=rob_in.rob_idxs[i];
+            comm_snap_out.rob_tail[i]=rob_in.rob_idxs_n[i + 1];
+                /* Q: Why +1?
+                A: Checkpoint the tail AFTER us. The mispredicted branch still retires.
+                */
         end
     end
 

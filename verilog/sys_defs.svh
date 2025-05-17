@@ -351,9 +351,9 @@ typedef enum logic [2:0] {
 } MUL_FUNC;
 
 typedef enum logic [0:1] {
-    FIFO_FLUSH_RESET = 0, // default
-    FIFO_FLUSH_HEAD  = 1, // wind tail to head
-    FIFO_FLUSH_CHECK = 2  // wind tail to checkpoint
+    FIFO_FLUSH_RESET     = 0, // default
+    FIFO_FLUSH_SNAP_HEAD = 1, // wind head to checkpoint
+    FIFO_FLUSH_SNAP_TAIL = 2  // wind tail to checkpoint
 } FIFO_FLUSH_MODE;
 
 typedef enum logic [0:1] {
@@ -627,6 +627,7 @@ typedef struct packed {
 
     // alloc
     PHYS_REG_IDX    t;
+    logic [$clog2(`ROB_SZ)-1:0] fl_head_snap;
 } ALLOC_RENAME_PKT;
 
 typedef struct packed {
@@ -704,7 +705,7 @@ typedef struct packed {
 
 typedef struct packed {
     logic   [$clog2(`N):0]  btq_rdy_scnt;
-    BTQ_IDX [`N-1:0]        btq_idxs;
+    BTQ_IDX [`N-1:0]        btq_idxs_n;
 
     logic       puq_en;
     PUQ_ENTRY   puq_dat;
@@ -778,8 +779,8 @@ typedef struct packed {
     logic [`N-1:0] snap_en;
     BMASK [`N-1:0] b1hot_n;
     logic [`N-1:0][$clog2(`BTQ_SZ)-1:0] btq_tail;
-    // logic [`N-1:0][$clog2(`ROB_SZ)-1:0] fl_tail;
-    // mt, fl checkpoints are handled locally
+    logic [`N-1:0][$clog2(`ROB_SZ)-1:0] fl_head;
+    // mt checkpoints are handled locally
 } rename2snap_bus;
 
 typedef struct packed {
@@ -891,7 +892,7 @@ typedef struct packed {
     logic   [$clog2(`N):0] rob_rdy_scnt;
         // From: ROB
         // saturating counter for number of free rob entries
-    ROB_IDX [`N-1:0] rob_idxs;
+    ROB_IDX [`N-1:0] rob_idxs_n;
         // To: dispatch
         // rob idxs of entries that can be allocated this cycle
 } rob2dispatch;
@@ -940,7 +941,7 @@ typedef struct packed {
         // From: Free list
         // - newly allocated pregs
 
-    logic [`N-1:0][$clog2(`ROB_SZ)-1:0] fl_tail;
+    logic [`N:0][$clog2(`ROB_SZ)-1:0] fl_heads_n;
 } free_list2dispatch;
 
 `define BY_FU(type) \

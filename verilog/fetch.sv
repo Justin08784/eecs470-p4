@@ -116,7 +116,7 @@ module stage_if_p4 (
         f_cnt = `MIN(btq_lim_cnt, f_cnt);
         btq_out.en_cnt = btq_prefix_cnt[f_cnt];
         for (int i = 0; i < `N; ++i) begin
-            f_dat[i].btq_idx = btq_in.btq_idxs[btq_prefix_cnt[i]];
+            f_dat[i].btq_idx = btq_in.btq_idxs_n[btq_prefix_cnt[i]];
 
             btq_out.PC      [btq_prefix_cnt[i]] = PC_n[i];
             btq_out.pred    [btq_prefix_cnt[i]] = pred[i];

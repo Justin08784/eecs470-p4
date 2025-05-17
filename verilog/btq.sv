@@ -36,28 +36,28 @@ module btq #(
     logic [$clog2(BTQ_SZ):0]    used;
     logic [$clog2(BTQ_SZ):0]    free;
 
-    logic [NUM_RPORTS-1:0][$clog2(BTQ_SZ)-1:0] r_idxs;
-    logic [NUM_FPORTS-1:0][$clog2(BTQ_SZ)-1:0] f_idxs;
+    logic [NUM_RPORTS:0][$clog2(BTQ_SZ)-1:0] r_idxs_n;
+    logic [NUM_FPORTS:0][$clog2(BTQ_SZ)-1:0] f_idxs_n;
 
     ring_ctr #(
         .DEPTH(BTQ_SZ),
         .WIDTH($bits(BTQ_ENTRY)),
         .RPORTS(NUM_RPORTS),
         .WPORTS(NUM_FPORTS),
-        .FLUSH_MODE(FIFO_FLUSH_CHECK)
+        .FLUSH_MODE(FIFO_FLUSH_SNAP_TAIL)
     ) ring_ctr0 (
         .clock,
         .reset,
         .flush,
-        .flush_tail (snap),
+        .flush_snap (snap),
 
         .rd_en_cnt  (r_in.rd_cnt),
         .wr_en_cnt  (f_in.en_cnt),
 
         .head,
         .tail,
-        .rd_idxs    (r_idxs),
-        .wr_idxs    (f_idxs),
+        .rd_idxs_n  (r_idxs_n),
+        .wr_idxs_n  (f_idxs_n),
 
         .used,
         .free,
@@ -80,16 +80,16 @@ module btq #(
 
     always_comb begin
         // handle fetch (outs)
-        f_out.btq_idxs     = f_idxs;
+        f_out.btq_idxs_n     = f_idxs_n;
     end
 
     logic puq_empty;
     PUQ_ENTRY [NUM_RPORTS-1:0] tmp_puq_in;
     always_comb begin
         for (int i = 0; i < NUM_RPORTS; ++i) begin
-            tmp_puq_in[i].take = state[r_idxs[i]].take;
-            tmp_puq_in[i].pc   = state[r_idxs[i]].PC;
-            tmp_puq_in[i].tgt  = state[r_idxs[i]].tgt;
+            tmp_puq_in[i].take = state[r_idxs_n[i]].take;
+            tmp_puq_in[i].pc   = state[r_idxs_n[i]].PC;
+            tmp_puq_in[i].tgt  = state[r_idxs_n[i]].tgt;
         end
 
         f_out.puq_en = !puq_empty;
@@ -145,7 +145,7 @@ module btq #(
 
             // handle fetch (ins)
             for (int i = 0, int idx = 0; i < NUM_FPORTS; ++i) begin
-                idx = f_idxs[i];
+                idx = f_idxs_n[i];
                 if (i >= f_in.en_cnt)
                     continue;
 
@@ -166,6 +166,7 @@ module btq #(
         logic [BTQ_SZ-1:0] btq_vld;
 
         $display(">> BTQ >>");
+        $display("head: %d, used: %d", head, used);
         btq_vld = '0;
         for (int cnt = 0; cnt < used; ++cnt)
             btq_vld[(head + cnt) % BTQ_SZ] = 1;

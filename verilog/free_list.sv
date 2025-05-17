@@ -94,46 +94,45 @@ module free_list #(parameter
     end
    
 
-    logic [$clog2(DEPTH)-1:0] snap, tail;
+    logic [$clog2(DEPTH)-1:0] snap;
     fifo #(
         .INSTANCE_ID(0),
         .DEPTH(DEPTH),
         .WIDTH(WIDTH),
         .NUM_RPORTS(`N),
         .NUM_WPORTS(`N),
-        .FLUSH_MODE(FIFO_FLUSH_CHECK),
+        .FLUSH_MODE(FIFO_FLUSH_SNAP_HEAD),
         .ENABLE_INTR_FWD(`FALSE),
         .RESET_STATE(RESET_STATE)
     ) lst (
         .clock,
         .reset,
         .flush,
-        .flush_tail(snap),
+        .flush_snap(snap),
 
         .wr_en_cnt(free_cnt),
         .wr_data(told_packed),
-        .tail,
 
         .rd_en_cnt(d_in.free_d_en_cnt),
         .rd_data(d_out.d_ts),
+        .rd_idxs_n(d_out.fl_heads_n),
 
         .free_scnt(), // do we need this? how would even retire return more pregs than in existence?
         .used_scnt(d_out.free_rdy_scnt)
     );
 
-    fl_snaps fl_tails0 (
+    general_snaps #(
+        .WIDTH($clog2(`ROB_SZ))
+    ) fl_heads0 (
         .clock,
 
         .rmsk   (clmsk),
         .rdat   (snap),
 
-        .uen_cnt(free_cnt),
-
         .wen    (snap_in.snap_en),
         .wmsk   (snap_in.b1hot_n),
-        .wdat   ({N{tail}})
+        .wdat   (snap_in.fl_head)
     );
-
 
 `ifdef DEBUG
     task print_fl();

@@ -38,28 +38,28 @@ module rob #(
     sz(alloc_buf) + sz(rename_buf) = 4*`N.
     */
 
-    logic [NUM_RPORTS-1:0][$clog2(ROB_SZ)-1:0] rtre_idxs;
-    logic [NUM_DPORTS-1:0][$clog2(ROB_SZ)-1:0] comm_idxs;
+    logic [NUM_RPORTS:0][$clog2(ROB_SZ)-1:0] rtre_idxs_n;
+    logic [NUM_DPORTS:0][$clog2(ROB_SZ)-1:0] comm_idxs_n;
 
     ring_ctr #(
         .DEPTH(ROB_SZ),
         .WIDTH($bits(ROB_ENTRY)),
         .RPORTS(NUM_RPORTS),
         .WPORTS(NUM_DPORTS),
-        .FLUSH_MODE(FIFO_FLUSH_CHECK)
+        .FLUSH_MODE(FIFO_FLUSH_SNAP_TAIL)
     ) ring_ctr0 (
         .clock,
         .reset,
         .flush,
-        .flush_tail (snap),
+        .flush_snap (snap),
 
         .rd_en_cnt  (r_in.r_en_cnt),
         .wr_en_cnt  (d_in.d_en_cnt),
 
         .head,
         .tail,
-        .rd_idxs    (rtre_idxs),
-        .wr_idxs    (comm_idxs),
+        .rd_idxs_n    (rtre_idxs_n),
+        .wr_idxs_n    (comm_idxs_n),
 
         .used,
         .free,
@@ -89,13 +89,13 @@ module rob #(
         for (int unsigned i = 0; i < used_scnt; ++i) begin
             /* preview mode–– just display all valid entries in read window even
             if not all will get retired this cycle */
-            r_out.entries[i] = state[rtre_idxs[i]];
+            r_out.entries[i] = state[rtre_idxs_n[i]];
         end
 
         // handle dispatch (outs)
         d_out = '{
-            rob_rdy_scnt : free_scnt,
-            rob_idxs     : comm_idxs
+            rob_rdy_scnt: free_scnt,
+            rob_idxs_n  : comm_idxs_n
         };
     end
 
@@ -124,7 +124,7 @@ module rob #(
             for (int unsigned i = 0, int cur_idx = 0; i < NUM_DPORTS; ++i) begin
                 if (i >= d_in.d_en_cnt)
                     continue;
-                cur_idx = comm_idxs[i];
+                cur_idx = comm_idxs_n[i];
                 state[cur_idx] <= '{
                     cpl     : 0,
                     fu_idx  : d_in.fu_idx[i],

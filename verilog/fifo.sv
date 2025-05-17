@@ -45,15 +45,17 @@ module fifo #(
     input                                           clock, 
     input                                           reset,
     input                                           flush,
-    input   PTR                                     flush_tail,
+    input   PTR                                     flush_snap,
 
     input   logic   [$clog2(NUM_WPORTS):0]          wr_en_cnt,
     input   logic   [NUM_WPORTS-1:0][WIDTH-1:0]     wr_data,
     output  PTR                                     tail,
+    output  PTR     [NUM_WPORTS:0]                  wr_idxs_n,
 
     input   logic   [$clog2(NUM_RPORTS):0]          rd_en_cnt,
     output  logic   [NUM_RPORTS-1:0][WIDTH-1:0]     rd_data,
     output  PTR                                     head,
+    output  PTR     [NUM_RPORTS:0]                  rd_idxs_n,
 
     output  logic                                   empty,
     output  logic                                   full,
@@ -75,9 +77,6 @@ module fifo #(
     logic [DEPTH-1:0][WIDTH-1:0]    state;
     logic [$clog2(DEPTH):0]         used, free;
 
-    PTR [NUM_WPORTS-1:0] wr_idxs;
-    PTR [NUM_RPORTS-1:0] rd_idxs;
-
     ring_ctr #(
         .DEPTH(DEPTH),
         .WIDTH(WIDTH),
@@ -94,15 +93,15 @@ module fifo #(
         .clock,
         .reset,
         .flush,
-        .flush_tail,
+        .flush_snap,
 
         .rd_en_cnt,
         .wr_en_cnt,
 
         .head,
         .tail,
-        .rd_idxs,
-        .wr_idxs,
+        .rd_idxs_n,
+        .wr_idxs_n,
 
         .used,
         .free,
@@ -128,7 +127,7 @@ module fifo #(
             end else if (fwd_dat[i] && (i - used) < wr_en_cnt) begin // fwding logic
                 rd_data[i] = wr_data[i - used];
             end else begin
-                rd_data[i] = state[rd_idxs[i]];
+                rd_data[i] = state[rd_idxs_n[i]];
             end
         end
     end
@@ -144,7 +143,7 @@ module fifo #(
             for (int unsigned i = 0; i < NUM_WPORTS; ++i) begin
                 if (i >= wr_en_cnt) // suppresses oob index warning
                     continue;
-                state[wr_idxs[i]] <= wr_data[i];
+                state[wr_idxs_n[i]] <= wr_data[i];
             end
         end
     end
