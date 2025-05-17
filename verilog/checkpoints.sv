@@ -160,7 +160,7 @@ module branch_manager (
     BMASK bmask_reg;
     
     BMASK [`N-1:0]  b1hot_n;
-    BMASK [`N:0]    bmask_n;
+    BMASK [`N:0]    bmask_n, cum_b1hot_n;
     psel_gen #(
         .WIDTH  (BMASK_LEN),
         .REQS   (`N)
@@ -170,9 +170,12 @@ module branch_manager (
     );
 
     always_comb begin
-        bmask_n[0] = bmask_reg;
+        cum_b1hot_n[0] = '0; 
         for (int n = 0; n < `N; ++n)
-            bmask_n[n + 1] = bmask_n[n] | b1hot_n[n];
+            cum_b1hot_n[n+1] = cum_b1hot_n[n] | b1hot_n[n];
+
+        for (int n = 0; n < `N+1; ++n)
+            bmask_n[n] = bmask_reg | cum_b1hot_n[n];
 
         dis_out.b1hot_n = b1hot_n;
         dis_out.bmask_n = bmask_n;
@@ -185,13 +188,39 @@ module branch_manager (
         end
     end
 
+    BMASK [BMASK_LEN-1:0] dep_table;
+        // dep_table[i][j] := branch w/ b1hot j is dependent on branch w/ b1hot i
+
     always_ff @(posedge clock) begin
+        assert ($onehot0({reset,clmsk})) else $fatal("clmsk not one-hot");
+
         if (reset) begin
             bmask_reg <= '0;
+            dep_table <= '0;
+
         end else if (flush) begin
-            bmask_reg <= bmask_reg & ~clmsk;
+            foreach (clmsk[i]) begin
+                if (!clmsk[i])
+                    continue;
+                bmask_reg   <= bmask_reg & ~(clmsk | dep_table[i]);
+                dep_table[i]<= '0;
+            end
+
+            for (int i = 0; i < BMASK_LEN; ++i)
+                dep_table[i] <= dep_table[i] & ~clmsk;
+
         end else begin
             bmask_reg <= bmask_n[dis_in.snap_en_cnt] & ~clmsk;
+
+            for (int i = 0; i < BMASK_LEN; ++i)
+                dep_table[i] <= (dep_table[i] & ~clmsk) | cum_b1hot_n[dis_in.snap_en_cnt];
+
+            foreach (b1hot_n[n, i]) begin
+                if (!b1hot_n[n][i] || n >= dis_in.snap_en_cnt)
+                    continue;
+                dep_table[i] <= cum_b1hot_n[n];
+            end
+
         end
     end
 
