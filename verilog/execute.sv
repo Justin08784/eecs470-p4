@@ -75,34 +75,14 @@ module alu_ex(
     /* BACKEND */
     output CPL_CAND [`NUM_FU_ALU-1:0]   o_cands
 );
-    ADDR [`NUM_FU_ALU-1:0] pc_addrs, npc_addrs;
-    DATA [`NUM_FU_ALU-1:0] opa, opb;
-    always_comb begin
-        foreach(opa[i]) begin
-            pc_addrs[i]     = w2addr(i_regs[i].PC);
-            npc_addrs[i]    = w2addr(i_regs[i].PC + 1);
-            // ALU opA mux
-            case (i_regs[i].opa_select)
-                OPA_IS_RS1:  opa[i] = i_regs[i].rs1;
-                OPA_IS_NPC:  opa[i] = npc_addrs[i];
-                OPA_IS_PC:   opa[i] = pc_addrs[i];
-                OPA_IS_ZERO: opa[i] = 0;
-                default:     opa[i] = 32'hdeadface; // dead face
-            endcase
-
-            // ALU opB mux
-            opb[i] = i_regs[i].opb;
-        end
-    end
-
     // execute
     generate
         DATA        [`NUM_FU_ALU-1:0] tmp_res;
         for (genvar i = 0; i < `NUM_FU_ALU; ++i) begin : gen_alus
             alu alu_0 ( 
                 // Inputs
-                .opa        (opa[i]),
-                .opb        (opb[i]),
+                .opa        (i_regs[i].opa),
+                .opb        (i_regs[i].opb),
                 .alu_func   (i_regs[i].alu_func),
 
                 // Output (directly to cdat_out)
@@ -637,8 +617,20 @@ module stage_ex_p4 (
     } ex;
     always_comb begin
         foreach (iss.o_vld.alu[i]) begin
-            DATA imm32b;
-            logic opb_is_rs2;
+            DATA imm32a, imm32b;
+            logic opa_is_rs1, opb_is_rs2;
+            ADDR pc_addr, npc_addr;
+            pc_addr  = w2addr(iss.o_dat.alu[i].PC);
+            npc_addr = w2addr(iss.o_dat.alu[i].PC + 1);
+
+            opa_is_rs1 = iss.o_dat.alu[i].opa_select == OPA_IS_RS1;
+            case (iss.o_dat.alu[i].opa_select)
+                OPA_IS_RS1:  imm32a = '0;
+                OPA_IS_NPC:  imm32a = npc_addr;
+                OPA_IS_PC:   imm32a = pc_addr;
+                OPA_IS_ZERO: imm32a = 0;
+                default:     imm32a = 32'hdeadface; // dead face
+            endcase
 
             opb_is_rs2 = iss.o_dat.alu[i].opb_select == OPB_IS_RS2;
             case (iss.o_dat.alu[i].opb_select)
@@ -654,13 +646,14 @@ module stage_ex_p4 (
             regs.i_dat.alu[i] = '{
                 bytag : iss.o_dat.alu[i].bytag,
 
-                rs1 : prf_in.v1s.alu[i],
+                opa : opa_is_rs1
+                    ? prf_in.v1s.alu[i]
+                    : imm32a,
                 opb : opb_is_rs2
                     ? prf_in.v2s.alu[i]
                     : imm32b,
 
-                PC          : iss.o_dat.alu[i].PC,
-                opa_select  : iss.o_dat.alu[i].opa_select,
+                opa_is_rs1  : opa_is_rs1,
                 opb_is_rs2  : opb_is_rs2,
                 alu_func    : iss.o_dat.alu[i].alu_func,
 

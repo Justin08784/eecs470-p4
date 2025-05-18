@@ -84,14 +84,16 @@ typedef struct packed {
 
 typedef struct packed {
     BYPASS_TAG      bytag;
-    DATA            rs1;
+    union packed {
+        DATA    rs1;
+        DATA    imm32a;
+    } opa;
     union packed {
         DATA    rs2;
         DATA    imm32b;
     } opb;
 
-    WADDR           PC;
-    ALU_OPA_SELECT  opa_select;
+    logic           opa_is_rs1;
     logic           opb_is_rs2;
     ALU_FUNC        alu_func;
 
@@ -143,8 +145,8 @@ function automatic ALU_REGS alu_snoop(
     input execute2complete_dat cdat
 );
     ALU_REGS rv = v;
-    if (rv.bytag.bypass1)
-        rv.rs1 = cdat.data[rv.bytag.cdb_idx1];
+    if (rv.bytag.bypass1 && rv.opa_is_rs1)
+        rv.opa = cdat.data[rv.bytag.cdb_idx1];
     if (rv.bytag.bypass2 && rv.opb_is_rs2)
         rv.opb = cdat.data[rv.bytag.cdb_idx2];
     return rv;
