@@ -15,33 +15,33 @@ module dispatch #(parameter
     output  rename2snap_bus rnme_snap_out,
     output  comm2snap_bus   comm_snap_out,
 
-    // DECODE
+    // decode
     input   decode2dispatch d_in,
     output  dispatch2decode d_out,
 
-    // RS
+    // rs
     input   rs2dispatch rs_in,
     output  dispatch2rs rs_out,
 
-    // ROB
+    // rob
     input   rob2dispatch rob_in,
     output  dispatch2rob rob_out,
 
-    // Free list
+    // free list
     input   free_list2dispatch free_in,
     output  dispatch2free_list free_out,
 
-    // CDB (completions)
+    // cdb (completions)
     input   execute2complete_tag ctag_in,
 
-    // Map table
+    // map table
     input   map_table2dispatch map_in,
     output  dispatch2map_table map_out
 );
 
     logic [`PHYS_REG_SZ_R10K-1:0] cpl_lst;
 
-    /* >> ==== 1. Alloc Stage ==== >> */
+    /* >> ==== 1. Rename stage ==== >> */
     // Gate by availability
     logic [`N-1:0] has_dst;
     logic [`N:0][$clog2(`N):0] free_prefix_cnt;
@@ -64,8 +64,6 @@ module dispatch #(parameter
     logic [$clog2(N):0] rename_rdy_scnt;
     logic [$clog2(N):0] rename_en_cnt;
     logic [`N-1:0]      rename_en;
-
-    /* >> ==== 2. Rename Stage ==== >> */
 
     logic [`N-1:0] rnme_is_brch;
     logic [`N:0][$clog2(`N):0] rnme_snap_prefix_cnt;
@@ -110,12 +108,12 @@ module dispatch #(parameter
         end
     end
 
-    RENAME_COMMIT_PKT [`N-1:0] tmp_alloc2rename;
-    BMASK             [`N-1:0] tmp_alloc2rename_bmask;
+    RENAME_COMMIT_PKT [`N-1:0] rename2commit;
+    BMASK             [`N-1:0] rename2commit_bmask;
     always_comb begin
-        tmp_alloc2rename = '0;
+        rename2commit = '0;
         for (int i = 0; i < `N; ++i) begin
-            tmp_alloc2rename[i] = '{
+            rename2commit[i] = '{
 `ifdef DEBUG
                 id          : d_in.d_dat[i].id,
 `endif
@@ -143,13 +141,13 @@ module dispatch #(parameter
                 t2          : '0
             };
 
-            tmp_alloc2rename[i].t       = map_out.ts[i];
-            tmp_alloc2rename[i].t_old   = map_in.ts_old[i];
-            tmp_alloc2rename[i].t1      = map_in.t1s[i];
-            tmp_alloc2rename[i].t2      = map_in.t2s[i];
+            rename2commit[i].t       = map_out.ts[i];
+            rename2commit[i].t_old   = map_in.ts_old[i];
+            rename2commit[i].t1      = map_in.t1s[i];
+            rename2commit[i].t2      = map_in.t2s[i];
 
-            tmp_alloc2rename[i].b1hot = bman_in.b1hot_n[rnme_snap_prefix_cnt[i]];
-            tmp_alloc2rename_bmask[i] = bman_in.bmask_n[rnme_snap_prefix_cnt[i]];
+            rename2commit[i].b1hot = bman_in.b1hot_n[rnme_snap_prefix_cnt[i]];
+            rename2commit_bmask[i] = bman_in.bmask_n[rnme_snap_prefix_cnt[i]];
         end
 
         for (int i = 0; i < `N; ++i) begin
@@ -184,8 +182,8 @@ module dispatch #(parameter
         .clmsk      (clmsk),
 
         .wr_en_cnt  (rename_en_cnt),
-        .wr_data    (tmp_alloc2rename),
-        .wr_bmask   (tmp_alloc2rename_bmask),
+        .wr_data    (rename2commit),
+        .wr_bmask   (rename2commit_bmask),
         .rd_en_cnt  (commit_en_cnt),
         .rd_data    (commit_in),
         .rd_bmask   (commit_in_bmask),
@@ -194,7 +192,7 @@ module dispatch #(parameter
         .used_scnt  (rename_vld_scnt)
     );
 
-    /* >> ==== 3. Commit Stage ==== >> */
+    /* >> ==== 2. Commit Stage ==== >> */
 
     logic [`N-1:0] comm_is_brch;
     logic [`N:0][$clog2(`N):0] comm_snap_prefix_cnt;
@@ -273,7 +271,7 @@ module dispatch #(parameter
 
             rs_out.dat[i].rob_idx = rob_in.rob_idxs_n[i];
 
-            // actually need src tags?
+            // tag readiness check
             rd_src1s[i] = commit_in[i].opa_select == OPA_IS_RS1
                 || commit_in[i].cond_branch;
             rd_src2s[i] = commit_in[i].opb_select == OPB_IS_RS2
