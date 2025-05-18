@@ -163,6 +163,12 @@ module dispatch #(parameter
         end
     end
 
+    /*
+    NOTE:
+    To save area, we can size this buffer to 2*`N and use
+    combinational backpressure:
+    rename_en_cnt = `MIN(rename_rdy_scnt + commit_en_cnt, rename_en_cnt);
+    */
     RENAME_COMMIT_PKT [`N-1:0]  commit_in;
     BMASK [`N-1:0] commit_in_bmask;
     logic [$clog2(N):0] commit_en_cnt;

@@ -68,15 +68,6 @@ module fifo #(
     /*NOTE: By removing rd_valid, wr_valid, we force the caller to make sure
     the enabled cnts are correct. */
 );
-    function automatic PTR incr(input PTR ptr, input int unsigned step);
-        logic [$clog2(DEPTH):0] carry;
-        carry = ptr + step;
-        return (carry >= DEPTH) ? carry - DEPTH : carry[$bits(PTR)-1:0];
-    endfunction
-    function automatic PTR distance(input PTR x, input PTR y);
-        return (y >= x) ? (y - x) : (y + DEPTH - x);
-    endfunction
-
     logic [DEPTH-1:0][WIDTH-1:0]    state;
     BMASK [DEPTH-1:0]               bmask;
     logic [$clog2(DEPTH):0]         used, free;
@@ -143,9 +134,9 @@ module fifo #(
         if (reset) begin
             state   <= RESET_STATE.state;
         end else begin
-            if (wr_en_cnt > (ENABLE_INTR_FWD ? free + rd_en_cnt : free))
+            if (wr_en_cnt > free + rd_en_cnt)
                 $error("FIFO overflow! instance: %d", INSTANCE_ID);
-            if (rd_en_cnt > (ENABLE_INTR_FWD ? used + wr_en_cnt : used))
+            if (rd_en_cnt > used + wr_en_cnt)
                 $error("FIFO underflow! instance: %d", INSTANCE_ID);
 
             for (int i = 0; i < DEPTH; ++i)

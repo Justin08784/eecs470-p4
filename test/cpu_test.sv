@@ -33,16 +33,12 @@ import "DPI-C" function string decode_inst(int inst);
 
 `define TB_MAX_CYCLES 50000000
 // `define TB_MAX_CYCLES 500
-// `define TB_MAX_CYCLES 10000
+// `define TB_MAX_CYCLES 160100
 
 
 // Debug cycle limits, both inclusive
 localparam DBG_CYCLE_MIN = 0;
 localparam DBG_CYCLE_MAX = `TB_MAX_CYCLES;
-// localparam DBG_CYCLE_MIN = 1480;
-// localparam DBG_CYCLE_MAX = 1510;
-// localparam DBG_CYCLE_MIN = 1300;
-// localparam DBG_CYCLE_MAX = 1500;
 
 /*
 - unsure about correctness of call/ret checking; make sure to
@@ -573,18 +569,18 @@ module testbench;
 
         $display("  | >> CYCLE: %3d (t: %3d)", clock_count-1, $time);
         // print_btb();
-        // print_fetch();
+        print_fetch();
         // print_decode();
         print_rob();
-        print_fl();
         print_dispatch();
+        print_fl();
+        print_btq();
         // print_map_table();
         // print_prf();
-        // print_btq();
         print_rs();
         // print_execute();
         // print_dcache();
-        print_retire();
+        // print_retire();
         $display("  | << CYCLE: %3d (t: %3d)", clock_count-1, $time);
 
         // $display("---- rob_debug contents ----");
