@@ -14,6 +14,7 @@ TESTS=(
     test1
     test2
     test3
+    fib-nomem
 
     # contains mem ops
     # btest1
