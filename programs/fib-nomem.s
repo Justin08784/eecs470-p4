@@ -1,5 +1,6 @@
     .text
     .globl _start
+
 _start:
     li x5, 0          # f0 = 0
     li x6, 1          # f1 = 1
