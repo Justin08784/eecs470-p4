@@ -78,14 +78,10 @@ module btq #(
         .wdat   (snap_in.btq_tail)
     );
 
-    always_comb begin
-        // handle fetch (outs)
-        f_out.btq_idxs_n     = f_idxs_n;
-    end
-
     logic puq_empty;
     PUQ_ENTRY [NUM_RPORTS-1:0] tmp_puq_in;
     always_comb begin
+        // handle fetch (outs)
         for (int i = 0; i < NUM_RPORTS; ++i) begin
             tmp_puq_in[i].take = state[r_idxs_n[i]].take;
             tmp_puq_in[i].pc   = state[r_idxs_n[i]].PC;
@@ -93,6 +89,7 @@ module btq #(
         end
 
         f_out.puq_en = !puq_empty;
+        f_out.btq_idxs_n     = f_idxs_n;
 
         // handle reads (execute)
         for (int i = 0; i < `NUM_FU_BRU; ++i) begin
@@ -146,8 +143,8 @@ module btq #(
 `endif
             end
 
-            // mark alloc'd bmask (debug only)
 `ifdef DEBUG
+            // mark alloc'd b1hot (debug only)
             for (int i = 0; i < N; ++i) begin
                 if (!snap_in.snap_en[i])
                     continue;
