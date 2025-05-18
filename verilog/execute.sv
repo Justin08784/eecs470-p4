@@ -1043,7 +1043,7 @@ module stage_ex_p4 (
             $display("regs.o_dat.alu[%0d]: bsy: %b, rs1: 0x%x, opb: 0x%x t: %2d, rob_idx: %2d",
                 i,
                 regs.o_vld.alu[i],
-                regs.o_dat.alu[i].rs1,
+                regs.o_dat.alu[i].opa,
                 regs.o_dat.alu[i].opb,
                 regs.o_dat.alu[i].t,
                 regs.o_dat.alu[i].rob_idx

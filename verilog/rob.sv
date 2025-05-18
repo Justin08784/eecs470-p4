@@ -131,6 +131,7 @@ module rob #(
     task print_rob;
         logic [`ROB_SZ-1:0] rob_vld;
         logic t_dup, told_dup;
+        localparam half_sz = `ROB_SZ / 2;
 
         $display("  | >> ROB >>");
         for (int i = 0; i < `N; ++i) begin
@@ -170,7 +171,7 @@ module rob #(
         for (int cnt = 0; cnt < used; ++cnt)
             rob_vld[(head + cnt) % `ROB_SZ] = 1;
 
-        for (int i = 0; i < `ROB_SZ / 2; ++i) begin
+        for (int i = 0; i < half_sz; ++i) begin
             string ls, rs, name;
 
             t_dup = 0;
@@ -204,17 +205,17 @@ module rob #(
             else
                 ls = $sformatf("Rob[%2d]:", i);
 
-            get_fu_name(state[i+32].fu_idx, name);
-            if (rob_vld[i+32])
+            get_fu_name(state[i+half_sz].fu_idx, name);
+            if (rob_vld[i+half_sz])
                 rs = $sformatf("Rob[%2d]: {cpl:%b, hlt:%b}, %s, dst:%2d (%2d->%2d),",
-                    i+32,
-                    state[i+32].cpl,
-                    state[i+32].halt,
-                    // state[i+32].illegal,
+                    i+half_sz,
+                    state[i+half_sz].cpl,
+                    state[i+half_sz].halt,
+                    // state[i+half_sz].illegal,
                     name,
-                    state[i+32].dst,
-                    state[i+32].t_old,
-                    state[i+32].tag
+                    state[i+half_sz].dst,
+                    state[i+half_sz].t_old,
+                    state[i+half_sz].tag
                     // state[i].is_brch,
                     // state[i].wr_mem,
                     // state[i].rd_mem,
@@ -222,7 +223,7 @@ module rob #(
                     // told_dup
                 );
             else
-                rs = $sformatf("Rob[%2d]:", i+32);
+                rs = $sformatf("Rob[%2d]:", i+half_sz);
 
            $display("%-50s | %-50s", ls, rs); 
         end

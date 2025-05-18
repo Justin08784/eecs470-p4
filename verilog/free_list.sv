@@ -142,6 +142,8 @@ module free_list #(parameter
         logic [$clog2(DEPTH)-1:0]       tail;
         logic [DEPTH-1:0][WIDTH-1:0]    state;
         logic [$clog2(DEPTH):0]         used;
+        localparam half_sz = `ROB_SZ / 2;
+
         head = lst.head;
         tail = lst.tail;
         state= lst.state;
@@ -168,12 +170,12 @@ module free_list #(parameter
                     state[i]
                 );
 
-            if (!fl_vld[i+32])
-                rs = $sformatf("Fl[%2d]: ", i+32);
+            if (!fl_vld[i+half_sz])
+                rs = $sformatf("Fl[%2d]: ", i+half_sz);
             else
                 rs = $sformatf("Fl[%2d]: %2d",
-                    i+32,
-                    state[i+32]
+                    i+half_sz,
+                    state[i+half_sz]
                 );
 
            $display("%-12s | %-12s", ls, rs); 
