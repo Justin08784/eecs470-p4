@@ -660,8 +660,6 @@ typedef struct packed {
     PHYS_REG_IDX    t_old;
     PHYS_REG_IDX    t1;
     PHYS_REG_IDX    t2;
-    logic           t1_rdy;
-    logic           t2_rdy;
 } RENAME_COMMIT_PKT;
 
 typedef struct packed {
@@ -810,8 +808,6 @@ typedef struct packed {
 } dispatch2rs;
 
 typedef struct packed {
-    /* Alloc */
-    logic [$clog2(`N):0] alloc_en_cnt;
     /* Rename */
     /* Commit */
     logic [$clog2(`N):0] d_en_cnt;

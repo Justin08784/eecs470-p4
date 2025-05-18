@@ -84,17 +84,11 @@ module dispatch #(parameter
             rnme_is_brch[n] = d_in.d_dat[n].fu_idx == FU_BRU;
 
         rename_en_cnt = d_in.d_vld_scnt;
-        rename_en_cnt = `MIN(rob_in.rob_rdy_scnt, rename_en_cnt);
         rename_en_cnt = `MIN(free_lim_cnt, rename_en_cnt);
-
-        // rename_en_cnt = `MIN(alloc_rdy_scnt, rename_en_cnt);
-        // rename_en_cnt = alloc_vld_scnt;
-
         rename_en_cnt = `MIN(rename_rdy_scnt, rename_en_cnt);
         rename_en_cnt = `MIN(rnme_snap_lim_cnt, rename_en_cnt);
 
         d_out.dispatch_en_cnt  = rename_en_cnt;
-        rob_out.alloc_en_cnt   = rename_en_cnt;
         free_out.free_d_en_cnt = free_prefix_cnt[rename_en_cnt];
         bman_out.snap_en_cnt = rnme_snap_prefix_cnt[rename_en_cnt];
     end
@@ -104,7 +98,7 @@ module dispatch #(parameter
         map_out = '0;
         map_out.en_cnt  = rename_en_cnt;
 
-        for (int i = 0; i < rename_en_cnt; i++) begin
+        for (int i = 0; i < `N; i++) begin
             //handling dest register
             map_out.ts[i]       = has_dst[i] ? free_in.d_ts[free_prefix_cnt[i]] : '0;
             map_out.dsts[i]     = d_in.d_dat[i].has_dst
@@ -119,16 +113,9 @@ module dispatch #(parameter
     RENAME_COMMIT_PKT [`N-1:0] tmp_alloc2rename;
     BMASK             [`N-1:0] tmp_alloc2rename_bmask;
     always_comb begin
-        logic [`N-1:0] rd_src1s;
-        logic [`N-1:0] rd_src2s;
-
         tmp_alloc2rename = '0;
         for (int i = 0; i < `N; ++i) begin
-            // logic [$bits(RENAME_COMMIT_PKT)-$bits(ALLOC_RENAME_PKT)-1:0] diff;
-            // diff = '0;
-            // tmp_alloc2rename[i] = RENAME_COMMIT_PKT'({d_in.d_dat[i], diff});
             tmp_alloc2rename[i] = '{
-                // from ID_RESULT
 `ifdef DEBUG
                 id          : d_in.d_dat[i].id,
 `endif
@@ -153,9 +140,7 @@ module dispatch #(parameter
                 b1hot       : '0,
                 t_old       : '0,
                 t1          : '0,
-                t2          : '0,
-                t1_rdy      : '0,
-                t2_rdy      : '0
+                t2          : '0
             };
 
             tmp_alloc2rename[i].t       = map_out.ts[i];
@@ -165,28 +150,18 @@ module dispatch #(parameter
 
             tmp_alloc2rename[i].b1hot = bman_in.b1hot_n[rnme_snap_prefix_cnt[i]];
             tmp_alloc2rename_bmask[i] = bman_in.bmask_n[rnme_snap_prefix_cnt[i]];
-
-            // actually need src tags?
-            rd_src1s[i] = d_in.d_dat[i].opa_select == OPA_IS_RS1
-                || d_in.d_dat[i].cond_branch;
-            rd_src2s[i] = d_in.d_dat[i].opb_select == OPB_IS_RS2
-                || d_in.d_dat[i].cond_branch
-                || d_in.d_dat[i].fu_idx == FU_STR;
-            tmp_alloc2rename[i].t1_rdy  = !rd_src1s[i];
-            tmp_alloc2rename[i].t2_rdy  = !rd_src2s[i];
         end
 
         for (int i = 0; i < `N; ++i) begin
             rnme_snap_out.snap_en[i] = rnme_is_brch[i] && (i < rename_en_cnt);
             rnme_snap_out.b1hot_n[i] = bman_in.b1hot_n[rnme_snap_prefix_cnt[i]]; // only valid if snap_en
-
             rnme_snap_out.fl_head[i] = free_in.fl_heads_n[free_prefix_cnt[i]];
-`ifdef DEBUG
-            rnme_snap_out.btq_idx[i] = d_in.d_dat[i].btq_idx;
-`endif
             rnme_snap_out.btq_tail[i]= d_in.d_dat[i].btq_idx + 1 >= `BTQ_SZ ?
                 0 :
                 d_in.d_dat[i].btq_idx + 1;
+`ifdef DEBUG
+            rnme_snap_out.btq_idx[i] = d_in.d_dat[i].btq_idx;
+`endif
         end
     end
 
@@ -236,12 +211,15 @@ module dispatch #(parameter
     always_comb begin
         logic [`FU_IDX_NUM-1:0][`N-1:0] en_by_fu;
         logic [`N-1:0] commit_en;
+        logic [`N-1:0] rd_src1s;
+        logic [`N-1:0] rd_src2s;
 
         foreach (comm_is_brch[n])
             comm_is_brch[n] = commit_in[n].fu_idx == FU_BRU;
 
         foreach (en_by_fu[f, n]) begin
             en_by_fu[f][n] = (n < rename_vld_scnt)
+                && (n < rob_in.rob_rdy_scnt)
                 && commit_in[n].fu_idx == f
                 && rs_in.rdy_sbus[f][n];
         end
@@ -260,11 +238,7 @@ module dispatch #(parameter
 
         rs_out.dat    = '0;
         for (int i = 0; i < `N; i++) begin
-            // logic [$bits(COMMIT_RS_PKT)-$bits(RENAME_COMMIT_PKT)-1:0] diff;
-            // diff = '0;
-            // rs_out.dat[i] = COMMIT_RS_PKT'({commit_in[i], diff});
             rs_out.dat[i] = '{
-                // from ID_RESULT
 `ifdef DEBUG
                 id          : commit_in[i].id,
 `endif
@@ -291,13 +265,22 @@ module dispatch #(parameter
                 t_old       : commit_in[i].t_old,
                 t1          : commit_in[i].t1,
                 t2          : commit_in[i].t2,
-                t1_rdy      : commit_in[i].t1_rdy,
-                t2_rdy      : commit_in[i].t2_rdy,
+                t1_rdy      : '0,
+                t2_rdy      : '0,
                 // commit
                 rob_idx     : '0
             };
 
             rs_out.dat[i].rob_idx = rob_in.rob_idxs_n[i];
+
+            // actually need src tags?
+            rd_src1s[i] = commit_in[i].opa_select == OPA_IS_RS1
+                || commit_in[i].cond_branch;
+            rd_src2s[i] = commit_in[i].opb_select == OPB_IS_RS2
+                || commit_in[i].cond_branch
+                || commit_in[i].fu_idx == FU_STR;
+            rs_out.dat[i].t1_rdy = !rd_src1s[i];
+            rs_out.dat[i].t2_rdy = !rd_src2s[i];
             for (int c = 0; c < `N; ++c) begin
                 rs_out.dat[i].t1_rdy |= ctag_in.en[c] & (ctag_in.ts[c] == commit_in[i].t1);
                 rs_out.dat[i].t2_rdy |= ctag_in.en[c] & (ctag_in.ts[c] == commit_in[i].t2);

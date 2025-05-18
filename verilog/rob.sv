@@ -31,12 +31,6 @@ module rob #(
 
     ROB_ENTRY [ROB_SZ-1:0]      state;
     logic [$clog2(ROB_SZ):0]    used, free;
-    logic [$clog2(4*`N):0]      rsvd;
-    /*
-    FIXME: can just make rsvd [$clog2(ROB_SZ):0] to be safe but I'm trying to
-    match it exactly with the max number of insns that can have reservations:
-    sz(alloc_buf) + sz(rename_buf) = 4*`N.
-    */
 
     logic [NUM_RPORTS:0][$clog2(ROB_SZ)-1:0] rtre_idxs_n;
     logic [NUM_DPORTS:0][$clog2(ROB_SZ)-1:0] comm_idxs_n;
@@ -64,7 +58,7 @@ module rob #(
         .used,
         .free,
         .used_scnt,
-        .free_scnt() // DO NOT wire. Will compute this ourselves.
+        .free_scnt
     );
 
     general_snaps #(
@@ -79,8 +73,6 @@ module rob #(
         .wmsk   (snap_in.b1hot_n),
         .wdat   (snap_in.rob_tail)
     );
-
-    assign free_scnt    = `MIN(free - rsvd, NUM_DPORTS);
 
     always_comb begin
         // handle retire (outs)
@@ -101,7 +93,6 @@ module rob #(
 
     always_ff @(posedge clock) begin
         if (reset) begin
-            rsvd    <= 0;
             state   <= '0;
         end else begin
 `ifndef SYNTH
@@ -110,8 +101,6 @@ module rob #(
             if (r_out.r_vld_cnt > used + d_in.d_en_cnt)
                 $error("ROB underflow!");
 `endif
-            rsvd    <= rsvd - d_in.d_en_cnt + d_in.alloc_en_cnt;
-
             // handle complete (ins)
             for (int unsigned i = 0, int cur_idx = 0; i < NUM_CPORTS; ++i) begin
                 cur_idx = cdat_in.rob_idxs[i];
