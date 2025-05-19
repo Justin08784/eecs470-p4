@@ -79,12 +79,13 @@ module stage_if_p4 (
     logic [`N:0][$clog2(`N):0] btq_prefix_cnt;
     logic [$clog2(`N):0] btq_lim_cnt;
     compactor #(
-        .WIDTH(`N)
+        .REQW(`N),
+        .GNTW(`N)
     ) comp_btq (
         .req        (is_brch),
-        .rdy        (btq_in.btq_rdy_scnt),
-        .gnt_cnt    (btq_lim_cnt),
-        .prefix_cnt (btq_prefix_cnt)
+        .lim_cnt    (btq_in.btq_rdy_scnt),
+        .prefix_cnt (btq_prefix_cnt),
+        .gnt_cnt    (btq_lim_cnt)
     );
 
     always_comb begin

@@ -47,12 +47,13 @@ module dispatch #(parameter
     logic [`N:0][$clog2(`N):0] free_prefix_cnt;
     logic [$clog2(`N):0] free_lim_cnt;
     compactor #(
-        .WIDTH(`N)
+        .REQW(`N),
+        .GNTW(`N)
     ) comp_free (
         .req        (has_dst),
-        .rdy        (free_in.free_rdy_scnt),
-        .gnt_cnt    (free_lim_cnt),
-        .prefix_cnt (free_prefix_cnt)
+        .lim_cnt    (free_in.free_rdy_scnt),
+        .prefix_cnt (free_prefix_cnt),
+        .gnt_cnt    (free_lim_cnt)
     );
 
     always_comb begin
@@ -69,12 +70,13 @@ module dispatch #(parameter
     logic [`N:0][$clog2(`N):0] rnme_snap_prefix_cnt;
     logic [$clog2(`N):0] rnme_snap_lim_cnt;
     compactor #(
-        .WIDTH(`N)
+        .REQW(`N),
+        .GNTW(`N)
     ) comp_rnme_snap (
         .req        (rnme_is_brch),
-        .rdy        (bman_in.snap_rdy_scnt),
-        .gnt_cnt    (rnme_snap_lim_cnt),
-        .prefix_cnt (rnme_snap_prefix_cnt)
+        .lim_cnt    (bman_in.snap_rdy_scnt),
+        .prefix_cnt (rnme_snap_prefix_cnt),
+        .gnt_cnt    (rnme_snap_lim_cnt)
     );
 
     always_comb begin
@@ -203,12 +205,13 @@ module dispatch #(parameter
     logic [`N-1:0] comm_is_brch;
     logic [`N:0][$clog2(`N):0] comm_snap_prefix_cnt;
     compactor #(
-        .WIDTH(`N)
+        .REQW(`N),
+        .GNTW(`N)
     ) comp_comm_snap (
         .req        (comm_is_brch),
-        .rdy        (),
-        .gnt_cnt    (),
-        .prefix_cnt (comm_snap_prefix_cnt)
+        .lim_cnt    (),
+        .prefix_cnt (comm_snap_prefix_cnt),
+        .gnt_cnt    ()
     );
 
     // handle rs output 

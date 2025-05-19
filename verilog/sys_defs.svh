@@ -981,25 +981,26 @@ typedef struct packed {
 } DBG_fl;
 
 module compactor #(
-    parameter int WIDTH=`N,
-    type CNT=logic [$clog2(WIDTH):0]
+    parameter int REQW,
+    parameter int GNTW
 ) (
-    input   logic [WIDTH-1:0] req, // in-order, sparse
-    input   CNT rdy,
-    output  CNT gnt_cnt,
-    output  CNT [WIDTH:0] prefix_cnt
+    input   logic [REQW-1:0] req, // in-order, sparse
+    input   logic [$clog2(GNTW):0] lim_cnt,
+
+    output  logic [REQW:0][$clog2(GNTW):0] prefix_cnt,
+    output  logic [$clog2(REQW):0] gnt_cnt
         // prefix_cnt[i] "left-compacted index" for the i-th lane.
         // (valid iff req[i])
 );
-    // NOTE: upgrade prefix_cnt to a tree adder if speed needed
-    assign prefix_cnt[0] = '0;
-    for (genvar i = 0; i < WIDTH; ++i)
+    assign prefix_cnt[0] = 0;
+    for (genvar i = 0; i < REQW; ++i) begin
         assign prefix_cnt[i+1] = prefix_cnt[i] + req[i];
+    end
 
     always_comb begin
         gnt_cnt = 0;
-        for (int i = 0; i < WIDTH; ++i) begin
-            if (prefix_cnt[i] + req[i] > rdy)
+        for (int i = 0; i < REQW; ++i) begin
+            if (prefix_cnt[i] + req[i] > lim_cnt)
                 break;
             gnt_cnt = i + 1;
         end
