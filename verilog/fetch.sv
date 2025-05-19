@@ -45,11 +45,10 @@ module stage_if_p4 (
     logic [`N-1:0] bp_take, pred;
     WADDR [`N-1:0] pred_tgt;
     always_comb begin
-        logic woff;
         foreach (is_brch[i]) begin
+            logic woff;
             woff = PC_n[i][0];
-            is_brch[i] = (mem_in.insn_md[i][woff].cond_branch
-                       || mem_in.insn_md[i][woff].uncond_branch);
+            is_brch[i] = mem_in.insn_md[i][woff].branch;
         end
 
         pred = is_brch & bp_take;

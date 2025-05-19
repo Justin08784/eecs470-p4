@@ -740,14 +740,19 @@ typedef struct packed {
 typedef struct packed {
     ADDR    [`N-1:0] PCs;
 } fetch2mem;
+
+typedef struct packed {
+    // struct guard
+    logic branch;   // 1 iff is any form of control insn
+
+    // fields valid iff branch high
+    logic cond;
+    logic call;
+    logic ret;
+} BRANCH_MD;
 typedef struct packed {
     MEM_BLOCK   [`N-1:0] data;
-    struct packed {
-        logic call;
-        logic ret;
-        logic cond_branch;
-        logic uncond_branch;
-    } [`N-1:0][1:0] insn_md; // [dw][w]
+    BRANCH_MD   [`N-1:0][1:0] insn_md; // [dw][w]
 } mem2fetch;
 
 typedef struct packed {

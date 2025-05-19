@@ -203,17 +203,6 @@ module dispatch #(parameter
     /* >> ==== 2. Commit Stage ==== >> */
 
     logic [`N-1:0] comm_is_brch;
-    logic [`N:0][$clog2(`N):0] comm_snap_prefix_cnt;
-    compactor #(
-        .REQW(`N),
-        .GNTW(`N)
-    ) comp_comm_snap (
-        .req        (comm_is_brch),
-        .lim_cnt    (),
-        .prefix_cnt (comm_snap_prefix_cnt),
-        .gnt_cnt    ()
-    );
-
     // handle rs output 
     always_comb begin
         logic [`FU_IDX_NUM-1:0][`N-1:0] en_by_fu;

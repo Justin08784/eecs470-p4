@@ -51,34 +51,35 @@ module predecoder (
 
     output logic    call,
     output logic    ret,
-    output logic    cond_branch,
-    output logic    uncond_branch
+    output logic    cond,
+    output logic    branch
 );
     always_comb begin
         REG_IDX rd;
-        call            = `FALSE;
-        ret             = `FALSE;
-        cond_branch     = `FALSE;
-        uncond_branch   = `FALSE;
+        call    = `FALSE;
+        ret     = `FALSE;
+        cond    = `FALSE;
+        branch  = `FALSE;
         rd = inst.r.rd;
 
         casez (inst)
             `RV32_JAL: begin
-                uncond_branch = `TRUE;
                 call = (rd == 5'd1) || (rd == 5'd5);
+                branch = `TRUE;
             end
 
             `RV32_JALR: begin
-                uncond_branch = `TRUE;
                 call = (rd == 5'd1) || (rd == 5'd5);
                 ret  = (rd         == `ZERO_REG)    &&
                        (inst.r.rs1 == 5'd1)         &&   // rs1 lives in same bit‑slice for I‑type
                        (inst.i.imm == 12'd0);
+                branch = `TRUE;
             end
 
             `RV32_BEQ, `RV32_BNE, `RV32_BLT, `RV32_BGE,
             `RV32_BLTU, `RV32_BGEU: begin
-                cond_branch = `TRUE;
+                cond    = `TRUE;
+                branch  = `TRUE;
                 // stage_ex uses inst.b.funct3 as the branch function
             end
             default:;
@@ -171,12 +172,12 @@ module testbench;
     for (genvar blk = 0; blk < `N; ++blk) begin : gen_predecs
         for (genvar woff = 0; woff < 2; ++woff) begin
             predecoder predec_i (
-                .inst           (mem2f.data[blk].word_level[woff]),
+                .inst   (mem2f.data[blk].word_level[woff]),
 
-                .call           (mem2f.insn_md[blk][woff].call),
-                .ret            (mem2f.insn_md[blk][woff].ret),
-                .cond_branch    (mem2f.insn_md[blk][woff].cond_branch),
-                .uncond_branch  (mem2f.insn_md[blk][woff].uncond_branch)
+                .call   (mem2f.insn_md[blk][woff].call),
+                .ret    (mem2f.insn_md[blk][woff].ret),
+                .cond   (mem2f.insn_md[blk][woff].cond),
+                .branch (mem2f.insn_md[blk][woff].branch)
             );
         end
     end
