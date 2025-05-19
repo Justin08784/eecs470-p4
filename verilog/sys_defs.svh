@@ -980,6 +980,26 @@ typedef struct packed {
     } fifo;
 } DBG_fl;
 
+module ffs #(
+    parameter int VECW
+) (
+    input   logic [VECW-1:0] i_vec,
+    output  logic o_vld,
+    output  logic [$clog2(VECW)-1:0] o_idx
+);
+    always_comb begin
+        o_vld = 1'b0;
+        o_idx = 0;
+        for (int i = 0; i < VECW; ++i) begin
+            if (i_vec[i]) begin
+                o_vld = 1'b1;
+                o_idx = i;
+                break;
+            end
+        end
+    end
+endmodule
+
 module compactor #(
     parameter int REQW,
     parameter int GNTW
@@ -997,14 +1017,25 @@ module compactor #(
         assign prefix_cnt[i+1] = prefix_cnt[i] + req[i];
     end
 
-    always_comb begin
-        gnt_cnt = 0;
-        for (int i = 0; i < REQW; ++i) begin
-            if (prefix_cnt[i] + req[i] > lim_cnt)
-                break;
-            gnt_cnt = i + 1;
+    generate
+        logic [REQW-1:0] exceeds;
+        logic found;
+        logic first;
+
+        for (genvar i = 0; i < REQW; ++i) begin
+            assign exceeds[i] = (prefix_cnt[i] + req[i]) > lim_cnt;
         end
-    end
+
+        ffs #(
+            .VECW(REQW)
+        ) ff_exceed (
+            .i_vec(exceeds),
+            .o_vld(found),
+            .o_idx(first)
+        );
+
+        assign gnt_cnt = found ? first : REQW;
+    endgenerate
 endmodule
 
 `ifdef DEBUG
