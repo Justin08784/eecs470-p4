@@ -45,32 +45,16 @@ module bp #(
         .i_upd
     );
 
-    // logic ras_hit, ras_empty, full;
-    // WADDR ras_rtgt, ras_wtgt;
-    // ras #(
-    //     .DEPTH(16)
-    // ) ras0 (
-    //     .clock,
-    //     .reset,
-    //     .flush,
-    //     .flush_snap('0), // FIXME: need a snapshot table
-
-    //     .empty(ras_empty)
-    // );
-    // assign ras_hit = !ras_empty;
-
     // stop fetching beyond the first predicted taken branch
     logic [`N-1:0] raw_take;
-    assign raw_take = brch & btb_hit;
-
-    // always_comb begin
-    //     o_take = raw_take;
-    //     for (int i = 1; i < `N; ++i)
-    //         o_take[i] &= !o_take[i-1];
-    // end
-
     logic take_any;
     logic [$clog2(`N)-1:0] take_idx;
+    logic empty; // ras empty?
+
+    assign raw_take =
+    (ret & {`N{!empty}})
+  | (btb_hit & ((brch & ~cond) | (cond & '1))); // FIXME: '1 = stand-in for direction predictor
+
     ffs #(
         .VECW(`N)
     ) ff_take (
@@ -79,7 +63,34 @@ module bp #(
         .o_idx(take_idx)
     );
 
+    logic ren, wen;
+    logic [$clog2(`N)-1:0] call_idx, ret_idx;
+    WADDR ras_tgt;
+
+    assign ren = take_any && f_en[take_idx] && ret[take_idx];
+    assign wen = take_any && f_en[take_idx] && call[take_idx];
+    ras #(
+        .DEPTH(16)
+    ) ras0 (
+        .clock,
+        .reset,
+        .flush,
+        .flush_snap('0), // FIXME: need a snapshot table
+
+        .rtgt   (ras_tgt),
+        .ren,
+
+        .wen,
+        .wtgt   (btb_tgt[take_idx]),
+
+        .empty
+    );
+
     assign o_take   = raw_take;
     assign o_lim_cnt= take_any ? take_idx + 1 : `N;
-    assign o_tgt    = btb_tgt;
+    generate
+    for (genvar i = 0; i < `N; ++i) begin
+        assign o_tgt[i] = call[i] ? ras_tgt : btb_tgt[i];
+    end
+    endgenerate
 endmodule
