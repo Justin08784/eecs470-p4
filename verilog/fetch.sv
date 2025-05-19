@@ -41,10 +41,8 @@ module stage_if_p4 (
         end
     end
 
-    fetch2btb f2btb;
-    btb2fetch btb2f;
     logic [`N-1:0] is_brch;
-    logic [`N-1:0] pred;
+    logic [`N-1:0] bp_take, pred;
     WADDR [`N-1:0] pred_tgt;
     always_comb begin
         logic woff;
@@ -52,28 +50,22 @@ module stage_if_p4 (
             woff = PC_n[i][0];
             is_brch[i] = (mem_in.insn_md[i][woff].cond_branch
                        || mem_in.insn_md[i][woff].uncond_branch);
-
-            f2btb.pc[i] = PC_n[i];
-
-            pred[i]     = is_brch[i] && btb2f.vld[i];
-            pred_tgt[i] = btb2f.tgt[i];
         end
+
+        pred = is_brch & bp_take;
     end
 
-    puq2btb puq_2_btb;
-    assign puq_2_btb = '{
-        en  : btq_in.puq_en,
-        pc  : btq_in.puq_dat.pc,
-        tgt : btq_in.puq_dat.tgt
-    };
-    btb btb0 (
+    bp #(
+        .QUERY_SZ(`N)
+    ) bp0 (
         .clock,
         .reset,
 
-        .f_in (f2btb),
-        .f_out(btb2f),
+        .i_qry  (PC_n[`N-1:0]),
+        .o_take (bp_take),
+        .o_tgt  (pred_tgt),
 
-        .puq_in(puq_2_btb)
+        .i_upd  (btq_in.bp_upd)
     );
 
     logic [`N:0][$clog2(`N):0] btq_prefix_cnt;

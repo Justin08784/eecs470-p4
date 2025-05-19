@@ -1,17 +1,20 @@
 `include "sys_defs.svh"
 
 module btb #(parameter
+    QUERY_SZ=`N,
     NUM_LINES=256
 ) (
     input clock,
     input reset,
 
-    // query (fetch)
-    input   fetch2btb   f_in,
-    output  btb2fetch   f_out,
+    // fetch query
+    input   WADDR   [QUERY_SZ-1:0]  i_qry, // branch pc
 
-    // write (retire)
-    input   puq2btb     puq_in
+    output  logic   [QUERY_SZ-1:0]  o_vld,
+    output  WADDR   [QUERY_SZ-1:0]  o_tgt,
+
+    // puq updates
+    input   puq2fetch i_upd
 );
     localparam ASSOC = 2;
     localparam NUM_SETS = NUM_LINES / ASSOC;
@@ -85,12 +88,11 @@ module btb #(parameter
         tgt_n = tgt;
 
         // fetch
-        f_out = '0;
-        foreach (f_in.pc[i]) begin
+        foreach (i_qry[i]) begin
             LOC loc;
-            loc = locate(hdr, f_in.pc[i]);
-            f_out.vld[i] = loc.hit;
-            f_out.tgt[i] = tgt[loc.sid][loc.way];
+            loc = locate(hdr, i_qry[i]);
+            o_vld[i] = loc.hit;
+            o_tgt[i] = tgt[loc.sid][loc.way];
 
             /* Unsure: btb reads during fetch should not update
             lru, since they're speculative right? */
@@ -99,10 +101,10 @@ module btb #(parameter
         end
 
         // retire
-        if (puq_in.en) begin
+        if (i_upd.en) begin
             LOC loc;
 
-            loc = locate(hdr, puq_in.pc);
+            loc = locate(hdr, i_upd.dat.pc);
             if (!loc.hit) begin // dedup (dont insert if already there)
                 WAY way;
                 way = hdr.lru[loc.sid];
@@ -110,7 +112,7 @@ module btb #(parameter
                 hdr_n.vld[loc.sid][way] = 1;
                 hdr_n.tag[loc.sid][way] = loc.tag;
                 hdr_n.lru[loc.sid] = !way;
-                tgt_n[loc.sid][way] = puq_in.tgt;
+                tgt_n[loc.sid][way] = i_upd.dat.tgt;
             end
         end
     end

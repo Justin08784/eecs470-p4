@@ -88,8 +88,8 @@ module btq #(
             tmp_puq_in[i].tgt  = state[r_idxs_n[i]].tgt;
         end
 
-        f_out.puq_en = !puq_empty;
-        f_out.btq_idxs_n     = f_idxs_n;
+        f_out.bp_upd.en     = !puq_empty;
+        f_out.btq_idxs_n    = f_idxs_n;
 
         // handle reads (execute)
         for (int i = 0; i < `NUM_FU_BRU; ++i) begin
@@ -114,8 +114,8 @@ module btq #(
         .flush      ('0),
         .wr_en_cnt  (r_in.rd_cnt),
         .wr_data    (tmp_puq_in),
-        .rd_en_cnt  (f_out.puq_en),
-        .rd_data    (f_out.puq_dat),
+        .rd_en_cnt  (f_out.bp_upd.en),
+        .rd_data    (f_out.bp_upd.dat),
         .free_scnt  (r_out.puq_rdy_scnt),
         .used_scnt  (),
         .empty      (puq_empty)

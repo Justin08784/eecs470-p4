@@ -704,11 +704,14 @@ typedef struct packed {
 } fetch2decode;
 
 typedef struct packed {
+    logic       en;
+    PUQ_ENTRY   dat;
+} puq2fetch;
+typedef struct packed {
     logic   [$clog2(`N):0]  btq_rdy_scnt;
     BTQ_IDX [`N-1:0]        btq_idxs_n;
 
-    logic       puq_en;
-    PUQ_ENTRY   puq_dat;
+    puq2fetch   bp_upd;
 } btq2fetch;
 
 typedef struct packed {
