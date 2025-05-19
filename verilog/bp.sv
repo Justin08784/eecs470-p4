@@ -63,11 +63,11 @@ module bp #(
     logic [`N-1:0] raw_take;
     assign raw_take = brch & btb_hit;
 
-    always_comb begin
-        o_take = raw_take;
-        for (int i = 1; i < `N; ++i)
-            o_take[i] &= !o_take[i-1];
-    end
+    // always_comb begin
+    //     o_take = raw_take;
+    //     for (int i = 1; i < `N; ++i)
+    //         o_take[i] &= !o_take[i-1];
+    // end
 
     logic take_any;
     logic [$clog2(`N)-1:0] take_idx;
@@ -79,6 +79,7 @@ module bp #(
         .o_idx(take_idx)
     );
 
+    assign o_take   = raw_take;
     assign o_lim_cnt= take_any ? take_idx + 1 : `N;
     assign o_tgt    = btb_tgt;
 endmodule

@@ -98,9 +98,12 @@ module stage_if_p4 (
 
         // handle btq output
         btq_out = '0;
-        f_cnt = bp_lim_cnt;
-        f_cnt = `MIN(free_scnt, f_cnt);
+        f_cnt = free_scnt;
         f_cnt = `MIN(btq_lim_cnt, f_cnt);
+        for (int i = 0; i < `N; ++i)
+            f_en[i] = i < `N; // snapshot the f_cnt BEFORE gating by bp_lim_cnt
+        f_cnt = `MIN(bp_lim_cnt, f_cnt);
+
         btq_out.en_cnt = btq_prefix_cnt[f_cnt];
         for (int i = 0; i < `N; ++i) begin
             f_dat[i].btq_idx = btq_in.btq_idxs_n[btq_prefix_cnt[i]];
@@ -109,9 +112,6 @@ module stage_if_p4 (
             btq_out.pred    [btq_prefix_cnt[i]] = pred[i];
             btq_out.pred_tgt[btq_prefix_cnt[i]] = pred_tgt[i];
         end
-
-        for (int i = 0; i < `N; ++i)
-            f_en[i] = i < `N;
 
     end
 

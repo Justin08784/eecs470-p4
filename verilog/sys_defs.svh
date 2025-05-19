@@ -1091,11 +1091,10 @@ module ffs #(
     output  logic [$clog2(VECW)-1:0] o_idx
 );
     always_comb begin
-        o_vld = 1'b0;
+        o_vld = |i_vec;
         o_idx = 0;
         for (int i = 0; i < VECW; ++i) begin
             if (i_vec[i]) begin
-                o_vld = 1'b1;
                 o_idx = i;
                 break;
             end
