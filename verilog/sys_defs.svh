@@ -1063,7 +1063,7 @@ module compactor_exp #(
         end
 
         ffs_exp #(
-            .REQW(REQW)
+            .VECW(REQW)
         ) ff_exceed (
             .i_vec  (exceeds),
             .o_vld  (found),
