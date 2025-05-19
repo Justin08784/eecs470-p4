@@ -1015,8 +1015,8 @@ module ffs_exp #(
 endmodule
 
 module compactor_exp #(
-    parameter int REQW=`N,
-    parameter int GNTW=`N
+    parameter int REQW=1,
+    parameter int GNTW=1
 ) (
     input   logic [REQW-1:0] req, // in-order, sparse
     input   logic [$clog2(GNTW):0] lim_cnt,
@@ -1047,9 +1047,11 @@ module compactor_exp #(
     end
     endgenerate
 
+    generate
     for (genvar i = 0; i < REQW+1; ++i) begin
         assign prefix_cnt[i] = sums[SUM_LEVELS-1][i];
     end
+    endgenerate
 
     generate
         logic [REQW-1:0] exceeds;
@@ -1094,8 +1096,8 @@ module ffs #(
 endmodule
 
 module compactor #(
-    parameter int REQW,
-    parameter int GNTW
+    parameter int REQW=1,
+    parameter int GNTW=1
 ) (
     input   logic [REQW-1:0] req, // in-order, sparse
     input   logic [$clog2(GNTW):0] lim_cnt,
@@ -1105,10 +1107,12 @@ module compactor #(
         // prefix_cnt[i] "left-compacted index" for the i-th lane.
         // (valid iff req[i])
 );
+    generate
     assign prefix_cnt[0] = 0;
     for (genvar i = 0; i < REQW; ++i) begin
         assign prefix_cnt[i+1] = prefix_cnt[i] + req[i];
     end
+    endgenerate
 
     generate
         logic [REQW-1:0] exceeds;
