@@ -29,6 +29,7 @@ module stage_if_p4 (
     WADDR [`N:0] PC_n;  // PC_n[m] := next PC if we fetch "m" this cycle (inaccurate past the 1st branch)
 
     logic [$clog2(`N):0]    free_scnt, used_scnt, f_cnt;
+    logic [`N-1:0] f_en;
     IF_ID_PACKET [`N-1:0]   f_dat;
 
     always_comb begin
@@ -42,29 +43,33 @@ module stage_if_p4 (
     end
 
     logic [`N-1:0] is_brch;
-    logic [`N-1:0] bp_take, pred;
-    WADDR [`N-1:0] pred_tgt;
+    BRANCH_MD [`N-1:0] insn_md;
     always_comb begin
-        foreach (is_brch[i]) begin
+        for (int i = 0; i < `N; ++i) begin
             logic woff;
-            woff = PC_n[i][0];
-            is_brch[i] = mem_in.insn_md[i][woff].branch;
+            woff        = PC_n[i][0];
+            insn_md[i]  = mem_in.insn_md[i][woff];
+            is_brch[i]  = insn_md[i].branch;
         end
-
-        pred = is_brch & bp_take;
     end
 
-    bp #(
-        .QUERY_SZ(`N)
-    ) bp0 (
+    logic [$clog2(`N):0] bp_lim_cnt;
+    logic [`N-1:0] pred;
+    WADDR [`N-1:0] pred_tgt;
+    bp bp0 (
         .clock,
         .reset,
+        .flush,
 
-        .i_qry  (PC_n[`N-1:0]),
-        .o_take (bp_take),
-        .o_tgt  (pred_tgt),
+        .i_md       (insn_md),
+        .i_qry      (PC_n[`N-1:0]),
+        .o_lim_cnt  (bp_lim_cnt),
+        .o_take     (pred),
+        .o_tgt      (pred_tgt),
 
-        .i_upd  (btq_in.bp_upd)
+        .f_en,
+
+        .i_upd      (btq_in.bp_upd)
     );
 
     logic [`N:0][$clog2(`N):0] btq_prefix_cnt;
@@ -80,18 +85,6 @@ module stage_if_p4 (
     );
 
     always_comb begin
-        // stop fetching beyond the first predicted taken branch
-        f_cnt = 0;
-        for (int i = 0; i < `N; ++i) begin
-            if (i >= free_scnt)
-                break;
-            f_cnt = i + 1;
-            if (pred[i]) begin
-                break;
-            end
-        end
-
-
         for (int unsigned i = 0; i < `N; ++i) begin
             logic woff;
             woff = PC_n[i][0];
@@ -105,6 +98,8 @@ module stage_if_p4 (
 
         // handle btq output
         btq_out = '0;
+        f_cnt = bp_lim_cnt;
+        f_cnt = `MIN(free_scnt, f_cnt);
         f_cnt = `MIN(btq_lim_cnt, f_cnt);
         btq_out.en_cnt = btq_prefix_cnt[f_cnt];
         for (int i = 0; i < `N; ++i) begin
@@ -115,6 +110,8 @@ module stage_if_p4 (
             btq_out.pred_tgt[btq_prefix_cnt[i]] = pred_tgt[i];
         end
 
+        for (int i = 0; i < `N; ++i)
+            f_en[i] = i < `N;
 
     end
 
