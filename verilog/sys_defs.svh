@@ -980,6 +980,99 @@ typedef struct packed {
     } fifo;
 } DBG_fl;
 
+
+// find first set index
+module ffs_exp #(
+    parameter int VECW  =`N
+) (
+    input   logic [VECW-1:0] i_vec,
+    output  logic o_vld,
+    output  logic [$clog2(VECW)-1:0] o_idx
+);
+    localparam LEVELS = $clog2(VECW+1);
+    logic [LEVELS-1:0][VECW-1:0] lset;
+
+    generate
+    assign lset[0] = i_vec << 1;
+    for (genvar h = 1; h < LEVELS; ++h) begin
+        localparam DIST = 1 << (h-1);
+        assign lset[h] = lset[h-1] | (lset[h-1] << DIST);
+    end
+    endgenerate
+
+    logic [VECW-1:0] onehot;
+    assign onehot = i_vec & ~lset[LEVELS-1];
+    assign o_vld = |i_vec;
+    always_comb begin
+        o_idx = '0;
+        for (int i = 0; i < VECW; ++i) begin
+            if (onehot[i]) begin
+                o_idx = i; 
+            end
+        end
+    end
+
+endmodule
+
+module compactor_exp #(
+    parameter int REQW=`N,
+    parameter int GNTW=`N
+) (
+    input   logic [REQW-1:0] req, // in-order, sparse
+    input   logic [$clog2(GNTW):0] lim_cnt,
+
+    output  logic [$clog2(REQW):0] gnt_cnt,
+    output  logic [REQW:0][$clog2(GNTW):0] prefix_cnt
+        // prefix_cnt[i] "left-compacted index" for the i-th lane.
+        // (valid iff req[i])
+);
+    localparam SUM_LEVELS = $clog2(REQW+1);
+    logic [SUM_LEVELS-1:0][REQW:0][$clog2(REQW):0] sums;
+    generate
+    assign sums[0][0] = 0;
+    for (genvar i = 1; i < REQW+1; ++i) begin
+        assign sums[0][i] = req[i-1];
+    end
+    endgenerate
+
+    generate
+    for (genvar h = 1; h < SUM_LEVELS; ++h) begin
+        localparam DIST = 1 << (h-1);
+        for (genvar i = 0; i < DIST; ++i) begin
+            assign sums[h][i] = sums[h-1][i];
+        end
+        for (genvar i = DIST; i < REQW+1; ++i) begin
+            assign sums[h][i] = sums[h-1][i] + sums[h-1][i-DIST];
+        end
+    end
+    endgenerate
+
+    for (genvar i = 0; i < REQW+1; ++i) begin
+        assign prefix_cnt[i] = sums[SUM_LEVELS-1][i];
+    end
+
+    generate
+        logic [REQW-1:0] exceeds;
+        logic found;
+        logic [$clog2(REQW)-1:0] first;
+
+        for (genvar i = 0; i < REQW; ++i) begin
+            assign exceeds[i] = (sums[SUM_LEVELS-1][i] + req[i]) > lim_cnt;
+        end
+
+        ffs_exp #(
+            .REQW(REQW)
+        ) ff_exceed (
+            .i_vec  (exceeds),
+            .o_vld  (found),
+            .o_idx  (first)
+        );
+
+        assign gnt_cnt = found ? first : REQW;
+    endgenerate
+endmodule
+
+
 module ffs #(
     parameter int VECW
 ) (
@@ -1020,7 +1113,7 @@ module compactor #(
     generate
         logic [REQW-1:0] exceeds;
         logic found;
-        logic first;
+        logic [$clog2(REQW)-1:0] first;
 
         for (genvar i = 0; i < REQW; ++i) begin
             assign exceeds[i] = (prefix_cnt[i] + req[i]) > lim_cnt;
