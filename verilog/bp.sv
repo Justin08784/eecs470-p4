@@ -64,7 +64,6 @@ module bp #(
     );
 
     logic ren, wen;
-    logic [$clog2(`N)-1:0] call_idx, ret_idx;
     WADDR ras_tgt;
 
     assign ren = take_any && f_en[take_idx] && ret[take_idx];
@@ -81,7 +80,7 @@ module bp #(
         .ren,
 
         .wen,
-        .wtgt   (btb_tgt[take_idx]),
+        .wtgt   (WADDR'(i_qry[take_idx] + 1)), // npc
 
         .empty
     );
@@ -90,7 +89,7 @@ module bp #(
     assign o_lim_cnt= take_any ? take_idx + 1 : `N;
     generate
     for (genvar i = 0; i < `N; ++i) begin
-        assign o_tgt[i] = call[i] ? ras_tgt : btb_tgt[i];
+        assign o_tgt[i] = ret[i] ? ras_tgt : btb_tgt[i];
     end
     endgenerate
 endmodule
