@@ -261,23 +261,26 @@ module cpu (
         .clmsk,
         .snap_in(rnme_2_snap),
 
-        .am_in  (am_2_mt),
         .d_in   (dispatch_2_map),
         .d_out  (map_2_dispatch)
     );
 
 
     /* >> ==== Architectural map (table) ==== >> */
-    arch_map #(
-        .N(`N)
-    ) arch_map0 (
-        .clock,
-        .reset,
-        .flush,
+    /*
+    FIXME: We no longer need the arch_map for CPU functionality. However,
+    it may be useful to instantiate this in cpu_test.sv for debugging.
+    */
+    // arch_map #(
+    //     .N(`N)
+    // ) arch_map0 (
+    //     .clock,
+    //     .reset,
+    //     .flush,
 
-        .mt_out (am_2_mt),
-        .r_in   (retire_exec)
-    );
+    //     .mt_out (am_2_mt),
+    //     .r_in   (retire_exec)
+    // );
 
 
     /* >> ==== Free list ==== >> */

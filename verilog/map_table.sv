@@ -24,16 +24,10 @@ module map_table #(parameter
     input  flush,
     input  BMASK clmsk,
 
-    // flush
-    input  arch_map2map_table am_in,
-
     // dispatch
     input  rename2snap_bus      snap_in,
-    input  dispatch2map_table d_in,
-    output map_table2dispatch d_out, 
-
-    // retire
-    input  retire_final r_in
+    input  dispatch2map_table   d_in,
+    output map_table2dispatch   d_out
 );
     PHYS_REG_IDX [`NUM_ARCH_REG-1:0] entries;
     /*
@@ -69,15 +63,26 @@ module map_table #(parameter
         end
     end
 
-    mt_snaps mts (
+    /*
+    Q: Why did I switch to the general_snaps impl, which does not accumulate
+    any retirement updates?
+    A: I discovered that the CPU was correct on all_test.sh EVEN WITHOUT r_in
+    being wired to map_table (yes! the mt_snaps r_in was being fed X's).
+    When I DID hook the r_in line to retire_exec properly, the CPU began to fail.
+
+    I now believe it is incorrect for mt snapshots to reflect retirement updates.
+    In the prior branch recovery scheme, we performed a full pipeline flush,
+    which meant rollback to the latest *committed* state. However, now, with selective
+    flushing, we want to rollback to the latest *speculative* state BEFORE the
+    mispredicted branch.
+    */
+    general_snaps #(
+        .WIDTH($bits(snap))
+    ) mts (
         .clock,
 
         .rmsk   (clmsk),
         .rdat   (snap),
-
-        .uen_cnt(r_in.r_en_cnt),
-        .udst   (r_in.dst),
-        .ut     (r_in.tag),
 
         .wen    (snap_in.snap_en),
         .wmsk   (snap_in.b1hot_n),
@@ -89,17 +94,9 @@ module map_table #(parameter
             entries[`ZERO_REG] <= '0;
             for (int r = 1; r < `NUM_ARCH_REG; ++r)
                 entries[r] <= r;
-
         end else if (flush) begin
             for (int r = 1; r < `NUM_ARCH_REG; ++r)
                 entries[r] <= snap[r];
-
-            for (int n = 0; n < r_in.r_en_cnt; ++n) begin
-                if (r_in.dst[n] == `ZERO_REG)
-                    continue;
-                entries[r_in.dst[n]] <= r_in.tag[n];
-            end
-
         end else begin
             entries <= entries_n[d_in.en_cnt];
 `ifndef SYNTH
@@ -143,15 +140,23 @@ module map_table #(parameter
                     break;
                 end
             end
-            $display("mt[%2d]: t=%3d, v=%x :::: am[%2d]: t=%3d, v=%x  (has_dup: %b)",
+
+            $display("mt[%2d]: t=%3d, v=%x (has_dup: %b)",
                 r,
                 entries[r],
                 dbg_prf.file[entries[r]],
-                r, 
-                am_in.entries[r],
-                dbg_prf.file[am_in.entries[r]],
                 duplicate
             );
+
+            // $display("mt[%2d]: t=%3d, v=%x :::: am[%2d]: t=%3d, v=%x  (has_dup: %b)",
+            //     r,
+            //     entries[r],
+            //     dbg_prf.file[entries[r]],
+            //     r, 
+            //     am_in.entries[r],
+            //     dbg_prf.file[am_in.entries[r]],
+            //     duplicate
+            // );
         end
         $display("<< MT <<", $time);
     endtask
