@@ -159,6 +159,7 @@ module dispatch #(parameter
             rnme_snap_out.btq_tail[i]= d_in.d_dat[i].btq_idx + 1 >= `BTQ_SZ ?
                 0 :
                 d_in.d_dat[i].btq_idx + 1;
+            rnme_snap_out.ras_snap[i]= d_in.d_dat[i].ras_snap;
 `ifdef DEBUG
             rnme_snap_out.btq_idx[i] = d_in.d_dat[i].btq_idx;
 `endif

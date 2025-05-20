@@ -14,6 +14,7 @@ module stage_if_p4 (
     input   clock,
     input   reset,
     input   flush,
+    input   BMASK clmsk,
     input   WADDR flush_PC,
 
     input   decode2fetch d_in,
@@ -21,6 +22,8 @@ module stage_if_p4 (
 
     input   btq2fetch   btq_in,
     output  fetch2btq   btq_out,
+
+    input   rename2snap_bus snap_in,
 
     output  fetch2mem   mem_out,
     input   mem2fetch   mem_in
@@ -56,16 +59,20 @@ module stage_if_p4 (
     logic [$clog2(`N):0] bp_lim_cnt;
     logic [`N-1:0] pred;
     WADDR [`N-1:0] pred_tgt;
+    RAS_SNAP ras_snap;
     bp bp0 (
         .clock,
         .reset,
         .flush,
+        .clmsk,
+        .snap_in,
 
         .i_md       (insn_md),
         .i_qry      (PC_n[`N-1:0]),
         .o_lim_cnt  (bp_lim_cnt),
         .o_take     (pred),
         .o_tgt      (pred_tgt),
+        .o_ras_snap (ras_snap),
 
         .f_en,
 
@@ -92,6 +99,7 @@ module stage_if_p4 (
             f_dat[i] = '{
                 inst    : mem_in.data[i].word_level[woff],
                 PC      : PC_n[i],
+                ras_snap: ras_snap,
                 btq_idx : '0 // filled below
             };
         end

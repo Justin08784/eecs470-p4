@@ -31,6 +31,7 @@
 // sizes
 `define ROB_SZ 64
 `define BTQ_SZ 16
+`define RAS_SZ 16
     /* BTQ_SZ doubled (form 8). This improved CPI on tight loop
     programs like branchy.s and branchy_nested.s */
 `define PHYS_REG_SZ_P6 32
@@ -379,9 +380,14 @@ typedef enum logic [0:1] {
  */
 typedef logic [$clog2(`BTQ_SZ)-1:0] BTQ_IDX;
 typedef struct packed {
+    logic [`N-1:0][$clog2(`RAS_SZ)-1:0] top;
+    logic [`N-1:0][$clog2(`RAS_SZ):0]   used;
+} RAS_SNAP;
+typedef struct packed {
     INST  inst;
     WADDR PC;
 
+    RAS_SNAP ras_snap;
     BTQ_IDX btq_idx;
 } IF_ID_PACKET;
 
@@ -605,6 +611,7 @@ typedef struct packed {
     logic           halt;       // Is this a halt?
     logic           illegal;    // Is this instruction illegal?
     logic           csr_op;     // Is this a CSR operation? (we only used this as a cheap way to get return code)
+    RAS_SNAP        ras_snap;
     BTQ_IDX         btq_idx;
 } ID_RESULT;
 
@@ -791,6 +798,7 @@ typedef struct packed {
 `endif
     logic [`N-1:0][$clog2(`BTQ_SZ)-1:0] btq_tail;
     logic [`N-1:0][$clog2(`ROB_SZ)-1:0] fl_head;
+    RAS_SNAP [`N-1:0] ras_snap;
     // mt checkpoints are handled locally
 } rename2snap_bus;
 

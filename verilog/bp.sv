@@ -6,6 +6,8 @@ module bp #(
     input   clock,
     input   reset,
     input   flush,
+    input   BMASK   clmsk,
+    input   rename2snap_bus snap_in,
 
     // fetch npc query
     input BRANCH_MD [`N-1:0]    i_md,
@@ -14,6 +16,7 @@ module bp #(
     output  logic   [$clog2(`N):0]  o_lim_cnt, // f_cnt limit (cap at first taken)
     output  logic   [`N-1:0]    o_take,
     output  WADDR   [`N-1:0]    o_tgt,
+    output  RAS_SNAP            o_ras_snap,
 
     input   logic   [`N-1:0]    f_en,
 
@@ -68,20 +71,19 @@ module bp #(
 
     assign ren = take_any && f_en[take_idx] && ret[take_idx];
     assign wen = take_any && f_en[take_idx] && call[take_idx];
-    ras #(
-        .DEPTH(16)
-    ) ras0 (
+    ras ras0 (
         .clock,
         .reset,
         .flush,
-        .flush_snap('{default:0}), // FIXME: need a snapshot table
+        .clmsk,
 
+        .if_snap(o_ras_snap),
         .rtgt   (ras_tgt),
         .ren,
-
         .wen,
         .wtgt   (WADDR'(i_qry[take_idx] + 1)), // npc
 
+        .snap_in,
         .empty
     );
 

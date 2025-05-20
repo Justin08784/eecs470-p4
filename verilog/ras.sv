@@ -1,31 +1,36 @@
 `include "sys_defs.svh"
 
-module ras #(parameter
-    DEPTH=2,
+module ras #(
+    parameter DEPTH = `RAS_SZ,
     type PTR = logic [$clog2(DEPTH)-1:0],
     type CNT = logic [$clog2(DEPTH):0]
 ) (
     input           clock, 
     input           reset,
     input           flush,
-    input struct packed {
-        PTR top;
-        CNT used;
-    } flush_snap,
+    input   BMASK   clmsk,
 
-    // fetch return
+    // fetch
+    output  RAS_SNAP if_snap,
+        // return
     output  WADDR   rtgt,
     input           ren,
-
-    // fetch call
+        // call
     input           wen,
     input   WADDR   wtgt,
+
+    // dispatch (alloc snapshot)
+    input  rename2snap_bus snap_in,
 
     output  logic   full,
     output  logic   empty
 );
-    PTR top;
-    CNT used;
+    RAS_SNAP snap;
+        /* FIXME: Do fifo snapshots need to store used count as well?
+        e.g. What if a pointer needs to rollback more than "DEPTH" entries?
+        (wouldn't the distance function would be wrong then?) */
+    PTR top, top_n;
+    CNT used, used_n;
     WADDR state [DEPTH-1:0];
     PTR ridx;
 
@@ -37,6 +42,37 @@ module ras #(parameter
         rtgt    = state[ridx];
     end
 
+    general_snaps #(
+        .WIDTH($bits(RAS_SNAP))
+    ) snaps (
+        .clock,
+
+        .rmsk   (clmsk),
+        .rdat   (snap),
+
+        .wen    (snap_in.snap_en),
+        .wmsk   (snap_in.b1hot_n),
+        .wdat   (snap_in.ras_snap)
+    );
+
+    always_comb begin
+        if (flush) begin
+            used_n = snap.used;
+            top_n  = snap.top;
+        end else if (wen) begin
+            used_n = full ? DEPTH : used + 1;
+            top_n  = top + 1;
+        end else if (ren) begin
+            used_n = empty ? 0 : used - 1;
+            top_n  = ridx;
+        end
+
+        if_snap = '{
+            top : top_n,
+            used: used_n
+        };
+    end
+
     always_ff @(posedge clock) begin
         // CHECK: we accept at most 1 predict taken per cycle, so ren, wen must be exclusive
         assert(!(wen & ren)) else $error("RAS: both wen and ren asserted");
@@ -45,23 +81,11 @@ module ras #(parameter
             top  <= '0;
             for (int i = 0; i < DEPTH; ++i)
                 state[i] <= '0;
-        end else if (flush) begin
-            top  <= flush_snap.top;
-            used <= flush_snap.used;
-                /*
-                FIXME: Do fifo snapshots need to store used count as well?
-                e.g. What if a pointer needs to rollback more than "DEPTH" entries?
-                (wouldn't the distance function would be wrong then?)
-                */
         end else begin
-            if (wen) begin
-                used <= full ? DEPTH : used + 1;
-                top  <= top + 1;
+            used <= used_n;
+            top  <= top_n;
+            if (wen && !flush)
                 state[top] <= wtgt;
-            end else if (ren) begin
-                used <= empty ? 0 : used - 1;
-                top  <= ridx;
-            end
         end
     end
 endmodule

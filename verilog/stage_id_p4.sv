@@ -294,6 +294,7 @@ module stage_id_p4 (
                 halt        : tmp[i].halt,
                 illegal     : tmp[i].illegal,
                 csr_op      : tmp[i].csr_op,
+                ras_snap    : f_in.f_dat[i].ras_snap,
                 btq_idx     : f_in.f_dat[i].btq_idx
             };
         end
