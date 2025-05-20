@@ -549,7 +549,7 @@ module testbench;
     endtask
 
     task print_btb;
-        verisimpleV.fetch0.btb0.print_btb();
+        verisimpleV.fetch0.bp0.btb0.print_btb();
     endtask
 
     task print_decode;
@@ -558,6 +558,10 @@ module testbench;
 
     task print_dispatch;
         verisimpleV.dispatch0.print_dispatch();
+    endtask
+
+    task print_ras;
+        verisimpleV.fetch0.bp0.ras0.print_ras();
     endtask
 
 
@@ -569,13 +573,14 @@ module testbench;
 
         $display("  | >> CYCLE: %3d (t: %3d)", clock_count-1, $time);
         // print_btb();
-        print_fetch();
+        // print_fetch();
+        // print_ras();
         // print_decode();
         print_rob();
         print_dispatch();
         print_fl();
         print_btq();
-        // print_map_table();
+        print_map_table();
         // print_prf();
         print_rs();
         // print_execute();

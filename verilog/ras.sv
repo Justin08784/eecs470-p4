@@ -90,4 +90,27 @@ module ras #(
                 state[top] <= wtgt;
         end
     end
+
+`ifdef DEBUG
+    task print_ras;
+        $display(">> ras >>");
+        $display("used_n: %2d, top_n: %2d, full: %b, empty: %b", used_n, top_n, full, empty);
+        $display("ras: clock: %b, reset: %b, flush: %b, clmsk: %b, ren: %b, wen: %b, wtgt: %x, snap_in: %x",
+        clock,
+        reset,
+        flush,
+        clmsk,
+        ren,
+        wen,
+        wtgt,
+        snap_in
+        );
+        $display("ras: used: %2d, top: %2d", used, top);
+        for (int i = 0; i < DEPTH; ++i) begin
+            $write("state[%2d]: %x", i, state[i]);
+        end
+
+        $display("<< ras <<");
+    endtask
+`endif
 endmodule

@@ -196,6 +196,18 @@ module free_list #(parameter
 
            $display("%-12s | %-12s", ls, rs); 
         end
+        
+        $display("");
+        //             rnme_snap_out.fl_head[i] = free_in.fl_heads_n[free_prefix_cnt[i]];
+        // $display()
+        // for (int i = 0; i < `N; ++i)
+        //     $display()
+        for (int i = 0; i < BMASK_LEN; ++i) begin
+            logic [$clog2(DEPTH)-1:0] head;
+            head = fl_heads0.snaps[i];
+            $display("fl_head[%8b]: %2d", 1 << i, head);
+        end
+
         $display("  | << FL <<");
 
     endtask

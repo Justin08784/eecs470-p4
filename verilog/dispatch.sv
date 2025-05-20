@@ -347,6 +347,26 @@ module dispatch #(parameter
         $display("rob_in.rob_rdy_scnt: %d",  rob_in.rob_rdy_scnt);
         $display("d_in.d_vld_scnt: %d",  d_in.d_vld_scnt);
         $display("free_in.free_rdy_scnt: %d [%d, %d]",  free_in.free_rdy_scnt, free_in.d_ts[0], free_in.d_ts[1]);
+
+        $display("");
+        for (int i = 0; i < `N+1; ++i) begin
+            $display("prefix_cnt[%2d]: rnme_snap: %2d free: %2d",
+            i, rnme_snap_prefix_cnt[i], free_prefix_cnt[i]);
+        end
+
+        for (int i = 0; i < `N+1; ++i) begin
+            $display("free_in.fl_heads_n[%2d]: %2d", i, free_in.fl_heads_n[i]);
+        end
+
+        for (int i = 0; i < `N; ++i) begin
+            $display("rnme_snap_out[%2d]: en: %b, b1hot_n: %b, fl_head: %2d, btq_tail: %2d",
+                i,
+                rnme_snap_out.snap_en[i],
+                rnme_snap_out.b1hot_n[i],
+                rnme_snap_out.fl_head[i],
+                rnme_snap_out.btq_tail[i]
+            );
+        end
         $display("  %3d | << Dispatch <<", $time);
     endtask
 `endif

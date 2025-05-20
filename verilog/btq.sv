@@ -191,8 +191,9 @@ module btq #(
                 continue;
             end
 
-            $write("BTQ[%2d]: pred: %b, pred_tgt: %x, take: %b, tgt: %x, ",
+            $write("BTQ[%2d]: {pc: %d} pred: %b, pred_tgt: %x, take: %b, tgt: %x, ",
                 i,
+                state[i].PC,
                 state[i].pred,
                 state[i].pred_tgt,
                 state[i].take,
@@ -203,6 +204,13 @@ module btq #(
                 $display("b1hot: %b", state[i].b1hot);
             else
                 $display("b1hot:");
+        end
+
+        $display("");
+        for (int i = 0; i < BMASK_LEN; ++i) begin
+            logic [$clog2(BTQ_SZ)-1:0] tail;
+            tail = btq_tails.snaps[i];
+            $display("btq_tail[%8b]: %2d", 1 << i, tail);
         end
 
         for (int i = 0; i < `NUM_FU_BRU; ++i) begin
