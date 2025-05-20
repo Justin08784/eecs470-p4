@@ -29,7 +29,7 @@ module cpu (
     output MEM_SIZE     proc2mem_size,    // Data size sent to memory
 
     output DBG_dcache   dbg_dcache,
-    output COMMIT_PACKET [`N-1:0] committed_insts
+    output COMMIT_PACKET commit
 );
     /* Global controls*/
     logic flush;
@@ -325,15 +325,10 @@ module cpu (
 
     /* >> ==== Pipeline outputs ==== >> */
     // Output the committed instruction to the testbench for counting
-    always_comb begin
-        committed_insts = '0;
-        foreach(committed_insts[i]) begin
-            if (i >= retire_exec.r_en_cnt)
-                continue;
-            committed_insts[i].valid      = 1;
-            committed_insts[i].halt       = retire_exec.halt[i];
-            committed_insts[i].illegal    = retire_exec.illegal[i];
-        end
-    end
+    assign commit = '{
+        r_en_cnt: retire_exec.r_en_cnt,
+        halt    : retire_exec.halt,
+        illegal : retire_exec.illegal
+    };
 
 endmodule // pipeline

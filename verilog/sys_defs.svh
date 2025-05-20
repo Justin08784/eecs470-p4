@@ -400,9 +400,9 @@ typedef struct packed {
  * some slight changes
  */
 typedef struct packed {
-    logic   halt;
-    logic   illegal;
-    logic   valid;
+    logic   [$clog2(`N):0] r_en_cnt;
+    logic   [`N-1:0] halt;
+    logic   [`N-1:0] illegal;
 } COMMIT_PACKET;
 
 // ROB stuff

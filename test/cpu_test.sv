@@ -114,7 +114,7 @@ module testbench;
     MEM_TAG     mem2proc_data_tag;
     MEM_SIZE    proc2mem_size;
 
-    COMMIT_PACKET [`N-1:0] committed_insts;
+    COMMIT_PACKET commit;
     ADDR [`N-1:0] PC_reg;
     EXCEPTION_CODE error_status = NO_ERROR;
 
@@ -142,7 +142,7 @@ module testbench;
 `endif
 
         .dbg_dcache     (dbg_dcache),
-        .committed_insts(committed_insts)
+        .commit(commit)
     );
 
 
@@ -335,13 +335,12 @@ module testbench;
         (only *.out is graded after all), since hierarchical references
         do not work in synthesis
         */
-        for (int n = 0, int cur_idx = 0; n < `N; ++n) begin
-            if (!committed_insts[n].valid)
-                continue;
-            // update the count for every committed instruction
-            ++instr_count;
-            halt    = committed_insts[n].halt;
-            illegal = committed_insts[n].illegal;
+        // update the count for every committed instruction
+        instr_count += commit.r_en_cnt;
+
+        for (int n = 0, int cur_idx = 0; n < commit.r_en_cnt; ++n) begin
+            halt    = commit.halt[n];
+            illegal = commit.illegal[n];
 
 `ifndef SYNTH
             cur_idx = verisimpleV.rob0.rtre_idxs_n[n];
@@ -351,11 +350,11 @@ module testbench;
             pc      = rob_debug[cur_idx].NPC - 4;
             block   = memory.unified_memory[pc[31:3]];
             inst    = block.word_level[pc[2]];
-            reg_idx = verisimpleV.rob0.r_out.entries[n].dst;
+            reg_idx = verisimpleV.retire_exec.dst[n];
             tag     = verisimpleV.retire_exec.tag[n];
             t_old   = verisimpleV.retire_exec.t_old[n];
             data    = verisimpleV.prf0.file[
-                verisimpleV.rob0.r_out.entries[n].tag
+                verisimpleV.retire_exec.tag[n]
             ];
             // print the committed instructions to the writeback output file
             if (reg_idx == `ZERO_REG) begin
