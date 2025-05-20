@@ -86,21 +86,22 @@ module bp #(
         .snap_in,
         .empty
     );
-    always_ff@(posedge clock) begin
-        if (!reset) begin
-            $display("f_en: %b, brch: %b, cond: %b, call: %b, ret: %b",
-            f_en,
-            brch,
-            cond,
-            call,
-            ret
-            );
-            $display("take_any: %b, take_idx: %2d",
-            take_any,
-            take_idx
-            );
-        end
-    end
+
+    // always_ff@(posedge clock) begin
+    //     if (!reset) begin
+    //         $display("f_en: %b, brch: %b, cond: %b, call: %b, ret: %b",
+    //         f_en,
+    //         brch,
+    //         cond,
+    //         call,
+    //         ret
+    //         );
+    //         $display("take_any: %b, take_idx: %2d",
+    //         take_any,
+    //         take_idx
+    //         );
+    //     end
+    // end
 
     assign o_take   = raw_take;
     assign o_lim_cnt= take_any ? take_idx + 1 : `N;

@@ -6,6 +6,8 @@ TESTS=(
     btest1-nomem
     btest2-nomem
     dummy_branches
+    fun1
+    fun_loop
     halt
     hw4q4a-nomem
     hw4q4b
