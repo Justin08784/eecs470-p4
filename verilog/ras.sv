@@ -34,7 +34,7 @@ module ras #(parameter
         empty   = used == 0;
 
         ridx    = top - 1; // wraparound is intended (likewise for write)
-        rtgt    = empty ? '0 : state[ridx];
+        rtgt    = state[ridx];
     end
 
     always_ff @(posedge clock) begin
