@@ -21,6 +21,12 @@ module decoder_p4 (
     output logic          illegal // non-zero on an illegal instruction
 );
 
+    assign has_dest = !(fu_idx == FU_STR
+        || csr_op
+        || cond_branch
+        || inst.r.rd == `ZERO_REG
+    );
+
     // Note: I recommend using an IDE's code folding feature on this block
     always_comb begin
         // Default control values (looks like a NOP)
@@ -29,7 +35,7 @@ module decoder_p4 (
         opa_select    = OPA_IS_RS1;
         opb_select    = OPB_IS_RS2;
         alu_func      = ALU_ADD;
-        has_dest      = `FALSE;
+        // has_dest      = `FALSE;
         csr_op        = `FALSE;
         cond_branch   = `FALSE;
         halt          = `FALSE;
@@ -37,12 +43,12 @@ module decoder_p4 (
 
         casez (inst)
             `RV32_LUI: begin
-                has_dest   = `TRUE;
+                // has_dest   = `TRUE;
                 opa_select = OPA_IS_ZERO;
                 opb_select = OPB_IS_U_IMM;
             end
             `RV32_AUIPC: begin
-                has_dest   = `TRUE;
+                // has_dest   = `TRUE;
                 opa_select = OPA_IS_PC;
                 opb_select = OPB_IS_U_IMM;
             end
@@ -52,7 +58,7 @@ module decoder_p4 (
                 FIXME. Okay what the fuck. j with x0 destination was allocating pregs.
                 It's surely because of this. What the fuck? Is their decoder wrong???
                 */
-                has_dest      = inst.r.rd != `ZERO_REG;
+                // has_dest      = inst.r.rd != `ZERO_REG;
                 opa_select    = OPA_IS_PC;
                 opb_select    = OPB_IS_J_IMM;
             end
@@ -61,7 +67,7 @@ module decoder_p4 (
                 /*
                 FIXME. Same situation. See above.
                 */
-                has_dest      = inst.r.rd != `ZERO_REG;
+                // has_dest      = inst.r.rd != `ZERO_REG;
                 opa_select    = OPA_IS_RS1;
                 opb_select    = OPB_IS_I_IMM;
             end
@@ -75,25 +81,25 @@ module decoder_p4 (
             end
             `RV32_MULHU: begin
                 fu_idx     = FU_MUL;
-                has_dest   = `TRUE;
+                // has_dest   = `TRUE;
             end
             `RV32_MULHSU: begin
                 fu_idx     = FU_MUL;
-                has_dest   = `TRUE;
+                // has_dest   = `TRUE;
             end
             `RV32_MULH: begin
                 fu_idx     = FU_MUL;
-                has_dest   = `TRUE;
+                // has_dest   = `TRUE;
             end
             `RV32_MUL: begin //, `RV32_MULH, `RV32_MULHSU, `RV32_MULHU: begin
                 fu_idx     = FU_MUL;
-                has_dest   = `TRUE;
+                // has_dest   = `TRUE;
                 // stage_ex uses inst.r.funct3 as the mult function
             end
             `RV32_LB, `RV32_LH, `RV32_LW,
             `RV32_LBU, `RV32_LHU: begin
                 fu_idx     = FU_LOD;
-                has_dest   = `TRUE;
+                // has_dest   = `TRUE;
                 opb_select = OPB_IS_I_IMM;
                 // stage_ex uses inst.r.funct3 as the load size and signedness
             end
@@ -103,104 +109,104 @@ module decoder_p4 (
                 // stage_ex uses inst.r.funct3 as the store size
             end
             `RV32_ADDI: begin
-                has_dest   = `TRUE;
+                // has_dest   = `TRUE;
                 opb_select = OPB_IS_I_IMM;
             end
             `RV32_SLTI: begin
                 fu_idx     = FU_ALU;
-                has_dest   = `TRUE;
+                // has_dest   = `TRUE;
                 opb_select = OPB_IS_I_IMM;
                 alu_func   = ALU_SLT;
             end
             `RV32_SLTIU: begin
                 fu_idx     = FU_ALU;
-                has_dest   = `TRUE;
+                // has_dest   = `TRUE;
                 opb_select = OPB_IS_I_IMM;
                 alu_func   = ALU_SLTU;
             end
             `RV32_ANDI: begin
                 fu_idx     = FU_ALU;
-                has_dest   = `TRUE;
+                // has_dest   = `TRUE;
                 opb_select = OPB_IS_I_IMM;
                 alu_func   = ALU_AND;
             end
             `RV32_ORI: begin
                 fu_idx     = FU_ALU;
-                has_dest   = `TRUE;
+                // has_dest   = `TRUE;
                 opb_select = OPB_IS_I_IMM;
                 alu_func   = ALU_OR;
             end
             `RV32_XORI: begin
                 fu_idx     = FU_ALU;
-                has_dest   = `TRUE;
+                // has_dest   = `TRUE;
                 opb_select = OPB_IS_I_IMM;
                 alu_func   = ALU_XOR;
             end
             `RV32_SLLI: begin
                 fu_idx     = FU_ALU;
-                has_dest   = `TRUE;
+                // has_dest   = `TRUE;
                 opb_select = OPB_IS_I_IMM;
                 alu_func   = ALU_SLL;
             end
             `RV32_SRLI: begin
                 fu_idx     = FU_ALU;
-                has_dest   = `TRUE;
+                // has_dest   = `TRUE;
                 opb_select = OPB_IS_I_IMM;
                 alu_func   = ALU_SRL;
             end
             `RV32_SRAI: begin
                 fu_idx     = FU_ALU;
-                has_dest   = `TRUE;
+                // has_dest   = `TRUE;
                 opb_select = OPB_IS_I_IMM;
                 alu_func   = ALU_SRA;
             end
             `RV32_ADD: begin
                 fu_idx     = FU_ALU;
-                has_dest   = `TRUE;
+                // has_dest   = `TRUE;
             end
             `RV32_SUB: begin
                 fu_idx     = FU_ALU;
-                has_dest   = `TRUE;
+                // has_dest   = `TRUE;
                 alu_func   = ALU_SUB;
             end
             `RV32_SLT: begin
                 fu_idx     = FU_ALU;
-                has_dest   = `TRUE;
+                // has_dest   = `TRUE;
                 alu_func   = ALU_SLT;
             end
             `RV32_SLTU: begin
                 fu_idx     = FU_ALU;
-                has_dest   = `TRUE;
+                // has_dest   = `TRUE;
                 alu_func   = ALU_SLTU;
             end
             `RV32_AND: begin
                 fu_idx     = FU_ALU;
-                has_dest   = `TRUE;
+                // has_dest   = `TRUE;
                 alu_func   = ALU_AND;
             end
             `RV32_OR: begin
                 fu_idx     = FU_ALU;
-                has_dest   = `TRUE;
+                // has_dest   = `TRUE;
                 alu_func   = ALU_OR;
             end
             `RV32_XOR: begin
                 fu_idx     = FU_ALU;
-                has_dest   = `TRUE;
+                // has_dest   = `TRUE;
                 alu_func   = ALU_XOR;
             end
             `RV32_SLL: begin
                 fu_idx     = FU_ALU;
-                has_dest   = `TRUE;
+                // has_dest   = `TRUE;
                 alu_func   = ALU_SLL;
             end
             `RV32_SRL: begin
                 fu_idx     = FU_ALU;
-                has_dest   = `TRUE;
+                // has_dest   = `TRUE;
                 alu_func   = ALU_SRL;
             end
             `RV32_SRA: begin
                 fu_idx     = FU_ALU;
-                has_dest   = `TRUE;
+                // has_dest   = `TRUE;
                 alu_func   = ALU_SRA;
             end
             `RV32_CSRRW, `RV32_CSRRS, `RV32_CSRRC: begin
@@ -209,7 +215,7 @@ module decoder_p4 (
             `WFI: begin
                 fu_idx      = FU_ALU;
                 halt = `TRUE;
-                has_dest   = `FALSE;
+                // has_dest   = `FALSE;
                 alu_func   = ALU_ADD;
                 opa_select = OPA_IS_ZERO;
                 opb_select = OPB_IS_I_IMM;
