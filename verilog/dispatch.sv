@@ -155,7 +155,9 @@ module dispatch #(parameter
         for (int i = 0; i < `N; ++i) begin
             rnme_snap_out.snap_en[i] = rnme_is_brch[i] && (i < rename_en_cnt);
             rnme_snap_out.b1hot_n[i] = bman_in.b1hot_n[rnme_snap_prefix_cnt[i]]; // only valid if snap_en
-            rnme_snap_out.fl_head[i] = free_in.fl_heads_n[free_prefix_cnt[i]];
+            rnme_snap_out.fl_head[i] = free_in.fl_heads_n[free_prefix_cnt[i] + has_dst[i]];
+                // Q: Why "+ has_dst[i]"? A: Remember, we want to snapshot the free_list
+                // head immediately AFTER the branch. The next free_list head is incremented IFF we consume a preg.
             rnme_snap_out.btq_tail[i]= d_in.d_dat[i].btq_idx + 1 >= `BTQ_SZ ?
                 0 :
                 d_in.d_dat[i].btq_idx + 1;
