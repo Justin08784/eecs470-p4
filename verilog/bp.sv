@@ -74,7 +74,7 @@ module bp #(
         .clock,
         .reset,
         .flush,
-        .flush_snap('0), // FIXME: need a snapshot table
+        .flush_snap('{default:0}), // FIXME: need a snapshot table
 
         .rtgt   (ras_tgt),
         .ren,
