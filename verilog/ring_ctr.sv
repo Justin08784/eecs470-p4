@@ -54,14 +54,14 @@ module ring_ctr #(
             wr_idxs_n[i] = incr(tail, i);
     end
 
-    initial begin
-        $display("id:%d, head: %d, tail: %d, used: %d",
-        INSTANCE_ID,
-        RESET_STATE.head,
-        RESET_STATE.tail,
-        RESET_STATE.used
-        );
-    end
+    // initial begin
+    //     $display("id:%d, head: %d, tail: %d, used: %d",
+    //     INSTANCE_ID,
+    //     RESET_STATE.head,
+    //     RESET_STATE.tail,
+    //     RESET_STATE.used
+    //     );
+    // end
 
     always_ff @(posedge clock) begin
         if (reset) begin
