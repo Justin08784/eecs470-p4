@@ -14,7 +14,7 @@ module free_list #(parameter
     input BMASK clmsk,
 
     // retire
-    input retire_final r_in,
+    input retire_final r_in_n,
 
     // complete ?? 
     // issue ??
@@ -78,6 +78,11 @@ module free_list #(parameter
     In addition, it seems 2 is only shifting the work of the "packing loop" into
     the FIFO (you still have to do it *somewhere*).
     */
+    struct packed {
+        logic [$clog2(`N):0]  r_en_cnt;
+        PHYS_REG_IDX [`N-1:0] t_old;
+    } r_in;
+
     logic [$clog2(`N):0] free_cnt;
     PHYS_REG_IDX [`N-1:0] told_packed;
     always_comb begin
@@ -133,6 +138,17 @@ module free_list #(parameter
         .wmsk   (snap_in.b1hot_n),
         .wdat   (snap_in.fl_head)
     );
+
+    // flop returning free pregs for better timing
+    always_ff @(posedge clock) begin
+        if (reset)
+            r_in <= '0;
+        else
+            r_in <= '{
+                r_en_cnt: r_in_n.r_en_cnt,
+                t_old   : r_in_n.t_old
+            };
+    end
 
 `ifdef DEBUG
     task print_fl();

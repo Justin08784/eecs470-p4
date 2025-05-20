@@ -292,7 +292,7 @@ module cpu (
         .flush,
         .clmsk,
         .snap_in(rnme_2_snap),
-        .r_in   (retire_exec),
+        .r_in_n (retire_exec), // *_n -> retire_exec is flopped internally
         .d_in   (dispatch_2_fl),
         .d_out  (fl_2_dispatch)
     );
@@ -324,7 +324,7 @@ module cpu (
 
 
     /* >> ==== Pipeline outputs ==== >> */
-    // Output the committed instruction to the testbench for counting
+    // Output committed instructions to the testbench for counting
     assign commit = '{
         r_en_cnt: retire_exec.r_en_cnt,
         halt    : retire_exec.halt,
