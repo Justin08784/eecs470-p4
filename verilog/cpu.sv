@@ -53,17 +53,21 @@ module cpu (
     decode2fetch decode_2_f;
     btq2fetch    btq_2_f;
     fetch2btq    f_2_btq;
+    rename2snap_bus rnme_2_snap;
 
     stage_if_p4 fetch0 (
         .clock,
         .reset,
         .flush,
+        .clmsk,
         .flush_PC,
 
         .d_in   (decode_2_f),
         .d_out  (f_2_decode),
         .btq_in (btq_2_f),
         .btq_out(f_2_btq),
+
+        .snap_in(rnme_2_snap),
 
         .mem_out(f2mem),
         .mem_in (mem2f)
@@ -99,7 +103,6 @@ module cpu (
     execute2complete_dat ex_2_cdat;
     rename2bman rnme_2_bman;
     bman2rename bman_2_rnme;
-    rename2snap_bus rnme_2_snap;
     comm2snap_bus   comm_2_snap;
 
     dispatch dispatch0 (

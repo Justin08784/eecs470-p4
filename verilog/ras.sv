@@ -56,6 +56,8 @@ module ras #(
     );
 
     always_comb begin
+        used_n = used;
+        top_n  = top;
         if (flush) begin
             used_n = snap.used;
             top_n  = snap.top;
@@ -75,7 +77,7 @@ module ras #(
 
     always_ff @(posedge clock) begin
         // CHECK: we accept at most 1 predict taken per cycle, so ren, wen must be exclusive
-        assert(!(wen & ren)) else $error("RAS: both wen and ren asserted");
+        assert(reset || !(wen & ren)) else $error("RAS: both wen and ren asserted");
         if (reset) begin
             used <= '0;
             top  <= '0;
