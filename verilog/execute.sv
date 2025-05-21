@@ -1066,7 +1066,7 @@ module stage_ex_p4 (
             btq_in.pred,
             btq_in.pred_tgt
         );
-        $display("i_regs: %b", bru_ex.i_regs);
+        $display("i_regs: %b", bru_ex0.i_regs);
         // $display("bytag: %b, b1hot: %b, rs1: %d, rs2: %d, PC: %x");
         // $display("opa_sel: %2d, opb_is_rs2: %b, imm32b: %d, cond_branch: %b");
         // $display("func: %d, t: %2d, rob_idx: %2d, btq_idx");
