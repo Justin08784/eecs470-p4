@@ -107,9 +107,11 @@ module stage_if_p4 (
         // handle btq output
         btq_out = '0;
         f_cnt = `MIN(btq_lim_cnt, free_scnt);
-        f_cnt = `MIN(bp_lim_cnt, f_cnt);
         for (int i = 0; i < `N; ++i)
             f_en[i] = i < f_cnt;
+            /* ^ want this f_en to be "pre BP f_en". bp_lim_cnt is redundant to BP
+            since BP derives it in the first place */
+        f_cnt = `MIN(bp_lim_cnt, f_cnt);
 
         btq_out.en_cnt = btq_prefix_cnt[f_cnt];
         for (int i = 0; i < `N; ++i) begin

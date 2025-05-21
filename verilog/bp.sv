@@ -55,7 +55,8 @@ module bp #(
     logic empty; // ras empty?
 
     assign raw_take =
-    (ret & {`N{!empty}})
+    call
+  | (ret & {`N{!empty}})
   | (btb_hit & ((brch & ~cond) | (cond & '1))); // FIXME: '1 = stand-in for direction predictor
 
     ffs #(
@@ -69,20 +70,10 @@ module bp #(
     logic ren, wen;
     WADDR ras_tgt;
 
-    logic call_any;
-    logic [$clog2(`N)-1:0] call_idx;
-    ffs #(
-        .VECW(`N)
-    ) ff_call (
-        .i_vec(call),
-        .o_vld(call_any),
-        .o_idx(call_idx)
-    );
-
-    assign ren = take_any && f_en[take_idx] && ret[take_idx];
-    assign wen = call_any && f_en[call_idx];
+    assign ren = take_any && f_en[take_idx] && ret [take_idx];
+    assign wen = take_any && f_en[take_idx] && call[take_idx];
         /* Calls unconditionally write their NPC to the RAS, EVEN IF they 
-        they miss in the BTB (we still predict the call as not taken of course, though).
+        they miss in the BTB (we mark the call/ret as taken too, unintuitively).
         This ensures the subsequent return insn ––after the call inevitably
         triggers a flush–– is a hit on the RAS. */
     ras ras0 (
@@ -95,7 +86,7 @@ module bp #(
         .rtgt   (ras_tgt),
         .ren,
         .wen,
-        .wtgt   (PC_n[call_idx+1]), // npc
+        .wtgt   (PC_n[take_idx+1]), // npc
 
         .snap_in,
         .empty
@@ -118,14 +109,17 @@ module bp #(
     // end
 
     assign o_take   = raw_take;
-    assign o_lim_cnt= `MIN(
-        take_any ? take_idx + 1 : `N,
-        call_any ? call_idx + 1 : `N    // we only have 1 RAS write port
-    );
+    assign o_lim_cnt= take_any ? take_idx + 1 : `N;
 
     generate
     for (genvar i = 0; i < `N; ++i) begin
-        assign o_tgt[i] = ret[i] ? ras_tgt : btb_tgt[i];
+        assign o_tgt[i] =
+            ret[i]      ? ras_tgt :
+            !btb_hit[i] ? PC_n[i+1] : btb_tgt[i];
+                /* On btb_miss, use NPC as a fallback. (Note: "ret" and "call"
+                will predict taken even BTB miss, so they their fake "prediction"
+                target is the sequentially next PC).
+                */
     end
     endgenerate
 endmodule
