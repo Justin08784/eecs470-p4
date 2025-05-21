@@ -59,7 +59,7 @@ module stage_if_p4 (
     logic [$clog2(`N):0] bp_lim_cnt;
     logic [`N-1:0] pred;
     WADDR [`N-1:0] pred_tgt;
-    RAS_SNAP ras_snap;
+    RAS_SNAP [`N-1:0] ras_snap;
     bp bp0 (
         .clock,
         .reset,
@@ -72,6 +72,7 @@ module stage_if_p4 (
         .o_lim_cnt  (bp_lim_cnt),
         .o_take     (pred),
         .o_tgt      (pred_tgt),
+
         .o_ras_snap (ras_snap),
 
         .f_en,
@@ -99,7 +100,7 @@ module stage_if_p4 (
             f_dat[i] = '{
                 inst    : mem_in.data[i].word_level[woff],
                 PC      : PC_n[i],
-                ras_snap: ras_snap,
+                ras_snap: ras_snap[i],
                 btq_idx : '0 // filled below
             };
         end

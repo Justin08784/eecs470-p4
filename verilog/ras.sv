@@ -11,7 +11,8 @@ module ras #(
     input   BMASK   clmsk,
 
     // fetch
-    output  RAS_SNAP if_snap,
+    output  RAS_SNAP if_snap_pre,
+    output  RAS_SNAP if_snap_pos,
         // return
     output  WADDR   rtgt,
     input           ren,
@@ -69,7 +70,11 @@ module ras #(
             top_n  = ridx;
         end
 
-        if_snap = '{
+        if_snap_pre = '{
+            top : top,
+            used: used
+        };
+        if_snap_pos = '{
             top : top_n,
             used: used_n
         };

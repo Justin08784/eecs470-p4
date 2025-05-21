@@ -16,7 +16,7 @@ module bp #(
     output  logic   [$clog2(`N):0]  o_lim_cnt, // f_cnt limit (cap at first taken)
     output  logic   [`N-1:0]    o_take,
     output  WADDR   [`N-1:0]    o_tgt,
-    output  RAS_SNAP            o_ras_snap,
+    output  RAS_SNAP [`N-1:0]   o_ras_snap,
 
     input   logic   [`N-1:0]    f_en,
 
@@ -56,8 +56,8 @@ module bp #(
 
     assign raw_take =
     call
-  | (ret & {`N{!empty}})
-  | (btb_hit & ((brch & ~cond) | (cond & '1))); // FIXME: '1 = stand-in for direction predictor
+    | ret
+    | (btb_hit & ((brch & ~cond) | (cond & '1))); // FIXME: '1 = stand-in for direction predictor
 
     ffs #(
         .VECW(`N)
@@ -76,13 +76,15 @@ module bp #(
         they miss in the BTB (we mark the call/ret as taken too, unintuitively).
         This ensures the subsequent return insn ––after the call inevitably
         triggers a flush–– is a hit on the RAS. */
+    RAS_SNAP ras_snap_pre, ras_snap_pos;
     ras ras0 (
         .clock,
         .reset,
         .flush,
         .clmsk,
 
-        .if_snap(o_ras_snap),
+        .if_snap_pre(ras_snap_pre), // RAS top/used at start of cycle
+        .if_snap_pos(ras_snap_pos), // " after the first taken branch (which may or may not be a ret/call)
         .rtgt   (ras_tgt),
         .ren,
         .wen,
@@ -114,12 +116,22 @@ module bp #(
     generate
     for (genvar i = 0; i < `N; ++i) begin
         assign o_tgt[i] =
-            ret[i]      ? ras_tgt :
-            !btb_hit[i] ? PC_n[i+1] : btb_tgt[i];
-                /* On btb_miss, use NPC as a fallback. (Note: "ret" and "call"
-                will predict taken even BTB miss, so they their fake "prediction"
-                target is the sequentially next PC).
-                */
+            ret[i] && !empty    ? ras_tgt :
+            btb_hit[i]          ? btb_tgt[i]: PC_n[i+1];
+            /* On btb_miss, use NPC as a fallback. (Note: "ret" and "call"
+            will predict taken even BTB miss, so they their fake "prediction"
+            target is the sequentially next PC).
+            */
+        assign o_ras_snap[i] = (ret[i] || call[i]) ? ras_snap_pos : ras_snap_pre;
+            /*
+            Observation:
+            1. only rets/calls update the RAS.
+            2. fetch accepts at most 1 taken branch per cycle.
+
+            Trivially, the only situation which requires the post-ret/call snapshot of the RAS
+            is when a the ret/call is the FIRST taken branch in the fetch group. In this
+            situation, no insn except for the terminating ret/call needs the post update snapshot.
+            */
     end
     endgenerate
 endmodule
