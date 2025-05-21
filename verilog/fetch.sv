@@ -68,7 +68,7 @@ module stage_if_p4 (
         .snap_in,
 
         .i_md       (insn_md),
-        .i_qry      (PC_n[`N-1:0]),
+        .PC_n,
         .o_lim_cnt  (bp_lim_cnt),
         .o_take     (pred),
         .o_tgt      (pred_tgt),
@@ -106,8 +106,7 @@ module stage_if_p4 (
 
         // handle btq output
         btq_out = '0;
-        f_cnt = free_scnt;
-        f_cnt = `MIN(btq_lim_cnt, f_cnt);
+        f_cnt = `MIN(btq_lim_cnt, free_scnt);
         f_cnt = `MIN(bp_lim_cnt, f_cnt);
         for (int i = 0; i < `N; ++i)
             f_en[i] = i < f_cnt;

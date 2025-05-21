@@ -11,7 +11,7 @@ module bp #(
 
     // fetch npc query
     input BRANCH_MD [`N-1:0]    i_md,
-    input   WADDR   [`N-1:0]    i_qry, // branch pc
+    input   WADDR   [`N:0]      PC_n, // branch pc
 
     output  logic   [$clog2(`N):0]  o_lim_cnt, // f_cnt limit (cap at first taken)
     output  logic   [`N-1:0]    o_take,
@@ -41,7 +41,7 @@ module bp #(
         .clock,
         .reset,
 
-        .i_qry,
+        .i_qry(PC_n[`N-1:0]),
         .o_vld(btb_hit),
         .o_tgt(btb_tgt),
 
@@ -95,7 +95,7 @@ module bp #(
         .rtgt   (ras_tgt),
         .ren,
         .wen,
-        .wtgt   (WADDR'(i_qry[call_idx] + 1)), // npc
+        .wtgt   (PC_n[call_idx+1]), // npc
 
         .snap_in,
         .empty
