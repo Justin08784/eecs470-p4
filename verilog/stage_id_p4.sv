@@ -8,7 +8,6 @@
 // This module is purely combinational
 module decoder_p4 (
     input INST  inst,
-    input logic valid, // when low, ignore inst. Output will look like a NOP
 
     output FU_IDX         fu_idx,
     output ALU_OPA_SELECT opa_select,
