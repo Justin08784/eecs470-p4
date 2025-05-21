@@ -163,8 +163,11 @@ module branch_manager (
             foreach (b1hot_n[n, i]) begin
                 if (!b1hot_n[n][i] || n >= dis_in.snap_en_cnt)
                     continue;
-                dep_table[i] <= cum_b1hot_n[n];
+                dep_table[i] <= cum_b1hot_n[dis_in.snap_en_cnt] & ~cum_b1hot_n[n+1];
+                    // "all younger branches" MINUS "branches older than or equal to i"
             end
+        end
+    end
 
         end
     end
