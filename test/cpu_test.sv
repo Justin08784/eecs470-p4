@@ -37,7 +37,7 @@ import "DPI-C" function string decode_inst(int inst);
 
 
 // Debug cycle limits, both inclusive
-localparam DBG_CYCLE_MIN = 0;
+localparam DBG_CYCLE_MIN = 400;
 localparam DBG_CYCLE_MAX = `TB_MAX_CYCLES;
 
 /*
@@ -64,15 +64,23 @@ module predecoder (
 
         casez (inst)
             `RV32_JAL: begin
-                call = (rd == 5'd1) || (rd == 5'd5);
+                // call = (rd == 5'd1) || (rd == 5'd5);
+
+                call = rd != `ZERO_REG;
                 branch = `TRUE;
             end
 
             `RV32_JALR: begin
-                call = (rd == 5'd1) || (rd == 5'd5);
+                // call = (rd == 5'd1) || (rd == 5'd5);
+                // ret  = (rd         == `ZERO_REG)    &&
+                //        (inst.r.rs1 == 5'd1)         &&   // rs1 lives in same bit‑slice for I‑type
+                //        (inst.i.imm == 12'd0);
+
+                call = rd != `ZERO_REG;
                 ret  = (rd         == `ZERO_REG)    &&
-                       (inst.r.rs1 == 5'd1)         &&   // rs1 lives in same bit‑slice for I‑type
-                       (inst.i.imm == 12'd0);
+                       ((inst.r.rs1 == 5'd1) || (inst.r.rs1 == 5'd5));
+                    //    (inst.i.imm == 12'd0);
+                    // idea: compute these imm's (or why not the full branch entirely) in icache refill path?
                 branch = `TRUE;
             end
 
@@ -563,6 +571,10 @@ module testbench;
     task print_ras;
         verisimpleV.fetch0.bp0.ras0.print_ras();
     endtask
+    
+    task print_bman;
+        verisimpleV.bman.print_bman();
+    endtask
 
 
     task print_custom_data;
@@ -574,16 +586,17 @@ module testbench;
         $display("  | >> CYCLE: %3d (t: %3d)", clock_count-1, $time);
         // print_btb();
         // print_fetch();
-        // print_ras();
+        print_ras();
         // print_decode();
-        print_rob();
-        print_dispatch();
-        print_fl();
+        // print_rob();
+        // print_fl();
         print_btq();
-        print_map_table();
+        // print_map_table();
         // print_prf();
         print_rs();
-        // print_execute();
+        print_bman();
+        print_dispatch();
+        print_execute();
         // print_dcache();
         // print_retire();
         $display("  | << CYCLE: %3d (t: %3d)", clock_count-1, $time);
