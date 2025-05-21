@@ -40,6 +40,7 @@ module fifo #(
     */
     parameter int INSTANCE_ID=-1,
     parameter FIFO_STATE RESET_STATE='{default:0},
+    type VEC = logic [DEPTH-1:0], // 1 hot vector pointer
     type PTR = logic [$clog2(DEPTH)-1:0]
 ) (
     input                                           clock, 
@@ -71,6 +72,10 @@ module fifo #(
     logic [DEPTH-1:0][WIDTH-1:0]    state;
     BMASK [DEPTH-1:0]               bmask;
     logic [$clog2(DEPTH):0]         used, free;
+    VEC head_oh, tail_oh;
+    function automatic VEC rotl(input VEC v, PTR sh);
+        return (v << sh) | (v >> (DEPTH - sh));
+    endfunction
 
     ring_ctr #(
         .DEPTH(DEPTH),
@@ -93,8 +98,8 @@ module fifo #(
         .rd_en_cnt,
         .wr_en_cnt,
 
-        .head,
-        .tail,
+        .head(head_oh),
+        .tail(tail_oh),
         .rd_idxs_n,
         .wr_idxs_n,
 
@@ -112,9 +117,24 @@ module fifo #(
     assign full         = used == DEPTH;
 
     logic [NUM_RPORTS-1:0] fwd_dat;
+    logic [NUM_RPORTS-1:0][WIDTH-1:0] rdat_win;
+    BMASK [NUM_RPORTS-1:0] rmsk_win;
     always_comb begin
         for (int i = 0; i < NUM_RPORTS; ++i)
             fwd_dat[i] = i >= used && ENABLE_INTR_FWD;
+
+        rdat_win = '0;
+        rmsk_win = '0;
+        for (int i = 0; i < NUM_RPORTS; ++i) begin
+            VEC sel;
+            sel = rotl(head_oh, i);
+            for (int d = 0; d < DEPTH; d++) begin
+                if (sel[d]) begin
+                    rdat_win[i] = state[d];
+                    rmsk_win[i] = bmask[d];
+                end
+            end
+        end
 
         for (int unsigned i = 0; i < NUM_RPORTS; ++i) begin
             if (i >= used_scnt) begin
@@ -124,8 +144,8 @@ module fifo #(
                 rd_data[i] = wr_data[i - used];
                 rd_bmask[i] = wr_bmask[i - used]; // does this need ~clmsk?
             end else begin
-                rd_data[i] = state[rd_idxs_n[i]];
-                rd_bmask[i] = bmask[rd_idxs_n[i]] & ~clmsk;
+                rd_data[i] = rdat_win[i];
+                rd_bmask[i] = rmsk_win[i] & ~clmsk;
             end
         end
     end
@@ -142,11 +162,15 @@ module fifo #(
             for (int i = 0; i < DEPTH; ++i)
                 bmask[i] <= bmask[i] & ~clmsk;
 
-            for (int unsigned i = 0; i < NUM_WPORTS; ++i) begin
-                if (i >= wr_en_cnt) // suppresses oob index warning
-                    continue;
-                state[wr_idxs_n[i]] <= wr_data[i];
-                bmask[wr_idxs_n[i]] <= wr_bmask[i];
+            for (int unsigned i = 0; i < wr_en_cnt; ++i) begin
+                VEC sel;
+                sel = rotl(tail_oh, i);
+                for (int d = 0; d < DEPTH; d++) begin
+                    if (sel[d]) begin
+                        state[d] <= wr_data[i];
+                        bmask[d] <= wr_bmask[i];
+                    end
+                end
             end
         end
     end

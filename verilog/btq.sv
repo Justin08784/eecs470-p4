@@ -3,7 +3,10 @@
 /* Branch target queue */
 module btq #(
     parameter BTQ_SZ = `BTQ_SZ,  // num elements
-    parameter N=`N
+    parameter N=`N,
+    parameter DEPTH=BTQ_SZ,
+    type PTR = logic [$clog2(DEPTH)-1:0],
+    type VEC = logic [DEPTH-1:0] // 1 hot vector pointer
 ) (
     input  clock,
     input  reset,
@@ -28,15 +31,17 @@ module btq #(
     localparam NUM_FPORTS = N; // fetch ports (in-order)
     localparam NUM_RPORTS = N; // retire ports (in-order)
     localparam NUM_CPORTS = `NUM_FU_BRU; // complete ports (*OUT-OF-ORDER*)
+    VEC head_oh, tail_oh;
+    function automatic VEC rotl(input VEC v, PTR sh);
+        return (v << sh) | (v >> (DEPTH - sh));
+    endfunction
 
     BTQ_ENTRY [BTQ_SZ-1:0]      state;
-    logic [$clog2(BTQ_SZ)-1:0]  head;
-    logic [$clog2(BTQ_SZ)-1:0]  tail;
     logic [$clog2(BTQ_SZ)-1:0]  snap;
     logic [$clog2(BTQ_SZ):0]    used;
     logic [$clog2(BTQ_SZ):0]    free;
 
-    logic [NUM_RPORTS:0][$clog2(BTQ_SZ)-1:0] r_idxs_n;
+    // logic [NUM_RPORTS:0][$clog2(BTQ_SZ)-1:0] r_idxs_n;
     logic [NUM_FPORTS:0][$clog2(BTQ_SZ)-1:0] f_idxs_n;
 
     ring_ctr #(
@@ -54,9 +59,9 @@ module btq #(
         .rd_en_cnt  (r_in.rd_cnt),
         .wr_en_cnt  (f_in.en_cnt),
 
-        .head,
-        .tail,
-        .rd_idxs_n  (r_idxs_n),
+        .head       (head_oh),
+        .tail       (tail_oh),
+        // .rd_idxs_n  (r_idxs_n),
         .wr_idxs_n  (f_idxs_n),
 
         .used,
@@ -64,6 +69,20 @@ module btq #(
         .used_scnt(),
         .free_scnt(f_out.btq_rdy_scnt)
     );
+
+    BTQ_ENTRY [NUM_FPORTS-1:0] rdat_win;
+    always_comb begin
+        rdat_win = '0;
+        for (int i = 0; i < NUM_FPORTS; ++i) begin
+            VEC sel;
+            sel = rotl(head_oh, i);
+            for (int d = 0; d < DEPTH; d++) begin
+                if (sel[d]) begin
+                    rdat_win[i] = state[d];
+                end
+            end
+        end
+    end
 
     general_snaps #(
         .WIDTH($clog2(`BTQ_SZ))
@@ -83,7 +102,7 @@ module btq #(
     // logic [$clog2(NUM_RPORTS):0] nret_lim_cnt;
     generate
     for (genvar i = 0; i < NUM_RPORTS; ++i) begin
-        assign nret[i] = !state[r_idxs_n[i]].ret; // nret = not a return instruction
+        assign nret[i] = !rdat_win[i].ret; // nret = not a return instruction
     end
     endgenerate
 
@@ -102,9 +121,9 @@ module btq #(
     always_comb begin
         // handle fetch (outs)
         for (int i = 0; i < NUM_RPORTS; ++i) begin
-            puq_enq_raw[i].take = state[r_idxs_n[i]].take;
-            puq_enq_raw[i].pc   = state[r_idxs_n[i]].PC;
-            puq_enq_raw[i].tgt  = state[r_idxs_n[i]].tgt;
+            puq_enq_raw[i].take = rdat_win[i].take;
+            puq_enq_raw[i].pc   = rdat_win[i].PC;
+            puq_enq_raw[i].tgt  = rdat_win[i].tgt;
         end
 
         for (int i = 0; i < NUM_RPORTS; ++i)
@@ -175,35 +194,49 @@ module btq #(
 `endif
 
             // handle fetch (ins)
-            for (int i = 0, int idx = 0; i < NUM_FPORTS; ++i) begin
-                idx = f_idxs_n[i];
-                if (i >= f_in.en_cnt)
-                    continue;
-
-                state[idx] <= '{
+            for (int unsigned i = 0; i < f_in.en_cnt; ++i) begin
+                VEC sel;
+                sel = rotl(tail_oh, i);
+                for (int d = 0; d < DEPTH; d++) begin
+                    if (sel[d]) begin
+                        state[d] <= '{
 `ifdef DEBUG
-                    b1hot   : '0,
+                            b1hot   : '0,
 `endif
-                    PC      : f_in.PC[i],
-                    pred    : f_in.pred[i],
-                    pred_tgt: f_in.pred_tgt[i],
-                    ret     : f_in.ret[i],
+                            PC      : f_in.PC[i],
+                            pred    : f_in.pred[i],
+                            pred_tgt: f_in.pred_tgt[i],
+                            ret     : f_in.ret[i],
 
-                    take    : '0,
-                    tgt     : '0
-                };
+                            take    : '0,
+                            tgt     : '0
+                        };
+                    end
+                end
             end
         end
     end
 
 `ifdef DEBUG
+    function automatic PTR v2p (input VEC v);
+        PTR p;
+        p = 0;
+        for (int i = 0; i < DEPTH; ++i)
+            if (v[i])
+                p = i;
+        return p;
+    endfunction
     task print_btq;
         logic [BTQ_SZ-1:0] btq_vld;
+        PTR head, tail;
+        head = v2p(head_oh);
+        tail = v2p(tail_oh);
 
         $display(">> BTQ >>");
         $display("head: %d, tail: %d, used: %d, free: %d", head, tail, used, free);
         $display("flush: %b, flush_snap: %2d", flush, snap);
         $display("rd_en_cnt: %2d, wr_en_cnt: %2d", r_in.rd_cnt, f_in.en_cnt);
+        $display("free: %2d, used: %2d", free, used);
         btq_vld = '0;
         for (int cnt = 0; cnt < used; ++cnt)
             btq_vld[(head + cnt) % BTQ_SZ] = 1;

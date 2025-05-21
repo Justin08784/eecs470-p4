@@ -2,7 +2,10 @@
 
 module rob #(
     parameter ROB_SZ = `ROB_SZ,  // num elements
-    parameter N=`N
+    parameter N=`N,
+    parameter DEPTH=ROB_SZ,
+    type PTR = logic [$clog2(DEPTH)-1:0],
+    type VEC = logic [DEPTH-1:0] // 1 hot vector pointer
 ) (
     input clock, reset, flush,
     input  BMASK clmsk,
@@ -24,9 +27,11 @@ module rob #(
     localparam NUM_CPORTS = N; // complete ports (*OUT-OF-ORDER*)
     logic [$clog2(NUM_DPORTS):0]    free_scnt;
     logic [$clog2(NUM_RPORTS):0]    used_scnt;
+    VEC head_oh, tail_oh;
+    function automatic VEC rotl(input VEC v, PTR sh);
+        return (v << sh) | (v >> (DEPTH - sh));
+    endfunction
 
-    logic [$clog2(ROB_SZ)-1:0]  head;
-    logic [$clog2(ROB_SZ)-1:0]  tail;
     logic [$clog2(ROB_SZ)-1:0]  snap;
 
     ROB_ENTRY [ROB_SZ-1:0]      state;
@@ -50,8 +55,8 @@ module rob #(
         .rd_en_cnt  (r_in.r_en_cnt),
         .wr_en_cnt  (d_in.d_en_cnt),
 
-        .head,
-        .tail,
+        .head       (head_oh),
+        .tail       (tail_oh),
         .rd_idxs_n    (rtre_idxs_n),
         .wr_idxs_n    (comm_idxs_n),
 
@@ -60,6 +65,20 @@ module rob #(
         .used_scnt,
         .free_scnt
     );
+
+    ROB_ENTRY [NUM_RPORTS-1:0] rdat_win;
+    always_comb begin
+        rdat_win = '0;
+        for (int i = 0; i < NUM_RPORTS; ++i) begin
+            VEC sel;
+            sel = rotl(head_oh, i);
+            for (int d = 0; d < DEPTH; d++) begin
+                if (sel[d]) begin
+                    rdat_win[i] = state[d];
+                end
+            end
+        end
+    end
 
     general_snaps #(
         .WIDTH($clog2(`ROB_SZ))
@@ -81,7 +100,7 @@ module rob #(
         for (int unsigned i = 0; i < used_scnt; ++i) begin
             /* preview mode–– just display all valid entries in read window even
             if not all will get retired this cycle */
-            r_out.entries[i] = state[rtre_idxs_n[i]];
+            r_out.entries[i] = rdat_win[i];
         end
 
         // handle dispatch (outs)
@@ -110,28 +129,42 @@ module rob #(
             end
 
             // handle dispatch (ins)
-            for (int unsigned i = 0, int cur_idx = 0; i < NUM_DPORTS; ++i) begin
-                if (i >= d_in.d_en_cnt)
-                    continue;
-                cur_idx = comm_idxs_n[i];
-                state[cur_idx] <= '{
-                    cpl     : 0,
-                    fu_idx  : d_in.fu_idx[i],
-                    tag     : d_in.tag[i],
-                    t_old   : d_in.t_old[i],
-                    dst     : d_in.dst[i],
-                    halt    : d_in.halt[i],
-                    illegal : d_in.illegal[i]
-                };
+            for (int unsigned i = 0; i < d_in.d_en_cnt; ++i) begin
+                VEC sel;
+                sel = rotl(tail_oh, i);
+                for (int d = 0; d < DEPTH; d++) begin
+                    if (sel[d]) begin
+                        state[d] <= '{
+                            cpl     : 0,
+                            fu_idx  : d_in.fu_idx[i],
+                            tag     : d_in.tag[i],
+                            t_old   : d_in.t_old[i],
+                            dst     : d_in.dst[i],
+                            halt    : d_in.halt[i],
+                            illegal : d_in.illegal[i]
+                        };
+                    end
+                end
             end
         end
     end
     
 `ifdef DEBUG
+    function automatic PTR v2p (input VEC v);
+        PTR p;
+        p = 0;
+        for (int i = 0; i < DEPTH; ++i)
+            if (v[i])
+                p = i;
+        return p;
+    endfunction
     task print_rob;
         logic [`ROB_SZ-1:0] rob_vld;
+        PTR head, tail;
         logic t_dup, told_dup;
         localparam half_sz = `ROB_SZ / 2;
+        head = v2p(head_oh);
+        tail = v2p(tail_oh);
 
         $display("  | >> ROB >>");
         for (int i = 0; i < `N; ++i) begin
@@ -153,6 +186,7 @@ module rob #(
 
         $display("r_out: vld_cnt: %d", r_out.r_vld_cnt);
         $display("head: %2d, tail: %2d, used: %2d", head, tail, used);
+        $display("free_scnt: %1d, used_scnt: %1d", free_scnt, used_scnt);
         for (int i = 0; i < `N; ++i) begin
             string name;
             get_fu_name(r_out.entries[i].fu_idx, name);
