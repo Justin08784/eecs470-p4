@@ -78,15 +78,37 @@ module btq #(
         .wdat   (snap_in.btq_tail)
     );
 
+    logic [NUM_RPORTS-1:0] nret;
+    logic [NUM_RPORTS:0][$clog2(NUM_RPORTS):0] nret_prefix_cnt;
+    // logic [$clog2(NUM_RPORTS):0] nret_lim_cnt;
+    generate
+    for (genvar i = 0; i < NUM_RPORTS; ++i) begin
+        assign nret[i] = !state[r_idxs_n[i]].ret; // nret = not a return instruction
+    end
+    endgenerate
+
+    compactor #(
+        .REQW(NUM_RPORTS),
+        .GNTW(NUM_RPORTS)
+    ) comp_nret (
+        .req        (nret),
+        .prefix_cnt (nret_prefix_cnt)
+    );
+
+
     logic puq_empty;
-    PUQ_ENTRY [NUM_RPORTS-1:0] tmp_puq_in;
+    PUQ_ENTRY [NUM_RPORTS-1:0]  puq_enq_raw,
+                                puq_enq_flt; // ret's filtered out
     always_comb begin
         // handle fetch (outs)
         for (int i = 0; i < NUM_RPORTS; ++i) begin
-            tmp_puq_in[i].take = state[r_idxs_n[i]].take;
-            tmp_puq_in[i].pc   = state[r_idxs_n[i]].PC;
-            tmp_puq_in[i].tgt  = state[r_idxs_n[i]].tgt;
+            puq_enq_raw[i].take = state[r_idxs_n[i]].take;
+            puq_enq_raw[i].pc   = state[r_idxs_n[i]].PC;
+            puq_enq_raw[i].tgt  = state[r_idxs_n[i]].tgt;
         end
+
+        for (int i = 0; i < NUM_RPORTS; ++i)
+            puq_enq_flt[i] = puq_enq_raw[nret_prefix_cnt[i]];
 
         f_out.bp_upd.en     = !puq_empty;
         f_out.btq_idxs_n    = f_idxs_n;
@@ -112,8 +134,8 @@ module btq #(
         .clock      (clock),
         .reset      (reset),
         .flush      ('0),
-        .wr_en_cnt  (r_in.rd_cnt),
-        .wr_data    (tmp_puq_in),
+        .wr_en_cnt  (nret_prefix_cnt[r_in.rd_cnt]),
+        .wr_data    (puq_enq_flt),
         .rd_en_cnt  (f_out.bp_upd.en),
         .rd_data    (f_out.bp_upd.dat),
         .free_scnt  (r_out.puq_rdy_scnt),
@@ -165,6 +187,7 @@ module btq #(
                     PC      : f_in.PC[i],
                     pred    : f_in.pred[i],
                     pred_tgt: f_in.pred_tgt[i],
+                    ret     : f_in.ret[i],
 
                     take    : '0,
                     tgt     : '0

@@ -121,6 +121,7 @@ module stage_if_p4 (
             btq_out.PC      [btq_prefix_cnt[i]] = PC_n[i];
             btq_out.pred    [btq_prefix_cnt[i]] = pred[i];
             btq_out.pred_tgt[btq_prefix_cnt[i]] = pred_tgt[i];
+            btq_out.ret     [btq_prefix_cnt[i]] = insn_md[i].ret;
         end
 
     end

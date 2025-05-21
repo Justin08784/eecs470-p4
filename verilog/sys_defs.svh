@@ -449,6 +449,7 @@ typedef struct packed {
 
     logic   take;
     WADDR   tgt;
+    logic   ret;    // is a ret instruction?
 } BTQ_ENTRY;
 
 typedef struct packed {
@@ -728,6 +729,7 @@ typedef struct packed {
     WADDR   [`N-1:0]    PC;
     WADDR   [`N-1:0]    pred_tgt;
     logic   [`N-1:0]    pred;
+    logic   [`N-1:0]    ret;
 } fetch2btq;
 
 typedef struct packed {
