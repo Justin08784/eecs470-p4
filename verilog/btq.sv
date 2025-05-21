@@ -202,7 +202,7 @@ module btq #(
 
         $display(">> BTQ >>");
         $display("head: %d, tail: %d, used: %d, free: %d", head, tail, used, free);
-        $display("flush: %b, flush_snap: %2d", flush, snap);
+        $display("flush: %b, flush_snap: %2d, clmsk: %b", flush, snap, clmsk);
         $display("rd_en_cnt: %2d, wr_en_cnt: %2d", r_in.rd_cnt, f_in.en_cnt);
         btq_vld = '0;
         for (int cnt = 0; cnt < used; ++cnt)

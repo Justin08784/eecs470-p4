@@ -164,12 +164,35 @@ module branch_manager (
                 if (!b1hot_n[n][i] || n >= dis_in.snap_en_cnt)
                     continue;
                 dep_table[i] <= cum_b1hot_n[dis_in.snap_en_cnt] & ~cum_b1hot_n[n+1];
-                    // "all younger branches" MINUS "branches older than or equal to i"
+                    // "all new dispatching branches" MINUS "branches older than or equal to i"
             end
         end
     end
 
+`ifdef DEBUG
+    task print_bman;
+        $display("  %3d | >> Branch manager >>", $time);
+        // $display("r_in.btq_rdy_scnt: %d",   btq_in.btq_rdy_scnt);
+        // $display("btq_in.btq_rdy_scnt: %d",   btq_in.btq_rdy_scnt);
+        for (int i = 0; i < `N+1; ++i) begin
+            $display("bmask_n[%2d]: %b, b1hot_n: %b, cum_b1hot_n: %b",
+                i,
+                bmask_n[i],
+                b1hot_n[i],
+                cum_b1hot_n[i]
+            );
         end
-    end
+        $display("bmask_reg: %b", bmask_reg);
+
+        $display("");
+        for (int i = 0; i < BMASK_LEN; ++i) begin
+            if (bmask_reg[i])
+                $display("dep_table[%8b]: %8b", 1 << i, dep_table[i]);
+            else
+                $display("dep_table[%8b]:", 1 << i);
+        end
+        $display("  %3d | << Branch manager <<", $time);
+    endtask
+`endif
 
 endmodule
