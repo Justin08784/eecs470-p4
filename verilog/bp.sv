@@ -69,8 +69,22 @@ module bp #(
     logic ren, wen;
     WADDR ras_tgt;
 
+    logic call_any;
+    logic [$clog2(`N)-1:0] call_idx;
+    ffs #(
+        .VECW(`N)
+    ) ff_call (
+        .i_vec(call),
+        .o_vld(call_any),
+        .o_idx(call_idx)
+    );
+
     assign ren = take_any && f_en[take_idx] && ret[take_idx];
-    assign wen = take_any && f_en[take_idx] && call[take_idx];
+    assign wen = call_any && f_en[call_idx];
+        /* Calls unconditionally write their NPC to the RAS, EVEN IF they 
+        they miss in the BTB (we still predict the call as not taken of course, though).
+        This ensures the subsequent return insn ––after the call inevitably
+        triggers a flush–– is a hit on the RAS. */
     ras ras0 (
         .clock,
         .reset,
@@ -81,7 +95,7 @@ module bp #(
         .rtgt   (ras_tgt),
         .ren,
         .wen,
-        .wtgt   (WADDR'(i_qry[take_idx] + 1)), // npc
+        .wtgt   (WADDR'(i_qry[call_idx] + 1)), // npc
 
         .snap_in,
         .empty
@@ -104,7 +118,11 @@ module bp #(
     // end
 
     assign o_take   = raw_take;
-    assign o_lim_cnt= take_any ? take_idx + 1 : `N;
+    assign o_lim_cnt= `MIN(
+        take_any ? take_idx + 1 : `N,
+        call_any ? call_idx + 1 : `N    // we only have 1 RAS write port
+    );
+
     generate
     for (genvar i = 0; i < `N; ++i) begin
         assign o_tgt[i] = ret[i] ? ras_tgt : btb_tgt[i];

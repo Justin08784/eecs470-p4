@@ -93,24 +93,42 @@ module ras #(
 
 `ifdef DEBUG
     task print_ras;
-        $display(">> ras >>");
-        $display("used_n: %2d, top_n: %2d, full: %b, empty: %b", used_n, top_n, full, empty);
-        $display("ras: clock: %b, reset: %b, flush: %b, clmsk: %b, ren: %b, wen: %b, wtgt: %x, snap_in: %x",
-        clock,
-        reset,
-        flush,
-        clmsk,
-        ren,
-        wen,
-        wtgt,
-        snap_in
-        );
-        $display("ras: used: %2d, top: %2d", used, top);
+        logic [DEPTH-1:0] ras_vld;
+
+        ras_vld = '0;
+        for (int cnt = 0; cnt < used; ++cnt)
+            ras_vld[(top - (cnt + 1)) % `ROB_SZ] = 1;
+
+        $display(">> RAS >>");
+        // $display("used_n: %2d, top_n: %2d, full: %b, empty: %b", used_n, top_n, full, empty);
+        // $display("ras: clock: %b, reset: %b, flush: %b, clmsk: %b, ren: %b, wen: %b, wtgt: %x, snap_in: %x",
+        // clock,
+        // reset,
+        // flush,
+        // clmsk,
+        // ren,
+        // wen,
+        // wtgt,
+        // snap_in
+        // );
+        $display("top: %2d, used: %2d", top, used);
         for (int i = 0; i < DEPTH; ++i) begin
-            $write("state[%2d]: %x", i, state[i]);
+            if (!ras_vld[i]) begin
+                $display("ras[%2d]:", i);
+                continue;
+            end
+
+            $display("ras[%2d]: %x", i, state[i]);
         end
 
-        $display("<< ras <<");
+        $display("");
+        for (int i = 0; i < BMASK_LEN; ++i) begin
+            RAS_SNAP snap;
+            snap = snaps.snaps[i];
+            $display("snaps[%8b]: top: %2d, used: %2d", 1 << i, snap.top, snap.used);
+        end
+
+        $display("<< RAS <<");
     endtask
 `endif
 endmodule
