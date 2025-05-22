@@ -26,10 +26,8 @@ module ghr #(
         return p < k ? p + DEPTH - k : p - k;
     endfunction
 
-    function automatic logic [DEPTH-1:0] rotr(input logic [DEPTH-1:0] v, int sh);
-        int sh_mod;
-        sh_mod = sh % DEPTH;
-        return (v >> sh_mod) | (v << (DEPTH - sh_mod));
+    function automatic PTR rotr(input logic [DEPTH-1:0] v, input PTR sh);
+        return (v >> sh) | (v << (DEPTH - sh));
     endfunction
 
     logic [DEPTH-1:0] rslv; // resolved? i.e. not speculative?
@@ -50,9 +48,19 @@ module ghr #(
     end
 
     always_comb begin
-        f_ghr[0] = rotr(hist, base + 1);
-        for (int i = 0; i < `N-1; ++i)
-            f_ghr[i+1] = f_ghr[i] << 1 | f_pred[i];
+        logic [`N-1:0][DEPTH-1:0] tmp;
+
+        for (int i = 0; i < `N; ++i) begin
+            // tmp[i] = (i > 0)
+            //     ? tmp[i-1] << 1 | f_pred[i-1]
+            //     : rotr(hist, base) & ~GHR_LEN'(1);
+            // f_ghr[i] = tmp[i][GHR_LEN:1];
+
+            tmp[i] = (i > 0)
+                ? tmp[i-1] << 1
+                : rotr(hist, base) & ~GHR_LEN'(1); // clear LSB (write head/base)
+            f_ghr[i] = tmp[i][GHR_LEN:1];
+        end
 
         // cannot retire hist bit if leftmost branch in GHR window is unresolved
         // (otherwise, on mispredict of that branch, the current bit will be
@@ -70,13 +78,14 @@ module ghr #(
     always_ff @(posedge clock) begin
         if (reset) begin
             rslv <= '1;
-            hist <= 'hACE1; // heuristic seed to avoid cold start
+            // hist <= 'hACE1; // heuristic seed to avoid cold start
+            hist <= '0;
             base <= DEPTH-1;
 
         end else if (flush) begin
             rslv[flush_base] <= 1;
             hist[flush_base] <= flush_take;
-            base <= decr(flush_base, 1);
+            base <= flush_base;
 
         end else begin
             for (int i = 0; i < `NUM_FU_BRU; ++i) begin
@@ -86,10 +95,22 @@ module ghr #(
             end
 
             for (int i = 0; i < f_en_cnt; ++i) begin
-                rslv[decr(base, i)] <= 0;
-                hist[decr(base, i)] <= f_pred[i];
+                int idx;
+                idx = decr(base, i);
+                rslv[idx] <= 0;
+                hist[idx] <= f_pred[i];
             end
             base <= decr(base, f_en_cnt);
         end
     end
 endmodule
+
+// cool indexing trick
+
+// if (base >= GHR_LEN)
+//     f_ghr[0] = hist[base-1 -: GHR_LEN];
+// else
+//     f_ghr[0] = {
+//         hist[DEPTH-1 -: (GHR_LEN-base)], // this illegal
+//         hist[base-1 -: GHR_LEN]
+//     };
