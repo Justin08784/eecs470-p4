@@ -42,7 +42,7 @@ module ghr_test();
     always @(posedge clock) begin
         if (DEBUG) begin
             $write("  %3d | ", $time);
-            $display("  %3d | ex_in: {en: %b, idx: %2d}, fetch: {en_cnt: %1d, rdy_cnt: %1d, pred: [%b, %b], ghr: %b}",
+            $display("  %3d | ex_in: {en: %b, idx: %2d}, fetch: {en_cnt: %1d, rdy_cnt: %1d, pred: [%b, %b], ghr: [%b, %b]}",
                 $time,
                 ex_en,
                 ex_idx,
@@ -50,7 +50,8 @@ module ghr_test();
                 f_rdy_scnt,
                 f_pred[0],
                 f_pred[1],
-                f_ghr[0]
+                f_ghr[0],
+                f_ghr[1]
             );
         end
     end
