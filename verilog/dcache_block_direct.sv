@@ -101,6 +101,8 @@ module fill_handler (
             .req (~hdr.vld[s]),
             .gnt (free_gnt[s])
         );
+        /* this is unnecessary. lru is a superset
+        of this. see btb. */
     end
     endgenerate
 
