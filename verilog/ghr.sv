@@ -1,7 +1,7 @@
 `include "sys_defs.svh"
 
 module ghr #(
-    parameter DEPTH     = 32, // must be greater than GHR_LEN and a power of 2
+    parameter DEPTH     = 32, // must be geq than 2*GHR_LEN and a power of 2
     parameter NUM_FU_BRU= `NUM_FU_BRU,
     parameter GHR_LEN   = GHR_LEN,
     parameter N         = `N,
@@ -36,10 +36,6 @@ module ghr #(
         assert (DEPTH >= 2*GHR_LEN)
             else $fatal("GHR DEPTH must be >= 2*GHR_LEN");
     end
-
-    function automatic PTR decr(input PTR p, input int unsigned k);
-        return p < k ? p + DEPTH - k : p - k;
-    endfunction
 
     function automatic VEC rotl(input VEC v, input PTR sh);
         // This is so fucking elegant I'm going to cry
@@ -153,25 +149,27 @@ module ghr #(
         end
     end
     
+    PTR     flush_base_n;
+    assign  flush_base_n = flush_base - PTR'(1);
     always_ff @(posedge clock) begin
         if (reset) begin
             rslv    <= '1;
             // hist <= 'hACE1; // heuristic seed to avoid cold start
             hist    <= '0;
             base    <= DEPTH-1;
-            base_oh <= 1 << (DEPTH-1);
+            base_oh <= VEC'(1) << (DEPTH-1);
 
         end else if (flush) begin
             rslv            <= rslv | get_arc(base, flush_base);
                 // everything in rlsv[flush_base,..(mod+), base] must be set
             hist[flush_base]<= flush_take;
-            base            <= flush_base-1;
-            base_oh         <= 1 << (flush_base-1);
+            base            <= flush_base_n;
+            base_oh         <= VEC'(1) << flush_base_n;
 
         end else begin
             rslv    <= rslv_n;
             hist    <= hist_n;
-            base    <= decr(base, f_en_cnt);
+            base    <= base - PTR'(f_en_cnt);
             base_oh <= base_oh_n[f_en_cnt];
         end
 
