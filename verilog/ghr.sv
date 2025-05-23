@@ -63,8 +63,8 @@ module ghr #(
         wrap = lo >= hi;
         for (int i = 0; i < DEPTH; ++i) begin
             rv[i] = wrap
-                ? ((i > lo) && (i <= hi))
-                : ((i > lo) || (i <= hi));
+                ? ((i > lo) || (i <= hi))
+                : ((i > lo) && (i <= hi));
         end
 
         return rv;
