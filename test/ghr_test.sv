@@ -1,13 +1,14 @@
 `include "sys_defs.svh"
 `include "test/ghr_sva.svh"
 
-module ghr_test();
-    localparam DEPTH     = 4;
-    localparam NUM_FU_BRU= 1;
-    localparam GHR_LEN   = 2;
-    localparam N         = 2;
-    typedef logic [$clog2(DEPTH)-1:0] PTR;
-
+module ghr_test #(
+    parameter DEPTH     = 8, // must be geq than 2*GHR_LEN and a power of 2
+    parameter NUM_FU_BRU= 1,
+    parameter GHR_LEN   = 4,
+    parameter N         = 2,
+    type VEC = logic [DEPTH-1:0],
+    type PTR = logic [$clog2(DEPTH)-1:0]
+) ();
     logic   clock;
     logic   reset;
     logic   flush;
@@ -49,9 +50,9 @@ module ghr_test();
     ) dut (
         .clock,
         .reset,
-        .flush      ('0),
-        .flush_base ('0),
-        .flush_take ('0),
+        .flush,
+        .flush_base,
+        .flush_take,
 
         .ex_en,
         .ex_idx,
@@ -66,7 +67,7 @@ module ghr_test();
     always @(posedge clock) begin
         if (DEBUG) begin
             $write("  %3d | ", $time);
-            $display("  %3d | ex_in: {en: %b, idx: %2d}, fetch: {en_cnt: %1d, rdy_cnt: %1d, pred: [%b, %b], ghr: [%b, %b]}",
+            $display("  %3d | ex_in: {en: %b, idx: %2d}, fetch: {en_cnt: %1d, rdy_scnt: %1d, pred: [%b, %b], ghr: [%b, %b]}",
                 $time,
                 ex_en,
                 ex_idx,
@@ -77,28 +78,55 @@ module ghr_test();
                 f_ghr[0],
                 f_ghr[1]
             );
-            $display("hist: %b, ghr: %b (base: %2d)", dut.hist, f_ghr[0], dut.base);
+            $display("flush: %b, flush_base: %d, flush_take: %b", flush, flush_base, flush_take);
+            $display("hist: %b, ghr: %b", dut.hist, f_ghr[0]);
             $display("rslv: %b", dut.rslv);
+            $display("b1ht: %b (idx: %2d) rdy: %b, okay: %b", dut.base_oh, dut.base, dut.rdy, dut.okay);
         end
     end
-    
 
-    // ghr_sva #(
-    //     .DEPTH(DEPTH),
-    //     .WIDTH(WIDTH),
-    //     .NUM_RPORTS(NUM_RPORTS),
-    //     .NUM_WPORTS(NUM_WPORTS),
-    //     .ENABLE_INTR_FWD(`TRUE)
-    // ) sva (
-    //     .clock      (clock),
-    //     .reset      (reset),
-    //     .wr_en_cnt  (wr_en_cnt),
-    //     .wr_data    (wr_data),
-    //     .rd_en_cnt  (rd_en_cnt),
-    //     .rd_data    (rd_data),
-    //     .free_scnt  (free_scnt),
-    //     .used_scnt  (used_scnt)
-    // );
+
+    VEC     rslv;
+    VEC     hist;
+    PTR     base;
+    VEC     base_oh;
+    VEC     okay;
+    always_comb begin
+        rslv    = dut.rslv;
+        hist    = dut.hist;
+        base    = dut.base;
+        base_oh = dut.base_oh;
+        okay    = dut.okay;
+    end
+
+    ghr_sva #(
+        .DEPTH      (DEPTH),
+        .NUM_FU_BRU (NUM_FU_BRU),
+        .GHR_LEN    (GHR_LEN),
+        .N          (N)
+    ) sva (
+        .rslv,
+        .hist,
+        .base,
+        .base_oh,
+        .okay,
+
+        .clock,
+        .reset,
+
+        .flush,
+        .flush_base,
+        .flush_take,
+
+        .ex_en,
+        .ex_idx,
+
+        .f_en_cnt,
+        .f_pred,
+        .f_rdy_scnt,
+        .f_ghr
+    );
+
 
     initial begin
         $display("\nStart Testbench");
@@ -121,11 +149,34 @@ module ghr_test();
 
         // ---------- Test 1 ---------- //
         $display("\nTest 1");
-        for (int i = 0; i < 15; ++i) begin
-            f_pred = {1'b1, 1'b0};
-            f_en_cnt = 2;
+        f_pred[0] = 1'b1;
+        f_en_cnt = 1;
+
+        while (f_rdy_scnt > 0)
             @(negedge clock);
-        end
+        f_en_cnt = 0;
+        @(negedge clock);
+
+        $display("\nTest 2");
+        ex_en   = 1;
+        ex_idx  = 1;
+        @(negedge clock);
+        @(negedge clock);
+
+        $display("\nTest 3");
+        flush       = 1;
+        flush_base  = 3;
+        flush_take  = 0;
+        ex_en       = 0;
+        ex_idx      = 0;
+        // $display("ex_en: %b, ex_idx: %d", ex_en, ex_idx);
+        @(negedge clock);
+        flush = 0;
+        @(negedge clock);
+        @(negedge clock);
+
+
+
 
         $display("\n\033[32m@@@ Passed\033[0m\n");
 

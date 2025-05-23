@@ -56,7 +56,7 @@ module ghr #(
         logic wrap;
         VEC rv;
 
-        wrap = lo >= hi;
+        wrap = lo > hi;
         for (int i = 0; i < DEPTH; ++i) begin
             rv[i] = wrap
                 ? ((i >= lo) || (i <= hi))
