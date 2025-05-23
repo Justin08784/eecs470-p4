@@ -179,16 +179,15 @@ module ghr_test #(
 
         $display("\nTest 2");
         ex_en   = 1;
-        ex_idx  = 1;
+        ex_idx  = 2;
         @(negedge clock);
+        ex_en       = 0;
         @(negedge clock);
 
         $display("\nTest 3");
         flush       = 1;
-        flush_base  = 3;
+        flush_base  = 4;
         flush_take  = 0;
-        ex_en       = 0;
-        ex_idx      = 0;
         // $display("ex_en: %b, ex_idx: %d", ex_en, ex_idx);
         @(negedge clock);
         flush = 0;
