@@ -115,9 +115,8 @@ module ghr #(
 
     logic [N-1:0] rdy;
     always_comb begin
-        // cannot retire hist bit if youngest branch in GHR window is unresolved
-        // (otherwise, on mispredict of that branch, the current bit will be
-        // lost/"shifted out" and unrecoverable)
+        // if we advance base, then we will push 1 more branch into the nrz.
+        // we must ensure said branch is resolved (and thus does not require recovery).
         okay = rotl(rslv, GHR_LEN-1);
 
         rdy[0] = |(okay & base_oh_n[1]);

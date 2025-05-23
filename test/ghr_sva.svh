@@ -153,6 +153,33 @@ module ghr_sva #(
         end
     endtask
 
+    function automatic logic is_nrz_resolved();
+        /*
+        nrz (non-recoverable zone) := def. is a GHR_LEN-1 length window of the GHR.
+        If an index is in the nrz, then the GHR based at it (i.e. its youngest
+        entry is that index) is missing at least one entry (more precisely, the
+        GHR base pointer wrote past it), hence "non-recoverable". The nrz shifts
+        -modulo whenever we decrement the base.
+
+        We must only allow branches into the nrz that do not need to recover its GHR or,
+        in other words, branches that are resolved. If a non-resolved branch enters
+        the nrz, it becomes impossible to rebuild the full GHR rooted at that branch
+        if it resolves to a mispredict.
+
+        If a branch in the nrz is not fully resolved, this implies that the
+        base pointer–– at some earlier time–– illegally advanced/decremented.
+        */
+
+        logic [GHR_LEN-2:0] nrz_rslv;
+        for (int i = 0; i <= GHR_LEN-2; ++i) begin
+            PTR idx;
+            idx = base - (i+1);
+            nrz_rslv[i] = rslv[idx];
+        end
+
+        return &nrz_rslv;
+    endfunction
+
     clocking cb @(posedge clock);
         property f_rdy_correct;
             disable iff (reset)
@@ -164,9 +191,24 @@ module ghr_sva #(
             f_ghr == sva_comb.f_ghr;
         endproperty
 
+        property rslv_correct;
+            disable iff (reset)
+            rslv == s.rslv;
+        endproperty
+
         property hist_correct;
             disable iff (reset)
             hist == s.hist;
+        endproperty
+
+        property base_correct;
+            disable iff (reset)
+            base == s.base && base_oh == (1 << s.base);
+        endproperty
+
+        property nrz_rslvd;
+            disable iff (reset)
+            is_nrz_resolved();
         endproperty
     endclocking
 
@@ -174,7 +216,13 @@ module ghr_sva #(
         else exit_on_error;
     match_f_ghr: assert property(cb.f_ghr_correct)
         else exit_on_error;
+    match_rslv: assert property(cb.rslv_correct)
+        else exit_on_error;
     match_hist: assert property(cb.hist_correct)
+        else exit_on_error;
+    match_base: assert property(cb.base_correct)
+        else exit_on_error;
+    nrz_rslv: assert property(cb.nrz_rslvd)
         else exit_on_error;
 
 
