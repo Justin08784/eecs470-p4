@@ -42,16 +42,21 @@ module ghr #(
     endfunction
 
     function automatic VEC rotl(input VEC v, input PTR sh);
-        return (v << sh) | (v >> (DEPTH - sh));
+        // This is so fucking elegant I'm going to cry
+        logic [2*DEPTH-1:0] dv;
+        dv = {v, v} << sh;
+        return dv[DEPTH-1:0];
     endfunction
 
     function automatic VEC rotr(input VEC v, input PTR sh);
-        return (v >> sh) | (v << (DEPTH - sh));
+        logic [2*DEPTH-1:0] dv;
+        dv = {v, v} >> sh;
+        return dv[DEPTH-1:0];
     endfunction
 
     VEC rslv; // resolved? i.e. not speculative?
     VEC hist; // {0=ntake, 1=take}
-    PTR base;
+    PTR base; // to youngest entry in the GHR window; (base-1) % DEPTH is the write head
     VEC base_oh;
     VEC okay; // okay to overwrite?
 
@@ -86,7 +91,7 @@ module ghr #(
     always_comb begin
         logic [N-1:0] rdy;
 
-        // cannot retire hist bit if leftmost branch in GHR window is unresolved
+        // cannot retire hist bit if youngest branch in GHR window is unresolved
         // (otherwise, on mispredict of that branch, the current bit will be
         // lost/"shifted out" and unrecoverable)
         okay = rotl(rslv, GHR_LEN-1);
