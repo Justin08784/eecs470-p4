@@ -41,6 +41,10 @@ module ghr #(
         return p < k ? p + DEPTH - k : p - k;
     endfunction
 
+    function automatic VEC rotl(input VEC v, input PTR sh);
+        return (v << sh) | (v >> (DEPTH - sh));
+    endfunction
+
     function automatic VEC rotr(input VEC v, input PTR sh);
         return (v >> sh) | (v << (DEPTH - sh));
     endfunction
@@ -52,12 +56,17 @@ module ghr #(
     VEC okay; // okay to overwrite?
 
 
-    localparam int MAX_OFF = GHR_LEN + N - 1;   // furthest bit we ever touch
-    VEC [MAX_OFF:0] base_oh_n;
+    VEC [N:0]           base_oh_n;      // oh's to prescribe writes
+    VEC [GHR_LEN-1:0]   base_oh_win;    // oh's to prescribe GHR window
     generate
     assign base_oh_n[0] = base_oh;
-    for (genvar k = 1; k <= MAX_OFF; ++k) begin
+    for (genvar k = 1; k < N+1; ++k) begin
         assign base_oh_n[k] = rotr(base_oh, k);
+    end
+
+    assign base_oh_win[0] = base_oh;
+    for (genvar k = 1; k < GHR_LEN; ++k) begin
+        assign base_oh_win[k] = rotl(base_oh, k);
     end
     endgenerate
 
@@ -65,13 +74,10 @@ module ghr #(
     generate
     for (genvar i = 0; i < N; ++i) begin : GEN_GHR
         for (genvar j = 0; j < GHR_LEN; ++j) begin : GEN_BIT
-            localparam int off = i + j + 1; // 1 ... MAX_OFF
-            if (j < i) begin
-                assign f_ghr[i][j] = 1'b0;  // still speculative, force 0
-            end else begin
-                // single bit:  hist[ base – off ]
-                assign f_ghr[i][j] = |(hist & base_oh_n[off]);
-            end
+            if (j < i)
+                assign f_ghr[i][j] = 1'b0; // new bits; default ntaken
+            else
+                assign f_ghr[i][j] = |(hist & base_oh_win[j-i]);
         end
     end
     endgenerate
@@ -83,11 +89,11 @@ module ghr #(
         // cannot retire hist bit if leftmost branch in GHR window is unresolved
         // (otherwise, on mispredict of that branch, the current bit will be
         // lost/"shifted out" and unrecoverable)
-        okay = rotr(rslv, GHR_LEN-1);
+        okay = rotl(rslv, GHR_LEN-1);
 
-        rdy[0] = |(okay & base_oh_n[0]);
+        rdy[0] = |(okay & base_oh_n[1]);
         for (int i = 1; i < N; ++i)
-            rdy[i] = rdy[i-1] && |(okay & base_oh_n[i]);
+            rdy[i] = rdy[i-1] && |(okay & base_oh_n[i+1]);
         f_rdy_scnt = $countones(rdy);
     end
 
