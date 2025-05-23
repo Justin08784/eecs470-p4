@@ -51,7 +51,7 @@ module ghr #(
     endfunction
 
     function automatic VEC get_arc(input PTR lo, input PTR hi);
-        // "in-between" circular mask". low exclusive, high inclusive
+        // "in-between" circular mask". low inclusive AND high inclusive
         // V1
         logic wrap;
         VEC rv;
@@ -59,8 +59,8 @@ module ghr #(
         wrap = lo >= hi;
         for (int i = 0; i < DEPTH; ++i) begin
             rv[i] = wrap
-                ? ((i > lo) || (i <= hi))
-                : ((i > lo) && (i <= hi));
+                ? ((i >= lo) || (i <= hi))
+                : ((i >= lo) && (i <= hi));
         end
 
         return rv;
