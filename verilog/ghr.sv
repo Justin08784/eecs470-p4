@@ -149,8 +149,6 @@ module ghr #(
         end
     end
     
-    PTR     flush_base_n;
-    assign  flush_base_n = flush_base - PTR'(1);
     always_ff @(posedge clock) begin
         if (reset) begin
             rslv    <= '1;
@@ -163,8 +161,8 @@ module ghr #(
             rslv            <= rslv | get_arc(base, flush_base);
                 // everything in rlsv[flush_base,..(mod+), base] must be set
             hist[flush_base]<= flush_take;
-            base            <= flush_base_n;
-            base_oh         <= VEC'(1) << flush_base_n;
+            base            <= flush_base;
+            base_oh         <= VEC'(1) << flush_base;
 
         end else begin
             rslv    <= rslv_n;
