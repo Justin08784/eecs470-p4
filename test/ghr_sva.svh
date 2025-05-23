@@ -40,6 +40,7 @@ module ghr_sva #(
         VEC hist;
         VEC rslv;
     } GHR_STATE;
+    int nres [$]; // non resolved base pointers (an alternative way to construct rslv)
 
     GHR_STATE s, n;
     struct packed {
@@ -48,14 +49,52 @@ module ghr_sva #(
     } sva_comb;
 
     always_ff @(posedge clock) begin
-        if (reset)
+        if (reset) begin
             s <= '{
                 base :  DEPTH-1,
                 hist :  '0,
                 rslv :  '1
             };
-        else
+
+            nres = {};
+        end else begin
             s <= n;
+
+            if (flush) begin
+                while (`TRUE) begin
+                    if (nres[$] == flush_base) begin
+                        nres.pop_back();
+                        break;
+                    end
+
+                    if (nres.empty()) begin
+                        $error("What the fuck");
+                        break;
+                    end
+
+                    nres.pop_back();
+                end
+
+            end else begin
+                for (int i = 0; i < NUM_FU_BRU; ++i) begin
+                    if (!ex_en[i])
+                        continue;
+                    foreach (nres[j]) begin
+                        if (nres[j] == ex_idx[i]) begin
+                            nres.delete(j);
+                            break;
+                        end
+                    end
+                end
+
+                for (int i = 0; i < f_en_cnt; ++i) begin
+                    PTR idx;
+                    idx = s.base - (i+1);
+                    nres.push_back(idx);
+                end
+            end
+
+        end
     end
 
     function automatic GHR_STATE ghr_step (
@@ -153,6 +192,14 @@ module ghr_sva #(
         end
     endtask
 
+    function automatic logic nres_iff_rslv();
+        VEC shadow_rslv;
+        shadow_rslv = '1;
+        foreach (nres[i])
+            shadow_rslv[nres[i]] = 1'b0;
+        return rslv == shadow_rslv;
+    endfunction
+
     function automatic logic is_nrz_resolved();
         /*
         nrz (non-recoverable zone) := def. is a GHR_LEN-1 length window of the GHR.
@@ -206,6 +253,11 @@ module ghr_sva #(
             base == s.base && base_oh == (1 << s.base);
         endproperty
 
+        property rslv_correct_wrt_nres;
+            disable iff (reset)
+            nres_iff_rslv();
+        endproperty
+
         property nrz_rslvd;
             disable iff (reset)
             is_nrz_resolved();
@@ -223,6 +275,8 @@ module ghr_sva #(
     match_base: assert property(cb.base_correct)
         else exit_on_error;
     nrz_rslv: assert property(cb.nrz_rslvd)
+        else exit_on_error;
+    nres_rslv: assert property(cb.rslv_correct_wrt_nres)
         else exit_on_error;
 
 

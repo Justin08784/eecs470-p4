@@ -108,7 +108,7 @@ module ghr_test #(
     logic DEBUG = 1;
     always @(posedge clock) begin
         if (DEBUG) begin
-            $display("  %3d | fetch: {en_cnt: %1d, pred: [%b, %b]}, ex_in: {en: %b, idx: %2d}, flush: {%b, base: %b, take: %b}",
+            $display("  %3d | fetch: {en_cnt: %1d, pred: [%b, %b]}, ex_in: {en: %b, idx: %2d}, flush: {%b, base: %2d, take: %b}",
                 $time,
                 f_en_cnt,
                 f_pred[0],
@@ -119,6 +119,9 @@ module ghr_test #(
                 flush_base,
                 flush_take
             );
+
+            foreach(sva.nres[i])
+                $display("  nres[%2d]: %2d", i, sva.nres[i]);
 
             $display("got: ghr: [%b, %b], hist: %b, rslv: %b, base: %2d",
                 f_ghr[0],
