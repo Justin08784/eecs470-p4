@@ -82,18 +82,34 @@ module ghr #(
         // lost/"shifted out" and unrecoverable)
         okay = rotr(rslv, GHR_LEN-1);
 
-        for (int i = 0; i < `N; ++i)
-            rdy[i] = |(okay & base_oh_n[i]);
+        rdy[0] = |(okay & base_oh_n[0]);
         for (int i = 1; i < `N; ++i)
-            rdy[i] &= rdy[i-1];
+            rdy[i] = rdy[i-1] && |(okay & base_oh_n[i]);
         f_rdy_scnt = $countones(rdy);
+    end
+
+    // these _n's are for normal path updates (not for flush!)
+    VEC hist_n;
+    VEC rslv_n;
+    always_comb begin
+        hist_n = hist;
+        rslv_n = rslv;
+
+        for (int i = 0; i < f_en_cnt; ++i) begin
+            if (f_pred[i])
+                hist_n |= base_oh_n[i+1];
+            else
+                hist_n &= ~base_oh_n[i+1];
+
+            rslv_n &= ~base_oh_n[i+1];
+        end
     end
 
     always_ff @(posedge clock) begin
         if (reset) begin
-            rslv    <= '0;
+            rslv    <= '1;
             // hist <= 'hACE1; // heuristic seed to avoid cold start
-            hist    <= '1;
+            hist    <= '0;
             base    <= DEPTH-1;
             base_oh <= 1 << (DEPTH-1);
 
@@ -112,12 +128,8 @@ module ghr #(
                 rslv[ex_idx[i]] <= 1;
             end
 
-            for (int i = 0; i < f_en_cnt; ++i) begin
-                rslv <= rslv & ~base_oh_n[i];
-                hist <= f_pred[i]
-                    ? hist | base_oh_n[i]
-                    : hist & ~base_oh_n[i];
-            end
+            rslv    <= rslv_n;
+            hist    <= hist_n;
             base    <= decr(base, f_en_cnt);
             base_oh <= base_oh_n[f_en_cnt];
         end
