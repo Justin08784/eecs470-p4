@@ -170,6 +170,22 @@ module ghr #(
             base_oh <= base_oh_n[f_en_cnt];
         end
 
+
+        // runtime assertions
+        if (!reset) begin
+            assert(!flush || !rslv[flush_base]) else
+                $fatal("ghr: flush base %2d is already resolved", flush_base);
+            assert(!flush || hist[flush_base] != flush_take) else
+                $fatal("ghr: flush take %b matches existing history", flush_take);
+
+            for (int i = 0; i < NUM_FU_BRU; ++i) begin
+                assert(!ex_en[i] || !rslv[ex_idx[i]]) else
+                    $fatal("ghr: ex_idx %2d is already resolved", ex_idx[i]);
+            end
+            assert(!(|f_pred) || $onehot(f_pred)) else
+                $fatal("ghr: f_pred (%b) is not one-hot", f_pred);
+        end
+
     end
 endmodule
 
