@@ -112,6 +112,12 @@ module ghr #(
 
             rslv_n &= ~base_oh_n[i+1];
         end
+
+        for (int i = 0; i < NUM_FU_BRU; ++i) begin
+            if (!ex_en[i])
+                continue;
+            rslv_n[ex_idx[i]] = 1;
+        end
     end
 
     always_ff @(posedge clock) begin
@@ -131,17 +137,12 @@ module ghr #(
             between base and flush_base? c.f. dep table in bman */
 
         end else begin
-            for (int i = 0; i < NUM_FU_BRU; ++i) begin
-                if (!ex_en[i])
-                    continue;
-                rslv[ex_idx[i]] <= 1;
-            end
-
             rslv    <= rslv_n;
             hist    <= hist_n;
             base    <= decr(base, f_en_cnt);
             base_oh <= base_oh_n[f_en_cnt];
         end
+
     end
 endmodule
 
