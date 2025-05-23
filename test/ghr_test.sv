@@ -279,7 +279,7 @@ endtask
         f_pred      = 0;
 
 
-        DEBUG = 0;
+        DEBUG = 1;
         @(negedge clock);
         reset = 0;
         @(negedge clock);
