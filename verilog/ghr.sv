@@ -24,6 +24,7 @@ module ghr #(
     input   logic [$clog2(N):0] f_en_cnt,
     input   logic [N-1:0]       f_pred,
     output  logic [$clog2(N):0] f_rdy_scnt,
+    output  PTR   [N-1:0]       f_base,
     output  logic [N-1:0][GHR_LEN-1:0] f_ghr
 );
     initial begin
@@ -86,9 +87,16 @@ module ghr #(
     VEC okay; // okay to overwrite?
 
 
+    PTR [N:0]           base_n;
     VEC [N:0]           base_oh_n;      // oh's to prescribe writes
     VEC [GHR_LEN-1:0]   base_oh_win;    // oh's to prescribe GHR window
     generate
+    assign base_n[0] = base;
+    for (genvar k = 1; k < N+1; ++k) begin
+        assign base_n[k] = base - PTR'(k);
+    end
+    assign f_base = base_n[`N:1];
+
     assign base_oh_n[0] = base_oh;
     for (genvar k = 1; k < N+1; ++k) begin
         assign base_oh_n[k] = rotr(base_oh, k);
@@ -166,7 +174,7 @@ module ghr #(
         end else begin
             rslv    <= rslv_n;
             hist    <= hist_n;
-            base    <= base - PTR'(f_en_cnt);
+            base    <= base_n[f_en_cnt];
             base_oh <= base_oh_n[f_en_cnt];
         end
 
