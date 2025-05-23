@@ -1,3 +1,5 @@
+`include "sys_defs.svh"
+
 `ifndef GHR_SVA_SVH
 `define GHR_SVA_SVH
 

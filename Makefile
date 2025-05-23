@@ -219,6 +219,7 @@ build/fifo.cov: $(FIFO_FILES)
 synth/fifo.vg: $(FIFO_FILES)
 
 GHR_FILES = verilog/sys_defs.svh test/ghr_test.sv test/ghr_sva.svh
+# GHR_FILES = verilog/sys_defs.svh # to do synthesis
 build/ghr.simv: $(GHR_FILES)
 build/ghr.cov: $(GHR_FILES)
 synth/ghr.vg: $(GHR_FILES)
