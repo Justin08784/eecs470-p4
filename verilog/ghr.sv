@@ -33,8 +33,8 @@ module ghr #(
         assert ((DEPTH != 0) && ((DEPTH & (DEPTH - 1)) == 0))
             else $fatal("GHR DEPTH must be a power of 2");
 
-        assert (DEPTH >= GHR_LEN)
-            else $fatal("GHR DEPTH must be >= GHR_LEN");
+        assert (DEPTH >= 2*GHR_LEN)
+            else $fatal("GHR DEPTH must be >= 2*GHR_LEN");
     end
 
     function automatic PTR decr(input PTR p, input int unsigned k);
@@ -52,6 +52,35 @@ module ghr #(
         logic [2*DEPTH-1:0] dv;
         dv = {v, v} >> sh;
         return dv[DEPTH-1:0];
+    endfunction
+
+    function automatic VEC get_arc(input PTR lo, input PTR hi);
+        // "in-between" circular mask". low exclusive, high inclusive
+        // V1
+        logic wrap;
+        VEC rv;
+
+        wrap = lo >= hi;
+        for (int i = 0; i < DEPTH; ++i) begin
+            rv[i] = wrap
+                ? ((i > lo) && (i <= hi))
+                : ((i > lo) || (i <= hi));
+        end
+
+        return rv;
+
+        // V2
+        // VEC rv, ones_z0, gt, lt, flush_set;
+        // ones_z0 = {{DEPTH-1{1'b1}}, 1'b0};
+        
+        // gt =   ones_z0 << lo;
+        // lt = ~(ones_z0 << hi);
+
+        // rv = |(gt & lt)
+        //     ? gt & lt
+        //     : gt | lt;
+
+        // return rv;
     endfunction
 
     VEC rslv; // resolved? i.e. not speculative?
@@ -124,7 +153,7 @@ module ghr #(
             rslv_n[ex_idx[i]] = 1;
         end
     end
-
+    
     always_ff @(posedge clock) begin
         if (reset) begin
             rslv    <= '1;
@@ -134,12 +163,11 @@ module ghr #(
             base_oh <= 1 << (DEPTH-1);
 
         end else if (flush) begin
-            rslv[flush_base]<= 1;
+            rslv            <= rslv | get_arc(flush_base, base);
+                // everything in rlsv[flush_base,..(mod+), base] must be set
             hist[flush_base]<= flush_take;
             base            <= flush_base;
             base_oh         <= 1 << flush_base;
-            /* Do we need to re-set (i.e set high) the bits
-            between base and flush_base? c.f. dep table in bman */
 
         end else begin
             rslv    <= rslv_n;
