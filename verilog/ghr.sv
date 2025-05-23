@@ -1,7 +1,10 @@
 `include "sys_defs.svh"
 
 module ghr #(
-    parameter DEPTH = 32, // must be greater than GHR_LEN and a power of 2
+    parameter DEPTH     = 32, // must be greater than GHR_LEN and a power of 2
+    parameter NUM_FU_BRU= `NUM_FU_BRU,
+    parameter GHR_LEN   = GHR_LEN,
+    parameter N         = `N,
     type VEC = logic [DEPTH-1:0],
     type PTR = logic [$clog2(DEPTH)-1:0]
 ) (
@@ -14,18 +17,18 @@ module ghr #(
     input   logic   flush_take,
 
     // ex (correct resolutions)
-    input   logic [`NUM_FU_BRU-1:0] ex_en,
-    input   PTR   [`NUM_FU_BRU-1:0] ex_idx,
+    input   logic [NUM_FU_BRU-1:0] ex_en,
+    input   PTR   [NUM_FU_BRU-1:0] ex_idx,
 
     // fetch
-    input   logic [$clog2(`N):0] f_en_cnt,
-    input   logic [`N-1:0]       f_pred,
-    output  logic [$clog2(`N):0] f_rdy_scnt,
-    output  logic [`N-1:0][GHR_LEN-1:0] f_ghr
+    input   logic [$clog2(N):0] f_en_cnt,
+    input   logic [N-1:0]       f_pred,
+    output  logic [$clog2(N):0] f_rdy_scnt,
+    output  logic [N-1:0][GHR_LEN-1:0] f_ghr
 );
     initial begin
-        assert(`N < DEPTH) else
-            $fatal("GHR: N (%0d) must be smaller than DEPTH (%0d)",`N,DEPTH);
+        assert(N < DEPTH) else
+            $fatal("GHR: N (%0d) must be smaller than DEPTH (%0d)", N, DEPTH);
 
         assert ((DEPTH != 0) && ((DEPTH & (DEPTH - 1)) == 0))
             else $fatal("GHR DEPTH must be a power of 2");
@@ -49,7 +52,7 @@ module ghr #(
     VEC okay; // okay to overwrite?
 
 
-    localparam int MAX_OFF = GHR_LEN + `N - 1;   // furthest bit we ever touch
+    localparam int MAX_OFF = GHR_LEN + N - 1;   // furthest bit we ever touch
     VEC [MAX_OFF:0] base_oh_n;
     generate
     assign base_oh_n[0] = base_oh;
@@ -60,7 +63,7 @@ module ghr #(
 
 
     generate
-    for (genvar i = 0; i < `N; ++i) begin : GEN_GHR
+    for (genvar i = 0; i < N; ++i) begin : GEN_GHR
         for (genvar j = 0; j < GHR_LEN; ++j) begin : GEN_BIT
             localparam int off = i + j + 1; // 1 ... MAX_OFF
             if (j < i) begin
@@ -75,7 +78,7 @@ module ghr #(
 
 
     always_comb begin
-        logic [`N-1:0] rdy;
+        logic [N-1:0] rdy;
 
         // cannot retire hist bit if leftmost branch in GHR window is unresolved
         // (otherwise, on mispredict of that branch, the current bit will be
@@ -83,7 +86,7 @@ module ghr #(
         okay = rotr(rslv, GHR_LEN-1);
 
         rdy[0] = |(okay & base_oh_n[0]);
-        for (int i = 1; i < `N; ++i)
+        for (int i = 1; i < N; ++i)
             rdy[i] = rdy[i-1] && |(okay & base_oh_n[i]);
         f_rdy_scnt = $countones(rdy);
     end
@@ -122,7 +125,7 @@ module ghr #(
             between base and flush_base? c.f. dep table in bman */
 
         end else begin
-            for (int i = 0; i < `NUM_FU_BRU; ++i) begin
+            for (int i = 0; i < NUM_FU_BRU; ++i) begin
                 if (!ex_en[i])
                     continue;
                 rslv[ex_idx[i]] <= 1;

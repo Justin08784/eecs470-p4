@@ -2,7 +2,10 @@
 `include "test/ghr_sva.svh"
 
 module ghr_test();
-    localparam DEPTH = 32;
+    localparam DEPTH     = 4;
+    localparam NUM_FU_BRU= 1;
+    localparam GHR_LEN   = 2;
+    localparam N         = 2;
     typedef logic [$clog2(DEPTH)-1:0] PTR;
 
     logic   clock;
@@ -38,27 +41,11 @@ module ghr_test();
         // };
     end
 
-    logic DEBUG = 1;
-    always @(posedge clock) begin
-        if (DEBUG) begin
-            $write("  %3d | ", $time);
-            $display("  %3d | ex_in: {en: %b, idx: %2d}, fetch: {en_cnt: %1d, rdy_cnt: %1d, pred: [%b, %b], ghr: [%b, %b]}",
-                $time,
-                ex_en,
-                ex_idx,
-                f_en_cnt,
-                f_rdy_scnt,
-                f_pred[0],
-                f_pred[1],
-                f_ghr[0],
-                f_ghr[1]
-            );
-        end
-    end
-    
-
     ghr #(
-        .DEPTH(DEPTH)
+        .DEPTH      (DEPTH),
+        .NUM_FU_BRU (NUM_FU_BRU),
+        .GHR_LEN    (GHR_LEN),
+        .N          (N)
     ) dut (
         .clock,
         .reset,
@@ -74,6 +61,27 @@ module ghr_test();
         .f_rdy_scnt,
         .f_ghr
     );
+
+    logic DEBUG = 1;
+    always @(posedge clock) begin
+        if (DEBUG) begin
+            $write("  %3d | ", $time);
+            $display("  %3d | ex_in: {en: %b, idx: %2d}, fetch: {en_cnt: %1d, rdy_cnt: %1d, pred: [%b, %b], ghr: [%b, %b]}",
+                $time,
+                ex_en,
+                ex_idx,
+                f_en_cnt,
+                f_rdy_scnt,
+                f_pred[0],
+                f_pred[1],
+                f_ghr[0],
+                f_ghr[1]
+            );
+            $display("hist: %b, ghr: %b (base: %2d)", dut.hist, f_ghr[0], dut.base);
+            $display("rslv: %b", dut.rslv);
+        end
+    end
+    
 
     // ghr_sva #(
     //     .DEPTH(DEPTH),
@@ -112,6 +120,12 @@ module ghr_test();
         @(negedge clock);
 
         // ---------- Test 1 ---------- //
+        $display("\nTest 1");
+        for (int i = 0; i < 15; ++i) begin
+            f_pred = {1'b1, 1'b0};
+            f_en_cnt = 2;
+            @(negedge clock);
+        end
 
         $display("\n\033[32m@@@ Passed\033[0m\n");
 
