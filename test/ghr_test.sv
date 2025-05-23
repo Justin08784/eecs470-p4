@@ -63,28 +63,6 @@ module ghr_test #(
         .f_ghr
     );
 
-    logic DEBUG = 1;
-    always @(posedge clock) begin
-        if (DEBUG) begin
-            $write("  %3d | ", $time);
-            $display("  %3d | ex_in: {en: %b, idx: %2d}, fetch: {en_cnt: %1d, rdy_scnt: %1d, pred: [%b, %b], ghr: [%b, %b]}",
-                $time,
-                ex_en,
-                ex_idx,
-                f_en_cnt,
-                f_rdy_scnt,
-                f_pred[0],
-                f_pred[1],
-                f_ghr[0],
-                f_ghr[1]
-            );
-            $display("flush: %b, flush_base: %d, flush_take: %b", flush, flush_base, flush_take);
-            $display("hist: %b, ghr: %b", dut.hist, f_ghr[0]);
-            $display("rslv: %b", dut.rslv);
-            $display("b1ht: %b (idx: %2d) rdy: %b, okay: %b", dut.base_oh, dut.base, dut.rdy, dut.okay);
-        end
-    end
-
 
     VEC     rslv;
     VEC     hist;
@@ -126,6 +104,45 @@ module ghr_test #(
         .f_rdy_scnt,
         .f_ghr
     );
+
+    logic DEBUG = 1;
+    always @(posedge clock) begin
+        if (DEBUG) begin
+            $display("  %3d | fetch: {en_cnt: %1d, pred: [%b, %b]}, ex_in: {en: %b, idx: %2d}, flush: {%b, base: %b, take: %b}",
+                $time,
+                f_en_cnt,
+                f_pred[0],
+                f_pred[1],
+                ex_en,
+                ex_idx,
+                flush,
+                flush_base,
+                flush_take
+            );
+
+            $display("got: ghr: [%b, %b], hist: %b, rslv: %b, base: %2d",
+                f_ghr[0],
+                f_ghr[1],
+                hist,
+                rslv,
+                base
+            );
+
+            $display("exp: ghr: [%b, %b], hist: %b, rslv: %b, base: %2d",
+                sva.sva_comb.f_ghr[0],
+                sva.sva_comb.f_ghr[1],
+                sva.s.hist,
+                sva.s.rslv,
+                sva.s.base
+            );
+
+            // $display("flush: %b, flush_base: %d, flush_take: %b", flush, flush_base, flush_take);
+            // $display("hist: %b, ghr: %b", dut.hist, f_ghr[0]);
+            // $display("rslv: %b", dut.rslv);
+            // $display("b1ht: %b (idx: %2d) rdy: %b, okay: %b", dut.base_oh, dut.base, dut.rdy, dut.okay);
+        end
+    end
+
 
 
     initial begin

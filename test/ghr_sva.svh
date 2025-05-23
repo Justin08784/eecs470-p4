@@ -42,6 +42,10 @@ module ghr_sva #(
     } GHR_STATE;
 
     GHR_STATE s, n;
+    struct packed {
+        logic [$clog2(N):0] f_rdy_scnt;
+        logic [N-1:0][GHR_LEN-1:0] f_ghr;
+    } sva_comb;
 
     always_ff @(posedge clock) begin
         if (reset)
@@ -66,13 +70,9 @@ module ghr_sva #(
     );
         n = s;
         if (flush) begin
-            logic wrap;
-            wrap = s.base > flush_base;
-            for (int i = 0; i < DEPTH; ++i) begin
-                if (wrap ? (i >= s.base) || (i <= flush_base)
-                         : (i >= s.base) && (i <= flush_base))
-                    n.rslv[i] = 1'b1;
-            end
+            for (PTR i = s.base; i != flush_base; ++i)
+                n.rslv[i] = 1'b1;
+            n.rslv[flush_base]= 1'b1;
 
             n.base = flush_base;
             n.hist[flush_base] = flush_take;
@@ -85,9 +85,11 @@ module ghr_sva #(
 
             for (int i = 0; i < f_en_cnt; ++i) begin
                 PTR widx;
-                widx = n.base - (i+1);
+                widx = s.base - (i+1);
                 n.hist[widx] = f_pred[i];
+                n.rslv[widx] = 1'b0;
             end
+            n.base = s.base - f_en_cnt;
         end
 
         return n;
@@ -113,11 +115,67 @@ module ghr_sva #(
             f_pred
         );
 
+        sva_comb.f_rdy_scnt = 0;
+        for (int i = 0; i < N; ++i) begin
+            PTR widx, last_dep;
+            widx = s.base - (i+1);
+            last_dep = widx - (GHR_LEN-1);
+            if (!s.rslv[last_dep])
+                break;
+
+            ++sva_comb.f_rdy_scnt;
+        end
+
+        for (int i = 0; i < N; ++i) begin
+            PTR idx;
+            for (int j = 0; j < GHR_LEN; ++j) begin
+                idx = s.base + j - i;
+                sva_comb.f_ghr[i][j] = (j < i)
+                    ? 1'b0
+                    : s.hist[idx];
+            end
+        end
+
         @(posedge clock);
         @(negedge clock);
     end
     end
 
+    task exit_on_error;
+        begin
+            $display("\n\033[31m@@@ Failed at time %4d\033[0m\n", $time);
+            $display("%b, %b", n.hist, hist);
+            $display("%2d, %2d", f_rdy_scnt, sva_comb.f_rdy_scnt);
+            $display("%b, %b] %b, %b]", f_ghr[0],f_ghr[1],
+            sva_comb.f_ghr[0], sva_comb.f_ghr[1]);
+            // $display("used %d free %d us %d fs %d reset: %b", used, free, used_scnt, free_scnt, reset);
+            $finish;
+        end
+    endtask
+
+    clocking cb @(posedge clock);
+        property f_rdy_correct;
+            disable iff (reset)
+            f_rdy_scnt == sva_comb.f_rdy_scnt;
+        endproperty
+
+        property f_ghr_correct;
+            disable iff (reset)
+            f_ghr == sva_comb.f_ghr;
+        endproperty
+
+        property hist_correct;
+            disable iff (reset)
+            hist == s.hist;
+        endproperty
+    endclocking
+
+    match_f_rdy: assert property(cb.f_rdy_correct)
+        else exit_on_error;
+    match_f_ghr: assert property(cb.f_ghr_correct)
+        else exit_on_error;
+    match_hist: assert property(cb.hist_correct)
+        else exit_on_error;
 
 
 endmodule
