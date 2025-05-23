@@ -13,7 +13,7 @@ module ghr #(
 
     // misprediction flush (i.e. incorrect resolution)
     input           flush,
-    input   PTR     flush_base,
+    input   PTR     flush_base, // base BEFORE shifting in current branch's pred
     input   logic   flush_take,
 
     // ex (correct resolutions)
@@ -45,7 +45,7 @@ module ghr #(
         // This is so fucking elegant I'm going to cry
         logic [2*DEPTH-1:0] dv;
         dv = {v, v} << sh;
-        return dv[DEPTH-1:0];
+        return dv[2*DEPTH-1:DEPTH];
     endfunction
 
     function automatic VEC rotr(input VEC v, input PTR sh);
@@ -117,9 +117,8 @@ module ghr #(
     endgenerate
 
 
+    logic [N-1:0] rdy;
     always_comb begin
-        logic [N-1:0] rdy;
-
         // cannot retire hist bit if youngest branch in GHR window is unresolved
         // (otherwise, on mispredict of that branch, the current bit will be
         // lost/"shifted out" and unrecoverable)
@@ -163,11 +162,11 @@ module ghr #(
             base_oh <= 1 << (DEPTH-1);
 
         end else if (flush) begin
-            rslv            <= rslv | get_arc(flush_base, base);
+            rslv            <= rslv | get_arc(base, flush_base);
                 // everything in rlsv[flush_base,..(mod+), base] must be set
             hist[flush_base]<= flush_take;
-            base            <= flush_base;
-            base_oh         <= 1 << flush_base;
+            base            <= flush_base-1;
+            base_oh         <= 1 << (flush_base-1);
 
         end else begin
             rslv    <= rslv_n;
