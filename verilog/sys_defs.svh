@@ -730,6 +730,7 @@ typedef struct packed {
     // insn md flattened
     logic   [`N-1:0]    brch, cond, call, ret;
     WADDR   [`N:0]      PC_n; // branch pc
+    logic   [`N:0][$clog2(`N):0] brch_prefix_cnt;
 
     logic   [`N-1:0]    f_en; // pre-bp fetch enable
 } fetch2bp;
@@ -737,6 +738,7 @@ typedef struct packed {
 typedef struct packed {
     // fetch sublimit
     logic   [$clog2(`N):0]  lim_cnt; // f_cnt limit (cap at first taken)
+    logic   [$clog2(`N):0]  ghr_rdy_scnt;
 
     // btq_entry contributions
     logic   [`N-1:0] take;

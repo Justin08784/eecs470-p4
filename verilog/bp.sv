@@ -111,9 +111,9 @@ module bp #(
         .ex_en      ('0), // FIXME
         .ex_idx     (cbru_in.dat[0].ghr_base),
 
-        .f_en_cnt   (),
+        .f_en_cnt   ('0),
         .f_pred     ('0), // FIXME
-        .f_rdy_scnt (),
+        .f_rdy_scnt (f_out.ghr_rdy_scnt),
         .f_base     (),
         .f_ghr      ()
     );

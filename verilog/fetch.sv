@@ -102,7 +102,20 @@ module stage_if_p4 (
     //     end
     // end
 
+    logic [$clog2(`N):0] brch_lim_cnt;
+    logic [`N:0][$clog2(`N):0] brch_prefix_cnt;
     fetch2bp bp_qry;
+    bp2fetch bp_res;
+    compactor #(
+        .REQW(`N),
+        .GNTW(`N)
+    ) comp_brch (
+        .req        (brch),
+        .lim_cnt    (`MIN(btq_in.btq_rdy_scnt, bp_res.ghr_rdy_scnt)),
+        .prefix_cnt (brch_prefix_cnt),
+        .gnt_cnt    (brch_lim_cnt)
+    );
+
     assign bp_qry = '{
         brch    : brch,
         cond    : cond,
@@ -110,10 +123,10 @@ module stage_if_p4 (
         ret     : ret,
 
         PC_n    : PC_n,
+        brch_prefix_cnt : brch_prefix_cnt,
         f_en    : f_en
     };
 
-    bp2fetch bp_res;
     logic [`N-1:0] pred;
     WADDR [`N-1:0] pred_tgt;
     assign pred     = bp_res.take;
@@ -133,19 +146,6 @@ module stage_if_p4 (
         .i_upd      (btq_in.bp_upd)
     );
 
-
-    logic [`N:0][$clog2(`N):0] btq_prefix_cnt;
-    logic [$clog2(`N):0] btq_lim_cnt;
-    compactor #(
-        .REQW(`N),
-        .GNTW(`N)
-    ) comp_btq (
-        .req        (brch),
-        .lim_cnt    (btq_in.btq_rdy_scnt),
-        .prefix_cnt (btq_prefix_cnt),
-        .gnt_cnt    (btq_lim_cnt)
-    );
-
     always_comb begin
         for (int unsigned i = 0; i < `N; ++i) begin
             f_dat[i] = '{
@@ -158,21 +158,21 @@ module stage_if_p4 (
 
         // handle btq output
         btq_out = '0;
-        f_cnt = `MIN(btq_lim_cnt, free_scnt);
+        f_cnt = `MIN(brch_lim_cnt, free_scnt);
         for (int i = 0; i < `N; ++i)
             f_en[i] = i < f_cnt;
             /* ^ want this f_en to be "pre BP f_en". bp_lim_cnt is redundant to BP
             since BP derives it in the first place */
         f_cnt = `MIN(bp_res.lim_cnt, f_cnt);
 
-        btq_out.en_cnt = btq_prefix_cnt[f_cnt];
+        btq_out.en_cnt = brch_prefix_cnt[f_cnt];
         for (int i = 0; i < `N; ++i) begin
-            f_dat[i].btq_idx = btq_in.btq_idxs_n[btq_prefix_cnt[i]];
+            f_dat[i].btq_idx = btq_in.btq_idxs_n[brch_prefix_cnt[i]];
 
-            btq_out.PC      [btq_prefix_cnt[i]] = PC_n[i];
-            btq_out.pred    [btq_prefix_cnt[i]] = pred[i];
-            btq_out.pred_tgt[btq_prefix_cnt[i]] = pred_tgt[i];
-            btq_out.ret     [btq_prefix_cnt[i]] = ret[i];
+            btq_out.PC      [brch_prefix_cnt[i]] = PC_n[i];
+            btq_out.pred    [brch_prefix_cnt[i]] = pred[i];
+            btq_out.pred_tgt[brch_prefix_cnt[i]] = pred_tgt[i];
+            btq_out.ret     [brch_prefix_cnt[i]] = ret[i];
         end
 
     end
@@ -181,7 +181,7 @@ module stage_if_p4 (
     //     $display("reset: %b, btq_out.en_cnt: %d, f_cnt: %d", reset, btq_out.en_cnt, f_cnt);
     //     $display("fluck: %b", fluck);
     //     for (int i = 0; i < `N+1; ++i)
-    //         $display("> btq_prefix_cnt[%1d]: %1d", i, btq_prefix_cnt[i]);
+    //         $display("> brch_prefix_cnt[%1d]: %1d", i, brch_prefix_cnt[i]);
     // end
 
 
@@ -227,7 +227,7 @@ module stage_if_p4 (
         //     insn_buf_vld[(insn_buf.head + cnt) % (2*`N)] = 1;
         // $display("insn_buf_vld: %b", insn_buf_vld);
         // for (int i = 0; i < `N; ++i)
-        //     $display("[%1d]: %1d", i, btq_prefix_cnt[i]);
+        //     $display("[%1d]: %1d", i, brch_prefix_cnt[i]);
         $display("flush: %b, flush_PC: 0x%x", flush, flush_PC);
         $display("d_out: {f_en_cnt: %b, dat: [%x, %x]}", d_out.f_en_cnt, d_out.f_dat[0], d_out.f_dat[1]);
         $display("<< Fetch <<");
