@@ -45,21 +45,42 @@ module stage_if_p4 (
         end
     end
 
-    logic [`N-1:0] is_brch;
     BRANCH_MD [`N-1:0] insn_md;
     always_comb begin
         for (int i = 0; i < `N; ++i) begin
             logic woff;
             woff        = PC_n[i][0];
             insn_md[i]  = mem_in.insn_md[i][woff];
-            is_brch[i]  = insn_md[i].branch;
         end
     end
 
-    logic [$clog2(`N):0] bp_lim_cnt;
+    logic [`N-1:0] brch, cond, call, ret;
+    generate
+    for (genvar i = 0; i < `N; ++i) begin
+        assign brch[i] = insn_md[i].branch;
+        assign cond[i] = insn_md[i].cond;
+        assign call[i] = insn_md[i].call;
+        assign ret[i]  = insn_md[i].ret;
+    end
+    endgenerate
+
+
+    fetch2bp bp_qry;
+    assign bp_qry = '{
+        brch    : brch,
+        cond    : cond,
+        call    : call,
+        ret     : ret,
+
+        PC_n    : PC_n,
+        f_en    : f_en
+    };
+
+    bp2fetch bp_res;
     logic [`N-1:0] pred;
     WADDR [`N-1:0] pred_tgt;
-    RAS_SNAP [`N-1:0] ras_snap;
+    assign pred     = bp_res.take;
+    assign pred_tgt = bp_res.tgt;
     bp bp0 (
         .clock,
         .reset,
@@ -67,18 +88,12 @@ module stage_if_p4 (
         .clmsk,
         .snap_in,
 
-        .i_md       (insn_md),
-        .PC_n,
-        .o_lim_cnt  (bp_lim_cnt),
-        .o_take     (pred),
-        .o_tgt      (pred_tgt),
-
-        .o_ras_snap (ras_snap),
-
-        .f_en,
+        .f_in       (bp_qry),
+        .f_out      (bp_res),
 
         .i_upd      (btq_in.bp_upd)
     );
+
 
     logic [`N:0][$clog2(`N):0] btq_prefix_cnt;
     logic [$clog2(`N):0] btq_lim_cnt;
@@ -86,7 +101,7 @@ module stage_if_p4 (
         .REQW(`N),
         .GNTW(`N)
     ) comp_btq (
-        .req        (is_brch),
+        .req        (brch),
         .lim_cnt    (btq_in.btq_rdy_scnt),
         .prefix_cnt (btq_prefix_cnt),
         .gnt_cnt    (btq_lim_cnt)
@@ -100,7 +115,7 @@ module stage_if_p4 (
             f_dat[i] = '{
                 inst    : mem_in.data[i].word_level[woff],
                 PC      : PC_n[i],
-                ras_snap: ras_snap[i],
+                ras_snap: bp_res.ras_snap[i],
                 btq_idx : '0 // filled below
             };
         end
@@ -112,7 +127,7 @@ module stage_if_p4 (
             f_en[i] = i < f_cnt;
             /* ^ want this f_en to be "pre BP f_en". bp_lim_cnt is redundant to BP
             since BP derives it in the first place */
-        f_cnt = `MIN(bp_lim_cnt, f_cnt);
+        f_cnt = `MIN(bp_res.lim_cnt, f_cnt);
 
         btq_out.en_cnt = btq_prefix_cnt[f_cnt];
         for (int i = 0; i < `N; ++i) begin
@@ -121,7 +136,7 @@ module stage_if_p4 (
             btq_out.PC      [btq_prefix_cnt[i]] = PC_n[i];
             btq_out.pred    [btq_prefix_cnt[i]] = pred[i];
             btq_out.pred_tgt[btq_prefix_cnt[i]] = pred_tgt[i];
-            btq_out.ret     [btq_prefix_cnt[i]] = insn_md[i].ret;
+            btq_out.ret     [btq_prefix_cnt[i]] = ret[i];
         end
 
     end

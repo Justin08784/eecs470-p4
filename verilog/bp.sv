@@ -10,28 +10,23 @@ module bp #(
     input   rename2snap_bus snap_in,
 
     // fetch npc query
-    input BRANCH_MD [`N-1:0]    i_md,
-    input   WADDR   [`N:0]      PC_n, // branch pc
-
-    output  logic   [$clog2(`N):0]  o_lim_cnt, // f_cnt limit (cap at first taken)
-    output  logic   [`N-1:0]    o_take,
-    output  WADDR   [`N-1:0]    o_tgt,
-    output  RAS_SNAP [`N-1:0]   o_ras_snap,
-
-    input   logic   [`N-1:0]    f_en,
+    input   fetch2bp    f_in,
+    output  bp2fetch    f_out,
 
     // puq updates
     input   puq2fetch i_upd
 );
     logic [`N-1:0] brch, cond, call, ret;
-    generate
-    for (genvar i = 0; i < `N; ++i) begin
-        assign brch[i] = i_md[i].branch;
-        assign cond[i] = i_md[i].cond;
-        assign call[i] = i_md[i].call;
-        assign ret[i]  = i_md[i].ret;
-    end
-    endgenerate
+    assign brch = f_in.brch;
+    assign cond = f_in.cond;
+    assign call = f_in.call;
+    assign ret  = f_in.ret;
+
+    WADDR [`N:0] PC_n;
+    assign PC_n = f_in.PC_n;
+
+    logic [`N-1:0] f_en;
+    assign f_en = f_in.f_en;
 
     logic [`N-1:0] btb_hit;
     WADDR [`N-1:0] btb_tgt;
@@ -94,35 +89,36 @@ module bp #(
         .empty
     );
 
-    // always_ff@(posedge clock) begin
-    //     if (!reset) begin
-    //         $display("f_en: %b, brch: %b, cond: %b, call: %b, ret: %b",
-    //         f_en,
-    //         brch,
-    //         cond,
-    //         call,
-    //         ret
-    //         );
-    //         $display("take_any: %b, take_idx: %2d",
-    //         take_any,
-    //         take_idx
-    //         );
-    //     end
-    // end
+    // ghr #(
+    //     .DEPTH      (32),
+    //     .NUM_FU_BRU (`NUM_FU_BRU),
+    //     .GHR_LEN    (GHR_LEN),
+    //     .N          (`N)
+    // ) ghr0 (
+    //     .clock,
+    //     .reset,
+    //     .flush,
+    //     .clmsk,
 
-    assign o_take   = raw_take;
-    assign o_lim_cnt= take_any ? take_idx + 1 : `N;
+    //     .flush_take,
+    //         /* ^^ Do we realy need this? Why not just let GHR
+    //         invert whatever was there. */
+    //     .flush_base,
+    // );
+
+    assign f_out.take   = raw_take;
+    assign f_out.lim_cnt= take_any ? take_idx + 1 : `N;
 
     generate
     for (genvar i = 0; i < `N; ++i) begin
-        assign o_tgt[i] =
+        assign f_out.tgt[i] =
             ret[i] && !empty    ? ras_tgt :
             btb_hit[i]          ? btb_tgt[i]: PC_n[i+1];
             /* On btb_miss, use NPC as a fallback. (Note: "ret" and "call"
             will predict taken even BTB miss, so they their fake "prediction"
             target is the sequentially next PC).
             */
-        assign o_ras_snap[i] = (ret[i] || call[i]) ? ras_snap_pos : ras_snap_pre;
+        assign f_out.ras_snap[i] = (ret[i] || call[i]) ? ras_snap_pos : ras_snap_pre;
             /*
             Observation:
             1. only rets/calls update the RAS.

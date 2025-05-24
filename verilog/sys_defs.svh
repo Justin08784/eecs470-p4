@@ -41,6 +41,7 @@
 `define BRANCH_PRED_SZ xx
 `define LSQ_SZ 12
 `define SQ_RET_BUF_SZ 4
+parameter GHR_BUF_SZ= 32;
 parameter GHR_LEN   = 8;
 parameter BMASK_LEN = 8; // i.e. number of branch checkpoints
 typedef logic [BMASK_LEN-1:0] BMASK;
@@ -708,6 +709,28 @@ typedef struct packed {
 
 
 // By Fetch
+typedef struct packed {
+    // insn md flattened
+    logic   [`N-1:0]    brch, cond, call, ret;
+    WADDR   [`N:0]      PC_n; // branch pc
+
+    logic   [`N-1:0]    f_en; // pre-bp fetch enable
+} fetch2bp;
+
+typedef struct packed {
+    // fetch sublimit
+    logic   [$clog2(`N):0]  lim_cnt; // f_cnt limit (cap at first taken)
+
+    // btq_entry contributions
+    logic   [`N-1:0] take;
+    WADDR   [`N-1:0] tgt;
+    logic   [`N-1:0][GHR_LEN-1:0] hash;
+
+    // if_id_packet contributions
+    RAS_SNAP[`N-1:0] ras_snap;
+    logic   [`N-1:0][$clog2(GHR_BUF_SZ)-1:0] ghr_base;
+} bp2fetch;
+
 typedef struct packed {
     logic       [$clog2(`N):0]  f_en_cnt;
     IF_ID_PACKET    [`N-1:0]    f_dat;

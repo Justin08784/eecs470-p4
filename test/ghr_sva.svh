@@ -70,7 +70,7 @@ module ghr_sva #(
                         break;
                     end
 
-                    if (nres.empty()) begin
+                    if (nres.size() == 0) begin
                         $error("What the fuck");
                         break;
                     end
