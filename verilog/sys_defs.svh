@@ -456,6 +456,7 @@ typedef struct packed {
     logic take;
     WADDR pc;
     WADDR tgt;
+    logic [GHR_LEN-1:0] hash; // gshare hash index
 } PUQ_ENTRY;
 
 typedef struct packed {
