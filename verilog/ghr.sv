@@ -1,4 +1,5 @@
 `include "sys_defs.svh"
+`include "test/ghr_sva.svh"
 
 module ghr #(
     parameter DEPTH     = 32, // must be geq than 2*GHR_LEN and a power of 2
@@ -13,12 +14,18 @@ module ghr #(
 
     // misprediction flush (i.e. incorrect resolution)
     input           flush,
-    input   PTR     flush_base, // base BEFORE shifting in current branch's pred
+    input   BMASK   clmsk,
     input   logic   flush_take,
+`ifdef GHR_TEST // during tests ignore snapshot table
+    input   PTR     flush_base, // base BEFORE shifting in current branch's pred
+`endif
 
     // ex (correct resolutions)
     input   logic [NUM_FU_BRU-1:0] ex_en,
     input   PTR   [NUM_FU_BRU-1:0] ex_idx,
+
+    // dispatch (alloc snapshot)
+    input   rename2snap_bus     snap_in,
 
     // fetch
     input   logic [$clog2(N):0] f_en_cnt,
@@ -85,6 +92,7 @@ module ghr #(
     PTR base; // to youngest entry in the GHR window; (base-1) % DEPTH is the write head
     VEC base_oh;
     VEC okay; // okay to overwrite?
+    PTR snap;
 
 
     PTR [N:0]           base_n;
@@ -156,6 +164,21 @@ module ghr #(
         end
     end
     
+`ifndef GHR_TEST
+    general_snaps #(
+        .WIDTH($bits(PTR))
+    ) bases (
+        .clock,
+
+        .rmsk   (clmsk),
+        .rdat   (snap),
+
+        .wen    (snap_in.snap_en),
+        .wmsk   (snap_in.b1hot_n),
+        .wdat   (snap_in.ghr_base)
+    );
+`endif
+
     always_ff @(posedge clock) begin
         if (reset) begin
             rslv    <= '1;
@@ -164,12 +187,21 @@ module ghr #(
             base    <= DEPTH-1;
             base_oh <= VEC'(1) << (DEPTH-1);
 
+`ifdef GHR_TEST
         end else if (flush) begin
             rslv            <= rslv | get_arc(base, flush_base);
                 // everything in rlsv[flush_base,..(mod+), base] must be set
             hist[flush_base]<= flush_take;
             base            <= flush_base;
             base_oh         <= VEC'(1) << flush_base;
+`else
+        end else if (flush) begin
+            rslv        <= rslv | get_arc(base, snap);
+                // everything in rlsv[snap,..(mod+), base] must be set
+            hist[snap]  <= flush_take;
+            base        <= snap;
+            base_oh     <= VEC'(1) << snap;
+`endif
 
         end else begin
             rslv    <= rslv_n;

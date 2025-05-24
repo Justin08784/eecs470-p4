@@ -449,6 +449,7 @@ typedef struct packed {
 
     logic   take;
     WADDR   tgt;
+    // logic   [GHR_LEN-1:0] hash; // gshare hash index
     logic   ret;    // is a ret instruction?
 } BTQ_ENTRY;
 
@@ -456,7 +457,7 @@ typedef struct packed {
     logic take;
     WADDR pc;
     WADDR tgt;
-    logic [GHR_LEN-1:0] hash; // gshare hash index
+    logic [GHR_LEN-1:0] hash;
 } PUQ_ENTRY;
 
 typedef struct packed {
@@ -801,6 +802,7 @@ typedef struct packed {
 `endif
     logic [`N-1:0][$clog2(`BTQ_SZ)-1:0] btq_tail;
     logic [`N-1:0][$clog2(`ROB_SZ)-1:0] fl_head;
+    logic [`N-1:0][$clog2(GHR_LEN)-1:0] ghr_base;
     RAS_SNAP [`N-1:0] ras_snap;
     // mt checkpoints are handled locally
 } rename2snap_bus;

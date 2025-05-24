@@ -2,6 +2,7 @@
 
 `ifndef GHR_SVA_SVH
 `define GHR_SVA_SVH
+`define GHR_TEST
 
 // check that the GHR_LEN-1 bits below-modulo after the base are resolved
 
