@@ -101,6 +101,7 @@ module cpu (
     map_table2dispatch map_2_dispatch;
     execute2complete_tag ex_2_ctag;
     execute2complete_dat ex_2_cdat;
+    execute2complete_bru ex_2_cbru;
     rename2bman rnme_2_bman;
     bman2rename bman_2_rnme;
     comm2snap_bus   comm_2_snap;
@@ -174,6 +175,7 @@ module cpu (
 
         .ex_in  (ex_2_btq),
         .ex_out (btq_2_ex),
+        .cbru_in(ex_2_cbru),
 
         .r_in   (retire_2_btq),
         .r_out  (btq_2_retire),
@@ -240,6 +242,7 @@ module cpu (
         .btq_out    (ex_2_btq),
 
         .ctag_out   (ex_2_ctag),
+        .cbru_out   (ex_2_cbru),
         .cdat_out   (ex_2_cdat)
     );
 

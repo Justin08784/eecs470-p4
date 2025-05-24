@@ -210,7 +210,7 @@ module bru_ex(
         // insn metadata/operands
 
     /* BACKEND */
-    output execute2btq                  o_btq_out,
+    output execute2complete_bru         cbru_out,
     output CPL_CAND [`NUM_FU_BRU-1:0]   o_cands
 );
     initial begin
@@ -264,8 +264,8 @@ module bru_ex(
                 data    : tmp_take[i] ? npc_addrs[i] : tmp_res[i]
             };
 
-            assign o_btq_out.dat[i] = '{
-                en      : i_vld[i],
+            assign cbru_out.en[i]  = i_vld[i];
+            assign cbru_out.dat[i] = '{
                 btq_idx : i_regs[i].btq_idx,
                 take    : tmp_take[i],
                 tgt     : addr2w(tmp_res[i])
@@ -291,10 +291,10 @@ module bru_ex(
         mispred_tgt = '0;
 
         pred     = btq_in.pred[0];
-        take     = o_btq_out.dat[0].take;
-        corr_tgt = btq_in.pred_tgt[0] == o_btq_out.dat[0].tgt;
+        take     = cbru_out.dat[0].take;
+        corr_tgt = btq_in.pred_tgt[0] == cbru_out.dat[0].tgt;
         npc      = i_regs[0].PC + 1;
-        tgt      = o_btq_out.dat[0].tgt;
+        tgt      = cbru_out.dat[0].tgt;
 
         unique casez ({pred, take, corr_tgt})
         3'b010,
@@ -356,6 +356,7 @@ module stage_ex_p4 (
     input   btq2execute btq_in,
     output  execute2btq btq_out,
 
+    output  execute2complete_bru cbru_out,
     output  execute2complete_tag ctag_out,
     output  execute2complete_dat cdat_out
 
@@ -615,6 +616,7 @@ module stage_ex_p4 (
     struct packed {
         `BY_FU(logic) i_rdy;
     } ex;
+    execute2btq btq_out_n;
     always_comb begin
         foreach (iss.o_vld.alu[i]) begin
             DATA imm32a, imm32b;
@@ -918,7 +920,7 @@ module stage_ex_p4 (
         .o_cands(cands.mul)
     );
 
-    execute2btq btq_out_n, bru_out;
+    execute2complete_bru cbru_out_n;
     bru_ex bru_ex0 (
         .clock  (clock),
         .reset  (reset),
@@ -932,10 +934,9 @@ module stage_ex_p4 (
         .btq_in (btq_in),
         .i_regs (regs.o_dat.bru),
 
-        .o_btq_out(bru_out),
+        .cbru_out(cbru_out_n),
         .o_cands(cands.bru)
     );
-    assign btq_out_n.dat = bru_out.dat;
 
     /* >> ======== STAGE 4/?: CDB data/tag broadcast ======== >> */
     // Tag broadcast occurs with CDB arbitration
@@ -983,6 +984,7 @@ module stage_ex_p4 (
             cdb_gnt_shr     <= '0;
             ctag_out        <= '0;
             cdat_out        <= '0;
+            cbru_out        <= '0;
             btq_out         <= '0;
         end else begin
             cdb2fu_gbus_shr[0]  <= cdb2fu_gbus;
@@ -993,6 +995,7 @@ module stage_ex_p4 (
             end
             ctag_out <= ctag_out_n;
             cdat_out <= cdat_out_n;
+            cbru_out <= cbru_out_n;
             btq_out  <= btq_out_n;
 
             if (ctag_out.en[0] && ctag_out.en[1]

@@ -489,6 +489,20 @@ typedef struct packed {
     } [`NUM_FU_BRU-1:0] dat;
 } execute2btq;
 
+
+// branch completion bus
+typedef struct packed {
+    logic   [`NUM_FU_BRU-1:0] en;
+    
+    // BTQ-specific completion stuff
+    struct packed {
+        BTQ_IDX btq_idx; 
+            // Entries to which we are completing
+        logic   take;
+        WADDR   tgt;
+    } [`NUM_FU_BRU-1:0] dat;
+} execute2complete_bru;
+
 typedef struct packed {
     // WADDR [`NUM_FU_BRU-1:0] PC; // Does BRU need to carry PC if we can supply it like so?
     logic [`NUM_FU_BRU-1:0] pred;
@@ -825,7 +839,7 @@ typedef struct packed {
 `endif
     logic [`N-1:0][$clog2(`BTQ_SZ)-1:0] btq_tail;
     logic [`N-1:0][$clog2(`ROB_SZ)-1:0] fl_head;
-    logic [`N-1:0][$clog2(GHR_LEN)-1:0] ghr_base;
+    logic [`N-1:0][$clog2(GHR_BUF_SZ)-1:0] ghr_base;
     RAS_SNAP [`N-1:0] ras_snap;
     // mt checkpoints are handled locally
 } rename2snap_bus;
