@@ -772,7 +772,7 @@ typedef struct packed {
 } decode2fetch;
 
 typedef struct packed {
-    ADDR    [`N-1:0] PCs;
+    DWADDR [`N-1:0] PCdws; // PC double word indices
 } fetch2mem;
 
 typedef struct packed {

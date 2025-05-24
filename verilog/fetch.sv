@@ -36,34 +36,68 @@ module stage_if_p4 (
     IF_ID_PACKET [`N-1:0]   f_dat;
 
     always_comb begin
+        DWADDR PC_dw;
         d_out.f_en_cnt = `MIN(used_scnt, d_in.d_rdy_cnt);
 
         PC_n[0] = PC_reg;
-        for (int i = 0; i < `N; ++i) begin
-            PC_n[i + 1] = PC_reg + i + 1;
-            mem_out.PCs[i] = w2addr(PC_n[i]);
+        for (int i = 0; i < `N; ++i)
+            PC_n[i+1] = PC_reg + (i+1);
+
+        PC_dw = PC_reg[13:1]; // w -> dw
+        for (int i = 0; i < `N; ++i)
+            mem_out.PCdws[i] = PC_dw + i;
+    end
+
+
+    // Align
+    BRANCH_MD [2*`N-1:0] md_raw;
+    INST      [2*`N-1:0] inst_raw;
+    BRANCH_MD [`N-1:0] md;
+    INST      [`N-1:0] inst;
+    generate
+    for (genvar i = 0; i < `N; ++i) begin
+        for (genvar woff = 0; woff < 2; ++woff) begin
+            assign md_raw   [2*i + woff] = mem_in.insn_md[i][woff];
+            assign inst_raw [2*i + woff] = mem_in.data[i].word_level[woff];
         end
     end
 
-    BRANCH_MD [`N-1:0] insn_md;
-    always_comb begin
-        for (int i = 0; i < `N; ++i) begin
-            logic woff;
-            woff        = PC_n[i][0];
-            insn_md[i]  = mem_in.insn_md[i][woff];
-        end
+    logic base_woff;
+    assign base_woff = PC_reg[0];
+    for (genvar i = 0; i < `N; ++i) begin
+        assign md[i]    = base_woff ? md_raw    [i+1] : md_raw  [i];
+        assign inst[i]  = base_woff ? inst_raw  [i+1] : inst_raw[i];
     end
+    endgenerate
 
     logic [`N-1:0] brch, cond, call, ret;
     generate
     for (genvar i = 0; i < `N; ++i) begin
-        assign brch[i] = insn_md[i].branch;
-        assign cond[i] = insn_md[i].cond;
-        assign call[i] = insn_md[i].call;
-        assign ret[i]  = insn_md[i].ret;
+        assign brch[i] = md[i].branch;
+        assign cond[i] = md[i].cond;
+        assign call[i] = md[i].call;
+        assign ret[i]  = md[i].ret;
     end
     endgenerate
 
+    // always_ff @(posedge clock) begin
+    //     if (!reset) begin
+    //         $display("PC_dws: [%x, %x]", mem_out.PCdws[0], mem_out.PCdws[1]);
+    //         $display("mem_in: [%x, %x, %x, %x]",
+    //         mem_in.data[0].word_level[0],
+    //         mem_in.data[0].word_level[1],
+    //         mem_in.data[1].word_level[0],
+    //         mem_in.data[1].word_level[1]
+    //         );
+    //         $display("base_woff: %b", base_woff);
+
+    //         $display("md_raw: %x, %x, %x, %x", md_raw[0], md_raw[1], md_raw[2], md_raw[3]);
+    //         $display("inst_raw: %x, %x, %x, %x", inst_raw[0], inst_raw[1], inst_raw[2], inst_raw[3]);
+
+    //         $display("md: %x, %x", md[0], md[1]);
+    //         $display("inst: %x, %x", inst[0], inst[1]);
+    //     end
+    // end
 
     fetch2bp bp_qry;
     assign bp_qry = '{
@@ -109,11 +143,8 @@ module stage_if_p4 (
 
     always_comb begin
         for (int unsigned i = 0; i < `N; ++i) begin
-            logic woff;
-            woff = PC_n[i][0];
-
             f_dat[i] = '{
-                inst    : mem_in.data[i].word_level[woff],
+                inst    : inst[i],
                 PC      : PC_n[i],
                 ras_snap: bp_res.ras_snap[i],
                 btq_idx : '0 // filled below

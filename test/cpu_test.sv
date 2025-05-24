@@ -173,7 +173,7 @@ module testbench;
 
     always_comb begin
         for (int i = 0; i < `N; ++i)
-            mem2f.data[i] = memory.unified_memory[addr2dw(f2mem.PCs[i])];
+            mem2f.data[i] = memory.unified_memory[f2mem.PCdws[i]];
     end
 
     generate
