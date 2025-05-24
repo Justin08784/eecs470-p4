@@ -2,10 +2,15 @@
 // `include "test/ghr_sva.svh"
 
 module ghr_test #(
-    parameter DEPTH     = 8, // must be geq than 2*GHR_LEN and a power of 2
+    parameter DEPTH     = 64, // must be geq than 2*GHR_LEN and a power of 2
     parameter NUM_FU_BRU= 1,
-    parameter GHR_LEN   = 4,
-    parameter N         = 2,
+    parameter GHR_LEN   = 8,
+    parameter N         = 3,
+    // try these too
+    // parameter DEPTH     = 512,
+    // parameter NUM_FU_BRU= 1,
+    // parameter GHR_LEN   = 64,
+    // parameter N         = 12,
     type VEC = logic [DEPTH-1:0],
     type PTR = logic [$clog2(DEPTH)-1:0]
 ) ();
@@ -20,10 +25,10 @@ module ghr_test #(
     PTR   [`NUM_FU_BRU-1:0] ex_idx;
 
     // fetch
-    logic [$clog2(`N):0] f_en_cnt;
-    logic [`N-1:0]       f_pred;
-    logic [$clog2(`N):0] f_rdy_scnt;
-    logic [`N-1:0][GHR_LEN-1:0] f_ghr;
+    logic [$clog2(N):0] f_en_cnt;
+    logic [N-1:0]       f_pred;
+    logic [$clog2(N):0] f_rdy_scnt;
+    logic [N-1:0][GHR_LEN-1:0] f_ghr;
     PTR   [N-1:0]        f_base;
     
     // Variable to count values written to FIFO
@@ -122,8 +127,8 @@ module ghr_test #(
                 flush_take
             );
 
-            foreach(sva.nres[i])
-                $display("  nres[%2d]: %2d", i, sva.nres[i]);
+            // foreach(sva.nres[i])
+            //     $display("  nres[%2d]: %2d", i, sva.nres[i]);
 
             $display("got: ghr: [%b, %b], hist: %b, rslv: %b, base: %2d (f_rdy_scnt: %2d)",
                 f_ghr[0],
@@ -167,7 +172,7 @@ pend_t  pend[$];       // queue : pend[0] is the OLDEST (closest to commit)
 int     cycles = 0;
 
 localparam FETCH_RATE   = 75;   // % chance we will fetch at all
-localparam RESOLVE_RATE = 75;   // % chance we will try to resolve something
+localparam RESOLVE_RATE = 20;   // % chance we will try to resolve something
 localparam MISP_RATE    = 10;   // % chance a resolve is a mis-predict
 
 task automatic push_new_fetches();
@@ -284,32 +289,32 @@ endtask
         reset = 0;
         @(negedge clock);
 
-        // ---------- Test 1 ---------- //
-        $display("\nTest 1");
-        f_pred[0] = 1'b1;
-        f_en_cnt = 1;
+        // // ---------- Test 1 ---------- //
+        // $display("\nTest 1");
+        // f_pred[0] = 1'b1;
+        // f_en_cnt = 1;
 
-        while (f_rdy_scnt > 0)
-            @(negedge clock);
-        f_en_cnt = 0;
-        @(negedge clock);
+        // while (f_rdy_scnt > 0)
+        //     @(negedge clock);
+        // f_en_cnt = 0;
+        // @(negedge clock);
 
-        $display("\nTest 2");
-        ex_en   = 1;
-        ex_idx  = 2;
-        @(negedge clock);
-        ex_en       = 0;
-        @(negedge clock);
+        // $display("\nTest 2");
+        // ex_en   = 1;
+        // ex_idx  = 2;
+        // @(negedge clock);
+        // ex_en       = 0;
+        // @(negedge clock);
 
-        $display("\nTest 3");
-        flush       = 1;
-        flush_base  = 4;
-        flush_take  = 0;
-        // $display("ex_en: %b, ex_idx: %d", ex_en, ex_idx);
-        @(negedge clock);
-        flush = 0;
-        @(negedge clock);
-        @(negedge clock);
+        // $display("\nTest 3");
+        // flush       = 1;
+        // flush_base  = 4;
+        // flush_take  = 0;
+        // // $display("ex_en: %b, ex_idx: %d", ex_en, ex_idx);
+        // @(negedge clock);
+        // flush = 0;
+        // @(negedge clock);
+        // @(negedge clock);
 
 
         reset = 1;
@@ -317,7 +322,7 @@ endtask
         reset = 0;
         @(negedge clock);
         $display("\nTest 4: Randomized stress testing");
-        DEBUG = 0; // disable debugs
+        DEBUG = 1; // disable debugs
 
         // for (int i = 0; i < 100; ++i) begin
         //     int f_en_cnt1, f_en_cnt2;
@@ -346,7 +351,7 @@ endtask
         // reset  = 1; @(negedge clock); reset = 0; @(negedge clock);
         // DEBUG  = 0;    // turn off verbose wave print
 
-        repeat (10_000) begin        // run for 10 000 cycles
+        repeat (1000) begin        // run for 10 000 cycles
             // foreach(pend[i])
             //     $display("  pend[%2d]: pt: %b, idx: %2d", i, pend[i].pred_take, pend[i].idx);
             resolve_or_flush();

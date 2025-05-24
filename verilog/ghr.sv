@@ -95,7 +95,7 @@ module ghr #(
     for (genvar k = 1; k < N+1; ++k) begin
         assign base_n[k] = base - PTR'(k);
     end
-    assign f_base = base_n[`N:1];
+    assign f_base = base_n[N:1];
 
     assign base_oh_n[0] = base_oh;
     for (genvar k = 1; k < N+1; ++k) begin
