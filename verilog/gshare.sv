@@ -19,7 +19,7 @@ module gshare #(
 );
     localparam PHT_SZ = 1 << GHR_LEN;
     // logic [1:0] pht [PHT_SZ-1:0]; // ram inference?
-    logic [1:0][PHT_SZ-1:0] pht;
+    logic [PHT_SZ-1:0][1:0] pht;
 
     function automatic logic [1:0] update_sc(
         input logic unsigned [1:0] sc,
