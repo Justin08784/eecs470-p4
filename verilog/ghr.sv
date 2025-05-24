@@ -1,5 +1,5 @@
 `include "sys_defs.svh"
-`include "test/ghr_sva.svh"
+// `define GHR_TEST // enable to test
 
 module ghr #(
     parameter DEPTH     = 32, // must be geq than 2*GHR_LEN and a power of 2
@@ -213,10 +213,17 @@ module ghr #(
 
         // runtime assertions
         if (!reset) begin
+`ifdef GHR_TEST
             assert(!flush || !rslv[flush_base]) else
                 $fatal("ghr: flush base %2d is already resolved", flush_base);
             assert(!flush || hist[flush_base] != flush_take) else
                 $fatal("ghr: flush take %b matches existing history", flush_take);
+`else
+            assert(!flush || !rslv[snap]) else
+                $fatal("ghr: snap %2d is already resolved", snap);
+            assert(!flush || hist[snap] != flush_take) else
+                $fatal("ghr: flush take %b matches existing history", flush_take);
+`endif
 
             for (int i = 0; i < NUM_FU_BRU; ++i) begin
                 assert(!ex_en[i] || !rslv[ex_idx[i]]) else
