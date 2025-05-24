@@ -268,6 +268,7 @@ module bru_ex(
             assign cbru_out.dat[i] = '{
                 btq_idx : i_regs[i].btq_idx,
                 take    : tmp_take[i],
+                ghr_base: btq_in.ghr_base[i],
                 tgt     : addr2w(tmp_res[i])
             };
 

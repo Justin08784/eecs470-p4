@@ -54,6 +54,7 @@ module cpu (
     btq2fetch    btq_2_f;
     fetch2btq    f_2_btq;
     rename2snap_bus rnme_2_snap;
+    execute2complete_bru ex_2_cbru;
 
     stage_if_p4 fetch0 (
         .clock,
@@ -68,6 +69,7 @@ module cpu (
         .btq_out(f_2_btq),
 
         .snap_in(rnme_2_snap),
+        .cbru_in(ex_2_cbru),
 
         .mem_out(f2mem),
         .mem_in (mem2f)
@@ -101,7 +103,6 @@ module cpu (
     map_table2dispatch map_2_dispatch;
     execute2complete_tag ex_2_ctag;
     execute2complete_dat ex_2_cdat;
-    execute2complete_bru ex_2_cbru;
     rename2bman rnme_2_bman;
     bman2rename bman_2_rnme;
     comm2snap_bus   comm_2_snap;

@@ -13,6 +13,9 @@ module bp #(
     input   fetch2bp    f_in,
     output  bp2fetch    f_out,
 
+    // execute
+    input   execute2complete_bru cbru_in,
+
     // puq updates
     input   puq2fetch i_upd
 );
@@ -89,22 +92,31 @@ module bp #(
         .empty
     );
 
-    // ghr #(
-    //     .DEPTH      (32),
-    //     .NUM_FU_BRU (`NUM_FU_BRU),
-    //     .GHR_LEN    (GHR_LEN),
-    //     .N          (`N)
-    // ) ghr0 (
-    //     .clock,
-    //     .reset,
-    //     .flush,
-    //     .clmsk,
+    ghr #(
+        .DEPTH      (GHR_BUF_SZ),
+        .NUM_FU_BRU (`NUM_FU_BRU),
+        .GHR_LEN    (GHR_LEN),
+        .N          (`N)
+    ) ghr0 (
+        .clock,
+        .reset,
+        .flush      ('0), // FIXME
+        .clmsk,
+        .flush_take (cbru_in.dat[0].take),
+            /* ^^ Do we really need this? Why not just let GHR
+            invert whatever was there. */
+        .flush_base (cbru_in.dat[0].ghr_base),
 
-    //     .flush_take,
-    //         /* ^^ Do we realy need this? Why not just let GHR
-    //         invert whatever was there. */
-    //     .flush_base,
-    // );
+        // .ex_en      (cbru_in.en),
+        .ex_en      ('0), // FIXME
+        .ex_idx     (cbru_in.dat[0].ghr_base),
+
+        .f_en_cnt   (),
+        .f_pred     ('0), // FIXME
+        .f_rdy_scnt (),
+        .f_base     (),
+        .f_ghr      ()
+    );
 
     assign f_out.take   = raw_take;
     assign f_out.lim_cnt= take_any ? take_idx + 1 : `N;

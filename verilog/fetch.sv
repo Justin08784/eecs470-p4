@@ -23,6 +23,9 @@ module stage_if_p4 (
     input   btq2fetch   btq_in,
     output  fetch2btq   btq_out,
 
+    // execute
+    input   execute2complete_bru cbru_in,
+
     input   rename2snap_bus snap_in,
 
     output  fetch2mem   mem_out,
@@ -124,6 +127,8 @@ module stage_if_p4 (
 
         .f_in       (bp_qry),
         .f_out      (bp_res),
+
+        .cbru_in,
 
         .i_upd      (btq_in.bp_upd)
     );

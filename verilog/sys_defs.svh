@@ -450,7 +450,8 @@ typedef struct packed {
 
     logic   take;
     WADDR   tgt;
-    // logic   [GHR_LEN-1:0] hash; // gshare hash index
+    logic   [GHR_LEN-1:0] hash; // gshare hash index
+    logic   [`N-1:0][$clog2(GHR_BUF_SZ)-1:0] ghr_base;
     logic   ret;    // is a ret instruction?
 } BTQ_ENTRY;
 
@@ -500,6 +501,7 @@ typedef struct packed {
             // Entries to which we are completing
         logic   take;
         WADDR   tgt;
+        logic   [$clog2(GHR_BUF_SZ)-1:0] ghr_base;
     } [`NUM_FU_BRU-1:0] dat;
 } execute2complete_bru;
 
@@ -507,6 +509,7 @@ typedef struct packed {
     // WADDR [`NUM_FU_BRU-1:0] PC; // Does BRU need to carry PC if we can supply it like so?
     logic [`NUM_FU_BRU-1:0] pred;
     WADDR [`NUM_FU_BRU-1:0] pred_tgt;
+    logic [`NUM_FU_BRU-1:0][$clog2(GHR_BUF_SZ)-1:0] ghr_base;
 } btq2execute;
 
 typedef struct packed {
@@ -769,6 +772,8 @@ typedef struct packed {
     WADDR   [`N-1:0]    pred_tgt;
     logic   [`N-1:0]    pred;
     logic   [`N-1:0]    ret;
+    logic   [GHR_LEN-1:0] hash; // gshare hash index
+    logic   [`N-1:0][$clog2(GHR_BUF_SZ)-1:0] ghr_base;
 } fetch2btq;
 
 typedef struct packed {
@@ -839,7 +844,6 @@ typedef struct packed {
 `endif
     logic [`N-1:0][$clog2(`BTQ_SZ)-1:0] btq_tail;
     logic [`N-1:0][$clog2(`ROB_SZ)-1:0] fl_head;
-    logic [`N-1:0][$clog2(GHR_BUF_SZ)-1:0] ghr_base;
     RAS_SNAP [`N-1:0] ras_snap;
     // mt checkpoints are handled locally
 } rename2snap_bus;

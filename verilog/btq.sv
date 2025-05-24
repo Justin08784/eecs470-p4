@@ -121,6 +121,7 @@ module btq #(
             idx = ex_in.btq_idx[i];
             ex_out.pred[i]     = state[idx].pred;
             ex_out.pred_tgt[i] = state[idx].pred_tgt;
+            ex_out.ghr_base[i] = state[idx].ghr_base;
         end
     end
 
@@ -190,7 +191,8 @@ module btq #(
                     pred    : f_in.pred[i],
                     pred_tgt: f_in.pred_tgt[i],
                     ret     : f_in.ret[i],
-                    // hash    : f_in.hash[i],
+                    hash    : f_in.hash[i],
+                    ghr_base: f_in.ghr_base[i],
 
                     take    : '0,
                     tgt     : '0
