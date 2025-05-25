@@ -230,6 +230,7 @@ module stage_if_p4 (
         //     $display("[%1d]: %1d", i, brch_prefix_cnt[i]);
         $display("flush: %b, flush_PC: 0x%x", flush, flush_PC);
         $display("d_out: {f_en_cnt: %b, dat: [%x, %x]}", d_out.f_en_cnt, d_out.f_dat[0], d_out.f_dat[1]);
+        bp0.ghr0.print_ghr;
         $display("<< Fetch <<");
     endtask
 `endif

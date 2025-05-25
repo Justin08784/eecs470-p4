@@ -37,7 +37,7 @@ import "DPI-C" function string decode_inst(int inst);
 
 
 // Debug cycle limits, both inclusive
-localparam DBG_CYCLE_MIN = 400;
+localparam DBG_CYCLE_MIN = 0;
 localparam DBG_CYCLE_MAX = `TB_MAX_CYCLES;
 
 /*

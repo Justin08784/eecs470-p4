@@ -195,6 +195,34 @@ module ghr #(
         end
 
     end
+
+    task print_ghr;
+        $display("  %3d | fetch: {en_cnt: %1d, pred: [%b, %b]}, ex_in: {en: %b, idx: %2d}, flush: {%b, base: %2d, take: %b}",
+            $time,
+            f_en_cnt,
+            f_pred[0],
+            f_pred[1],
+            ex_en,
+            ex_idx,
+            flush,
+            flush_base,
+            flush_take
+        );
+
+        // foreach(sva.nres[i])
+        //     $display("  nres[%2d]: %2d", i, sva.nres[i]);
+
+        $display("got: ghr: [%b, %b], hist: %b, rslv: %b, base: %2d (f_rdy_scnt: %2d)",
+            f_ghr[0],
+            f_ghr[1],
+            hist,
+            rslv,
+            base,
+            f_rdy_scnt
+        );
+    endtask
+
+
 endmodule
 
 // cool part-slice indexing trick
