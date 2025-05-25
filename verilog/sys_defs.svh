@@ -454,6 +454,8 @@ typedef struct packed {
     logic   [`N-1:0][$clog2(GHR_BUF_SZ)-1:0] ghr_base;
     logic   ret;    // is a ret instruction? (heuristic only; see predecoder for spec)
     logic   cond;   // is a conditional branch?
+    logic   pred_bim;
+    logic   pred_gshare;
 } BTQ_ENTRY;
 
 typedef struct packed {
@@ -462,6 +464,8 @@ typedef struct packed {
     WADDR tgt;
     logic cond;
     logic [GHR_LEN-1:0] hash;
+    logic pred_bim;
+    logic pred_gshare;
 } PUQ_ENTRY;
 
 typedef struct packed {
@@ -751,6 +755,8 @@ typedef struct packed {
     // if_id_packet contributions
     RAS_SNAP[`N-1:0] ras_snap;
     logic   [`N-1:0][$clog2(GHR_BUF_SZ)-1:0] ghr_base;
+    logic   [`N-1:0] pred_gshare;
+    logic   [`N-1:0] pred_bim;
 } bp2fetch;
 
 typedef struct packed {
@@ -780,6 +786,8 @@ typedef struct packed {
     logic   [`N-1:0]    cond;
     logic   [`N-1:0][GHR_LEN-1:0] hash; // gshare hash index
     logic   [`N-1:0][$clog2(GHR_BUF_SZ)-1:0] ghr_base;
+    logic   [`N-1:0]    pred_bim;
+    logic   [`N-1:0]    pred_gshare;
 } fetch2btq;
 
 typedef struct packed {

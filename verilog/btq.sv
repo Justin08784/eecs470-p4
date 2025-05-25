@@ -103,11 +103,19 @@ module btq #(
     always_comb begin
         // handle fetch (outs)
         for (int i = 0; i < NUM_RPORTS; ++i) begin
-            puq_enq_raw[i].cond = state[r_idxs_n[i]].cond;
-            puq_enq_raw[i].take = state[r_idxs_n[i]].take;
-            puq_enq_raw[i].pc   = state[r_idxs_n[i]].PC;
-            puq_enq_raw[i].tgt  = state[r_idxs_n[i]].tgt;
-            puq_enq_raw[i].hash = state[r_idxs_n[i]].hash;
+            BTQ_ENTRY cur;
+            cur = state[r_idxs_n[i]];
+
+            puq_enq_raw[i] = '{
+                cond    : cur.cond,
+                take    : cur.take,
+                pc      : cur.PC,
+                tgt     : cur.tgt,
+                hash    : cur.hash,
+                pred_bim    : cur.pred_bim,
+                pred_gshare : cur.pred_gshare
+            };
+
         end
 
         for (int i = 0; i < NUM_RPORTS; ++i)
@@ -195,6 +203,8 @@ module btq #(
                     cond    : f_in.cond[i],
                     hash    : f_in.hash[i],
                     ghr_base: f_in.ghr_base[i],
+                    pred_bim: f_in.pred_bim[i],
+                    pred_gshare : f_in.pred_gshare[i],
 
                     take    : '0,
                     tgt     : '0

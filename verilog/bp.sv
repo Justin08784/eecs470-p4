@@ -48,7 +48,7 @@ module bp #(
 
     // stop fetching beyond the first predicted taken branch
     logic [`N-1:0] raw_take, raw_take_comp;
-    logic [`N-1:0] cond_take, cond_take_comp;
+    logic [`N-1:0] cond_take, sel_pred, cond_take_comp_gshare, cond_take_comp_bim;
     logic take_any;
     logic [$clog2(`N)-1:0] take_idx;
     logic empty; // ras empty?
@@ -103,7 +103,9 @@ module bp #(
         for (int i = 0; i < `N; ++i) begin
             brPC_n[f_in.brch_prefix_cnt[i]] = PC_n[i];
             raw_take_comp[f_in.brch_prefix_cnt[i]] = raw_take[i];
-            cond_take[i]     = cond_take_comp[f_in.brch_prefix_cnt[i]];
+            cond_take[i] = sel_pred[f_in.brch_prefix_cnt[i]]
+                ? cond_take_comp_gshare[f_in.brch_prefix_cnt[i]]
+                : cond_take_comp_bim   [f_in.brch_prefix_cnt[i]];
         end
     end
 
@@ -134,6 +136,34 @@ module bp #(
         .f_ghr      (ghr_vec)
     );
 
+    chooser #(
+        .GHR_LEN    (GHR_LEN),
+        .N          (`N)
+    ) chooser0 (
+        .clock,
+        .reset,
+
+        .i_upd,
+
+        .i_qry  (brPC_n),
+        .o_sel  (sel_pred)
+    );
+
+    assign f_out.pred_bim = cond_take_comp_bim;
+    bim #(
+        .GHR_LEN    (GHR_LEN),
+        .N          (`N)
+    ) bim0 (
+        .clock,
+        .reset,
+
+        .i_upd,
+
+        .i_qry  (brPC_n),
+        .o_pred (cond_take_comp_bim)
+    );
+
+    assign f_out.pred_gshare = cond_take_comp_gshare;
     gshare #(
         .GHR_LEN    (GHR_LEN),
         .N          (`N)
@@ -146,7 +176,7 @@ module bp #(
         .i_ghr  (ghr_vec),
         .i_qry  (brPC_n),
         .o_hash (f_out.hash),
-        .o_pred (cond_take_comp)
+        .o_pred (cond_take_comp_gshare)
     );
 
     assign f_out.take   = raw_take;

@@ -1,6 +1,101 @@
 
 `include "sys_defs.svh"
 
+function automatic logic [1:0] update_sc(
+    input logic unsigned [1:0] sc,
+    input logic take
+);
+    if (take)
+        return sc == 2'b11 ? 2'b11 : sc + 1;
+    else
+        return sc == 0 ? 0 : sc - 1;
+endfunction
+
+function automatic logic query_sc(input logic [1:0] sc);
+    return sc[1];
+endfunction
+
+// meta-chooser for 2 predictors
+module chooser #(
+    parameter GHR_LEN   = GHR_LEN,
+    parameter N         = `N
+) (
+    input   clock,
+    input   reset,
+
+    // puq updates
+    input   puq2fetch       i_upd,
+
+    // fetch
+    input   WADDR [N-1:0]   i_qry, // branch pc
+    output  logic [N-1:0]   o_sel
+);
+    localparam TBL_SZ = 1 << GHR_LEN;
+    logic [TBL_SZ-1:0][1:0] choice;
+
+    generate
+    for (genvar i = 0; i < N; ++i) begin
+        // 0 -> bim. 1 -> gshare
+        assign o_sel[i] = query_sc(choice[i_qry[i][GHR_LEN-1:0]]);
+    end
+    endgenerate
+
+    logic corr_bim, corr_gshare, dir, delta;
+    always_comb begin
+        corr_bim    = i_upd.dat.pred_bim    == i_upd.dat.take;
+        corr_gshare = i_upd.dat.pred_gshare == i_upd.dat.take;
+
+        dir     = corr_gshare;
+        delta   = corr_bim != corr_gshare;
+    end
+
+    always_ff @(posedge clock) begin
+        if (reset)
+            for (int i = 0; i < TBL_SZ; ++i)
+                choice[i] <= 2'b01; // weakly favor bim (bim converges faster to new branches)
+        else if (i_upd.en && i_upd.dat.cond) begin // train only on conditional branches!
+            if (delta) begin
+                choice[i_upd.dat.pc[GHR_LEN-1:0]] <=
+                    update_sc(choice[i_upd.dat.pc[GHR_LEN-1:0]], dir);
+            end
+        end
+    end
+endmodule
+
+// 2-bit sc bimodal table
+module bim #(
+    parameter GHR_LEN   = GHR_LEN,
+    parameter N         = `N
+) (
+    input   clock,
+    input   reset,
+
+    // puq updates
+    input   puq2fetch       i_upd,
+
+    // fetch
+    input   WADDR [N-1:0]   i_qry, // branch pc
+    output  logic [N-1:0]   o_pred
+);
+    localparam PHT_SZ = 1 << GHR_LEN;
+    logic [PHT_SZ-1:0][1:0] pht;
+
+    generate
+    for (genvar i = 0; i < N; ++i) begin
+        assign o_pred[i] = query_sc(pht[i_qry[i][GHR_LEN-1:0]]);
+    end
+    endgenerate
+
+    always_ff @(posedge clock) begin
+        if (reset)
+            for (int i = 0; i < PHT_SZ; ++i)
+                pht[i] <= 2'b01;
+        else if (i_upd.en && i_upd.dat.cond) // train only on conditional branches!
+            pht[i_upd.dat.pc[GHR_LEN-1:0]] <=
+                update_sc(pht[i_upd.dat.pc[GHR_LEN-1:0]], i_upd.dat.take);
+    end
+endmodule
+
 module gshare #(
     parameter GHR_LEN   = GHR_LEN,
     parameter N         = `N
@@ -20,20 +115,6 @@ module gshare #(
     localparam PHT_SZ = 1 << GHR_LEN;
     // logic [1:0] pht [PHT_SZ-1:0]; // ram inference?
     logic [PHT_SZ-1:0][1:0] pht;
-
-    function automatic logic [1:0] update_sc(
-        input logic unsigned [1:0] sc,
-        input logic take
-    );
-        if (take)
-            return sc == 2'b11 ? 2'b11 : sc + 1;
-        else
-            return sc == 0 ? 0 : sc - 1;
-    endfunction
-
-    function automatic logic query_sc(input logic [1:0] sc);
-        return sc[1];
-    endfunction
 
     generate
     for (genvar i = 0; i < N; ++i) begin

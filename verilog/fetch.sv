@@ -176,9 +176,10 @@ module stage_if_p4 (
             btq_out.pred_tgt[brch_prefix_cnt[i]] = pred_tgt[i];
             btq_out.ret     [brch_prefix_cnt[i]] = ret[i];
             btq_out.cond    [brch_prefix_cnt[i]] = cond[i];
-            btq_out.hash    [i]                  = bp_res.hash[i];
-            btq_out.ghr_base[i]                  = bp_res.ghr_base[i];
-
+            btq_out.hash        [i]              = bp_res.hash[i];
+            btq_out.ghr_base    [i]              = bp_res.ghr_base[i];
+            btq_out.pred_bim    [i]              = bp_res.pred_bim[i];
+            btq_out.pred_gshare [i]              = bp_res.pred_gshare[i];
         end
 
     end
