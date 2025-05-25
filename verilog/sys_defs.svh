@@ -1152,7 +1152,7 @@ endmodule
 
 
 module ffs #(
-    parameter int VECW
+    parameter int VECW=2
 ) (
     input   logic [VECW-1:0] i_vec,
     output  logic o_vld,
