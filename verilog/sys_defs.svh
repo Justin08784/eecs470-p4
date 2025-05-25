@@ -1198,7 +1198,7 @@ module compactor #(
         assign raw_prefix_cnt[i][$clog2(i):0] = raw_prefix_cnt[i-1][$clog2(i-1):0] + req[i-1];
     end
 
-    for (genvar i = 1; i < REQW; ++i) begin
+    for (genvar i = 2; i < REQW; ++i) begin
         for (genvar j = $clog2(i)+1; j <= $clog2(REQW); ++j) begin
             assign raw_prefix_cnt[i][j] = 1'b0;
         end
