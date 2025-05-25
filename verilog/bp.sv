@@ -47,7 +47,8 @@ module bp #(
     );
 
     // stop fetching beyond the first predicted taken branch
-    logic [`N-1:0] raw_take;
+    logic [`N-1:0] raw_take, raw_take_comp;
+    logic [`N-1:0] cond_take, cond_take_comp;
     logic take_any;
     logic [$clog2(`N)-1:0] take_idx;
     logic empty; // ras empty?
@@ -55,7 +56,8 @@ module bp #(
     assign raw_take =
     call
     | ret
-    | (btb_hit & ((brch & ~cond) | (cond & '1))); // FIXME: '1 = stand-in for direction predictor
+    // | (btb_hit & ((brch & ~cond) | (cond & '1))); // FIXME: '1 = stand-in for direction predictor
+    | (btb_hit & ((brch & ~cond) | (cond & cond_take)));
 
     ffs #(
         .VECW(`N)
@@ -92,6 +94,21 @@ module bp #(
         .empty
     );
 
+    WADDR [`N-1:0] brPC_n;
+    logic [`N-1:0][GHR_LEN-1:0] ghr_vec;
+    always_comb begin
+        brPC_n = '0;
+        raw_take_comp = '0;
+        cond_take = '0;
+        for (int i = 0; i < `N; ++i) begin
+            brPC_n[f_in.brch_prefix_cnt[i]] = PC_n[i];
+            raw_take_comp[f_in.brch_prefix_cnt[i]] = raw_take[i];
+            cond_take[i]     = cond_take_comp[f_in.brch_prefix_cnt[i]];
+        end
+    end
+
+    logic [$clog2(`N):0] f_brch_cnt;
+    assign f_brch_cnt = f_in.brch_prefix_cnt[f_in.f_cnt];
     ghr #(
         .DEPTH      (GHR_BUF_SZ),
         .NUM_FU_BRU (`NUM_FU_BRU),
@@ -100,22 +117,36 @@ module bp #(
     ) ghr0 (
         .clock,
         .reset,
-        .flush      ('0), // FIXME
+        .flush,
         .clmsk,
         .flush_take (cbru_in.dat[0].take),
             /* ^^ Do we really need this? Why not just let GHR
             invert whatever was there. */
         .flush_base (cbru_in.dat[0].ghr_base),
 
-        // .ex_en      (cbru_in.en),
-        .ex_en      ('0), // FIXME
+        .ex_en      (cbru_in.en[0]),
         .ex_idx     (cbru_in.dat[0].ghr_base),
 
-        .f_en_cnt   ('0),
-        .f_pred     ('0), // FIXME
+        .f_en_cnt   (f_brch_cnt),
+        .f_pred     (raw_take_comp),
         .f_rdy_scnt (f_out.ghr_rdy_scnt),
-        .f_base     (),
-        .f_ghr      ()
+        .f_base     (f_out.ghr_base),
+        .f_ghr      (ghr_vec)
+    );
+
+    gshare #(
+        .GHR_LEN    (GHR_LEN),
+        .N          (`N)
+    ) gshare0 (
+        .clock,
+        .reset,
+
+        .i_upd,
+
+        .i_ghr  (ghr_vec),
+        .i_qry  (brPC_n),
+        .o_hash (f_out.hash),
+        .o_pred (cond_take_comp)
     );
 
     assign f_out.take   = raw_take;

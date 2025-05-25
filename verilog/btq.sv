@@ -106,7 +106,7 @@ module btq #(
             puq_enq_raw[i].take = state[r_idxs_n[i]].take;
             puq_enq_raw[i].pc   = state[r_idxs_n[i]].PC;
             puq_enq_raw[i].tgt  = state[r_idxs_n[i]].tgt;
-            // puq_enq_raw[i].hash = state[r_idxs_n[i]].hash;
+            puq_enq_raw[i].hash = state[r_idxs_n[i]].hash;
         end
 
         for (int i = 0; i < NUM_RPORTS; ++i)
@@ -219,9 +219,11 @@ module btq #(
                 continue;
             end
 
-            $write("BTQ[%2d]: {pc: %d} pred: %b, pred_tgt: %x, take: %b, tgt: %x, ",
+            $write("BTQ[%2d]: {pc: %d} base: %2d, hash: %b, pred: %b, pred_tgt: %x, take: %b, tgt: %x, ",
                 i,
                 state[i].PC,
+                state[i].ghr_base,
+                state[i].hash,
                 state[i].pred,
                 state[i].pred_tgt,
                 state[i].take,

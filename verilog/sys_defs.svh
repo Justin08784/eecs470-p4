@@ -732,7 +732,8 @@ typedef struct packed {
     WADDR   [`N:0]      PC_n; // branch pc
     logic   [`N:0][$clog2(`N):0] brch_prefix_cnt;
 
-    logic   [`N-1:0]    f_en; // pre-bp fetch enable
+    logic   [$clog2(`N):0]  f_cnt;
+    logic   [`N-1:0]        f_en;
 } fetch2bp;
 
 typedef struct packed {
@@ -774,7 +775,7 @@ typedef struct packed {
     WADDR   [`N-1:0]    pred_tgt;
     logic   [`N-1:0]    pred;
     logic   [`N-1:0]    ret;
-    logic   [GHR_LEN-1:0] hash; // gshare hash index
+    logic   [`N-1:0][GHR_LEN-1:0] hash; // gshare hash index
     logic   [`N-1:0][$clog2(GHR_BUF_SZ)-1:0] ghr_base;
 } fetch2btq;
 

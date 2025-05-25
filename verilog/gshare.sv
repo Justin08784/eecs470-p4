@@ -45,9 +45,25 @@ module gshare #(
     always_ff @(posedge clock) begin
         if (reset)
             for (int i = 0; i < PHT_SZ; ++i)
-                pht[i] <= '0;
+                pht[i] <= 2'b01;
         else if (i_upd.en)
             pht[i_upd.dat.hash] <= update_sc(pht[i_upd.dat.hash], i_upd.dat.take);
     end
+
+    task print_gshare;
+        $display(">> gshare");
+        $display("i_ghr: [%b, %b], i_qry: [%x, %x], o_hash: [%b, %b], o_pred: [%b, %b]",
+            i_ghr[0],
+            i_ghr[1],
+            i_qry[0],
+            i_qry[1],
+            o_hash[0],
+            o_hash[1],
+            o_pred[0],
+            o_pred[1]
+        );
+        $display("upd: {en: %b, hash: %b, take: %b}", i_upd.en, i_upd.dat.hash, i_upd.dat.take);
+        $display("<< gshare");
+    endtask
 
 endmodule

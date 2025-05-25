@@ -181,17 +181,32 @@ module ghr #(
 
         // runtime assertions
         if (!reset) begin
+            logic [`N-1:0] en_pred;
             assert(!flush || !rslv[flush_base]) else
                 $fatal("ghr: flush base %2d is already resolved", flush_base);
-            assert(!flush || hist[flush_base] != flush_take) else
-                $fatal("ghr: flush take %b matches existing history", flush_take);
+            // assert(!flush || hist[flush_base] != flush_take) else
+            //     $fatal("ghr: flush take %b matches existing history", flush_take);
+            /* Reason for disabling this asssertion:
+            We must still perform flush even if the flush_take matches the hist record
+            (Q: How can this happen? A: target mismatch).
+
+            If we do not, we will fail to mark-resolve the dependent branches on the
+            mispredicted path and the ghr will stall forever. (This is also why we
+            cannot move to a simple "invert" hist value iff flush.)
+            */
 
             for (int i = 0; i < NUM_FU_BRU; ++i) begin
                 assert(!ex_en[i] || !rslv[ex_idx[i]]) else
                     $fatal("ghr: ex_idx %2d is already resolved", ex_idx[i]);
             end
-            assert(!(|f_pred) || $onehot(f_pred)) else
-                $fatal("ghr: f_pred (%b) is not one-hot", f_pred);
+            // assert(!(|f_pred) || $onehot(f_pred)) else
+            //     $fatal("ghr: f_pred (%b) is not one-hot", f_pred);
+
+            en_pred = '0;
+            for (int i = 0; i < f_en_cnt; ++i)
+                en_pred[i] = f_pred[i];
+            assert(!(|en_pred) || $onehot(en_pred)) else
+                $fatal("ghr: en_pred (%b) is not one-hot", en_pred);
         end
 
     end

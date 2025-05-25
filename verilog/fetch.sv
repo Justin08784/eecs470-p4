@@ -122,6 +122,8 @@ module stage_if_p4 (
         call    : call,
         ret     : ret,
 
+        f_cnt   : f_cnt,
+        // f_cnt   : f_cnt,
         PC_n    : PC_n,
         brch_prefix_cnt : brch_prefix_cnt,
         f_en    : f_en
@@ -159,11 +161,11 @@ module stage_if_p4 (
         // handle btq output
         btq_out = '0;
         f_cnt = `MIN(brch_lim_cnt, free_scnt);
+        f_cnt = `MIN(bp_res.lim_cnt, f_cnt);
         for (int i = 0; i < `N; ++i)
             f_en[i] = i < f_cnt;
-            /* ^ want this f_en to be "pre BP f_en". bp_lim_cnt is redundant to BP
-            since BP derives it in the first place */
-        f_cnt = `MIN(bp_res.lim_cnt, f_cnt);
+        /* NO LONGER.. IGNORE THIS:::: ^ want this f_en to be "pre BP f_en". bp_lim_cnt is redundant to BP
+        since BP derives it in the first place */
 
         btq_out.en_cnt = brch_prefix_cnt[f_cnt];
         for (int i = 0; i < `N; ++i) begin
@@ -173,6 +175,9 @@ module stage_if_p4 (
             btq_out.pred    [brch_prefix_cnt[i]] = pred[i];
             btq_out.pred_tgt[brch_prefix_cnt[i]] = pred_tgt[i];
             btq_out.ret     [brch_prefix_cnt[i]] = ret[i];
+            btq_out.hash    [i]                  = bp_res.hash[i];
+            btq_out.ghr_base[i]                  = bp_res.ghr_base[i];
+
         end
 
     end
@@ -230,7 +235,22 @@ module stage_if_p4 (
         //     $display("[%1d]: %1d", i, brch_prefix_cnt[i]);
         $display("flush: %b, flush_PC: 0x%x", flush, flush_PC);
         $display("d_out: {f_en_cnt: %b, dat: [%x, %x]}", d_out.f_en_cnt, d_out.f_dat[0], d_out.f_dat[1]);
+        $display("btq_out.hash: [%b, %b], bp_res.hash: [%b, %b], bp_res.ghr_base: [%2d, %2d]",
+            btq_out.hash[0],
+            btq_out.hash[1],
+            bp_res.hash[0],
+            bp_res.hash[1],
+            bp_res.ghr_base[0],
+            bp_res.ghr_base[1]
+        );
+        $display("brch: %b, PC_n: [%x, %x, %x]",
+            brch,
+            PC_n[0],
+            PC_n[1],
+            PC_n[2]
+        );
         bp0.ghr0.print_ghr;
+        bp0.gshare0.print_gshare;
         $display("<< Fetch <<");
     endtask
 `endif
