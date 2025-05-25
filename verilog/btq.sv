@@ -103,6 +103,7 @@ module btq #(
     always_comb begin
         // handle fetch (outs)
         for (int i = 0; i < NUM_RPORTS; ++i) begin
+            puq_enq_raw[i].cond = state[r_idxs_n[i]].cond;
             puq_enq_raw[i].take = state[r_idxs_n[i]].take;
             puq_enq_raw[i].pc   = state[r_idxs_n[i]].PC;
             puq_enq_raw[i].tgt  = state[r_idxs_n[i]].tgt;
@@ -191,6 +192,7 @@ module btq #(
                     pred    : f_in.pred[i],
                     pred_tgt: f_in.pred_tgt[i],
                     ret     : f_in.ret[i],
+                    cond    : f_in.cond[i],
                     hash    : f_in.hash[i],
                     ghr_base: f_in.ghr_base[i],
 

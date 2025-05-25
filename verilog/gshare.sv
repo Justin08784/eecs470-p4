@@ -46,7 +46,7 @@ module gshare #(
         if (reset)
             for (int i = 0; i < PHT_SZ; ++i)
                 pht[i] <= 2'b01;
-        else if (i_upd.en)
+        else if (i_upd.en && i_upd.dat.cond) // train only on conditional branches!
             pht[i_upd.dat.hash] <= update_sc(pht[i_upd.dat.hash], i_upd.dat.take);
     end
 
