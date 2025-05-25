@@ -1161,42 +1161,85 @@ endmodule
 
 module compactor #(
     parameter int REQW=1,
-    parameter int GNTW=1
+    parameter int GNTW=1,
+    type RCNT = logic[$clog2(REQW):0],
+    type GCNT = logic[$clog2(GNTW):0]
 ) (
-    input   logic [REQW-1:0] req, // in-order, sparse
-    input   logic [$clog2(GNTW):0] lim_cnt,
+    input   logic [REQW-1:0]req, // in-order, sparse
+    input   GCNT            lim_cnt,
 
-    output  logic [REQW:0][$clog2(GNTW):0] prefix_cnt,
-    output  logic [$clog2(REQW):0] gnt_cnt
+    output  GCNT  [REQW:0]  prefix_cnt,
+    output  RCNT            gnt_cnt
         // prefix_cnt[i] "left-compacted index" for the i-th lane.
         // (valid iff req[i])
 );
+`ifdef SYNTH // ferocious bit twiddling version
+    initial begin
+        assert(REQW >= GNTW) else $fatal("compactor: reqw (%d) < gntw (%d)", REQW, GNTW);
+        assert(REQW >= 2)    else $fatal("compactor: reqw less than 2");
+    end
+
+    RCNT [REQW:0] raw_prefix_cnt;
     generate
-    assign prefix_cnt[0] = 0;
-    for (genvar i = 0; i < REQW; ++i) begin
-        assign prefix_cnt[i+1] = prefix_cnt[i] + req[i];
+    assign raw_prefix_cnt[0] = 0;
+    assign raw_prefix_cnt[1] = req[0];
+    for (genvar i = 2; i <= REQW; ++i) begin
+        assign raw_prefix_cnt[i][$clog2(i):0] = raw_prefix_cnt[i-1][$clog2(i-1):0] + req[i-1];
+    end
+
+    for (genvar i = 1; i < REQW; ++i) begin
+        for (genvar j = $clog2(i)+1; j <= $clog2(REQW); ++j) begin
+            assign raw_prefix_cnt[i][j] = 1'b0;
+        end
     end
     endgenerate
 
     generate
-        logic [REQW-1:0] exceeds;
-        logic found;
-        logic [$clog2(REQW)-1:0] first;
-
-        for (genvar i = 0; i < REQW; ++i) begin
-            assign exceeds[i] = (prefix_cnt[i] + req[i]) > lim_cnt;
-        end
-
-        ffs #(
-            .VECW(REQW)
-        ) ff_exceed (
-            .i_vec(exceeds),
-            .o_vld(found),
-            .o_idx(first)
-        );
-
-        assign gnt_cnt = found ? first : REQW;
+    for (genvar i = 0; i <= REQW; ++i) begin
+        assign prefix_cnt[i] = (i <= GNTW || raw_prefix_cnt[i] <= GNTW)
+            ? raw_prefix_cnt[i]
+            : GNTW;
+    end
     endgenerate
+
+    logic [REQW-1:0] exceeds;
+    generate
+    for (genvar i = 0; i < REQW; ++i) begin
+        assign exceeds[i] = raw_prefix_cnt[i+1][$clog2(i+1):0] > lim_cnt;
+    end
+    endgenerate
+    always_comb begin
+        logic found;
+
+        found   = 1'b0;
+        gnt_cnt = REQW;
+        for (int i = 0; i < REQW; ++i) begin
+            if (exceeds[i] && !found) begin
+                found   = 1'b1;
+                gnt_cnt = i;
+            end
+        end
+    end
+
+`else // faster for simulation
+    always_comb begin
+        prefix_cnt[0] = 0;
+        for (int i = 0; i < REQW; ++i)
+            prefix_cnt[i+1] = prefix_cnt[i] + req[i];
+    end
+
+    always_comb begin
+        RCNT cnt;
+
+        cnt     = 0;
+        gnt_cnt = REQW;
+        for (int i = 0; i < REQW; ++i) begin
+            cnt += req[i];
+            if (cnt > lim_cnt && gnt_cnt == REQW)
+                gnt_cnt = i;
+        end
+    end
+`endif
 endmodule
 
 `ifdef DEBUG
