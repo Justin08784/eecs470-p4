@@ -1,22 +1,33 @@
 `include "sys_defs.svh"
 
-module btb #(parameter
-    QUERY_SZ=`N,
-    NUM_LINES=256
+typedef struct packed {
+    // characterizing the exit branch
+    logic fall; // fall(through)? 1->no exit branch (continue fetching sequentially)
+                // set only if len == 2^7 ?
+    logic cond;
+    logic call;
+    logic ret;
+    WADDR tgt;  // target of exit branch (if applicable)
+
+    logic [6:0] dist; // num insns until exit branch
+} FTB_ENTRY;
+
+module ftb #(
+    parameter NUM_LINES=256
 ) (
     input clock,
     input reset,
 
     // fetch query
-    input   WADDR   [QUERY_SZ-1:0]  i_qry, // branch pc
+    input   WADDR       i_qry, // branch pc
 
-    output  logic   [QUERY_SZ-1:0]  o_vld,
-    output  WADDR   [QUERY_SZ-1:0]  o_tgt,
+    output  logic       o_vld,
+    output  FTB_ENTRY   o_tgt,
 
     // puq updates
-    input   puq2fetch i_upd
+    input   puq2fetch   i_upd
 );
-    localparam ASSOC = 2;
+    localparam ASSOC    = 2;
     localparam NUM_SETS = NUM_LINES / ASSOC;
 
     localparam SID_BITS     = $clog2(NUM_SETS);
@@ -46,7 +57,7 @@ module btb #(parameter
         logic   [NUM_SETS-1:0] lru; // 1 bit is enough for 2-way
     } HEADER;
     HEADER hdr, hdr_n;
-    WADDR [NUM_SETS-1:0][ASSOC-1:0] tgt, tgt_n;
+    FTB_ENTRY [NUM_SETS-1:0][ASSOC-1:0] tgt, tgt_n;
 
     typedef struct packed {
         logic   hit;
@@ -83,37 +94,32 @@ module btb #(parameter
         };
     endfunction
 
+    // fetch
     always_comb begin
+        LOC loc;
+
+        loc = locate(hdr, i_qry);
+        o_vld = loc.hit;
+        o_tgt = tgt[loc.sid][loc.way];
+    end
+
+    // retire
+    always_comb begin
+        LOC loc;
+
         hdr_n = hdr;
         tgt_n = tgt;
 
-        // fetch
-        foreach (i_qry[i]) begin
-            LOC loc;
-            loc = locate(hdr, i_qry[i]);
-            o_vld[i] = loc.hit;
-            o_tgt[i] = tgt[loc.sid][loc.way];
+        loc = locate(hdr, i_upd.dat.pc);
 
-            /* Unsure: btb reads during fetch should not update
-            lru, since they're speculative right? */
-            // if (f_in.en[i] && loc.hit)
-            //     hdr_n.lru[loc.sid] = !loc.way;
-        end
+        if (i_upd.en && !loc.hit) begin // dedup (dont insert if already there)
+            WAY way;
+            way = hdr.lru[loc.sid];
 
-        // retire
-        if (i_upd.en) begin
-            LOC loc;
-
-            loc = locate(hdr, i_upd.dat.pc);
-            if (!loc.hit) begin // dedup (dont insert if already there)
-                WAY way;
-                way = hdr.lru[loc.sid];
-
-                hdr_n.vld[loc.sid][way] = 1;
-                hdr_n.tag[loc.sid][way] = loc.tag;
-                hdr_n.lru[loc.sid] = !way;
-                tgt_n[loc.sid][way] = i_upd.dat.tgt;
-            end
+            hdr_n.vld[loc.sid][way] = 1;
+            hdr_n.tag[loc.sid][way] = loc.tag;
+            hdr_n.lru[loc.sid]      = !way;
+            tgt_n[loc.sid][way]     = i_upd.dat.tgt;
         end
     end
 
@@ -129,7 +135,7 @@ module btb #(parameter
 
 
 `ifdef DEBUG
-    task automatic print_btb();
+    task automatic print_ftb();
         for (int s = 0; s < NUM_SETS; ++s) begin
             if (!(|hdr.vld[s]))
                 continue;
