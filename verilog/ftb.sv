@@ -1,17 +1,5 @@
 `include "sys_defs.svh"
 
-typedef struct packed {
-    // characterizing the exit branch
-    logic fall; // fall(through)? 1->no exit branch (continue fetching sequentially)
-                // set only if len == 2^7 ?
-    logic cond;
-    logic call;
-    logic ret;
-    WADDR tgt;  // target of exit branch (if applicable)
-
-    logic [6:0] dist; // num insns until exit branch
-} FTB_ENTRY;
-
 module ftb #(
     parameter NUM_LINES=256
 ) (

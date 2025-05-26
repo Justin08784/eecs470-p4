@@ -32,6 +32,7 @@
 `define ROB_SZ 64
 `define BTQ_SZ 16
 `define RAS_SZ 16
+`define FTQ_SZ 32
     /* BTQ_SZ doubled (form 8). This improved CPI on tight loop
     programs like branchy.s and branchy_nested.s */
 `define PHYS_REG_SZ_P6 32
@@ -437,6 +438,29 @@ typedef struct packed {
 typedef struct packed {
     logic _dummy;
 } LQ_ENTRY;
+
+typedef struct packed {
+    // characterizing the exit branch
+    logic brch; // if set fetch block has an exit branch
+                // else fallthrough (continue fetching sequentially) and assert(len == 2^7)
+    logic cond;
+    logic call;
+    logic ret;
+    WADDR tgt;  // target of exit branch (if applicable)
+
+    logic [6:0] len; // num insns until exit branch
+} FTB_ENTRY;
+
+typedef struct packed {
+    // characterizing the exit branch
+    logic brch;
+    logic cond;
+    logic call;
+    logic ret;
+    WADDR base; // base address of fetch block (i.e. FTB index)
+
+    logic [6:0] len; // num insns until exit branch
+} FTQ_ENTRY;
 
 // BTQ stuff
 // By btq
