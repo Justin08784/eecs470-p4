@@ -189,7 +189,7 @@ GREP = grep -E --color=auto
 # ---- Modules to Test ---- #
 
 # TODO: add more modules here
-MODULES = cpu ghr mult rob rs fifo free_list dispatch prf map_table stage_id_p4 execute fetch skid_buffer victim
+MODULES = cpu ghr mult rob rs fifo free_list dispatch prf map_table stage_id_p4 execute fetch skid_buffer victim ftq ftb
 
 # TODO: update this if you add more header files
 ALL_HEADERS = $(CPU_HEADERS)
@@ -267,6 +267,16 @@ BTQ_FILES = verilog/sys_defs.svh
 build/btq.simv: $(BTB_FILES)
 build/btq.cov: $(BTB_FILES)
 build/btq.vg: $(BTB_FILES)
+
+FTQ_FILES = verilog/sys_defs.svh verilog/ring_ctr.sv
+build/ftq.simv: $(FTQ_FILES)
+build/ftq.cov: $(FTQ_FILES)
+build/ftq.vg: $(FTQ_FILES)
+
+FTB_FILES = verilog/sys_defs.svh
+build/ftb.simv: $(FTQ_FILES)
+build/ftb.cov: $(FTQ_FILES)
+build/ftb.vg: $(FTQ_FILES)
 
 VICTIM_FILES = verilog/sys_defs.svh verilog/psel_gen.sv
 build/victim.simv: $(VICTIM_FILES)

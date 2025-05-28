@@ -440,26 +440,51 @@ typedef struct packed {
 } LQ_ENTRY;
 
 typedef struct packed {
-    // characterizing the exit branch
-    logic brch; // if set fetch block has an exit branch
-                // else fallthrough (continue fetching sequentially) and assert(len == 2^7)
-    logic cond;
-    logic call;
-    logic ret;
-    WADDR tgt;  // target of exit branch (if applicable)
+    // PC of exit branch of take-next fetch block
+    WADDR next_exit;
 
-    logic [6:0] len; // num insns until exit branch
-} FTB_ENTRY;
+    logic take_ovsz; // if set, use ootb_idx (will be cleared if ootb entry is invalidated)
+    union packed {
+        logic [5:0] offset;
+        logic [5:0] ootb_idx;
+    } t;
+    // take-next FB exit branch PC = take_ovsz ? ootb[t.ootb_idx] : next_exit - t.offset
+} jFTB_ENTRY; // jump FTB
 
 typedef struct packed {
-    // characterizing the exit branch
-    logic brch;
+    // md of current exit branch
+    logic cond;
+    logic call;
+    // logic ret;
+
+    // PC of exit branch of take-next fetch block
+    WADDR next_exit;
+
+    logic take_ovsz, fall_ovsz; // if set, use ootb_idx (will be cleared if ootb entry is invalidated)
+    union packed {
+        logic [5:0] offset;
+        logic [5:0] ootb_idx;
+    } t, f;
+    // take-next FB exit branch PC = take_ovsz ? ootb[t.ootb_idx] : next_exit - t.offset
+    // fall-next FB exit branch PC = fall_ovsz ? ootb[f.ootb_idx] : query_PC  + f.offset
+} bFTB_ENTRY; // bimodal FTB
+
+typedef struct packed {
+    logic [1:0] version;// version tag (for lazy invalidation of FTB entries)
+    WADDR       pc;     // A full PC value. pointing FTB entry decides how to interpret this
+    logic [3:0] ref_cnt;// number of FTB references to it
+} OOTB_ENTRY;
+
+typedef struct packed {
+    // md of the exit branch *which led to this FB*
+    // (i.e. fb_end of the previous FTQ entry)
     logic cond;
     logic call;
     logic ret;
-    WADDR base; // base address of fetch block (i.e. FTB index)
 
-    logic [6:0] len; // num insns until exit branch
+    // fetch distance
+    WADDR fb_start;
+    WADDR fb_end;
 } FTQ_ENTRY;
 
 // BTQ stuff
