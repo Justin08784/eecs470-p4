@@ -1,23 +1,35 @@
 `include "sys_defs.svh"
 
+typedef struct packed {
+    logic       vld1, vld2;
+    WADDR       tgt1, tgt2;
+    logic [3:0] off1, off2;
+    logic       always_take1, always_take2;
+    struct packed {
+        logic cond; // = "sharing" bit
+        logic call;
+        logic ret;
+        logic jalr;
+    } md2; // re: br2/tail_slot
+} FTB_ENTRY;
+
 module ftb #(
-    parameter NUM_LINES=256,
-    type ENTRY = bFTB_ENTRY
+    parameter NUM_LINES=256
 ) (
     input clock,
     input reset,
 
     // fetch query
-    input   WADDR   i_qry, // branch pc
+    input   WADDR       i_qry, // branch pc
 
-    output  logic   o_vld,
-    output  ENTRY   o_tgt,
+    output  logic       o_vld,
+    output  FTB_ENTRY   o_tgt,
 
     // puq updates
     input   struct packed {
-        logic en;
-        WADDR pc;
-        ENTRY dat;
+        logic       en;
+        WADDR       pc;
+        FTB_ENTRY   dat;
     } i_upd
 );
     localparam ASSOC    = 2;
@@ -50,7 +62,7 @@ module ftb #(
         logic   [NUM_SETS-1:0] lru; // 1 bit is enough for 2-way
     } HEADER;
     HEADER hdr, hdr_n;
-    ENTRY [NUM_SETS-1:0][ASSOC-1:0] tgt, tgt_n;
+    FTB_ENTRY [NUM_SETS-1:0][ASSOC-1:0] tgt, tgt_n;
 
     typedef struct packed {
         logic   hit;
@@ -87,32 +99,64 @@ module ftb #(
         };
     endfunction
 
+    // s1: tag access
+    // s2: data access
+    struct packed {
+        logic   hit;
+        SID     sid;
+        WAY     way;
+    } s1r, s1r_n;
+
+    struct packed {
+        logic   en;
+        SID     sid;
+        TAG     tag;
+        WAY     way;
+        FTB_ENTRY dat;
+    } s1w, s1w_n;
+
     // fetch
     always_comb begin
+        // s1
         LOC loc;
-
         loc = locate(hdr, i_qry);
-        o_vld = loc.hit;
-        o_tgt = tgt[loc.sid][loc.way];
+
+        s1r_n = '{
+            hit : loc.hit,
+            sid : loc.sid,
+            way : loc.way
+        };
+
+        // s2
+        o_vld = s1r.hit;
+        o_tgt = tgt[s1r.sid][s1r.way];
     end
 
     // retire
     always_comb begin
+        // s1
         LOC loc;
+        loc = locate(hdr, i_upd.pc);
+        s1w_n = '{
+            en  : i_upd.en,
+            sid : loc.sid,
+            tag : loc.tag,
+            way : hdr.lru[loc.sid],
+            dat : i_upd.dat
+        };
 
+        // s2
         hdr_n = hdr;
         tgt_n = tgt;
 
-        loc = locate(hdr, i_upd.pc);
-
-        if (i_upd.en && !loc.hit) begin // dedup (dont insert if already there)
-            WAY way;
-            way = hdr.lru[loc.sid];
-
-            hdr_n.vld[loc.sid][way] = 1;
-            hdr_n.tag[loc.sid][way] = loc.tag;
-            hdr_n.lru[loc.sid]      = !way;
-            tgt_n[loc.sid][way]     = i_upd.dat;
+        // if (i_upd.en && !loc.hit) begin // dedup (dont insert if already there)
+        // ^^ This dedup rule should no longer be valid if must be able to selectively
+        // overwrite parts of existing FTB entries.
+        if (s1w.en) begin
+            hdr_n.vld[s1w.sid][s1w.way] = 1;
+            hdr_n.tag[s1w.sid][s1w.way] = s1w.tag;
+            hdr_n.lru[s1w.sid]          = !s1w.way;
+            tgt_n[s1w.sid][s1w.way]     = i_upd.dat;
         end
     end
 
@@ -120,9 +164,13 @@ module ftb #(
         if (reset) begin
             hdr <= '0;
             tgt <= '0;
+            s1r <= '0;
+            s1w <= '0;
         end else begin
             hdr <= hdr_n;
             tgt <= tgt_n;
+            s1r <= s1r_n;
+            s1w <= s1w_n;
         end
     end
 
