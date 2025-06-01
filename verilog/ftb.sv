@@ -1,19 +1,24 @@
 `include "sys_defs.svh"
 
 module ftb #(
-    parameter NUM_LINES=256
+    parameter NUM_LINES=256,
+    type ENTRY = bFTB_ENTRY
 ) (
     input clock,
     input reset,
 
     // fetch query
-    input   WADDR       i_qry, // branch pc
+    input   WADDR   i_qry, // branch pc
 
-    output  logic       o_vld,
-    output  FTB_ENTRY   o_tgt,
+    output  logic   o_vld,
+    output  ENTRY   o_tgt,
 
     // puq updates
-    input   puq2fetch   i_upd
+    input   struct packed {
+        logic en;
+        WADDR pc;
+        ENTRY dat;
+    } i_upd
 );
     localparam ASSOC    = 2;
     localparam NUM_SETS = NUM_LINES / ASSOC;
@@ -45,7 +50,7 @@ module ftb #(
         logic   [NUM_SETS-1:0] lru; // 1 bit is enough for 2-way
     } HEADER;
     HEADER hdr, hdr_n;
-    FTB_ENTRY [NUM_SETS-1:0][ASSOC-1:0] tgt, tgt_n;
+    ENTRY [NUM_SETS-1:0][ASSOC-1:0] tgt, tgt_n;
 
     typedef struct packed {
         logic   hit;
@@ -98,7 +103,7 @@ module ftb #(
         hdr_n = hdr;
         tgt_n = tgt;
 
-        loc = locate(hdr, i_upd.dat.pc);
+        loc = locate(hdr, i_upd.pc);
 
         if (i_upd.en && !loc.hit) begin // dedup (dont insert if already there)
             WAY way;
@@ -107,7 +112,7 @@ module ftb #(
             hdr_n.vld[loc.sid][way] = 1;
             hdr_n.tag[loc.sid][way] = loc.tag;
             hdr_n.lru[loc.sid]      = !way;
-            tgt_n[loc.sid][way]     = i_upd.dat.tgt;
+            tgt_n[loc.sid][way]     = i_upd.dat;
         end
     end
 
