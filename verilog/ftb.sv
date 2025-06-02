@@ -14,7 +14,8 @@ typedef struct packed {
 } FTB_ENTRY;
 
 module ftb #(
-    parameter NUM_LINES=256
+    parameter NUM_LINES=1024,
+    parameter ASSOC = 4
 ) (
     input clock,
     input reset,
@@ -32,9 +33,7 @@ module ftb #(
         FTB_ENTRY   dat;
     } i_upd
 );
-    localparam ASSOC    = 2;
-    localparam NUM_SETS = NUM_LINES / ASSOC;
-
+    localparam NUM_SETS     = NUM_LINES / ASSOC;
     localparam SID_BITS     = $clog2(NUM_SETS);
     localparam TAG_SKIMP    = 3;
     /*
@@ -48,6 +47,7 @@ module ftb #(
     typedef logic [SID_BITS-1:0] SID;
     typedef logic [TAG_BITS-1:0] TAG;
     typedef logic [$clog2(ASSOC)-1:0]   WAY;
+    typedef logic [ASSOC-1:0][ASSOC-1:0]AGE;
 
     function automatic TAG get_tag(input WADDR waddr);
         return waddr[SID_BITS+TAG_BITS-1:SID_BITS];
@@ -59,7 +59,13 @@ module ftb #(
     typedef struct packed {
         logic   [NUM_SETS-1:0][ASSOC-1:0] vld;
         TAG     [NUM_SETS-1:0][ASSOC-1:0] tag;
-        logic   [NUM_SETS-1:0] lru; // 1 bit is enough for 2-way
+        /* TODO: implement pLRU (tree or bit) for assoc ≥ 8.
+        Maybe auto-switch between LRU and pRLU according to assoc
+        parameter, keeping LRU for assoc < 8. 
+        
+        TODO: We can save bits in the LRU age matrix by storing the upper-triangle
+        bits (top right above diagonal). */
+        AGE     [NUM_SETS-1:0] age;
     } HEADER;
     HEADER hdr, hdr_n;
     FTB_ENTRY [NUM_SETS-1:0][ASSOC-1:0] tgt, tgt_n;
@@ -99,6 +105,21 @@ module ftb #(
         };
     endfunction
 
+    function automatic AGE update_lru(
+        input AGE age,
+        input WAY way
+    );
+        AGE rv;
+        rv = age;
+        foreach(rv[i, j]) begin
+            if (i == way)
+                rv[i][j] = i == j;
+            else if (j == way)
+                rv[i][j] = 1;
+        end
+        return rv;
+    endfunction
+
     // s1: tag access
     // s2: data access
     struct packed {
@@ -135,13 +156,28 @@ module ftb #(
     // retire
     always_comb begin
         // s1
+        logic [NUM_SETS-1:0][ASSOC-1:0] lru;
+        logic [NUM_SETS-1:0][$clog2(ASSOC)-1:0] ways;
         LOC loc;
+
+        foreach (lru[s, w])
+            lru[s][w] = &hdr.age[s][w];
+
+        ways = '0;
+        foreach (ways[s]) begin
+            for (int w = 0; w < ASSOC; ++w) begin
+                if (lru[s][w])
+                    ways[s] = w;
+            end
+        end
+        
         loc = locate(hdr, i_upd.pc);
+
         s1w_n = '{
             en  : i_upd.en,
             sid : loc.sid,
             tag : loc.tag,
-            way : hdr.lru[loc.sid],
+            way : ways[loc.sid],
             dat : i_upd.dat
         };
 
@@ -155,14 +191,21 @@ module ftb #(
         if (s1w.en) begin
             hdr_n.vld[s1w.sid][s1w.way] = 1;
             hdr_n.tag[s1w.sid][s1w.way] = s1w.tag;
-            hdr_n.lru[s1w.sid]          = !s1w.way;
+            hdr_n.age[s1w.sid]          = update_lru(hdr.age[s1w.sid], s1w.way);
+            /* TODO: since every branch queries the FTB (but not every branch
+            generates an FTB update) we need an LRU update for reads as well,
+            not just writes. */
             tgt_n[s1w.sid][s1w.way]     = i_upd.dat;
         end
     end
 
     always_ff @(posedge clock) begin
         if (reset) begin
-            hdr <= '0;
+            hdr <= '{
+                vld : '0,
+                tag : '0,
+                age : '1 // *IMPORTANT* empty lines are treated as "oldest"
+            };
             tgt <= '0;
             s1r <= '0;
             s1w <= '0;
