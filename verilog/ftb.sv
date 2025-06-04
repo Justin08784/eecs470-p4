@@ -1,17 +1,119 @@
 `include "sys_defs.svh"
 
 typedef struct packed {
-    logic       vld1, vld2;
-    WADDR       tgt1, tgt2;
-    logic [3:0] off1, off2;
-    logic       always_take1, always_take2;
+    // fallthrough npc (i.e. npc if no branch taken)
+    logic [3:0] ft_lo4;     // LSB 4-bits
+    logic       ft_cry;     // carry: does adding ft_off into base overflow a 4-bit offset
+                            // (i.e. generate carry into bit 4)?
+        /*
+        has_end := does [base, base + 16) contain an FB-ending branch
+        (i.e. a cond branch that was taken at least once or an uncond branch)?
+        end_off := 4-bit offset from base to last FB-ending branch, if any
+
+        logic [4:0] ft_off = has_end ? end_off + 1 : 16;
+        ft_npc = base + ft_off;
+
+        In retire, we compute ft_lo4, ft_cry as follows...
+        logic [4:0] cry_sum;
+        cry_sum = base[3:0] + ft_off;
+        ft_lo4 = cry_sum[3:0];
+        ft_cry = cry_sum[4];
+
+        ...so that in BPU/pc-gen we can efficiently reconstruct ft_npc:
+        ft_npc[:4]  = base[:4] + ft_cry;
+        ft_npc[3:0] = ft_lo4;
+        */
+
+    // two branch slots: [0, 1]
     struct packed {
-        logic cond; // = "sharing" bit
+        logic       vld;
+        WADDR       tgt;
+        logic [3:0] off;
+        logic       always_take;
+    } [1:0] br_slot;
+
+    // metadata re: br1/tail slot
+    struct packed {
+        logic cond;         // = "sharing" bit
         logic call;
         logic ret;
         logic jalr;
-    } md2; // re: br2/tail_slot
+    } md1;
 } FTB_ENTRY;
+
+typedef struct packed {
+    logic [3:0] ft_lo4;
+    logic       ft_cry;
+
+    struct packed {
+        logic       vld;
+        logic [3:0] off;
+        logic       always_take;
+    } [1:0] br_slot;
+
+    logic       cond;   // is br1 conditional?
+} FTB_ENTRY_vFTQ;
+
+typedef struct packed {
+    WADDR base;         // base address of FB
+
+    logic take;         // any taken?
+    logic take_slot;    // if so which branch slot?
+
+    FTB_ENTRY_vFTQ fb;  // pared down FTB entry
+} _FTQ_ENTRY;
+
+typedef struct packed {
+`ifdef DEBUG
+    BMASK   b1hot;
+`endif
+    WADDR   PC;
+
+    /* TODO: have a single take, tgt field, initialized by the BPU, but later
+    overwritten by decode/EX when the branch resolves */
+    logic   pred;
+    WADDR   pred_tgt;
+    logic   take;
+    WADDR   tgt;
+
+    logic   ret;    // is a ret instruction? (heuristic only; see predecoder for spec)
+    logic   cond;   // is a conditional branch?
+
+    logic   [GHR_LEN-1:0] hash; // gshare hash index
+    logic   [`N-1:0][$clog2(GHR_BUF_SZ)-1:0] ghr_base;
+    logic   pred_bim;
+    logic   pred_gshare;
+
+    logic   [$clog2(`FTQ_SZ)-1:0] ftq_idx; // pointer to owning FTQ entry
+        /* Since multiple contiguous BTQ entries may be associated with an FTQ entry,
+        an FTQ entry cannot dequeue until the "last" in the BTQ entry span is reached.
+
+        TODO by retire coalescer unit (RCU):
+        When a BTQ entry is dequeued, it spends 1 cycle to form into an FTB entry,
+        and the FTB entry is latched into a "previous flop" local to the RCU.
+        (maybe call prev-flop "working entry")
+
+        For each new BTQ retiree entering the RCU:
+        1. If prev-flop is invalid (i.e. contains no valid insn)
+        -> Merge update into the FTQ-stored FTB entry copy, latch into prev-flop.
+        2. Else if prev-flop valid && ftq_idx NOT match that of prev-flop.
+        -> Push prev-flop entry to the FTB and dequeue its FTQ entry.
+        -> Merge update into the FTQ-stored FTB entry copy, latch into prev-flop.
+        3. Else if prev-flop valid && ftq_idx match that of prev-flop && !spill.
+            (spill := the tail slot of the FTB entry, either from FTQ or prev-flop,
+            is valid and the incoming retiree's branch's pc exceeds the tail slot's pc,
+            requiring storage in the next FTB entry)
+        -> Merge update into the prev-flop stored FTB entry copy.
+        (no updates to FTB / dequeue from FTQ)
+        4. Else if prev-flop valid && ftq_idx match that of prev-flop && spill.
+        -> Push prev-flop entry to the FTB. (but DO NOT dequeue its FTQ entry)
+        -> Advance retiree's fb_base past end of current FB and store into the prev-flop.
+        (This can allow arbitrary chaining of spills, even if the FTB entry is packed
+        with 16 branches. Each branch in the same 16-insn span with the same FB base
+        will have the same ftq_idx. Each spill from the prev-flop will just push
+        out the prev-flop and the new retiree will advance the FB base).
+        */
+} _BTQ_ENTRY;
 
 module ftb #(
     parameter NUM_LINES=1024,
@@ -29,8 +131,8 @@ module ftb #(
     // puq updates
     input   struct packed {
         logic       en;
-        WADDR       pc;
-        FTB_ENTRY   dat;
+        WADDR       base;
+        FTB_ENTRY   fb;
     } i_upd
 );
     localparam NUM_SETS     = NUM_LINES / ASSOC;
@@ -171,14 +273,14 @@ module ftb #(
             end
         end
         
-        loc = locate(hdr, i_upd.pc);
+        loc = locate(hdr, i_upd.base);
 
         s1w_n = '{
             en  : i_upd.en,
             sid : loc.sid,
             tag : loc.tag,
             way : ways[loc.sid],
-            dat : i_upd.dat
+            dat : i_upd.fb
         };
 
         // s2
@@ -195,7 +297,7 @@ module ftb #(
             /* TODO: since every branch queries the FTB (but not every branch
             generates an FTB update) we need an LRU update for reads as well,
             not just writes. */
-            tgt_n[s1w.sid][s1w.way]     = i_upd.dat;
+            tgt_n[s1w.sid][s1w.way]     = i_upd.fb;
         end
     end
 
