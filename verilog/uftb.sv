@@ -170,33 +170,141 @@ module uftb #(
         return rv;
     endfunction
 
-    function automatic FTB_ENTRY update_fb(
-        output logic        spill,
-        input FTB_ENTRY     look,
+    function automatic FTB_ENTRY wr_br0(
+        input FTB_ENTRY     dst,
         input FTB_UPD_PKT   udat
     );
-        // TODO: stubbed
-        spill = 1'b0;
-        return look;
+        FTB_ENTRY rv;
+        rv = dst;
+
+        rv.br_slot[0] = '{
+            vld : 1,
+            tgt : udat.tgt,
+            off : udat.pc_off,
+            always_take : udat.always_take 
+        };
+
+        return rv;
+    endfunction
+
+    function automatic FTB_ENTRY wr_br1(
+        input FTB_ENTRY     dst,
+        input FTB_UPD_PKT   udat
+    );
+        FTB_ENTRY rv;
+        rv = dst;
+
+        rv.br_slot[1] = '{
+            vld : 1,
+            tgt : udat.tgt,
+            off : udat.pc_off,
+            always_take : udat.always_take
+        };
+
+        rv.md1 = '{
+            cond : 0,
+            call : udat.call,
+            ret  : udat.ret,
+            jalr : udat.jalr
+        };
+
+        return rv;
+    endfunction
+
+    function automatic FTB_ENTRY update_fb(
+        output logic        spill,
+        input FTB_ENTRY     dst,
+        input FTB_UPD_PKT   udat
+    );
+        FTB_ENTRY rv;
+        logic [1:0] vld;
+        logic eq0, eq1, lt0, lt1;
+        rv = dst;
+        vld[0] = dst.br_slot[0].vld;
+        vld[1] = dst.br_slot[1].vld;
+        eq0 = udat.pc_off == dst.br_slot[0].off;
+        eq1 = udat.pc_off == dst.br_slot[1].off;
+        lt0 = udat.pc_off <  dst.br_slot[0].off;
+        lt1 = udat.pc_off <  dst.br_slot[1].off;
+
+        spill = vld[1] && (dst.br_slot[1].off < udat.pc_off);
+
+        if (vld[0] && eq0)
+            rv = wr_br0(rv, udat);
+        else if (vld[1] && eq1)
+            rv = wr_br1(rv, udat);
+        else begin
+            case (vld) // {vld[0], vld[1]}
+            2'b00,
+            2'b01: begin
+                rv = udat.cond
+                    ? wr_br0(rv, udat)
+                    : wr_br1(rv, udat);
+
+            end
+
+            2'b10: begin
+                if (lt0)
+                    if (udat.cond) begin
+                        // shift left
+                        rv.br_slot[1]   = rv.br_slot[0];
+                        rv.md1.cond     = 1;
+
+                        rv = wr_br0(rv, udat);
+                    end else begin
+                        // invalidate to ensure off[0] < off[1]
+                        rv.br_slot[0].vld = 0;
+
+                        rv = wr_br1(rv, udat);
+                    end
+                else
+                    rv = wr_br1(rv, udat);
+
+            end
+
+            2'b11: begin
+                if (lt0)
+                    if (udat.cond) begin
+                        // shift left
+                        rv.br_slot[1]   = rv.br_slot[0];
+                        rv.md1.cond     = 1;
+
+                        rv = wr_br0(rv, udat);
+                    end else begin
+                        // invalidate to ensure off[0] < off[1]
+                        rv.br_slot[0].vld = 0;
+
+                        rv = wr_br1(rv, udat);
+                    end
+                else if (lt1)
+                    rv = wr_br1(rv, udat);
+
+            end
+
+            endcase
+        end
+
+        return rv;
     endfunction
 
     function automatic FTB_ENTRY create_fb(
         input FTB_UPD_PKT   udat
     );
-        // TODO: stubbed
-        return '0;
+        FTB_ENTRY rv = '0;
+
+        if (udat.cond) begin
+            rv.end_off = 15;
+            rv = wr_br0(rv, udat);
+
+        end else begin
+            rv.end_off = udat.pc_off;
+            rv = wr_br1(rv, udat);
+
+        end
+
+        return rv;
     endfunction
 
-    // fetch
-    always_comb begin
-        LOC loc;
-        loc = locate(hdr, i_qry);
-
-        o_vld = loc.hit;
-        o_tgt = tgt[loc.way];
-    end
-
-    // retire
     logic [NUM_LINES-1:0] lru;
     WAY lru_way;
     always_comb begin
@@ -210,6 +318,16 @@ module uftb #(
         end
     end
 
+    // fetch
+    always_comb begin
+        LOC loc;
+        loc = locate(hdr, i_qry);
+
+        o_vld = loc.hit;
+        o_tgt = tgt[loc.way];
+    end
+
+    // retire
     always_comb begin
         LOC loc;
         WAY way;
