@@ -112,6 +112,25 @@ typedef struct packed {
         with 16 branches. Each branch in the same 16-insn span with the same FB base
         will have the same ftq_idx. Each spill from the prev-flop will just push
         out the prev-flop and the new retiree will advance the FB base).
+
+        Problem:
+        But consider branches A, X, B, where A, B write to the same FTB entry f1
+        while X writes to a different FTB entry f2. Thus, A, B have different ftq idx's
+        due to the separating X. But if A, B both spill out of f1 they will each allocate
+        a new FTB entry with the same new base, and B's entry will overwrite A's
+        because B was not able to observe A's partial copy in prev-flop due to the 1 cycle
+        separation.
+
+        Problem:
+        Same setup as above A, X, B. But f1 is has 1 free slot. A writes to the FTB
+        entry. Sees no successor, pushes prev-flop working copy to the FTB. X overwrites
+        prev-flop. B still has the stale copy of the FTB entry in the FTQ, and believes
+        it still has 1 free slot–– writes to it. B overwrites update by A.
+
+        Solution (I think):
+        DO NOT HANDLE SPILLS. Abandon retire-side coalescing entirely. uFTB should
+        re-read the base of every incoming update. Push an update to uFTB only if
+        a diff is detected.
         */
 } _BTQ_ENTRY;
 

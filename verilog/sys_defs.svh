@@ -32,7 +32,6 @@
 `define ROB_SZ 64
 `define BTQ_SZ 16
 `define RAS_SZ 16
-`define FTQ_SZ 32
     /* BTQ_SZ doubled (form 8). This improved CPI on tight loop
     programs like branchy.s and branchy_nested.s */
 `define PHYS_REG_SZ_P6 32
@@ -438,54 +437,6 @@ typedef struct packed {
 typedef struct packed {
     logic _dummy;
 } LQ_ENTRY;
-
-typedef struct packed {
-    // PC of exit branch of take-next fetch block
-    WADDR next_exit;
-
-    logic take_ovsz; // if set, use ootb_idx (will be cleared if ootb entry is invalidated)
-    union packed {
-        logic [5:0] offset;
-        logic [5:0] ootb_idx;
-    } t;
-    // take-next FB exit branch PC = take_ovsz ? ootb[t.ootb_idx] : next_exit - t.offset
-} jFTB_ENTRY; // jump FTB
-
-typedef struct packed {
-    // md of current exit branch
-    logic cond;
-    logic call;
-    // logic ret;
-
-    // PC of exit branch of take-next fetch block
-    WADDR next_exit;
-
-    logic take_ovsz, fall_ovsz; // if set, use ootb_idx (will be cleared if ootb entry is invalidated)
-    union packed {
-        logic [5:0] offset;
-        logic [5:0] ootb_idx;
-    } t, f;
-    // take-next FB exit branch PC = take_ovsz ? ootb[t.ootb_idx] : next_exit - t.offset
-    // fall-next FB exit branch PC = fall_ovsz ? ootb[f.ootb_idx] : query_PC  + f.offset
-} bFTB_ENTRY; // bimodal FTB
-
-typedef struct packed {
-    logic [1:0] version;// version tag (for lazy invalidation of FTB entries)
-    WADDR       pc;     // A full PC value. pointing FTB entry decides how to interpret this
-    logic [3:0] ref_cnt;// number of FTB references to it
-} OOTB_ENTRY;
-
-typedef struct packed {
-    // md of the exit branch *which led to this FB*
-    // (i.e. fb_end of the previous FTQ entry)
-    logic cond;
-    logic call;
-    logic ret;
-
-    // fetch distance
-    WADDR fb_start;
-    WADDR fb_end;
-} FTQ_ENTRY;
 
 // BTQ stuff
 // By btq
