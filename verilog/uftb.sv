@@ -233,17 +233,12 @@ module uftb #(
             rv = wr_br0(rv, udat);
         else if (vld[1] && eq1)
             rv = wr_br1(rv, udat);
-        else begin
-            case (vld) // {vld[0], vld[1]}
-            2'b00,
-            2'b01: begin
+        else
+            if (!vld[0])
                 rv = udat.cond
                     ? wr_br0(rv, udat)
                     : wr_br1(rv, udat);
-
-            end
-
-            2'b10: begin
+            else
                 if (lt0)
                     if (udat.cond) begin
                         // shift left
@@ -260,29 +255,9 @@ module uftb #(
                 else
                     rv = wr_br1(rv, udat);
 
-            end
-
-            2'b11: begin
-                if (lt0)
-                    if (udat.cond) begin
-                        // shift left
-                        rv.br_slot[1]   = rv.br_slot[0];
-                        rv.md1.cond     = 1;
-
-                        rv = wr_br0(rv, udat);
-                    end else begin
-                        // invalidate to ensure off[0] < off[1]
-                        rv.br_slot[0].vld = 0;
-
-                        rv = wr_br1(rv, udat);
-                    end
-                else if (lt1)
-                    rv = wr_br1(rv, udat);
-
-            end
-
-            endcase
-        end
+        rv.end_off = rv.br_slot[1].vld
+            ? rv.br_slot[1].off
+            : 15;
 
         return rv;
     endfunction
