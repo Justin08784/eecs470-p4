@@ -91,10 +91,10 @@ module uftb #(
     output  FTB_ENTRY   o_tgt,
 
     // puq updates
-    input   logic       i_upd_en,
-    input   FTB_UPD_PKT i_upd_dat
+    input   logic       i_uen,
+    input   FTB_UPD_PKT i_udat
 );
-    localparam TAG_SKIMP    = 3;
+    localparam TAG_SKIMP = 0;
         /* TAG_SKIMP = how many bits to drop from the full tag that is required to
         eliminate aliases (0 for no alias).
 
@@ -170,6 +170,23 @@ module uftb #(
         return rv;
     endfunction
 
+    function automatic FTB_ENTRY update_fb(
+        output logic        spill,
+        input FTB_ENTRY     look,
+        input FTB_UPD_PKT   udat
+    );
+        // TODO: stubbed
+        spill = 1'b0;
+        return look;
+    endfunction
+
+    function automatic FTB_ENTRY create_fb(
+        input FTB_UPD_PKT   udat
+    );
+        // TODO: stubbed
+        return '0;
+    endfunction
+
     // fetch
     always_comb begin
         LOC loc;
@@ -180,32 +197,46 @@ module uftb #(
     end
 
     // retire
+    logic [NUM_LINES-1:0] lru;
+    WAY lru_way;
     always_comb begin
-        logic [NUM_LINES-1:0] lru;
-        LOC loc;
-        WAY way;
-
         foreach (lru[w])
             lru[w] = &hdr.age[w];
 
-        way = '0;
+        lru_way = '0;
         for (int w = 0; w < NUM_LINES; ++w) begin
             if (lru[w])
-                way = w;
+                lru_way = w;
         end
-        
-        loc = locate(hdr, i_upd_dat.base);
+    end
+
+    always_comb begin
+        LOC loc;
+        WAY way;
+        logic spill;
+        FTB_ENTRY wfb; // FTB entry with updates
+        logic wen;
+
+        loc = locate(hdr, i_udat.base);
+        way = loc.hit ? loc.way : lru_way;
+        wfb = loc.hit
+            ? update_fb(spill, tgt[loc.way], i_udat)
+            : create_fb(i_udat);
+        wen = i_uen && (!loc.hit || !spill);
+
         hdr_n = hdr;
         tgt_n = tgt;
 
-        if (i_upd_en) begin
+        if (wen) begin
             hdr_n.vld[way]  = 1;
+            hdr_n.dirty[way]= 1;
             hdr_n.tag[way]  = loc.tag;
             hdr_n.age       = update_lru(hdr.age, way);
                 /* TODO: since every branch queries the FTB (but not every branch
                 generates an FTB update) we need an LRU update for reads as well,
                 not just writes. */
-            tgt_n[way]      = i_upd_dat;
+
+            tgt_n[way]      = wfb;
         end
     end
 
@@ -227,7 +258,7 @@ module uftb #(
     end
 
 
-// `ifdef DEBUG
+`ifdef DEBUG
     task automatic print_ftb();
         for (int w = 0; w < NUM_LINES; ++w) begin
             if (!hdr.vld[w]) begin
@@ -241,5 +272,5 @@ module uftb #(
             );
         end
     endtask
-// `endif
+`endif
 endmodule
