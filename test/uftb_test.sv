@@ -401,6 +401,111 @@ module uftb_test;
         fb  = uftb.update_fb(spill, save, udat);
         chk(1, '0);
 
+        $display("\nTest 5: vld = [1, 1] (no gap)");
+        save = init_fb(
+            '0,
+            '{1, 1, tgt[0]},
+            '{1, 2, tgt[1], md_cond}
+        );
+
+        $display("  5A: udat = {off = br0_off, tgt3, md_cond}");
+        udat= init_udat(udat, 1, tgt[2], md_cond);
+        fb  = uftb.update_fb(spill, save, udat);
+        chk(0, init_fb(
+            '0,
+            '{1, 1, tgt[2]},
+            '{1, 2, tgt[1], md_cond}
+        ));
+
+        $display("  5B: udat = {off = br1_off, tgt3, md_cond}");
+        udat= init_udat(udat, 2, tgt[2], md_cond);
+        fb  = uftb.update_fb(spill, save, udat);
+        chk(0, init_fb(
+            '0,
+            '{1, 1, tgt[0]},
+            '{1, 2, tgt[2], md_cond}
+        ));
+
+        $display("  5A': udat = {off = br0_off, tgt3, md_call}");
+        udat= init_udat(udat, 1, tgt[2], md_call);
+        fb  = uftb.update_fb(spill, save, udat);
+        chk(0, init_fb(
+            '0,
+            '0,
+            '{1, 1, tgt[2], md_call}
+        ));
+
+        $display("  5B': udat = {off = br1_off, tgt3, md_call}");
+        udat= init_udat(udat, 2, tgt[2], md_call);
+        fb  = uftb.update_fb(spill, save, udat);
+        chk(0, init_fb(
+            '0,
+            '{1, 1, tgt[0]},
+            '{1, 2, tgt[2], md_call}
+        ));
+
+
+        $display("\nTest 6: vld = [1, 1] (boundaries)");
+        save = init_fb(
+            '0,
+            '{1, 0, tgt[0]},
+            '{1, 15, tgt[1], md_cond}
+        );
+
+        $display("  6A: udat = {off = br0_off, tgt3, md_cond}");
+        udat= init_udat(udat, 0, tgt[2], md_cond);
+        fb  = uftb.update_fb(spill, save, udat);
+        chk(0, init_fb(
+            '0,
+            '{1, 0, tgt[2]},
+            '{1, 15, tgt[1], md_cond}
+        ));
+
+        $display("  6B: udat = {br0 < off < br1, tgt3, md_cond}");
+        udat= init_udat(udat, 7, tgt[2], md_cond);
+        fb  = uftb.update_fb(spill, save, udat);
+        chk(0, init_fb(
+            '0,
+            '{1, 0, tgt[0]},
+            '{1, 7, tgt[2], md_cond}
+        ));
+
+        $display("  6C: udat = {off = br1_off, tgt3, md_cond}");
+        udat= init_udat(udat, 15, tgt[2], md_cond);
+        fb  = uftb.update_fb(spill, save, udat);
+        chk(0, init_fb(
+            '0,
+            '{1, 0, tgt[0]},
+            '{1, 15, tgt[2], md_cond}
+        ));
+
+        $display("  6A': udat = {off = br0_off, tgt3, md_call}");
+        udat= init_udat(udat, 0, tgt[2], md_call);
+        fb  = uftb.update_fb(spill, save, udat);
+        chk(0, init_fb(
+            '0,
+            '0,
+            '{1, 0, tgt[2], md_call}
+        ));
+
+        $display("  6B': udat = {br0 < off < br1, tgt3, md_call}");
+        udat= init_udat(udat, 7, tgt[2], md_call);
+        fb  = uftb.update_fb(spill, save, udat);
+        chk(0, init_fb(
+            '0,
+            '{1, 0, tgt[0]},
+            '{1, 7, tgt[2], md_call}
+        ));
+
+        $display("  6C': udat = {off = br1_off, tgt3, md_call}");
+        udat= init_udat(udat, 15, tgt[2], md_call);
+        fb  = uftb.update_fb(spill, save, udat);
+        chk(0, init_fb(
+            '0,
+            '{1, 0, tgt[0]},
+            '{1, 15, tgt[2], md_call}
+        ));
+
         $finish;
     end
 

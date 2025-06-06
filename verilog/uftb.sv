@@ -179,17 +179,15 @@ module uftb #(
     );
         FTB_ENTRY rv;
         logic [1:0] vld;
-        logic eq0, eq1, lt0, lt1, gt1;
+        logic eq0, eq1, lt0, gt1;
 
         rv = dst;
         vld[0] = dst.br_slot[0].vld;
         vld[1] = dst.br_slot[1].vld;
         eq0 = udat.pc_off == dst.br_slot[0].off;
-        eq1 = udat.pc_off == dst.br_slot[1].off;
         lt0 = udat.pc_off <  dst.br_slot[0].off;
-        lt1 = udat.pc_off <  dst.br_slot[1].off;
-        gt1 = !(eq1 || lt1); // should be equiv. to "greater than" via trichotomy
-            // gt1 = udat.pc_off >  dst.br_slot[1].off;
+        eq1 = udat.pc_off == dst.br_slot[1].off;
+        gt1 = udat.pc_off >  dst.br_slot[1].off;
 
         spill = vld[1] && gt1;
         if (udat.md.cond) begin
@@ -214,20 +212,6 @@ module uftb #(
 
             rv = wr_br1(rv, udat);
         end
-
-            // if (vld[0]) begin
-            //     if (lt0) begin
-            //         // shift left
-            //         rv.br_slot[1]   = rv.br_slot[0];
-            //         rv.md1.cond     = 1;
-            //     end
-
-            //     rv = (eq0 || lt0)
-            //         ? wr_br0(rv, udat)
-            //         : wr_br1(rv, udat);
-            // end else
-            //     rv = wr_br0(rv, udat);
-
 
         // if (vld[0] && eq0)
         //     if (udat.md.cond)
