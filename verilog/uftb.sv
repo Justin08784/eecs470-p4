@@ -194,7 +194,14 @@ module uftb #(
         spill = vld[1] && gt1;
 
         if (vld[0] && eq0)
-            rv = wr_br0(rv, udat);
+            if (udat.md.cond)
+                rv = wr_br0(rv, udat);
+            else begin
+                // invalidate to ensure off[0] < off[1]
+                rv.br_slot[0].vld = 0;
+
+                rv = wr_br1(rv, udat);
+            end
         else if (vld[1] && eq1)
             rv = wr_br1(rv, udat);
         else
