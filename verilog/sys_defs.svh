@@ -1198,11 +1198,13 @@ module ffs #(
     always_comb begin
         o_vld = |i_vec;
         o_idx = 0;
-        for (int i = 0; i < VECW; ++i) begin
-            if (i_vec[i]) begin
-                o_idx = i;
-                break;
-            end
+
+        // TRICKY: iterate highest -> lowest index. Find lowest set index, if any.
+        // (This improves timing compared to having an explicit `break;`.
+        // See uftb/btb way-searching in locate for other applications)
+        foreach (i_vec[rev]) begin
+            if (i_vec[rev])
+                o_idx = rev; // last/lowest qualifying assignment wins
         end
     end
 endmodule
@@ -1257,15 +1259,11 @@ module compactor #(
     end
     endgenerate
     always_comb begin
-        logic found;
-
-        found   = 1'b0;
         gnt_cnt = REQW;
-        for (int i = 0; i < REQW; ++i) begin
-            if (exceeds[i] && !found) begin
-                found   = 1'b1;
-                gnt_cnt = i;
-            end
+
+        foreach (exceeds[rev]) begin
+            if (exceeds[rev])
+                gnt_cnt = rev;
         end
     end
 

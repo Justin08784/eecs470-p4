@@ -19,10 +19,8 @@ module general_snaps #(
     always_comb begin
         rdat = '0;
         foreach (rmsk[i]) begin
-            if (!rmsk[i])
-                continue;
-            rdat = snaps[i];
-            break;
+            if (rmsk[i])
+                rdat = snaps[i];
         end
     end
 
@@ -63,10 +61,8 @@ module mt_snaps #(
     always_comb begin
         rdat = '0;
         foreach (rmsk[i]) begin
-            if (!rmsk[i])
-                continue;
-            rdat = snaps[i];
-            break;
+            if (rmsk[i])
+                rdat = snaps[i];
         end
     end
 
@@ -103,6 +99,7 @@ module branch_manager (
 );
     BMASK bmask_reg;
     
+    logic [`N-1:0]  b1hot_rdy_n;
     BMASK [`N-1:0]  b1hot_n;
     BMASK [`N:0]    bmask_n, cum_b1hot_n;
     psel_gen #(
@@ -113,23 +110,24 @@ module branch_manager (
         .gnt_bus(b1hot_n)
     );
 
+    generate
+    assign cum_b1hot_n[0]   = '0; 
+    assign bmask_n    [0]   = bmask_reg & ~clmsk;
+    for (genvar n = 0; n < `N; ++n) begin       
+        assign cum_b1hot_n[n+1] = cum_b1hot_n[n] | b1hot_n[n];
+        assign bmask_n    [n+1] = bmask_n[0] | cum_b1hot_n[n+1];
+        assign b1hot_rdy_n[n]   = |b1hot_n[n];
+    end
+    endgenerate
+
     always_comb begin
-        cum_b1hot_n[0] = '0; 
-        for (int n = 0; n < `N; ++n)
-            cum_b1hot_n[n+1] = cum_b1hot_n[n] | b1hot_n[n];
-
-        bmask_n[0] = bmask_reg & ~clmsk;
-        for (int n = 0; n < `N+1; ++n)
-            bmask_n[n] = bmask_n[0] | cum_b1hot_n[n];
-
         dis_out.b1hot_n = b1hot_n;
         dis_out.bmask_n = bmask_n;
         dis_out.snap_rdy_scnt = `N;
-        for (int n = 0; n < `N; ++n) begin
-            if (|b1hot_n[n])
-                continue;
-            dis_out.snap_rdy_scnt = n;
-            break;
+        
+        foreach (b1hot_rdy_n[rev]) begin
+            if (!b1hot_rdy_n[rev])
+                dis_out.snap_rdy_scnt = rev;
         end
     end
 

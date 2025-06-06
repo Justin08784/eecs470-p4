@@ -58,6 +58,7 @@ module btb #(parameter
         input HEADER    hdr,
         input WADDR     waddr
     );
+        logic   [ASSOC-1:0] hitv;
         logic   hit;
         TAG     tag;
         WAY     way;
@@ -65,14 +66,14 @@ module btb #(parameter
         tag = get_tag(waddr);
         sid = get_sid(waddr);
 
+        for (int w = 0; w < ASSOC; ++w)
+            hitv[w] = hdr.vld[sid][w] && (tag == hdr.tag[sid][w]);
+
+        hit = |hitv;
         way = 0;
-        hit = 0;
         for (int w = 0; w < ASSOC; ++w) begin
-            if (hdr.vld[sid][w] && (tag == hdr.tag[sid][w])) begin
-                hit = 1;
+            if (hitv[w])
                 way = w;
-                break;
-            end
         end
 
         return '{
