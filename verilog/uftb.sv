@@ -3,28 +3,6 @@
 localparam FTQ_SZ = 32;
 
 typedef struct packed {
-    // fallthrough npc (i.e. npc if no branch taken)
-    logic [3:0] end_off;    // offset of last insn in the FB. ft_npc = base + end_off + 1
-    // TODO: use ft_lo4, ft_cry scheme?
-
-    // two branch slots: [0, 1]
-    struct packed {
-        logic       vld;
-        WADDR       tgt;
-        logic [3:0] off;
-        logic       always_take;
-    } [1:0] br_slot;
-
-    // metadata re: br1/tail slot
-    struct packed {
-        logic cond;         // = "sharing" bit
-        logic call;
-        logic ret;
-        logic jalr;
-    } md1;
-} FTB_ENTRY;
-
-typedef struct packed {
     WADDR       base;   // base address of FB
 
     // pared down FTB entry
@@ -64,18 +42,6 @@ typedef struct packed {
         /* Since multiple contiguous BTQ entries may be associated with an FTQ entry,
         an FTQ entry cannot dequeue until the "last" in the BTQ entry span is reached. */
 } _BTQ_ENTRY;
-
-typedef struct packed {
-    WADDR       base;
-    logic [3:0] pc_off; // pc = base + pc_off
-    WADDR       tgt;
-
-    logic       cond;
-    logic       always_take; // i.e. a cond branch that is always taken?
-    logic       call;
-    logic       ret;
-    logic       jalr;
-} FTB_UPD_PKT;
 
 module uftb #(
     parameter NUM_LINES=16
@@ -201,12 +167,7 @@ module uftb #(
             always_take : udat.always_take
         };
 
-        rv.md1 = '{
-            cond : udat.cond,
-            call : udat.call,
-            ret  : udat.ret,
-            jalr : udat.jalr
-        };
+        rv.md1 = udat.md;
 
         return rv;
     endfunction
@@ -227,7 +188,8 @@ module uftb #(
         eq1 = udat.pc_off == dst.br_slot[1].off;
         lt0 = udat.pc_off <  dst.br_slot[0].off;
         lt1 = udat.pc_off <  dst.br_slot[1].off;
-        gt1 = udat.pc_off >  dst.br_slot[1].off;
+        gt1 = !(eq1 || lt1); // should be equiv. to "greater than" via trichotomy
+            // gt1 = udat.pc_off >  dst.br_slot[1].off;
 
         spill = vld[1] && gt1;
 
@@ -237,12 +199,12 @@ module uftb #(
             rv = wr_br1(rv, udat);
         else
             if (!vld[0])
-                rv = udat.cond
+                rv = udat.md.cond
                     ? wr_br0(rv, udat)
                     : wr_br1(rv, udat);
             else
                 if (lt0)
-                    if (udat.cond) begin
+                    if (udat.md.cond) begin
                         // shift left
                         rv.br_slot[1]   = rv.br_slot[0];
                         rv.md1.cond     = 1;
@@ -269,7 +231,7 @@ module uftb #(
     );
         FTB_ENTRY rv = '0;
 
-        if (udat.cond) begin
+        if (udat.md.cond) begin
             rv.end_off = 15;
             rv = wr_br0(rv, udat);
 
