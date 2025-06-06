@@ -192,39 +192,75 @@ module uftb #(
             // gt1 = udat.pc_off >  dst.br_slot[1].off;
 
         spill = vld[1] && gt1;
+        if (udat.md.cond) begin
+            if (vld[0] && lt0) begin
+                // shift left
+                rv.br_slot[1]   = rv.br_slot[0];
+                rv.md1.cond     = 1;
+            end
 
-        if (vld[0] && eq0)
-            if (udat.md.cond)
-                rv = wr_br0(rv, udat);
-            else begin
+            rv = (
+                (vld[1] &&   eq1)
+            ||  (vld[0] && !(eq0 || lt0))
+            )
+                ? wr_br1(rv, udat)
+                : wr_br0(rv, udat);
+
+        end else begin
+            if (vld[0] && (eq0 || lt0)) begin
                 // invalidate to ensure off[0] < off[1]
                 rv.br_slot[0].vld = 0;
-
-                rv = wr_br1(rv, udat);
             end
-        else if (vld[1] && eq1)
+
             rv = wr_br1(rv, udat);
-        else
-            if (!vld[0])
-                rv = udat.md.cond
-                    ? wr_br0(rv, udat)
-                    : wr_br1(rv, udat);
-            else
-                if (lt0)
-                    if (udat.md.cond) begin
-                        // shift left
-                        rv.br_slot[1]   = rv.br_slot[0];
-                        rv.md1.cond     = 1;
+        end
 
-                        rv = wr_br0(rv, udat);
-                    end else begin
-                        // invalidate to ensure off[0] < off[1]
-                        rv.br_slot[0].vld = 0;
+            // if (vld[0]) begin
+            //     if (lt0) begin
+            //         // shift left
+            //         rv.br_slot[1]   = rv.br_slot[0];
+            //         rv.md1.cond     = 1;
+            //     end
 
-                        rv = wr_br1(rv, udat);
-                    end
-                else
-                    rv = wr_br1(rv, udat);
+            //     rv = (eq0 || lt0)
+            //         ? wr_br0(rv, udat)
+            //         : wr_br1(rv, udat);
+            // end else
+            //     rv = wr_br0(rv, udat);
+
+
+        // if (vld[0] && eq0)
+        //     if (udat.md.cond)
+        //         rv = wr_br0(rv, udat);
+        //     else begin
+        //         // invalidate to ensure off[0] < off[1]
+        //         rv.br_slot[0].vld = 0;
+
+        //         rv = wr_br1(rv, udat);
+        //     end
+        // else if (vld[1] && eq1)
+        //     rv = wr_br1(rv, udat);
+        // else
+        //     if (!vld[0])
+        //         rv = udat.md.cond
+        //             ? wr_br0(rv, udat)
+        //             : wr_br1(rv, udat);
+        //     else
+        //         if (lt0)
+        //             if (udat.md.cond) begin
+        //                 // shift left
+        //                 rv.br_slot[1]   = rv.br_slot[0];
+        //                 rv.md1.cond     = 1;
+
+        //                 rv = wr_br0(rv, udat);
+        //             end else begin
+        //                 // invalidate to ensure off[0] < off[1]
+        //                 rv.br_slot[0].vld = 0;
+
+        //                 rv = wr_br1(rv, udat);
+        //             end
+        //         else
+        //             rv = wr_br1(rv, udat);
 
         rv.end_off = rv.br_slot[1].vld
             ? rv.br_slot[1].off
