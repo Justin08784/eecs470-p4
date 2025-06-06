@@ -1,5 +1,8 @@
 `include "sys_defs.svh"
 
+// enable to synthesize uFTB (via `make uftb.syn.out`)
+`define SYNTH_UFTB
+
 module uftb_test;
     logic       spill;
     FTB_UPD_PKT udat;
@@ -167,7 +170,7 @@ module uftb_test;
 
 
 
-        // ---------- Test 1 ---------- //
+`ifndef SYNTH_UFTB
         $display("\nTest 1: vld = [0, 0]");
         save = '0;
 
@@ -505,6 +508,7 @@ module uftb_test;
             '{1, 0, tgt[0]},
             '{1, 15, tgt[2], md_call}
         ));
+`endif
 
         $finish;
     end

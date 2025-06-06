@@ -99,19 +99,20 @@ module uftb #(
         input HEADER    hdr,
         input WADDR     waddr
     );
+        logic   [NUM_LINES-1:0] hitv;
         logic   hit;
         TAG     tag;
         WAY     way;
         tag = get_tag(waddr);
 
+        for (int w = 0; w < NUM_LINES; ++w)
+            hitv[w] = hdr.vld[w] && (tag == hdr.tag[w]);
+
+        hit = |hitv;
         way = 0;
-        hit = 0;
         for (int w = 0; w < NUM_LINES; ++w) begin
-            if (hdr.vld[w] && (tag == hdr.tag[w])) begin
-                hit = 1;
+            if (hitv[w])
                 way = w;
-                break;
-            end
         end
 
         return '{
