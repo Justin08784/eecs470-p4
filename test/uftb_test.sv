@@ -1,7 +1,7 @@
 `include "sys_defs.svh"
 
 // enable to synthesize uFTB (via `make uftb.syn.out`)
-`define SYNTH_UFTB
+// `define SYNTH_UFTB
 
 module uftb_test;
     logic       spill;
@@ -113,6 +113,19 @@ module uftb_test;
 
     endtask
 
+    task cmp_br_slot(
+        input   FTB_ENTRY a,b,
+        input   logic i,
+        output  logic match
+    );
+        // ignore sc
+        match =
+            a.br_slot[i].vld == b.br_slot[i].vld
+        &&  a.br_slot[i].tgt == b.br_slot[i].tgt
+        &&  a.br_slot[i].off == b.br_slot[i].off
+        &&  a.br_slot[i].always_take == b.br_slot[i].always_take;
+    endtask
+
     task chk(
         logic     exp_spill,
         FTB_ENTRY exp_fb
@@ -121,9 +134,14 @@ module uftb_test;
         logic match_br0;
         logic match_br1;
         logic match_md1;
+        logic match_slot0, match_slot1;
+
+        cmp_br_slot(fb, exp_fb, 0, match_slot0);
+        cmp_br_slot(fb, exp_fb, 1, match_slot1);
+
         match_br0 = (fb.br_slot[0].vld == exp_fb.br_slot[0].vld)
         &&  (!fb.br_slot[0].vld // dont care about mismatch if invalid
-            ||  (fb.br_slot[0] == exp_fb.br_slot[0])
+            ||  match_slot0
         );
 
         // the non-"cond" fields are meaningful/valid only if !cond
@@ -133,7 +151,7 @@ module uftb_test;
 
         match_br1 = (fb.br_slot[1].vld == exp_fb.br_slot[1].vld)
         &&  (!fb.br_slot[1].vld // dont care about mismatch if invalid
-            ||  ((fb.br_slot[1] == exp_fb.br_slot[1]) && match_md1)
+            ||  (match_slot1 && match_md1)
         );
         
         correct = (spill == exp_spill)
