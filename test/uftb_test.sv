@@ -13,24 +13,14 @@ module uftb_test;
     FTB_UPD_PKT udat;
     FTB_ENTRY   fb, save;
 
-    struct packed {
-        logic cond;
-        logic call;
-        logic ret;
-        logic jalr;
-    } md_cond, md_call;
+    FTB_MD1     md_cond, md_call;
     WADDR [2:0] tgt;
 
     function automatic FTB_UPD_PKT init_udat(
         input FTB_UPD_PKT udat,
         input logic [3:0] off,
         input WADDR       tgt,
-        input struct packed {
-            logic cond;
-            logic call;
-            logic ret;
-            logic jalr;
-        } md
+        input FTB_MD1     md
     );
         udat = '0;
 
@@ -55,12 +45,7 @@ module uftb_test;
             logic       en;
             logic [3:0] off;
             WADDR       tgt;
-            struct packed {
-                logic cond;
-                logic call;
-                logic ret;
-                logic jalr;
-            } md;
+            FTB_MD1     md;
         } br1
     );
         fb = '0;
@@ -119,16 +104,15 @@ module uftb_test;
     endtask
 
     task cmp_br_slot(
-        input   FTB_ENTRY a,b,
-        input   logic i,
+        input   FTB_BR_SLOT a,b,
         output  logic match
     );
         // ignore sc
-        match =
-            a.br_slot[i].vld == b.br_slot[i].vld
-        &&  a.br_slot[i].tgt == b.br_slot[i].tgt
-        &&  a.br_slot[i].off == b.br_slot[i].off
-        &&  a.br_slot[i].always_take == b.br_slot[i].always_take;
+        FTB_BR_SLOT sub_sc;
+        sub_sc      = '1;
+        sub_sc.sc   = '0;
+
+        match = (a & sub_sc) == (b & sub_sc);
     endtask
 
     task chk(
@@ -141,8 +125,8 @@ module uftb_test;
         logic match_md1;
         logic match_slot0, match_slot1;
 
-        cmp_br_slot(fb, exp_fb, 0, match_slot0);
-        cmp_br_slot(fb, exp_fb, 1, match_slot1);
+        cmp_br_slot(fb.br_slot[0], exp_fb.br_slot[0], match_slot0);
+        cmp_br_slot(fb.br_slot[1], exp_fb.br_slot[1], match_slot1);
 
         match_br0 = (fb.br_slot[0].vld == exp_fb.br_slot[0].vld)
         &&  (!fb.br_slot[0].vld // dont care about mismatch if invalid

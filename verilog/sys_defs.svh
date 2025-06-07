@@ -481,26 +481,29 @@ typedef struct packed {
 } BTQ_ENTRY;
 
 typedef struct packed {
+    logic [1:0] sc;
+    logic       vld;
+    WADDR       tgt;
+    logic [3:0] off;
+    logic       always_take;
+} FTB_BR_SLOT;
+typedef struct packed {
+    logic cond;         // = "sharing" bit
+    logic call;
+    logic ret;
+    logic jalr;
+} FTB_MD1;
+
+typedef struct packed {
     // fallthrough npc (i.e. npc if no branch taken)
     logic [3:0] end_off;    // offset of last insn in the FB. ft_npc = base + end_off + 1
     // TODO: use ft_lo4, ft_cry scheme?
 
     // two branch slots: [0, 1]
-    struct packed {
-        logic [1:0] sc;
-        logic       vld;
-        WADDR       tgt;
-        logic [3:0] off;
-        logic       always_take;
-    } [1:0] br_slot;
+    FTB_BR_SLOT [1:0] br_slot;
 
     // metadata re: br1/tail slot
-    struct packed {
-        logic cond;         // = "sharing" bit
-        logic call;
-        logic ret;
-        logic jalr;
-    } md1;
+    FTB_MD1 md1;
 } FTB_ENTRY;
 
 typedef struct packed {
@@ -511,12 +514,7 @@ typedef struct packed {
 
     logic       always_take; // i.e. a cond branch that is always taken?
 
-    struct packed {
-        logic   cond;
-        logic   call;
-        logic   ret;
-        logic   jalr;
-    } md;
+    FTB_MD1 md;
 } FTB_UPD_PKT;
 
 typedef struct packed {

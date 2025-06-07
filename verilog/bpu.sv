@@ -1,6 +1,23 @@
 `include "sys_defs.svh"
 
 parameter NUM_BR_SLOTS = 2;
+typedef struct packed {
+    // FTB_UPD_PKT fields
+    WADDR       base;
+    logic [3:0] pc_off; // pc = base + pc_off
+    logic       take;
+    WADDR       tgt;
+
+    logic       always_take; // i.e. a cond branch that is always taken?
+    FTB_MD1     md;
+
+    // predictor-specific fields
+    logic [GHR_LEN-1:0] hash; // gshare hash
+    logic pred_bim;
+    logic pred_gshare;
+
+} BPU_UPD_PKT;
+
 /* Branch predictor unit (BPU):
 generates PCs for decoupled fetch (experimental) */
 module bpu (
@@ -13,7 +30,11 @@ module bpu (
     input   logic   flush_take,
     input   logic   [$clog2(GHR_BUF_SZ)-1:0] flush_base,
 
-    input   puq2fetch i_upd,
+    input   struct packed {
+        logic       en;
+        BPU_UPD_PKT dat;
+    } upd_in,
+
     input   struct packed {
         logic rdy;
     } ftq_in,
@@ -52,8 +73,18 @@ module bpu (
     } ghr_io;
 
     assign uftb_io.i_qry = pc_reg;
-    assign uftb_io.i_uen = 0;
-    assign uftb_io.i_udat= '0;
+    assign uftb_io.i_uen = upd_in.en;
+    assign uftb_io.i_udat= '{
+        base        : upd_in.dat.base,
+        pc_off      : upd_in.dat.pc_off,
+        take        : upd_in.dat.take,
+        tgt         : upd_in.dat.tgt,
+
+        always_take : upd_in.dat.always_take,
+
+        md          : upd_in.dat.md
+    };
+
     uftb #(
         .NUM_LINES(16)
     ) uftb0 (
@@ -79,8 +110,11 @@ module bpu (
         .o_idx(pred_idx)
     );
 
+    typedef logic [4:0] v5b;
     always_comb begin
         FTB_ENTRY e;
+        FTB_BR_SLOT slot;
+        WADDR pc_flt, pc_jmp;
 
         ghr_io.ex_en    = 0;
         ghr_io.ex_idx   = '0;
@@ -97,6 +131,7 @@ module bpu (
         if (!uftb_io.o_vld)
             pred = '0;
 
+        slot = e.br_slot[pred_idx];
         step = buf_io.i_rdy && (!pred_any || (pred_idx < ghr_io.f_rdy_scnt));
 
         ghr_io.f_en_cnt =
@@ -105,16 +140,16 @@ module bpu (
             NUM_BR_SLOTS;
         ghr_io.f_pred   = pred;
 
-        pc_reg_n = pred_any
-            ? e.br_slot[pred_idx].tgt
-            : pc_reg + (e.end_off + 1);
+        pc_flt = WADDR'(pc_reg + v5b'(e.end_off + 1));
+        pc_jmp = slot.tgt;
+        pc_reg_n = pred_any ? pc_jmp : pc_flt;
 
         buf_io.i_dat = '{
             base        : pc_reg,
             ft          : !pred_any,
-            off         : pred_any ? e.br_slot[pred_idx].off : e.end_off,
-            vld         : e.br_slot[pred_idx].vld,
-            always_take : e.br_slot[pred_idx].always_take,
+            off         : pred_any ? slot.off : e.end_off,
+            vld         : slot.vld,
+            always_take : slot.always_take,
             cond        : (pred_idx == 0) || e.md1.cond
         };
     end
