@@ -520,6 +520,20 @@ typedef struct packed {
 } FTB_UPD_PKT;
 
 typedef struct packed {
+    WADDR       base;   // base address of FB
+
+    // pared down FTB entry
+    logic       ft;     // fallthrough? else took a branch
+    logic [3:0] off;    // ft ? end_off : br_slot[0/1].off
+        // if a branch
+    logic       vld;
+    // WADDR       tgt;
+        // Q: Why omit? A: if branch, next FTQ entry's base is branch target
+    logic       always_take;
+    logic       cond;
+} FTQ_ENTRY;
+
+typedef struct packed {
     logic take;
     WADDR pc;
     WADDR tgt;

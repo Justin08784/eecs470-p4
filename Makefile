@@ -189,7 +189,7 @@ GREP = grep -E --color=auto
 # ---- Modules to Test ---- #
 
 # TODO: add more modules here
-MODULES = cpu ghr mult rob rs fifo free_list dispatch prf map_table stage_id_p4 execute fetch skid_buffer victim uftb
+MODULES = cpu ghr mult rob rs fifo free_list dispatch prf map_table stage_id_p4 execute fetch skid_buffer victim uftb bpu
 
 # TODO: update this if you add more header files
 ALL_HEADERS = $(CPU_HEADERS)
@@ -218,8 +218,8 @@ build/fifo.simv: $(FIFO_FILES)
 build/fifo.cov: $(FIFO_FILES)
 synth/fifo.vg: $(FIFO_FILES)
 
-GHR_FILES = verilog/sys_defs.svh test/ghr_test.sv test/ghr_sva.svh
-# GHR_FILES = verilog/sys_defs.svh # to do synthesis
+# GHR_FILES = verilog/sys_defs.svh test/ghr_test.sv test/ghr_sva.svh
+GHR_FILES = verilog/sys_defs.svh # to do synthesis
 build/ghr.simv: $(GHR_FILES)
 build/ghr.cov: $(GHR_FILES)
 synth/ghr.vg: $(GHR_FILES)
@@ -283,17 +283,13 @@ build/uftb.vg: $(uFTB_FILES)
 # build/ftb.cov: $(FTB_FILES)
 # build/ftb.vg: $(FTB_FILES)
 
-# DCF_FILES = verilog/sys_defs.svh \
-# 	verilog/ftb.sv \
-# 	verilog/ghr.sv \
-# 	verilog/ras.sv \
-# 	verilog/checkpoints.sv \
-# 	verilog/psel_gen.sv \
-# 	verilog/gshare.sv
-# # verilog/ftq.sv
-# build/dcf.simv: $(DCF_FILES)
-# build/dcf.cov: $(DCF_FILES)
-# build/dcf.vg: $(DCF_FILES)
+BPU_FILES = verilog/sys_defs.svh \
+	verilog/uftb.sv \
+	verilog/skid_buffer.sv \
+	verilog/ghr.sv
+build/bpu.simv: $(BPU_FILES)
+build/bpu.cov: $(BPU_FILES)
+build/bpu.vg: $(BPU_FILES)
 
 VICTIM_FILES = verilog/sys_defs.svh verilog/psel_gen.sv
 build/victim.simv: $(VICTIM_FILES)
