@@ -1,20 +1,6 @@
 
 `include "sys_defs.svh"
 
-function automatic logic [1:0] update_sc(
-    input logic unsigned [1:0] sc,
-    input logic take
-);
-    if (take)
-        return sc == 2'b11 ? 2'b11 : sc + 1;
-    else
-        return sc == 0 ? 0 : sc - 1;
-endfunction
-
-function automatic logic query_sc(input logic [1:0] sc);
-    return sc[1];
-endfunction
-
 // meta-chooser for 2 predictors
 module chooser #(
     parameter GHR_LEN   = GHR_LEN,

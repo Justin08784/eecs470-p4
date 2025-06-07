@@ -1,7 +1,7 @@
 `include "sys_defs.svh"
 
 /* PC gen stage for decoupled fetch (experimental) */
-module pc_gen (
+module bpu (
     input   clock,
     input   reset,
     input   flush,

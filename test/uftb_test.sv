@@ -62,6 +62,7 @@ module uftb_test;
 
         if (br0.en) begin
             fb.br_slot[0] = '{
+                sc  : '0,
                 vld : 1,
                 off : br0.off,
                 tgt : br0.tgt,
@@ -72,6 +73,7 @@ module uftb_test;
 
         if (br1.en) begin
             fb.br_slot[1] = '{
+                sc  : '0,
                 vld : 1,
                 off : br1.off,
                 tgt : br1.tgt,

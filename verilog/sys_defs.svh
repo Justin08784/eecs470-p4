@@ -438,6 +438,28 @@ typedef struct packed {
     logic _dummy;
 } LQ_ENTRY;
 
+// BPU stuff
+typedef enum logic [1:0] {
+    SN = 2'b00,
+    WN = 2'b01,
+    WT = 2'b10,
+    ST = 2'b11
+} SC_STATE;
+
+function automatic logic [1:0] update_sc(
+    input logic unsigned [1:0] sc,
+    input logic take
+);
+    if (take)
+        return sc == 2'b11 ? 2'b11 : sc + 1;
+    else
+        return sc == 0 ? 0 : sc - 1;
+endfunction
+
+function automatic logic query_sc(input logic [1:0] sc);
+    return sc[1];
+endfunction
+
 // BTQ stuff
 // By btq
 typedef struct packed {
@@ -465,6 +487,7 @@ typedef struct packed {
 
     // two branch slots: [0, 1]
     struct packed {
+        logic [1:0] sc;
         logic       vld;
         WADDR       tgt;
         logic [3:0] off;
@@ -483,6 +506,7 @@ typedef struct packed {
 typedef struct packed {
     WADDR       base;
     logic [3:0] pc_off; // pc = base + pc_off
+    logic       take;
     WADDR       tgt;
 
     logic       always_take; // i.e. a cond branch that is always taken?

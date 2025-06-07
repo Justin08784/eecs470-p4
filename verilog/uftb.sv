@@ -275,12 +275,14 @@ module uftb #(
 
     function automatic FTB_ENTRY wr_br0(
         input FTB_ENTRY     dst,
+        input logic [1:0]   sc,
         input FTB_UPD_PKT   udat
     );
         FTB_ENTRY rv;
         rv = dst;
 
         rv.br_slot[0] = '{
+            sc  : sc,
             vld : 1,
             tgt : udat.tgt,
             off : udat.pc_off,
@@ -292,12 +294,14 @@ module uftb #(
 
     function automatic FTB_ENTRY wr_br1(
         input FTB_ENTRY     dst,
+        input logic [1:0]   sc,
         input FTB_UPD_PKT   udat
     );
         FTB_ENTRY rv;
         rv = dst;
 
         rv.br_slot[1] = '{
+            sc  : sc,
             vld : 1,
             tgt : udat.tgt,
             off : udat.pc_off,
@@ -318,6 +322,13 @@ module uftb #(
         logic [1:0] vld;
         logic eq0, eq1, lt0, gt1;
 
+        logic [1:0] sc_new, // new slot sc
+                    sc_upd0,// br0 sc updated
+                    sc_upd1;// br1 sc updated
+        sc_new  = WT;
+        sc_upd0 = update_sc(dst.br_slot[0].sc, udat.take);
+        sc_upd1 = update_sc(dst.br_slot[1].sc, udat.take);
+
         rv = dst;
         vld[0] = dst.br_slot[0].vld;
         vld[1] = dst.br_slot[1].vld;
@@ -335,7 +346,7 @@ module uftb #(
                 // shift left
                 rv.br_slot[1]   = rv.br_slot[0];
                 rv.md1.cond     = 1;
-                rv = wr_br0(rv, udat);
+                rv = wr_br0(rv, sc_new, udat);
 
             end else begin
                 /*
@@ -350,8 +361,17 @@ module uftb #(
                     (vld[1] &&   eq1)
                 ||  (vld[0] && !(eq0 || lt0))
                 )
-                    ? wr_br1(rv, udat)
-                    : wr_br0(rv, udat);
+                    ? wr_br1(
+                        rv, 
+                        (vld[1] && eq1) ? sc_upd1 : sc_new,
+                        udat
+                    )
+
+                    : wr_br0(
+                        rv,
+                        (vld[0] && eq0) ? sc_upd0 : sc_new,
+                        udat
+                    );
             end 
 
         end else begin
@@ -360,7 +380,11 @@ module uftb #(
                 rv.br_slot[0].vld = 0;
             end
 
-            rv = wr_br1(rv, udat);
+            rv = wr_br1(
+                rv, 
+                (vld[1] && eq1) ? sc_upd1 : sc_new,
+                udat
+            );
         end
 
         // if (vld[0] && eq0)
@@ -406,15 +430,19 @@ module uftb #(
     function automatic FTB_ENTRY create_fb(
         input FTB_UPD_PKT   udat
     );
-        FTB_ENTRY rv = '0;
+        FTB_ENTRY rv;
+        logic [1:0] sc_new;
+
+        rv = '0;
+        sc_new  = WT;
 
         if (udat.md.cond) begin
             rv.end_off = 15;
-            rv = wr_br0(rv, udat);
+            rv = wr_br0(rv, sc_new, udat);
 
         end else begin
             rv.end_off = udat.pc_off;
-            rv = wr_br1(rv, udat);
+            rv = wr_br1(rv, sc_new, udat);
 
         end
 
