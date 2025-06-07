@@ -43,6 +43,101 @@ typedef struct packed {
         an FTQ entry cannot dequeue until the "last" in the BTQ entry span is reached. */
 } _BTQ_ENTRY;
 
+module lru_man #(
+    parameter SETW=16
+) (
+    input   logic [SETW-1:0][SETW-1:0] age,
+    input   logic [$clog2(SETW)-1:0] acc_way,
+
+    output  logic [$clog2(SETW)-1:0] lru_way,
+    output  logic [SETW-1:0][SETW-1:0] age_n
+);
+`define LRU_UTRI
+
+`ifdef LRU_UTRI
+/* interpret age as an "older than" upper triangle matrix:
+age[i][j]
+    1) is valid iff i < j
+    2) if valid, means way i is "older" than way j */
+
+    logic [SETW-1:0][SETW-1:0] nage;
+    logic [SETW-1:0][SETW-1:0] ot;
+    logic [SETW-1:0] lruv;
+    generate
+    assign nage = ~age;
+    for (genvar i = 0; i < SETW; ++i) begin
+        for (genvar j = 0; j < SETW; ++j) begin
+            assign ot[i][j] =
+                i <  j ?  age[i][j] :
+                i >  j ? nage[j][i] :
+                1;
+        end
+    end
+
+    for (genvar w = 0; w < SETW; ++w) begin
+        assign lruv[w] = &ot[w];
+    end
+    endgenerate
+
+    always_comb begin
+        lru_way = '0;
+        for (int w = 0; w < SETW; ++w) begin
+            if (lruv[w])
+                lru_way = w;
+        end
+    end
+
+    generate
+    for (genvar i = 0; i < SETW; ++i) begin
+        for (genvar j = i+1; j < SETW; ++j) begin
+            assign age_n[i][j] =
+                i == acc_way ? 0 :
+                j == acc_way ? 1 :
+                age[i][j];
+        end
+    end
+    endgenerate
+
+`else
+/* interpret age as an "not younger than" full matrix:
+age[i][j]
+    1) is valid forall i, j
+    2) means way i is "not younger" than way j */
+
+    function automatic logic [SETW-1:0][SETW-1:0] update_lru(
+        input logic [SETW-1:0][SETW-1:0] age,
+        input logic [$clog2(SETW)-1:0] way
+    );
+        logic [SETW-1:0][SETW-1:0] rv;
+        rv = age;
+        foreach(rv[i, j]) begin
+            if (i == way)
+                rv[i][j] = i == j;
+            else if (j == way)
+                rv[i][j] = 1;
+        end
+        return rv;
+    endfunction
+
+    logic [SETW-1:0] lru;
+    generate
+    for (genvar w = 0; w < SETW; ++w)
+        assign lru[w] = &age[w];
+    endgenerate
+
+    always_comb begin
+        lru_way = '0;
+        for (int w = 0; w < SETW; ++w) begin
+            if (lru[w])
+                lru_way = w;
+        end
+    end
+
+    assign age_n = update_lru(age, acc_way);
+`endif
+
+endmodule
+
 // custom comparator for 4-bits. Seems to be faster than default synthesis of "<".
 function automatic cmp4(
     input   logic [3:0] a,b,
@@ -326,18 +421,16 @@ module uftb #(
         return rv;
     endfunction
 
-    logic [NUM_LINES-1:0] lru;
-    WAY lru_way;
-    always_comb begin
-        foreach (lru[w])
-            lru[w] = &hdr.age[w];
-
-        lru_way = '0;
-        for (int w = 0; w < NUM_LINES; ++w) begin
-            if (lru[w])
-                lru_way = w;
-        end
-    end
+    WAY lru_way, acc_way;
+    AGE age_n;
+    lru_man #(
+        .SETW(NUM_LINES)
+    ) lru_man0 (
+        .age(hdr.age),
+        .acc_way,
+        .lru_way,
+        .age_n
+    );
 
     // fetch
     always_comb begin
@@ -358,6 +451,7 @@ module uftb #(
 
         loc = locate(hdr, i_udat.base);
         way = loc.hit ? loc.way : lru_way;
+        acc_way = way;
         wfb = loc.hit
             ? update_fb(spill, tgt[loc.way], i_udat)
             : create_fb(i_udat);
@@ -370,7 +464,7 @@ module uftb #(
             hdr_n.vld[way]  = 1;
             hdr_n.dirty[way]= 1;
             hdr_n.tag[way]  = loc.tag;
-            hdr_n.age       = update_lru(hdr.age, way);
+            hdr_n.age       = age_n;
                 /* TODO: since every branch queries the FTB (but not every branch
                 generates an FTB update) we need an LRU update for reads as well,
                 not just writes. */
