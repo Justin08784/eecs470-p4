@@ -43,6 +43,47 @@ typedef struct packed {
         an FTQ entry cannot dequeue until the "last" in the BTQ entry span is reached. */
 } _BTQ_ENTRY;
 
+// custom comparator for 4-bits. Seems to be faster than default synthesis of "<".
+function automatic cmp4(
+    input   logic [3:0] a,b,
+    output  logic eq,
+    output  logic lt
+);
+    logic [3:0] x;
+    logic [3:0] l;
+    logic eq_lo, eq_hi;
+    logic lt_lo, lt_hi;
+
+    x =  a   ^  b;
+    l = (~a) &  b;
+
+    eq_lo = ~(x[1] | x[0]);
+    lt_lo = l[1] | (~x[1] & l[0]);
+
+    eq_hi = ~(x[3] | x[2]);
+    lt_hi = l[3] | (~x[3] & l[2]);
+
+    eq = eq_hi & eq_lo;
+    lt = lt_hi | (eq_hi & lt_lo);
+
+
+    // logic [3:0] lt1, eq1;
+    // logic [1:0] lt2, eq2;
+
+    // for (int i = 0; i < 4; ++i) begin
+    //     lt1[i] = !a[i] && b[i];
+    //     eq1[i] =  a[i] == b[i];
+    // end
+
+    // lt2[0] = lt1[1] || (eq1[1] ? lt1[0] : 0);
+    // lt2[1] = lt1[3] || (eq1[3] ? lt1[2] : 0);
+    // eq2[0] = eq1[0] && eq1[1];
+    // eq2[1] = eq1[2] && eq1[3];
+
+    // eq = eq2[0] && eq2[1];
+    // lt = lt2[1] || (eq2[1] ? lt2[0] : 0);
+endfunction
+
 module uftb #(
     parameter NUM_LINES=16
     // fully associative
@@ -185,10 +226,13 @@ module uftb #(
         rv = dst;
         vld[0] = dst.br_slot[0].vld;
         vld[1] = dst.br_slot[1].vld;
-        eq0 = udat.pc_off == dst.br_slot[0].off;
-        lt0 = udat.pc_off <  dst.br_slot[0].off;
-        eq1 = udat.pc_off == dst.br_slot[1].off;
-        gt1 = udat.pc_off >  dst.br_slot[1].off;
+        // eq0 = udat.pc_off == dst.br_slot[0].off;
+        // lt0 = udat.pc_off <  dst.br_slot[0].off;
+        // eq1 = udat.pc_off == dst.br_slot[1].off;
+        // gt1 = udat.pc_off >  dst.br_slot[1].off;
+
+        cmp4(udat.pc_off, dst.br_slot[0].off, eq0, lt0);
+        cmp4(dst.br_slot[1].off, udat.pc_off, eq1, gt1);
 
         spill = vld[1] && gt1;
         if (udat.md.cond) begin
@@ -196,14 +240,24 @@ module uftb #(
                 // shift left
                 rv.br_slot[1]   = rv.br_slot[0];
                 rv.md1.cond     = 1;
-            end
+                rv = wr_br0(rv, udat);
 
-            rv = (
-                (vld[1] &&   eq1)
-            ||  (vld[0] && !(eq0 || lt0))
-            )
-                ? wr_br1(rv, udat)
-                : wr_br0(rv, udat);
+            end else begin
+                /*
+                improved critical path when this assignment was moved into `else`.
+                knowledge injection: synthesizer does not know "shift left" and
+                "wr_br1" are mutually exclusive (it is based upon the off0 < off1
+                invariant)–– the programmer must make explicit what the synthesizer
+                cannot infer.
+                */
+
+                rv = (
+                    (vld[1] &&   eq1)
+                ||  (vld[0] && !(eq0 || lt0))
+                )
+                    ? wr_br1(rv, udat)
+                    : wr_br0(rv, udat);
+            end 
 
         end else begin
             if (vld[0] && (eq0 || lt0)) begin
