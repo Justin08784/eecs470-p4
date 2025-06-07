@@ -1210,7 +1210,7 @@ module ffs #(
 endmodule
 
 module compactor #(
-    parameter int REQW=1,
+    parameter int REQW=2,
     parameter int GNTW=1,
     type RCNT = logic[$clog2(REQW):0],
     type GCNT = logic[$clog2(GNTW):0]

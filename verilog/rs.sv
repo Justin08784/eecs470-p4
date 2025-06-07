@@ -269,14 +269,14 @@ module rs_part #(
                 if (entries[rs].issd || kill[rs])
                     entries[rs].busy <= 0; // only clear busy bit
 
-                for (int n = 0; n < N; ++n) begin
-                    if (flush) // frontend is killed unconditionally; disable ALL dispatches during flush
-                        break;
-                    if (!d2entry[n][rs])
-                        continue;
-                    entries[rs].busy    <= 1;
-                    entries[rs].issd    <= 0;
-                    entries[rs].dat     <= d_in_dat[n];
+                if (!flush) begin // frontend is killed unconditionally; disable ALL dispatches during flush
+                    for (int n = 0; n < N; ++n) begin
+                        if (!d2entry[n][rs])
+                            continue;
+                        entries[rs].busy    <= 1;
+                        entries[rs].issd    <= 0;
+                        entries[rs].dat     <= d_in_dat[n];
+                    end
                 end
             end
 
