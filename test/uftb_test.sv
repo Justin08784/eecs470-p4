@@ -3,6 +3,11 @@
 // enable to synthesize uFTB (via `make uftb.syn.out`)
 // `define SYNTH_UFTB
 
+/*
+TODO: Test sc updates by update_fb. sc_new should be different from
+sc_upd0 and sc_upd1.
+*/
+
 module uftb_test;
     logic       spill;
     FTB_UPD_PKT udat;
