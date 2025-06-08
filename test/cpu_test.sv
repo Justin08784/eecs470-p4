@@ -49,17 +49,25 @@ the icache metadata
 module predecoder (
     input  INST     inst,
 
-    output logic    call,
-    output logic    ret,
-    output logic    cond,
-    output logic    branch
+    output BRANCH_MD md
 );
+    logic brch, cond, call, ret, jalr;
+    REG_IDX rd;
+
+    assign md = '{
+        brch: brch,
+        cond: cond,
+        call: call,
+        ret : ret,
+        jalr:jalr
+    };
+
     always_comb begin
-        REG_IDX rd;
+        brch    = `FALSE;
+        cond    = `FALSE;
         call    = `FALSE;
         ret     = `FALSE;
-        cond    = `FALSE;
-        branch  = `FALSE;
+        jalr    = `FALSE;
         rd = inst.r.rd;
 
         casez (inst)
@@ -67,7 +75,7 @@ module predecoder (
                 // call = (rd == 5'd1) || (rd == 5'd5);
 
                 call = rd != `ZERO_REG;
-                branch = `TRUE;
+                brch = `TRUE;
             end
 
             `RV32_JALR: begin
@@ -81,13 +89,14 @@ module predecoder (
                        ((inst.r.rs1 == 5'd1) || (inst.r.rs1 == 5'd5));
                     //    (inst.i.imm == 12'd0);
                     // idea: compute these imm's (or why not the full branch entirely) in icache refill path?
-                branch = `TRUE;
+                brch = `TRUE;
+                jalr = `TRUE;
             end
 
             `RV32_BEQ, `RV32_BNE, `RV32_BLT, `RV32_BGE,
             `RV32_BLTU, `RV32_BGEU: begin
                 cond    = `TRUE;
-                branch  = `TRUE;
+                brch    = `TRUE;
                 // stage_ex uses inst.b.funct3 as the branch function
             end
             default:;
@@ -181,11 +190,7 @@ module testbench;
         for (genvar woff = 0; woff < 2; ++woff) begin
             predecoder predec_i (
                 .inst   (mem2f.data[blk].word_level[woff]),
-
-                .call   (mem2f.insn_md[blk][woff].call),
-                .ret    (mem2f.insn_md[blk][woff].ret),
-                .cond   (mem2f.insn_md[blk][woff].cond),
-                .branch (mem2f.insn_md[blk][woff].branch)
+                .md     (mem2f.insn_md[blk][woff])
             );
         end
     end

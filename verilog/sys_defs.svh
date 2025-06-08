@@ -542,6 +542,7 @@ typedef struct packed {
     logic       ft;     // fallthrough? else took a branch
     logic [3:0] off;    // ft ? end_off : br_slot[0/1].off
         // if a branch
+    logic       vld;    // is slot valid/hit?
     // WADDR       tgt;
         // Q: Why omit? A: if branch, next FTQ entry's base is branch target
     logic       always_take;
@@ -900,12 +901,13 @@ typedef struct packed {
 
 typedef struct packed {
     // struct guard
-    logic branch;   // 1 iff is any form of control insn
+    logic brch; // 1 iff is any form of control insn
 
     // fields valid iff branch high
     logic cond;
     logic call;
     logic ret;
+    logic jalr;
 } BRANCH_MD;
 typedef struct packed {
     MEM_BLOCK   [`N-1:0] data;

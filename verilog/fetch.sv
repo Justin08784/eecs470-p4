@@ -40,7 +40,6 @@ module fetch (
 
     struct packed {
         FETCH_FSM_STATE s;
-        logic [$clog2(FTQ_SZ)-1:0] head; // ftq head
         logic [3:0] off;
         WADDR fb_base;
     } cur, cur_n;
@@ -134,13 +133,14 @@ module fetch (
     end
     endgenerate
 
-    logic [`N-1:0] brch, cond, call, ret;
+    logic [`N-1:0] brch, cond, call, ret, jalr;
     generate
     for (genvar i = 0; i < `N; ++i) begin
-        assign brch[i] = md[i].branch;
+        assign brch[i] = md[i].brch;
         assign cond[i] = md[i].cond;
         assign call[i] = md[i].call;
-        assign ret[i]  = md[i].ret;
+        assign ret [i] = md[i].ret;
+        assign jalr[i] = md[i].jalr;
     end
     endgenerate
 
@@ -159,8 +159,12 @@ module fetch (
 
     // TODO: FTQ consuming FSM
     FTQ_ENTRY r;
+    logic unused_fsm_state;
     assign r = ftq_io.rdat;
+
     always_comb begin
+        unused_fsm_state = 0;
+
         unique case (cur.s)
         F_FSM_NVLD,
         F_FSM_VLD_DONE: begin
@@ -170,7 +174,7 @@ module fetch (
         F_FSM_VLD_NDONE: begin
         end
 
-        default: assert(!reset) else $fatal("FTQ FSM: Should be unreachable");
+        default: unused_fsm_state = 1;
         endcase
     end
 
@@ -228,18 +232,20 @@ module fetch (
         if (reset) begin
             cur     <= '{
                 s       : F_FSM_NVLD,
-                head    : '0,
                 off     : '0,
                 fb_base : '0
             };
 
         end else if (flush) begin
             cur.s   <= F_FSM_NVLD;
-            cur.head<= ftq_io.head;
 
         end else begin
             // cur.head <=
 
+        end
+
+        if (!reset) begin
+            assert(!unused_fsm_state) else assert("FTQ FSM: Should be unreachable");
         end
     end
 
@@ -311,7 +317,7 @@ module stage_if_p4 (
     logic [`N-1:0] brch, cond, call, ret;
     generate
     for (genvar i = 0; i < `N; ++i) begin
-        assign brch[i] = md[i].branch;
+        assign brch[i] = md[i].brch;
         assign cond[i] = md[i].cond;
         assign call[i] = md[i].call;
         assign ret[i]  = md[i].ret;
