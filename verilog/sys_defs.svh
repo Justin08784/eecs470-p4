@@ -485,6 +485,23 @@ typedef struct packed {
     logic       vld;
     WADDR       tgt;
     logic [3:0] off;
+        /* TODO (critical path opt.): Use either...
+            A. cry, lo4 scheme:
+                cry = idx-4 carry bit,
+                lo4 = lowest 4 bits of branch pc
+                pc  = {base + cry, lo4}
+                ++ cheap to reconstruct pc (simply concat lowest bits)
+                -- costlier update_fb offset comparisons
+
+            B. cry, off scheme:
+                cry = same as above
+                off = pc - base
+                pc  = {base + cry, (base + off)[3:0]}
+                -- costlier to reconstruct pc (add offset)
+                ++ cheaper update_fb offset comparisons
+
+            Maybe lo4 for fallthrough (end_off), off for branch pc_off?
+        */
     logic       always_take;
 } FTB_BR_SLOT;
 typedef struct packed {
@@ -497,7 +514,7 @@ typedef struct packed {
 typedef struct packed {
     // fallthrough npc (i.e. npc if no branch taken)
     logic [3:0] end_off;    // offset of last insn in the FB. ft_npc = base + end_off + 1
-    // TODO: use ft_lo4, ft_cry scheme?
+        // TODO: see FTB_BR_SLOT (above) for alternative schemes
 
     // two branch slots: [0, 1]
     FTB_BR_SLOT [1:0] br_slot;
