@@ -1,3 +1,5 @@
+`include "sys_defs.svh"
+
 module fetch_test;
     logic   clock, reset;
     logic   DEBUG = 1;
