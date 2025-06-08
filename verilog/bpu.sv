@@ -20,12 +20,18 @@ typedef struct packed {
 
 /* Branch predictor unit (BPU):
 generates PCs for decoupled fetch (experimental) */
+
+/* TODO:
+- scheme to squash speculatively generated fetch blocks?
+See "5.3.1. L1 FTB Miss and L2 FTB Hit" in Reinman's paper "Optimizations Enabled..."
+*/
 module bpu (
     input   clock,
     input   reset,
 
     // TODO: wrap flush, clmsk, flush_take/base into a single "bru_res" bus.
     input   flush,
+    input   WADDR   flush_PC,
     input   BMASK   clmsk,
     input   logic   flush_take,
     input   logic   [$clog2(GHR_BUF_SZ)-1:0] flush_base,
@@ -204,8 +210,10 @@ module bpu (
     );
 
     always_ff @(posedge clock) begin
-        if (reset || flush)
+        if (reset)
             pc_reg <= '0;
+        else if (flush)
+            pc_reg <= flush_PC;
         else
             pc_reg <= pc_reg_n;
     end

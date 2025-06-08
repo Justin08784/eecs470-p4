@@ -1,7 +1,9 @@
 `include "sys_defs.svh"
 
+parameter FTQ_SZ = 32;
+// FIXME: Isn't this just a FIFO?
 module ftq #(
-    parameter FTQ_SZ = `FTQ_SZ, // num elements
+    parameter FTQ_SZ = FTQ_SZ,
     type PTR = logic [$clog2(FTQ_SZ)-1:0],
     type CNT = logic [$clog2(FTQ_SZ):0]
 ) (
@@ -9,22 +11,21 @@ module ftq #(
     input   reset,
     input   flush,
 
-    input   steer,
-    input   PTR         steer_tail,
-    input   FTQ_ENTRY   sdat,
+    // TODO: for fetch/decode-stage resteering/direct branch resolution
+    // input   steer,
+    // input   PTR         steer_tail,
 
-    // if1 (pc generation)
+    // bpu (pc generation)
+    output  logic       rdy,
     input   logic       wen,
-    input   FTB_ENTRY   wdat,
-    output  logic       full,
-    output  PTR         tail,
+    input   FTQ_ENTRY   wdat,
 
-    // if2 (icache read)
-    input   logic       ren,
+    // fetch (icache read)
+    output  logic       vld,
     output  FTQ_ENTRY   rdat,
-    output  logic       empty
+    input   logic       ren
 );
-    PTR head;
+    PTR head, tail;
     FTQ_ENTRY [FTQ_SZ-1:0] state;
     CNT used;
 
@@ -33,12 +34,12 @@ module ftq #(
         .WIDTH($bits(FTQ_ENTRY)),
         .RPORTS(1),
         .WPORTS(1),
-        .FLUSH_MODE(FIFO_FLUSH_SNAP_TAIL)
+        .FLUSH_MODE(FIFO_FLUSH_RESET)
     ) ring_ctr0 (
         .clock,
-        .reset      (reset || flush),
-        .flush      (steer),
-        .flush_snap (steer_tail + 1),
+        .reset,
+        .flush,
+        .flush_snap ('0),
 
         .rd_en_cnt  (ren),
         .wr_en_cnt  (wen),
@@ -55,17 +56,17 @@ module ftq #(
         .free_scnt  ()
     );
 
+    assign vld  = used != 0;
     assign rdat = state[head];
-    assign full = used == FTQ_SZ;
-    assign empty= used == 0;
+    assign rdy  = used != FTQ_SZ;
 
     always_ff @(posedge clock) begin
-        if (reset)
+        if (reset || flush)
             state <= '0;
-        else if (steer)
-            state[steer_tail] <= sdat;
-        else if (wen)
-            state[tail] <= wdat;
+        else begin
+            if (wen)
+                state[tail] <= wdat;
+        end
     end
 
 
