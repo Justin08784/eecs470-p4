@@ -144,13 +144,23 @@ module fetch (
     end
     endgenerate
 
+    logic [$clog2(`N):0] brch_lim_cnt;
+    logic [`N:0][$clog2(`N):0] brch_prefix_cnt;
+    compactor #(
+        .REQW(`N),
+        .GNTW(`N)
+    ) comp_brch (
+        .req        (brch),
+        .lim_cnt    (btq_in.btq_rdy_scnt),
+        .prefix_cnt (brch_prefix_cnt),
+        .gnt_cnt    (brch_lim_cnt)
+    );
+
 
     // TODO: FTQ consuming FSM
+    FTQ_ENTRY r;
+    assign r = ftq_io.rdat;
     always_comb begin
-        FTQ_ENTRY r;
-
-        r = ftq_io.rdat;
-
         unique case (cur.s)
         F_FSM_NVLD,
         F_FSM_VLD_DONE: begin
@@ -159,9 +169,39 @@ module fetch (
 
         F_FSM_VLD_NDONE: begin
         end
-        default: $fatal;
-        endcase
 
+        default: assert(!reset) else $fatal("FTQ FSM: Should be unreachable");
+        endcase
+    end
+
+    always_comb begin
+
+        f_cnt = `MIN(brch_lim_cnt, free_scnt);
+        for (int unsigned i = 0; i < `N; ++i) begin
+            f_dat[i] = '{
+                inst    : inst[i],
+                PC      : pc_n[i],
+                ras_snap: '0, // FIXME
+                btq_idx : '0 // filled below
+            };
+        end
+
+        btq_out = '0;
+        btq_out.en_cnt = brch_prefix_cnt[f_cnt];
+
+        for (int i = 0; i < `N; ++i) begin
+            f_dat[i].btq_idx = btq_in.btq_idxs_n[brch_prefix_cnt[i]];
+
+            btq_out.PC      [brch_prefix_cnt[i]] = pc_n[i];
+            btq_out.pred    [brch_prefix_cnt[i]] = !r.ft && (off_n[i] == r.off);
+            btq_out.pred_tgt[brch_prefix_cnt[i]] = r.base_n;
+            btq_out.ret     [brch_prefix_cnt[i]] = ret[i]; // TODO: fix RAS if pred ret but not ret (likewise for call)
+            btq_out.cond    [brch_prefix_cnt[i]] = cond[i];
+            btq_out.hash        [i]              = '0; // FIXME
+            btq_out.ghr_base    [i]              = '0; // FIXME
+            btq_out.pred_bim    [i]              = '0; // FIXME
+            btq_out.pred_gshare [i]              = '0; // FIXME
+        end
     end
 
     fifo #(

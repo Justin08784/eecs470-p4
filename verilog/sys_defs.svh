@@ -542,7 +542,6 @@ typedef struct packed {
     logic       ft;     // fallthrough? else took a branch
     logic [3:0] off;    // ft ? end_off : br_slot[0/1].off
         // if a branch
-    logic       vld;
     // WADDR       tgt;
         // Q: Why omit? A: if branch, next FTQ entry's base is branch target
     logic       always_take;
