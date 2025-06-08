@@ -1,6 +1,5 @@
 `include "sys_defs.svh"
 
-parameter FTQ_SZ = 32;
 // FIXME: Isn't this just a FIFO?
 module ftq #(
     parameter FTQ_SZ = FTQ_SZ,

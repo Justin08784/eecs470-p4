@@ -10,6 +10,46 @@
 
 `include "sys_defs.svh"
 
+// decoupled fetch
+module fetch (
+    input   clock,
+    input   reset,
+    input   flush,
+    input   BMASK clmsk,
+    input   WADDR flush_PC,
+
+    input   decode2fetch d_in,
+    output  fetch2decode d_out,
+
+    input   btq2fetch   btq_in,
+    output  fetch2btq   btq_out,
+
+    // execute
+    input   execute2complete_bru cbru_in,
+
+    input   rename2snap_bus snap_in,
+
+    output  fetch2mem   mem_out,
+    input   mem2fetch   mem_in
+);
+    logic [4:0] head, tail; // ftq head, tail
+
+    logic [3:0] off;
+    logic [`N:0][3:0] off_n;
+    WADDR fb_base;
+
+    bpu bpu0 (
+        .clock,
+        .reset,
+
+        .flush,
+        .flush_PC,
+        .clmsk
+    );
+    ftq ftq0 ();
+
+endmodule
+
 module stage_if_p4 (
     input   clock,
     input   reset,

@@ -191,7 +191,9 @@ GREP = grep -E --color=auto
 # TODO: add more modules here
 MODULES = cpu \
 	bpu \
+	fetch \
 	fifo \
+	ftq \
 	ghr \
 	mult \
 	rs \
@@ -207,10 +209,33 @@ build/bpu.simv: $(BPU_FILES)
 build/bpu.cov: $(BPU_FILES)
 synth/bpu.vg: $(BPU_FILES)
 
+FETCH_FILES = verilog/sys_defs.svh \
+	verilog/uftb.sv \
+	verilog/skid_buffer.sv \
+	verilog/ghr.sv \
+	verilog/gshare.sv \
+	verilog/btb.sv \
+	verilog/ras.sv \
+	verilog/checkpoints.sv \
+	verilog/psel_gen.sv \
+	verilog/bp.sv \
+	verilog/bpu.sv \
+	verilog/ring_ctr.sv \
+	verilog/fifo.sv \
+	verilog/ftq.sv
+build/fetch.simv: $(FETCH_FILES)
+build/fetch.cov: $(FETCH_FILES)
+synth/fetch.vg: $(FETCH_FILES)
+
 FIFO_FILES = verilog/sys_defs.svh verilog/ring_ctr.sv
 build/fifo.simv: $(FIFO_FILES)
 build/fifo.cov: $(FIFO_FILES)
 synth/fifo.vg: $(FIFO_FILES)
+
+FTQ_FILES = verilog/sys_defs.svh verilog/ring_ctr.sv
+build/ftq.simv: $(FTQ_FILES)
+build/ftq.cov: $(FTQ_FILES)
+synth/ftq.vg: $(FTQ_FILES)
 
 GHR_FILES = test/ghr_sva.svh # FIXME: how are you able to omit sys_def.svh like so and it still works???
 build/ghr.simv: $(GHR_FILES)

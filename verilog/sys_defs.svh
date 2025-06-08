@@ -534,6 +534,7 @@ typedef struct packed {
     FTB_MD1 md;
 } FTB_UPD_PKT;
 
+parameter FTQ_SZ = 32;
 typedef struct packed {
     WADDR       base;   // base address of FB
 

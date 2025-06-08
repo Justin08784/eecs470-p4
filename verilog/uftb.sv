@@ -1,7 +1,5 @@
 `include "sys_defs.svh"
 
-localparam FTQ_SZ = 32;
-
 typedef struct packed {
 `ifdef DEBUG
     BMASK   b1hot;
