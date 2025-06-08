@@ -33,21 +33,14 @@ module bpu (
     input   flush,
     input   WADDR   flush_PC,
     input   BMASK   clmsk,
-    input   logic   flush_take,
-    input   logic   [$clog2(GHR_BUF_SZ)-1:0] flush_base,
+    input   execute2complete_bru cbru_in,
 
-    input   struct packed {
-        logic       en;
-        BPU_UPD_PKT dat;
-    } upd_in,
+    input   logic       i_uen,
+    input   BPU_UPD_PKT i_udat,
 
-    input   struct packed {
-        logic rdy;
-    } ftq_in,
-    output  struct packed {
-        logic       en;
-        FTQ_ENTRY   dat;
-    } ftq_out
+    input   logic       i_ftq_rdy,
+    output  logic       o_ftq_en,
+    output  FTQ_ENTRY   o_ftq_dat
 );
     logic step;
     WADDR pc_reg, pc_reg_n; // current fb/ftb base
@@ -65,10 +58,6 @@ module bpu (
     } uftb_io;
 
     struct packed {
-        // ex (correct resolutions)
-        logic ex_en;
-        logic [$clog2(GHR_BUF_SZ)-1:0] ex_idx;
-
         // fetch
         logic [$clog2(NUM_BR_SLOTS):0] f_en_cnt;
         logic [NUM_BR_SLOTS-1:0]       f_pred;
@@ -79,16 +68,16 @@ module bpu (
     } ghr_io;
 
     assign uftb_io.i_qry = pc_reg;
-    assign uftb_io.i_uen = upd_in.en;
+    assign uftb_io.i_uen = i_uen;
     assign uftb_io.i_udat= '{
-        base        : upd_in.dat.base,
-        pc_off      : upd_in.dat.pc_off,
-        take        : upd_in.dat.take,
-        tgt         : upd_in.dat.tgt,
+        base        : i_udat.base,
+        pc_off      : i_udat.pc_off,
+        take        : i_udat.take,
+        tgt         : i_udat.tgt,
 
-        always_take : upd_in.dat.always_take,
+        always_take : i_udat.always_take,
 
-        md          : upd_in.dat.md
+        md          : i_udat.md
     };
 
     uftb #(
@@ -122,9 +111,6 @@ module bpu (
         FTB_BR_SLOT slot;
         WADDR pc_flt, pc_jmp;
 
-        ghr_io.ex_en    = 0;
-        ghr_io.ex_idx   = '0;
-
         e = uftb_io.o_tgt;
 
         pred[0] =
@@ -151,7 +137,7 @@ module bpu (
         pc_reg_n = pred_any ? pc_jmp : pc_flt;
 
         buf_io.i_dat = '{
-            base        : pc_reg,
+            base_n      : pc_reg_n,
             ft          : !pred_any,
             off         : pred_any ? slot.off : e.end_off,
             vld         : slot.vld,
@@ -171,11 +157,11 @@ module bpu (
 
         .flush,
         .clmsk,
-        .flush_take,
-        .flush_base,
+        .flush_take (cbru_in.dat[0].take),
+        .flush_base (cbru_in.dat[0].ghr_base),
 
-        .ex_en      (ghr_io.ex_en),
-        .ex_idx     (ghr_io.ex_idx),
+        .ex_en      (cbru_in.en[0]),
+        .ex_idx     (cbru_in.dat[0].ghr_base),
 
         .f_en_cnt   (ghr_io.f_en_cnt),
         .f_pred     (ghr_io.f_pred),
@@ -203,10 +189,10 @@ module bpu (
         .i_msk ('0),
         .i_dat (buf_io.i_dat),
 
-        .o_vld (ftq_out.en),
-        .o_rdy (ftq_in.rdy),
+        .o_vld (o_ftq_en),
+        .o_rdy (i_ftq_rdy),
         .o_msk (),
-        .o_dat (ftq_out.dat)
+        .o_dat (o_ftq_dat)
     );
 
     always_ff @(posedge clock) begin

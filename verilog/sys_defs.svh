@@ -536,7 +536,7 @@ typedef struct packed {
 
 parameter FTQ_SZ = 32;
 typedef struct packed {
-    WADDR       base;   // base address of FB
+    WADDR       base_n; // base address of *next* FB
 
     // pared down FTB entry
     logic       ft;     // fallthrough? else took a branch

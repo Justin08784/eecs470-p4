@@ -32,11 +32,30 @@ module fetch (
     output  fetch2mem   mem_out,
     input   mem2fetch   mem_in
 );
-    logic [4:0] head, tail; // ftq head, tail
-
-    logic [3:0] off;
+    struct packed {
+        logic vld;
+        logic [$clog2(FTQ_SZ)-1:0] head; // ftq head
+        logic [3:0] off;
+        WADDR fb_base;
+    } cur;
     logic [`N:0][3:0] off_n;
-    WADDR fb_base;
+
+    // bpu <-> ftq plumbing
+    struct packed {
+        logic       en;
+        FTQ_ENTRY   dat;
+    } bpu2ftq;
+    struct packed {
+        logic       rdy;
+    } ftq2bpu;
+
+    // ftq <-> fetch (us) plumbing
+    struct packed {
+        logic [$clog2(FTQ_SZ)-1:0] head;
+        logic vld;
+        FTQ_ENTRY rdat;
+        logic ren;
+    } ftq_io;
 
     bpu bpu0 (
         .clock,
@@ -44,9 +63,42 @@ module fetch (
 
         .flush,
         .flush_PC,
-        .clmsk
+        .clmsk,
+        .cbru_in,
+
+        .i_uen      ('0), // FIXME
+        .i_udat     ('0), // FIXME
+
+        .i_ftq_rdy  (ftq2bpu.rdy),
+        .o_ftq_en   (bpu2ftq.en),
+        .o_ftq_dat  (bpu2ftq.dat)
     );
-    ftq ftq0 ();
+
+    ftq ftq0 (
+        .clock,
+        .reset,
+        .flush,
+
+        .rdy    (ftq2bpu.rdy),
+        .wen    (bpu2ftq.en),
+        .wdat   (bpu2ftq.dat),
+
+        .head   (ftq_io.head),
+        .vld    (ftq_io.vld),
+        .rdat   (ftq_io.rdat),
+        .ren    (ftq_io.ren)
+
+    );
+
+    always_ff @(posedge clock) begin
+        if (reset) begin
+            cur.head <= '0;
+        end else if (flush) begin
+            cur.head <= ftq_io.head;
+        end else begin
+            // cur.head <=
+        end
+    end
 
 endmodule
 
