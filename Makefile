@@ -189,7 +189,17 @@ GREP = grep -E --color=auto
 # ---- Modules to Test ---- #
 
 # TODO: add more modules here
-MODULES = cpu ghr mult rob rs fifo free_list dispatch prf map_table stage_id_p4 execute fetch skid_buffer victim uftb bpu
+MODULES = cpu \
+	bpu \
+	fifo \
+	ghr \
+	mult \
+	rob \
+	rs \
+	skid_buffer \
+	stage_id_p4 \
+	uftb \
+	victim 
 
 # TODO: update this if you add more header files
 ALL_HEADERS = $(CPU_HEADERS)
@@ -231,65 +241,15 @@ build/stage_id_p4.cov: $(ID_FILES)
 synth/stage_id_p4.vg: $(ID_FILES)
 build/stage_id_p4.out: $(ID_FILES)
 
-FREE_LIST_FILES = verilog/sys_defs.svh verilog/fifo.sv
-build/free_list.simv: $(FREE_LIST_FILES)
-build/free_list.cov: $(FREE_LIST_FILES)
-synth/free_list.vg: $(FREE_LIST_FILES)
-
-DISPATCH_FILES = verilog/sys_defs.svh verilog/psel_gen.sv
-build/dispatch.simv: $(DISPATCH_FILES)
-build/dispatch.cov: $(DISPATCH_FILES)
-build/dispatch.vg: $(DISPATCH_FILES)
-
-PRF_FILES = verilog/sys_defs.svh verilog/prf.sv
-build/prf.simv: $(PRF_FILES)
-build/prf.cov: $(PRF_FILES)
-build/prf.vg: $(PRF_FILES)
-
-FETCH_FILES = verilog/sys_defs.svh verilog/mem.sv verilog/memDP.sv
-build/fetch.simv: $(FETCH_FILES)
-build/fetch.cov: $(FETCH_FILES)
-build/fetch.vg: $(FETCH_FILES)
-
-MAP_TABLE_FILES = verilog/sys_defs.svh
-# MAP_TABLE_FILES = verilog/sys_defs.svh test/map_table_sva.svh test/map_table_test.sv
-build/map_table.simv: $(MAP_TABLE_FILES)
-build/map_table.cov: $(MAP_TABLE_FILES)
-build/map_table.vg: $(MAP_TABLE_FILES)
-# build/stage_id_p4.out: $(MAP_TABLE_FILES)
-
-EXECUTE_FILES = verilog/sys_defs.svh verilog/mult.sv verilog/psel_gen.sv
-build/execute.simv: $(EXECUTE_FILES)
-build/execute.cov: $(EXECUTE_FILES)
-build/execute.vg: $(EXECUTE_FILES)
-
-BTQ_FILES = verilog/sys_defs.svh
-build/btq.simv: $(BTB_FILES)
-build/btq.cov: $(BTB_FILES)
-build/btq.vg: $(BTB_FILES)
-
 uFTB_FILES = verilog/sys_defs.svh
 build/uftb.simv: $(uFTB_FILES)
 build/uftb.cov: $(uFTB_FILES)
-build/uftb.vg: $(uFTB_FILES)
+synth/uftb.vg: $(uFTB_FILES)
 
-# FTQ_FILES = verilog/sys_defs.svh verilog/ring_ctr.sv
-# build/ftq.simv: $(FTQ_FILES)
-# build/ftq.cov: $(FTQ_FILES)
-# build/ftq.vg: $(FTQ_FILES)
-
-# FTB_FILES = verilog/sys_defs.svh
-# build/ftb.simv: $(FTB_FILES)
-# build/ftb.cov: $(FTB_FILES)
-# build/ftb.vg: $(FTB_FILES)
-
-BPU_FILES = verilog/sys_defs.svh \
-	verilog/uftb.sv \
-	verilog/skid_buffer.sv \
-	verilog/ghr.sv
+BPU_FILES = verilog/sys_defs.svh verilog/uftb.sv verilog/skid_buffer.sv verilog/ghr.sv
 build/bpu.simv: $(BPU_FILES)
 build/bpu.cov: $(BPU_FILES)
-build/bpu.vg: $(BPU_FILES)
+synth/bpu.vg: $(BPU_FILES)
 
 VICTIM_FILES = verilog/sys_defs.svh verilog/psel_gen.sv
 build/victim.simv: $(VICTIM_FILES)
