@@ -16,7 +16,7 @@ module fetch (
     input   reset,
     input   flush,
     input   BMASK clmsk,
-    input   WADDR flush_PC,
+    input   WADDR flush_PC, // FIXME: this should/would be an FB base...?
 
     input   decode2fetch d_in,
     output  fetch2decode d_out,
@@ -27,19 +27,12 @@ module fetch (
     // execute
     input   execute2complete_bru cbru_in,
 
-    input   rename2snap_bus snap_in,
+    input   rename2snap_bus snap_in, // unused
 
     output  fetch2mem   mem_out,
     input   mem2fetch   mem_in
 );
-    typedef enum logic [1:0] {
-        F_FSM_NVLD      = 2'b00,
-        F_FSM_VLD_DONE  = 2'b01,
-        F_FSM_VLD_NDONE = 2'b10
-    } FETCH_FSM_STATE;
-
     struct packed {
-        FETCH_FSM_STATE s;
         logic [3:0] off;
         WADDR fb_base;
     } cur, cur_n;
@@ -55,10 +48,9 @@ module fetch (
 
     // ftq <-> fetch (us) plumbing
     struct packed {
-        logic [$clog2(FTQ_SZ)-1:0] head;
-        logic vld;
-        FTQ_ENTRY rdat;
-        logic ren;
+        logic       vld;
+        FTQ_ENTRY   rdat;
+        logic       ren;
     } ftq_io;
 
     bpu bpu0 (
@@ -87,29 +79,25 @@ module fetch (
         .wen    (bpu2ftq.en),
         .wdat   (bpu2ftq.dat),
 
-        .head   (ftq_io.head),
+        .head   (), // FIXME: unused
         .vld    (ftq_io.vld),
         .rdat   (ftq_io.rdat),
         .ren    (ftq_io.ren)
 
     );
 
-    logic [`N:0][3:0] off_n;
-    WADDR [`N-1:0] pc_n;
-    logic [$clog2(`N):0]    free_scnt, used_scnt, f_cnt;
-    logic [`N-1:0] f_en;
-    IF_ID_PACKET [`N-1:0]   f_dat;
+    // Form indices: fb offsets, PCs, block DWs
+    logic [`N:0][3:0]   off_n;
+    WADDR [`N:0]        pc_n;
     always_comb begin
-        d_out.f_en_cnt = `MIN(used_scnt, d_in.d_rdy_cnt);
-
-        for (int i = 0; i < `N; ++i)
+        for (int i = 0; i < `N+1; ++i)
             off_n[i] = cur.off + i;
 
-        for (int i = 0; i < `N; ++i)
-            pc_n[i] = cur.fb_base + off_n[i+1];
+        for (int i = 0; i < `N+1; ++i)
+            pc_n[i] = cur.fb_base + off_n[i];
 
         for (int i = 0; i < `N; ++i) // FIXME: These are mem blocks btw. Only works for `N = 2;
-            mem_out.PCdws[i] = pc_n[i][13:1] + i; // w -> dw
+            mem_out.PCdws[i] = pc_n[i+1][13:1] + i; // w -> dw
     end
 
     // Align
@@ -144,6 +132,55 @@ module fetch (
     end
     endgenerate
 
+    // Process FTQ entry
+    FTQ_ENTRY r;
+    assign r = ftq_io.rdat;
+
+        // Detect FB end
+    logic [`N-1:0] is_fb_end;
+    logic [$clog2(`N)-1:0] fb_end_any, fb_end_idx;
+    generate
+    for (genvar i = 0; i < `N; ++i)
+        assign is_fb_end[i] = off_n[i] == r.off;
+    endgenerate
+
+    ffs #(
+        .VECW(`N)
+    ) ff_end (
+        .i_vec(is_fb_end),
+        .o_vld(fb_end_any),
+        .o_idx(fb_end_idx)
+    );
+
+        // Fetch-FSM: consume FTQ entry
+    logic [$clog2(`N):0] fsm_lim_cnt, f_cnt;
+    always_comb begin
+        fsm_lim_cnt =
+            !ftq_io.vld ? 0 :
+            fb_end_any  ? fb_end_idx + 1 :
+            `N;
+
+        cur_n       = cur;
+        ftq_io.ren  = 0;
+        if (ftq_io.vld && fb_end_any && (fsm_lim_cnt == f_cnt)) begin
+            // finished consuming FTQ entry (entry is valid and reached FB end)
+            cur_n = '{
+                fb_base : r.base_n, // advance FB base
+                off     : 0         // reset in-fb offset
+            };
+
+            // signal consume to FTQ
+            ftq_io.ren = 1;
+
+        end else
+            cur_n.off = off_n[f_cnt];
+
+    end
+
+    // Handle count
+    logic [$clog2(`N):0]    free_scnt, used_scnt;
+    IF_ID_PACKET [`N-1:0]   f_dat;
+        // BTQ limit
     logic [$clog2(`N):0] brch_lim_cnt;
     logic [`N:0][$clog2(`N):0] brch_prefix_cnt;
     compactor #(
@@ -156,31 +193,12 @@ module fetch (
         .gnt_cnt    (brch_lim_cnt)
     );
 
-
-    // TODO: FTQ consuming FSM
-    FTQ_ENTRY r;
-    logic unused_fsm_state;
-    assign r = ftq_io.rdat;
-
     always_comb begin
-        unused_fsm_state = 0;
-
-        unique case (cur.s)
-        F_FSM_NVLD,
-        F_FSM_VLD_DONE: begin
-
-        end
-
-        F_FSM_VLD_NDONE: begin
-        end
-
-        default: unused_fsm_state = 1;
-        endcase
+        d_out.f_en_cnt = `MIN(used_scnt, d_in.d_rdy_cnt);
+        f_cnt = `MIN(fsm_lim_cnt, `MIN(brch_lim_cnt, free_scnt));
     end
 
     always_comb begin
-
-        f_cnt = `MIN(brch_lim_cnt, free_scnt);
         for (int unsigned i = 0; i < `N; ++i) begin
             f_dat[i] = '{
                 inst    : inst[i],
@@ -229,24 +247,18 @@ module fetch (
     );
 
     always_ff @(posedge clock) begin
-        if (reset) begin
-            cur     <= '{
-                s       : F_FSM_NVLD,
-                off     : '0,
-                fb_base : '0
+        if (reset)
+            cur <= '0;
+
+        else if (flush)
+            cur <= '{
+                fb_base : flush_PC,
+                off     : 0
             };
 
-        end else if (flush) begin
-            cur.s   <= F_FSM_NVLD;
+        else
+            cur <= cur_n;
 
-        end else begin
-            // cur.head <=
-
-        end
-
-        if (!reset) begin
-            assert(!unused_fsm_state) else assert("FTQ FSM: Should be unreachable");
-        end
     end
 
 endmodule

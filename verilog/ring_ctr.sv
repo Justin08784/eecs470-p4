@@ -1,3 +1,5 @@
+`include "sys_defs.svh"
+
 // pointer engine for fifos/ring buffers. no data storage
 module ring_ctr #(
     parameter int DEPTH=2,

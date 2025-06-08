@@ -539,15 +539,32 @@ typedef struct packed {
     WADDR       base_n; // base address of *next* FB
 
     // pared down FTB entry
+    logic       vld;    // is slot valid/hit?
     logic       ft;     // fallthrough? else took a branch
     logic [3:0] off;    // ft ? end_off : br_slot[0/1].off
         // if a branch
-    logic       vld;    // is slot valid/hit?
     // WADDR       tgt;
         // Q: Why omit? A: if branch, next FTQ entry's base is branch target
     logic       always_take;
-    logic       cond;
+    FTB_MD1     md;
 } FTQ_ENTRY;
+
+typedef struct packed {
+    // FTB_UPD_PKT fields
+    WADDR       base;
+    logic [3:0] pc_off; // pc = base + pc_off
+    logic       take;
+    WADDR       tgt;
+
+    logic       always_take; // i.e. a cond branch that is always taken?
+    FTB_MD1     md;
+
+    // predictor-specific fields
+    logic [GHR_LEN-1:0] hash; // gshare hash
+    logic pred_bim;
+    logic pred_gshare;
+
+} BPU_UPD_PKT;
 
 typedef struct packed {
     logic take;

@@ -1,22 +1,6 @@
 `include "sys_defs.svh"
 
 parameter NUM_BR_SLOTS = 2;
-typedef struct packed {
-    // FTB_UPD_PKT fields
-    WADDR       base;
-    logic [3:0] pc_off; // pc = base + pc_off
-    logic       take;
-    WADDR       tgt;
-
-    logic       always_take; // i.e. a cond branch that is always taken?
-    FTB_MD1     md;
-
-    // predictor-specific fields
-    logic [GHR_LEN-1:0] hash; // gshare hash
-    logic pred_bim;
-    logic pred_gshare;
-
-} BPU_UPD_PKT;
 
 /* Branch predictor unit (BPU):
 generates PCs for decoupled fetch (experimental) */
@@ -111,6 +95,13 @@ module bpu (
         FTB_BR_SLOT slot;
         WADDR pc_flt, pc_jmp;
 
+        const FTB_MD1 COND_MD = '{
+            cond : 1,
+            call : 0,
+            ret  : 0,
+            jalr : 0
+        };
+
         e = uftb_io.o_tgt;
 
         pred[0] =
@@ -134,7 +125,9 @@ module bpu (
 
         pc_flt = WADDR'(pc_reg + v5b'(e.end_off + 1));
         pc_jmp = slot.tgt;
-        pc_reg_n = pred_any ? pc_jmp : pc_flt;
+        pc_reg_n =
+            !uftb_io.o_vld ? pc_reg + 16 :
+            pred_any ? pc_jmp : pc_flt;
 
         buf_io.i_dat = '{
             base_n      : pc_reg_n,
@@ -142,7 +135,7 @@ module bpu (
             off         : pred_any ? slot.off : e.end_off,
             vld         : slot.vld,
             always_take : slot.always_take,
-            cond        : (pred_idx == 0) || e.md1.cond
+            md          : (pred_idx == 0) ? COND_MD : e.md1.cond
         };
     end
 
