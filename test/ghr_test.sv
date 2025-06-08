@@ -1,6 +1,10 @@
 `include "sys_defs.svh"
 // `include "test/ghr_sva.svh"
 
+// enable to synthesize GHR (via `make ghr.syn.out`)
+`define SYNTH_GHR
+
+`ifndef SYNTH_GHR
 module ghr_test #(
     parameter DEPTH     = 64, // must be geq than 2*GHR_LEN and a power of 2
     parameter NUM_FU_BRU= 1,
@@ -368,3 +372,4 @@ endtask
 
 
 endmodule
+`endif

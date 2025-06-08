@@ -194,62 +194,32 @@ MODULES = cpu \
 	fifo \
 	ghr \
 	mult \
-	rob \
 	rs \
 	skid_buffer \
-	stage_id_p4 \
 	uftb \
 	victim 
 
 # TODO: update this if you add more header files
 ALL_HEADERS = $(CPU_HEADERS)
 
-# TODO: add extra source file dependencies below
-
-MULT_FILES = verilog/sys_defs.svh
-build/mult.simv: $(MULT_FILES)
-build/mult.cov: $(MULT_FILES)
-synth/mult.vg: $(MULT_FILES)
-
-# TODO: add any files required for the RS here (besides test/rs_test.sv and verilog/rs.sv)
-RS_FILES = verilog/sys_defs.svh verilog/psel_gen.sv
-build/rs.simv: $(RS_FILES)
-build/rs.cov: $(RS_FILES)
-synth/rs.vg: $(RS_FILES)
-
-# TODO: add any files required for the ROB here (besides test/rob_test.sv and verilog/rob.sv)
-ROB_FILES = verilog/sys_defs.svh verilog/memDP.sv verilog/FIFO.sv
-build/rob.simv: $(ROB_FILES)
-build/rob.cov: $(ROB_FILES)
-synth/rob.vg: $(ROB_FILES)
+BPU_FILES = verilog/sys_defs.svh verilog/uftb.sv verilog/skid_buffer.sv verilog/ghr.sv
+build/bpu.simv: $(BPU_FILES)
+build/bpu.cov: $(BPU_FILES)
+synth/bpu.vg: $(BPU_FILES)
 
 FIFO_FILES = verilog/sys_defs.svh verilog/ring_ctr.sv
 build/fifo.simv: $(FIFO_FILES)
 build/fifo.cov: $(FIFO_FILES)
 synth/fifo.vg: $(FIFO_FILES)
 
-# GHR_FILES = verilog/sys_defs.svh test/ghr_test.sv test/ghr_sva.svh
-GHR_FILES = verilog/sys_defs.svh # to do synthesis
+GHR_FILES = test/ghr_sva.svh # FIXME: how are you able to omit sys_def.svh like so and it still works???
 build/ghr.simv: $(GHR_FILES)
 build/ghr.cov: $(GHR_FILES)
-synth/ghr.vg: $(GHR_FILES)
 
-ID_FILES = verilog/sys_defs.svh verilog/fifo.sv
-# ID_FILES = verilog/sys_defs.svh verilog/fifo.sv test/stage_id_p4_sva.svh test/stage_id_p4_test.sv
-build/stage_id_p4.simv: $(ID_FILES)
-build/stage_id_p4.cov: $(ID_FILES)
-synth/stage_id_p4.vg: $(ID_FILES)
-build/stage_id_p4.out: $(ID_FILES)
-
-uFTB_FILES = verilog/sys_defs.svh
-build/uftb.simv: $(uFTB_FILES)
-build/uftb.cov: $(uFTB_FILES)
-synth/uftb.vg: $(uFTB_FILES)
-
-BPU_FILES = verilog/sys_defs.svh verilog/uftb.sv verilog/skid_buffer.sv verilog/ghr.sv
-build/bpu.simv: $(BPU_FILES)
-build/bpu.cov: $(BPU_FILES)
-synth/bpu.vg: $(BPU_FILES)
+RS_FILES = verilog/sys_defs.svh verilog/psel_gen.sv
+build/rs.simv: $(RS_FILES)
+build/rs.cov: $(RS_FILES)
+synth/rs.vg: $(RS_FILES)
 
 VICTIM_FILES = verilog/sys_defs.svh verilog/psel_gen.sv
 build/victim.simv: $(VICTIM_FILES)
