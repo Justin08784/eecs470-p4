@@ -32,13 +32,18 @@ module fetch (
     output  fetch2mem   mem_out,
     input   mem2fetch   mem_in
 );
+    typedef enum logic [1:0] {
+        F_FSM_NVLD      = 2'b00,
+        F_FSM_VLD_DONE  = 2'b01,
+        F_FSM_VLD_NDONE = 2'b10
+    } FETCH_FSM_STATE;
+
     struct packed {
-        logic vld;
+        FETCH_FSM_STATE s;
         logic [$clog2(FTQ_SZ)-1:0] head; // ftq head
         logic [3:0] off;
         WADDR fb_base;
-    } cur;
-    logic [`N:0][3:0] off_n;
+    } cur, cur_n;
 
     // bpu <-> ftq plumbing
     struct packed {
@@ -90,13 +95,111 @@ module fetch (
 
     );
 
+    logic [`N:0][3:0] off_n;
+    WADDR [`N-1:0] pc_n;
+    logic [$clog2(`N):0]    free_scnt, used_scnt, f_cnt;
+    logic [`N-1:0] f_en;
+    IF_ID_PACKET [`N-1:0]   f_dat;
+    always_comb begin
+        d_out.f_en_cnt = `MIN(used_scnt, d_in.d_rdy_cnt);
+
+        for (int i = 0; i < `N; ++i)
+            off_n[i] = cur.off + i;
+
+        for (int i = 0; i < `N; ++i)
+            pc_n[i] = cur.fb_base + off_n[i+1];
+
+        for (int i = 0; i < `N; ++i) // FIXME: These are mem blocks btw. Only works for `N = 2;
+            mem_out.PCdws[i] = pc_n[i][13:1] + i; // w -> dw
+    end
+
+    // Align
+    BRANCH_MD [2*`N-1:0] md_raw;
+    INST      [2*`N-1:0] inst_raw;
+    BRANCH_MD [`N-1:0] md;
+    INST      [`N-1:0] inst;
+    generate
+    for (genvar i = 0; i < `N; ++i) begin
+        for (genvar woff = 0; woff < 2; ++woff) begin
+            assign md_raw   [2*i + woff] = mem_in.insn_md[i][woff];
+            assign inst_raw [2*i + woff] = mem_in.data[i].word_level[woff];
+        end
+    end
+
+    logic base_woff;
+    assign base_woff = pc_n[0];
+    for (genvar i = 0; i < `N; ++i) begin
+        assign md[i]    = base_woff ? md_raw    [i+1] : md_raw  [i];
+        assign inst[i]  = base_woff ? inst_raw  [i+1] : inst_raw[i];
+    end
+    endgenerate
+
+    logic [`N-1:0] brch, cond, call, ret;
+    generate
+    for (genvar i = 0; i < `N; ++i) begin
+        assign brch[i] = md[i].branch;
+        assign cond[i] = md[i].cond;
+        assign call[i] = md[i].call;
+        assign ret[i]  = md[i].ret;
+    end
+    endgenerate
+
+
+    // TODO: FTQ consuming FSM
+    always_comb begin
+        FTQ_ENTRY r;
+
+        r = ftq_io.rdat;
+
+        unique case (cur.s)
+        F_FSM_NVLD,
+        F_FSM_VLD_DONE: begin
+
+        end
+
+        F_FSM_VLD_NDONE: begin
+        end
+        default: $fatal;
+        endcase
+
+    end
+
+    fifo #(
+        .DEPTH(2*`N),
+        .WIDTH($bits(IF_ID_PACKET)),
+        .NUM_RPORTS(`N),
+        .NUM_WPORTS(`N),
+        .FLUSH_MODE(FIFO_FLUSH_RESET),
+        .ENABLE_INTR_FWD(`FALSE),
+        .INSTANCE_ID(2)
+    ) pc_buf (
+        .clock,
+        .reset,
+        .flush,
+        .wr_en_cnt  (f_cnt),
+        .wr_data    (f_dat),
+        .rd_en_cnt  (d_out.f_en_cnt),
+        .rd_data    (d_out.f_dat),
+        .free_scnt  (free_scnt),
+        .used_scnt  (used_scnt)
+    );
+
     always_ff @(posedge clock) begin
         if (reset) begin
-            cur.head <= '0;
+            cur     <= '{
+                s       : F_FSM_NVLD,
+                head    : '0,
+                off     : '0,
+                fb_base : '0
+            };
+
         end else if (flush) begin
-            cur.head <= ftq_io.head;
+            cur.s   <= F_FSM_NVLD;
+            cur.head<= ftq_io.head;
+
         end else begin
             // cur.head <=
+
         end
     end
 
