@@ -20,12 +20,11 @@ module ftq #(
     input   FTQ_ENTRY   wdat,
 
     // fetch (icache read)
-    output  PTR         head,
     output  logic       vld,
     output  FTQ_ENTRY   rdat,
     input   logic       ren
 );
-    PTR tail;
+    PTR head, tail;
     FTQ_ENTRY [FTQ_SZ-1:0] state;
     CNT used;
 

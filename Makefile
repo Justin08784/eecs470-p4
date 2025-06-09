@@ -96,7 +96,7 @@
 # there should be no need to change anything for project 3
 
 # this is a global clock period variable used in the tcl script and referenced in testbenches
-export CLOCK_PERIOD = 30.0
+export CLOCK_PERIOD = 4.0
 
 # the Verilog Compiler command and arguments
 VCS =  vcs -sverilog -xprop=tmerge +vc -Mupdate -Mdir=build/csrc -line -full64 -kdb -lca -nc \
@@ -213,16 +213,17 @@ FETCH_FILES = verilog/sys_defs.svh \
 	verilog/uftb.sv \
 	verilog/skid_buffer.sv \
 	verilog/ghr.sv \
-	verilog/gshare.sv \
-	verilog/btb.sv \
-	verilog/ras.sv \
 	verilog/checkpoints.sv \
 	verilog/psel_gen.sv \
-	verilog/bp.sv \
 	verilog/bpu.sv \
 	verilog/ring_ctr.sv \
 	verilog/fifo.sv \
 	verilog/ftq.sv
+# verilog/ras.sv
+# verilog/gshare.sv
+# verilog/btb.sv
+# verilog/bp.sv
+
 build/fetch.simv: $(FETCH_FILES)
 build/fetch.cov: $(FETCH_FILES)
 synth/fetch.vg: $(FETCH_FILES)
@@ -270,6 +271,7 @@ CPU_TESTBENCH = test/pipeline_print.c \
 # verilog/cpu.sv is implicit
 CPU_SOURCES = verilog/cpu.sv \
 			  verilog/checkpoints.sv \
+			  verilog/fetch.sv \
 			  verilog/regfile.sv \
               verilog/memDP.sv \
 			  verilog/mult.sv \
@@ -284,7 +286,6 @@ CPU_SOURCES = verilog/cpu.sv \
 			  verilog/stage_id_p4.sv \
 			  verilog/ring_ctr.sv \
 			  verilog/fifo.sv \
-			  verilog/ras.sv \
 			  verilog/fetch.sv \
 			  verilog/execute.sv \
 			  verilog/uftb.sv \
@@ -292,13 +293,14 @@ CPU_SOURCES = verilog/cpu.sv \
 			  verilog/bpu.sv \
 			  verilog/btq.sv \
 			  verilog/ghr.sv \
-			  verilog/gshare.sv \
-			  verilog/btb.sv \
-			  verilog/bp.sv \
 			  verilog/skid_buffer.sv \
 			  verilog/retire.sv \
 			  verilog/victim.sv \
 			  verilog/dcache_block_direct.sv
+# verilog/ras.sv
+# verilog/gshare.sv
+# verilog/btb.sv
+# verilog/bp.sv
 
 
 build/cpu.simv: $(CPU_SOURCES) $(CPU_HEADERS) $(CPU_TESTBENCH)

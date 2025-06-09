@@ -2,7 +2,7 @@
 
 module fetch_test;
     logic   clock, reset;
-    logic   DEBUG = 1;
+    logic   DEBUG;
     
     always begin
         #(`CLOCK_PERIOD/2) clock = ~clock;

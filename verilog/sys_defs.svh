@@ -460,26 +460,6 @@ function automatic logic query_sc(input logic [1:0] sc);
     return sc[1];
 endfunction
 
-// BTQ stuff
-// By btq
-typedef struct packed {
-`ifdef DEBUG
-    BMASK   b1hot;
-`endif
-    WADDR   PC;
-    logic   pred;
-    WADDR   pred_tgt;
-
-    logic   take;
-    WADDR   tgt;
-    logic   [GHR_LEN-1:0] hash; // gshare hash index
-    logic   [`N-1:0][$clog2(GHR_BUF_SZ)-1:0] ghr_base;
-    logic   ret;    // is a ret instruction? (heuristic only; see predecoder for spec)
-    logic   cond;   // is a conditional branch?
-    logic   pred_bim;
-    logic   pred_gshare;
-} BTQ_ENTRY;
-
 typedef struct packed {
     logic [1:0] sc;
     logic       vld;
@@ -549,6 +529,31 @@ typedef struct packed {
     FTB_MD1     md;
 } FTQ_ENTRY;
 
+// BTQ stuff
+// By btq
+typedef struct packed {
+`ifdef DEBUG
+    BMASK   b1hot;
+`endif
+    WADDR   base; // FIXME: fb base (expensive!!!) Store only branch pc offset?
+    WADDR   PC;
+    logic   [3:0] off; // offset in fb (if taken, equals offset in FTQ_ENTRY)
+
+    /* TODO: have a single take, tgt field, initialized by the BPU, but later
+    overwritten by decode/EX when the branch resolves */
+    logic   pred;
+    WADDR   pred_tgt;
+    logic   take;
+    WADDR   tgt;
+
+    FTB_MD1 md;
+
+    logic   [GHR_LEN-1:0] hash; // gshare hash index
+    logic   [`N-1:0][$clog2(GHR_BUF_SZ)-1:0] ghr_base;
+    logic   pred_bim;
+    logic   pred_gshare;
+} BTQ_ENTRY;
+
 typedef struct packed {
     // FTB_UPD_PKT fields
     WADDR       base;
@@ -566,15 +571,15 @@ typedef struct packed {
 
 } BPU_UPD_PKT;
 
-typedef struct packed {
-    logic take;
-    WADDR pc;
-    WADDR tgt;
-    logic cond;
-    logic [GHR_LEN-1:0] hash;
-    logic pred_bim;
-    logic pred_gshare;
-} PUQ_ENTRY;
+// typedef struct packed {
+//     logic take;
+//     WADDR pc;
+//     WADDR tgt;
+//     logic cond;
+//     logic [GHR_LEN-1:0] hash;
+//     logic pred_bim;
+//     logic pred_gshare;
+// } PUQ_ENTRY;
 
 typedef struct packed {
     logic en;
@@ -874,7 +879,7 @@ typedef struct packed {
 
 typedef struct packed {
     logic       en;
-    PUQ_ENTRY   dat;
+    BPU_UPD_PKT dat;
 } puq2fetch;
 typedef struct packed {
     logic   [$clog2(`N):0]  btq_rdy_scnt;
@@ -887,11 +892,13 @@ typedef struct packed {
     logic   [$clog2(`N):0] en_cnt;
         // How many branch instructions dispatching?
         // Sender must ensure branch insns packed to lowest indices.
-    WADDR   [`N-1:0]    PC;
-    WADDR   [`N-1:0]    pred_tgt;
-    logic   [`N-1:0]    pred;
-    logic   [`N-1:0]    ret;
-    logic   [`N-1:0]    cond;
+    WADDR   [`N-1:0]        base;
+    WADDR   [`N-1:0]        PC;
+    logic   [`N-1:0][3:0]   off;
+    logic   [`N-1:0]        pred;
+    WADDR   [`N-1:0]        pred_tgt;
+    FTB_MD1 [`N-1:0]        md;
+
     logic   [`N-1:0][GHR_LEN-1:0] hash; // gshare hash index
     logic   [`N-1:0][$clog2(GHR_BUF_SZ)-1:0] ghr_base;
     logic   [`N-1:0]    pred_bim;

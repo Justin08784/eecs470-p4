@@ -56,7 +56,7 @@ module cpu (
     rename2snap_bus rnme_2_snap;
     execute2complete_bru ex_2_cbru;
 
-    stage_if_p4 fetch0 (
+    fetch fetch0 (
         .clock,
         .reset,
         .flush,

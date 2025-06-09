@@ -84,7 +84,7 @@ module btq #(
     // logic [$clog2(NUM_RPORTS):0] nret_lim_cnt;
     generate
     for (genvar i = 0; i < NUM_RPORTS; ++i) begin
-        assign nret[i] = !state[r_idxs_n[i]].ret; // nret = not a return instruction
+        assign nret[i] = !state[r_idxs_n[i]].md.ret; // nret = not a return instruction
     end
     endgenerate
 
@@ -98,8 +98,8 @@ module btq #(
 
 
     logic puq_empty;
-    PUQ_ENTRY [NUM_RPORTS-1:0]  puq_enq_raw,
-                                puq_enq_flt; // ret's filtered out
+    BPU_UPD_PKT [NUM_RPORTS-1:0]puq_enq_raw,
+                                puq_enq_flt; // ret's filtered out (FIXME: probably dont want to filter out ret's to FTB)
     always_comb begin
         // handle fetch (outs)
         for (int i = 0; i < NUM_RPORTS; ++i) begin
@@ -107,10 +107,13 @@ module btq #(
             cur = state[r_idxs_n[i]];
 
             puq_enq_raw[i] = '{
-                cond    : cur.cond,
+                base    : cur.base,
+                pc_off  : cur.off,
                 take    : cur.take,
-                pc      : cur.PC,
                 tgt     : cur.tgt,
+                always_take : 0, // FIXME
+                md      : cur.md,
+
                 hash    : cur.hash,
                 pred_bim    : cur.pred_bim,
                 pred_gshare : cur.pred_gshare
@@ -137,7 +140,7 @@ module btq #(
     localparam PUQ_SZ = 3;
     fifo #(
         .DEPTH(PUQ_SZ),
-        .WIDTH($bits(PUQ_ENTRY)),
+        .WIDTH($bits(BPU_UPD_PKT)),
         .NUM_RPORTS(1),
         .NUM_WPORTS(NUM_RPORTS),
         .ENABLE_INTR_FWD(`FALSE),
@@ -196,18 +199,21 @@ module btq #(
 `ifdef DEBUG
                     b1hot   : '0,
 `endif
+                    base    : f_in.base[i],
                     PC      : f_in.PC[i],
+                    off     : f_in.off[i],
+
                     pred    : f_in.pred[i],
                     pred_tgt: f_in.pred_tgt[i],
-                    ret     : f_in.ret[i],
-                    cond    : f_in.cond[i],
+                    take    : '0,
+                    tgt     : '0,
+
+                    md      : f_in.md[i],
+
                     hash    : f_in.hash[i],
                     ghr_base: f_in.ghr_base[i],
                     pred_bim: f_in.pred_bim[i],
-                    pred_gshare : f_in.pred_gshare[i],
-
-                    take    : '0,
-                    tgt     : '0
+                    pred_gshare : f_in.pred_gshare[i]
                 };
             end
         end
