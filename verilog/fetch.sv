@@ -95,7 +95,7 @@ module fetch (
             pc_n[i] = cur.fb_base + off_n[i];
 
         for (int i = 0; i < `N; ++i) // FIXME: These are mem blocks btw. Only works for `N = 2;
-            mem_out.PCdws[i] = cur.fb_base[13:1] + i; // w -> dw
+            mem_out.PCdws[i] = pc_n[0][13:1] + i; // w -> dw
     end
 
     // Align
