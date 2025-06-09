@@ -141,29 +141,46 @@ module bpu (
         };
     end
 
-    ghr #(
-        .DEPTH      (GHR_BUF_SZ),
-        .NUM_FU_BRU (`NUM_FU_BRU),
-        .GHR_LEN    (GHR_LEN),
-        .N          (NUM_BR_SLOTS) // up to 2 branches per FTB_ENTRY
-    ) ghr0 (
-        .clock,
-        .reset,
+    /*
+    FIXME:
+    - GHR temporarily commented out because none of our predictors rely on it yet
+    - Q: How to pass ghr_base forward to FTQ? A:
+    Each FTB_ENTRY / fetch block has 2 branch slots, so the FTQ_ENTRY will
+    need to store at most 2 ghr_base's.
+        A. Store only the initial ghr_base and compute the 2nd ghr_base on the fly
+        (need to ensure it is equal the ghr_base fed into the GHR).
+        B. Simply store both ghr_base's.
+    
+    Remember, any branch in the fetch block which do not occupy a branch slot is
+    assumed "never taken" and do not require a branch slot, thus nor a ghr_base.
+    They will only ever start receiving their own ghr_base if they are ever taken
+    and added to a branch_slot.
+    */
+    assign ghr_io.f_rdy_scnt = NUM_BR_SLOTS;
 
-        .flush,
-        .clmsk,
-        .flush_take (cbru_in.dat[0].take),
-        .flush_base (cbru_in.dat[0].ghr_base),
+    // ghr #(
+    //     .DEPTH      (GHR_BUF_SZ),
+    //     .NUM_FU_BRU (`NUM_FU_BRU),
+    //     .GHR_LEN    (GHR_LEN),
+    //     .N          (NUM_BR_SLOTS) // up to 2 branches per FTB_ENTRY
+    // ) ghr0 (
+    //     .clock,
+    //     .reset,
 
-        .ex_en      (cbru_in.en[0]),
-        .ex_idx     (cbru_in.dat[0].ghr_base),
+    //     .flush,
+    //     .clmsk,
+    //     .flush_take (cbru_in.dat[0].take),
+    //     .flush_base (cbru_in.dat[0].ghr_base),
 
-        .f_en_cnt   (ghr_io.f_en_cnt),
-        .f_pred     (ghr_io.f_pred),
-        .f_rdy_scnt (ghr_io.f_rdy_scnt),
-        .f_base     (ghr_io.f_base),
-        .f_ghr      (ghr_io.f_ghr)
-    );
+    //     .ex_en      (cbru_in.en[0]),
+    //     .ex_idx     (cbru_in.dat[0].ghr_base),
+
+    //     .f_en_cnt   (ghr_io.f_en_cnt),
+    //     .f_pred     (ghr_io.f_pred),
+    //     .f_rdy_scnt (ghr_io.f_rdy_scnt),
+    //     .f_base     (ghr_io.f_base),
+    //     .f_ghr      (ghr_io.f_ghr)
+    // );
 
     struct packed {
         logic i_rdy;
