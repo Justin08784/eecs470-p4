@@ -117,11 +117,11 @@ module bpu (
         slot = e.br_slot[pred_idx];
         step = buf_io.i_rdy && (!pred_any || (pred_idx < ghr_io.f_rdy_scnt));
 
-        ghr_io.f_en_cnt =
-            !step ? 0 :
-            pred_any ? pred_idx + 1 :
-            NUM_BR_SLOTS;
-        ghr_io.f_pred   = pred;
+        if (!step || !uftb_io.o_vld)
+            ghr_io.f_en_cnt = 0;
+        else
+            ghr_io.f_en_cnt = pred_any ? pred_idx + 1 : NUM_BR_SLOTS;
+        ghr_io.f_pred = pred;
 
         pc_flt = WADDR'(pc_reg + v5b'(e.end_off + 1));
         pc_jmp = slot.tgt;
