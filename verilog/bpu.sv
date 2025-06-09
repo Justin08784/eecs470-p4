@@ -187,6 +187,7 @@ module bpu (
         FTQ_ENTRY i_dat;
     } buf_io;
 
+    logic o_buf_ftq_vld;
     ppln_skid #(
         .FLUSH_MODE (SKID_FLUSH_RESET),
         .WIDTH      ($bits(FTQ_ENTRY))
@@ -201,19 +202,33 @@ module bpu (
         .i_msk ('0),
         .i_dat (buf_io.i_dat),
 
-        .o_vld (o_ftq_en),
+        .o_vld (o_buf_ftq_vld),
         .o_rdy (i_ftq_rdy),
         .o_msk (),
         .o_dat (o_ftq_dat)
     );
+
+    assign o_ftq_en = o_buf_ftq_vld && i_ftq_rdy;
 
     always_ff @(posedge clock) begin
         if (reset)
             pc_reg <= '0;
         else if (flush)
             pc_reg <= flush_PC;
-        else
+        else if (step)
             pc_reg <= pc_reg_n;
     end
+
+    task print_bpu;
+        $display(">> bpu");
+        $display("pc_reg: %d, step: %b, buf_rdy: %b, ftq_rdy: %b",
+            pc_reg,
+            step,
+            buf_io.i_rdy,
+            i_ftq_rdy
+        );
+
+        $display("<< bpu");
+    endtask
 
 endmodule
