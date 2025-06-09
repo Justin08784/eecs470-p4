@@ -237,9 +237,10 @@ module btq #(
                 continue;
             end
 
-            $write("BTQ[%2d]: {pc: %d} base: %2d, hash: %b, pred: %b, pred_tgt: %x, take: %b, tgt: %x, ",
+            $write("BTQ[%2d]: {pc: %d} fb_base: %d, base: %2d, hash: %b, pred: %b, pred_tgt: %x, take: %b, tgt: %x, ",
                 i,
                 state[i].PC,
+                state[i].base,
                 state[i].ghr_base,
                 state[i].hash,
                 state[i].pred,

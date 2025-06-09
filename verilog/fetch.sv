@@ -278,15 +278,47 @@ module fetch (
         // for (int i = 0; i < `N; ++i)
         //     $display("[%1d]: %1d", i, brch_prefix_cnt[i]);
         $display("flush: %b, flush_PC: 0x%x", flush, flush_PC);
+        $display("pc_reg: %d", bpu0.pc_reg);
+        // $display("step: %b, pred:%b, f_en_cnt:%d, pred_any: %b, pred_idx: %b",
+        //     bpu0.step,
+        //     bpu0.pred,
+        //     bpu0.ghr0.f_en_cnt,
+        //     bpu0.pred_any,
+        //     bpu0.pred_idx
+        // );
         $display("d_out: {f_en_cnt: %b, dat: [%x, %x]}", d_out.f_en_cnt, d_out.f_dat[0], d_out.f_dat[1]);
-        $display("brch: %b, pc_n: [%x, %x, %x]",
+        $display("brch: %b, pc_n: [%d, %d, %d]",
             brch,
             pc_n[0],
             pc_n[1],
             pc_n[2]
         );
+        $display("cur: {fb_base: %d, off: %d}",
+            cur.fb_base,
+            cur.off
+        );
 
-        ftq0.print_ftq;
+        $display("f_cnt: %d, off_n: [%d, %d, %d], mem_out [%d, %d]",
+            f_cnt,
+            off_n[0],
+            off_n[1],
+            off_n[2],
+            mem_out.PCdws[0],
+            mem_out.PCdws[1]
+        );
+
+        // bpu0.ghr0.print_ghr;
+        // ftq0.print_ftq;
+
+        $display("bpu_upd: {en: %b, base: %d, pc_off: %d, take: %b, tgt: %d, md: %b}",
+            btq_in.bp_upd.en,
+            btq_in.bp_upd.dat.base,
+            btq_in.bp_upd.dat.pc_off,
+            btq_in.bp_upd.dat.take,
+            btq_in.bp_upd.dat.tgt,
+            btq_in.bp_upd.dat.md
+        );
+        bpu0.uftb0.print_uftb;
         $display("<< Fetch <<");
     endtask
 `endif

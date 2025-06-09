@@ -504,18 +504,44 @@ module uftb #(
 
 
 `ifdef DEBUG
-    task automatic print_ftb();
+    task automatic print_uftb();
+        $display(">> uftb >>");
+
         for (int w = 0; w < NUM_LINES; ++w) begin
+            FTB_ENTRY fb;
+
             if (!hdr.vld[w]) begin
-                $display("  %1d:", w);
+                $display("%1d:", w);
                 continue;
             end
-            $display("  %1d: {tag: 0x%x tgt: %x} ",
+
+            fb = tgt[w];
+
+            $display("%1d: [{vld: %b, tgt: %d, off = %2d, always_take: %b, sc: %b},",
                 w,
-                hdr.tag[w],
-                w2addr(tgt[w])
+                fb.br_slot[0].vld,
+                fb.br_slot[0].tgt,
+                fb.br_slot[0].off,
+                fb.br_slot[0].always_take,
+                fb.br_slot[0].sc
             );
+
+            $display("    {vld: %b, tgt: %d, off = %2d, always_take: %b, sc: %b, ccrj: %b%b%b%b},",
+                fb.br_slot[1].vld,
+                fb.br_slot[1].tgt,
+                fb.br_slot[1].off,
+                fb.br_slot[1].always_take,
+                fb.br_slot[1].sc,
+                fb.md1.cond,
+                fb.md1.call,
+                fb.md1.ret,
+                fb.md1.jalr
+            );
+
+            $display("    end_off = %2d] (base: %d)", fb.end_off, hdr.tag[w]);
         end
+
+        $display("<< uftb <<");
     endtask
 `endif
 endmodule

@@ -31,8 +31,8 @@ import "DPI-C" function string decode_inst(int inst);
 //import "DPI-C" function void close_pipeline_output_file();
 
 
-// `define TB_MAX_CYCLES 50000000
-`define TB_MAX_CYCLES 500
+`define TB_MAX_CYCLES 50000000
+// `define TB_MAX_CYCLES 500
 // `define TB_MAX_CYCLES 160100
 
 
@@ -590,11 +590,11 @@ module testbench;
 
         $display("  | >> CYCLE: %3d (t: %3d)", clock_count-1, $time);
         // print_btb();
+        print_btq();
         print_fetch();
         // print_decode();
-        // print_rob();
         // print_fl();
-        // print_btq();
+        // print_rob();
         // print_map_table();
         // print_prf();
         // print_rs();
