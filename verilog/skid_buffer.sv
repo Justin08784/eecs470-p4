@@ -35,6 +35,8 @@ module flop #(
             vld <= 0;
             msk <= '0;
             dat <= '0;
+        end else if (flush && SKID_FLUSH_RESET) begin
+            vld <= 0;
         end else begin
             vld <= i_vld;
             msk <= i_msk;
@@ -94,6 +96,9 @@ module skid #(
             vld <= 1'b0;
             msk <= '0;
             dat <= '0;
+
+        end else if (flush && SKID_FLUSH_RESET) begin
+            vld <= 0;
 
         // ---- normal acceptance path ----
         end else if (i_rdy) begin
@@ -172,6 +177,10 @@ module ppln_skid #(
 
             dat <= '0; dat_msk <= '0;
             tmp <= '0; tmp_msk <= '0;
+        end else if (flush && SKID_FLUSH_RESET) begin
+            s   <= PIPE;
+            vld <= 0; 
+            rdy <= 1;
         end else begin
             case (s)
             PIPE: begin // tmp is not full (i.e. at most dat is full)
