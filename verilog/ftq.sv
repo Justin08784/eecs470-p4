@@ -68,5 +68,39 @@ module ftq #(
         end
     end
 
+`ifdef DEBUG
+    task print_ftq;
+        logic [FTQ_SZ-1:0] ftq_vld;
+
+        $display(">> FTQ >>");
+        $display("head: %d, tail: %d, used: %d", head, tail, used);
+        // $display("flush: %b, flush_snap: %2d, clmsk: %b", flush, snap, clmsk);
+
+        ftq_vld = '0;
+        for (int cnt = 0; cnt < used; ++cnt)
+            ftq_vld[(head + cnt) % FTQ_SZ] = 1;
+
+        for (int i = 0; i < FTQ_SZ; ++i) begin
+            if (!ftq_vld[i]) begin
+                $display("ftq[%2d]:", i);
+                continue;
+            end
+
+            $display("ftq[%2d]: {base_n: %d} vld: %b, ft: %b, off: %b, always_take: %b, md: %b",
+                i,
+                state[i].base_n,
+                state[i].vld,
+                state[i].ft,
+                state[i].off,
+                state[i].always_take,
+                state[i].md
+            );
+        end
+
+        $display("<< FTQ <<");
+    endtask
+
+`endif
+
 
 endmodule

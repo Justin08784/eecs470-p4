@@ -31,8 +31,8 @@ import "DPI-C" function string decode_inst(int inst);
 //import "DPI-C" function void close_pipeline_output_file();
 
 
-`define TB_MAX_CYCLES 50000000
-// `define TB_MAX_CYCLES 500
+// `define TB_MAX_CYCLES 50000000
+`define TB_MAX_CYCLES 500
 // `define TB_MAX_CYCLES 160100
 
 
@@ -561,9 +561,9 @@ module testbench;
         verisimpleV.fetch0.print_fetch();
     endtask
 
-    task print_btb;
-        verisimpleV.fetch0.bp0.btb0.print_btb();
-    endtask
+    // task print_btb;
+    //     verisimpleV.fetch0.bp0.btb0.print_btb();
+    // endtask
 
     task print_decode;
         verisimpleV.decode0.print_decode();
@@ -573,9 +573,9 @@ module testbench;
         verisimpleV.dispatch0.print_dispatch();
     endtask
 
-    task print_ras;
-        verisimpleV.fetch0.bp0.ras0.print_ras();
-    endtask
+    // task print_ras;
+    //     verisimpleV.fetch0.bp0.ras0.print_ras();
+    // endtask
     
     task print_bman;
         verisimpleV.bman.print_bman();
@@ -590,18 +590,17 @@ module testbench;
 
         $display("  | >> CYCLE: %3d (t: %3d)", clock_count-1, $time);
         // print_btb();
-        // print_fetch();
-        print_ras();
+        print_fetch();
         // print_decode();
         // print_rob();
         // print_fl();
-        print_btq();
+        // print_btq();
         // print_map_table();
         // print_prf();
-        print_rs();
-        print_bman();
-        print_dispatch();
-        print_execute();
+        // print_rs();
+        // print_bman();
+        // print_dispatch();
+        // print_execute();
         // print_dcache();
         // print_retire();
         $display("  | << CYCLE: %3d (t: %3d)", clock_count-1, $time);
