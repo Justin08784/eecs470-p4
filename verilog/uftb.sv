@@ -32,6 +32,8 @@ module lru_man #(
 ) (
     input   logic [SETW-1:0][SETW-1:0] age,
     input   `IDX_TYPE(SETW) acc_way,   
+    input   logic msk_en,
+    input   `IDX_TYPE(SETW) msk_way,
 
     output  `IDX_TYPE(SETW) lru_way,
     output  logic [SETW-1:0][SETW-1:0] age_n
@@ -45,7 +47,7 @@ age[i][j]
     2) if valid, means way i is "older" than way j */
 
     logic [SETW-1:0][SETW-1:0] nage;
-    logic [SETW-1:0][SETW-1:0] ot;
+    logic [SETW-1:0][SETW-1:0] ot, ot_masked;
     logic [SETW-1:0] lruv;
     generate
     assign nage = ~age;
@@ -58,8 +60,19 @@ age[i][j]
         end
     end
 
+    for (genvar i = 0; i < SETW; ++i) begin
+        for (genvar j = 0; j < SETW; ++j) begin
+            // force mask way to be youngest (protects it from LRU selection)
+            assign ot_masked[i][j] =
+                !msk_en         ? ot[i][j]  : 
+                i == msk_way    ? 0         :
+                j == msk_way    ? 1         :
+                                  ot[i][j];
+        end
+    end
+
     for (genvar w = 0; w < SETW; ++w) begin
-        assign lruv[w] = &ot[w];
+        assign lruv[w] = &ot_masked[w];
     end
     endgenerate
 
@@ -78,6 +91,10 @@ age[i][j]
                 i == acc_way ? 0 :
                 j == acc_way ? 1 :
                 age[i][j];
+        end
+
+        for (genvar j = 0; j < i+1; ++j) begin
+            assign age_n[i][j] = 1'b0;
         end
     end
     endgenerate
@@ -212,18 +229,15 @@ module uftb #(
 
     typedef struct packed {
         logic   hit;
-        TAG     tag;
         WAY     way;
     } LOC;
     function automatic LOC locate(
         input HEADER    hdr,
-        input WADDR     waddr
+        input TAG       tag
     );
         logic   [NUM_LINES-1:0] hitv;
         logic   hit;
-        TAG     tag;
         WAY     way;
-        tag = get_tag(waddr);
 
         for (int w = 0; w < NUM_LINES; ++w)
             hitv[w] = hdr.vld[w] && (tag == hdr.tag[w]);
@@ -237,24 +251,8 @@ module uftb #(
 
         return '{
             hit : hit,
-            tag : tag,
             way : way
         };
-    endfunction
-
-    function automatic AGE update_lru(
-        input AGE age,
-        input WAY way
-    );
-        AGE rv;
-        rv = age;
-        foreach(rv[i, j]) begin
-            if (i == way)
-                rv[i][j] = i == j;
-            else if (j == way)
-                rv[i][j] = 1;
-        end
-        return rv;
     endfunction
 
     function automatic FTB_ENTRY wr_br0(
@@ -309,7 +307,7 @@ module uftb #(
         logic [1:0] sc_new, // new slot sc
                     sc_upd0,// br0 sc updated
                     sc_upd1;// br1 sc updated
-        sc_new  = WT;
+        sc_new  = udat.take ? WT : WN;
         sc_upd0 = update_sc(dst.br_slot[0].sc, udat.take);
         sc_upd1 = update_sc(dst.br_slot[1].sc, udat.take);
 
@@ -418,7 +416,7 @@ module uftb #(
         logic [1:0] sc_new;
 
         rv = '0;
-        sc_new  = WT;
+        sc_new  = udat.take ? WT : WN;
 
         if (udat.md.cond) begin
             rv.end_off = 15;
@@ -435,55 +433,155 @@ module uftb #(
 
     WAY lru_way, acc_way;
     AGE age_n;
+    logic msk_en;
+    WAY msk_way;
     lru_man #(
         .SETW(NUM_LINES)
     ) lru_man0 (
         .age(hdr.age),
         .acc_way,
         .lru_way,
+
+        .msk_en,
+        .msk_way,
+
         .age_n
     );
 
     // fetch
     always_comb begin
         LOC loc;
-        loc = locate(hdr, i_qry);
+        TAG tag;
+
+        tag = get_tag(i_qry);
+        loc = locate(hdr, tag);
 
         o_vld = loc.hit;
         o_tgt = tgt[loc.way];
     end
 
     // retire
+    struct packed {
+        logic   en;
+
+        logic   hit;
+        WAY     way;
+        // logic   spill; // if we insert would we spill
+            // ^^ FIXME unused
+
+        FTB_ENTRY e;
+        FTB_UPD_PKT udat;
+    } s1, s1_n;
+
+    // s1
     always_comb begin
-        LOC loc;
-        WAY way;
+        TAG tag;
+        LOC loc_s1, loc_hdr, loc;
+
+        tag = get_tag(i_udat.base);
+        // query s1 reg
+        msk_en  = s1.en;
+        msk_way = s1.way;
+            // ^ protect our predecessor's way from LRU selection so we don't clobber it
+        loc_s1  = '{
+            hit : s1.en && (tag == get_tag(s1.udat.base)),
+            way : s1.way
+        };
+
+        // query header
+        loc_hdr = locate(hdr, tag);
+
+        // mux loc, giving priority to s1 (forwards)
+        loc.hit = loc_s1.hit || loc_hdr.hit;
+        loc.way = '0;
+        if (loc_s1.hit)
+            loc.way = loc_s1.way;
+        else
+            loc.way = loc_hdr.way;
+
+        s1_n = '{
+            en  : i_uen,
+
+            hit : loc.hit,
+            way : loc.hit ? loc.way : lru_way,
+
+            e   : tgt[loc_hdr.way],
+                /* Q: Why choose entry from committed state rather than s1.e? A:
+                Since stage s1 does not perform any updates to its FTB_ENTRY, the
+                committed state is guaranteed to be more up-to-date.
+
+                Now if we wish to change the pipeline design so that s1 DOES perform
+                some updates, this scheme is no longer acceptable. On one hand:
+                1. The committed state, unlike s2, has updates from last cycle's s2.
+                    ...simultaneously, though...
+                2. The s1 register has updates from the current updatee (in s2 right now).
+
+                The only way to do this coherently is to force s1 to stall for a cycle
+                if s2 has the same way/base (i.e. no back-to-back updates to the same entry!) */
+            udat: i_udat
+        };
+    end
+
+    // s2
+    always_comb begin
         logic spill;
-        FTB_ENTRY wfb; // FTB entry with updates
+        FTB_ENTRY wfb;
         logic wen;
 
-        loc = locate(hdr, i_udat.base);
-        way = loc.hit ? loc.way : lru_way;
-        acc_way = way;
-        wfb = loc.hit
-            ? update_fb(spill, tgt[loc.way], i_udat)
-            : create_fb(i_udat);
-        wen = i_uen && (!loc.hit || !spill);
+        acc_way = s1.way;
+        wfb = s1.hit
+            ? update_fb(spill, s1.e, s1.udat)
+            : create_fb(s1.udat);
+        wen = s1.en && (!s1.hit || !spill);
 
         hdr_n = hdr;
         tgt_n = tgt;
 
         if (wen) begin
-            hdr_n.vld[way]  = 1;
-            hdr_n.dirty[way]= 1;
-            hdr_n.tag[way]  = loc.tag;
-            hdr_n.age       = age_n;
+            hdr_n.vld[s1.way]   = 1;
+            hdr_n.dirty[s1.way] = 1;
+            hdr_n.tag[s1.way]   = get_tag(s1.udat.base);
+            hdr_n.age           = age_n;
                 /* TODO: since every branch queries the FTB (but not every branch
                 generates an FTB update) we need an LRU update for reads as well,
                 not just writes. */
 
-            tgt_n[way]      = wfb;
+            tgt_n[s1.way]       = wfb;
         end
+
     end
+
+    // single stage update
+    // always_comb begin
+    //     LOC loc;
+    //     WAY way;
+    //     logic spill;
+    //     FTB_ENTRY wfb; // FTB entry with updates
+    //     logic wen;
+
+    //     loc = locate(hdr, i_udat.base);
+    //     way = loc.hit ? loc.way : lru_way;
+    //     acc_way = way;
+    //     wfb = loc.hit
+    //         ? update_fb(spill, tgt[loc.way], i_udat)
+    //         : create_fb(i_udat);
+    //     wen = i_uen && (!loc.hit || !spill);
+
+    //     hdr_n = hdr;
+    //     tgt_n = tgt;
+
+    //     if (wen) begin
+    //         hdr_n.vld[way]  = 1;
+    //         hdr_n.dirty[way]= 1;
+    //         hdr_n.tag[way]  = loc.tag;
+    //         hdr_n.age       = age_n;
+    //             /* TODO: since every branch queries the FTB (but not every branch
+    //             generates an FTB update) we need an LRU update for reads as well,
+    //             not just writes. */
+
+    //         tgt_n[way]      = wfb;
+    //     end
+    // end
 
     always_ff @(posedge clock) begin
         if (reset) begin
@@ -494,10 +592,12 @@ module uftb #(
                 age     : '1 // *IMPORTANT* empty lines are treated as "oldest"
             };
             tgt <= '0;
+            s1  <= '0;
 
         end else begin
             hdr <= hdr_n;
             tgt <= tgt_n;
+            s1  <= s1_n;
 
         end
     end
