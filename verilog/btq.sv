@@ -117,7 +117,7 @@ module btq #(
 
     assign rd_en_cnt = `MIN(
         `MIN(btq_vld_scnt, puq_rdy_scnt),
-        ncpl_any ? ncpl_idx : NUM_RPORTS
+        ncpl_any ? ncpl_idx : `UCAST_FIT(NUM_RPORTS)
     );
 
     always_comb begin

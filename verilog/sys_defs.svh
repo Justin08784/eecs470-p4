@@ -73,7 +73,7 @@ typedef logic [BMASK_LEN-1:0] BMASK;
 ///////////////////////////////
 /* How can we implement this in the Makefile? */
 // comment out to enable synth only constructions
-// `define SYNTH
+`define SYNTH
 
 `ifndef SYNTH
 // comment out to disable DEBUG:
@@ -1316,11 +1316,11 @@ module compactor #(
     assign raw_prefix_cnt[0] = 0;
     assign raw_prefix_cnt[1] = req[0];
     for (genvar i = 2; i <= REQW; ++i) begin
-        assign raw_prefix_cnt[i][$clog2(i):0] = raw_prefix_cnt[i-1][$clog2(i-1):0] + req[i-1];
+        assign raw_prefix_cnt[i][`CNT_SIZE(i)-1:0] = `UCAST_LEN(raw_prefix_cnt[i-1], i-1) + req[i-1];
     end
 
     for (genvar i = 2; i < REQW; ++i) begin
-        for (genvar j = $clog2(i)+1; j <= $clog2(REQW); ++j) begin
+        for (genvar j = `CNT_SIZE(i); j < $bits(RCNT); ++j) begin
             assign raw_prefix_cnt[i][j] = 1'b0;
         end
     end
@@ -1337,7 +1337,7 @@ module compactor #(
     logic [REQW-1:0] exceeds;
     generate
     for (genvar i = 0; i < REQW; ++i) begin
-        assign exceeds[i] = raw_prefix_cnt[i+1][$clog2(i+1):0] > lim_cnt;
+        assign exceeds[i] = `UCAST_LEN(raw_prefix_cnt[i+1], i+1) > lim_cnt;
     end
     endgenerate
     always_comb begin

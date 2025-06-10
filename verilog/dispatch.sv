@@ -153,6 +153,8 @@ module dispatch #(parameter
         end
 
         for (int i = 0; i < `N; ++i) begin
+            `CNT_TYPE(`BTQ_SZ) btq_carry;
+
             rnme_snap_out.snap_en[i] = rnme_is_brch[i] && (i < rename_en_cnt);
             rnme_snap_out.b1hot_n[i] = bman_in.b1hot_n[rnme_snap_prefix_cnt[i]]; // only valid if snap_en
             rnme_snap_out.fl_head[i] = free_in.fl_heads_n[free_prefix_cnt[i] + has_dst[i]];
@@ -161,6 +163,9 @@ module dispatch #(parameter
             rnme_snap_out.btq_tail[i]= d_in.d_dat[i].btq_idx + `UCAST_FIT(1) >= `BTQ_SZ ?
                 0 :
                 d_in.d_dat[i].btq_idx + `UCAST_FIT(1);
+
+            btq_carry = d_in.d_dat[i].btq_idx + `UCAST_FIT(1);
+            rnme_snap_out.btq_tail[i]= btq_carry >= `BTQ_SZ ? 0 : btq_carry;
             rnme_snap_out.ras_snap[i]= d_in.d_dat[i].ras_snap;
 `ifdef DEBUG
             rnme_snap_out.btq_idx[i] = d_in.d_dat[i].btq_idx;

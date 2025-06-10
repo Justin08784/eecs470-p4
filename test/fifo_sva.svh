@@ -9,11 +9,9 @@ module fifo_sva #(
     parameter int unsigned DEPTH,       // num elements
     parameter int unsigned WIDTH,       // num bits per element
     type FIFO_STATE = struct packed {
-        logic [$clog2(DEPTH)-1:0] head;
-        logic [$clog2(DEPTH)-1:0] tail;
         logic [DEPTH-1:0][WIDTH-1:0] state;
-        logic [$clog2(DEPTH):0]   used;
-        // logic [$clog2(DEPTH):0]   free;
+        `IDX_TYPE(DEPTH) head, tail;
+        `CNT_TYPE(DEPTH) free, used;
     },
     parameter int unsigned NUM_RPORTS, // also cap for used_scnt
     parameter int unsigned NUM_WPORTS, // also cap for free_scnt
@@ -24,28 +22,28 @@ module fifo_sva #(
     input                                           clock, 
     input                                           reset,
 
-    input   logic   [$clog2(NUM_WPORTS):0]          wr_en_cnt,
+    input   `CNT_TYPE(NUM_WPORTS) wr_en_cnt,
+    input   `CNT_TYPE(NUM_WPORTS) free_scnt,
     input   logic   [NUM_WPORTS-1:0][WIDTH-1:0]     wr_data,
 
-    input   logic   [$clog2(NUM_RPORTS):0]          rd_en_cnt,
+    input   `CNT_TYPE(NUM_RPORTS) rd_en_cnt,
+    input   `CNT_TYPE(NUM_RPORTS) used_scnt,
     // outputs
-    input   logic   [NUM_RPORTS-1:0][WIDTH-1:0]     rd_data,
+    input   logic   [NUM_RPORTS-1:0][WIDTH-1:0]     rd_data
 
-    input   logic   [$clog2(NUM_WPORTS):0]          free_scnt,
-    input   logic   [$clog2(NUM_RPORTS):0]          used_scnt
 );
     struct packed {
-        logic   [$clog2(NUM_WPORTS):0]          wr_en_cnt;
         logic   [NUM_WPORTS-1:0][WIDTH-1:0]     wr_data;
-
-        logic   [$clog2(NUM_RPORTS):0]          rd_en_cnt;
+        
+        `CNT_TYPE(NUM_WPORTS) wr_en_cnt;
+        `CNT_TYPE(NUM_RPORTS) rd_en_cnt;
     } ins_pre, ins_cur;
 
     struct packed {
         logic   [NUM_RPORTS-1:0][WIDTH-1:0]     rd_data;
 
-        logic   [$clog2(NUM_WPORTS):0]          free_scnt;
-        logic   [$clog2(NUM_RPORTS):0]          used_scnt;
+        `CNT_TYPE(NUM_WPORTS) free_scnt;
+        `CNT_TYPE(NUM_RPORTS) used_scnt;
     } outs_pre, outs_cur;
 
     assign ins_cur = '{
@@ -60,10 +58,11 @@ module fifo_sva #(
         used_scnt:used_scnt
     };
 
-    int                        rd_count; // number of reads complete
+    int unsigned rd_count; // number of reads complete
     logic [WIDTH-1:0] entries [$];
-    logic [$clog2(DEPTH):0] used;    // how full the buffer should be
-    logic [$clog2(DEPTH):0] free;    // how full the buffer should be
+    int unsigned used; // how full the buffer should be
+    int unsigned free; // "   free ""
+        /* ^^ Use full 32-bit types to avoid overflow when we do arithmetic. */
     logic [NUM_RPORTS-1:0][WIDTH-1:0] rd_data_sva;
     assign free = DEPTH - used;
     // string s;
@@ -147,7 +146,7 @@ module fifo_sva #(
         property used_scnt_correct;
             disable iff (reset)
             used_scnt == (ENABLE_INTR_FWD
-                ? `MIN(used + wr_en_cnt, NUM_RPORTS)
+                ? `MIN(used + wr_en_cnt, `UCAST_FIT(NUM_RPORTS))
                 : `MIN(used, NUM_RPORTS));
         endproperty
 

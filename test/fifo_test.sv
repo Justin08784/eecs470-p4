@@ -9,14 +9,15 @@ module fifo_test();
     localparam WIDTH = 32;
     localparam NUM_RPORTS = 10;
     localparam NUM_WPORTS = 14;
+    // localparam NUM_RPORTS = 10;
+    // localparam NUM_WPORTS = 10;
 
     typedef struct packed {
-        logic [$clog2(DEPTH)-1:0] head;
-        logic [$clog2(DEPTH)-1:0] tail;
+        `IDX_TYPE(DEPTH) head, tail;
+        `CNT_TYPE(DEPTH) used;
         logic [DEPTH-1:0][WIDTH-1:0] state;
-        logic [$clog2(DEPTH):0]   used;
-        // logic [$clog2(DEPTH):0]   free;
     } FIFO_STATE;
+
     function automatic FIFO_STATE gen_reset_state();
         logic [DEPTH-1:0][WIDTH-1:0] state;
         logic [WIDTH-1:0] start = 32;
@@ -33,14 +34,11 @@ module fifo_test();
     endfunction
     localparam FIFO_STATE RESET_STATE = gen_reset_state();
 
-    logic                               clock, reset;
-    logic   [$clog2(NUM_WPORTS):0]      wr_en_cnt;
+    logic   clock, reset;
+    `CNT_TYPE(NUM_WPORTS) wr_en_cnt, free_scnt;
+    `CNT_TYPE(NUM_RPORTS) rd_en_cnt, used_scnt;
     logic   [NUM_WPORTS-1:0][WIDTH-1:0] wr_data;
-    logic   [$clog2(NUM_RPORTS):0]      rd_en_cnt;
     logic   [NUM_RPORTS-1:0][WIDTH-1:0] rd_data;
-    logic   [$clog2(NUM_WPORTS):0]      free_scnt;
-    logic   [$clog2(NUM_RPORTS):0]      used_scnt;
-    
     // Variable to count values written to FIFO
     int cnt;
 
@@ -60,7 +58,7 @@ module fifo_test();
     logic DEBUG = 1;
     always @(posedge clock) begin
         if (DEBUG) begin
-            $display("  %3d | d_in: [%d, %d]   wr_en_cnt: %d  rd_en_cnt: %d  |  d_out: [%d, %d]   used_scnt: %2d  free_scnt: %2d",
+            $display("  %3d | d_in: [%d, %d]   wr_en_cnt: %d  rd_en_cnt: %d  |  d_out: [%d, %d]   used_scnt: %2d (used: %2d) free_scnt: %2d",
                 $time,
                 wr_en_cnt > 0 ? wr_data[0] : 0,
                 wr_en_cnt > 1 ? wr_data[1] : 0,
@@ -69,6 +67,7 @@ module fifo_test();
                 rd_data[0], 
                 rd_data[1], 
                 used_scnt, 
+                dut.used,
                 free_scnt);
         end
     end
@@ -344,7 +343,7 @@ module fifo_test();
 
         // ---------- Test 16 ---------- //
         $display("\nTest 16: Randomized stress testing");
-        DEBUG = 0; // disable debugs
+        DEBUG = 1; // disable debugs
 
         used = 0;
         free = DEPTH;

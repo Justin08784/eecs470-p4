@@ -35,35 +35,35 @@ module ring_ctr #(
     output  `CNT_TYPE(RPORTS) used_scnt,
     output  `CNT_TYPE(WPORTS) free_scnt
 );
+    // casted constants
+    localparam `CNT_TYPE(DEPTH) _DEPTH  = DEPTH;
+    localparam `CNT_TYPE(RPORTS)_RPORTS = RPORTS;
+    localparam `CNT_TYPE(WPORTS)_WPORTS = WPORTS;
+
     function automatic PTR incr(input PTR p, input int unsigned k);
-        logic [(`CNT_SIZE(DEPTH)+1)-1:0] carry;
+        logic [`CNT_SIZE(2*_DEPTH)-1:0] carry;
         carry = p + k;
-        return (carry >= DEPTH) ? carry - DEPTH : carry[$bits(PTR)-1:0];
+        return (carry >= _DEPTH) ? carry - _DEPTH : carry;
     endfunction
     function automatic CNT distance(input PTR x, input PTR y);
-        return (y >= x) ? (y - x) : (y + DEPTH - x);
+        return (y >= x) ? (y - x) : (y + _DEPTH - x);
     endfunction
 
-    always_comb begin
-        free = DEPTH - used;
+    assign free     = _DEPTH - used;
+    assign used_scnt= `MIN(used, _RPORTS);
+    assign free_scnt= `MIN(free, _WPORTS);
 
-        used_scnt = `MIN(used, RPORTS);
-        free_scnt = `MIN(free, WPORTS);
-
-        for (int i = 0; i < RPORTS+1; ++i)
-            rd_idxs_n[i] = incr(head, i);
-        for (int i = 0; i < WPORTS+1; ++i)
-            wr_idxs_n[i] = incr(tail, i);
+    generate
+    assign rd_idxs_n[0] = head;
+    for (genvar i = 1; i < RPORTS+1; ++i) begin
+        assign rd_idxs_n[i] = incr(head, `UCAST_FIT(i));
     end
 
-    // initial begin
-    //     $display("id:%d, head: %d, tail: %d, used: %d",
-    //     INSTANCE_ID,
-    //     RESET_STATE.head,
-    //     RESET_STATE.tail,
-    //     RESET_STATE.used
-    //     );
-    // end
+    assign wr_idxs_n[0] = tail;
+    for (genvar i = 1; i < WPORTS+1; ++i) begin
+        assign wr_idxs_n[i] = incr(tail, `UCAST_FIT(i));
+    end
+    endgenerate
 
     always_ff @(posedge clock) begin
         if (reset) begin
@@ -74,13 +74,15 @@ module ring_ctr #(
         end else if (flush) begin
             unique case (FLUSH_MODE)
             FIFO_FLUSH_SNAP_HEAD: begin
-                used <= used + distance(flush_snap, head) + wr_en_cnt;
+                // used <= used + distance(flush_snap, head) + wr_en_cnt;
+                used <= used + `UCAST_LEN(distance(flush_snap, head) + wr_en_cnt, DEPTH); // or DEPTH+WPORTS?
                 head <= flush_snap;
                 tail <= wr_idxs_n[wr_en_cnt];
             end
 
             FIFO_FLUSH_SNAP_TAIL: begin
-                used <= used - distance(flush_snap, tail) - rd_en_cnt;
+                // used <= used - distance(flush_snap, tail) - rd_en_cnt;
+                used <= used - `UCAST_LEN(distance(flush_snap, tail) + rd_en_cnt, DEPTH); // or DEPTH+RPORTS?
                 head <= rd_idxs_n[rd_en_cnt];
                 tail <= flush_snap;
             end
@@ -93,7 +95,11 @@ module ring_ctr #(
             endcase
 
         end else begin
-            used <= used + wr_en_cnt - rd_en_cnt;
+            // used <= used + wr_en_cnt - rd_en_cnt;
+            used <= `UCAST_LEN(used + wr_en_cnt, DEPTH+WPORTS) - rd_en_cnt;
+                /* realistically the "WPORTS" safety margin is not necessary
+                if we don't have internal forwarding */
+
             head <= rd_idxs_n[rd_en_cnt];
             tail <= wr_idxs_n[wr_en_cnt];
 

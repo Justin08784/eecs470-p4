@@ -133,11 +133,6 @@ module fifo #(
         if (reset) begin
             state   <= RESET_STATE.state;
         end else begin
-            if (wr_en_cnt > free + rd_en_cnt)
-                $error("FIFO overflow! instance: %d", INSTANCE_ID);
-            if (rd_en_cnt > used + wr_en_cnt)
-                $error("FIFO underflow! instance: %d", INSTANCE_ID);
-
             for (int i = 0; i < DEPTH; ++i)
                 bmask[i] <= bmask[i] & ~clmsk;
 
@@ -147,6 +142,43 @@ module fifo #(
                 state[wr_idxs_n[i]] <= wr_data[i];
                 bmask[wr_idxs_n[i]] <= wr_bmask[i];
             end
+        end
+    end
+
+    // runtime assertions
+    always_ff @(posedge clock) begin
+        if (!reset) begin
+
+            int unsigned free_full, used_full;
+            int unsigned rd_en_cnt_full, wr_en_cnt_full;
+            free_full = free;
+            used_full = used;
+            rd_en_cnt_full = rd_en_cnt;
+            wr_en_cnt_full = wr_en_cnt;
+                /* ^^ Cast to full 32-bit temporaries for arithmetic.
+                Q: Why? A: When you do arithmetic between, e.g. a + b, the result
+                seems to have the type of the larger operand.
+
+                And so if we just use the default, narrow types it is easy
+                to overflow the result type in the arithmetic of the below assertions
+                (e.g. free_full + rd_en_cnt_full). */
+
+            if (wr_en_cnt > free_full + rd_en_cnt_full)
+                $error("FIFO overflow! instance: %d (wr: %d, free: %d, rd: %d)",
+                    INSTANCE_ID,
+                    wr_en_cnt,
+                    free,
+                    rd_en_cnt
+                );
+
+            if (rd_en_cnt > used_full + wr_en_cnt_full)
+                $error("FIFO underflow! instance: %d (rd: %d, used: %d, wr: %d)",
+                    INSTANCE_ID,
+                    rd_en_cnt,
+                    used,
+                    wr_en_cnt
+                );
+
         end
     end
 endmodule

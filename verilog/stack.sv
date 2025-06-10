@@ -45,7 +45,7 @@ module stack #(parameter
         used_scnt = ENABLE_INTR_FWD
             ? `MIN(top + wr_en_cnt, `UCAST_FIT(RPORTS))
             : `MIN(top, `UCAST_FIT(RPORTS));
-        free_scnt = `MIN(free, WPORTS);
+        free_scnt = `MIN(free, `UCAST_FIT(WPORTS));
     end
 
     generate
