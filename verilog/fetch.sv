@@ -331,7 +331,6 @@ module fetch (
         );
 
         // bpu0.ghr0.print_ghr;
-        // ftq0.print_ftq;
 
         $display("bpu_upd: {en: %b, base: %d, pc_off: %d, take: %b, tgt: %d, md: %b}",
             btq_in.bp_upd.en,
@@ -342,6 +341,7 @@ module fetch (
             btq_in.bp_upd.dat.md
         );
         bpu0.uftb0.print_uftb;
+        // ftq0.print_ftq;
         $display("<< Fetch <<");
     endtask
 `endif

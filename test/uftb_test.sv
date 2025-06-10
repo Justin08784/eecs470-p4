@@ -1,7 +1,7 @@
 `include "sys_defs.svh"
 
 // enable to synthesize uFTB (via `make uftb.syn.out`)
-// `define SYNTH_UFTB
+`define SYNTH_UFTB
 
 /*
 TODO: Test sc updates by update_fb. sc_new should be different from

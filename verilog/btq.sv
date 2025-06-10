@@ -260,10 +260,11 @@ module btq #(
                 continue;
             end
 
-            $write("BTQ[%2d]: {pc: %d} fb_base: %d, {rslv: %b take: %b, tgt: %x}, ghr_base: %2d, hash: %b  ",
+            $write("BTQ[%2d]: {pc: %d (fb_base: %d, off: %d)}, {rslv: %b take: %b, tgt: %x}, ghr_base: %2d, hash: %b  ",
                 i,
                 state[i].PC,
-                state[i].base,
+                state[i].PC - state[i].off,
+                state[i].off,
                 state[i].rslv,
                 state[i].take,
                 state[i].tgt,
