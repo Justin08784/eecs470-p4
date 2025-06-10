@@ -4,7 +4,7 @@
 module ftq #(
     parameter FTQ_SZ = FTQ_SZ,
     type PTR = logic [$clog2(FTQ_SZ)-1:0],
-    type CNT = logic [$clog2(FTQ_SZ):0]
+    type CNT = `CNT_TYPE(FTQ_SZ)
 ) (
     input   clock,
     input   reset,

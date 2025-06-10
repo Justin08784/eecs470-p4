@@ -30,7 +30,7 @@ module free_list #(parameter
         logic [$clog2(DEPTH)-1:0]       head;
         logic [$clog2(DEPTH)-1:0]       tail;
         logic [DEPTH-1:0][WIDTH-1:0]    state;
-        logic [$clog2(DEPTH):0]         used;
+        `CNT_TYPE(DEPTH)                used;
     } FIFO_STATE;
 
     function automatic FIFO_STATE gen_reset_state();
@@ -79,11 +79,11 @@ module free_list #(parameter
     the FIFO (you still have to do it *somewhere*).
     */
     struct packed {
-        logic [$clog2(`N):0]  r_en_cnt;
+        `CNT_TYPE(`N)  r_en_cnt;
         PHYS_REG_IDX [`N-1:0] t_old;
     } r_in;
 
-    logic [$clog2(`N):0] free_cnt;
+    `CNT_TYPE(`N) free_cnt;
     PHYS_REG_IDX [`N-1:0] told_packed;
     always_comb begin
         free_cnt    = 0;
@@ -157,7 +157,7 @@ module free_list #(parameter
         logic [$clog2(DEPTH)-1:0]       head;
         logic [$clog2(DEPTH)-1:0]       tail;
         logic [DEPTH-1:0][WIDTH-1:0]    state;
-        logic [$clog2(DEPTH):0]         used;
+        `CNT_TYPE(DEPTH)                used;
         localparam half_sz = `ROB_SZ / 2;
 
         head = lst.head;

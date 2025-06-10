@@ -22,15 +22,15 @@ module rob #(
     localparam NUM_DPORTS = N; // dispatch ports (in-order)
     localparam NUM_RPORTS = N; // retire ports (in-order)
     localparam NUM_CPORTS = N; // complete ports (*OUT-OF-ORDER*)
-    logic [$clog2(NUM_DPORTS):0]    free_scnt;
-    logic [$clog2(NUM_RPORTS):0]    used_scnt;
+    `CNT_TYPE(NUM_DPORTS) free_scnt;
+    `CNT_TYPE(NUM_RPORTS) used_scnt;
 
     logic [$clog2(ROB_SZ)-1:0]  head;
     logic [$clog2(ROB_SZ)-1:0]  tail;
     logic [$clog2(ROB_SZ)-1:0]  snap;
 
     ROB_ENTRY [ROB_SZ-1:0]      state;
-    logic [$clog2(ROB_SZ):0]    used, free;
+    `CNT_TYPE(ROB_SZ)           used, free;
 
     logic [NUM_RPORTS:0][$clog2(ROB_SZ)-1:0] rtre_idxs_n;
     logic [NUM_DPORTS:0][$clog2(ROB_SZ)-1:0] comm_idxs_n;

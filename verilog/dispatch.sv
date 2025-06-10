@@ -44,8 +44,8 @@ module dispatch #(parameter
     /* >> ==== 1. Rename stage ==== >> */
     // Gate by availability
     logic [`N-1:0] has_dst;
-    logic [`N:0][$clog2(`N):0] free_prefix_cnt;
-    logic [$clog2(`N):0] free_lim_cnt;
+    logic [`N:0][`CNT_SIZE(`N)-1:0] free_prefix_cnt;
+    `CNT_TYPE(`N) free_lim_cnt;
     compactor #(
         .REQW(`N),
         .GNTW(`N)
@@ -61,14 +61,14 @@ module dispatch #(parameter
             has_dst[n] = d_in.d_dat[n].has_dst;
     end
 
-    logic [$clog2(N):0] rename_vld_scnt;
-    logic [$clog2(N):0] rename_rdy_scnt;
-    logic [$clog2(N):0] rename_en_cnt;
+    `CNT_TYPE(N) rename_vld_scnt;
+    `CNT_TYPE(N) rename_rdy_scnt;
+    `CNT_TYPE(N) rename_en_cnt;
     logic [`N-1:0]      rename_en;
 
     logic [`N-1:0] rnme_is_brch;
-    logic [`N:0][$clog2(`N):0] rnme_snap_prefix_cnt;
-    logic [$clog2(`N):0] rnme_snap_lim_cnt;
+    logic [`N:0][`CNT_SIZE(`N)-1:0] rnme_snap_prefix_cnt;
+    `CNT_TYPE(`N) rnme_snap_lim_cnt;
     compactor #(
         .REQW(`N),
         .GNTW(`N)
@@ -176,7 +176,7 @@ module dispatch #(parameter
     */
     RENAME_COMMIT_PKT [`N-1:0]  commit_in;
     BMASK [`N-1:0] commit_in_bmask;
-    logic [$clog2(N):0] commit_en_cnt;
+    `CNT_TYPE(N) commit_en_cnt;
     logic [`N-1:0]      commit_en;
     fifo #(
         .INSTANCE_ID(40),

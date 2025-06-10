@@ -45,9 +45,9 @@ module bpu (
 
     struct packed {
         // fetch
-        logic [$clog2(NUM_BR_SLOTS):0] f_en_cnt;
+        `CNT_TYPE(NUM_BR_SLOTS) f_en_cnt;
         logic [NUM_BR_SLOTS-1:0]       f_pred;
-        logic [$clog2(NUM_BR_SLOTS):0] f_rdy_scnt;
+        `CNT_TYPE(NUM_BR_SLOTS) f_rdy_scnt;
 
         logic [NUM_BR_SLOTS-1:0][$clog2(GHR_BUF_SZ)-1:0] f_base;
         logic [NUM_BR_SLOTS-1:0][GHR_LEN-1:0] f_ghr;

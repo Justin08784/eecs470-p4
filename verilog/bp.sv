@@ -50,7 +50,7 @@ module bp #(
     logic [`N-1:0] raw_take, raw_take_comp;
     logic [`N-1:0] cond_take, sel_pred, cond_take_comp_gshare, cond_take_comp_bim;
     logic take_any;
-    logic [$clog2(`N)-1:0] take_idx;
+    `IDX_TYPE(`N) take_idx;
     logic empty; // ras empty?
 
     assign raw_take =
@@ -109,7 +109,7 @@ module bp #(
         end
     end
 
-    logic [$clog2(`N):0] f_brch_cnt;
+    `CNT_TYPE(`N) f_brch_cnt;
     assign f_brch_cnt = f_in.brch_prefix_cnt[f_in.f_cnt];
     ghr #(
         .DEPTH      (GHR_BUF_SZ),

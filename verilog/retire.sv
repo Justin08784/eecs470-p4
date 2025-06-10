@@ -40,7 +40,7 @@ module retire (
     end
 
     // general retire
-    logic [$clog2(`N):0] r_en_cnt;
+    `CNT_TYPE(`N) r_en_cnt;
 
     always_comb begin
         r_en_cnt    = 0;

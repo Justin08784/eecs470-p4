@@ -47,7 +47,7 @@ module mt_snaps #(
     output  PHYS_REG_IDX [`NUM_ARCH_REG-1:0] rdat,
 
     // retire updates
-    input   logic       [$clog2(`N):0] uen_cnt,
+    input   `CNT_TYPE(`N)        uen_cnt,
     input   REG_IDX     [`N-1:0] udst,
     input   PHYS_REG_IDX[`N-1:0] ut,
 

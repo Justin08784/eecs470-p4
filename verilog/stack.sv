@@ -7,7 +7,7 @@ module stack #(parameter
     WPORTS=1,
     ENABLE_INTR_FWD=`FALSE,
     type PTR = logic [$clog2(DEPTH)-1:0],
-    type CNT = logic [$clog2(DEPTH):0]
+    type CNT = `CNT_TYPE(DEPTH)
 ) (
     input                                   clock, 
     input                                   reset,
@@ -17,17 +17,17 @@ module stack #(parameter
     input   BMASK                           clmsk,
     // << TODO: handle
 
-    input   logic   [$clog2(WPORTS):0]      wr_en_cnt,
+    input   `CNT_TYPE(WPORTS)               wr_en_cnt,
     input   logic   [WPORTS-1:0][WIDTH-1:0] wr_data,
 
-    input   logic   [$clog2(RPORTS):0]      rd_en_cnt,
+    input   `CNT_TYPE(RPORTS)               rd_en_cnt,
     output  logic   [RPORTS-1:0][WIDTH-1:0] rd_data,
 
-    output  logic   [$clog2(WPORTS):0]      free_scnt,
-    output  logic   [$clog2(RPORTS):0]      used_scnt
+    output  `CNT_TYPE(WPORTS)               free_scnt,
+    output  `CNT_TYPE(RPORTS)               used_scnt
 );
-    function automatic CNT incr(input CNT p, input logic [$clog2(WPORTS):0] k);
-        logic [$clog2(DEPTH+WPORTS):0] carry;
+    function automatic CNT incr(input CNT p, input `CNT_TYPE(WPORTS) k);
+        `CNT_TYPE(DEPTH+WPORTS) carry;
         carry = p + k;
         return (carry <= DEPTH) ? CNT'(carry) : CNT'(DEPTH);
     endfunction

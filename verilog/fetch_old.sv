@@ -22,7 +22,7 @@ module stage_if_p4 (
     WADDR PC_reg;       // base PC for this cycle
     WADDR [`N:0] PC_n;  // PC_n[m] := next PC if we fetch "m" this cycle (inaccurate past the 1st branch)
 
-    logic [$clog2(`N):0]    free_scnt, used_scnt, f_cnt;
+    `CNT_TYPE(`N)   free_scnt, used_scnt, f_cnt;
     logic [`N-1:0] f_en;
     IF_ID_PACKET [`N-1:0]   f_dat;
 
@@ -90,8 +90,8 @@ module stage_if_p4 (
     //     end
     // end
 
-    logic [$clog2(`N):0] brch_lim_cnt;
-    logic [`N:0][$clog2(`N):0] brch_prefix_cnt;
+    `CNT_TYPE(`N) brch_lim_cnt;
+    logic [`N:0][`CNT_SIZE(`N)-1:0] brch_prefix_cnt;
     fetch2bp bp_qry;
     bp2fetch bp_res;
     compactor #(

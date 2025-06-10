@@ -18,10 +18,10 @@
 `define MAX(a, b) ((a) > (b) ? (a) : (b))
 
 `define CNT_TYPE(max) logic [$clog2(max+1)-1:0] // smallest bit-vector to store max
-`define CNT_SIZE(max) logic $clog2(max+1)       // ...and number of bits in that type
+`define CNT_SIZE(max) ($clog2(max+1))           // ...and number of bits in that type
 
 `define IDX_TYPE(len) logic [$clog2(len)-1:0]   // smallest bit-vector to index an array of length len
-`define IDX_SIZE(len) logic $clog2(len)         // ...and number of bits in that type
+`define IDX_SIZE(len) ($clog2(len))             // ...and number of bits in that type
 
 
 ///////////////////////////////////
@@ -389,7 +389,7 @@ typedef enum logic [0:1] {
 typedef logic [$clog2(`BTQ_SZ)-1:0] BTQ_IDX;
 typedef struct packed {
     logic [`N-1:0][$clog2(`RAS_SZ)-1:0] top;
-    logic [`N-1:0][$clog2(`RAS_SZ):0]   used;
+    logic [`N-1:0][`CNT_SIZE(`RAS_SZ)-1:0] used;
 } RAS_SNAP;
 typedef struct packed {
     INST  inst;
@@ -408,7 +408,7 @@ typedef struct packed {
  * some slight changes
  */
 typedef struct packed {
-    logic   [$clog2(`N):0] r_en_cnt;
+    `CNT_TYPE(`N) r_en_cnt;
     logic   [`N-1:0] halt;
     logic   [`N-1:0] illegal;
 } COMMIT_PACKET;
@@ -634,7 +634,7 @@ typedef struct packed {
 } btq2execute;
 
 typedef struct packed {
-    logic [$clog2(`N):0]    r_en_cnt; // final final
+    `CNT_TYPE(`N) r_en_cnt; // final final
     PHYS_REG_IDX [`N-1:0]   tag;
     PHYS_REG_IDX [`N-1:0]   t_old;
     REG_IDX      [`N-1:0]   dst;
@@ -851,16 +851,16 @@ typedef struct packed {
     // insn md flattened
     logic   [`N-1:0]    brch, cond, call, ret;
     WADDR   [`N:0]      PC_n; // branch pc
-    logic   [`N:0][$clog2(`N):0] brch_prefix_cnt;
+    logic   [`N:0][`CNT_SIZE(`N)-1:0] brch_prefix_cnt;
 
-    logic   [$clog2(`N):0]  f_cnt;
-    logic   [`N-1:0]        f_en;
+    `CNT_TYPE(`N)       f_cnt;
+    logic   [`N-1:0]    f_en;
 } fetch2bp;
 
 typedef struct packed {
     // fetch sublimit
-    logic   [$clog2(`N):0]  lim_cnt; // f_cnt limit (cap at first taken)
-    logic   [$clog2(`N):0]  ghr_rdy_scnt;
+    `CNT_TYPE(`N) lim_cnt; // f_cnt limit (cap at first taken)
+    `CNT_TYPE(`N) ghr_rdy_scnt;
 
     // btq_entry contributions
     logic   [`N-1:0] take;
@@ -875,7 +875,7 @@ typedef struct packed {
 } bp2fetch;
 
 typedef struct packed {
-    logic       [$clog2(`N):0]  f_en_cnt;
+    `CNT_TYPE(`N)   f_en_cnt;
     IF_ID_PACKET    [`N-1:0]    f_dat;
 } fetch2decode;
 
@@ -884,14 +884,14 @@ typedef struct packed {
     BPU_UPD_PKT dat;
 } puq2fetch;
 typedef struct packed {
-    logic   [$clog2(`N):0]  btq_rdy_scnt;
+    `CNT_TYPE(`N) btq_rdy_scnt;
     BTQ_IDX [`N-1:0]        btq_idxs_n;
 
     puq2fetch   bp_upd;
 } btq2fetch;
 
 typedef struct packed {
-    logic   [$clog2(`N):0] en_cnt;
+    `CNT_TYPE(`N)           en_cnt;
         // How many branch instructions dispatching?
         // Sender must ensure branch insns packed to lowest indices.
     logic   [`N-1:0]        is_tail;
@@ -918,7 +918,7 @@ typedef struct packed {
 
 // By decode
 typedef struct packed {
-    logic       [$clog2(`N):0]  d_rdy_cnt;
+    `CNT_TYPE(`N) d_rdy_cnt;
 } decode2fetch;
 
 typedef struct packed {
@@ -941,7 +941,7 @@ typedef struct packed {
 } mem2fetch;
 
 typedef struct packed {
-    logic       [$clog2(`N):0]  d_vld_scnt;
+    `CNT_TYPE(`N) d_vld_scnt;
     ID_RESULT   [`N-1:0]        d_dat;
 } decode2dispatch;
 
@@ -955,15 +955,15 @@ typedef struct packed {
 typedef struct packed {
     // NOTE: This is the only place where a transaction is
     // RECEIVER-decided!!! (i.e. receiver broadcasts enable signals)
-    logic       [$clog2(`N):0]  dispatch_en_cnt;
+    `CNT_TYPE(`N) dispatch_en_cnt;
 } dispatch2decode;
 
 typedef struct packed {
-    logic [$clog2(`N):0] snap_en_cnt;
+    `CNT_TYPE(`N) snap_en_cnt;
 } rename2bman;
 
 typedef struct packed {
-    logic [$clog2(`N):0] snap_rdy_scnt;
+    `CNT_TYPE(`N) snap_rdy_scnt;
     BMASK [`N-1:0]  b1hot_n;
     BMASK [`N:0]    bmask_n;
 } bman2rename;
@@ -1004,7 +1004,7 @@ typedef struct packed {
 typedef struct packed {
     /* Rename */
     /* Commit */
-    logic [$clog2(`N):0] d_en_cnt;
+    `CNT_TYPE(`N) d_en_cnt;
         // To: ROB
         // - Number of enabled dispatch lines?
     PHYS_REG_IDX [`N-1:0] tag;
@@ -1018,7 +1018,7 @@ typedef struct packed {
 } dispatch2rob;
 
 typedef struct packed {
-    logic     [$clog2(`N):0]  free_d_en_cnt;
+    `CNT_TYPE(`N) free_d_en_cnt;
         // To: Free list
         // - number of enabled dispatch lines WHO NEED A DEST PREG 
         //   (e.g. no stores)
@@ -1026,7 +1026,7 @@ typedef struct packed {
 } dispatch2free_list;
 
 typedef struct packed {
-    logic         [$clog2(`N):0] en_cnt;
+    `CNT_TYPE(`N) en_cnt;
         // - Number of enabled dispatch lines?
         // - NOTE: For in-order stuff with serial deps (like dispatch), use c(ou)nts;
         // otherwise use en(able) buses.
@@ -1055,8 +1055,8 @@ typedef struct packed {
 typedef struct packed {
     logic bypass1;
     logic bypass2;
-    logic [$clog2(`N)-1:0] cdb_idx1;
-    logic [$clog2(`N)-1:0] cdb_idx2;
+    `IDX_TYPE(`N) cdb_idx1;
+    `IDX_TYPE(`N) cdb_idx2;
 } BYPASS_TAG;
 
 typedef struct packed {
@@ -1084,7 +1084,7 @@ typedef struct packed {
 
 // By ROB
 typedef struct packed {
-    logic   [$clog2(`N):0] rob_rdy_scnt;
+    `CNT_TYPE(`N)rob_rdy_scnt;
         // From: ROB
         // saturating counter for number of free rob entries
     ROB_IDX [`N:0] rob_idxs_n;
@@ -1093,7 +1093,7 @@ typedef struct packed {
 } rob2dispatch;
 
 typedef struct packed {
-    logic       [$clog2(`N):0]  r_vld_cnt;
+    `CNT_TYPE(`N) r_vld_cnt;
         // From: retire (ROB)
         // - number of valid retire lines
     ROB_ENTRY   [`N-1:0]        entries; 
@@ -1128,7 +1128,7 @@ typedef struct packed {
 
 // By Free List
 typedef struct packed {
-    logic    [$clog2(`N):0] free_rdy_scnt;
+    `CNT_TYPE(`N) free_rdy_scnt;
         // From: Free list
         // - sat. count of number of free pregs in free list;
         //   count reflects any pregs returned in retire! (i.e. AFTER retires)
@@ -1170,7 +1170,7 @@ typedef struct packed {
         logic [$clog2(FL_DEPTH)-1:0]       head;
         logic [$clog2(FL_DEPTH)-1:0]       tail;
         logic [FL_DEPTH-1:0][FL_WIDTH-1:0] state;
-        logic [$clog2(FL_DEPTH):0]         used;
+        `CNT_TYPE(FL_DEPTH)                used;
     } fifo;
 } DBG_fl;
 
@@ -1183,7 +1183,7 @@ module ffs_exp #(
     output  logic o_vld,
     output  logic [$clog2(VECW)-1:0] o_idx
 );
-    localparam LEVELS = $clog2(VECW+1);
+    localparam LEVELS = `CNT_SIZE(VECW);
     logic [LEVELS-1:0][VECW-1:0] lset;
 
     generate
@@ -1213,15 +1213,15 @@ module compactor_exp #(
     parameter int GNTW=1
 ) (
     input   logic [REQW-1:0] req, // in-order, sparse
-    input   logic [$clog2(GNTW):0] lim_cnt,
+    input   `CNT_TYPE(GNTW) lim_cnt,
 
-    output  logic [$clog2(REQW):0] gnt_cnt,
-    output  logic [REQW:0][$clog2(GNTW):0] prefix_cnt
+    output  `CNT_TYPE(REQW) gnt_cnt,
+    output  logic [REQW:0][`CNT_SIZE(GNTW)-1:0] prefix_cnt
         // prefix_cnt[i] "left-compacted index" for the i-th lane.
         // (valid iff req[i])
 );
-    localparam SUM_LEVELS = $clog2(REQW+1);
-    logic [SUM_LEVELS-1:0][REQW:0][$clog2(REQW):0] sums;
+    localparam SUM_LEVELS = `CNT_SIZE(REQW);
+    logic [SUM_LEVELS-1:0][REQW:0][`CNT_SIZE(REQW)-1:0] sums;
     generate
     assign sums[0][0] = 0;
     for (genvar i = 1; i < REQW+1; ++i) begin
@@ -1293,8 +1293,8 @@ endmodule
 module compactor #(
     parameter int REQW=2,
     parameter int GNTW=1,
-    type RCNT = logic[$clog2(REQW):0],
-    type GCNT = logic[$clog2(GNTW):0]
+    type RCNT = `CNT_TYPE(REQW),
+    type GCNT = `CNT_TYPE(GNTW)
 ) (
     input   logic [REQW-1:0]req, // in-order, sparse
     input   GCNT            lim_cnt,

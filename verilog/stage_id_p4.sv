@@ -243,9 +243,9 @@ module stage_id_p4 (
 
 
     // assign d_out.d_dat[0].valid = if_id_reg[0].valid;
-    logic [$clog2(`N):0] used_scnt;
-    logic [$clog2(`N):0] free_scnt;
-    logic [$clog2(`N):0] prvw_vld_cnt;
+    `CNT_TYPE(`N) used_scnt;
+    `CNT_TYPE(`N) free_scnt;
+    `CNT_TYPE(`N) prvw_vld_cnt;
     assign f_out.d_rdy_cnt  = free_scnt;
     assign d_out.d_vld_scnt = used_scnt;
 
@@ -255,7 +255,7 @@ module stage_id_p4 (
     ID_RESULT [`N-1:0] tmp;
     ID_RESULT [`N-1:0] wr_fifo;
     // number of legal fetched insns until the 1st illegal insn
-    logic [$clog2(`N):0] non_illegal_cnt; // TODO: do we need stall fetch when we get an illegal?
+    `CNT_TYPE(`N) non_illegal_cnt; // TODO: do we need stall fetch when we get an illegal?
 
     // Instantiate the instruction decoder
     generate

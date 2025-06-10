@@ -3,7 +3,7 @@
 module ras #(
     parameter DEPTH = `RAS_SZ,
     type PTR = logic [$clog2(DEPTH)-1:0],
-    type CNT = logic [$clog2(DEPTH):0]
+    type CNT = `CNT_TYPE(DEPTH)
 ) (
     input           clock, 
     input           reset,

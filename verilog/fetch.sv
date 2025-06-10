@@ -147,7 +147,7 @@ module fetch (
 
         // Detect FB end
     logic [`N-1:0] is_fb_end;
-    logic [$clog2(`N)-1:0] fb_end_any, fb_end_idx;
+    `IDX_TYPE(`N) fb_end_any, fb_end_idx;
     generate
     for (genvar i = 0; i < `N; ++i)
         assign is_fb_end[i] = off_n[i] == r.off;
@@ -162,7 +162,7 @@ module fetch (
     );
 
         // Fetch-FSM: consume FTQ entry
-    logic [$clog2(`N):0] fsm_lim_cnt, f_cnt;
+    `CNT_TYPE(`N) fsm_lim_cnt, f_cnt;
     always_comb begin
         fsm_lim_cnt =
             !ftq_io.vld ? 0 :
@@ -187,11 +187,11 @@ module fetch (
     end
 
     // Handle count
-    logic [$clog2(`N):0]    free_scnt, used_scnt;
+    `CNT_TYPE(`N)   free_scnt, used_scnt;
     IF_ID_PACKET [`N-1:0]   f_dat;
         // BTQ limit
-    logic [$clog2(`N):0] brch_lim_cnt;
-    logic [`N:0][$clog2(`N):0] brch_prefix_cnt;
+    `CNT_TYPE(`N) brch_lim_cnt;
+    logic [`N:0][`CNT_SIZE(`N)-1:0] brch_prefix_cnt;
     compactor #(
         .REQW(`N),
         .GNTW(`N)

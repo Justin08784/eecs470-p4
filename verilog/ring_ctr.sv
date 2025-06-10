@@ -8,7 +8,7 @@ module ring_ctr #(
     parameter int WPORTS=1,
     parameter int FLUSH_MODE=FIFO_FLUSH_RESET,
     type PTR = logic [$clog2(DEPTH)-1:0],
-    type CNT = logic [$clog2(DEPTH):0],
+    type CNT = `CNT_TYPE(DEPTH),
     type RING_PTR_STATE = struct packed {
         PTR head;
         PTR tail;
@@ -22,8 +22,8 @@ module ring_ctr #(
     input   flush,
     input   PTR     flush_snap,
 
-    input   logic   [$clog2(RPORTS):0]  rd_en_cnt,
-    input   logic   [$clog2(WPORTS):0]  wr_en_cnt,
+    input   `CNT_TYPE(RPORTS) rd_en_cnt,
+    input   `CNT_TYPE(WPORTS) wr_en_cnt,
 
     output  PTR     head,
     output  PTR     tail,
@@ -32,11 +32,11 @@ module ring_ctr #(
 
     output  CNT     used,
     output  CNT     free,
-    output  logic   [$clog2(RPORTS):0]  used_scnt,
-    output  logic   [$clog2(WPORTS):0]  free_scnt
+    output  `CNT_TYPE(RPORTS) used_scnt,
+    output  `CNT_TYPE(WPORTS) free_scnt
 );
     function automatic PTR incr(input PTR p, input int unsigned k);
-        logic [$clog2(DEPTH):0] carry;
+        logic [(`CNT_SIZE(DEPTH)+1)-1:0] carry;
         carry = p + k;
         return (carry >= DEPTH) ? carry - DEPTH : carry[$bits(PTR)-1:0];
     endfunction

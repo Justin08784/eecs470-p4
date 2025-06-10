@@ -42,14 +42,14 @@ module dispatch #(parameter
     logic [`PHYS_REG_SZ_R10K-1:0] cpl_lst;
 
     /* >> ==== 1. Alloc Stage ==== >> */
-    logic [$clog2(N):0] alloc_en_cnt;
-    logic [$clog2(N):0] alloc_rdy_scnt;
-    logic [$clog2(N):0] alloc_vld_scnt;
+    `CNT_TYPE(N) alloc_en_cnt;
+    `CNT_TYPE(N) alloc_rdy_scnt;
+    `CNT_TYPE(N) alloc_vld_scnt;
 
     // Gate by availability
     logic [`N-1:0] has_dst;
-    logic [`N:0][$clog2(`N):0] free_prefix_cnt;
-    logic [$clog2(`N):0] free_lim_cnt;
+    logic [`N:0][`CNT_SIZE(N)-1:0] free_prefix_cnt;
+    `CNT_TYPE(`N) free_lim_cnt;
     compactor #(
         .WIDTH(`N)
     ) comp_free (
@@ -112,9 +112,9 @@ module dispatch #(parameter
     end
 
     ALLOC_RENAME_PKT [`N-1:0]  rename_in;
-    logic [$clog2(N):0] rename_vld_scnt;
-    logic [$clog2(N):0] rename_rdy_scnt;
-    logic [$clog2(N):0] rename_en_cnt;
+    `CNT_TYPE(N) rename_vld_scnt;
+    `CNT_TYPE(N) rename_rdy_scnt;
+    `CNT_TYPE(N) rename_en_cnt;
     logic [`N-1:0]      rename_en;
     fifo #(
         .INSTANCE_ID(39),
@@ -140,8 +140,8 @@ module dispatch #(parameter
     /* >> ==== 2. Rename Stage ==== >> */
 
     logic [`N-1:0] rnme_is_brch;
-    logic [`N:0][$clog2(`N):0] rnme_snap_prefix_cnt;
-    logic [$clog2(`N):0] rnme_snap_lim_cnt;
+    logic [`N:0][`CNT_SIZE(`N)-1:0] rnme_snap_prefix_cnt;
+    `CNT_TYPE(`N) rnme_snap_lim_cnt;
     compactor #(
         .WIDTH(`N)
     ) comp_rnme_snap (
@@ -254,7 +254,7 @@ module dispatch #(parameter
 
     RENAME_COMMIT_PKT [`N-1:0]  commit_in;
     BMASK [`N-1:0] commit_in_bmask;
-    logic [$clog2(N):0] commit_en_cnt;
+    `CNT_TYPE(N) commit_en_cnt;
     logic [`N-1:0]      commit_en;
     fifo #(
         .INSTANCE_ID(40),
@@ -284,7 +284,7 @@ module dispatch #(parameter
     /* >> ==== 3. Commit Stage ==== >> */
 
     logic [`N-1:0] comm_is_brch;
-    logic [`N:0][$clog2(`N):0] comm_snap_prefix_cnt;
+    logic [`N:0][`CNT_SIZE(`N)-1:0] comm_snap_prefix_cnt;
     compactor #(
         .WIDTH(`N)
     ) comp_comm_snap (

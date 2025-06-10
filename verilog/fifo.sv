@@ -7,7 +7,7 @@ module fifo #(
         logic [$clog2(DEPTH)-1:0]   head;
         logic [$clog2(DEPTH)-1:0]   tail;
         logic [DEPTH-1:0][WIDTH-1:0]state;
-        logic [$clog2(DEPTH):0]     used;
+        `CNT_TYPE(DEPTH) used;
     },
     parameter int FLUSH_MODE=FIFO_FLUSH_RESET,
     parameter int NUM_RPORTS=`N, // also cap for used_scnt
@@ -48,13 +48,13 @@ module fifo #(
     input   PTR                                     flush_snap,
     input   BMASK                                   clmsk,
 
-    input   logic   [$clog2(NUM_WPORTS):0]          wr_en_cnt,
+    input   `CNT_TYPE(NUM_WPORTS)                   wr_en_cnt,
     input   logic   [NUM_WPORTS-1:0][WIDTH-1:0]     wr_data,
     input   BMASK   [NUM_WPORTS-1:0]                wr_bmask,
     output  PTR                                     tail,
     output  PTR     [NUM_WPORTS:0]                  wr_idxs_n,
 
-    input   logic   [$clog2(NUM_RPORTS):0]          rd_en_cnt,
+    input   `CNT_TYPE(NUM_RPORTS)                   rd_en_cnt,
     output  logic   [NUM_RPORTS-1:0][WIDTH-1:0]     rd_data,
     output  BMASK   [NUM_RPORTS-1:0]                rd_bmask,
     output  PTR                                     head,
@@ -62,15 +62,15 @@ module fifo #(
 
     output  logic                                   empty,
     output  logic                                   full,
-    output  logic   [$clog2(NUM_WPORTS):0]          free_scnt,
-    output  logic   [$clog2(NUM_RPORTS):0]          used_scnt
+    output  `CNT_TYPE(NUM_WPORTS)                   free_scnt,
+    output  `CNT_TYPE(NUM_RPORTS)                   used_scnt
 
     /*NOTE: By removing rd_valid, wr_valid, we force the caller to make sure
     the enabled cnts are correct. */
 );
     logic [DEPTH-1:0][WIDTH-1:0]    state;
     BMASK [DEPTH-1:0]               bmask;
-    logic [$clog2(DEPTH):0]         used, free;
+    `CNT_TYPE(DEPTH) used, free;
 
     ring_ctr #(
         .DEPTH(DEPTH),

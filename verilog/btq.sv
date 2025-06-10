@@ -28,8 +28,8 @@ module btq #(
 
     BTQ_ENTRY [BTQ_SZ-1:0]      state;
     logic [$clog2(BTQ_SZ)-1:0]  head, tail, snap;
-    logic [$clog2(BTQ_SZ):0]    used, free;
-    logic [$clog2(NUM_RPORTS):0] btq_vld_scnt, rd_en_cnt;
+    `CNT_TYPE(BTQ_SZ)           used, free;
+    `CNT_TYPE(NUM_RPORTS)       btq_vld_scnt, rd_en_cnt;
 
     logic [NUM_RPORTS:0][$clog2(BTQ_SZ)-1:0] r_idxs_n;
     logic [NUM_FPORTS:0][$clog2(BTQ_SZ)-1:0] f_idxs_n;
@@ -74,8 +74,7 @@ module btq #(
     );
 
     logic [NUM_RPORTS-1:0] nret;
-    logic [NUM_RPORTS:0][$clog2(NUM_RPORTS):0] nret_prefix_cnt;
-    // logic [$clog2(NUM_RPORTS):0] nret_lim_cnt;
+    logic [NUM_RPORTS:0][`CNT_SIZE(NUM_RPORTS)-1:0] nret_prefix_cnt;
     generate
     for (genvar i = 0; i < NUM_RPORTS; ++i) begin
         assign nret[i] = !state[r_idxs_n[i]].md.ret; // nret = not a return instruction
@@ -92,7 +91,7 @@ module btq #(
 
 
     logic puq_empty;
-    logic [$clog2(NUM_RPORTS):0]puq_rdy_scnt;
+    `CNT_TYPE(NUM_RPORTS) puq_rdy_scnt;
     BPU_UPD_PKT [NUM_RPORTS-1:0]puq_enq_raw,
                                 puq_enq_flt; // ret's filtered out (FIXME: probably dont want to filter out ret's to FTB)
 
