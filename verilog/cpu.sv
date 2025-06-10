@@ -148,9 +148,6 @@ module cpu (
 
     /* >> ==== Retire ==== >> */
     rob2retire rob_2_retire;
-    btq2retire btq_2_retire;
-    retire2btq retire_2_btq;
-
     retire_final    retire_exec;
 
     retire retire0 (
@@ -158,8 +155,6 @@ module cpu (
         .reset,
 
         .rob_in (rob_2_retire),
-        .btq_in (btq_2_retire),
-        .btq_out(retire_2_btq),
 
         .retire_exec
     );
@@ -180,8 +175,6 @@ module cpu (
         .ex_out (btq_2_ex),
         .cbru_in(ex_2_cbru),
 
-        .r_in   (retire_2_btq),
-        .r_out  (btq_2_retire),
         .f_in   (f_2_btq),
         .f_out  (btq_2_f)
     );

@@ -18,10 +18,6 @@ module retire (
     input  clock, reset,
 
     input  rob2retire rob_in,
-    // output retire2rob rob_out,
-
-    input  btq2retire btq_in,
-    output retire2btq btq_out,
 
     output retire_final retire_exec
 );
@@ -46,15 +42,8 @@ module retire (
     // general retire
     logic [$clog2(`N):0] r_en_cnt;
 
-    // bru retire
-    logic [$clog2(`N):0] btq_rd_cnt;
-    logic [$clog2(`N):0] puq_credits;
-
     always_comb begin
         r_en_cnt    = 0;
-
-        btq_rd_cnt  = 0;
-        puq_credits = btq_in.puq_rdy_scnt;
 
         for (int i = 0; i < rob_in.r_vld_cnt; ++i) begin
             if (!rob_in.entries[i].cpl)
@@ -65,30 +54,12 @@ module retire (
             RET_HLT,
             RET_ILL,
             RET_LOD,
+            RET_BRU,
             RET_STR: begin
                 ++r_en_cnt;
             end
-
-            RET_BRU: begin
-                if (puq_credits == 0)
-                    break;
-                --puq_credits;
-                ++r_en_cnt;
-                ++btq_rd_cnt;
-            end
             endcase
         end
-    end
-
-    always_comb begin
-        /* Retire should not act while flush is high */
-        // btq_out = flush ? '0 : '{
-        //     rd_cnt : btq_rd_cnt
-        // };
-
-        btq_out = '{
-            rd_cnt : btq_rd_cnt
-        };
     end
 
     always_comb begin
@@ -123,15 +94,6 @@ module retire (
 `ifdef DEBUG
     task print_retire;
         $display("  | >> retire >>");
-        // for (int i = 0; i < `N; ++i) begin
-        //     $display("btq_out [%0d]: tgt: %x, pred: %b, take: %b",
-        //         i,
-        //         btq_in.dat[i].tgt,
-        //         btq_in.dat[i].pred,
-        //         btq_in.dat[i].take
-        //     );
-        // end
-        $display("btq_rd_cnt: %0d", btq_out.rd_cnt);
 
         $display("retire_exec.r_en_cnt: %0d", retire_exec.r_en_cnt);
         $display("  | << retire <<");

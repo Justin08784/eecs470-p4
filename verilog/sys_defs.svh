@@ -590,14 +590,6 @@ typedef struct packed {
 } puq2btb;
 
 typedef struct packed {
-    logic   [$clog2(`N):0]  puq_rdy_scnt;
-} btq2retire;
-
-typedef struct packed {
-    logic   [$clog2(`N):0]  rd_cnt;
-} retire2btq;
-
-typedef struct packed {
     // for reading
     BTQ_IDX [`NUM_FU_BRU-1:0] btq_idx;
 

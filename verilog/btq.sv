@@ -10,10 +10,6 @@ module btq #(
     input  flush,
     input  BMASK clmsk,
 
-    // retire
-    input  retire2btq   r_in,
-    output btq2retire   r_out,
-
     // complete (write)
     input  execute2btq  ex_in,
     output btq2execute  ex_out,
@@ -31,11 +27,9 @@ module btq #(
     localparam NUM_CPORTS = `NUM_FU_BRU; // complete ports (*OUT-OF-ORDER*)
 
     BTQ_ENTRY [BTQ_SZ-1:0]      state;
-    logic [$clog2(BTQ_SZ)-1:0]  head;
-    logic [$clog2(BTQ_SZ)-1:0]  tail;
-    logic [$clog2(BTQ_SZ)-1:0]  snap;
-    logic [$clog2(BTQ_SZ):0]    used;
-    logic [$clog2(BTQ_SZ):0]    free;
+    logic [$clog2(BTQ_SZ)-1:0]  head, tail, snap;
+    logic [$clog2(BTQ_SZ):0]    used, free;
+    logic [$clog2(NUM_RPORTS):0] btq_vld_scnt, rd_en_cnt;
 
     logic [NUM_RPORTS:0][$clog2(BTQ_SZ)-1:0] r_idxs_n;
     logic [NUM_FPORTS:0][$clog2(BTQ_SZ)-1:0] f_idxs_n;
@@ -52,7 +46,7 @@ module btq #(
         .flush,
         .flush_snap (snap),
 
-        .rd_en_cnt  (r_in.rd_cnt),
+        .rd_en_cnt  (rd_en_cnt),
         .wr_en_cnt  (f_in.en_cnt),
 
         .head,
@@ -62,7 +56,7 @@ module btq #(
 
         .used,
         .free,
-        .used_scnt(),
+        .used_scnt(btq_vld_scnt),
         .free_scnt(f_out.btq_rdy_scnt)
     );
 
@@ -98,13 +92,40 @@ module btq #(
 
 
     logic puq_empty;
+    logic [$clog2(NUM_RPORTS):0]puq_rdy_scnt;
     BPU_UPD_PKT [NUM_RPORTS-1:0]puq_enq_raw,
                                 puq_enq_flt; // ret's filtered out (FIXME: probably dont want to filter out ret's to FTB)
+
+    // btq retire window
+    BTQ_ENTRY   [NUM_RPORTS-1:0] rdat;
+    logic       [NUM_RPORTS-1:0] rcpl;
+    generate
+    for (genvar i = 0; i < NUM_RPORTS; ++i) begin
+        assign rdat[i] = state[r_idxs_n[i]];
+        assign rcpl[i] = rdat[i].rslv;
+    end
+    endgenerate
+
+    logic ncpl_any; // any unresolved/incomplete in retire window?
+    logic [$clog2(NUM_RPORTS)-1:0] ncpl_idx; // first index in retire window that is not resolved
+    ffs #(
+        .VECW(NUM_RPORTS)
+    ) ff_end (
+        .i_vec(~rcpl),
+        .o_vld(ncpl_any),
+        .o_idx(ncpl_idx)
+    );
+
+    assign rd_en_cnt = `MIN(
+        `MIN(btq_vld_scnt, puq_rdy_scnt),
+        ncpl_any ? ncpl_idx : NUM_RPORTS
+    );
+
     always_comb begin
-        // handle fetch (outs)
+        // handle retires (btq->puq)
         for (int i = 0; i < NUM_RPORTS; ++i) begin
             BTQ_ENTRY cur;
-            cur = state[r_idxs_n[i]];
+            cur = rdat[i];
 
             puq_enq_raw[i] = '{
                 base    : cur.base,
@@ -124,6 +145,7 @@ module btq #(
         for (int i = 0; i < NUM_RPORTS; ++i)
             puq_enq_flt[i] = puq_enq_raw[nret_prefix_cnt[i]];
 
+        // handle fetch (outs)
         f_out.bp_upd.en     = !puq_empty;
         f_out.btq_idxs_n    = f_idxs_n;
 
@@ -151,11 +173,11 @@ module btq #(
         .clock      (clock),
         .reset      (reset),
         .flush      ('0),
-        .wr_en_cnt  (nret_prefix_cnt[r_in.rd_cnt]),
+        .wr_en_cnt  (nret_prefix_cnt[rd_en_cnt]),
         .wr_data    (puq_enq_flt),
         .rd_en_cnt  (f_out.bp_upd.en),
         .rd_data    (f_out.bp_upd.dat),
-        .free_scnt  (r_out.puq_rdy_scnt),
+        .free_scnt  (puq_rdy_scnt),
         .used_scnt  (),
         .empty      (puq_empty)
     );
@@ -166,7 +188,7 @@ module btq #(
         end else begin
             if (f_in.en_cnt > free)
                 $error("BTQ overflow!");
-            if (r_in.rd_cnt > used)
+            if (rd_en_cnt > used)
                 $error("BTQ underflow!");
 
             // handle complete (ins)
@@ -229,7 +251,7 @@ module btq #(
         $display(">> BTQ >>");
         $display("head: %d, tail: %d, used: %d, free: %d", head, tail, used, free);
         $display("flush: %b, flush_snap: %2d, clmsk: %b", flush, snap, clmsk);
-        $display("rd_en_cnt: %2d, wr_en_cnt: %2d", r_in.rd_cnt, f_in.en_cnt);
+        $display("rd_en_cnt: %2d, wr_en_cnt: %2d", rd_en_cnt, f_in.en_cnt);
         btq_vld = '0;
         for (int cnt = 0; cnt < used; ++cnt)
             btq_vld[(head + cnt) % BTQ_SZ] = 1;
@@ -240,16 +262,15 @@ module btq #(
                 continue;
             end
 
-            $write("BTQ[%2d]: {pc: %d} fb_base: %d, base: %2d, hash: %b, pred: %b, pred_tgt: %x, take: %b, tgt: %x, ",
+            $write("BTQ[%2d]: {pc: %d} fb_base: %d, {rslv: %b take: %b, tgt: %x}, ghr_base: %2d, hash: %b  ",
                 i,
                 state[i].PC,
                 state[i].base,
-                state[i].ghr_base,
-                state[i].hash,
-                state[i].pred,
-                state[i].pred_tgt,
+                state[i].rslv,
                 state[i].take,
-                state[i].tgt
+                state[i].tgt,
+                state[i].ghr_base,
+                state[i].hash
             );
 
             if(|state[i].b1hot)
@@ -275,7 +296,6 @@ module btq #(
             );
         end
 
-        $display("r_in: rd_cnt %d", r_in.rd_cnt);
         $display("<< BTQ <<");
     endtask
 
