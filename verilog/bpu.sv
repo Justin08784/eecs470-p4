@@ -1,6 +1,7 @@
 `include "sys_defs.svh"
 
 parameter NUM_BR_SLOTS = 2;
+// parameter MAX_FB_SPAN  = 16;
 
 /* Branch predictor unit (BPU):
 generates PCs for decoupled fetch (experimental) */
@@ -96,6 +97,8 @@ module bpu (
         FTB_ENTRY e;
         FTB_BR_SLOT slot;
         WADDR pc_flt, pc_jmp;
+        // logic leq0, lt0, eq0;
+        // logic leq1, lt1, eq1;
         logic leq0, leq1;
 
         const FTB_MD1 COND_MD = '{
@@ -108,6 +111,10 @@ module bpu (
         e = uftb_io.o_tgt;
 
         // ignore branches before the current FB-offset
+        // cmp4(off, e.br_slot[0].off, eq0, lt0);
+        // cmp4(off, e.br_slot[1].off, eq1, lt1);
+        // leq0 = eq0 || lt0;
+        // leq1 = eq1 || lt1;
         leq0 = off <= e.br_slot[0].off;
         leq1 = off <= e.br_slot[1].off;
         pred[0] =
