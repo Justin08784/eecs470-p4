@@ -17,6 +17,13 @@
 `define MIN(a, b) ((a) < (b) ? (a) : (b))
 `define MAX(a, b) ((a) > (b) ? (a) : (b))
 
+`define CNT_TYPE(max) logic [$clog2(max+1)-1:0] // smallest bit-vector to store max
+`define CNT_SIZE(max) logic $clog2(max+1)       // ...and number of bits in that type
+
+`define IDX_TYPE(len) logic [$clog2(len)-1:0]   // smallest bit-vector to index an array of length len
+`define IDX_SIZE(len) logic $clog2(len)         // ...and number of bits in that type
+
+
 ///////////////////////////////////
 // ---- Starting Parameters ---- //
 ///////////////////////////////////
