@@ -73,7 +73,7 @@ typedef logic [BMASK_LEN-1:0] BMASK;
 ///////////////////////////////
 /* How can we implement this in the Makefile? */
 // comment out to enable synth only constructions
-`define SYNTH
+// `define SYNTH
 
 `ifndef SYNTH
 // comment out to disable DEBUG:
