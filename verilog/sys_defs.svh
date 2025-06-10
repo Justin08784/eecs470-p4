@@ -536,7 +536,6 @@ typedef struct packed {
 `ifdef DEBUG
     BMASK   b1hot;
 `endif
-    WADDR   base; // FIXME: fb base (expensive!!!) Store only branch pc offset?
     WADDR   PC;
     logic   is_tail;
         /*  In BPU, if hit in FTB, is the offset of this branch greater than or equal
@@ -888,7 +887,6 @@ typedef struct packed {
     logic   [$clog2(`N):0] en_cnt;
         // How many branch instructions dispatching?
         // Sender must ensure branch insns packed to lowest indices.
-    WADDR   [`N-1:0]        base;
     logic   [`N-1:0]        is_tail;
     WADDR   [`N-1:0]        PC;
     logic   [`N-1:0][3:0]   off;

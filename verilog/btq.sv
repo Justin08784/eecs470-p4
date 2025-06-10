@@ -128,7 +128,7 @@ module btq #(
             cur = rdat[i];
 
             puq_enq_raw[i] = '{
-                base    : cur.base,
+                base    : cur.PC - cur.off,
                 pc_off  : cur.off,
                 take    : cur.take,
                 tgt     : cur.tgt,
@@ -224,7 +224,6 @@ module btq #(
 `ifdef DEBUG
                     b1hot   : '0,
 `endif
-                    base    : f_in.base[i],
                     PC      : f_in.PC[i],
                     is_tail : f_in.is_tail[i],
                     off     : f_in.off[i],
