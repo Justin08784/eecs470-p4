@@ -282,7 +282,6 @@ module bru_ex(
     BMASK clmsk_n;
     always_comb begin
         logic mispred;
-        WADDR mispred_tgt;
 
         logic pred;
         logic take;
@@ -290,8 +289,9 @@ module bru_ex(
         WADDR npc;
         WADDR tgt;
 
-        mispred     = 1'b0;
-        mispred_tgt = '0;
+        mispred         = 0;
+        flush_fb_base_n = '0;
+        flush_pc_off_n  = '0;
 
         pred     = btq_in.pred[0];
         take     = cbru_out.dat[0].take;
@@ -303,8 +303,7 @@ module bru_ex(
         3'b010,
         3'b011,
         3'b110: begin
-            mispred = i_vld[0];
-            mispred_tgt = tgt;
+            mispred = 1;
 
             flush_fb_base_n = tgt;
             flush_pc_off_n  = '0;
@@ -312,8 +311,7 @@ module bru_ex(
 
         3'b100,
         3'b101: begin
-            mispred = i_vld[0];
-            mispred_tgt = npc;
+            mispred = 1;
 
             if (&btq_in.pc_off[0]   // i.e. btq_in.pc_off == 15. npc would be in next fetch block
                 || btq_in.is_tail[0]
@@ -331,10 +329,8 @@ module bru_ex(
         default:;
         endcase
 
-        clmsk_n = i_vld[0]
-            ? i_regs[0].b1hot
-            : '0;
-        flush_n      = mispred;
+        clmsk_n = i_vld[0] ? i_regs[0].b1hot : '0;
+        flush_n = i_vld[0] && mispred;
     end
 
 
