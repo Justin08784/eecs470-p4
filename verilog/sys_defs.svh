@@ -543,12 +543,10 @@ typedef struct packed {
         to the offset of the branch in the tail slot / br1, if any? */
     logic   [3:0] off; // offset in fb (if taken, equals offset in FTQ_ENTRY)
 
-    /* TODO: have a single take, tgt field, initialized by the BPU, but later
-    overwritten by decode/EX when the branch resolves */
-    logic   pred;
-    WADDR   pred_tgt;
+    logic   rslv; // resolved? 0: take, tgt are predictions, 1: " are real values
     logic   take;
     WADDR   tgt;
+        // NOTE: We used to have separate pred, pred_tgt fields.
 
     FTB_MD1 md;
 

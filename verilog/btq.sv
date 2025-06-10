@@ -132,8 +132,8 @@ module btq #(
             int idx;
             idx = ex_in.btq_idx[i];
             ex_out.is_tail[i]  = state[idx].is_tail;
-            ex_out.pred[i]     = state[idx].pred;
-            ex_out.pred_tgt[i] = state[idx].pred_tgt;
+            ex_out.pred[i]     = state[idx].take;
+            ex_out.pred_tgt[i] = state[idx].tgt;
             ex_out.pc_off[i]   = state[idx].off;
             ex_out.ghr_base[i] = state[idx].ghr_base;
         end
@@ -175,6 +175,7 @@ module btq #(
                 if (!cbru_in.en[i])
                     continue;
 
+                state[idx].rslv <= 1;
                 state[idx].tgt  <= cbru_in.dat[i].tgt;
                 state[idx].take <= cbru_in.dat[i].take;
 `ifdef DEBUG
@@ -206,10 +207,9 @@ module btq #(
                     is_tail : f_in.is_tail[i],
                     off     : f_in.off[i],
 
-                    pred    : f_in.pred[i],
-                    pred_tgt: f_in.pred_tgt[i],
-                    take    : '0,
-                    tgt     : '0,
+                    rslv    : 0,
+                    take    : f_in.pred[i],
+                    tgt     : f_in.pred_tgt[i],
 
                     md      : f_in.md[i],
 
