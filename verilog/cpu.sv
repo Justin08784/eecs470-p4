@@ -33,7 +33,8 @@ module cpu (
 );
     /* Global controls*/
     logic flush;
-    WADDR flush_PC;
+    logic [3:0] flush_pc_off;
+    WADDR flush_fb_base;
     BMASK clmsk;
 
 
@@ -61,7 +62,8 @@ module cpu (
         .reset,
         .flush,
         .clmsk,
-        .flush_PC,
+        .flush_fb_base,
+        .flush_pc_off,
 
         .d_in   (decode_2_f),
         .d_out  (f_2_decode),
@@ -230,7 +232,8 @@ module cpu (
         .clock,
         .reset,
         .flush,
-        .flush_PC,
+        .flush_fb_base,
+        .flush_pc_off,
         .clmsk,
 
         .rs_in      (rs_2_ex),

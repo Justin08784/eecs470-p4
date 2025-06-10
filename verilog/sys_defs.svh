@@ -628,6 +628,7 @@ typedef struct packed {
     // WADDR [`NUM_FU_BRU-1:0] PC; // Does BRU need to carry PC if we can supply it like so?
     logic [`NUM_FU_BRU-1:0] pred;
     WADDR [`NUM_FU_BRU-1:0] pred_tgt;
+    logic [`NUM_FU_BRU-1:0][3:0] pc_off;
     logic [`NUM_FU_BRU-1:0][$clog2(GHR_BUF_SZ)-1:0] ghr_base;
 } btq2execute;
 

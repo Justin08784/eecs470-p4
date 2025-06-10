@@ -199,7 +199,8 @@ module bru_ex(
     input clock,
     input reset,
     output logic flush,
-    output WADDR flush_PC,
+    output WADDR flush_fb_base,
+    output logic [3:0] flush_pc_off,
     output BMASK clmsk,
 
 
@@ -276,7 +277,8 @@ module bru_ex(
     endgenerate
 
     logic flush_n;
-    WADDR flush_PC_n;
+    WADDR flush_fb_base_n;
+    logic [3:0] flush_pc_off_n;
     BMASK clmsk_n;
     always_comb begin
         logic mispred;
@@ -318,20 +320,28 @@ module bru_ex(
             ? i_regs[0].b1hot
             : '0;
         flush_n      = mispred;
-        flush_PC_n   = mispred_tgt;
+        if (take) begin
+            flush_fb_base_n = tgt;
+            flush_pc_off_n  = '0;
+        end else begin
+            flush_fb_base_n = i_regs[0].PC - btq_in.pc_off[0];
+            flush_pc_off_n  = btq_in.pc_off[0] + 1;
+        end
     end
 
 
     always_ff @(posedge clock) begin
         if (reset) begin
-            clmsk       <= '0;
-            flush       <= '0;
-            flush_PC    <= '0;
+            clmsk           <= '0;
+            flush           <= '0;
+            flush_pc_off    <= flush_pc_off_n;
+            flush_fb_base   <= flush_fb_base_n;
         end else begin
 /* ======================================== */
-            clmsk       <= clmsk_n;
-            flush       <= flush_n;
-            flush_PC    <= flush_PC_n;
+            clmsk           <= clmsk_n;
+            flush           <= flush_n;
+            flush_pc_off    <= flush_pc_off_n;
+            flush_fb_base   <= flush_fb_base_n;
 /* ======================================== */
         end
     end
@@ -342,7 +352,8 @@ module stage_ex_p4 (
     input clock,
     input reset,
     output  flush,
-    output  WADDR flush_PC,
+    output  WADDR flush_fb_base,
+    output  logic [3:0] flush_pc_off,
     output  BMASK clmsk,
 
     input   rs2execute rs_in,
@@ -927,7 +938,8 @@ module stage_ex_p4 (
         .reset  (reset),
     // == >>>> == //
         .flush  (flush),
-        .flush_PC,
+        .flush_fb_base,
+        .flush_pc_off,
         .clmsk,
     // == <<<< == //
 

@@ -16,7 +16,17 @@ module fetch (
     input   reset,
     input   flush,
     input   BMASK clmsk,
-    input   WADDR flush_PC, // FIXME: this should/would be an FB base...?
+    // input   WADDR flush_PC,
+        /*
+        WRONG >> 
+            FIXME: this should/would be an FB base...?
+        <<
+        If branch was mispred NT-resolved T, then flush_PC indeed will be an fb_base.
+        However, if branch was mispred T-resolved NT, then flush_PC may NOT be an
+        fb_base–– instead flush_PC is more likely to be a nonzero offset INO the FB.
+        */
+    input   WADDR flush_fb_base,
+    input   logic [3:0] flush_pc_off,
 
     input   decode2fetch d_in,
     output  fetch2decode d_out,
@@ -58,7 +68,8 @@ module fetch (
         .reset,
 
         .flush,
-        .flush_PC,
+        .flush_fb_base,
+        .flush_pc_off,
         .clmsk,
         .cbru_in,
 
@@ -257,8 +268,8 @@ module fetch (
 
         else if (flush)
             cur <= '{
-                fb_base : flush_PC,
-                off     : 0
+                fb_base : flush_fb_base,
+                off     : flush_pc_off
             };
 
         else
@@ -271,13 +282,14 @@ module fetch (
         logic [2*`N-1:0] insn_buf_vld;
 
         $display(">> Fetch >>");
+        bpu0.print_bpu;
         // insn_buf_vld = '0;
         // for (int cnt = 0; cnt < insn_buf.used; ++cnt)
         //     insn_buf_vld[(insn_buf.head + cnt) % (2*`N)] = 1;
         // $display("insn_buf_vld: %b", insn_buf_vld);
         // for (int i = 0; i < `N; ++i)
         //     $display("[%1d]: %1d", i, brch_prefix_cnt[i]);
-        $display("flush: %b, flush_PC: 0x%x", flush, flush_PC);
+        $display("flush: %b, flush_fb_base: %d, flush_pc_off", flush, flush_fb_base, flush_pc_off);
         $display("pc_reg: %d", bpu0.pc_reg);
         // $display("step: %b, pred:%b, f_en_cnt:%d, pred_any: %b, pred_idx: %b",
         //     bpu0.step,

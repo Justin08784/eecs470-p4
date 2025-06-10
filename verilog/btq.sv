@@ -133,6 +133,7 @@ module btq #(
             idx = ex_in.btq_idx[i];
             ex_out.pred[i]     = state[idx].pred;
             ex_out.pred_tgt[i] = state[idx].pred_tgt;
+            ex_out.pc_off[i]   = state[idx].off;
             ex_out.ghr_base[i] = state[idx].ghr_base;
         end
     end

@@ -15,7 +15,8 @@ module bpu (
 
     // TODO: wrap flush, clmsk, flush_take/base into a single "bru_res" bus.
     input   flush,
-    input   WADDR   flush_PC,
+    input   WADDR   flush_fb_base,
+    input   logic [3:0] flush_pc_off,
     input   BMASK   clmsk,
     input   execute2complete_bru cbru_in,
 
@@ -27,6 +28,7 @@ module bpu (
     output  FTQ_ENTRY   o_ftq_dat
 );
     logic step;
+    logic [3:0] off; // in-FB offset
     WADDR pc_reg, pc_reg_n; // current fb/ftb base
 
     struct packed {
@@ -94,6 +96,7 @@ module bpu (
         FTB_ENTRY e;
         FTB_BR_SLOT slot;
         WADDR pc_flt, pc_jmp;
+        logic leq0, leq1;
 
         const FTB_MD1 COND_MD = '{
             cond : 1,
@@ -104,13 +107,15 @@ module bpu (
 
         e = uftb_io.o_tgt;
 
+        // ignore branches before the current FB-offset
+        leq0 = off <= e.br_slot[0].off;
+        leq1 = off <= e.br_slot[1].off;
         pred[0] =
             !e.br_slot[0].vld ? 0 :
-            query_sc(e.br_slot[0].sc);
+            leq0 && query_sc(e.br_slot[0].sc);
         pred[1] =
             !e.br_slot[1].vld ? 0 :
-            e.md1.cond ? query_sc(e.br_slot[1].sc) :
-            1;
+            leq1 && (!e.md1.cond || query_sc(e.br_slot[1].sc));
         if (!uftb_io.o_vld)
             pred = '0;
 
@@ -211,18 +216,25 @@ module bpu (
     assign o_ftq_en = o_buf_ftq_vld && i_ftq_rdy;
 
     always_ff @(posedge clock) begin
-        if (reset)
+        if (reset) begin
             pc_reg <= '0;
-        else if (flush)
-            pc_reg <= flush_PC;
-        else if (step)
+            off    <= '0;
+        end else if (flush) begin
+            pc_reg <= flush_fb_base;
+            off    <= flush_pc_off;
+        end else if (step) begin
             pc_reg <= pc_reg_n;
+            off    <= '0;
+        end
     end
 
     task print_bpu;
         $display(">> bpu");
-        $display("pc_reg: %d, step: %b, buf_rdy: %b, ftq_rdy: %b",
+        $display("(pc_reg: %d, off: %0d, pred: [%b, %b]), step: %b, buf_rdy: %b, ftq_rdy: %b",
             pc_reg,
+            off,
+            pred[0],
+            pred[1],
             step,
             buf_io.i_rdy,
             i_ftq_rdy
