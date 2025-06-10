@@ -305,12 +305,27 @@ module bru_ex(
         3'b110: begin
             mispred = i_vld[0];
             mispred_tgt = tgt;
+
+            flush_fb_base_n = tgt;
+            flush_pc_off_n  = '0;
         end
 
         3'b100,
         3'b101: begin
             mispred = i_vld[0];
             mispred_tgt = npc;
+
+            if (&btq_in.pc_off[0]   // i.e. btq_in.pc_off == 15. npc would be in next fetch block
+                || btq_in.is_tail[0]
+            ) begin
+                flush_pc_off_n  = '0;
+                flush_fb_base_n = npc;
+
+            end else begin
+                flush_fb_base_n = i_regs[0].PC - btq_in.pc_off[0];
+                flush_pc_off_n  = btq_in.pc_off[0] + 1;
+
+            end
         end
 
         default:;
@@ -320,13 +335,6 @@ module bru_ex(
             ? i_regs[0].b1hot
             : '0;
         flush_n      = mispred;
-        if (take) begin
-            flush_fb_base_n = tgt;
-            flush_pc_off_n  = '0;
-        end else begin
-            flush_fb_base_n = i_regs[0].PC - btq_in.pc_off[0];
-            flush_pc_off_n  = btq_in.pc_off[0] + 1;
-        end
     end
 
 

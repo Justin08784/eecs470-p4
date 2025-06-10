@@ -137,6 +137,7 @@ module bpu (
         buf_io.i_dat = '{
             base_n      : pc_reg_n,
             ft          : !pred_any,
+            pred_idx    : pred_idx,
             off         : 
                 !uftb_io.o_vld ? 15 :
                 pred_any ? slot.off : e.end_off,

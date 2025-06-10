@@ -131,6 +131,7 @@ module btq #(
         for (int i = 0; i < `NUM_FU_BRU; ++i) begin
             int idx;
             idx = ex_in.btq_idx[i];
+            ex_out.is_tail[i]  = state[idx].is_tail;
             ex_out.pred[i]     = state[idx].pred;
             ex_out.pred_tgt[i] = state[idx].pred_tgt;
             ex_out.pc_off[i]   = state[idx].off;
@@ -202,6 +203,7 @@ module btq #(
 `endif
                     base    : f_in.base[i],
                     PC      : f_in.PC[i],
+                    is_tail : f_in.is_tail[i],
                     off     : f_in.off[i],
 
                     pred    : f_in.pred[i],

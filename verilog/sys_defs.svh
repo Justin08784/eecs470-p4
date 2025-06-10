@@ -521,6 +521,7 @@ typedef struct packed {
     // pared down FTB entry
     logic       vld;    // is slot valid/hit?
     logic       ft;     // fallthrough? else took a branch
+    logic       pred_idx; // ft ? <IGNORE> : slot idx of pred-taken branch
     logic [3:0] off;    // ft ? end_off : br_slot[0/1].off
         // if a branch
     // WADDR       tgt;
@@ -537,6 +538,9 @@ typedef struct packed {
 `endif
     WADDR   base; // FIXME: fb base (expensive!!!) Store only branch pc offset?
     WADDR   PC;
+    logic   is_tail;
+        /*  In BPU, if hit in FTB, is the offset of this branch greater than or equal
+        to the offset of the branch in the tail slot / br1, if any? */
     logic   [3:0] off; // offset in fb (if taken, equals offset in FTQ_ENTRY)
 
     /* TODO: have a single take, tgt field, initialized by the BPU, but later
@@ -626,6 +630,7 @@ typedef struct packed {
 
 typedef struct packed {
     // WADDR [`NUM_FU_BRU-1:0] PC; // Does BRU need to carry PC if we can supply it like so?
+    logic [`NUM_FU_BRU-1:0] is_tail;
     logic [`NUM_FU_BRU-1:0] pred;
     WADDR [`NUM_FU_BRU-1:0] pred_tgt;
     logic [`NUM_FU_BRU-1:0][3:0] pc_off;
@@ -894,6 +899,7 @@ typedef struct packed {
         // How many branch instructions dispatching?
         // Sender must ensure branch insns packed to lowest indices.
     WADDR   [`N-1:0]        base;
+    logic   [`N-1:0]        is_tail;
     WADDR   [`N-1:0]        PC;
     logic   [`N-1:0][3:0]   off;
     logic   [`N-1:0]        pred;

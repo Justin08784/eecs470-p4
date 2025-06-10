@@ -224,6 +224,12 @@ module fetch (
             f_dat[i].btq_idx = btq_in.btq_idxs_n[brch_prefix_cnt[i]];
 
             btq_out.base    [brch_prefix_cnt[i]] = cur.fb_base;
+            btq_out.is_tail [brch_prefix_cnt[i]] = (r.pred_idx == 1) && (off_n[i] == r.off);
+                /*
+                FIXME (unsure): Probably not necessary to check for "off_geq_tail",
+                i.e. (r.pred_idx == 1) && (off_n[i] >= r.off), because branches after (>)
+                the tail slot would not even be in the same fetch block?
+                */
             btq_out.PC      [brch_prefix_cnt[i]] = pc_n[i];
             btq_out.off     [brch_prefix_cnt[i]] = off_n[i];
             btq_out.pred    [brch_prefix_cnt[i]] = !r.ft && (off_n[i] == r.off);
