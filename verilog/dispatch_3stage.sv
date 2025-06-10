@@ -246,9 +246,9 @@ module dispatch #(parameter
 `ifdef DEBUG
             rnme_snap_out.btq_idx[i] = rename_in[i].btq_idx;
 `endif
-            rnme_snap_out.btq_tail[i]= rename_in[i].btq_idx + 1 >= `BTQ_SZ ?
+            rnme_snap_out.btq_tail[i]= rename_in[i].btq_idx + `UCAST_FIT(1) >= `BTQ_SZ ?
                 0 :
-                rename_in[i].btq_idx + 1;
+                rename_in[i].btq_idx + `UCAST_FIT(1);
         end
     end
 
@@ -369,7 +369,7 @@ module dispatch #(parameter
 
             comm_snap_out.snap_en[i]= comm_is_brch[i] && (i < commit_en_cnt);
             comm_snap_out.b1hot_n[i]= commit_in[i].b1hot; // only valid if snap_en
-            comm_snap_out.rob_tail[i]=rob_in.rob_idxs_n[i + 1];
+            comm_snap_out.rob_tail[i]=rob_in.rob_idxs_n[i+1];
                 /* Q: Why +1?
                 A: Checkpoint the tail AFTER us. The mispredicted branch still retires.
                 */

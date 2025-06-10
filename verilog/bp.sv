@@ -88,7 +88,7 @@ module bp #(
         .rtgt   (ras_tgt),
         .ren,
         .wen,
-        .wtgt   (PC_n[take_idx+1]), // npc
+        .wtgt   (PC_n[take_idx+`UCAST_FIT(1)]), // npc
 
         .snap_in,
         .empty
@@ -180,7 +180,7 @@ module bp #(
     );
 
     assign f_out.take   = raw_take;
-    assign f_out.lim_cnt= take_any ? take_idx + 1 : `N;
+    assign f_out.lim_cnt= take_any ? take_idx + `UCAST_FIT(1) : `N;
 
     generate
     for (genvar i = 0; i < `N; ++i) begin

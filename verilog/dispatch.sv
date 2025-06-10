@@ -158,9 +158,9 @@ module dispatch #(parameter
             rnme_snap_out.fl_head[i] = free_in.fl_heads_n[free_prefix_cnt[i] + has_dst[i]];
                 // Q: Why "+ has_dst[i]"? A: Remember, we want to snapshot the free_list
                 // head immediately AFTER the branch. The next free_list head is incremented IFF we consume a preg.
-            rnme_snap_out.btq_tail[i]= d_in.d_dat[i].btq_idx + 1 >= `BTQ_SZ ?
+            rnme_snap_out.btq_tail[i]= d_in.d_dat[i].btq_idx + `UCAST_FIT(1) >= `BTQ_SZ ?
                 0 :
-                d_in.d_dat[i].btq_idx + 1;
+                d_in.d_dat[i].btq_idx + `UCAST_FIT(1);
             rnme_snap_out.ras_snap[i]= d_in.d_dat[i].ras_snap;
 `ifdef DEBUG
             rnme_snap_out.btq_idx[i] = d_in.d_dat[i].btq_idx;

@@ -23,6 +23,8 @@
 `define IDX_TYPE(len) logic [$clog2(len)-1:0]   // smallest bit-vector to index an array of length len
 `define IDX_SIZE(len) ($clog2(len))             // ...and number of bits in that type
 
+`define UCAST_LEN(n, max) ($clog2(max+1)'(unsigned'(n)))
+`define UCAST_FIT(n) (($clog2(n+1))'(unsigned'(n)))    // cast fit unsigned
 
 ///////////////////////////////////
 // ---- Starting Parameters ---- //
@@ -458,9 +460,9 @@ function automatic logic [1:0] update_sc(
     input logic take
 );
     if (take)
-        return sc == 2'b11 ? 2'b11 : sc + 1;
+        return sc == 2'b11 ? 2'b11 : sc + `UCAST_FIT(1);
     else
-        return sc == 0 ? 0 : sc - 1;
+        return sc == 0 ? 0 : sc - `UCAST_FIT(1);
 endfunction
 
 function automatic logic query_sc(input logic [1:0] sc);

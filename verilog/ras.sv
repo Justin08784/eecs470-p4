@@ -39,7 +39,7 @@ module ras #(
         full    = used == DEPTH;
         empty   = used == 0;
 
-        ridx    = top - 1; // wraparound is intended (likewise for write)
+        ridx    = top - `UCAST_FIT(1); // wraparound is intended (likewise for write)
         rtgt    = state[ridx];
     end
 
@@ -63,10 +63,10 @@ module ras #(
             used_n = snap.used;
             top_n  = snap.top;
         end else if (wen) begin
-            used_n = full ? DEPTH : used + 1;
-            top_n  = top + 1;
+            used_n = full ? DEPTH : used + `UCAST_FIT(1);
+            top_n  = top + `UCAST_FIT(1);
         end else if (ren) begin
-            used_n = empty ? 0 : used - 1;
+            used_n = empty ? 0 : used - `UCAST_FIT(1);
             top_n  = ridx;
         end
 

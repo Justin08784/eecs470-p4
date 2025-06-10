@@ -223,7 +223,7 @@ module bru_ex(
     always_comb begin
         foreach(opa[i]) begin
             pc_addrs[i]     = w2addr(i_regs[i].PC);
-            npc_addrs[i]    = w2addr(i_regs[i].PC + 1);
+            npc_addrs[i]    = w2addr(i_regs[i].PC + `UCAST_FIT(1));
             // BRU opA mux
             case (i_regs[i].opa_select)
                 OPA_IS_PC:   opa[i] = pc_addrs[i];
@@ -296,7 +296,7 @@ module bru_ex(
         pred     = btq_in.pred[0];
         take     = cbru_out.dat[0].take;
         corr_tgt = btq_in.pred_tgt[0] == cbru_out.dat[0].tgt;
-        npc      = i_regs[0].PC + 1;
+        npc      = i_regs[0].PC + `UCAST_FIT(1);
         tgt      = cbru_out.dat[0].tgt;
 
         unique casez ({pred, take, corr_tgt})
@@ -321,7 +321,7 @@ module bru_ex(
 
             end else begin
                 flush_fb_base_n = i_regs[0].PC - btq_in.pc_off[0];
-                flush_pc_off_n  = btq_in.pc_off[0] + 1;
+                flush_pc_off_n  = btq_in.pc_off[0] + `UCAST_FIT(1);
 
             end
         end
@@ -639,7 +639,7 @@ module stage_ex_p4 (
             logic opa_is_rs1, opb_is_rs2;
             ADDR pc_addr, npc_addr;
             pc_addr  = w2addr(iss.o_dat.alu[i].PC);
-            npc_addr = w2addr(iss.o_dat.alu[i].PC + 1);
+            npc_addr = w2addr(iss.o_dat.alu[i].PC + `UCAST_FIT(1));
 
             opa_is_rs1 = iss.o_dat.alu[i].opa_select == OPA_IS_RS1;
             case (iss.o_dat.alu[i].opa_select)

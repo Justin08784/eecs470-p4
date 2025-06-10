@@ -41,17 +41,23 @@ module stack #(parameter
     logic [DEPTH-1:0][WIDTH-1:0] state;
 
     always_comb begin
-        free = DEPTH - top;
+        free = `UCAST_FIT(DEPTH) - top;
         used_scnt = ENABLE_INTR_FWD
-            ? `MIN(top + wr_en_cnt, RPORTS)
-            : `MIN(top, RPORTS);
+            ? `MIN(top + wr_en_cnt, `UCAST_FIT(RPORTS))
+            : `MIN(top, `UCAST_FIT(RPORTS));
         free_scnt = `MIN(free, WPORTS);
-
-        for (int i = 0; i < RPORTS; ++i)
-            rd_idxs[i] = decr(top, i + 1); // +1: first read entry is 1 below top pointer
-        for (int i = 0; i < WPORTS; ++i)
-            wr_idxs[i] = incr(top, i);
     end
+
+    generate
+    for (int i = 0; i < RPORTS; ++i) begin
+        assign rd_idxs[i] = decr(top, `UCAST_FIT(i+1)); // +1: first read entry is 1 below top pointer
+    end
+
+    assign wr_idxs[0] = top;
+    for (int i = 1; i < WPORTS; ++i) begin
+        assign wr_idxs[i] = incr(top, `UCAST_FIT(i));
+    end
+    endgenerate
 
     always_comb begin
         for (int unsigned i = 0; i < RPORTS; ++i) begin

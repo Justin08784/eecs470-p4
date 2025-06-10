@@ -98,16 +98,21 @@ module fetch (
     // Form indices: fb offsets, PCs, block DWs
     logic [`N:0][3:0]   off_n;
     WADDR [`N:0]        pc_n;
-    always_comb begin
-        for (int i = 0; i < `N+1; ++i)
-            off_n[i] = cur.off + i;
-
-        for (int i = 0; i < `N+1; ++i)
-            pc_n[i] = cur.fb_base + off_n[i];
-
-        for (int i = 0; i < `N; ++i) // FIXME: These are mem blocks btw. Only works for `N = 2;
-            mem_out.PCdws[i] = pc_n[0][13:1] + i; // w -> dw
+    generate
+    assign off_n[0] = cur.off;
+    for (genvar i = 1; i < `N+1; ++i) begin
+        assign off_n[i] = cur.off + `UCAST_FIT(i);
     end
+
+    for (genvar i = 0; i < `N+1; ++i) begin
+        assign pc_n[i] = cur.fb_base + off_n[i];
+    end
+
+    assign mem_out.PCdws[0] = pc_n[0][13:1];
+    for (genvar i = 1; i < `N; ++i) begin // FIXME: These are mem blocks btw. Only works for `N = 2;
+        assign mem_out.PCdws[i] = pc_n[0][13:1] + `UCAST_FIT(i); // w -> dw
+    end
+    endgenerate
 
     // Align
     BRANCH_MD [2*`N-1:0] md_raw;
@@ -166,7 +171,7 @@ module fetch (
     always_comb begin
         fsm_lim_cnt =
             !ftq_io.vld ? 0 :
-            fb_end_any  ? fb_end_idx + 1 :
+            fb_end_any  ? fb_end_idx + `UCAST_FIT(1) :
             `N;
 
         cur_n       = cur;

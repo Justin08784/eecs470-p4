@@ -26,18 +26,19 @@ module stage_if_p4 (
     logic [`N-1:0] f_en;
     IF_ID_PACKET [`N-1:0]   f_dat;
 
-    always_comb begin
-        DWADDR PC_dw;
-        d_out.f_en_cnt = `MIN(used_scnt, d_in.d_rdy_cnt);
+    generate
+    DWADDR PC_dw;
+    assign d_out.f_en_cnt = `MIN(used_scnt, d_in.d_rdy_cnt);
 
-        PC_n[0] = PC_reg;
-        for (int i = 0; i < `N; ++i)
-            PC_n[i+1] = PC_reg + (i+1);
+    assign PC_n[0] = PC_reg;
+    for (int i = 0; i < `N; ++i)
+        assign PC_n[i+1] = PC_reg + `UCAST_FIT(i+1);
 
-        PC_dw = PC_reg[13:1]; // w -> dw
-        for (int i = 0; i < `N; ++i)
-            mem_out.PCdws[i] = PC_dw + i;
-    end
+    assign PC_dw = PC_reg[13:1]; // w -> dw
+    assign mem_out.PCdws[0] = PC_dw;
+    for (int i = 1; i < `N; ++i)
+        assign mem_out.PCdws[i] = PC_dw + `UCAST_FIT(i);
+    endgenerate
 
 
     // Align

@@ -92,7 +92,6 @@ module bpu (
         .o_idx(pred_idx)
     );
 
-    typedef logic [4:0] v5b;
     always_comb begin
         FTB_ENTRY e;
         FTB_BR_SLOT slot;
@@ -126,13 +125,15 @@ module bpu (
         if (!step || !uftb_io.o_vld)
             ghr_io.f_en_cnt = 0;
         else
-            ghr_io.f_en_cnt = pred_any ? pred_idx + 1 : NUM_BR_SLOTS;
+            ghr_io.f_en_cnt = pred_any
+                ? pred_idx + `UCAST_FIT(1)
+                : NUM_BR_SLOTS;
         ghr_io.f_pred = pred;
 
-        pc_flt = WADDR'(pc_reg + v5b'(e.end_off + 1));
+        pc_flt = pc_reg + `UCAST_LEN(e.end_off + `UCAST_FIT(1), 16);
         pc_jmp = slot.tgt;
         pc_reg_n =
-            !uftb_io.o_vld ? pc_reg + 16 :
+            !uftb_io.o_vld ? pc_reg + `UCAST_FIT(16) :
             pred_any ? pc_jmp : pc_flt;
 
         buf_io.i_dat = '{

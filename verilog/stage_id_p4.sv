@@ -250,7 +250,9 @@ module stage_id_p4 (
     assign d_out.d_vld_scnt = used_scnt;
 
     logic [`N-1:0] tmp_has_dst;
+`ifdef DEBUG
     int insn_id;
+`endif
 
     ID_RESULT [`N-1:0] tmp;
     ID_RESULT [`N-1:0] wr_fifo;
@@ -373,6 +375,7 @@ module stage_id_p4 (
         .used_scnt  (used_scnt)
     );
 
+`ifdef DEBUG
     always_ff @(posedge clock) begin
         if (reset) begin
             insn_id <= 0;
@@ -381,7 +384,6 @@ module stage_id_p4 (
         end
     end
 
-`ifdef DEBUG
     task print_decode;
         $display(">> ID >>", $time);
         // $display("  %3d | FIFO: {used_scnt: %d, free_scnt: %d}",
