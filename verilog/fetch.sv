@@ -152,7 +152,8 @@ module fetch (
 
         // Detect FB end
     logic [`N-1:0] is_fb_end;
-    `IDX_TYPE(`N) fb_end_any, fb_end_idx;
+    logic fb_end_any;
+    `IDX_TYPE(`N) fb_end_idx;
     generate
     for (genvar i = 0; i < `N; ++i)
         assign is_fb_end[i] = off_n[i] == r.off;

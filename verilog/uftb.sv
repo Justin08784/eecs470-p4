@@ -187,7 +187,7 @@ module uftb #(
         Increasing will result in more aliases, but acceptable for
         BTB since they are speculative. Can be worth to save area and logic. */
     localparam TAG_BITS = $bits(WADDR) - TAG_SKIMP;
-    typedef `IDX_TYPE(TAG_BITS) TAG;
+    typedef logic [TAG_BITS-1:0]TAG;
     typedef `IDX_TYPE(NUM_LINES)WAY;
     typedef logic [NUM_LINES-1:0][NUM_LINES-1:0]AGE;
 

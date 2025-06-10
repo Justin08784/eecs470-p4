@@ -29,8 +29,8 @@ module btb #(parameter
     BTB since they are speculative. Can be worth to save area and logic.
     */
     localparam TAG_BITS     = $bits(WADDR) - SID_BITS - TAG_SKIMP;
-    typedef `IDX_TYPE(SID_BITS) SID;
-    typedef `IDX_TYPE(TAG_BITS) TAG;
+    typedef logic [SID_BITS-1:0] SID;
+    typedef logic [TAG_BITS-1:0] TAG;
     typedef `IDX_TYPE(ASSOC) WAY;
 
     function automatic TAG get_tag(input WADDR waddr);

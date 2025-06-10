@@ -165,8 +165,8 @@ module ftb #(
     BTB since they are speculative. Can be worth to save area and logic.
     */
     localparam TAG_BITS     = $bits(WADDR) - SID_BITS - TAG_SKIMP;
-    `IDX_TYPE(SID_BITS) SID;
-    `IDX_TYPE(TAG_BITS) TAG;
+    typedef logic [SID_BITS-1:0] SID;
+    typedef logic [TAG_BITS-1:0] TAG;
     `IDX_TYPE(ASSOC)    WAY;
     typedef logic [ASSOC-1:0][ASSOC-1:0]AGE;
 
