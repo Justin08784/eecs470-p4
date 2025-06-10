@@ -4,9 +4,8 @@ module fifo #(
     parameter int DEPTH=`ROB_SZ,            // num elements
     parameter int WIDTH=$bits(PHYS_REG_IDX),// num bits per element
     type FIFO_STATE = struct packed {
-        logic [$clog2(DEPTH)-1:0]   head;
-        logic [$clog2(DEPTH)-1:0]   tail;
         logic [DEPTH-1:0][WIDTH-1:0]state;
+        `IDX_TYPE(DEPTH) head, tail;
         `CNT_TYPE(DEPTH) used;
     },
     parameter int FLUSH_MODE=FIFO_FLUSH_RESET,
@@ -40,7 +39,7 @@ module fifo #(
     */
     parameter int INSTANCE_ID=-1,
     parameter FIFO_STATE RESET_STATE='{default:0},
-    type PTR = logic [$clog2(DEPTH)-1:0]
+    type PTR = `IDX_TYPE(DEPTH)
 ) (
     input                                           clock, 
     input                                           reset,

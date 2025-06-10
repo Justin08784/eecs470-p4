@@ -3,7 +3,7 @@
 // FIXME: Isn't this just a FIFO?
 module ftq #(
     parameter FTQ_SZ = FTQ_SZ,
-    type PTR = logic [$clog2(FTQ_SZ)-1:0],
+    type PTR = `IDX_TYPE(FTQ_SZ),
     type CNT = `CNT_TYPE(FTQ_SZ)
 ) (
     input   clock,

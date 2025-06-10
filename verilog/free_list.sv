@@ -27,10 +27,9 @@ module free_list #(parameter
     output free_list2dispatch d_out
 );
     typedef struct packed {
-        logic [$clog2(DEPTH)-1:0]       head;
-        logic [$clog2(DEPTH)-1:0]       tail;
         logic [DEPTH-1:0][WIDTH-1:0]    state;
-        `CNT_TYPE(DEPTH)                used;
+        `IDX_TYPE(DEPTH)    head, tail;
+        `CNT_TYPE(DEPTH)    used;
     } FIFO_STATE;
 
     function automatic FIFO_STATE gen_reset_state();
@@ -99,7 +98,7 @@ module free_list #(parameter
     end
    
 
-    logic [$clog2(DEPTH)-1:0] snap;
+    `IDX_TYPE(DEPTH) snap;
     fifo #(
         .INSTANCE_ID(0),
         .DEPTH(DEPTH),
@@ -127,7 +126,7 @@ module free_list #(parameter
     );
 
     general_snaps #(
-        .WIDTH($clog2(`ROB_SZ))
+        .WIDTH(`IDX_SIZE(`ROB_SZ))
     ) fl_heads0 (
         .clock,
 
@@ -154,10 +153,9 @@ module free_list #(parameter
     task print_fl();
         logic [`ROB_SZ-1:0] fl_vld;
         logic dup;
-        logic [$clog2(DEPTH)-1:0]       head;
-        logic [$clog2(DEPTH)-1:0]       tail;
+        `IDX_TYPE(DEPTH) head, tail;
         logic [DEPTH-1:0][WIDTH-1:0]    state;
-        `CNT_TYPE(DEPTH)                used;
+        `CNT_TYPE(DEPTH) used;
         localparam half_sz = `ROB_SZ / 2;
 
         head = lst.head;
@@ -203,7 +201,7 @@ module free_list #(parameter
         // for (int i = 0; i < `N; ++i)
         //     $display()
         for (int i = 0; i < BMASK_LEN; ++i) begin
-            logic [$clog2(DEPTH)-1:0] head;
+            `IDX_TYPE(DEPTH) head;
             head = fl_heads0.snaps[i];
             $display("fl_head[%8b]: %2d", 1 << i, head);
         end

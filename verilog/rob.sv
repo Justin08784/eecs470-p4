@@ -25,15 +25,12 @@ module rob #(
     `CNT_TYPE(NUM_DPORTS) free_scnt;
     `CNT_TYPE(NUM_RPORTS) used_scnt;
 
-    logic [$clog2(ROB_SZ)-1:0]  head;
-    logic [$clog2(ROB_SZ)-1:0]  tail;
-    logic [$clog2(ROB_SZ)-1:0]  snap;
+    ROB_ENTRY [ROB_SZ-1:0]  state;
+    `IDX_TYPE(ROB_SZ) head, tail, snap;
+    `CNT_TYPE(ROB_SZ) used, free;
 
-    ROB_ENTRY [ROB_SZ-1:0]      state;
-    `CNT_TYPE(ROB_SZ)           used, free;
-
-    logic [NUM_RPORTS:0][$clog2(ROB_SZ)-1:0] rtre_idxs_n;
-    logic [NUM_DPORTS:0][$clog2(ROB_SZ)-1:0] comm_idxs_n;
+    logic [NUM_RPORTS:0][`IDX_SIZE(ROB_SZ)-1:0] rtre_idxs_n;
+    logic [NUM_DPORTS:0][`IDX_SIZE(ROB_SZ)-1:0] comm_idxs_n;
 
     ring_ctr #(
         .DEPTH(ROB_SZ),
@@ -62,7 +59,7 @@ module rob #(
     );
 
     general_snaps #(
-        .WIDTH($clog2(`ROB_SZ))
+        .WIDTH(`IDX_SIZE(`ROB_SZ))
     ) rob_tails (
         .clock,
 

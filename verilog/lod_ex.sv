@@ -227,7 +227,7 @@ module lod_ex(
 
 
     /* Dcache query selection */
-    logic [$clog2(BAY_SZ)-1:0]
+    `IDX_TYPE(BAY_SZ)
         prv_qry,
         nex_qry,
         qry;

@@ -19,7 +19,7 @@ module btb #(parameter
     localparam ASSOC = 2;
     localparam NUM_SETS = NUM_LINES / ASSOC;
 
-    localparam SID_BITS     = $clog2(NUM_SETS);
+    localparam SID_BITS     = `IDX_SIZE(NUM_SETS);
     localparam TAG_SKIMP    = 3;
     /*
     TAG_SKIMP = how many bits to drop from the full tag that is required to
@@ -29,9 +29,9 @@ module btb #(parameter
     BTB since they are speculative. Can be worth to save area and logic.
     */
     localparam TAG_BITS     = $bits(WADDR) - SID_BITS - TAG_SKIMP;
-    typedef logic [SID_BITS-1:0] SID;
-    typedef logic [TAG_BITS-1:0] TAG;
-    typedef logic [$clog2(ASSOC)-1:0]   WAY;
+    typedef `IDX_TYPE(SID_BITS) SID;
+    typedef `IDX_TYPE(TAG_BITS) TAG;
+    typedef `IDX_TYPE(ASSOC) WAY;
 
     function automatic TAG get_tag(input WADDR waddr);
         return waddr[SID_BITS+TAG_BITS-1:SID_BITS];

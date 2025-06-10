@@ -80,11 +80,11 @@ typedef struct packed {
     logic   cond;   // is a conditional branch?
 
     logic   [GHR_LEN-1:0] hash; // gshare hash index
-    logic   [`N-1:0][$clog2(GHR_BUF_SZ)-1:0] ghr_base;
+    logic   [`N-1:0][`IDX_SIZE(GHR_BUF_SZ)-1:0] ghr_base;
     logic   pred_bim;
     logic   pred_gshare;
 
-    logic   [$clog2(`FTQ_SZ)-1:0] ftq_idx; // pointer to owning FTQ entry
+    `IDX_TYPE(`FTQ_SZ) ftq_idx; // pointer to owning FTQ entry
         /* Since multiple contiguous BTQ entries may be associated with an FTQ entry,
         an FTQ entry cannot dequeue until the "last" in the BTQ entry span is reached.
 
@@ -155,7 +155,7 @@ module ftb #(
     } i_upd
 );
     localparam NUM_SETS     = NUM_LINES / ASSOC;
-    localparam SID_BITS     = $clog2(NUM_SETS);
+    localparam SID_BITS     = `IDX_SIZE(NUM_SETS);
     localparam TAG_SKIMP    = 3;
     /*
     TAG_SKIMP = how many bits to drop from the full tag that is required to
@@ -165,9 +165,9 @@ module ftb #(
     BTB since they are speculative. Can be worth to save area and logic.
     */
     localparam TAG_BITS     = $bits(WADDR) - SID_BITS - TAG_SKIMP;
-    typedef logic [SID_BITS-1:0] SID;
-    typedef logic [TAG_BITS-1:0] TAG;
-    typedef logic [$clog2(ASSOC)-1:0]   WAY;
+    `IDX_TYPE(SID_BITS) SID;
+    `IDX_TYPE(TAG_BITS) TAG;
+    `IDX_TYPE(ASSOC)    WAY;
     typedef logic [ASSOC-1:0][ASSOC-1:0]AGE;
 
     function automatic TAG get_tag(input WADDR waddr);
@@ -278,7 +278,7 @@ module ftb #(
     always_comb begin
         // s1
         logic [NUM_SETS-1:0][ASSOC-1:0] lru;
-        logic [NUM_SETS-1:0][$clog2(ASSOC)-1:0] ways;
+        WAY [NUM_SETS-1:0] ways;
         LOC loc;
 
         foreach (lru[s, w])

@@ -7,7 +7,7 @@ module ring_ctr #(
     parameter int RPORTS=1,
     parameter int WPORTS=1,
     parameter int FLUSH_MODE=FIFO_FLUSH_RESET,
-    type PTR = logic [$clog2(DEPTH)-1:0],
+    type PTR = `IDX_TYPE(DEPTH),
     type CNT = `CNT_TYPE(DEPTH),
     type RING_PTR_STATE = struct packed {
         PTR head;

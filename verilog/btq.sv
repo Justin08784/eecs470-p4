@@ -27,12 +27,12 @@ module btq #(
     localparam NUM_CPORTS = `NUM_FU_BRU; // complete ports (*OUT-OF-ORDER*)
 
     BTQ_ENTRY [BTQ_SZ-1:0]      state;
-    logic [$clog2(BTQ_SZ)-1:0]  head, tail, snap;
-    `CNT_TYPE(BTQ_SZ)           used, free;
-    `CNT_TYPE(NUM_RPORTS)       btq_vld_scnt, rd_en_cnt;
+    `IDX_TYPE(BTQ_SZ)       head, tail, snap;
+    `CNT_TYPE(BTQ_SZ)       used, free;
+    `CNT_TYPE(NUM_RPORTS)   btq_vld_scnt, rd_en_cnt;
 
-    logic [NUM_RPORTS:0][$clog2(BTQ_SZ)-1:0] r_idxs_n;
-    logic [NUM_FPORTS:0][$clog2(BTQ_SZ)-1:0] f_idxs_n;
+    logic [NUM_RPORTS:0][`IDX_SIZE(BTQ_SZ)-1:0] r_idxs_n;
+    logic [NUM_FPORTS:0][`IDX_SIZE(BTQ_SZ)-1:0] f_idxs_n;
 
     ring_ctr #(
         .DEPTH(BTQ_SZ),
@@ -61,7 +61,7 @@ module btq #(
     );
 
     general_snaps #(
-        .WIDTH($clog2(`BTQ_SZ))
+        .WIDTH(`IDX_SIZE(`BTQ_SZ))
     ) btq_tails (
         .clock,
 
@@ -106,7 +106,7 @@ module btq #(
     endgenerate
 
     logic ncpl_any; // any unresolved/incomplete in retire window?
-    logic [$clog2(NUM_RPORTS)-1:0] ncpl_idx; // first index in retire window that is not resolved
+    `IDX_TYPE(NUM_RPORTS) ncpl_idx; // first index in retire window that is not resolved
     ffs #(
         .VECW(NUM_RPORTS)
     ) ff_end (
@@ -279,7 +279,7 @@ module btq #(
 
         $display("");
         for (int i = 0; i < BMASK_LEN; ++i) begin
-            logic [$clog2(BTQ_SZ)-1:0] tail;
+            `IDX_TYPE(BTQ_SZ) tail;
             tail = btq_tails.snaps[i];
             $display("btq_tail[%8b]: %2d", 1 << i, tail);
         end

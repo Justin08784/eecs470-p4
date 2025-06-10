@@ -91,7 +91,7 @@ module fill_handler (
     logic [NUM_SETS-1:0][ASSOC-1:0] free_gnt;
     logic [NUM_SETS-1:0][ASSOC-1:0] lru;
     logic [NUM_SETS-1:0][ASSOC-1:0] wmsks;
-    logic [NUM_SETS-1:0][$clog2(ASSOC)-1:0] ways;
+    WAY   [NUM_SETS-1:0] ways;
     generate
     for (genvar s = 0; s < NUM_SETS; ++s) begin : gen_sets
         psel_gen #(

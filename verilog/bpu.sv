@@ -49,7 +49,7 @@ module bpu (
         logic [NUM_BR_SLOTS-1:0]       f_pred;
         `CNT_TYPE(NUM_BR_SLOTS) f_rdy_scnt;
 
-        logic [NUM_BR_SLOTS-1:0][$clog2(GHR_BUF_SZ)-1:0] f_base;
+        logic [NUM_BR_SLOTS-1:0][`IDX_SIZE(GHR_BUF_SZ)-1:0] f_base;
         logic [NUM_BR_SLOTS-1:0][GHR_LEN-1:0] f_ghr;
     } ghr_io;
 
@@ -82,7 +82,8 @@ module bpu (
     );
 
     logic [NUM_BR_SLOTS-1:0] pred;
-    logic [$clog2(NUM_BR_SLOTS)-1:0] pred_any, pred_idx;
+    logic pred_any;
+    `IDX_TYPE(NUM_BR_SLOTS) pred_idx;
     ffs #(
         .VECW(NUM_BR_SLOTS)
     ) ff_take (

@@ -17,12 +17,12 @@ typedef struct packed {
     logic   cond;   // is a conditional branch?
 
     logic   [GHR_LEN-1:0] hash; // gshare hash index
-    logic   [`N-1:0][$clog2(GHR_BUF_SZ)-1:0] ghr_base;
+    logic   [`N-1:0][`IDX_SIZE(GHR_BUF_SZ)-1:0] ghr_base;
     logic   pred_bim;
     logic   pred_gshare;
 
     logic   [3:0] off; // offset in fb (if taken, equals offset in FTQ_ENTRY)
-    logic   [$clog2(FTQ_SZ)-1:0] ftq_idx; // pointer to owning FTQ entry
+    `IDX_TYPE(FTQ_SZ) ftq_idx; // pointer to owning FTQ entry
         /* Since multiple contiguous BTQ entries may be associated with an FTQ entry,
         an FTQ entry cannot dequeue until the "last" in the BTQ entry span is reached. */
 } _BTQ_ENTRY;
@@ -31,9 +31,9 @@ module lru_man #(
     parameter SETW=16
 ) (
     input   logic [SETW-1:0][SETW-1:0] age,
-    input   logic [$clog2(SETW)-1:0] acc_way,
+    input   `IDX_TYPE(SETW) acc_way,   
 
-    output  logic [$clog2(SETW)-1:0] lru_way,
+    output  `IDX_TYPE(SETW) lru_way,
     output  logic [SETW-1:0][SETW-1:0] age_n
 );
 `define LRU_UTRI
@@ -90,7 +90,7 @@ age[i][j]
 
     function automatic logic [SETW-1:0][SETW-1:0] update_lru(
         input logic [SETW-1:0][SETW-1:0] age,
-        input logic [$clog2(SETW)-1:0] way
+        input `IDX_TYPE(SETW) way
     );
         logic [SETW-1:0][SETW-1:0] rv;
         rv = age;
@@ -187,8 +187,8 @@ module uftb #(
         Increasing will result in more aliases, but acceptable for
         BTB since they are speculative. Can be worth to save area and logic. */
     localparam TAG_BITS = $bits(WADDR) - TAG_SKIMP;
-    typedef logic [TAG_BITS-1:0]                TAG;
-    typedef logic [$clog2(NUM_LINES)-1:0]       WAY;
+    typedef `IDX_TYPE(TAG_BITS) TAG;
+    typedef `IDX_TYPE(NUM_LINES)WAY;
     typedef logic [NUM_LINES-1:0][NUM_LINES-1:0]AGE;
 
     function automatic TAG get_tag(input WADDR waddr);

@@ -132,7 +132,7 @@ NOTE: We will use PHYS_REG_IDX = 0 as a sentinel (to denote "no register" / "is 
 While we lose out on a single physical register, this greatly simplifies logic 
 (the alternative is to pipe around 'is valid src_reg' bit signals everywhere).
 */
-typedef logic [$clog2(`PHYS_REG_SZ_R10K)-1:0] PHYS_REG_IDX;
+typedef `IDX_TYPE(`PHYS_REG_SZ_R10K) PHYS_REG_IDX;
 
 // the zero register
 // In RISC-V, any read of this register returns zero and any writes are thrown away
@@ -386,9 +386,9 @@ typedef enum logic [0:1] {
  * IF_ID Packet:
  * Data exchanged from the IF to the ID stage
  */
-typedef logic [$clog2(`BTQ_SZ)-1:0] BTQ_IDX;
+typedef `IDX_TYPE(`BTQ_SZ) BTQ_IDX;
 typedef struct packed {
-    logic [`N-1:0][$clog2(`RAS_SZ)-1:0] top;
+    logic [`N-1:0][`IDX_SIZE(`RAS_SZ)-1:0] top;
     logic [`N-1:0][`CNT_SIZE(`RAS_SZ)-1:0] used;
 } RAS_SNAP;
 typedef struct packed {
@@ -423,7 +423,7 @@ typedef enum logic [2:0] {
 } FU_IDX;
 `define FU_IDX_NUM 5
 
-typedef logic [$clog2(`ROB_SZ)-1:0] ROB_IDX;
+typedef `IDX_TYPE(`ROB_SZ) ROB_IDX;
 typedef struct packed {
     logic           cpl;
     PHYS_REG_IDX    tag;
@@ -436,7 +436,7 @@ typedef struct packed {
 } ROB_ENTRY;
 
 
-typedef logic [$clog2(`LSQ_SZ)-1:0] LSQ_IDX; 
+typedef `IDX_TYPE(`LSQ_SZ) LSQ_IDX;
 typedef struct packed {
     logic _dummy;
 } SQ_ENTRY;
@@ -557,7 +557,7 @@ typedef struct packed {
     FTB_MD1 md;
 
     logic   [GHR_LEN-1:0] hash; // gshare hash index
-    logic   [`N-1:0][$clog2(GHR_BUF_SZ)-1:0] ghr_base;
+    logic   [`N-1:0][`IDX_SIZE(GHR_BUF_SZ)-1:0] ghr_base;
     logic   pred_bim;
     logic   pred_gshare;
 } BTQ_ENTRY;
@@ -620,7 +620,7 @@ typedef struct packed {
             // Entries to which we are completing
         logic   take;
         WADDR   tgt;
-        logic   [$clog2(GHR_BUF_SZ)-1:0] ghr_base;
+        logic   [`IDX_SIZE(GHR_BUF_SZ)-1:0] ghr_base;
     } [`NUM_FU_BRU-1:0] dat;
 } execute2complete_bru;
 
@@ -630,7 +630,7 @@ typedef struct packed {
     logic [`NUM_FU_BRU-1:0] pred;
     WADDR [`NUM_FU_BRU-1:0] pred_tgt;
     logic [`NUM_FU_BRU-1:0][3:0] pc_off;
-    logic [`NUM_FU_BRU-1:0][$clog2(GHR_BUF_SZ)-1:0] ghr_base;
+    logic [`NUM_FU_BRU-1:0][`IDX_SIZE(GHR_BUF_SZ)-1:0] ghr_base;
 } btq2execute;
 
 typedef struct packed {
@@ -779,7 +779,7 @@ typedef struct packed {
 
     // alloc
     PHYS_REG_IDX    t;
-    logic [$clog2(`ROB_SZ)-1:0] fl_head_snap;
+    `IDX_TYPE(`ROB_SZ) fl_head_snap;
 } ALLOC_RENAME_PKT;
 
 typedef struct packed {
@@ -869,7 +869,7 @@ typedef struct packed {
 
     // if_id_packet contributions
     RAS_SNAP[`N-1:0] ras_snap;
-    logic   [`N-1:0][$clog2(GHR_BUF_SZ)-1:0] ghr_base;
+    logic   [`N-1:0][`IDX_SIZE(GHR_BUF_SZ)-1:0] ghr_base;
     logic   [`N-1:0] pred_gshare;
     logic   [`N-1:0] pred_bim;
 } bp2fetch;
@@ -902,7 +902,7 @@ typedef struct packed {
     FTB_MD1 [`N-1:0]        md;
 
     logic   [`N-1:0][GHR_LEN-1:0] hash; // gshare hash index
-    logic   [`N-1:0][$clog2(GHR_BUF_SZ)-1:0] ghr_base;
+    logic   [`N-1:0][`IDX_SIZE(GHR_BUF_SZ)-1:0] ghr_base;
     logic   [`N-1:0]    pred_bim;
     logic   [`N-1:0]    pred_gshare;
 } fetch2btq;
@@ -972,10 +972,10 @@ typedef struct packed {
     logic [`N-1:0] snap_en;
     BMASK [`N-1:0] b1hot_n;
 `ifdef DEBUG
-    logic [`N-1:0][$clog2(`BTQ_SZ)-1:0] btq_idx;
+    BTQ_IDX [`N-1:0] btq_idx;
 `endif
-    logic [`N-1:0][$clog2(`BTQ_SZ)-1:0] btq_tail;
-    logic [`N-1:0][$clog2(`ROB_SZ)-1:0] fl_head;
+    BTQ_IDX [`N-1:0] btq_tail;
+    logic [`N-1:0][`IDX_SIZE(`ROB_SZ)-1:0] fl_head;
     RAS_SNAP [`N-1:0] ras_snap;
     // mt checkpoints are handled locally
 } rename2snap_bus;
@@ -983,7 +983,7 @@ typedef struct packed {
 typedef struct packed {
     logic [`N-1:0] snap_en;
     BMASK [`N-1:0] b1hot_n;
-    logic [`N-1:0][$clog2(`ROB_SZ)-1:0] rob_tail;
+    ROB_IDX [`N-1:0] rob_tail;
 } comm2snap_bus;
 
 typedef struct packed {
@@ -1136,7 +1136,7 @@ typedef struct packed {
         // From: Free list
         // - newly allocated pregs
 
-    logic [`N:0][$clog2(`ROB_SZ)-1:0] fl_heads_n;
+    logic [`N:0][`IDX_SIZE(`ROB_SZ)-1:0] fl_heads_n;
 } free_list2dispatch;
 
 `define BY_FU(type) \
@@ -1167,10 +1167,9 @@ typedef struct packed {
     dispatch2free_list d_in;
     free_list2dispatch d_out;
     struct packed {
-        logic [$clog2(FL_DEPTH)-1:0]       head;
-        logic [$clog2(FL_DEPTH)-1:0]       tail;
         logic [FL_DEPTH-1:0][FL_WIDTH-1:0] state;
-        `CNT_TYPE(FL_DEPTH)                used;
+        `IDX_TYPE(FL_DEPTH) head, tail;
+        `CNT_TYPE(FL_DEPTH) used;
     } fifo;
 } DBG_fl;
 
@@ -1181,7 +1180,7 @@ module ffs_exp #(
 ) (
     input   logic [VECW-1:0] i_vec,
     output  logic o_vld,
-    output  logic [$clog2(VECW)-1:0] o_idx
+    output  `IDX_TYPE(VECW) o_idx
 );
     localparam LEVELS = `CNT_SIZE(VECW);
     logic [LEVELS-1:0][VECW-1:0] lset;
@@ -1250,7 +1249,7 @@ module compactor_exp #(
     generate
         logic [REQW-1:0] exceeds;
         logic found;
-        logic [$clog2(REQW)-1:0] first;
+        `IDX_TYPE(REQW) first;
 
         for (genvar i = 0; i < REQW; ++i) begin
             assign exceeds[i] = (sums[SUM_LEVELS-1][i] + req[i]) > lim_cnt;
@@ -1274,7 +1273,7 @@ module ffs #(
 ) (
     input   logic [VECW-1:0] i_vec,
     output  logic o_vld,
-    output  logic [$clog2(VECW)-1:0] o_idx
+    output  `IDX_TYPE(VECW) o_idx
 );
     always_comb begin
         o_vld = |i_vec;
