@@ -2,7 +2,7 @@
 // `include "test/ghr_sva.svh"
 
 // enable to synthesize GHR (via `make ghr.syn.out`)
-`define SYNTH_GHR
+// `define SYNTH_GHR
 
 `ifndef SYNTH_GHR
 module ghr_test #(
@@ -29,11 +29,10 @@ module ghr_test #(
     PTR   [`NUM_FU_BRU-1:0] ex_idx;
 
     // fetch
-    logic [$clog2(N):0] f_en_cnt;
-    logic [N-1:0]       f_pred;
-    logic [$clog2(N):0] f_rdy_scnt;
+    `CNT_TYPE(N)    f_en_cnt, f_rdy_scnt;
+    logic [N-1:0]   f_pred;
     logic [N-1:0][GHR_LEN-1:0] f_ghr;
-    PTR   [N-1:0]        f_base;
+    PTR   [N-1:0]   f_base;
     
     // Variable to count values written to FIFO
     int cnt;

@@ -32,9 +32,8 @@ module ghr_sva #(
     input   PTR   [NUM_FU_BRU-1:0] ex_idx,
 
     // fetch
-    input   logic [$clog2(N):0] f_en_cnt,
+    input   `CNT_TYPE(N) f_en_cnt, f_rdy_scnt,
     input   logic [N-1:0]       f_pred,
-    input   logic [$clog2(N):0] f_rdy_scnt,
     input   logic [N-1:0][GHR_LEN-1:0] f_ghr
 );
     typedef struct packed {
