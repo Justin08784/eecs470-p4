@@ -138,6 +138,12 @@ module testbench;
 
     DBG_dcache      dbg_dcache;
 
+    assign proc2mem_command = '0;
+    assign proc2mem_addr    = '0;
+    assign proc2mem_data    = '0;
+    assign proc2mem_size    = '0;
+    assign dbg_dcache       = '0;
+
     // Instantiate the Pipeline
     cpu verisimpleV (
         // Inputs
@@ -147,19 +153,22 @@ module testbench;
         .f2mem  (f2mem),
         .mem2f  (mem2f),
 
-        .mem2proc_transaction_tag (mem2proc_transaction_tag),
-        .mem2proc_data            (mem2proc_data),
-        .mem2proc_data_tag        (mem2proc_data_tag),
+// >> TODO: memory stubbed
+//         .mem2proc_transaction_tag (mem2proc_transaction_tag),
+//         .mem2proc_data            (mem2proc_data),
+//         .mem2proc_data_tag        (mem2proc_data_tag),
 
-        // Outputs
-        .proc2mem_command (proc2mem_command),
-        .proc2mem_addr    (proc2mem_addr),
-        .proc2mem_data    (proc2mem_data),
-`ifndef CACHE_MODE
-        .proc2mem_size    (proc2mem_size),
-`endif
+//         // Outputs
+//         .proc2mem_command (proc2mem_command),
+//         .proc2mem_addr    (proc2mem_addr),
+//         .proc2mem_data    (proc2mem_data),
+// `ifndef CACHE_MODE
+//         .proc2mem_size    (proc2mem_size),
+// `endif
 
-        .dbg_dcache     (dbg_dcache),
+//         .dbg_dcache     (dbg_dcache),
+// << TODO: memory stubbed
+
         .commit(commit)
     );
 

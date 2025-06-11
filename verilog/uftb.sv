@@ -27,6 +27,7 @@ typedef struct packed {
         an FTQ entry cannot dequeue until the "last" in the BTQ entry span is reached. */
 } _BTQ_ENTRY;
 
+/* TODO: Test lru_man, especially masking logic. */
 module lru_man #(
     parameter SETW=16
 ) (

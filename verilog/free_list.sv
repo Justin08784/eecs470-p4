@@ -114,6 +114,11 @@ module free_list #(parameter
         .flush,
         .flush_snap(snap),
 
+        // >> unused inputs
+        .clmsk      ('0),
+        .wr_bmask   ('0),
+        // << unused inputs
+
         .wr_en_cnt(free_cnt),
         .wr_data(told_packed),
 

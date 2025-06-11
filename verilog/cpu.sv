@@ -8,27 +8,29 @@ module cpu (
     output fetch2mem f2mem,
     input  mem2fetch mem2f,
 
-    input  MEM_TAG      mem2proc_transaction_tag, // Memory tag for current transaction
-    input  MEM_BLOCK    mem2proc_data,            // Data coming back from memory
-        /*
-        Q: Why 2 mem blocks when each mem block supplies a double word
-        i.e. 8 bytes i.e. 2 insns? Isn't this enough to support 2-size fetch?
-        A (Justin): No, it is not; fetch at a double-word misaligned PC will
-        straddle double word block boundaries.
+// >> TODO: memory stubbed
+//     input  MEM_TAG      mem2proc_transaction_tag, // Memory tag for current transaction
+//     input  MEM_BLOCK    mem2proc_data,            // Data coming back from memory
+//         /*
+//         Q: Why 2 mem blocks when each mem block supplies a double word
+//         i.e. 8 bytes i.e. 2 insns? Isn't this enough to support 2-size fetch?
+//         A (Justin): No, it is not; fetch at a double-word misaligned PC will
+//         straddle double word block boundaries.
 
-        An address is "double word-aligned" iff its lowest 3 bits are 000.
-        If PC_reg = 3'b100, the first instruction (PC) is in the *second half* of
-        mem2proc_data[0], but the next instruction (PC + 4) is in the *first half*
-        of mem2proc_data[1]. One memory block isn't enough to cover both.
-        */
-    input  MEM_TAG      mem2proc_data_tag,        // Tag for which transaction data is for
+//         An address is "double word-aligned" iff its lowest 3 bits are 000.
+//         If PC_reg = 3'b100, the first instruction (PC) is in the *second half* of
+//         mem2proc_data[0], but the next instruction (PC + 4) is in the *first half*
+//         of mem2proc_data[1]. One memory block isn't enough to cover both.
+//         */
+//     input  MEM_TAG      mem2proc_data_tag,        // Tag for which transaction data is for
 
-    output MEM_COMMAND  proc2mem_command, // Command sent to memory
-    output ADDR         proc2mem_addr,    // Address sent to memory
-    output MEM_BLOCK    proc2mem_data,    // Data sent to memory
-    output MEM_SIZE     proc2mem_size,    // Data size sent to memory
+//     output MEM_COMMAND  proc2mem_command, // Command sent to memory
+//     output ADDR         proc2mem_addr,    // Address sent to memory
+//     output MEM_BLOCK    proc2mem_data,    // Data sent to memory
+//     output MEM_SIZE     proc2mem_size,    // Data size sent to memory
 
-    output DBG_dcache   dbg_dcache,
+//     output DBG_dcache   dbg_dcache,
+// << TODO: memory stubbed
     output COMMIT_PACKET commit
 );
     /* Global controls*/
@@ -37,17 +39,15 @@ module cpu (
     WADDR flush_fb_base;
     BMASK clmsk;
 
-
     /* Memory stubs */
-    always_comb begin
-        proc2mem_command    = MEM_NONE;
-        proc2mem_addr       = '0;
-        proc2mem_data       = '0;
-        proc2mem_size       = DOUBLE;
+    // always_comb begin
+    //     proc2mem_command    = MEM_NONE;
+    //     proc2mem_addr       = '0;
+    //     proc2mem_data       = '0;
+    //     proc2mem_size       = DOUBLE;
 
-        dbg_dcache = '0;
-    end
-
+    //     dbg_dcache = '0;
+    // end
 
     /* >> ==== Fetch ==== >> */
     fetch2decode f_2_decode;

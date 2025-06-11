@@ -172,6 +172,13 @@ module btq #(
         .clock      (clock),
         .reset      (reset),
         .flush      ('0),
+
+        // >> unused inputs
+        .flush_snap ('0),
+        .clmsk      ('0),
+        .wr_bmask   ('0),
+        // << unused inputs
+
         .wr_en_cnt  (nret_prefix_cnt[rd_en_cnt]),
         .wr_data    (puq_enq_flt),
         .rd_en_cnt  (f_out.bp_upd.en),

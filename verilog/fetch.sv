@@ -265,6 +265,13 @@ module fetch (
         .clock,
         .reset,
         .flush,
+
+        // >> unused inputs
+        .flush_snap ('0),
+        .clmsk      ('0),
+        .wr_bmask   ('0),
+        // << unused inputs
+
         .wr_en_cnt  (f_cnt),
         .wr_data    (f_dat),
         .rd_en_cnt  (d_out.f_en_cnt),

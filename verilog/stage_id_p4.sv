@@ -367,6 +367,13 @@ module stage_id_p4 (
         .clock      (clock),
         .reset      (reset),
         .flush      (flush),
+
+        // >> unused inputs
+        .flush_snap ('0),
+        .clmsk      ('0),
+        .wr_bmask   ('0),
+        // << unused inputs
+
         .wr_en_cnt  (non_illegal_cnt), // accept only legal insns into FIFO
         .wr_data    (wr_fifo),
         .rd_en_cnt  (d_in.dispatch_en_cnt),
