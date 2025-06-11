@@ -137,7 +137,13 @@ module bpu (
                 : NUM_BR_SLOTS;
         ghr_io.f_pred = pred;
 
-        pc_flt = pc_reg + `UCAST_LEN(e.end_off + `UCAST_FIT(1), 16);
+        pc_flt = pc_reg + `UCAST_LEN(
+            (e.end_off == 4'd15)
+                ? 16
+                : e.end_off + `UCAST_FIT(1),
+            16
+        );
+
         pc_jmp = slot.tgt;
         pc_reg_n =
             !uftb_io.o_vld ? pc_reg + `UCAST_FIT(16) :
