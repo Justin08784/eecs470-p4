@@ -141,8 +141,9 @@ module btq #(
 
         end
 
+        puq_enq_flt = '0;
         for (int i = 0; i < NUM_RPORTS; ++i)
-            puq_enq_flt[i] = puq_enq_raw[nret_prefix_cnt[i]];
+            puq_enq_flt[nret_prefix_cnt[i]] = puq_enq_raw[i];
 
         // handle fetch (outs)
         f_out.bp_upd.en     = !puq_empty;
