@@ -1,7 +1,8 @@
 # IPC testing
 # loop limit; init to 10000
-lui x1, 0x2
-addi x1, x1, 0x710
+# lui x1, 0x2
+# addi x1, x1, 0x710
+li x1, 0x3e8
 
 li x2, 0
 li x3, 0
