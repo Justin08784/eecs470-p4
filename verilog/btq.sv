@@ -134,9 +134,8 @@ module btq #(
                 always_take : cur.always_take,
                 md      : cur.md,
 
-                hash    : cur.hash,
-                pred_bim    : cur.pred_bim,
-                pred_gshare : cur.pred_gshare
+                en_dir_update : cur.hit && cur.hit_slot,
+                hash    : cur.hash
             };
 
         end
@@ -242,10 +241,10 @@ module btq #(
                     always_take : f_in.always_take[i],
                     md      : f_in.md[i],
 
+                    hit     : f_in.hit[i],
+                    hit_slot: f_in.hit_slot[i],
                     hash    : f_in.hash[i],
-                    ghr_base: f_in.ghr_base[i],
-                    pred_bim: f_in.pred_bim[i],
-                    pred_gshare : f_in.pred_gshare[i]
+                    ghr_base: f_in.ghr_base[i]
                 };
             end
         end

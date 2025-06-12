@@ -227,31 +227,31 @@ module fetch (
         btq_out.en_cnt = brch_prefix_cnt[f_cnt];
 
         for (int i = 0; i < `N; ++i) begin
-            f_dat[i].btq_idx = btq_in.btq_idxs_n[brch_prefix_cnt[i]];
+            int     win_idx; // index into btq write window
+            logic   eq_end;
+            win_idx = brch_prefix_cnt[i];
+            eq_end  = off_n[i] == r.off;
 
-            btq_out.is_tail [brch_prefix_cnt[i]] = (r.pred_idx == 1) && (off_n[i] == r.off);
-                /*
-                FIXME (unsure): Probably not necessary to check for "off_geq_tail",
+            f_dat[i].btq_idx = btq_in.btq_idxs_n[win_idx];
+
+            btq_out.is_tail     [win_idx] = (r.pred_idx == 1) && eq_end;
+                /* FIXME (unsure): Probably not necessary to check for "off_geq_tail",
                 i.e. (r.pred_idx == 1) && (off_n[i] >= r.off), because branches after (>)
-                the tail slot would not even be in the same fetch block?
-                */
-            btq_out.PC      [brch_prefix_cnt[i]] = pc_n[i];
-            btq_out.off     [brch_prefix_cnt[i]] = off_n[i];
-            btq_out.pred    [brch_prefix_cnt[i]] = !r.ft && (off_n[i] == r.off);
-            btq_out.pred_tgt[brch_prefix_cnt[i]] = r.base_n;
-            btq_out.always_take[brch_prefix_cnt[i]] =
-                !r.ft && (off_n[i] == r.off) ? r.always_take : 0;
-            btq_out.md      [brch_prefix_cnt[i]] = '{
-                cond : cond[i],
-                call : call[i],
-                ret  : ret[i],
-                jalr : jalr[i]
-            }; // TODO: fix RAS if pred ret but not ret (likewise for call)
+                the tail slot would not even be in the same fetch block? */
+            btq_out.PC          [win_idx] = pc_n[i];
+            btq_out.off         [win_idx] = off_n[i];
+            btq_out.pred        [win_idx] = !r.ft && eq_end;
+            btq_out.pred_tgt    [win_idx] = r.base_n;
+            btq_out.always_take [win_idx] = !r.ft && eq_end ? r.always_take : 0;
+            btq_out.md          [win_idx] = md[i];
+                // TODO: fix RAS if pred ret but not ret (likewise for call)
 
-            btq_out.hash        [i]              = '0; // FIXME
-            btq_out.ghr_base    [i]              = '0; // FIXME
-            btq_out.pred_bim    [i]              = '0; // FIXME
-            btq_out.pred_gshare [i]              = '0; // FIXME
+            btq_out.hit         [win_idx] = r.hit;
+            btq_out.hit_slot    [win_idx] =
+                    (r.slot[0].vld && (r.slot[0].off == off_n[i]))
+                ||  (r.slot[1].vld && (r.slot[1].off == off_n[i]));
+            btq_out.hash        [win_idx] = '0; // FIXME
+            btq_out.ghr_base    [win_idx] = '0; // FIXME
         end
     end
 

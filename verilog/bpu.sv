@@ -95,8 +95,6 @@ module bpu (
         FTB_ENTRY e;
         FTB_BR_SLOT slot;
         WADDR pc_flt, pc_jmp;
-        // logic leq0, lt0, eq0;
-        // logic leq1, lt1, eq1;
         logic leq0, leq1;
 
         const FTB_MD1 COND_MD = '{
@@ -149,15 +147,25 @@ module bpu (
 
         buf_io.i_dat = '{
             base_n      : pc_reg_n,
+
             ft          : !pred_any,
             pred_idx    : pred_idx,
             off         : 
                 !uftb_io.o_vld ? 15 :
                 pred_any ? slot.off : e.end_off,
-            vld         : slot.vld,
+            hit         : uftb_io.o_vld,
+            
+            slot        : '0, // filled below
             always_take : slot.always_take,
             md          : (pred_idx == 0) ? COND_MD : e.md1.cond
         };
+
+        for (int i = 0; i < NUM_BR_SLOTS; ++i) begin
+            buf_io.i_dat.slot[i] = '{
+                vld : e.br_slot[i].vld,
+                off : e.br_slot[i].off
+            };
+        end
     end
 
     /*

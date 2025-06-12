@@ -523,18 +523,21 @@ typedef struct packed {
 
 parameter FTQ_SZ = 32;
 typedef struct packed {
-    WADDR       base_n; // base address of *next* FB
+    WADDR       base_n;     // base address of *next* FB
+
+    logic       ft;         // fallthrough? else took a branch
+    logic       pred_idx;   // ft ? <IGNORE>: slot of pred-taken branch
+    logic [3:0] off;        // ft ? end_off : slot[pred_idx].off
+    logic       hit;
 
     // pared down FTB entry
-    logic       vld;    // is slot valid/hit?
-    logic       ft;     // fallthrough? else took a branch
-    logic       pred_idx; // ft ? <IGNORE> : slot idx of pred-taken branch
-    logic [3:0] off;    // ft ? end_off : br_slot[0/1].off
-        // if a branch
-    // WADDR       tgt;
-        // Q: Why omit? A: if branch, next FTQ entry's base is branch target
-    logic       always_take;
-    FTB_MD1     md;
+    struct packed {
+        logic       vld;
+        logic [3:0] off;
+    } [1:0] slot;
+
+    logic       always_take;// ft ? <IGNORE>: " of pred-taken branch
+    FTB_MD1     md;         // ft ? <IGNORE>: " of pred-tkaen branch
 } FTQ_ENTRY;
 
 // BTQ stuff
@@ -560,10 +563,10 @@ typedef struct packed {
         in the FTB. */
     FTB_MD1 md;
 
-    logic   [GHR_LEN-1:0] hash; // gshare hash index
+    logic   [`N-1:0]        hit;        // hit an entry with base in FTB?
+    logic   [`N-1:0]        hit_slot;   // hit a slot in entry? (valid only if hit)
+    logic   [GHR_LEN-1:0]   hash;       // gshare hash index
     logic   [`N-1:0][`IDX_SIZE(GHR_BUF_SZ)-1:0] ghr_base;
-    logic   pred_bim;
-    logic   pred_gshare;
 } BTQ_ENTRY;
 
 typedef struct packed {
@@ -577,9 +580,8 @@ typedef struct packed {
     FTB_MD1     md;
 
     // predictor-specific fields
+    logic en_dir_update;    // update direction predictors?
     logic [GHR_LEN-1:0] hash; // gshare hash
-    logic pred_bim;
-    logic pred_gshare;
 
 } BPU_UPD_PKT;
 
@@ -906,10 +908,10 @@ typedef struct packed {
     logic   [`N-1:0]        always_take;
     FTB_MD1 [`N-1:0]        md;
 
+    logic   [`N-1:0]        hit;
+    logic   [`N-1:0]        hit_slot;
     logic   [`N-1:0][GHR_LEN-1:0] hash; // gshare hash index
     logic   [`N-1:0][`IDX_SIZE(GHR_BUF_SZ)-1:0] ghr_base;
-    logic   [`N-1:0]    pred_bim;
-    logic   [`N-1:0]    pred_gshare;
 } fetch2btq;
 
 typedef struct packed {
