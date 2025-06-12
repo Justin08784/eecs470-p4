@@ -1,9 +1,13 @@
 # test_branch_flood.s
     li x1, 0
     li x2, 1
+    li x3, 10
+
+loop:
+    addi x3, x3, -1        # 3
 
     # Branches that will NOT be taken
-    beq x1, x2, not_taken1
+    beq x1, x2, not_taken1 # 4
     beq x1, x2, not_taken2
     beq x1, x2, not_taken3
     beq x1, x2, not_taken4
@@ -15,7 +19,7 @@
     beq x1, x2, not_taken10
     beq x1, x2, not_taken11
     beq x1, x2, not_taken12
-    beq x1, x2, not_taken13
+    beq x1, x2, not_taken13 # 16
     beq x1, x2, not_taken14
     beq x1, x2, not_taken15
     beq x1, x2, not_taken16
@@ -23,6 +27,9 @@
     beq x1, x2, not_taken18
     beq x1, x2, not_taken19
     beq x1, x2, not_taken20
+    # The single branch that IS taken
+
+    bnez x3, loop
 
 done:
     li x3, 42     # To visually confirm we reached here

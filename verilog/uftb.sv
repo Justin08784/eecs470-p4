@@ -471,6 +471,9 @@ module uftb #(
         logic   en;
 
         logic   hit;
+        logic   hit_s1;
+            /* Predecessor is valid and has matching tag.
+            (When we reach s2, must bypass FTB_ENTRY from predecessor IFF it writes) */
         WAY     way;
         // logic   spill; // if we insert would we spill
             // ^^ FIXME unused
@@ -478,6 +481,10 @@ module uftb #(
         FTB_ENTRY e;
         FTB_UPD_PKT udat;
     } s1, s1_n;
+    struct packed {
+        logic   wen; // did predecessor write at all?
+        FTB_ENTRY e;
+    } s2, s2_n;
 
     // s1
     always_comb begin
@@ -497,7 +504,7 @@ module uftb #(
         // query header
         loc_hdr = locate(hdr, tag);
 
-        // mux loc, giving priority to s1 (forwards)
+        // mux loc, giving priority to s1 (bypass)
         loc.hit = loc_s1.hit || loc_hdr.hit;
         loc.way = '0;
         if (loc_s1.hit)
@@ -509,21 +516,10 @@ module uftb #(
             en  : i_uen,
 
             hit : loc.hit,
+            hit_s1  : loc_s1.hit,
             way : loc.hit ? loc.way : lru_way,
 
             e   : tgt[loc_hdr.way],
-                /* Q: Why choose entry from committed state rather than s1.e? A:
-                Since stage s1 does not perform any updates to its FTB_ENTRY, the
-                committed state is guaranteed to be more up-to-date.
-
-                Now if we wish to change the pipeline design so that s1 DOES perform
-                some updates, this scheme is no longer acceptable. On one hand:
-                1. The committed state, unlike s2, has updates from last cycle's s2.
-                    ...simultaneously, though...
-                2. The s1 register has updates from the current updatee (in s2 right now).
-
-                The only way to do this coherently is to force s1 to stall for a cycle
-                if s2 has the same way/base (i.e. no back-to-back updates to the same entry!) */
             udat: i_udat
         };
     end
@@ -533,7 +529,7 @@ module uftb #(
     logic hit_slot_spill_mex;
 `endif
     always_comb begin
-        FTB_ENTRY wfb, upd_fb, new_fb;
+        FTB_ENTRY wfb, upd_fb, new_fb, e;
         logic wen;
 
         logic spill;
@@ -543,7 +539,11 @@ module uftb #(
         logic update;   // entry hit , slot hit
 
         acc_way = s1.way;
-        upd_fb  = update_fb(hit_slot, spill, s1.e, s1.udat);
+        // e       = s1.e;
+        e       = (s2.wen && s1.hit_s1) ? s2.e : s1.e;
+            // bypass iff matching tag AND pred wrote
+            // (if pred did not write, committed state is latest)
+        upd_fb  = update_fb(hit_slot, spill, e, s1.udat);
         new_fb  = create_fb(s1.udat);
             /* NOTE: there IS a semantic difference between precomputing
             *_fb like this vs. putting them inline into the wfb ternary below.
@@ -576,6 +576,11 @@ module uftb #(
 
         hdr_n = hdr;
         tgt_n = tgt;
+
+        s2_n = '{
+            wen : wen,
+            e   : wfb
+        };
 
         if (wen) begin
             hdr_n.vld[s1.way]   = 1;
@@ -633,11 +638,13 @@ module uftb #(
             };
             tgt <= '0;
             s1  <= '0;
+            s2  <= '0;
 
         end else begin
             hdr <= hdr_n;
             tgt <= tgt_n;
             s1  <= s1_n;
+            s2  <= s2_n;
 
         end
     end
@@ -662,38 +669,56 @@ module uftb #(
     task automatic print_uftb();
         $display(">> uftb >>");
 
+        for (int w = 0; w < NUM_LINES; ++w)
+            // $display("age[%d]: %b", w, lru_man0.ot_masked[w]);
+            $display("age[%d]: %b", w, hdr.age[w]);
+
         for (int w = 0; w < NUM_LINES; ++w) begin
             FTB_ENTRY fb;
+            WADDR base;
 
             if (!hdr.vld[w]) begin
-                $display("%1d:", w);
+                $display("uftb[%1d]:", w);
+                // $display("uftb[%1d]:\n\n", w);
                 continue;
             end
 
             fb = tgt[w];
+            base = hdr.tag[w];
 
-            $display("%1d: [{vld: %b, tgt: %d, off = %2d, always_take: %b, sc: %b},",
+            $display("uftb[%1d]: base: %d, dirty: %b",
                 w,
-                fb.br_slot[0].vld,
-                fb.br_slot[0].tgt,
-                fb.br_slot[0].off,
-                fb.br_slot[0].always_take,
-                fb.br_slot[0].sc
+                base,
+                hdr.dirty[w]
             );
 
-            $display("    {vld: %b, tgt: %d, off = %2d, always_take: %b, sc: %b, ccrj: %b%b%b%b},",
-                fb.br_slot[1].vld,
-                fb.br_slot[1].tgt,
-                fb.br_slot[1].off,
-                fb.br_slot[1].always_take,
-                fb.br_slot[1].sc,
-                fb.md1.cond,
-                fb.md1.call,
-                fb.md1.ret,
-                fb.md1.jalr
-            );
+            if (fb.br_slot[0].vld)
+                $display("[{off: %d(pc=%d), tgt: %d, always_take: %b, sc: %b},",
+                    fb.br_slot[0].off,
+                    base + fb.br_slot[0].off,
+                    fb.br_slot[0].tgt,
+                    fb.br_slot[0].always_take,
+                    fb.br_slot[0].sc
+                );
+            else
+                $display("[{},");
 
-            $display("    end_off = %2d] (base: %d)", fb.end_off, hdr.tag[w]);
+            if (fb.br_slot[1].vld)
+                $display(" {off: %d(pc=%d), tgt: %d, always_take: %b, sc: %b, ccrj: %b%b%b%b},",
+                    fb.br_slot[1].off,
+                    base + fb.br_slot[1].off,
+                    fb.br_slot[1].tgt,
+                    fb.br_slot[1].always_take,
+                    fb.br_slot[1].sc,
+                    fb.md1.cond,
+                    fb.md1.call,
+                    fb.md1.ret,
+                    fb.md1.jalr
+                );
+            else
+                $display(" {},");
+
+            $display("  end_off = %2d]", fb.end_off);
         end
 
         $display("<< uftb <<");
