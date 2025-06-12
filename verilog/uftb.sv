@@ -297,6 +297,7 @@ module uftb #(
     endfunction
 
     function automatic FTB_ENTRY update_fb(
+        output logic        hit_slot,
         output logic        spill,
         input FTB_ENTRY     dst,
         input FTB_UPD_PKT   udat
@@ -324,6 +325,10 @@ module uftb #(
         cmp4(dst.br_slot[1].off, udat.pc_off, eq1, gt1);
 
         spill = vld[1] && gt1;
+        hit_slot =
+            (vld[0] && eq0)
+        ||  (vld[1] && eq1);
+
         if (udat.md.cond) begin
             if (vld[0] && lt0) begin
                 // shift left
@@ -524,16 +529,50 @@ module uftb #(
     end
 
     // s2
+`ifndef SYNTH
+    logic hit_slot_spill_mex;
+`endif
     always_comb begin
-        logic spill;
-        FTB_ENTRY wfb;
+        FTB_ENTRY wfb, upd_fb, new_fb;
         logic wen;
 
+        logic spill;
+        logic hit_slot; // does updatee already occupy a branch slot?
+        logic alloc;    // entry miss, slot miss -> need allocate entry
+        logic insert;   // entry hit , slot miss -> need allocate slot
+        logic update;   // entry hit , slot hit
+
         acc_way = s1.way;
-        wfb = s1.hit
-            ? update_fb(spill, s1.e, s1.udat)
-            : create_fb(s1.udat);
-        wen = s1.en && (!s1.hit || !spill);
+        upd_fb  = update_fb(hit_slot, spill, s1.e, s1.udat);
+        new_fb  = create_fb(s1.udat);
+            /* NOTE: there IS a semantic difference between precomputing
+            *_fb like this vs. putting them inline into the wfb ternary below.
+
+            If you put it inline, then the arguments will execute ONLY IF the
+            condition is evaluated. Of course, this is desirable for power,
+            but undesirable for reduced critical path (???).
+
+            (Q: How did I discover this fact? A: hit_slot_spill_mex was going
+            X on cycles because hit_slot, spill were not being initialized on
+            cycles, which is only possible if update_fb is conditinally executed.)
+            */
+        wfb     = s1.hit ? upd_fb : new_fb;
+`ifndef SYNTH
+        hit_slot_spill_mex = !s1.en || !(hit_slot && spill);
+`endif
+
+        /* allocate-on-take policy:
+        To conserve FTB space, a branch will never allocate/insert into the FTB
+        until it is taken for the first time. This is in accordance with how
+        Reinman et al. defines a "fetch block": an FB, unlike a basic block,
+        may embed arbitrarily many "strongly biased not taken" branches. */
+        alloc   = !s1.hit                   && s1.udat.take;
+        insert  = s1.hit    && !hit_slot    && s1.udat.take && !spill;
+        update  = s1.hit    && hit_slot; // not taken branches can still update owned slots
+
+        wen     = s1.en && (alloc || insert || update);
+        // old: allocate-always policy
+        // wen = s1.en && (!s1.hit || !spill);
 
         hdr_n = hdr;
         tgt_n = tgt;
@@ -603,6 +642,21 @@ module uftb #(
         end
     end
 
+`ifndef SYNTH
+    // runtime assertions
+    always_ff @(posedge clock) begin
+        if (!reset) begin
+            assert(hit_slot_spill_mex) else $fatal("hit_slot and spill are both high: %b. en: %b, hit: %b, way: %b, e: %b, udat: %b",
+            hit_slot_spill_mex,
+            s1.en,
+            s1.hit,
+            s1.way,
+            s1.e,
+            s1.udat
+            );
+        end
+    end
+`endif
 
 `ifdef DEBUG
     task automatic print_uftb();
