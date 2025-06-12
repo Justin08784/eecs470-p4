@@ -491,7 +491,7 @@ typedef struct packed {
 
             Maybe lo4 for fallthrough (end_off), off for branch pc_off?
         */
-    logic       always_take;
+    logic       always_take; // i.e. a cond branch that is always taken?
 } FTB_BR_SLOT;
 typedef struct packed {
     logic cond;         // = "sharing" bit
@@ -517,8 +517,6 @@ typedef struct packed {
     logic [3:0] pc_off; // pc = base + pc_off
     logic       take;
     WADDR       tgt;
-
-    logic       always_take; // i.e. a cond branch that is always taken?
 
     FTB_MD1 md;
 } FTB_UPD_PKT;
@@ -556,6 +554,10 @@ typedef struct packed {
     WADDR   tgt;
         // NOTE: We used to have separate pred, pred_tgt fields.
 
+    logic   always_take;
+        /* During retire-time update, this is sent to the direction predictors,
+        and not the FTB. We will use "take" to update the always_take in-place
+        in the FTB. */
     FTB_MD1 md;
 
     logic   [GHR_LEN-1:0] hash; // gshare hash index
@@ -901,6 +903,7 @@ typedef struct packed {
     logic   [`N-1:0][3:0]   off;
     logic   [`N-1:0]        pred;
     WADDR   [`N-1:0]        pred_tgt;
+    logic   [`N-1:0]        always_take;
     FTB_MD1 [`N-1:0]        md;
 
     logic   [`N-1:0][GHR_LEN-1:0] hash; // gshare hash index

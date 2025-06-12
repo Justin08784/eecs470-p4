@@ -86,13 +86,12 @@ module ftq #(
                 continue;
             end
 
-            $display("ftq[%2d]: {base_n: %d} vld: %b, ft: %b, off: %b, always_take: %b, md: %b",
+            $display("ftq[%2d]: {base_n: %d} vld: %b, ft: %b, off: %b, md: %b",
                 i,
                 state[i].base_n,
                 state[i].vld,
                 state[i].ft,
                 state[i].off,
-                state[i].always_take,
                 state[i].md
             );
         end

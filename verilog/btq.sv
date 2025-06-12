@@ -131,7 +131,7 @@ module btq #(
                 pc_off  : cur.off,
                 take    : cur.take,
                 tgt     : cur.tgt,
-                always_take : 0, // FIXME
+                always_take : cur.always_take,
                 md      : cur.md,
 
                 hash    : cur.hash,
@@ -239,6 +239,7 @@ module btq #(
                     take    : f_in.pred[i],
                     tgt     : f_in.pred_tgt[i],
 
+                    always_take : f_in.always_take[i],
                     md      : f_in.md[i],
 
                     hash    : f_in.hash[i],

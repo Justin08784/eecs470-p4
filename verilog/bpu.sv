@@ -62,8 +62,6 @@ module bpu (
         take        : i_udat.take,
         tgt         : i_udat.tgt,
 
-        always_take : i_udat.always_take,
-
         md          : i_udat.md
     };
 

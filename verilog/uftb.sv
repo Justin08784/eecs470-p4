@@ -258,6 +258,7 @@ module uftb #(
 
     function automatic FTB_ENTRY wr_br0(
         input FTB_ENTRY     dst,
+        input logic         always_take,
         input logic [1:0]   sc,
         input FTB_UPD_PKT   udat
     );
@@ -269,7 +270,7 @@ module uftb #(
             vld : 1,
             tgt : udat.tgt,
             off : udat.pc_off,
-            always_take : udat.always_take 
+            always_take : always_take 
         };
 
         return rv;
@@ -277,6 +278,7 @@ module uftb #(
 
     function automatic FTB_ENTRY wr_br1(
         input FTB_ENTRY     dst,
+        input logic         always_take,
         input logic [1:0]   sc,
         input FTB_UPD_PKT   udat
     );
@@ -288,7 +290,7 @@ module uftb #(
             vld : 1,
             tgt : udat.tgt,
             off : udat.pc_off,
-            always_take : udat.always_take
+            always_take : always_take
         };
 
         rv.md1 = udat.md;
@@ -305,13 +307,24 @@ module uftb #(
         FTB_ENTRY rv;
         logic [1:0] vld;
         logic eq0, eq1, lt0, gt1;
+        logic hit0, hit1;
 
         logic [1:0] sc_new, // new slot sc
                     sc_upd0,// br0 sc updated
                     sc_upd1;// br1 sc updated
-        sc_new  = udat.take ? WT : WN;
+        logic at_new,
+              at_upd0,
+              at_upd1;
+
+        sc_new  = WT;
+            /* Q: Why not "udat.take ? WT : WN"? A:
+            Only taken branches can insert a slot... in theory. */
         sc_upd0 = update_sc(dst.br_slot[0].sc, udat.take);
         sc_upd1 = update_sc(dst.br_slot[1].sc, udat.take);
+
+        at_new  = 1;
+        at_upd0 = udat.take && dst.br_slot[0].always_take; 
+        at_upd1 = udat.take && dst.br_slot[1].always_take; 
 
         rv = dst;
         vld[0] = dst.br_slot[0].vld;
@@ -325,16 +338,16 @@ module uftb #(
         cmp4(dst.br_slot[1].off, udat.pc_off, eq1, gt1);
 
         spill = vld[1] && gt1;
-        hit_slot =
-            (vld[0] && eq0)
-        ||  (vld[1] && eq1);
+        hit0  = (vld[0] && eq0);
+        hit1  = (vld[1] && eq1);
+        hit_slot = hit0 || hit1;
 
         if (udat.md.cond) begin
             if (vld[0] && lt0) begin
                 // shift left
                 rv.br_slot[1]   = rv.br_slot[0];
                 rv.md1.cond     = 1;
-                rv = wr_br0(rv, sc_new, udat);
+                rv = wr_br0(rv, at_new, sc_new, udat);
 
             end else begin
                 /*
@@ -346,18 +359,21 @@ module uftb #(
                 */
 
                 rv = (
-                    (vld[1] &&   eq1)
+                    // (vld[1] &&   eq1)
+                    hit1
                 ||  (vld[0] && !(eq0 || lt0))
                 )
                     ? wr_br1(
                         rv, 
-                        (vld[1] && eq1) ? sc_upd1 : sc_new,
+                        hit1 ? at_upd1 : at_new,
+                        hit1 ? sc_upd1 : sc_new,
                         udat
                     )
 
                     : wr_br0(
                         rv,
-                        (vld[0] && eq0) ? sc_upd0 : sc_new,
+                        hit0 ? at_upd0 : at_new,
+                        hit0 ? sc_upd0 : sc_new,
                         udat
                     );
             end 
@@ -370,7 +386,8 @@ module uftb #(
 
             rv = wr_br1(
                 rv, 
-                (vld[1] && eq1) ? sc_upd1 : sc_new,
+                hit1 ? at_upd1 : at_new,
+                hit1 ? sc_upd1 : sc_new,
                 udat
             );
         end
@@ -420,17 +437,21 @@ module uftb #(
     );
         FTB_ENTRY rv;
         logic [1:0] sc_new;
+        logic at_new;
 
         rv = '0;
-        sc_new  = udat.take ? WT : WN;
+        sc_new  = WT;
+            /* Q: Why not "udat.take ? WT : WN"? A:
+            Only taken branches can allocate an entry... in theory. */
+        at_new  = 1;
 
         if (udat.md.cond) begin
             rv.end_off = 15;
-            rv = wr_br0(rv, sc_new, udat);
+            rv = wr_br0(rv, at_new, sc_new, udat);
 
         end else begin
             rv.end_off = udat.pc_off;
-            rv = wr_br1(rv, sc_new, udat);
+            rv = wr_br1(rv, at_new, sc_new, udat);
 
         end
 

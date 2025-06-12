@@ -239,6 +239,8 @@ module fetch (
             btq_out.off     [brch_prefix_cnt[i]] = off_n[i];
             btq_out.pred    [brch_prefix_cnt[i]] = !r.ft && (off_n[i] == r.off);
             btq_out.pred_tgt[brch_prefix_cnt[i]] = r.base_n;
+            btq_out.always_take[brch_prefix_cnt[i]] =
+                !r.ft && (off_n[i] == r.off) ? r.always_take : 0;
             btq_out.md      [brch_prefix_cnt[i]] = '{
                 cond : cond[i],
                 call : call[i],
