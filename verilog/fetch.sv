@@ -17,9 +17,54 @@ typedef struct packed {
     `IDX_TYPE(IRQ_SZ) irq_idx;
 } ICACHE_QUERY;
 
+// typedef struct packed {
+//     // general
+//     MEM_BLOCK   blk;
+//     WADDR       base;
+//     logic [3:0] off;        // in-fb offset of word 0 in the cache line.
+
+//     // branch-specific
+//     WADDR       base_n;
+//     logic       ft;         // fallthrough? else took a branch
+//     logic       pred_w;     // ft ? <IGNORE? : word index of pred-taken branch
+
+
+//     logic       hit;
+//     logic [1:0] hit_slot;   // hit_slot[i] = hit FTB && hit slot i
+//                             // Thus hit = |hit_slot
+
+
+//     logic       is_tail;    // ft ? <IGNORE>: does pred-taken branch occupy tail slot?
+//     logic       always_take;// ft ? <IGNORE>: " of pred-taken branch
+//     BRANCH_MD   md;         // ft ? <IGNORE>: " of pred-tkaen branch
+//                             // (selectively overwrite with icache results)
+//     logic [GHR_LEN-1]       hash;
+//     `IDX_TYPE(GHR_BUF_SZ)   ghr_base;
+// } ICACHE_RESPONSE;
+
 typedef struct packed {
-    `IDX_TYPE(FTQ_SZ) ftq_idx;
-    MEM_BLOCK blk;
+    DWADDR          dw;
+    logic   [1:0]   fmsk;   // which words to fetch.
+        /* Invariants:
+        1. At least bit 0 (word 0) set
+        2. Bits set contiguously from 0
+
+        FUTURE: Invariant 2 may no longer hold if we detect when a branch in an
+        early word targets into a later word *in the same cache line*,
+        AND we allow storing them together in a single cache line. Then and all insns
+        between the branch and target would have fmsk set to 0.
+            Idea: if the branch target is in the same cache line as the
+            branch (much more likely with larger cache lines), we may reuse
+            the 14-bit tgt field in the FTB branch slot as a [$clog2(cache_line_sz)-1:0]
+            in-line offset (possible with a carry bit for faster computation).
+        */
+    logic   [1:0]   is_end;
+        /* Does word i *terminate* an FB?
+        Both bits can be 1 when word0 ends FB-A and word1 ends FB-B (a 1-insn block). */
+    
+    MEM_BLOCK       blk;
+    BRANCH_MD[1:0]  md;
+
 } ICACHE_RESPONSE;
 
 // icache response queue
@@ -36,12 +81,19 @@ module IRQ #(
     output  PTR [2:0]       wr_idxs_n,
     output  `CNT_TYPE(2)    rdy_scnt,
     input   `CNT_TYPE(2)    wen_cnt,
-    input   logic [1:0][`IDX_SIZE(FTQ_SZ)-1:0] wdat,
+    input   struct packed {
+        DWADDR      dw;
+        logic [1:0] fmsk;
+        logic [1:0] is_end;
+    } [1:0] wdat,
 
     // icache completions
     input   logic [1:0]     cen,
     input   PTR [1:0]       cidx,
-    input   MEM_BLOCK [1:0] cdat,
+    input   struct packed {
+        MEM_BLOCK       blk;
+        BRANCH_MD[1:0]  md;
+    } [1:0] cdat,
 
     // read
     output  `CNT_TYPE(2)    vld_scnt,
@@ -109,15 +161,24 @@ module IRQ #(
 
         end else begin
             for (int i = 0; i < 2; ++i) begin
+                int cur;
                 if (!cen[i])
                     continue;
-                cpl[cidx[i]]    <= 1;
-                state[cidx[i]]  <= cdat[i];
+                cur = cidx[i];
+
+                cpl  [cur]      <= 1;
+                state[cur].blk  <= cdat[i].blk;
+                state[cur].md   <= cdat[i].md;
             end
 
             for (int i = 0; i < `MIN(wen_cnt, 2); ++i) begin
-                cpl[wr_idxs_n[i]] <= 0;
-                state[wr_idxs_n[i]].ftq_idx <= wdat[i];
+                int cur;
+                cur = wr_idxs_n[i];
+
+                cpl  [cur]          <= 0;
+                state[cur].dw       <=  wdat[i].dw;
+                state[cur].fmsk     <=  wdat[i].fmsk;
+                state[cur].is_end   <=  wdat[i].is_end;
             end
 
         end
