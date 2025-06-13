@@ -97,7 +97,7 @@ module IRQ #(
 
     assign vld_scnt = `MIN(
         used_scnt,
-        rwin_ncpl_any ? rwin_ncpl_idx + `UCAST_FIT(1) : 2
+        rwin_ncpl_any ? rwin_ncpl_idx : 2
     );
 
     always_ff @(posedge clock) begin

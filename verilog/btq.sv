@@ -130,7 +130,10 @@ module btq #(
                 pc_off  : cur.off,
                 take    : cur.take,
                 tgt     : cur.tgt,
-                always_take : cur.always_take,
+                always_take : cur.always_take && cur.take,
+                    /* Why update always_take here instead of during complete?
+                    Updating always_take requires reading the existing value.
+                    We do a read during retire, but not during complete. */
                 md      : cur.md,
 
                 en_dir_update : cur.hit && cur.hit_slot,
