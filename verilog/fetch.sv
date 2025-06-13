@@ -58,9 +58,8 @@ module fetch (
 
     // ftq <-> fetch (us) plumbing
     struct packed {
-        logic       vld;
-        FTQ_ENTRY   rdat;
-        logic       ren;
+        FTQ_ENTRY [1:0] rdat;
+        `CNT_TYPE(2)    vld_scnt, ren_cnt;
     } ftq_io;
 
     bpu bpu0 (
@@ -90,9 +89,9 @@ module fetch (
         .wen    (bpu2ftq.en),
         .wdat   (bpu2ftq.dat),
 
-        .vld    (ftq_io.vld),
-        .rdat   (ftq_io.rdat),
-        .ren    (ftq_io.ren)
+        .vld_scnt   (ftq_io.vld_scnt),
+        .rdat       (ftq_io.rdat),
+        .ren_cnt    (ftq_io.ren_cnt)
     );
 
     // Form indices: fb offsets, PCs, block DWs
@@ -171,13 +170,13 @@ module fetch (
     `CNT_TYPE(`N) fsm_lim_cnt, f_cnt;
     always_comb begin
         fsm_lim_cnt =
-            !ftq_io.vld ? 0 :
+            (ftq_io.vld_scnt == 0) ? 0 :
             fb_end_any  ? fb_end_idx + `UCAST_FIT(1) :
             `N;
 
-        cur_n       = cur;
-        ftq_io.ren  = 0;
-        if (ftq_io.vld && fb_end_any && (fsm_lim_cnt == f_cnt)) begin
+        cur_n = cur;
+        ftq_io.ren_cnt = 0;
+        if ((ftq_io.vld_scnt != 0) && fb_end_any && (fsm_lim_cnt == f_cnt)) begin
             // finished consuming FTQ entry (entry is valid and reached FB end)
             cur_n = '{
                 fb_base : r.base_n, // advance FB base
@@ -185,7 +184,7 @@ module fetch (
             };
 
             // signal consume to FTQ
-            ftq_io.ren = 1;
+            ftq_io.ren_cnt = 1;
 
         end else
             cur_n.off = off_n[f_cnt];

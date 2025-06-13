@@ -20,18 +20,19 @@ module ftq #(
     input   FTQ_ENTRY   wdat,
 
     // fetch (icache read)
-    output  logic       vld,
-    output  FTQ_ENTRY   rdat,
-    input   logic       ren
+    output  `CNT_TYPE(2)    vld_scnt,
+    output  FTQ_ENTRY[1:0]  rdat,
+    input   `CNT_TYPE(2)    ren_cnt
 );
     PTR head, tail;
     FTQ_ENTRY [FTQ_SZ-1:0] state;
+    PTR [2:0] rd_idxs_n;
     CNT used;
 
     ring_ctr #(
         .DEPTH(FTQ_SZ),
         .WIDTH($bits(FTQ_ENTRY)),
-        .RPORTS(1),
+        .RPORTS(2),
         .WPORTS(1),
         .FLUSH_MODE(FIFO_FLUSH_RESET)
     ) ring_ctr0 (
@@ -40,24 +41,27 @@ module ftq #(
         .flush,
         .flush_snap ('0),
 
-        .rd_en_cnt  (ren),
+        .rd_en_cnt  (ren_cnt),
         .wr_en_cnt  (wen),
 
         .head,
         .tail,
 
-        .rd_idxs_n  (),
+        .rd_idxs_n,
         .wr_idxs_n  (),
 
         .used,
         .free       (),
-        .used_scnt  (),
+        .used_scnt  (vld_scnt),
         .free_scnt  ()
     );
 
-    assign vld  = used != 0;
-    assign rdat = state[head];
-    assign rdy  = used != FTQ_SZ;
+    generate
+    assign rdy = used != FTQ_SZ;
+    for (genvar i = 0; i < 2; ++i) begin
+        assign rdat[i] = state[rd_idxs_n[i]];
+    end
+    endgenerate
 
     always_ff @(posedge clock) begin
         if (reset || flush)
