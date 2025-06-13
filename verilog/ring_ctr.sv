@@ -3,7 +3,6 @@
 // pointer engine for fifos/ring buffers. no data storage
 module ring_ctr #(
     parameter int DEPTH=2,
-    parameter int WIDTH=1,
     parameter int RPORTS=1,
     parameter int WPORTS=1,
     parameter int FLUSH_MODE=FIFO_FLUSH_RESET,

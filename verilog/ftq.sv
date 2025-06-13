@@ -31,7 +31,6 @@ module ftq #(
 
     ring_ctr #(
         .DEPTH(FTQ_SZ),
-        .WIDTH($bits(FTQ_ENTRY)),
         .RPORTS(2),
         .WPORTS(1),
         .FLUSH_MODE(FIFO_FLUSH_RESET)

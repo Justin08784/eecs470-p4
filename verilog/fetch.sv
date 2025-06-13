@@ -10,6 +10,121 @@
 
 `include "sys_defs.svh"
 
+localparam IQQ_SZ = 4;
+localparam IRQ_SZ = 8;
+typedef struct packed {
+    DWADDR dw;
+    `IDX_TYPE(IRQ_SZ) irq_idx;
+} ICACHE_QUERY;
+
+typedef struct packed {
+    `IDX_TYPE(FTQ_SZ) ftq_idx;
+    MEM_BLOCK blk;
+} ICACHE_RESPONSE;
+
+// icache response queue
+module IRQ #(
+    parameter DEPTH=IRQ_SZ,
+    type PTR=`IDX_TYPE(DEPTH)
+) (
+    input   clock,
+    input   reset,
+    input   flush,
+    input   BMASK clmsk,
+
+    // write
+    output  PTR [2:0]       wr_idxs_n,
+    output  `CNT_TYPE(2)    rdy_scnt,
+    input   `CNT_TYPE(2)    wen_cnt,
+    input   logic [1:0][`IDX_SIZE(FTQ_SZ)-1:0] wdat,
+
+    // icache completions
+    input   logic [1:0]     cen,
+    input   PTR [1:0]       cidx,
+    input   MEM_BLOCK [1:0] cdat,
+
+    // read
+    output  `CNT_TYPE(2)    vld_scnt,
+    input   `CNT_TYPE(2)    ren_cnt,
+    output  ICACHE_RESPONSE [1:0]   rdat
+);
+    PTR [2:0] rd_idxs_n;
+
+    logic [DEPTH-1:0] cpl;
+    ICACHE_RESPONSE [DEPTH-1:0] state;
+
+    `CNT_TYPE(2) used_scnt, free_scnt;
+
+    ring_ctr #(
+        .DEPTH(DEPTH),
+        .RPORTS(2),
+        .WPORTS(2),
+        .FLUSH_MODE(FIFO_FLUSH_RESET)
+    ) ring_ctr0 (
+        .clock,
+        .reset,
+        .flush,
+
+        .rd_en_cnt  (ren_cnt),
+        .wr_en_cnt  (wen_cnt),
+
+        .head       (),
+        .tail       (),
+        .rd_idxs_n,
+        .wr_idxs_n,
+
+        .used       (),
+        .free       (),
+        .used_scnt,
+        .free_scnt
+    );
+
+    logic [1:0] rwin_cpl;
+    logic       rwin_ncpl_any;
+    `IDX_TYPE(2)rwin_ncpl_idx;
+    generate
+    for (genvar i = 0; i < 2; ++i) begin
+        assign rwin_cpl[i] = cpl[rd_idxs_n[i]];
+    end
+    endgenerate
+    ffs #(
+        .VECW(2)
+    ) ff_ncpl (
+        .i_vec(~rwin_cpl),
+        .o_vld(rwin_ncpl_any),
+        .o_idx(rwin_ncpl_idx)
+    );
+
+    assign vld_scnt = `MIN(
+        used_scnt,
+        rwin_ncpl_any ? rwin_ncpl_idx + `UCAST_FIT(1) : 2
+    );
+
+    always_ff @(posedge clock) begin
+        if (reset) begin
+            state   <= '0;
+            cpl     <= '1;
+        end else if (flush) begin
+            cpl     <= '1;
+
+        end else begin
+            for (int i = 0; i < 2; ++i) begin
+                if (!cen[i])
+                    continue;
+                cpl[cidx[i]]    <= 1;
+                state[cidx[i]]  <= cdat[i];
+            end
+
+            for (int i = 0; i < `MIN(wen_cnt, 2); ++i) begin
+                cpl[wr_idxs_n[i]] <= 0;
+                state[wr_idxs_n[i]].ftq_idx <= wdat[i];
+            end
+
+        end
+    end
+
+endmodule
+
 // decoupled fetch
 module fetch (
     input   clock,

@@ -34,7 +34,6 @@ module rob #(
 
     ring_ctr #(
         .DEPTH(ROB_SZ),
-        .WIDTH($bits(ROB_ENTRY)),
         .RPORTS(NUM_RPORTS),
         .WPORTS(NUM_DPORTS),
         .FLUSH_MODE(FIFO_FLUSH_SNAP_TAIL)

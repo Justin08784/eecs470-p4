@@ -36,7 +36,6 @@ module btq #(
 
     ring_ctr #(
         .DEPTH(BTQ_SZ),
-        .WIDTH($bits(BTQ_ENTRY)),
         .RPORTS(NUM_RPORTS),
         .WPORTS(NUM_FPORTS),
         .FLUSH_MODE(FIFO_FLUSH_SNAP_TAIL)

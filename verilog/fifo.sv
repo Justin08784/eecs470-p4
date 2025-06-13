@@ -73,7 +73,6 @@ module fifo #(
 
     ring_ctr #(
         .DEPTH(DEPTH),
-        .WIDTH(WIDTH),
         .RPORTS(NUM_RPORTS),
         .WPORTS(NUM_WPORTS),
         .FLUSH_MODE(FLUSH_MODE),
