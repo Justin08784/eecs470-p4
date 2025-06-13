@@ -95,16 +95,45 @@ module fetch (
     );
 
     // Form indices: fb offsets, PCs, block DWs
-    logic [`N:0][3:0]   off_n;
-    WADDR [`N:0]        pc_n;
+    logic   [1:0][4:0][3:0] off_n;
+    DWADDR  [1:0][1:0] blk;
+    logic   [1:0][1:0] blk_has_end;
+    logic   [1:0][3:0] word_is_end;
     generate
-    assign off_n[0] = cur.off;
-    for (genvar i = 1; i < `N+1; ++i) begin
-        assign off_n[i] = cur.off + `UCAST_FIT(i);
+    assign blk[0][0] = cur.fb_base[13:1];
+    assign blk[0][1] = blk[0][0] + `UCAST_FIT(1);
+    assign blk[1][0] = ftq_io.rdat[0].base_n;
+    assign blk[1][1] = blk[1][0] + `UCAST_FIT(1);
+
+    assign off_n[0][0] = cur.off;
+    assign off_n[1][0] = 0;
+    for (genvar i = 1; i <= 4; ++i) begin
+        assign off_n[0][i] = cur.off + `UCAST_FIT(i);
+        assign off_n[1][i] = i;
     end
 
+    for (genvar e = 0; e < 2; ++e) begin
+        for (genvar w = 0; w < 4; ++w) begin
+            assign word_is_end[e][w] = off_n[e][w] == ftq_io.rdat[e].off;
+        end
+        for (genvar b = 0; b < 2; ++b) begin
+            assign blk_has_end[e][b] =
+                word_is_end[e][2*b] || word_is_end[e][2*b+1];
+        end
+    end
+    endgenerate
+
+
+    // logic [`N:0][3:0]   off_n;
+    WADDR [`N:0]        pc_n;
+    generate
+    // assign off_n[0] = cur.off;
+    // for (genvar i = 1; i < `N+1; ++i) begin
+    //     assign off_n[i] = cur.off + `UCAST_FIT(i);
+    // end
+
     for (genvar i = 0; i < `N+1; ++i) begin
-        assign pc_n[i] = cur.fb_base + off_n[i];
+        assign pc_n[i] = cur.fb_base + off_n[0][i];
     end
 
     assign mem_out.PCdws[0] = pc_n[0][13:1];
@@ -155,7 +184,7 @@ module fetch (
     `IDX_TYPE(`N) fb_end_idx;
     generate
     for (genvar i = 0; i < `N; ++i)
-        assign is_fb_end[i] = off_n[i] == r.off;
+        assign is_fb_end[i] = off_n[0][i] == r.off;
     endgenerate
 
     ffs #(
@@ -187,7 +216,7 @@ module fetch (
             ftq_io.ren_cnt = 1;
 
         end else
-            cur_n.off = off_n[f_cnt];
+            cur_n.off = off_n[0][f_cnt];
 
     end
 
@@ -229,7 +258,7 @@ module fetch (
             int     win_idx; // index into btq write window
             logic   eq_end;
             win_idx = brch_prefix_cnt[i];
-            eq_end  = off_n[i] == r.off;
+            eq_end  = off_n[0][i] == r.off;
 
             f_dat[i].btq_idx = btq_in.btq_idxs_n[win_idx];
 
@@ -238,7 +267,7 @@ module fetch (
                 i.e. (r.pred_idx == 1) && (off_n[i] >= r.off), because branches after (>)
                 the tail slot would not even be in the same fetch block? */
             btq_out.PC          [win_idx] = pc_n[i];
-            btq_out.off         [win_idx] = off_n[i];
+            btq_out.off         [win_idx] = off_n[0][i];
             btq_out.pred        [win_idx] = !r.ft && eq_end;
             btq_out.pred_tgt    [win_idx] = r.base_n;
             btq_out.always_take [win_idx] = !r.ft && eq_end ? r.always_take : 0;
@@ -247,8 +276,8 @@ module fetch (
 
             btq_out.hit         [win_idx] = r.hit;
             btq_out.hit_slot    [win_idx] =
-                    (r.slot[0].vld && (r.slot[0].off == off_n[i]))
-                ||  (r.slot[1].vld && (r.slot[1].off == off_n[i]));
+                    (r.slot[0].vld && (r.slot[0].off == off_n[0][i]))
+                ||  (r.slot[1].vld && (r.slot[1].off == off_n[0][i]));
             btq_out.hash        [win_idx] = '0; // FIXME
             btq_out.ghr_base    [win_idx] = '0; // FIXME
         end
@@ -331,9 +360,9 @@ module fetch (
 
         $display("f_cnt: %d, off_n: [%d, %d, %d], mem_out [%d, %d]",
             f_cnt,
-            off_n[0],
-            off_n[1],
-            off_n[2],
+            off_n[0][0],
+            off_n[0][1],
+            off_n[0][2],
             mem_out.PCdws[0],
             mem_out.PCdws[1]
         );
