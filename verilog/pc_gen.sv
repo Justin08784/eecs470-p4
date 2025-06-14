@@ -37,42 +37,47 @@ module pc_gen (
     } cur, cur_n;
 
     // Form indices: fb offsets, PCs, block DWs
-    logic   base_woff [1:0];    // index: (blk).
-    logic   [4:0][3:0] off_n;   // index: (word). ftq0 offsets
+    logic   [1:0] base_woff;            // index: (blk).
+    logic   [1:0][4:0][3:0] nal_off_n;  // index: (blk, word).
     logic   [1:0][3:0] nal_word_is_end; // index: (blk, word). nal = not cache line aligned
     generate
     assign base_woff[0] = cur.base[0] ^ cur.off[0]; // 1 bit add
     assign base_woff[1] = ftq_in_dat[0].base_n[0];
 
-    assign off_n[0] = cur.off;
-    for (genvar i = 1; i <= 4; ++i)
-        assign off_n[i] = cur.off + `UCAST_FIT(i);
+    assign nal_off_n[0][0] = cur.off;
+    assign nal_off_n[1][0] = 0;
+    for (genvar w = 1; w <= 4; ++w) begin
+        assign nal_off_n[0][w] = cur.off + `UCAST_FIT(w);
+        assign nal_off_n[1][w] = w;
+    end
 
     for (genvar w = 0; w < 4; ++w) begin
-        assign nal_word_is_end[0][w] = ftq_in_dat[0].off == off_n[w];
+        assign nal_word_is_end[0][w] = ftq_in_dat[0].off == nal_off_n[0][w];
         assign nal_word_is_end[1][w] = ftq_in_dat[1].off == w;
     end
     endgenerate
 
-    logic   [1:0] ft;
-    logic   [1:0][1:0] blk_has_end;
-    LINE_STATUS [1:0][1:0] blk_status;
-    logic   [1:0][3:0] word_is_end, align_msk, fmsk;
+
+    logic   [1:0][4:0][3:0] off_n;
+    logic   [1:0][3:0] word_is_end, fmsk;
     generate
     for (genvar e = 0; e < 2; ++e) begin
-        assign ft[e] = ftq_in_dat[e].ft;
-        assign align_msk[e] = 4'b1111 << base_woff[e];
-        assign word_is_end[e] = nal_word_is_end[e] << base_woff[e];
+        assign off_n[e][0] = base_woff[e]
+            ? '0
+            : nal_off_n[e][0];
+
+        for (genvar w = 1; w <= 4; ++w) begin
+            assign off_n[e][w] = base_woff[e]
+                ? nal_off_n[e][w-1]
+                : nal_off_n[e][w];
+        end
     end
 
+
+    logic   [1:0][3:0] align_msk;
     for (genvar e = 0; e < 2; ++e) begin
-        for (genvar b = 0; b < 2; ++b) begin
-            assign blk_has_end[e][b] = word_is_end[e][2*b] || word_is_end[e][2*b+1];
-            assign blk_status[e][b] =
-                !blk_has_end[e][b] ? END_NONE :
-                !ft[e] ? END_BRANCH :
-                word_is_end[e][2*(b+1)-1] ? END_ALI_FT : END_NAL_FT;
-        end
+        assign align_msk[e]     = 4'b1111 << base_woff[e];
+        assign word_is_end[e]   = nal_word_is_end[e] << base_woff[e];
     end
 
     for (genvar e = 0; e < 2; ++e) begin
@@ -86,10 +91,29 @@ module pc_gen (
     endgenerate
 
 
+    logic       [1:0][1:0] blk_has_end;
+    LINE_STATUS [1:0][1:0] blk_status;
+    generate
+    logic   [1:0] ft;
+    for (genvar e = 0; e < 2; ++e)
+        assign ft[e] = ftq_in_dat[e].ft;
+
+    for (genvar e = 0; e < 2; ++e) begin
+        for (genvar b = 0; b < 2; ++b) begin
+            assign blk_has_end[e][b]= word_is_end[e][2*b+1:2*b];
+            assign blk_status [e][b]=
+                !blk_has_end[e][b]          ? END_NONE      :
+                !ft[e]                      ? END_BRANCH    :
+                word_is_end[e][2*(b+1)-1]   ? END_ALI_FT    : END_NAL_FT;
+        end
+    end
+    endgenerate
+
+
     DWADDR  [1:0][1:0] dws;
     generate
     WADDR [1:0] start_pc;
-    assign start_pc[0] = cur.base + off_n[0];
+    assign start_pc[0] = cur.base + nal_off_n[0][0];
     assign start_pc[1] = ftq_in_dat[0].base_n;
 
     assign dws[0][0] = start_pc[0][13:1];
@@ -102,13 +126,11 @@ module pc_gen (
     DWADDR  [1:0] base_n;
     logic   [1:0][1:0][3:0] pos_blk_off;
     generate
-    for (genvar e = 0; e < 2; ++e)
+    for (genvar e = 0; e < 2; ++e) begin
         assign base_n[e] = ftq_in_dat[e].base_n;
-
-    assign pos_blk_off[0][0] = $countones(fmsk[0][1:0]);
-    assign pos_blk_off[1][0] = $countones(fmsk[1][1:0]);
-    assign pos_blk_off[0][1] = $countones(fmsk[0]);
-    assign pos_blk_off[1][1] = $countones(fmsk[1]);
+        for (genvar b = 0; b < 2; ++b)
+            assign pos_blk_off[e][b] = off_n[e][2*b];
+    end
     endgenerate
 
 
@@ -117,9 +139,8 @@ module pc_gen (
     logic   [1:0][1:0]  is_end;
     always_comb begin
         logic ftq1_vld;
-        // ftq1_vld = ftq_in_vld_scnt >= `UCAST_FIT(2);
         ftq1_vld = ftq_in_vld_scnt[1];
-        // can this be ftq1_vld = ftq_in_vld_scnt[1]; ?
+        // ftq1_vld = ftq_in_vld_scnt >= `UCAST_FIT(2);
 
         dws_out = '0;
         fmsk_out= '0;
