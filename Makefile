@@ -196,6 +196,7 @@ MODULES = cpu \
 	ftq \
 	ghr \
 	mult \
+	pc_gen \
 	rs \
 	skid_buffer \
 	uftb \

@@ -276,8 +276,8 @@ module fetch (
     logic   [1:0][1:0] blk_has_end;
     logic   [1:0][3:0] word_is_end;
     generate
-    assign blk[0][0] = cur.fb_base[13:1];
-    assign blk[0][1] = blk[0][0] + `UCAST_FIT(1);
+    assign blk[0][0] = cur.fb_base[13:1]; // FIXME This is worng
+    assign blk[0][1] = blk[0][0] + `UCAST_FIT(1); // FIXME and this too
     assign blk[1][0] = ftq_io.rdat[0].base_n;
     assign blk[1][1] = blk[1][0] + `UCAST_FIT(1);
 
