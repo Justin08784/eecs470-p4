@@ -14,7 +14,7 @@ module pc_gen (
     // irq / iqq
     input   `CNT_TYPE(2)    ixq_in_rdy_scnt, // = `MIN(iqq_*, irq_*)
     output  `CNT_TYPE(2)    ixq_out_wen_cnt,
-    output  logic[1:0]      ixq_out_dw,
+    output  DWADDR [1:0]    ixq_out_dw,
     output  logic[1:0][1:0] irq_out_fmsk,
     output  logic[1:0][1:0] irq_out_is_end,
 
@@ -33,7 +33,7 @@ module pc_gen (
     struct packed {
         logic [3:0] off;
         WADDR       fb_base;
-        logic       in_buf; // FTQ entry allocated in buf?
+        // logic       in_buf; // FTQ entry allocated in buf?
     } cur, cur_n;
 
     // Form indices: fb offsets, PCs, block DWs
@@ -100,7 +100,7 @@ module pc_gen (
 
 
     DWADDR  [1:0]       dws_out;
-    DWADDR  [1:0][1:0]  fmsk_out;
+    logic   [1:0][1:0]  fmsk_out;
     always_comb begin
         logic ftq1_vld;
         ftq1_vld = `UCAST_FIT(1) >= ftq_in_vld_scnt;
@@ -108,44 +108,63 @@ module pc_gen (
         dws_out = '0;
         fmsk_out= '0;
 
-        dws_out[0] = dws[0][0];
-        fmsk_out[0]= fmsk[0][0];
+        dws_out[0]  = dws[0][0];
+        fmsk_out[0] = fmsk[0][0];
 
+        cur_n = cur;
         unique case (blk_status[0][0])
         END_NONE: begin
             unique case (blk_status[0][1])
             END_NONE: begin
-                dws_out[1] = dws[0][1];
-                fmsk_out[1]= fmsk[0][1]; // assert  == 1'b1111
+                dws_out[1]  = dws[0][1];
+                fmsk_out[1] = fmsk[0][1]; // assert  == 1'b1111
+                // cur_n // TODO
             end
 
             END_ALI_FT,
             END_BRANCH: begin
-
+                dws_out[1]  = dws[0][1];
+                fmsk_out[1] = fmsk[0][1];
+                // cur_n // TODO
             end
 
-
             END_NAL_FT: begin
-
+                dws_out[1]  = dws[0][1];
+                fmsk_out[1] = fmsk[0][1] | (ftq1_vld ? fmsk[1][0] : '0);
+                // cur_n // TODO
             end
             endcase
         end
 
         END_ALI_FT,
         END_BRANCH: begin
+            dws_out[1]  = dws[1][0];
+            fmsk_out[1] = fmsk[1][0];
+            // cur_n // TODO
         end
 
 
         END_NAL_FT: begin
+            fmsk_out[0] |= ftq1_vld ? fmsk[1][0] : '0;
+            dws_out[1]  = dws[1][1];
+            fmsk_out[1] = fmsk[1][1];
+            // cur_n // TODO
         end
         endcase
     end
 
-    // generate
-    // assign ixq_out_dw       [0] = blk[0][0];
-    // assign irq_out_fmsk     [0] = 1;
-    // assign irq_out_is_end   [0] = word_is_end[0][0];
-    // endgenerate
+    generate
+    assign ixq_out_dw   = dws_out;
+    assign irq_out_fmsk = fmsk_out;
+    endgenerate
+
+
+    always_ff @(posedge clock) begin
+        if (reset)
+            cur <= '0;
+        else begin
+        end
+    end
 
     always_comb begin
         // if ftq0.blk0 has nal-ft-endpoint begin
