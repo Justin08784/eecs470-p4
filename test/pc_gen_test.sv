@@ -98,11 +98,11 @@ module pc_gen_test;
 
         $display("ixq_out_dw [%d, %d]", ixq_out_dw[0], ixq_out_dw[1]);
         $display("irq_out_fmsk [%b, %b]", irq_out_fmsk[0], irq_out_fmsk[1]);
-        $display("word_is_end: %b", dut.word_is_end);
+        $display("is_end_flat: %b", dut.is_end_flat);
         $display("align_msk: %b, fmsk: %b", dut.align_msk, dut.fmsk);
         $display("fmsk[0]: [%b]", dut.fmsk[0]);
         $display("dws [%d, %d]", dut.dws[0][0], dut.dws[0][1]);
-        $display("dws_out [%d, %d]", dut.dws_out[0], dut.dws_out[1]);
+        $display("o_dws [%d, %d]", dut.o_dws[0], dut.o_dws[1]);
         $display("blk_status [%d, %d]", dut.blk_status[0][0], dut.blk_status[0][1]);
 
         $finish;

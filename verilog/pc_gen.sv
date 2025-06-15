@@ -39,7 +39,7 @@ module pc_gen (
     // Form indices: fb offsets, PCs, block DWs
     logic   [1:0] base_woff;            // index: (blk).
     logic   [1:0][4:0][3:0] nal_off_n;  // index: (blk, word).
-    logic   [1:0][3:0] nal_word_is_end; // index: (blk, word). nal = not cache line aligned
+    logic   [1:0][3:0] nal_is_end; // index: (blk, word). nal = not cache line aligned
     generate
     assign base_woff[0] = cur.base[0] ^ cur.off[0]; // 1 bit add
     assign base_woff[1] = ftq_in_dat[0].base_n[0];
@@ -52,14 +52,15 @@ module pc_gen (
     end
 
     for (genvar w = 0; w < 4; ++w) begin
-        assign nal_word_is_end[0][w] = ftq_in_dat[0].off == nal_off_n[0][w];
-        assign nal_word_is_end[1][w] = ftq_in_dat[1].off == w;
+        assign nal_is_end[0][w] = ftq_in_dat[0].off == nal_off_n[0][w];
+        assign nal_is_end[1][w] = ftq_in_dat[1].off == w;
     end
     endgenerate
 
 
     logic   [1:0][4:0][3:0] off_n;
-    logic   [1:0][3:0] word_is_end, fmsk;
+    logic   [1:0][3:0]      is_end_flat, fmsk_flat;
+    logic   [1:0][1:0][1:0] is_end, fmsk;
     generate
     for (genvar e = 0; e < 2; ++e) begin
         assign off_n[e][0] = base_woff[e]
@@ -77,15 +78,22 @@ module pc_gen (
     logic   [1:0][3:0] align_msk;
     for (genvar e = 0; e < 2; ++e) begin
         assign align_msk[e]     = 4'b1111 << base_woff[e];
-        assign word_is_end[e]   = nal_word_is_end[e] << base_woff[e];
+        assign is_end_flat[e]   = nal_is_end[e] << base_woff[e];
     end
 
     for (genvar e = 0; e < 2; ++e) begin
-        assign fmsk[e][0] = align_msk[e][0];
+        assign fmsk_flat[e][0] = align_msk[e][0];
 
         for (genvar w = 1; w < 4; ++w) begin
-            assign fmsk[e][w] =
-                fmsk[e][w-1] && align_msk[e][w] && !word_is_end[e][w-1];
+            assign fmsk_flat[e][w] =
+                fmsk_flat[e][w-1] && align_msk[e][w] && !is_end_flat[e][w-1];
+        end
+    end
+
+    for (genvar e = 0; e < 2; ++e) begin
+        for (genvar b = 0; b < 2; ++b) begin
+            assign fmsk  [e][b] = fmsk_flat  [e][2*b+1:2*b];
+            assign is_end[e][b] = is_end_flat[e][2*b+1:2*b];
         end
     end
     endgenerate
@@ -100,11 +108,11 @@ module pc_gen (
 
     for (genvar e = 0; e < 2; ++e) begin
         for (genvar b = 0; b < 2; ++b) begin
-            assign blk_has_end[e][b]= word_is_end[e][2*b+1:2*b];
+            assign blk_has_end[e][b]= |is_end[e][b];
             assign blk_status [e][b]=
                 !blk_has_end[e][b]          ? END_NONE      :
                 !ft[e]                      ? END_BRANCH    :
-                word_is_end[e][2*(b+1)-1]   ? END_ALI_FT    : END_NAL_FT;
+                is_end_flat[e][2*(b+1)-1]   ? END_ALI_FT    : END_NAL_FT;
         end
     end
     endgenerate
@@ -134,54 +142,109 @@ module pc_gen (
     endgenerate
 
 
-    DWADDR  [1:0]       dws_out;
-    logic   [1:0][1:0]  fmsk_out;
-    logic   [1:0][1:0]  is_end;
+
+    `CNT_TYPE(2) ren_cnt;
+    always_comb begin
+        unique case (blk_status[0][0])
+        END_NONE: begin
+            unique case (blk_status[0][1])
+            END_NONE:   ren_cnt = 0;
+
+            END_ALI_FT,
+            END_BRANCH: ren_cnt = 1;
+
+            END_NAL_FT: ren_cnt = blk_has_end[1][0] ? 2 : 1;
+            endcase
+        end
+
+        END_ALI_FT,
+        END_BRANCH: begin
+            unique case (blk_status[1][0])
+            END_NONE:   ren_cnt = 1;
+            default:    ren_cnt = 2;
+            endcase
+        end
+
+        END_NAL_FT: begin
+            unique case (blk_status[1][0])
+            END_NONE:   ren_cnt = 1;
+            default:    ren_cnt = 2;
+            endcase
+        end
+        endcase
+    end
+
+
+    struct packed {
+        logic [1:0] fmsk;
+        logic [1:0] is_end;
+    } a0_merge, a1_merge;
+    always_comb begin
+        a0_merge = '{
+            fmsk    : fmsk[0][0]    | fmsk[1][0],
+            is_end  : is_end[0][0]  | is_end[1][0]
+        };
+
+        a1_merge = '{
+            fmsk    : fmsk[0][1]    | fmsk[1][0],
+            is_end  : is_end[0][1]  | is_end[1][0]
+        };
+
+    end
+
+
+    DWADDR  [1:0]       o_dws;
+    logic   [1:0][1:0]  o_fmsk;
+    logic   [1:0][1:0]  o_is_end;
     always_comb begin
         logic ftq1_vld;
         ftq1_vld = ftq_in_vld_scnt[1];
         // ftq1_vld = ftq_in_vld_scnt >= `UCAST_FIT(2);
 
-        dws_out = '0;
-        fmsk_out= '0;
-        is_end  = '0;
+        o_dws   = '0;
+        o_fmsk  = '0;
+        o_is_end= '0;
 
-        dws_out[0]  = dws[0][0];
-        fmsk_out[0] = fmsk[0][1:0];
-        is_end[0]   = word_is_end[0][1:0];
+        o_dws[0]    = dws[0][0];
+        o_fmsk[0]   = fmsk[0][0];
+        o_is_end[0] = is_end[0][0];
 
         cur_n = cur;
         unique case (blk_status[0][0])
         END_NONE: begin
+            o_dws[1]    = dws[0][1];
+            o_fmsk[1]   = fmsk[0][1]; // assert  == 2'b11
+            o_is_end[1] = is_end[0][1]; // assert == 2'b00
+
             unique case (blk_status[0][1])
             END_NONE: begin
-                dws_out[1]  = dws[0][1];
-                fmsk_out[1] = fmsk[0][3:2]; // assert  == 2'b11
-                is_end[1]   = word_is_end[0][3:2]; // assert == 2'b00
+                // o_dws[1]    = dws[0][1];
+                // o_fmsk[1]   = fmsk[0][1]; // assert  == 2'b11
+                // o_is_end[1] = is_end[0][1]; // assert == 2'b00
 
                 cur_n.off   = pos_blk_off[0][1];
             end
 
             END_ALI_FT,
             END_BRANCH: begin
-                dws_out[1]  = dws[0][1];
-                fmsk_out[1] = fmsk[0][3:2];
-                is_end[1]   = word_is_end[0][3:2];
+                // o_dws[1]    = dws[0][1];
+                // o_fmsk[1]   = fmsk[0][1];
+                // o_is_end[1] = is_end[0][1];
 
                 cur_n.base  = base_n[0];
                 cur_n.off   = 0;
             end
 
             END_NAL_FT: begin
-                dws_out[1]  = dws[0][1];
-                fmsk_out[1] = fmsk[0][3:2];
-                is_end[1]   = word_is_end[0][3:2];
+                // o_dws[1]    = dws[0][1];
+                // o_fmsk[1]   = fmsk[0][1];
+                // o_is_end[1] = is_end[0][1];
 
                 cur_n.base  = base_n[0];
                 cur_n.off   = 0;
                 if (ftq1_vld) begin
-                    fmsk_out[1] |= fmsk[1][1:0];
-                    is_end[1]   |= word_is_end[1][1:0];
+                    o_fmsk[1]   = a1_merge.fmsk;
+                    o_is_end[1] = a1_merge.is_end;
 
                     if (blk_has_end[1][0])
                         cur_n.base  = base_n[1];
@@ -195,9 +258,9 @@ module pc_gen (
 
         END_ALI_FT,
         END_BRANCH: begin
-            dws_out[1]  = dws[1][0];
-            fmsk_out[1] = fmsk[1][1:0];
-            is_end[1]   = word_is_end[1][1:0];
+            o_dws[1]    = dws[1][0];
+            o_fmsk[1]   = fmsk[1][0];
+            o_is_end[1] = is_end[1][0];
 
             cur_n.base  = base_n[0];
             cur_n.off   = 0;
@@ -212,15 +275,16 @@ module pc_gen (
 
 
         END_NAL_FT: begin
-            dws_out[1]  = dws[1][1];
-            fmsk_out[1] = fmsk[1][3:2];
-            is_end[1]   = word_is_end[1][3:2];
+            o_dws[1]    = dws[1][1];
+            o_fmsk[1]   = fmsk[1][1];
+            o_is_end[1] = is_end[1][1];
 
             cur_n.base  = base_n[0];
             cur_n.off   = 0;
             if (ftq1_vld) begin
-                fmsk_out[0] |= fmsk[1][1:0];
-                is_end[0]   |= word_is_end[1][1:0];
+                o_fmsk[0]   = a0_merge.fmsk;
+                o_is_end[0] = a0_merge.is_end;
+
 
                 if (blk_has_end[1][0] || blk_has_end[1][1])
                     cur_n.base  = base_n[1];
@@ -233,8 +297,8 @@ module pc_gen (
     end
 
     generate
-    assign ixq_out_dw   = dws_out;
-    assign irq_out_fmsk = fmsk_out;
+    assign ixq_out_dw   = o_dws;
+    assign irq_out_fmsk = o_fmsk;
     endgenerate
 
 
