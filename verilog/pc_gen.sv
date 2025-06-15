@@ -1,10 +1,18 @@
 `include "sys_defs.svh"
 
+`define PC_GEN_TEST_MODE
+
 module pc_gen (
     input   clock,
     input   reset,
     input   flush,
     input   BMASK clmsk,
+`ifdef PC_GEN_TEST_MODE
+    input   struct packed {
+        logic [3:0] off;
+        WADDR       base;
+    } reset_val,
+`endif
 
     // ftq
     input   `CNT_TYPE(2)    ftq_in_vld_scnt,
@@ -175,23 +183,9 @@ module pc_gen (
     end
 
 
-    struct packed {
-        logic [1:0] fmsk;
-        logic [1:0] is_end;
-    } a0_merge, a1_merge;
-    always_comb begin
-        a0_merge = '{
-            fmsk    : fmsk[0][0]    | fmsk[1][0],
-            is_end  : is_end[0][0]  | is_end[1][0]
-        };
-
-        a1_merge = '{
-            fmsk    : fmsk[0][1]    | fmsk[1][0],
-            is_end  : is_end[0][1]  | is_end[1][0]
-        };
-
-    end
-
+    logic   merge_l0,
+            merge_l1;
+    `CNT_TYPE(2) adv_base, adv_blk;
 
     DWADDR  [1:0]       o_dws;
     logic   [1:0][1:0]  o_fmsk;
@@ -213,39 +207,24 @@ module pc_gen (
         unique case (blk_status[0][0])
         END_NONE: begin
             o_dws[1]    = dws[0][1];
-            o_fmsk[1]   = fmsk[0][1]; // assert  == 2'b11
-            o_is_end[1] = is_end[0][1]; // assert == 2'b00
+            o_fmsk[1]   = fmsk[0][1];
+            o_is_end[1] = is_end[0][1];
 
             unique case (blk_status[0][1])
             END_NONE: begin
-                // o_dws[1]    = dws[0][1];
-                // o_fmsk[1]   = fmsk[0][1]; // assert  == 2'b11
-                // o_is_end[1] = is_end[0][1]; // assert == 2'b00
-
                 cur_n.off   = pos_blk_off[0][1];
             end
 
             END_ALI_FT,
             END_BRANCH: begin
-                // o_dws[1]    = dws[0][1];
-                // o_fmsk[1]   = fmsk[0][1];
-                // o_is_end[1] = is_end[0][1];
-
                 cur_n.base  = base_n[0];
                 cur_n.off   = 0;
             end
 
             END_NAL_FT: begin
-                // o_dws[1]    = dws[0][1];
-                // o_fmsk[1]   = fmsk[0][1];
-                // o_is_end[1] = is_end[0][1];
-
                 cur_n.base  = base_n[0];
                 cur_n.off   = 0;
                 if (ftq1_vld) begin
-                    o_fmsk[1]   = a1_merge.fmsk;
-                    o_is_end[1] = a1_merge.is_end;
-
                     if (blk_has_end[1][0])
                         cur_n.base  = base_n[1];
                     else
@@ -273,7 +252,6 @@ module pc_gen (
             end
         end
 
-
         END_NAL_FT: begin
             o_dws[1]    = dws[1][1];
             o_fmsk[1]   = fmsk[1][1];
@@ -282,11 +260,7 @@ module pc_gen (
             cur_n.base  = base_n[0];
             cur_n.off   = 0;
             if (ftq1_vld) begin
-                o_fmsk[0]   = a0_merge.fmsk;
-                o_is_end[0] = a0_merge.is_end;
-
-
-                if (blk_has_end[1][0] || blk_has_end[1][1])
+                if (|blk_has_end[1])
                     cur_n.base  = base_n[1];
                 else
                     cur_n.off   = pos_blk_off[1][1];
@@ -294,17 +268,40 @@ module pc_gen (
             end
         end
         endcase
+
+        merge_l0 = ftq1_vld
+            && (blk_status[0][0] == END_NAL_FT);
+        merge_l1 = ftq1_vld
+            && (blk_status[0][0] == END_NONE)
+            && (blk_status[0][1] == END_NAL_FT);
+
+        if (merge_l0) begin
+            o_fmsk[0]   |= fmsk[1][0];
+            o_is_end[0] |= is_end[1][0];
+        end
+
+        if (merge_l1) begin
+            o_fmsk[1]   |= fmsk[1][0];
+            o_is_end[1] |= is_end[1][0];
+        end
     end
 
-    generate
-    assign ixq_out_dw   = o_dws;
-    assign irq_out_fmsk = o_fmsk;
-    endgenerate
+    always_comb begin
+        ixq_out_dw      = o_dws;
+        irq_out_fmsk    = o_fmsk;
+        irq_out_is_end  = o_is_end;
+
+        buf_out_dat     = ftq_in_dat;
+    end
 
 
     always_ff @(posedge clock) begin
         if (reset)
+`ifdef PC_GEN_TEST_MODE
             cur <= '0;
+`else
+            cur <= reset_val;
+`endif
         else
             cur <= cur_n;
     end
