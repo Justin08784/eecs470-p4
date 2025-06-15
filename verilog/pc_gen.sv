@@ -139,13 +139,12 @@ module pc_gen (
     endgenerate
 
 
-    DWADDR  [1:0] base_n;
     logic   [1:0][1:0][3:0] pos_blk_off;
     generate
     for (genvar e = 0; e < 2; ++e) begin
-        assign base_n[e] = ftq_in_dat[e].base_n;
-        for (genvar b = 0; b < 2; ++b)
+        for (genvar b = 0; b < 2; ++b) begin
             assign pos_blk_off[e][b] = off_n[e][2*b];
+        end
     end
     endgenerate
 
@@ -190,6 +189,9 @@ module pc_gen (
     DWADDR  [1:0]       o_dws;
     logic   [1:0][1:0]  o_fmsk;
     logic   [1:0][1:0]  o_is_end;
+
+    WADDR   [2:0]       ubase_n;
+    logic   [2:0][3:0]  uoff_n;
     always_comb begin
         logic ftq1_vld;
         ftq1_vld = ftq_in_vld_scnt[1];
@@ -198,37 +200,42 @@ module pc_gen (
         o_dws   = '0;
         o_fmsk  = '0;
         o_is_end= '0;
+        ubase_n [0] = cur.base;
+        uoff_n  [0] = cur.off;
 
-        o_dws[0]    = dws[0][0];
-        o_fmsk[0]   = fmsk[0][0];
+        o_dws   [0] = dws   [0][0];
+        o_fmsk  [0] = fmsk  [0][0];
         o_is_end[0] = is_end[0][0];
 
         cur_n = cur;
         unique case (blk_status[0][0])
         END_NONE: begin
-            o_dws[1]    = dws[0][1];
-            o_fmsk[1]   = fmsk[0][1];
+            o_dws   [1] = dws   [0][1];
+            o_fmsk  [1] = fmsk  [0][1];
             o_is_end[1] = is_end[0][1];
 
+            ubase_n [1] = cur.base;
+            uoff_n  [1] = pos_blk_off[0][0];
             unique case (blk_status[0][1])
             END_NONE: begin
-                cur_n.off   = pos_blk_off[0][1];
+                ubase_n [2] = cur.base;
+                uoff_n  [2] = pos_blk_off[0][1];
             end
 
             END_ALI_FT,
             END_BRANCH: begin
-                cur_n.base  = base_n[0];
-                cur_n.off   = 0;
+                ubase_n [2] = ftq_in_dat[0].base_n;
+                uoff_n  [2] = 0;
             end
 
             END_NAL_FT: begin
-                cur_n.base  = base_n[0];
-                cur_n.off   = 0;
+                ubase_n [2] = ftq_in_dat[0].base_n;
+                uoff_n  [2] = 0;
                 if (ftq1_vld) begin
                     if (blk_has_end[1][0])
-                        cur_n.base  = base_n[1];
+                        ubase_n [2] = ftq_in_dat[1].base_n;
                     else
-                        cur_n.off   = pos_blk_off[1][0];
+                        uoff_n  [2] = pos_blk_off[1][0];
 
                 end
             end
@@ -237,33 +244,33 @@ module pc_gen (
 
         END_ALI_FT,
         END_BRANCH: begin
-            o_dws[1]    = dws[1][0];
-            o_fmsk[1]   = fmsk[1][0];
+            o_dws   [1] = dws   [1][0];
+            o_fmsk  [1] = fmsk  [1][0];
             o_is_end[1] = is_end[1][0];
 
-            cur_n.base  = base_n[0];
-            cur_n.off   = 0;
+            ubase_n [1] = ftq_in_dat[0].base_n;
+            uoff_n  [1] = 0;
             if (ftq1_vld) begin
                 if (blk_has_end[1][0])
-                    cur_n.base  = base_n[1];
+                    ubase_n [2] = ftq_in_dat[1].base_n;
                 else
-                    cur_n.off   = pos_blk_off[1][0];
+                    uoff_n  [2] = pos_blk_off[1][0];
 
             end
         end
 
         END_NAL_FT: begin
-            o_dws[1]    = dws[1][1];
-            o_fmsk[1]   = fmsk[1][1];
+            o_dws   [1] = dws   [1][1];
+            o_fmsk  [1] = fmsk  [1][1];
             o_is_end[1] = is_end[1][1];
 
-            cur_n.base  = base_n[0];
-            cur_n.off   = 0;
+            ubase_n [1] = ftq_in_dat[0].base_n;
+            uoff_n  [1] = 0;
             if (ftq1_vld) begin
                 if (|blk_has_end[1])
-                    cur_n.base  = base_n[1];
+                    ubase_n [2] = ftq_in_dat[1].base_n;
                 else
-                    cur_n.off   = pos_blk_off[1][1];
+                    uoff_n  [2] = pos_blk_off[1][1];
 
             end
         end
@@ -276,12 +283,12 @@ module pc_gen (
             && (blk_status[0][1] == END_NAL_FT);
 
         if (merge_l0) begin
-            o_fmsk[0]   |= fmsk[1][0];
+            o_fmsk  [0] |= fmsk  [1][0];
             o_is_end[0] |= is_end[1][0];
         end
 
         if (merge_l1) begin
-            o_fmsk[1]   |= fmsk[1][0];
+            o_fmsk  [1] |= fmsk  [1][0];
             o_is_end[1] |= is_end[1][0];
         end
     end
@@ -290,6 +297,8 @@ module pc_gen (
         ixq_out_dw      = o_dws;
         irq_out_fmsk    = o_fmsk;
         irq_out_is_end  = o_is_end;
+
+        ixq_out_wen_cnt = `MIN(ftq_in_vld_scnt, ixq_in_rdy_scnt);
 
         buf_out_dat     = ftq_in_dat;
     end
@@ -303,7 +312,10 @@ module pc_gen (
             cur <= reset_val;
 `endif
         else
-            cur <= cur_n;
+            cur <= '{
+                base : ubase_n [ixq_out_wen_cnt],
+                off  : uoff_n  [ixq_out_wen_cnt]
+            };
     end
 
     always_comb begin
