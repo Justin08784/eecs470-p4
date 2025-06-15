@@ -17,8 +17,8 @@ module pc_gen_test;
     `CNT_TYPE(2)    ixq_in_rdy_scnt;
     `CNT_TYPE(2)    ixq_out_wen_cnt;
     DWADDR[1:0]     ixq_out_dw;
-    logic[1:0][1:0] irq_out_fmsk;
-    logic[1:0][1:0] irq_out_is_end;
+    logic[1:0][1:0] ixq_out_fmsk;
+    logic[1:0][1:0] ixq_out_is_end;
     // FTQ buffer
     `CNT_TYPE(2)    buf_in_rdy_scnt;
     `CNT_TYPE(2)    buf_out_wen_cnt;
@@ -59,8 +59,8 @@ module pc_gen_test;
         .ixq_in_rdy_scnt,
         .ixq_out_wen_cnt,
         .ixq_out_dw,
-        .irq_out_fmsk,
-        .irq_out_is_end,
+        .ixq_out_fmsk,
+        .ixq_out_is_end,
 
         .buf_in_rdy_scnt,
         .buf_out_wen_cnt,
@@ -100,7 +100,7 @@ module pc_gen_test;
 
         $display("base_woff: %b, %b", dut.base_woff[0], dut.base_woff[1]);
         $display("ixq_out_dw [%d, %d]", ixq_out_dw[0], ixq_out_dw[1]);
-        $display("irq_out_fmsk [%b, %b]", irq_out_fmsk[0], irq_out_fmsk[1]);
+        $display("ixq_out_fmsk [%b, %b]", ixq_out_fmsk[0], ixq_out_fmsk[1]);
         $display("is_end_flat: %b", dut.is_end_flat);
         $display("align_msk: %b, fmsk: %b", dut.align_msk, dut.fmsk);
         $display("fmsk[0]: [%b]", dut.fmsk[0]);

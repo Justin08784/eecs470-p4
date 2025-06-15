@@ -24,8 +24,8 @@ module pc_gen (
     input   `CNT_TYPE(2)    ixq_in_rdy_scnt, // = `MIN(iqq_*, irq_*)
     output  `CNT_TYPE(2)    ixq_out_wen_cnt,
     output  DWADDR [1:0]    ixq_out_dw,
-    output  logic[1:0][1:0] irq_out_fmsk,
-    output  logic[1:0][1:0] irq_out_is_end,
+    output  logic[1:0][1:0] ixq_out_fmsk,
+    output  logic[1:0][1:0] ixq_out_is_end,
 
     // FTQ buffer
     input   `CNT_TYPE(2)    buf_in_rdy_scnt,
@@ -199,15 +199,8 @@ module pc_gen (
             end
 
             END_NAL_FT: begin
-                adv_base[2] = 1;
-                uoff_n  [2] = 0;
-                if (ftq1_vld) begin
-                    if (blk_has_end[1][0])
-                        adv_base[2] = 2;
-                    else
-                        uoff_n  [2] = pos_blk_off[1][0];
-
-                end
+                adv_base[2] = blk_has_end[1][0] ? 2 : 1;
+                uoff_n  [2] = blk_has_end[1][0] ? 0 : pos_blk_off[1][0];
             end
             endcase
         end
@@ -220,13 +213,9 @@ module pc_gen (
 
             adv_base[1] = 1;
             uoff_n  [1] = 0;
-            if (ftq1_vld) begin
-                if (blk_has_end[1][0])
-                    adv_base[2] = 2;
-                else
-                    uoff_n  [2] = pos_blk_off[1][0];
 
-            end
+            adv_base[2] = blk_has_end[1][0] ? 2 : 1;
+            uoff_n  [2] = blk_has_end[1][0] ? 0 : pos_blk_off[1][0];
         end
 
         END_NAL_FT: begin
@@ -234,15 +223,16 @@ module pc_gen (
             o_fmsk  [1] = fmsk  [1][1];
             o_is_end[1] = is_end[1][1];
 
-            adv_base[1] = 1;
-            uoff_n  [1] = 0;
             if (ftq1_vld) begin
-                if (|blk_has_end[1])
-                    adv_base[2] = 2;
-                else
-                    uoff_n  [2] = pos_blk_off[1][1];
-
+                adv_base[1] = blk_has_end[1][0] ? 2 : 1;
+                uoff_n  [1] = blk_has_end[1][0] ? 0 : pos_blk_off[1][0];
+            end else begin
+                adv_base[1] = 1;
+                uoff_n  [1] = 0;
             end
+
+            adv_base[2] = |blk_has_end[1]   ? 2 : 1;
+            uoff_n  [2] = |blk_has_end[1]   ? 0 : pos_blk_off[1][1];
         end
         endcase
 
@@ -279,8 +269,8 @@ module pc_gen (
     always_comb begin
         `CNT_TYPE(2) tmp;
         ixq_out_dw      = o_dws;
-        irq_out_fmsk    = o_fmsk;
-        irq_out_is_end  = o_is_end;
+        ixq_out_fmsk    = o_fmsk;
+        ixq_out_is_end  = o_is_end;
 
         tmp = `MIN(ftq_in_vld_scnt, ixq_in_rdy_scnt);
 
@@ -291,6 +281,7 @@ module pc_gen (
 
         ftq_out_ren_cnt = adv_base[ixq_out_wen_cnt];
 
+        buf_out_dat = '0;
         for (int i = 0; i < 2; ++i)
             buf_out_dat[buf_prefix_cnt[i]] = ftq_in_dat[i];
         buf_out_wen_cnt = buf_prefix_cnt[ixq_out_wen_cnt];
@@ -306,26 +297,11 @@ module pc_gen (
 `endif
         else
             cur <= '{
-                inbuf: ixq_out_wen_cnt != 0,
+                // inbuf: ixq_out_wen_cnt != 0, // FIXME: probably wrong. inbuf shuld be zeroed if adv_base is 2
+                inbuf: ixq_out_wen_cnt != 0 && (adv_base[ixq_out_wen_cnt] != 2),
                 base : base_n  [adv_base[ixq_out_wen_cnt]],
                 off  : uoff_n  [ixq_out_wen_cnt]
             };
-    end
-
-    always_comb begin
-        // if ftq0.blk0 has nal-ft-endpoint begin
-        //     merge
-        // end
-
-    //     /*
-    //     FTQ 0 format -> request
-    //     0: [jump, - ] -> 0.0, 1.0
-    //     0: [ft, jump] -> 0.0, 0.1
-    //     0: [ft, jump] -> 0.0, 0.1
-    //     */
-    //     if (blk_has_end[0][0]) begin
-    //     end else if (blk_has_end[0][1]) begin
-    //     end
     end
 
 endmodule
