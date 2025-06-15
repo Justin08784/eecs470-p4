@@ -75,6 +75,8 @@ module pc_gen_test;
         ftq_in_vld_scnt = 0;
         ftq_in_dat      = 0;
 
+        ixq_in_rdy_scnt = 0;
+        buf_in_rdy_scnt = 0;
 
         // $monitor("  %3d | d_in: [%d, %d]   wr_en_cnt: %d  rd_en_cnt: %d  |  d_out: [%d, %d]   used_scnt: %2d  free_scnt: %2d",
         //     $time,
@@ -96,6 +98,7 @@ module pc_gen_test;
         wr_ftq1(0, 0, 0);
         #0;
 
+        $display("base_woff: %b, %b", dut.base_woff[0], dut.base_woff[1]);
         $display("ixq_out_dw [%d, %d]", ixq_out_dw[0], ixq_out_dw[1]);
         $display("irq_out_fmsk [%b, %b]", irq_out_fmsk[0], irq_out_fmsk[1]);
         $display("is_end_flat: %b", dut.is_end_flat);

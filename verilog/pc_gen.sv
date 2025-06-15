@@ -1,6 +1,6 @@
 `include "sys_defs.svh"
 
-`define PC_GEN_TEST_MODE
+// `define PC_GEN_TEST_MODE
 
 module pc_gen (
     input   clock,
@@ -11,6 +11,7 @@ module pc_gen (
     input   struct packed {
         logic [3:0] off;
         WADDR       base;
+        logic       inbuf;
     } reset_val,
 `endif
 
@@ -41,13 +42,13 @@ module pc_gen (
     struct packed {
         logic [3:0] off;
         WADDR       base;
-        // logic       in_buf; // FTQ entry allocated in buf?
-    } cur, cur_n;
+        logic       inbuf; // FTQ entry allocated in buf?
+    } cur;
 
     // Form indices: fb offsets, PCs, block DWs
-    logic   [1:0] base_woff;            // index: (blk).
-    logic   [1:0][4:0][3:0] nal_off_n;  // index: (blk, word).
-    logic   [1:0][3:0] nal_is_end; // index: (blk, word). nal = not cache line aligned
+    logic   [1:0] base_woff;            // index: (ftq).
+    logic   [1:0][4:0][3:0] nal_off_n;  // index: (ftq, word).
+    logic   [1:0][3:0] nal_is_end;      // index: (ftq, word). nal = not cache line aligned
     generate
     assign base_woff[0] = cur.base[0] ^ cur.off[0]; // 1 bit add
     assign base_woff[1] = ftq_in_dat[0].base_n[0];
@@ -148,49 +149,19 @@ module pc_gen (
     end
     endgenerate
 
-
-
-    `CNT_TYPE(2) ren_cnt;
-    always_comb begin
-        unique case (blk_status[0][0])
-        END_NONE: begin
-            unique case (blk_status[0][1])
-            END_NONE:   ren_cnt = 0;
-
-            END_ALI_FT,
-            END_BRANCH: ren_cnt = 1;
-
-            END_NAL_FT: ren_cnt = blk_has_end[1][0] ? 2 : 1;
-            endcase
-        end
-
-        END_ALI_FT,
-        END_BRANCH: begin
-            unique case (blk_status[1][0])
-            END_NONE:   ren_cnt = 1;
-            default:    ren_cnt = 2;
-            endcase
-        end
-
-        END_NAL_FT: begin
-            unique case (blk_status[1][0])
-            END_NONE:   ren_cnt = 1;
-            default:    ren_cnt = 2;
-            endcase
-        end
-        endcase
-    end
-
+    WADDR [2:0] base_n;
+    assign base_n[0] = cur.base;
+    assign base_n[1] = ftq_in_dat[0].base_n;
+    assign base_n[2] = ftq_in_dat[1].base_n;
 
     logic   merge_l0,
             merge_l1;
-    `CNT_TYPE(2) adv_base, adv_blk;
+    logic   [2:0][`CNT_SIZE(2)-1:0] adv_base;
 
     DWADDR  [1:0]       o_dws;
     logic   [1:0][1:0]  o_fmsk;
     logic   [1:0][1:0]  o_is_end;
 
-    WADDR   [2:0]       ubase_n;
     logic   [2:0][3:0]  uoff_n;
     always_comb begin
         logic ftq1_vld;
@@ -200,40 +171,39 @@ module pc_gen (
         o_dws   = '0;
         o_fmsk  = '0;
         o_is_end= '0;
-        ubase_n [0] = cur.base;
-        uoff_n  [0] = cur.off;
 
+        adv_base[0] = 0;
+        uoff_n  [0] = cur.off;
         o_dws   [0] = dws   [0][0];
         o_fmsk  [0] = fmsk  [0][0];
         o_is_end[0] = is_end[0][0];
 
-        cur_n = cur;
         unique case (blk_status[0][0])
         END_NONE: begin
             o_dws   [1] = dws   [0][1];
             o_fmsk  [1] = fmsk  [0][1];
             o_is_end[1] = is_end[0][1];
 
-            ubase_n [1] = cur.base;
+            adv_base[1] = 0;
             uoff_n  [1] = pos_blk_off[0][0];
             unique case (blk_status[0][1])
             END_NONE: begin
-                ubase_n [2] = cur.base;
+                adv_base[2] = 0;
                 uoff_n  [2] = pos_blk_off[0][1];
             end
 
             END_ALI_FT,
             END_BRANCH: begin
-                ubase_n [2] = ftq_in_dat[0].base_n;
+                adv_base[2] = 1;
                 uoff_n  [2] = 0;
             end
 
             END_NAL_FT: begin
-                ubase_n [2] = ftq_in_dat[0].base_n;
+                adv_base[2] = 1;
                 uoff_n  [2] = 0;
                 if (ftq1_vld) begin
                     if (blk_has_end[1][0])
-                        ubase_n [2] = ftq_in_dat[1].base_n;
+                        adv_base[2] = 2;
                     else
                         uoff_n  [2] = pos_blk_off[1][0];
 
@@ -248,11 +218,11 @@ module pc_gen (
             o_fmsk  [1] = fmsk  [1][0];
             o_is_end[1] = is_end[1][0];
 
-            ubase_n [1] = ftq_in_dat[0].base_n;
+            adv_base[1] = 1;
             uoff_n  [1] = 0;
             if (ftq1_vld) begin
                 if (blk_has_end[1][0])
-                    ubase_n [2] = ftq_in_dat[1].base_n;
+                    adv_base[2] = 2;
                 else
                     uoff_n  [2] = pos_blk_off[1][0];
 
@@ -264,11 +234,11 @@ module pc_gen (
             o_fmsk  [1] = fmsk  [1][1];
             o_is_end[1] = is_end[1][1];
 
-            ubase_n [1] = ftq_in_dat[0].base_n;
+            adv_base[1] = 1;
             uoff_n  [1] = 0;
             if (ftq1_vld) begin
                 if (|blk_has_end[1])
-                    ubase_n [2] = ftq_in_dat[1].base_n;
+                    adv_base[2] = 2;
                 else
                     uoff_n  [2] = pos_blk_off[1][1];
 
@@ -293,27 +263,51 @@ module pc_gen (
         end
     end
 
+    `CNT_TYPE(2) buf_lim_cnt;
+    logic [1:0] req_buf;
+    logic [2:0][`CNT_SIZE(2)-1:0] buf_prefix_cnt;
+    compactor #(
+        .REQW(2),
+        .GNTW(2)
+    ) comp_buf_req (
+        .req        (req_buf),
+        .lim_cnt    (buf_in_rdy_scnt),
+        .prefix_cnt (buf_prefix_cnt),
+        .gnt_cnt    (buf_lim_cnt)
+    );
+
     always_comb begin
+        `CNT_TYPE(2) tmp;
         ixq_out_dw      = o_dws;
         irq_out_fmsk    = o_fmsk;
         irq_out_is_end  = o_is_end;
 
-        ixq_out_wen_cnt = `MIN(ftq_in_vld_scnt, ixq_in_rdy_scnt);
+        tmp = `MIN(ftq_in_vld_scnt, ixq_in_rdy_scnt);
 
-        buf_out_dat     = ftq_in_dat;
+        req_buf[0] = !cur.inbuf;
+        req_buf[1] = adv_base[tmp] != 0;
+
+        ixq_out_wen_cnt = `MIN(buf_lim_cnt, tmp);
+
+        ftq_out_ren_cnt = adv_base[ixq_out_wen_cnt];
+
+        for (int i = 0; i < 2; ++i)
+            buf_out_dat[buf_prefix_cnt[i]] = ftq_in_dat[i];
+        buf_out_wen_cnt = buf_prefix_cnt[ixq_out_wen_cnt];
     end
 
 
     always_ff @(posedge clock) begin
         if (reset)
-`ifdef PC_GEN_TEST_MODE
+`ifndef PC_GEN_TEST_MODE
             cur <= '0;
 `else
             cur <= reset_val;
 `endif
         else
             cur <= '{
-                base : ubase_n [ixq_out_wen_cnt],
+                inbuf: ixq_out_wen_cnt != 0,
+                base : base_n  [adv_base[ixq_out_wen_cnt]],
                 off  : uoff_n  [ixq_out_wen_cnt]
             };
     end
