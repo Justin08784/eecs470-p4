@@ -49,20 +49,12 @@ module pc_gen (
 
     typedef `IDX_TYPE(MAX_W_PER_FB) FB_OFF;
 
-    function automatic FB_OFF [2*NUM_W:0] init_off_rst();
-        FB_OFF [2*NUM_W:0] rv;
-        for (int i = 0; i <= NUM_W; ++i)
-            rv[i] = i;
-        return rv;
-    endfunction
-    localparam FB_OFF [2*NUM_W-1:0] off_rst = init_off_rst();
+    localparam FB_OFF off_rst = '0;
     localparam WADDR base_rst = '0;
     localparam logic inbuf_rst = 0;
-    localparam DWADDR [NUM_DW-1:0] dw_rst = {DWADDR'(1), DWADDR'(0)};
 
     struct packed {
-        DWADDR  [NUM_DW-1:0] dw;
-        FB_OFF  [NUM_W-1:0] off;
+        FB_OFF  off;
         WADDR   base;
         logic   inbuf; // FTQ entry allocated in buf?
     } cur;
@@ -75,9 +67,11 @@ module pc_gen (
     assign base_woff[0] = cur.base[0] ^ cur.off[0]; // 1 bit add
     assign base_woff[1] = ftq_in_dat[0].base_n[0];
 
-    for (genvar w = 0; w < NUM_W; ++w) begin
-        assign nal_off_n[0][w] = cur.off[w];
-        assign nal_off_n[1][w] = off_rst[w];
+    assign nal_off_n[0][0] = cur.off;
+    assign nal_off_n[1][0] = 0;
+    for (genvar w = 1; w < NUM_W; ++w) begin
+        assign nal_off_n[0][w] = cur.off + `UCAST_FIT(w);
+        assign nal_off_n[1][w] = w;
     end
 
     for (genvar e = 0; e < NUM_FTQ; ++e) begin
@@ -147,47 +141,27 @@ module pc_gen (
     endgenerate
 
 
-    DWADDR  [NUM_FTQ:0][NUM_DW-1:0] dws;
-    DWADDR  [NUM_FTQ:0][NUM_DW-1:0] dws_nex;
-    DWADDR  [NUM_FTQ:0][2*NUM_DW-1:0] dws_full;
+    DWADDR  [NUM_FTQ-1:0][NUM_DW-1:0] dws;
     generate
-    assign dws[0] = cur.dw;
+    WADDR   [NUM_FTQ-1:0] start_pc;
+    assign start_pc[0] = cur.base + cur.off;
+    assign start_pc[1] = ftq_in_dat[0].base_n;
 
-    assign dws[1][0] = ftq_in_dat[0].base_n[13:1];
-    assign dws[2][0] = ftq_in_dat[1].base_n[13:1];
-    for (genvar b = 1; b < NUM_DW; ++b) begin
-        assign dws[1][b] = dws[1][0] + `UCAST_FIT(b);
-        assign dws[2][b] = dws[2][0] + `UCAST_FIT(b);
-    end
-
-    for (genvar b = 0; b < NUM_DW; ++b) begin
-        assign dws_nex[0][b] = dws[0][NUM_DW-1] + `UCAST_FIT(b+1);
-        assign dws_nex[1][b] = dws[1][0]        + `UCAST_FIT(NUM_DW+b);
-        assign dws_nex[2][b] = '0;
-    end
-
-    assign dws_full[0] = {dws_nex[0], dws[0]};
-    assign dws_full[1] = {dws_nex[1], dws[1]};
-    assign dws_full[2] = {dws_nex[2], dws[2]};
+    assign dws[0][0] = start_pc[0][13:1];
+    assign dws[0][1] = start_pc[0][13:1] + `UCAST_FIT(1);
+    assign dws[1][0] = start_pc[1][13:1];
+    assign dws[1][1] = start_pc[1][13:1] + `UCAST_FIT(1);
     endgenerate
 
-    FB_OFF  [NUM_FTQ:0][2*NUM_W-1:0]  off_full;
-    FB_OFF  [NUM_W-1:0] off_nex0;
     logic   [NUM_FTQ:0][NUM_DW:0][`CNT_SIZE(NUM_W)-1:0] pos_blk_inc; // TODO: UNSURE
     generate
-    for (genvar w = 0; w < NUM_W; ++w)
-        assign off_nex0[w] = cur.off[NUM_W-1] + `UCAST_FIT(w+1);
-    assign off_full[0] = {off_nex0, nal_off_n[0]};
-    assign off_full[1] = off_rst;
-    assign off_full[2] = off_rst;
-
     assign pos_blk_inc[2] = '0;
     for (genvar e = 0; e < NUM_FTQ; ++e) begin
         assign pos_blk_inc[e][0] = '0;
         for (genvar b = 1; b <= NUM_DW; ++b) begin
             assign pos_blk_inc[e][b] = base_woff[e]
-                ? off_rst[W_PER_DW*(b-1)+1]
-                : off_rst[W_PER_DW*(b-1)];
+                ? W_PER_DW*(b-1)+1
+                : W_PER_DW*(b-1);
         end
     end
     endgenerate
@@ -349,7 +323,6 @@ module pc_gen (
         if (reset)
 `ifndef PC_GEN_TEST_MODE
             cur <= '{
-                dw  : dw_rst,
                 off : off_rst,
                 base: base_rst,
                 inbuf:inbuf_rst
@@ -359,10 +332,9 @@ module pc_gen (
 `endif
         else if (flush)
             cur <= '{
-                dw   : flush_dw,
-                inbuf: 0,
+                off  : flush_off,
                 base : flush_fb_base,
-                off  : flush_off
+                inbuf: 0
             };
         else begin
             `CNT_TYPE(NUM_FTQ)  adv_base_v;
@@ -374,12 +346,11 @@ module pc_gen (
             adv_wrd_v   = pos_blk_inc[adv_base_v][adv_blk_v];
 
             cur <= '{
-                dw   : dws_full[base_n[adv_base_v]][adv_blk_v +: NUM_DW+1],
                 // inbuf: ixq_out_wen_cnt != 0, // FIXME: probably wrong. inbuf shuld be zeroed if adv_base is 2
-                inbuf: ixq_out_wen_cnt != 0 && (adv_base_v != 2),
+                off  : cur.off + adv_wrd_v,
                 base : base_n[adv_base_v],
+                inbuf: ixq_out_wen_cnt != 0 && (adv_base_v != 2)
                 // off  : off_full[base_n[adv_base_v]][adv_wrd_v +: NUM_W+1]
-                off  : off_full[base_n[adv_base_v]][adv_wrd_v +: NUM_W+1]
             };
         end
     end
