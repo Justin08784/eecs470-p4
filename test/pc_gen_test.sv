@@ -107,7 +107,7 @@ module pc_gen_test;
         $display("fmsk[0]: [%b]", dut.fmsk[0]);
         $display("dws [%d, %d]", dut.dws[0][0], dut.dws[0][1]);
         $display("o_dws [%d, %d]", dut.o_dws[0], dut.o_dws[1]);
-        $display("blk_status [%d, %d]", dut.blk_status[0][0], dut.blk_status[0][1]);
+        // $display("blk_status [%d, %d]", dut.blk_status[0][0], dut.blk_status[0][1]);
 
         $finish;
     end

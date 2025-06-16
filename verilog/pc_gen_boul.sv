@@ -84,7 +84,11 @@ module pc_gen (
             ? '0
             : nal_off_n[e][0];
 
-        assign off_n[e][NUM_W:1] = nal_off_n[e][!base_woff[e] +: NUM_W];
+        for (genvar w = 1; w <= NUM_W; ++w) begin
+            assign off_n[e][w] = base_woff[e]
+                ? nal_off_n[e][w-1]
+                : nal_off_n[e][w];
+        end
     end
 
     logic   [NUM_FTQ-1:0][NUM_W-1:0] align_msk;
@@ -164,6 +168,102 @@ module pc_gen (
         && !is_end[0][1][W_PER_DW-1]
         && ftq_in_dat[0].ft;
 
+    // always_comb begin
+    //     o_dws   [0] = dws   [0][0];
+    //     o_fmsk  [0] = fmsk  [0][0];
+    //     o_is_end[0] = is_end[0][0];
+
+    //     if (blk_has_end[0][0]) begin
+    //         if (merge_l0) begin
+    //             o_fmsk  [0] |= fmsk  [1][0];
+    //             o_is_end[0] |= is_end[1][0];
+
+    //             o_dws   [1] = dws   [1][1];
+    //             o_fmsk  [1] = fmsk  [1][1];
+    //             o_is_end[1] = is_end[1][1];
+
+    //         end else begin
+    //             o_dws   [1] = dws   [1][0];
+    //             o_fmsk  [1] = fmsk  [1][0];
+    //             o_is_end[1] = is_end[1][0];
+
+    //         end
+
+    //     end else if (blk_has_end[0][1]) begin
+    //         o_dws   [1] = dws   [0][1];
+    //         o_fmsk  [1] = fmsk  [0][1];
+    //         o_is_end[1] = is_end[0][1];
+
+    //         if (merge_l1) begin
+    //             o_fmsk  [1] |= fmsk  [1][0];
+    //             o_is_end[1] |= is_end[1][0];
+
+    //         end
+
+    //     end else begin
+    //         o_dws   [1] = dws   [1][0];
+    //         o_fmsk  [1] = fmsk  [1][0];
+    //         o_is_end[1] = is_end[1][0];
+
+    //     end
+
+    // end
+
+    // always_comb begin
+    //     adv_base    = '0;
+    //     adv_blk     = '0;
+
+    //     adv_base[0] = 0;
+    //     adv_blk [0] = 0;
+
+    //     if (blk_has_end[0][0]) begin
+    //         if (merge_l0) begin
+    //             adv_base[1] = blk_has_end[1][0] ? 2 : 1;
+    //             adv_blk [1] = blk_has_end[1][0] ? 0 : 1;
+
+    //             adv_base[2] = |blk_has_end[1] ? 2 : 1;
+    //             adv_blk [2] = |blk_has_end[1] ? 0 : 2;
+
+    //         end else begin
+    //             adv_base[1] = 1;
+    //             adv_blk [1] = 0;
+
+    //             adv_base[2] = blk_has_end[1][0] ? 2 : 1;
+    //             adv_blk [2] = blk_has_end[1][0] ? 0 : 1;
+
+    //         end
+
+    //     end else if (blk_has_end[0][1]) begin
+    //         adv_base[1] = 0;
+    //         adv_blk [1] = 1;
+
+    //         if (merge_l1) begin
+    //             adv_base[2] = blk_has_end[1][0] ? 2 : 1;
+    //             adv_blk [2] = blk_has_end[1][0] ? 0 : 1;
+
+    //         end else begin
+    //             adv_base[2] = 1;
+    //             adv_blk [2] = 0;
+
+    //         end
+
+    //     end else begin
+    //         adv_base[1] = 0;
+    //         adv_blk [1] = 1;
+
+    //         adv_base[2] = 0;
+    //         adv_blk [2] = 2;
+
+    //     end
+    // end
+
+
+
+
+
+    // ------------------------------------------------------------------
+    // short-depth version of adv_base / adv_blk generation
+    // ------------------------------------------------------------------
     logic bhe00;
     logic bhe01;
     logic bhe10;
@@ -252,6 +352,9 @@ module pc_gen (
     end
 
 
+
+
+
     // ------------------------------------------------------------------
     // o_*[0]
     // ------------------------------------------------------------------
@@ -307,6 +410,8 @@ module pc_gen (
     end
 
 
+
+
     `CNT_TYPE(NUM_FTQ) buf_lim_cnt;
     logic [NUM_FTQ-1:0] req_buf;
     logic [NUM_FTQ:0][`CNT_SIZE(NUM_FTQ)-1:0] buf_prefix_cnt;
@@ -341,18 +446,18 @@ module pc_gen (
         buf_out_wen_cnt = buf_prefix_cnt[ixq_out_wen_cnt];
     end
 
-    // DWADDR [NUM_DW-1:0] flush_dw;
-    // FB_OFF [NUM_W-1:0]  flush_off;
-    // generate
-    // assign flush_off[0] = flush_pc_off;
-    // for (genvar w = 1; w < NUM_W; ++w)
-    //     assign flush_off[w] = flush_pc_off + `UCAST_FIT(w);
+    DWADDR [NUM_DW-1:0] flush_dw;
+    FB_OFF [NUM_W-1:0] flush_off;
+    generate
+    assign flush_off[0] = flush_pc_off;
+    for (genvar w = 1; w < NUM_W; ++w)
+        assign flush_off[w] = flush_pc_off + `UCAST_FIT(w);
 
-    // WADDR flush_start;
-    // assign flush_start = flush_fb_base + flush_pc_off;
-    // assign flush_dw[0] = flush_start[13:1];
-    // assign flush_dw[1] = flush_start[13:1] + `UCAST_FIT(1);
-    // endgenerate
+    WADDR flush_start;
+    assign flush_start = flush_fb_base + flush_pc_off;
+    assign flush_dw[0] = flush_start[13:1];
+    assign flush_dw[1] = flush_start[13:1] + `UCAST_FIT(1);
+    endgenerate
 
     always_ff @(posedge clock) begin
         if (reset)
@@ -367,7 +472,7 @@ module pc_gen (
 `endif
         else if (flush)
             cur <= '{
-                off  : flush_pc_off,
+                off  : flush_off,
                 base : flush_fb_base,
                 inbuf: 0
             };
