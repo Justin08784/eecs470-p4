@@ -55,25 +55,27 @@ module pc_gen (
             rv[i] = i;
         return rv;
     endfunction
-    localparam FB_OFF [2*NUM_W:0] off_rst = init_off_rst();
+    localparam FB_OFF [2*NUM_W-1:0] off_rst = init_off_rst();
     localparam WADDR base_rst = '0;
-    localparam logic inbuf = 0;
+    localparam logic inbuf_rst = 0;
+    localparam DWADDR [NUM_DW-1:0] dw_rst = {DWADDR'(1), DWADDR'(0)};
 
     struct packed {
-        FB_OFF  [NUM_W:0] off;
+        DWADDR  [NUM_DW-1:0] dw;
+        FB_OFF  [NUM_W-1:0] off;
         WADDR   base;
         logic   inbuf; // FTQ entry allocated in buf?
     } cur;
 
     // Form indices: fb offsets, PCs, block DWs
     logic   [NUM_FTQ-1:0] base_woff;            // index: (ftq).
-    FB_OFF  [NUM_FTQ-1:0][NUM_W:0]  nal_off_n;  // index: (ftq, word).
+    FB_OFF  [NUM_FTQ-1:0][NUM_W-1:0]nal_off_n;  // index: (ftq, word).
     logic   [NUM_FTQ-1:0][NUM_W-1:0]nal_is_end; // index: (ftq, word). nal = not cache line aligned
     generate
     assign base_woff[0] = cur.base[0] ^ cur.off[0]; // 1 bit add
     assign base_woff[1] = ftq_in_dat[0].base_n[0];
 
-    for (genvar w = 0; w <= NUM_W; ++w) begin
+    for (genvar w = 0; w < NUM_W; ++w) begin
         assign nal_off_n[0][w] = cur.off[w];
         assign nal_off_n[1][w] = off_rst[w];
     end
@@ -86,7 +88,7 @@ module pc_gen (
     endgenerate
 
 
-    FB_OFF  [NUM_FTQ-1:0][NUM_W:0]  off_n;
+    FB_OFF  [NUM_FTQ-1:0][NUM_W-1:0]off_n;
     logic   [NUM_FTQ-1:0][NUM_W-1:0]is_end_flat, fmsk_flat;
     logic   [NUM_FTQ-1:0][NUM_DW-1:0][W_PER_DW-1:0] is_end, fmsk;
     generate
@@ -95,7 +97,7 @@ module pc_gen (
             ? '0
             : nal_off_n[e][0];
 
-        for (genvar w = 1; w <= NUM_W; ++w) begin
+        for (genvar w = 1; w < NUM_W; ++w) begin
             assign off_n[e][w] = base_woff[e]
                 ? nal_off_n[e][w-1]
                 : nal_off_n[e][w];
@@ -145,33 +147,47 @@ module pc_gen (
     endgenerate
 
 
-    DWADDR  [NUM_FTQ-1:0][NUM_DW-1:0] dws;
+    DWADDR  [NUM_FTQ:0][NUM_DW-1:0] dws;
+    DWADDR  [NUM_FTQ:0][NUM_DW-1:0] dws_nex;
+    DWADDR  [NUM_FTQ:0][2*NUM_DW-1:0] dws_full;
     generate
-    WADDR [NUM_FTQ-1:0] start_pc;
-    assign start_pc[0] = cur.base + nal_off_n[0][0];
-    assign start_pc[1] = ftq_in_dat[0].base_n;
+    assign dws[0] = cur.dw;
 
-    assign dws[0][0] = start_pc[0][13:1];
-    assign dws[0][1] = start_pc[0][13:1] + `UCAST_FIT(1);
-    assign dws[1][0] = start_pc[1][13:1];
-    assign dws[1][1] = start_pc[1][13:1] + `UCAST_FIT(1);
+    assign dws[1][0] = ftq_in_dat[0].base_n[13:1];
+    assign dws[2][0] = ftq_in_dat[1].base_n[13:1];
+    for (genvar b = 1; b < NUM_DW; ++b) begin
+        assign dws[1][b] = dws[1][0] + `UCAST_FIT(b);
+        assign dws[2][b] = dws[2][0] + `UCAST_FIT(b);
+    end
+
+    for (genvar b = 0; b < NUM_DW; ++b) begin
+        assign dws_nex[0][b] = dws[0][NUM_DW-1] + `UCAST_FIT(b+1);
+        assign dws_nex[1][b] = dws[1][0]        + `UCAST_FIT(NUM_DW+b);
+        assign dws_nex[2][b] = '0;
+    end
+
+    assign dws_full[0] = {dws_nex[0], dws[0]};
+    assign dws_full[1] = {dws_nex[1], dws[1]};
+    assign dws_full[2] = {dws_nex[2], dws[2]};
     endgenerate
 
-    FB_OFF  [NUM_FTQ:0][2*NUM_W:0]  off_full;
+    FB_OFF  [NUM_FTQ:0][2*NUM_W-1:0]  off_full;
     FB_OFF  [NUM_W-1:0] off_nex0;
-    logic   [NUM_FTQ-1:0][NUM_DW-1:0][`CNT_SIZE(NUM_W)-1:0] pos_blk_inc;
+    logic   [NUM_FTQ:0][NUM_DW:0][`CNT_SIZE(NUM_W)-1:0] pos_blk_inc; // TODO: UNSURE
     generate
     for (genvar w = 0; w < NUM_W; ++w)
-        assign off_nex0[w] = cur.off[NUM_W] + `UCAST_FIT(w+1);
+        assign off_nex0[w] = cur.off[NUM_W-1] + `UCAST_FIT(w+1);
     assign off_full[0] = {off_nex0, nal_off_n[0]};
     assign off_full[1] = off_rst;
     assign off_full[2] = off_rst;
 
+    assign pos_blk_inc[2] = '0;
     for (genvar e = 0; e < NUM_FTQ; ++e) begin
-        for (genvar b = 0; b < NUM_DW; ++b) begin
+        assign pos_blk_inc[e][0] = '0;
+        for (genvar b = 1; b <= NUM_DW; ++b) begin
             assign pos_blk_inc[e][b] = base_woff[e]
-                ? off_rst[W_PER_DW*b+1]
-                : off_rst[W_PER_DW*b];
+                ? off_rst[W_PER_DW*(b-1)+1]
+                : off_rst[W_PER_DW*(b-1)];
         end
     end
     endgenerate
@@ -184,7 +200,7 @@ module pc_gen (
     logic   merge_l0,
             merge_l1;
     logic   [NUM_DW:0][`CNT_SIZE(NUM_FTQ)-1:0]  adv_base;
-    logic   [NUM_DW:0][`CNT_SIZE(NUM_W)-1:0]    adv_inc;
+    logic   [NUM_DW:0][`CNT_SIZE(NUM_DW)-1:0]   adv_blk;
 
     DWADDR  [NUM_DW-1:0]    o_dws;
     logic   [NUM_DW-1:0][W_PER_DW-1:0]  o_fmsk;
@@ -198,8 +214,11 @@ module pc_gen (
         o_fmsk  = '0;
         o_is_end= '0;
 
+        adv_base    = '0;
+        adv_blk     = '0;
+
         adv_base[0] = 0;
-        adv_inc [0] = 0;
+        adv_blk [0] = 0;
         o_dws   [0] = dws   [0][0];
         o_fmsk  [0] = fmsk  [0][0];
         o_is_end[0] = is_end[0][0];
@@ -211,22 +230,22 @@ module pc_gen (
             o_is_end[1] = is_end[0][1];
 
             adv_base[1] = 0;
-            adv_inc [1] = pos_blk_inc[0][0];
+            adv_blk [1] = 1;
             unique case (blk_status[0][1])
             END_NONE: begin
                 adv_base[2] = 0;
-                adv_inc [2] = pos_blk_inc[0][1];
+                adv_blk [2] = 2;
             end
 
             END_ALI_FT,
             END_BRANCH: begin
                 adv_base[2] = 1;
-                adv_inc [2] = 0;
+                adv_blk [2] = 0;
             end
 
             END_NAL_FT: begin
                 adv_base[2] = blk_has_end[1][0] ? 2 : 1;
-                adv_inc [2] = blk_has_end[1][0] ? 0 : pos_blk_inc[1][0];
+                adv_blk [2] = blk_has_end[1][0] ? 0 : 1;
             end
             endcase
         end
@@ -238,10 +257,10 @@ module pc_gen (
             o_is_end[1] = is_end[1][0];
 
             adv_base[1] = 1;
-            adv_inc [1] = 0;
+            adv_blk [1] = 0;
 
             adv_base[2] = blk_has_end[1][0] ? 2 : 1;
-            adv_inc [2] = blk_has_end[1][0] ? 0 : pos_blk_inc[1][0];
+            adv_blk [2] = blk_has_end[1][0] ? 0 : 1;
         end
 
         END_NAL_FT: begin
@@ -251,14 +270,14 @@ module pc_gen (
 
             if (ftq1_vld) begin
                 adv_base[1] = blk_has_end[1][0] ? 2 : 1;
-                adv_inc [1] = blk_has_end[1][0] ? 0 : pos_blk_inc[1][0];
+                adv_blk [1] = blk_has_end[1][0] ? 0 : 1;
             end else begin
                 adv_base[1] = 1;
-                adv_inc [1] = 0;
+                adv_blk [1] = 0;
             end
 
             adv_base[2] = |blk_has_end[1]   ? 2 : 1;
-            adv_inc [2] = |blk_has_end[1]   ? 0 : pos_blk_inc[1][1];
+            adv_blk [2] = |blk_has_end[1]   ? 0 : 2;
         end
         endcase
 
@@ -313,35 +332,56 @@ module pc_gen (
         buf_out_wen_cnt = buf_prefix_cnt[ixq_out_wen_cnt];
     end
 
-    FB_OFF [NUM_W:0] flush_off;
+    DWADDR [NUM_DW-1:0] flush_dw;
+    FB_OFF [NUM_W-1:0] flush_off;
     generate
     assign flush_off[0] = flush_pc_off;
-    for (genvar w = 1; w <= NUM_W; ++w)
+    for (genvar w = 1; w < NUM_W; ++w)
         assign flush_off[w] = flush_pc_off + `UCAST_FIT(w);
+
+    WADDR flush_start;
+    assign flush_start = flush_fb_base + flush_pc_off;
+    assign flush_dw[0] = flush_start[13:1];
+    assign flush_dw[1] = flush_start[13:1] + `UCAST_FIT(1);
     endgenerate
 
     always_ff @(posedge clock) begin
         if (reset)
 `ifndef PC_GEN_TEST_MODE
-            cur <= '0; // FIXME: off should be reset to {..., 4'h2, 4'h1, 4'h0}
+            cur <= '{
+                dw  : dw_rst,
+                off : off_rst,
+                base: base_rst,
+                inbuf:inbuf_rst
+            };
 `else
             cur <= reset_val;
 `endif
         else if (flush)
             cur <= '{
+                dw   : flush_dw,
                 inbuf: 0,
                 base : flush_fb_base,
                 off  : flush_off
             };
-        else
+        else begin
+            `CNT_TYPE(NUM_FTQ)  adv_base_v;
+            `CNT_TYPE(NUM_DW)   adv_blk_v;
+            `CNT_TYPE(NUM_W)    adv_wrd_v;
+
+            adv_base_v  = adv_base   [ixq_out_wen_cnt];
+            adv_blk_v   = adv_blk    [ixq_out_wen_cnt];
+            adv_wrd_v   = pos_blk_inc[adv_base_v][adv_blk_v];
+
             cur <= '{
+                dw   : dws_full[base_n[adv_base_v]][adv_blk_v +: NUM_DW+1],
                 // inbuf: ixq_out_wen_cnt != 0, // FIXME: probably wrong. inbuf shuld be zeroed if adv_base is 2
-                inbuf: ixq_out_wen_cnt != 0 && (adv_base[ixq_out_wen_cnt] != 2),
-                base : base_n  [adv_base[ixq_out_wen_cnt]],
-                off  : off_full
-                    [base_n[adv_base[ixq_out_wen_cnt]]]
-                    [adv_inc[ixq_out_wen_cnt] +: NUM_W+1]
+                inbuf: ixq_out_wen_cnt != 0 && (adv_base_v != 2),
+                base : base_n[adv_base_v],
+                // off  : off_full[base_n[adv_base_v]][adv_wrd_v +: NUM_W+1]
+                off  : off_full[base_n[adv_base_v]][adv_wrd_v +: NUM_W+1]
             };
+        end
     end
 
 endmodule
