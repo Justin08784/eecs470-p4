@@ -152,9 +152,9 @@ module pc_gen (
     assign start_pc[1] = ftq_in_dat[0].base_n;
 
     assign dws[0][0] = start_pc[0][13:1];
-    assign dws[0][1] = start_pc[0] + `UCAST_FIT(1);
+    assign dws[0][1] = start_pc[0][13:1] + `UCAST_FIT(1);
     assign dws[1][0] = start_pc[1][13:1];
-    assign dws[1][1] = start_pc[1] + `UCAST_FIT(1);
+    assign dws[1][1] = start_pc[1][13:1] + `UCAST_FIT(1);
     endgenerate
 
     FB_OFF  [NUM_FTQ:0][2*NUM_W:0]  off_full;
