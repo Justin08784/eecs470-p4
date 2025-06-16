@@ -50,7 +50,8 @@ module pc_gen_test;
         .clock,
         .reset,
         .flush,
-        .clmsk,
+        .flush_fb_base  ('0),
+        .flush_pc_off   ('0),
 
         .ftq_in_vld_scnt,
         .ftq_in_dat,

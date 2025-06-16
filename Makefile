@@ -243,6 +243,11 @@ GHR_FILES = test/ghr_sva.svh # FIXME: how are you able to omit sys_def.svh like 
 build/ghr.simv: $(GHR_FILES)
 build/ghr.cov: $(GHR_FILES)
 
+PC_GEN_FILES = verilog/ring_ctr.sv
+build/pc_gen.simv: $(PC_GEN_FILES)
+build/pc_gen.cov: $(PC_GEN_FILES)
+synth/pc_gen.vg: $(PC_GEN_FILES)
+
 RS_FILES = verilog/sys_defs.svh verilog/psel_gen.sv
 build/rs.simv: $(RS_FILES)
 build/rs.cov: $(RS_FILES)
