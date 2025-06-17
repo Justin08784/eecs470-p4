@@ -10,6 +10,8 @@ property p_never_diverge;
     disable iff (reset)
     pc_gen.cur.base == $past(BPU.fb_base);
 endproperty
+
+TODO: Rename "buf" to re-read FTQ (since FTQ entries are being "re-read" at align)
 */
 module pc_gen #(
     parameter MAX_W_PER_FB  = 16,// maximum span of a fetch block / ftq entry, in words
@@ -338,6 +340,14 @@ module pc_gen #(
 
         tmp = `MIN(ftq_in_vld_scnt, ixq_in_rdy_scnt);
 
+        /*FIXME:
+        We may actually request up to 3 buffer slots per cycle
+        ftq 0 is !inbuf AND adv_base == 2
+
+        Actually maybe this is fine. inbuf is zeroed when adv_base_v == 2.
+        We don't even access to the 3rd ftq entry this cycle, so we will never
+        be able to push it to the reread queue.
+        */
         req_buf[0] = !cur.inbuf;
         req_buf[1] = adv_base[tmp] != 0;
 
@@ -364,8 +374,8 @@ module pc_gen #(
     // assign flush_dw[1] = flush_start[13:1] + `UCAST_FIT(1);
     // endgenerate
 
-    `CNT_TYPE(NUM_FTQ)  adv_base_v;
-    `CNT_TYPE(NUM_DW)   adv_blk_v;
+    `CNT_TYPE(NUM_FTQ)  adv_base_v; // num FTQ entries we eat
+    `CNT_TYPE(NUM_DW)   adv_blk_v;  // num cache line requests we emit
     assign adv_base_v   = adv_base  [ixq_out_wen_cnt];
     assign adv_blk_v    = adv_blk   [ixq_out_wen_cnt];
 
