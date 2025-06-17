@@ -38,6 +38,7 @@ module pc_gen_sva #(
     input   `CNT_TYPE(2)    ftq_out_ren_cnt,
 
     // irq / iqq
+    // **NOTE**: ixq_out_off is not checked
     input   `CNT_TYPE(2)    ixq_in_rdy_scnt, // = `MIN(iqq_*, irq_*)
     input   `CNT_TYPE(2)    ixq_out_wen_cnt,
     input   DWADDR [1:0]    ixq_out_dw,

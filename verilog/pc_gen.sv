@@ -43,6 +43,7 @@ module pc_gen #(
     // irq / iqq
     input   `CNT_TYPE(2)    ixq_in_rdy_scnt, // = `MIN(iqq_*, irq_*)
     output  `CNT_TYPE(2)    ixq_out_wen_cnt,
+    output  FB_OFF[1:0][1:0]ixq_out_off,
     output  DWADDR [1:0]    ixq_out_dw,
     output  logic[1:0][1:0] ixq_out_fmsk,
     output  logic[1:0][1:0] ixq_out_is_end,
@@ -162,6 +163,7 @@ module pc_gen #(
     logic   [NUM_DW:0][`CNT_SIZE(NUM_DW)-1:0]   adv_blk;
 
     DWADDR  [NUM_DW-1:0]    o_dws;
+    FB_OFF  [NUM_DW-1:0][W_PER_DW-1:0]  o_off;
     logic   [NUM_DW-1:0][W_PER_DW-1:0]  o_fmsk;
     logic   [NUM_DW-1:0][W_PER_DW-1:0]  o_is_end;
 
@@ -272,11 +274,13 @@ module pc_gen #(
 
         unique case (1'b1)
             bhe00 &  merge_l0: begin
+                o_off   [0] = off_n [0][1:0]|   off_n [1][1:0];
                 o_fmsk  [0] = fmsk  [0][1]  |   fmsk  [1][0];
                 o_is_end[0] = is_end[0][1]  |   is_end[1][0];
             end
 
             default: begin
+                o_off   [0] = off_n [0][1:0];
                 o_fmsk  [0] = fmsk  [0][0];
                 o_is_end[0] = is_end[0][0];
             end
@@ -289,11 +293,13 @@ module pc_gen #(
     always_comb begin
         unique case (1'b1)
             bhe00 &  merge_l0: begin
+                o_off   [1] = off_n [1][3:2];
                 o_dws   [1] = dws   [1][1];
                 o_fmsk  [1] = fmsk  [1][1];
                 o_is_end[1] = is_end[1][1];
             end
             bhe00 & ~merge_l0: begin
+                o_off   [1] = off_n [1][1:0];
                 o_dws   [1] = dws   [1][0];
                 o_fmsk  [1] = fmsk  [1][0];
                 o_is_end[1] = is_end[1][0];
@@ -301,17 +307,20 @@ module pc_gen #(
 
             bhe01 &  merge_l1: begin
                 o_dws   [1] = dws   [0][1];
+                o_off   [1] = off_n [0][3:2]|   off_n [1][1:0];
                 o_fmsk  [1] = fmsk  [0][1]  |   fmsk  [1][0];
                 o_is_end[1] = is_end[0][1]  |   is_end[1][0];
             end
             bhe01 & ~merge_l1: begin
                 o_dws   [1] = dws   [0][1];
+                o_off   [1] = off_n [0][3:2];
                 o_fmsk  [1] = fmsk  [0][1];
                 o_is_end[1] = is_end[0][1];
             end
 
             default: begin
                 o_dws   [1] = dws   [0][1];
+                o_off   [1] = off_n [0][3:2];
                 o_fmsk  [1] = fmsk  [0][1];
                 o_is_end[1] = is_end[0][1];
             end
@@ -335,6 +344,7 @@ module pc_gen #(
     always_comb begin
         `CNT_TYPE(NUM_DW) tmp;
         ixq_out_dw      = o_dws;
+        ixq_out_off     = o_off;
         ixq_out_fmsk    = o_fmsk;
         ixq_out_is_end  = o_is_end;
 
@@ -455,10 +465,14 @@ module pc_gen #(
             ftq_out_ren_cnt
         );
 
-        $display("ixq_out: wen_cnt = %d, dw = [%d, %d], fmsk = %b, is_end = %b",
+        $display("ixq_out: wen_cnt = %d, dw = [%d, %d], off = [[%d, %d], [%d, %d]], fmsk = %b, is_end = %b",
             ixq_out_wen_cnt,
             ixq_out_dw[0],
             ixq_out_dw[1],
+            ixq_out_off[0][0],
+            ixq_out_off[0][1],
+            ixq_out_off[1][0],
+            ixq_out_off[1][1],
             ixq_out_fmsk,
             ixq_out_is_end
         );
