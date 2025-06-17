@@ -148,21 +148,20 @@ module pc_gen_sva #(
         output  COMB_LINES  c
     );
         WADDR   tmp_waddr;
+        WADDR   [NUM_FTQ:0] base_n;
         logic   [NUM_FTQ-1:0] base_woff;
         FB_OFF  [NUM_FTQ-1:0][NUM_W-1:0] nal_off_n;
         DWADDR  [NUM_FTQ-1:0][NUM_DW-1:0] dws;
         logic   [NUM_FTQ-1:0][NUM_DW-1:0] blk_has_end;
-        logic   [NUM_FTQ-1:0][NUM_W-1:0] is_end_flat;
-        logic   [NUM_FTQ-1:0][NUM_W-1:0] fmsk_flat;
+        logic   [NUM_FTQ-1:0][NUM_W-1:0] is_end_flat, fmsk_flat;
         logic   [NUM_FTQ-1:0][NUM_DW-1:0][W_PER_DW-1:0] is_end, fmsk;
         int     blk_num_fetch [NUM_FTQ-1:0][NUM_DW-1:0];
 
         int avail, cur_off;
-        logic [1:0][:0] aft_bidx;
+        logic [1:0][`CNT_SIZE(NUM_FTQ)-1:0] aft_bidx;
         FB_OFF [1:0] aft_off;
 
         // >> vld_scnt == 2 case only:
-        int out_idx;
         logic [NUM_DW-1:0] req_buf;
         logic merge_l0, merge_l1;
 
@@ -203,6 +202,10 @@ module pc_gen_sva #(
         base_woff[0] = tmp_waddr[0];
         base_woff[1] = ftq_in_dat[0].base_n[0];
 
+        base_n[0] = s.base;
+        base_n[1] = ftq_in_dat[0].base_n;
+        base_n[2] = ftq_in_dat[1].base_n;
+
         nal_off_n[0][0] = s.off;
         nal_off_n[1][0] = 0;
         for (int w = 1; w < NUM_W; ++w) begin
@@ -241,8 +244,14 @@ module pc_gen_sva #(
         end
 
         avail = 0;
-        merge_l0 = (ftq_in_vld_scnt >= 2) && blk_has_end[0][0] && !is_end[0][0][W_PER_DW-1] && ftq_in_dat[0].ft;
-        merge_l1 = (ftq_in_vld_scnt >= 2) && blk_has_end[0][1] && !is_end[0][1][W_PER_DW-1] && ftq_in_dat[0].ft;
+        merge_l0 = (ftq_in_vld_scnt >= 2)
+            && blk_has_end[0][0]
+            && !is_end[0][0][W_PER_DW-1]
+            && ftq_in_dat[0].ft;
+        merge_l1 = (ftq_in_vld_scnt >= 2)
+            && blk_has_end[0][1]
+            && !is_end[0][1][W_PER_DW-1]
+            && ftq_in_dat[0].ft;
 
         cur_off = s.off;
         aft_bidx = '0;
@@ -340,7 +349,8 @@ module pc_gen_sva #(
 
             n.base  = base_n[aft_bidx[i]];
             n.off   = aft_off[i];
-            n.inbuf = base_n[aft_bidx[i]] != 2; // we cant store 3rd FTQ entry (which is not yet in window)
+            n.inbuf = aft_bidx[i] != 2;
+                // we cant store 3rd FTQ entry (it is not yet in window)
 
             c.ftq_out_ren_cnt = aft_bidx[i];
             c.ixq_out_wen_cnt = i+1;
