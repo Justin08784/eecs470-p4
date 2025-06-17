@@ -87,6 +87,7 @@ module pc_gen #(
 
 
     FB_OFF  [NUM_FTQ-1:0][NUM_W:0]off_n;
+    FB_OFF  [NUM_FTQ-1:0][NUM_DW-1:0][W_PER_DW-1:0] blk_off_n;
     logic   [NUM_FTQ-1:0][NUM_W-1:0]is_end_flat, fmsk_flat;
     logic   [NUM_FTQ-1:0][NUM_DW-1:0][W_PER_DW-1:0] is_end, fmsk;
     generate
@@ -119,6 +120,7 @@ module pc_gen #(
         for (genvar b = 0; b < NUM_DW; ++b) begin
             assign fmsk  [e][b] = fmsk_flat  [e][W_PER_DW*b +: W_PER_DW];
             assign is_end[e][b] = is_end_flat[e][W_PER_DW*b +: W_PER_DW];
+            assign blk_off_n[e][b] = off_n[e][W_PER_DW*b +: W_PER_DW];
         end
     end
 
@@ -265,6 +267,15 @@ module pc_gen #(
         endcase
     end
 
+    function FB_OFF [W_PER_DW-1:0] merge_off(
+        FB_OFF[W_PER_DW-1:0] aoff, boff,
+        logic [W_PER_DW-1:0] amsk
+    );
+        FB_OFF [W_PER_DW-1:0] rv;
+        for (int w = 0; w < W_PER_DW; ++w)
+            rv[w] = amsk[w] ? aoff[w] : boff[w];
+        return rv;
+    endfunction
 
     // ------------------------------------------------------------------
     // o_*[0]
@@ -274,13 +285,17 @@ module pc_gen #(
 
         unique case (1'b1)
             bhe00 &  merge_l0: begin
-                o_off   [0] = off_n [0][1:0]|   off_n [1][1:0];
-                o_fmsk  [0] = fmsk  [0][1]  |   fmsk  [1][0];
-                o_is_end[0] = is_end[0][1]  |   is_end[1][0];
+                o_off   [0] = merge_off(
+                    blk_off_n   [0][0],
+                    blk_off_n   [1][0],
+                    fmsk        [0][0]
+                );
+                o_fmsk  [0] = fmsk  [0][0]  |   fmsk  [1][0];
+                o_is_end[0] = is_end[0][0]  |   is_end[1][0];
             end
 
             default: begin
-                o_off   [0] = off_n [0][1:0];
+                o_off   [0] = blk_off_n[0][0];
                 o_fmsk  [0] = fmsk  [0][0];
                 o_is_end[0] = is_end[0][0];
             end
@@ -293,34 +308,38 @@ module pc_gen #(
     always_comb begin
         unique case (1'b1)
             bhe00 &  merge_l0: begin
-                o_off   [1] = off_n [1][3:2];
+                o_off   [1] = blk_off_n[1][1];
                 o_dws   [1] = dws   [1][1];
                 o_fmsk  [1] = fmsk  [1][1];
                 o_is_end[1] = is_end[1][1];
             end
             bhe00 & ~merge_l0: begin
-                o_off   [1] = off_n [1][1:0];
+                o_off   [1] = blk_off_n[1][0];
                 o_dws   [1] = dws   [1][0];
                 o_fmsk  [1] = fmsk  [1][0];
                 o_is_end[1] = is_end[1][0];
             end
 
             bhe01 &  merge_l1: begin
+                o_off   [1] = merge_off(
+                    blk_off_n   [0][1],
+                    blk_off_n   [1][0],
+                    fmsk        [0][1]
+                );
                 o_dws   [1] = dws   [0][1];
-                o_off   [1] = off_n [0][3:2]|   off_n [1][1:0];
                 o_fmsk  [1] = fmsk  [0][1]  |   fmsk  [1][0];
                 o_is_end[1] = is_end[0][1]  |   is_end[1][0];
             end
             bhe01 & ~merge_l1: begin
                 o_dws   [1] = dws   [0][1];
-                o_off   [1] = off_n [0][3:2];
+                o_off   [1] = blk_off_n[0][1];
                 o_fmsk  [1] = fmsk  [0][1];
                 o_is_end[1] = is_end[0][1];
             end
 
             default: begin
                 o_dws   [1] = dws   [0][1];
-                o_off   [1] = off_n [0][3:2];
+                o_off   [1] = blk_off_n[0][1];
                 o_fmsk  [1] = fmsk  [0][1];
                 o_is_end[1] = is_end[0][1];
             end
