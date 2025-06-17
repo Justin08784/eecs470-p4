@@ -1,8 +1,24 @@
 `include "sys_defs.svh"
 
-// `define PC_GEN_TEST_MODE
+/* NOTE:
+Since the FTQ_ENTRY does not store the current base (it only stores base_n),
+it is *vital* that upon reset, flush, or–– in the future–– steer, the BPU and
+pc_gen are both reset to exact same base. Maybe use a runtime assertion like this?:
 
-module pc_gen (
+property p_never_diverge;
+  @(posedge clock)
+    disable iff (reset)
+    pc_gen.cur.base == $past(BPU.fb_base);
+endproperty
+*/
+module pc_gen #(
+    parameter MAX_W_PER_FB  = 16,// maximum span of a fetch block / ftq entry, in words
+    parameter W_PER_DW      = 2, // num words per double-word / cache line
+    parameter NUM_DW        = 2, // num double words we can process per cycle
+    parameter NUM_FTQ       = 2, // num FTQ entries we can process per cycle
+    type FB_OFF=`IDX_TYPE(MAX_W_PER_FB),
+    localparam  NUM_W       = NUM_DW*W_PER_DW
+) (
     input   clock,
     input   reset,
     input   flush,
@@ -34,14 +50,6 @@ module pc_gen (
     output  `CNT_TYPE(2)    buf_out_wen_cnt,
     output  FTQ_ENTRY[1:0]  buf_out_dat
 );
-    localparam MAX_W_PER_FB = 16;// maximum span of a fetch block / ftq entry, in words
-    localparam W_PER_DW     = 2; // num words per double-word / cache line
-    localparam NUM_DW       = 2; // num double words we can process per cycle
-    localparam NUM_FTQ      = 2; // num FTQ entries we can process per cycle
-    localparam NUM_W        = NUM_DW*W_PER_DW;
-
-    typedef `IDX_TYPE(MAX_W_PER_FB) FB_OFF;
-
     localparam FB_OFF off_rst = '0;
     localparam WADDR base_rst = '0;
     localparam logic inbuf_rst = 0;
