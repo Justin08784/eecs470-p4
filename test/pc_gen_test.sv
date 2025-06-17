@@ -31,31 +31,19 @@ module pc_gen_test;
     `CNT_TYPE(2)    buf_out_wen_cnt;
     FTQ_ENTRY[1:0]  buf_out_dat;
 
-    task automatic wr_ftq0(
-        FTQ_ENTRY f,
-        WADDR   base_n,
-        logic   ft,
+    function automatic FTQ_ENTRY wr_ftq(
+        FTQ_ENTRY   f,
+        WADDR       base_n,
+        logic       ft,
         logic [3:0] off
     );
-        ftq_in_dat[0] = f;
-
-        ftq_in_dat[0].base_n    = base_n;
-        ftq_in_dat[0].ft        = ft;
-        ftq_in_dat[0].off       = off;
-    endtask
-
-    task automatic wr_ftq1(
-        FTQ_ENTRY f,
-        WADDR   base_n,
-        logic   ft,
-        logic [3:0] off
-    );
-        ftq_in_dat[1] = f;
-
-        ftq_in_dat[1].base_n    = base_n;
-        ftq_in_dat[1].ft        = ft;
-        ftq_in_dat[1].off       = off;
-    endtask
+        FTQ_ENTRY rv;
+        rv          = f;
+        rv.base_n   = base_n;
+        rv.ft       = ft;
+        rv.off      = off;
+        return rv;
+    endfunction
 
     pc_gen dut (
         .clock,
@@ -79,18 +67,47 @@ module pc_gen_test;
         .buf_out_dat
     );
 
-    FTQ_ENTRY f0, f1;
-
-
-    // base_n
-    // ft
-    // off
+    FTQ_ENTRY f0, f1, tmp_f0, tmp_f1;
 
     struct packed {
         FB_OFF  off;
         WADDR   base;
         logic   inbuf; // FTQ entry allocated in buf?
     } s, n;
+
+    struct packed {
+        `CNT_TYPE(2)    ftq_out_ren_cnt;
+        // irq / iqq
+        `CNT_TYPE(2)    ixq_out_wen_cnt;
+        DWADDR[1:0]     ixq_out_dw;
+        logic[1:0][1:0] ixq_out_fmsk;
+        logic[1:0][1:0] ixq_out_is_end;
+        // FTQ buffer
+        `CNT_TYPE(2)    buf_out_wen_cnt;
+        FTQ_ENTRY[1:0]  buf_out_dat;
+    } sva_comb, dut_comb;
+
+    struct packed {
+        logic   eq_ftq_out_ren_cnt;
+        logic   eq_ixq_out_wen_cnt,
+                eq_ixq_out_dw,
+                eq_ixq_out_fmsk,
+                eq_ixq_out_is_end;
+        logic   eq_buf_out_wen_cnt,
+                eq_buf_out_dat;
+    } diff, diff_n;
+
+    assign diff_n = '{
+        eq_ftq_out_ren_cnt  : sva_comb.ftq_out_ren_cnt  != ftq_out_ren_cnt,
+    
+        eq_ixq_out_wen_cnt  : sva_comb.ixq_out_wen_cnt  != ixq_out_wen_cnt,
+        eq_ixq_out_dw       : sva_comb.ixq_out_dw       != ixq_out_dw,
+        eq_ixq_out_fmsk     : sva_comb.ixq_out_fmsk     != ixq_out_fmsk,
+        eq_ixq_out_is_end   : sva_comb.ixq_out_is_end   != ixq_out_is_end,
+
+        eq_buf_out_wen_cnt  : sva_comb.buf_out_wen_cnt  != buf_out_wen_cnt,
+        eq_buf_out_dat      : sva_comb.buf_out_dat      != buf_out_dat
+    };
 
     task debug;
         $display("s: off: %h, base: %h, inbuf: %h",
@@ -112,50 +129,57 @@ module pc_gen_test;
             ftq_in_dat[1].base_n,
             ftq_in_dat[1].ft,
             ftq_in_dat[1].off,
-            ftq_out_ren_cnt
+            dut_comb.ftq_out_ren_cnt
         );
 
-        $display("ixq_out: dw = [%d, %d], fmsk = [%b%b, %b%b], is_end = [%b%b, %b%b]",
-            ixq_out_dw[0],
-            ixq_out_dw[1],
-            ixq_out_fmsk[0][0],
-            ixq_out_fmsk[0][1],
-            ixq_out_fmsk[1][0],
-            ixq_out_fmsk[1][1],
-            ixq_out_is_end[0][0],
-            ixq_out_is_end[0][1],
-            ixq_out_is_end[1][0],
-            ixq_out_is_end[1][1]
+        $display("ixq_out: wen_cnt = %d, dw = [%d, %d], fmsk = [%b%b, %b%b], is_end = [%b%b, %b%b]",
+            dut_comb.ixq_out_wen_cnt,
+            dut_comb.ixq_out_dw[0],
+            dut_comb.ixq_out_dw[1],
+            dut_comb.ixq_out_fmsk[0][0],
+            dut_comb.ixq_out_fmsk[0][1],
+            dut_comb.ixq_out_fmsk[1][0],
+            dut_comb.ixq_out_fmsk[1][1],
+            dut_comb.ixq_out_is_end[0][0],
+            dut_comb.ixq_out_is_end[0][1],
+            dut_comb.ixq_out_is_end[1][0],
+            dut_comb.ixq_out_is_end[1][1]
         );
 
         $display("buf_out: wen_cnt = %d, [{base_n: %d, ft: %b, off: %d}, {base_n: %d, ft: %b, off: %d}]\n",
-            buf_out_wen_cnt,
-            buf_out_dat[0].base_n,
-            buf_out_dat[0].ft,
-            buf_out_dat[0].off,
-            buf_out_dat[1].base_n,
-            buf_out_dat[1].ft,
-            buf_out_dat[1].off
+            dut_comb.buf_out_wen_cnt,
+            dut_comb.buf_out_dat[0].base_n,
+            dut_comb.buf_out_dat[0].ft,
+            dut_comb.buf_out_dat[0].off,
+            dut_comb.buf_out_dat[1].base_n,
+            dut_comb.buf_out_dat[1].ft,
+            dut_comb.buf_out_dat[1].off
         );
+
+        $display("diff: %b", diff);
     endtask
 
-    struct packed {
-        `CNT_TYPE(2)    ftq_out_ren_cnt;
-        // irq / iqq
-        `CNT_TYPE(2)    ixq_out_wen_cnt;
-        DWADDR[1:0]     ixq_out_dw;
-        logic[1:0][1:0] ixq_out_fmsk;
-        logic[1:0][1:0] ixq_out_is_end;
-        // FTQ buffer
-        `CNT_TYPE(2)    buf_out_wen_cnt;
-        FTQ_ENTRY[1:0]  buf_out_dat;
-    } sva_comb;
 
     always_ff @(posedge clock) begin
-        if (reset)
-            s <= '0;
-        else
-            s <= n;
+        if (reset) begin
+            s       <= '0;
+            dut_comb<= '0;
+            diff    <= '0;
+        end else begin
+            s       <= n;
+            dut_comb<= '{
+                ftq_out_ren_cnt :ftq_out_ren_cnt,
+                
+                ixq_out_wen_cnt :ixq_out_wen_cnt,
+                ixq_out_dw      :ixq_out_dw,
+                ixq_out_fmsk    :ixq_out_fmsk,
+                ixq_out_is_end  :ixq_out_is_end,
+                
+                buf_out_wen_cnt :buf_out_wen_cnt,
+                buf_out_dat     :buf_out_dat
+            };
+            diff    <= diff_n;
+        end
     end
 
     initial begin
@@ -165,6 +189,9 @@ module pc_gen_test;
 
         f0.slot[1:0]= 10'h42;
         f1.slot[1:0]= 10'h100;
+
+        tmp_f0 = '0;
+        tmp_f1 = '0;
 
         $display("\nStart Testbench");
         clock = 0;
@@ -177,38 +204,42 @@ module pc_gen_test;
         ixq_in_rdy_scnt = 0;
         buf_in_rdy_scnt = 0;
 
-        // $monitor("  %3d | d_in: [%d, %d]   wr_en_cnt: %d  rd_en_cnt: %d  |  d_out: [%d, %d]   used_scnt: %2d  free_scnt: %2d",
-        //     $time,
-        //     wr_en_cnt > 0 ? wr_data[0] : 0,
-        //     wr_en_cnt > 1 ? wr_data[1] : 0,
-        //     wr_en_cnt,
-        //     rd_en_cnt,
-        //     rd_data[0], 
-        //     rd_data[1], 
-        //     used_scnt, 
-        //     free_scnt);
-
-        // base_n
-        // ft
-        // off
-
         @(negedge clock);
         reset = 0;
-        @(negedge clock);
 
         ixq_in_rdy_scnt = 2;
         buf_in_rdy_scnt = 2;
         ftq_in_vld_scnt = 2;
-        wr_ftq0(f0, 0, 0, 15);
-        wr_ftq1(f1, 0, 0, 0);
-        // debug;
-        #0;
+        tmp_f0 = wr_ftq(f0, 0, 0, 15);
+        tmp_f1 = wr_ftq(f1, 0, 0, 0);
+        ftq_in_dat = {tmp_f1, tmp_f0};
+
+        sva_comb = '{
+            ftq_out_ren_cnt : 0,
+            ixq_out_wen_cnt : 2,
+            ixq_out_dw      : {DWADDR'(1), DWADDR'(0)},
+            ixq_out_fmsk    : {2'b11, 2'b11},
+            ixq_out_is_end  : {2'b00, 2'b00},
+            buf_out_wen_cnt : 1,
+            buf_out_dat     : {tmp_f1, tmp_f0}
+        };
 
         n = '{
             off : 4,
             base: 0,
             inbuf : 1
         };
+
+        @(posedge clock);
+
+        // reset = 1;
+        @(negedge clock);
+        // reset = 0;
+        // @(negedge clock);
+        // debug;
+
+
+        $finish;
 
         $display("base_woff: %b, %b", dut.base_woff[0], dut.base_woff[1]);
         $display("ixq_out_dw [%d, %d]", ixq_out_dw[0], ixq_out_dw[1]);
@@ -234,18 +265,6 @@ module pc_gen_test;
         $display("dws [%d, %d]", dut.dws[0][0], dut.dws[0][1]);
         $display("o_dws [%d, %d]", dut.o_dws[0], dut.o_dws[1]);
         // $display("blk_status [%d, %d]", dut.blk_status[0][0], dut.blk_status[0][1]);
-
-        // @(posedge clock);
-        @(negedge clock);
-
-        // ftq_in_vld_scnt = 2;
-        // wr_ftq0(0, 1, 2);
-        // wr_ftq1(69, 0, 8);
-        // #0;
-        debug;
-
-
-        $finish;
     end
 
 
@@ -268,8 +287,36 @@ module pc_gen_test;
             disable iff (reset)
             dut.cur == s;
         endproperty
+
+        property match_ftq_out;
+            disable iff (reset)
+            sva_comb.ftq_out_ren_cnt == ftq_out_ren_cnt;
+        endproperty
+
+        property match_ixq_out;
+            disable iff (reset)
+
+            sva_comb.ixq_out_wen_cnt == ixq_out_wen_cnt
+                && sva_comb.ixq_out_dw == ixq_out_dw 
+                && sva_comb.ixq_out_fmsk == ixq_out_fmsk 
+                && sva_comb.ixq_out_is_end == ixq_out_is_end;
+        endproperty
+
+        property match_buf_out;
+            disable iff (reset)
+
+            sva_comb.buf_out_wen_cnt == buf_out_wen_cnt
+                && sva_comb.buf_out_dat == buf_out_dat;
+        endproperty
     endclocking
 
     Match_Seq: assert property(cb.match_seq)
         else exit_on_error;
+
+    Match_Ftq_Out: assert property(cb.match_ftq_out)
+        else exit_on_error;
+    Match_Ixq_Out: assert property(cb.match_ixq_out)
+        else exit_on_error;
+    // Match_Buf_Out: assert property(cb.match_buf_out)
+    //     else exit_on_error;
 endmodule
