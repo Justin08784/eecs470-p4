@@ -84,7 +84,13 @@ module pc_gen (
             ? '0
             : nal_off_n[e][0];
 
-        assign off_n[e][NUM_W:1] = nal_off_n[e][!base_woff[e] +: NUM_W];
+        for (genvar w = 1; w <= NUM_W; ++w) begin
+            // assign off_n[e][NUM_W:1] = nal_off_n[e][!base_woff[e] +: NUM_W];
+            assign off_n[e][w] = base_woff[e]
+                ? nal_off_n[e][w-1]
+                : nal_off_n[e][w];
+        end
+
     end
 
     logic   [NUM_FTQ-1:0][NUM_W-1:0] align_msk, after_end;
@@ -295,9 +301,9 @@ module pc_gen (
             end
 
             default: begin
-                o_dws   [1] = dws   [1][0];
-                o_fmsk  [1] = fmsk  [1][0];
-                o_is_end[1] = is_end[1][0];
+                o_dws   [1] = dws   [0][1];
+                o_fmsk  [1] = fmsk  [0][1];
+                o_is_end[1] = is_end[0][1];
             end
         endcase
     end
@@ -350,6 +356,11 @@ module pc_gen (
     // assign flush_dw[1] = flush_start[13:1] + `UCAST_FIT(1);
     // endgenerate
 
+    `CNT_TYPE(NUM_FTQ)  adv_base_v;
+    `CNT_TYPE(NUM_DW)   adv_blk_v;
+    assign adv_base_v   = adv_base  [ixq_out_wen_cnt];
+    assign adv_blk_v    = adv_blk   [ixq_out_wen_cnt];
+
     always_ff @(posedge clock) begin
         if (reset)
 `ifndef PC_GEN_TEST_MODE
@@ -368,20 +379,133 @@ module pc_gen (
                 inbuf: 0
             };
 
-        else begin
-            `CNT_TYPE(NUM_FTQ)  adv_base_v;
-            `CNT_TYPE(NUM_DW)   adv_blk_v;
-
-            adv_base_v  = adv_base   [ixq_out_wen_cnt];
-            adv_blk_v   = adv_blk    [ixq_out_wen_cnt];
-
+        else
             cur <= '{
                 off  : pos_blk_off[adv_base_v][adv_blk_v],
                 base : base_n[adv_base_v],
                 inbuf: ixq_out_wen_cnt != 0 && (adv_base_v != 2)
             };
 
-        end
     end
+
+    task print_pc_gen;
+        // $display("ftq_in_dat[*].off: [%d, %d]",
+        //     ftq_in_dat[0].off,
+        //     ftq_in_dat[1].off,
+        // );
+
+        $display("nal_off_n: [[%d, %d, %d, %d, %d], [%d, %d, %d, %d, %d]]",
+            nal_off_n[0][0],
+            nal_off_n[0][1],
+            nal_off_n[0][2],
+            nal_off_n[0][3],
+            nal_off_n[0][4],
+            nal_off_n[1][0],
+            nal_off_n[1][1],
+            nal_off_n[1][2],
+            nal_off_n[1][3],
+            nal_off_n[1][4]
+        );
+
+        // $display("nal_is_end: %b", nal_is_end);
+
+        $display("ftq[0]: base_woff: %b, align_msk: %b, fmsk: %b, off_n: [%d, %d, %d, %d, %d], is_end_flat: %b",
+            base_woff[0],
+            align_msk[0],
+            fmsk_flat[0],
+            off_n[0][0],
+            off_n[0][1],
+            off_n[0][2],
+            off_n[0][3],
+            off_n[0][4],
+            is_end_flat[0]
+        );
+
+        $display("ftq[1]: base_woff: %b, align_msk: %b, fmsk: %b, off_n: [%d, %d, %d, %d, %d], is_end_flat: %b",
+            base_woff[1],
+            align_msk[1],
+            fmsk_flat[1],
+            off_n[1][0],
+            off_n[1][1],
+            off_n[1][2],
+            off_n[1][3],
+            off_n[1][4],
+            is_end_flat[1]
+        );
+
+        $display("ftq_out: ren_cnt: %d",
+            ftq_out_ren_cnt
+        );
+
+        $display("ixq_out: wen_cnt = %d, dw = [%d, %d], fmsk = %b, is_end = %b",
+            ixq_out_wen_cnt,
+            ixq_out_dw[0],
+            ixq_out_dw[1],
+            ixq_out_fmsk,
+            ixq_out_is_end
+        );
+
+        $display("buf_out: wen_cnt = %d, [{base_n: %d, ft: %b, off: %d}, {base_n: %d, ft: %b, off: %d}]\n",
+            buf_out_wen_cnt,
+            buf_out_dat[0].base_n,
+            buf_out_dat[0].ft,
+            buf_out_dat[0].off,
+            buf_out_dat[1].base_n,
+            buf_out_dat[1].ft,
+            buf_out_dat[1].off
+        );
+
+        $display("adv_base: [%d, %d, %d] -> %d",
+            adv_base[0],
+            adv_base[1],
+            adv_base[2],
+            adv_base_v
+        );
+
+        $display("adv_blk: [%d, %d, %d] -> %d",
+            adv_blk[0],
+            adv_blk[1],
+            adv_blk[2],
+            adv_blk_v
+        );
+
+        $display("pos_blk_off: [\n[%d, %d, %d],\n[%d, %d, %d],\n[%d, %d, %d]] -> %d",
+            pos_blk_off[0][0],
+            pos_blk_off[0][1],
+            pos_blk_off[0][2],
+            pos_blk_off[1][0],
+            pos_blk_off[1][1],
+            pos_blk_off[1][2],
+            pos_blk_off[2][0],
+            pos_blk_off[2][1],
+            pos_blk_off[2][2],
+            pos_blk_off[adv_base_v][adv_blk_v]
+        );
+
+        // $display("base_woff: %b, %b", base_woff[0], base_woff[1]);
+        // $display("ixq_out_dw [%d, %d]", ixq_out_dw[0], ixq_out_dw[1]);
+        // $display("ixq_out_fmsk [%b, %b]", ixq_out_fmsk[0], ixq_out_fmsk[1]);
+        // $display("is_end_flat: %b", dut.is_end_flat);
+        // $display("align_msk: %b, fmsk: %b", dut.align_msk, dut.fmsk);
+        // $display("%d %d %d %d %d",
+        //     dut.nal_off_n[0][0],
+        //     dut.nal_off_n[0][1],
+        //     dut.nal_off_n[0][2],
+        //     dut.nal_off_n[0][3],
+        //     dut.nal_off_n[0][4]
+        // );
+
+        // $display("%b %b %b %b",
+        //     dut.nal_is_end[0][0],
+        //     dut.nal_is_end[0][1],
+        //     dut.nal_is_end[0][2],
+        //     dut.nal_is_end[0][3]
+        // );
+        // $display("off: %d %d", ftq_in_dat[0].off, ftq_in_dat[1].off);
+        // $display("fmsk[0]: [%b]", dut.fmsk[0]);
+        // $display("dws [%d, %d]", dut.dws[0][0], dut.dws[0][1]);
+        // $display("o_dws [%d, %d]", dut.o_dws[0], dut.o_dws[1]);
+
+    endtask
 
 endmodule
