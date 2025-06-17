@@ -87,20 +87,16 @@ module pc_gen (
         assign off_n[e][NUM_W:1] = nal_off_n[e][!base_woff[e] +: NUM_W];
     end
 
-    logic   [NUM_FTQ-1:0][NUM_W-1:0] align_msk;
+    logic   [NUM_FTQ-1:0][NUM_W-1:0] align_msk, after_end;
     for (genvar e = 0; e < NUM_FTQ; ++e) begin
         assign align_msk[e]     = {NUM_W{1'b1}} << base_woff[e];
         assign is_end_flat[e]   = nal_is_end[e] << base_woff[e];
     end
 
-    for (genvar e = 0; e < NUM_FTQ; ++e) begin
-        assign fmsk_flat[e][0] = align_msk[e][0];
+    for (genvar e = 0; e < NUM_FTQ; ++e)
+        assign after_end[e] = (after_end[e] | is_end_flat[e]) << 1;
 
-        for (genvar w = 1; w < NUM_W; ++w) begin
-            assign fmsk_flat[e][w] =
-                fmsk_flat[e][w-1] && align_msk[e][w] && !is_end_flat[e][w-1];
-        end
-    end
+    assign fmsk_flat = align_msk & ~after_end;
 
     for (genvar e = 0; e < NUM_FTQ; ++e) begin
         for (genvar b = 0; b < NUM_DW; ++b) begin
