@@ -324,7 +324,7 @@ module pc_gen_sva #(
             ++avail;
         end
 
-        req_buf[0] = !s.inbuf;
+        req_buf[0] = (!s.inbuf || aft_bidx[0] > 0);
         req_buf[1] = aft_bidx[1] > 0;
 
         for (int i = 0; i < avail; ++i) begin

@@ -377,8 +377,8 @@ module pc_gen #(
         We don't even access to the 3rd ftq entry this cycle, so we will never
         be able to push it to the reread queue.
         */
-        req_buf[0] = !cur.inbuf;
-        req_buf[1] = adv_base[tmp] != 0;
+        req_buf[0] = (!cur.inbuf || adv_base[1] != 0);
+        req_buf[1] = (adv_base[2] != 0);
 
         ixq_out_wen_cnt = `MIN(buf_lim_cnt, tmp);
 
