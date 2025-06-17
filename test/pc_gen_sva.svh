@@ -157,6 +157,10 @@ module pc_gen_sva #(
         logic   [NUM_FTQ-1:0][NUM_DW-1:0][W_PER_DW-1:0] is_end, fmsk;
         int     blk_num_fetch [NUM_FTQ-1:0][NUM_DW-1:0];
 
+        int avail, cur_off;
+        logic [1:0][:0] aft_bidx;
+        FB_OFF [1:0] aft_off;
+
         // >> vld_scnt == 2 case only:
         int out_idx;
         logic [NUM_DW-1:0] req_buf;
@@ -170,8 +174,8 @@ module pc_gen_sva #(
             LS_END_MERGE_END    // line ends, and requires LB0 merge, and LB0 ends
         } LINE_STATUS;
 
-        logic pos_ftq [NUM_FTQ*NUM_DW-1:0];
-        logic pos_blk [NUM_FTQ*NUM_DW-1:0];
+        logic [NUM_FTQ*NUM_DW-1:0] pos_ftq;
+        logic [NUM_FTQ*NUM_DW-1:0] pos_blk;
 
         LINE_STATUS l0_status, l1_status;
         // <<
@@ -235,6 +239,115 @@ module pc_gen_sva #(
                 blk_num_fetch[e][b] = $countones(fmsk[e][b]);
             end
         end
+
+        avail = 0;
+        merge_l0 = (ftq_in_vld_scnt >= 2) && blk_has_end[0][0] && !is_end[0][0][W_PER_DW-1] && ftq_in_dat[0].ft;
+        merge_l1 = (ftq_in_vld_scnt >= 2) && blk_has_end[0][1] && !is_end[0][1][W_PER_DW-1] && ftq_in_dat[0].ft;
+
+        cur_off = s.off;
+        aft_bidx = '0;
+        pos_ftq = '0;
+        pos_blk = '0;
+        aft_off = '0;
+
+        // ftq 0
+        for (int b = 0; b < NUM_DW; ++b) begin
+            if (ftq_in_vld_scnt < 1)
+                break;
+            
+            if (blk_has_end[0][b]) begin
+                logic merge;
+
+                merge = b ? merge_l1 : merge_l0;
+
+                if (merge) begin
+                    aft_bidx[avail]= 1;
+                    pos_ftq[avail] = 1;
+                    pos_blk[avail] = 0;
+                    aft_off[avail] = 0;
+
+                    cur_off = 0;
+
+                end else begin
+                    aft_bidx[avail]= 0;
+                    pos_ftq[avail] = 0;
+                    pos_blk[avail] = b;
+                    aft_off[avail] = cur_off + blk_num_fetch[0][b];
+
+                    cur_off = 0;
+                    ++avail;
+                end
+                break;
+            end
+
+            cur_off += blk_num_fetch[0][b];
+
+            aft_bidx[avail]= 0;
+            pos_ftq[avail] = 0;
+            pos_blk[avail] = b;
+            aft_off[avail] = cur_off;
+            ++avail;
+        end
+
+        // ftq 1
+        for (int b = 0; b < NUM_DW; ++b) begin
+            if (ftq_in_vld_scnt < 2)
+                break;
+            if (avail == NUM_DW) // full
+                break;
+
+            if (blk_has_end[1][b]) begin
+                aft_bidx[avail]= 2;
+                pos_ftq[avail] = 1;
+                pos_blk[avail] = b;
+                aft_off[avail] = 0;
+
+                break;
+            end
+
+            cur_off += blk_num_fetch[1][b];
+
+            aft_bidx[avail]= 1;
+            pos_ftq[avail] = 1;
+            pos_blk[avail] = b;
+            aft_off[avail] = cur_off;
+            ++avail;
+        end
+
+        req_buf[0] = !s.inbuf;
+        req_buf[1] = aft_bidx[1] > 0;
+
+        for (int i = 0; i < avail; ++i) begin
+            int e, b;
+            e = pos_ftq[i];
+            b = pos_blk[i];
+
+            c.ixq_out_dw[i]     = dws[e][b];
+            c.ixq_out_fmsk[i]   = fmsk[e][b];
+            c.ixq_out_is_end[i] = is_end[e][b];
+        end
+
+        c.buf_out_dat[0] = !s.inbuf ? ftq_in_dat[0] : ftq_in_dat[1];
+        c.buf_out_dat[1] = ftq_in_dat[1];
+
+        c.ftq_out_ren_cnt = 0;
+        c.ixq_out_wen_cnt = 0;
+        c.buf_out_wen_cnt = 0;
+        for (int i = 0; i < avail; ++i) begin
+            if ((i+1 > ixq_in_rdy_scnt)
+            ||  (c.buf_out_wen_cnt + req_buf[i] > buf_in_rdy_scnt))
+                break;
+
+            n.base  = base_n[aft_bidx[i]];
+            n.off   = aft_off[i];
+            n.inbuf = base_n[aft_bidx[i]] != 2; // we cant store 3rd FTQ entry (which is not yet in window)
+
+            c.ftq_out_ren_cnt = aft_bidx[i];
+            c.ixq_out_wen_cnt = i+1;
+            c.buf_out_wen_cnt += req_buf[i];
+        end
+
+        return;
 
         if (ftq_in_vld_scnt == 0)
             return;
