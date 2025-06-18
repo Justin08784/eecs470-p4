@@ -521,8 +521,14 @@ typedef struct packed {
     FTB_MD1 md;
 } FTB_UPD_PKT;
 
+`ifndef SYNTH
+`define PC_GEN_TEST_MODE
+`endif
 parameter FTQ_SZ = 32;
 typedef struct packed {
+`ifdef PC_GEN_TEST_MODE
+    int id;
+`endif
     WADDR       base_n;     // base address of *next* FB
 
     logic       ft;         // fallthrough? else took a branch

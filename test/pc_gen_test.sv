@@ -1,6 +1,149 @@
 `include "sys_defs.svh"
 `include "test/pc_gen_sva.svh"
 
+`ifdef PC_GEN_TEST_MODE
+// stimulus engine
+module pc_gen_stim #(
+    parameter MAX_W_PER_FB  = 16,// maximum span of a fetch block / ftq entry, in words
+    parameter W_PER_DW      = 2, // num words per double-word / cache line
+    parameter NUM_DW        = 2, // num double words we can process per cycle
+    parameter NUM_FTQ       = 2, // num FTQ entries we can process per cycle
+    type FB_OFF=`IDX_TYPE(MAX_W_PER_FB),
+    localparam  NUM_W       = NUM_DW*W_PER_DW
+) (
+    input   clock,
+    input   reset,
+    output  flush,
+
+    output  WADDR       flush_fb_base,
+    output  logic [3:0] flush_pc_off,
+    input   struct packed {
+        logic [3:0] off;
+        WADDR       base;
+        logic       inbuf;
+    } reset_val,
+
+    // ftq
+    output  `CNT_TYPE(2)    ftq_in_vld_scnt,
+    output  FTQ_ENTRY[1:0]  ftq_in_dat,
+    input   `CNT_TYPE(2)    ftq_out_ren_cnt,
+
+    // irq / iqq
+    output  `CNT_TYPE(2)    ixq_in_rdy_scnt, // = `MIN(iqq_*, irq_*)
+    input   `CNT_TYPE(2)    ixq_out_wen_cnt,
+    input   FB_OFF[1:0][1:0]ixq_out_off,
+    input   DWADDR [1:0]    ixq_out_dw,
+    input   logic[1:0][1:0] ixq_out_fmsk,
+    input   logic[1:0][1:0] ixq_out_is_end,
+
+    // FTQ buffer
+    output  `CNT_TYPE(2)    buf_in_rdy_scnt,
+    input   `CNT_TYPE(2)    buf_out_wen_cnt,
+    input   FTQ_ENTRY[1:0]  buf_out_dat
+);
+    localparam _FTQ_SZ = 8;
+    localparam _BUF_SZ = 8;
+
+    int cur_id;
+    FTQ_ENTRY _ftq [$], _buf [$];
+    logic   ftq_ids[int],
+            buf_ids[int];
+    // does id exist in X? (doesn't need to have logic type, but SV doesn't support sets... right?)
+
+    WORD_STREAM_PKT in_stream   [$];
+    WORD_STREAM_PKT out_stream  [$];
+
+    int ftq_sz, buf_sz, num_add, num_del;
+    WADDR fb_base;
+    logic [3:0] fb_off;
+
+    struct packed {
+        FTQ_ENTRY [1:0] fb;
+    } rand_pkt;
+
+    FTQ_ENTRY hi;
+    initial begin
+        cur_id = 0;
+
+    // forever begin
+    repeat (1000) begin
+
+        @(negedge clock);
+        std::randomize(rand_pkt);
+
+        ftq_sz = _ftq.size;
+        buf_sz = _buf.size;
+
+        ftq_in_vld_scnt = `MIN(ftq_sz, 2); // TODO: randomly restrict this below the true count?
+        ftq_in_dat = '0;
+        for (int e = 0; e < ftq_sz; ++e)
+            ftq_in_dat[e] = _ftq[e];
+        ixq_in_rdy_scnt = 2; // TODO: make this random
+        buf_in_rdy_scnt = `MIN(_BUF_SZ-buf_sz, 2); // TODO: Likewise. random restriction
+
+        num_add = _FTQ_SZ-ftq_sz;
+        for (int e = 0; e < num_add; ++e) begin
+            FTQ_ENTRY fb;
+            FTQ_ENTRY [15:0] in_append;
+            int num_append;
+
+            fb = rand_pkt.fb[e];
+
+            if (fb.ft)
+                fb.base_n = fb_base + fb.off + 1;
+
+            in_append = fb2stream(fb, fb_base, fb_off, num_append);
+            for (int w = 0; w < num_append; ++w)
+                in_stream.push_back(in_append[w]);
+
+            fb.id = cur_id;
+            _ftq.push_back(fb);
+
+            assert(!ftq_ids.exists(cur_id));
+            ftq_ids[cur_id] = 1;
+
+            ++cur_id;
+            fb_base = fb.base_n;
+            fb_off  = 0;
+        end
+
+        // consume some buffer entries
+        num_del = `MIN(buf_sz, 2); // TODO: make this random too
+        for (int e = 0; e < num_del; ++e) begin
+            FTQ_ENTRY fb;
+            if (ftq_ids.exists(_buf[e].id))
+                break;
+
+            fb = _buf.pop_front();
+            buf_ids.delete(fb.id);
+        end
+
+        @(posedge clock);
+    end
+    end
+
+    always_ff @(posedge clock) begin
+        if (!reset) begin
+            for (int e = 0; e < ftq_out_ren_cnt; ++e) begin
+                FTQ_ENTRY fb;
+
+                fb = _ftq.pop_front();
+                ftq_ids.delete(fb.id);
+            end
+
+            for (int e = 0; e < buf_out_wen_cnt; ++e) begin
+                FTQ_ENTRY fb;
+                fb = buf_out_dat[e];
+
+                _buf.push_back(fb);
+                buf_ids[fb.id] = 1;
+            end
+        end
+
+    end
+endmodule
+`endif
+
 module pc_gen_test;
     localparam MAX_W_PER_FB = 16;// maximum span of a fetch block / ftq entry, in words
     localparam W_PER_DW     = 2; // num words per double-word / cache line

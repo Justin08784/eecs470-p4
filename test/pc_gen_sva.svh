@@ -4,9 +4,99 @@
 `define PC_GEN_SVA_SVH
 
 // `define PC_GEN_SYNTH_MODE
-`ifndef PC_GEN_SYNTH_MODE
-`define PC_GEN_TEST_MODE
-`endif
+// `ifndef PC_GEN_SYNTH_MODE
+// `define PC_GEN_TEST_MODE
+// `endif
+
+
+typedef struct packed {
+    DWADDR      dw;     // cache line to which it belongs
+    logic       is_end; // is end of fb?
+
+    WADDR       base;   // fb base
+    logic[3:0]  off;    // in-fb offset
+
+    // logic       ft;     // was fb predicted fallthrough?
+    // logic       fmsk;   // fetchable?
+    // FTQ_ENTRY   fb;     // fb to which it belongs
+} WORD_STREAM_PKT;
+
+function automatic WORD_STREAM_PKT [15:0] fb2stream (
+    input FTQ_ENTRY     fb,
+    input WADDR         base,   // of fetch block
+    input logic [3:0]   off,    // starting offset in fb
+    output int          num     // of packets produced
+);
+    WORD_STREAM_PKT [15:0] rv;
+    WADDR   cur_pc;
+    DWADDR  cur_dw;
+    logic   is_end;
+    logic[3:0] cur_off;
+    int     w;
+
+    assert (off <= fb.off) else $fatal;
+
+    rv = '0;
+
+    num = 0;
+    for (w = 0; w < 16; ++w) begin
+        cur_off = off + w;
+        cur_pc  = base + cur_off;
+        cur_dw  = cur_pc[13:1];
+        is_end  = cur_off == fb.off;
+
+        rv[num] = '{
+            dw      : cur_dw,
+            is_end  : is_end,
+            base    : base,
+            off     : cur_off
+        };
+
+        ++num;
+
+        if (is_end)
+            break;
+    end
+
+    return rv;
+endfunction
+
+
+function automatic WORD_STREAM_PKT [1:0] ixq_out2stream (
+    input DWADDR            dw,
+    input logic [1:0][3:0]  off,
+    input logic [1:0]       fmsk,
+    input logic [1:0]       is_end,
+
+    output int  num     // of packets produced
+);
+    WORD_STREAM_PKT [1:0] rv;
+    WADDR   line_start, cur_pc;
+    int     w;
+
+    line_start = dw << 1;
+
+    rv = '0;
+
+    num = 0;
+    for (w = 0; w < 2; ++w) begin
+        cur_pc  = line_start + w;
+        if (!fmsk[w])
+            continue;
+
+        rv[num] = '{
+            dw      : dw,
+            is_end  : is_end[w],
+            base    : cur_pc - off[w],
+            off     : off[w]
+        };
+
+        ++num;
+    end
+
+    return rv;
+endfunction
+
 
 module pc_gen_sva #(
     parameter MAX_W_PER_FB  =16,
@@ -369,144 +459,6 @@ module pc_gen_sva #(
         end
 
         return;
-
-        if (ftq_in_vld_scnt == 0)
-            return;
-
-        if (ftq_in_vld_scnt == 1) begin
-            logic sat; // satisfied
-
-            c.ixq_out_dw[0]     = dws[0][0];
-            c.ixq_out_fmsk[0]   = fmsk[0][0];
-            c.ixq_out_is_end[0] = is_end[0][0];
-            c.buf_out_dat[0]    = ftq_in_dat[0];
-
-            if (s.inbuf) begin
-                sat = (ixq_in_rdy_scnt > 0);
-                c.buf_out_wen_cnt = 0;
-            end else begin
-                sat = (ixq_in_rdy_scnt > 0) && (buf_in_rdy_scnt > 0);
-                c.buf_out_wen_cnt = sat;
-            end
-            c.ixq_out_wen_cnt = sat;
-
-            if (c.ixq_out_wen_cnt == 0) begin
-                c.ftq_out_ren_cnt = 0;
-            end else begin
-                logic bhe;
-
-                bhe = blk_has_end[0][0];
-                c.ftq_out_ren_cnt = sat && bhe;
-
-                n.off   = bhe ? 0 : s.off + blk_num_fetch[0][0];
-                n.base  = ftq_in_dat[0].base_n;
-                assert(s.inbuf);
-            end
-
-            return;
-        end
-
-        assert(ftq_in_vld_scnt == 2);
-        merge_l0 = blk_has_end[0][0] && !is_end[0][0][W_PER_DW-1] && ftq_in_dat[0].ft;
-        merge_l1 = blk_has_end[0][1] && !is_end[0][1][W_PER_DW-1] && ftq_in_dat[0].ft;
-
-        // // Note: ftq0 needs a buf slot iff !inbuf. ftq1 always needs a buf slot
-        // req_buf[0] = !s.inbuf;
-        // req_buf[1] = 1;
-        c.buf_out_dat[0] = !s.inbuf ? ftq_in_dat[0] : ftq_in_dat[1];
-        c.buf_out_dat[1] = ftq_in_dat[1];
-
-        l0_status =
-            !blk_has_end[0][0]  ? LS_CON        :
-            !merge_l0           ? LS_END_NOMER  :
-            !blk_has_end[1][0]  ? LS_END_MERGE  :
-            LS_END_MERGE_END;
-        l1_status =
-            !blk_has_end[0][1]  ? LS_CON        :
-            !merge_l1           ? LS_END_NOMER  :
-            !blk_has_end[1][0]  ? LS_END_MERGE  :
-            LS_END_MERGE_END;
-
-        if (merge_l0) begin
-            fmsk[0][0]  |= fmsk[1][0];
-            is_end[0][0]|= is_end[1][0];
-        end
-        if (merge_l1) begin
-            fmsk[0][1]  |= fmsk[1][0];
-            is_end[0][1]|= is_end[1][0];
-        end
-
-        pos_ftq[0] = 0;
-        pos_blk[0] = 0;
-
-        unique case (l0_status)
-        LS_CON: begin
-            pos_ftq[1] = 0;
-            pos_blk[1] = 0;
-
-            unique case (l1_status)
-            LS_CON: begin
-                pos_ftq[2] = 0;
-                pos_blk[2] = 1;
-            end
-
-            LS_END_NOMER: begin
-                pos_ftq[2] = 0;
-                pos_blk[2] = 1;
-            end
-
-            LS_END_MERGE: begin
-                pos_ftq[2] = 1;
-                pos_blk[2] = 0;
-            end
-
-            LS_END_MERGE_END: begin
-                pos_ftq[2] = 1;
-                pos_blk[2] = 1;
-            end
-            endcase
-        end
-
-        LS_END_NOMER: begin
-            pos_ftq[1] = 0;
-            pos_blk[1] = 0;
-
-            pos_ftq[2] = 1;
-            pos_blk[2] = 0;
-        end
-
-        LS_END_MERGE,
-        LS_END_MERGE_END: begin
-            pos_ftq[1] = 1;
-            pos_blk[1] = 0;
-
-            pos_ftq[2] = 1;
-            pos_blk[2] = 1;
-        end
-        endcase
-
-        // adv_base_v = pos_ftq[1] + blk_has_end[1][1];
-
-        for (int i = 0; i < NUM_DW; ++i) begin
-            int e, b;
-            e = pos_ftq[i+1];
-            b = pos_blk[i+1];
-
-            c.ixq_out_dw[i]     = dws[e][b];
-            c.ixq_out_fmsk[i]   = fmsk[e][b];
-            c.ixq_out_is_end[i] = is_end[e][b];
-        end
-
-        // c.ixq_out_wen_cnt = 0;
-        // c.buf_out_wen_cnt = 0;
-        // for (int i = 0; i < 2; ++i) begin
-        //     if ((i >= ixq_in_rdy_scnt)
-        //     ||  (c.buf_out_wen_cnt + req_buf[i] > buf_in_rdy_scnt))
-        //         break;
-
-        //     c.ixq_out_wen_cnt = i+1;
-        //     c.buf_out_wen_cnt += req_buf[i];
-        // end
 
         /*TODO:
         Edge case to test. Output block 0 is a merger of 00 and 10, but buf
