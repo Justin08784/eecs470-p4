@@ -44,7 +44,6 @@ module pc_gen_stim #(
     localparam _FTQ_SZ = 8;
     localparam _BUF_SZ = 8;
 
-    int cur_id;
     FTQ_ENTRY _ftq [$], _buf [$];
     logic   ftq_ids[int],
             buf_ids[int];
@@ -54,22 +53,29 @@ module pc_gen_stim #(
     WORD_STREAM_PKT out_stream  [$];
 
     int ftq_sz, buf_sz, num_add, num_del;
-    WADDR fb_base;
-    logic [3:0] fb_off;
 
+    int cur_id; // ignores reset/flushes. monotonic identifier
     struct packed {
-        FTQ_ENTRY [1:0] fb;
-    } rand_pkt;
+        WADDR base;
+        logic [3:0] off;
+    } cur, cur_n;
 
-    FTQ_ENTRY hi;
+    // struct packed {
+    // } rand_pkt;
+
     initial begin
         cur_id = 0;
 
+        // FIXME
+        flush   = 0;
+        flush_fb_base   = '0;
+        flush_pc_off    = '0;
+
     // forever begin
-    repeat (1000) begin
+    // repeat (1000) begin
+    repeat (10) begin
 
         @(negedge clock);
-        std::randomize(rand_pkt);
 
         ftq_sz = _ftq.size;
         buf_sz = _buf.size;
@@ -82,17 +88,19 @@ module pc_gen_stim #(
         buf_in_rdy_scnt = `MIN(_BUF_SZ-buf_sz, 2); // TODO: Likewise. random restriction
 
         num_add = _FTQ_SZ-ftq_sz;
+        cur_n = cur;
         for (int e = 0; e < num_add; ++e) begin
+            // localparam MAX_OFF_VAL = 1 << 15 - MAX_W_PER_FB; // FIXME: how to handle?
             FTQ_ENTRY fb;
-            FTQ_ENTRY [15:0] in_append;
+            WORD_STREAM_PKT [15:0] in_append;
             int num_append;
 
-            fb = rand_pkt.fb[e];
+            std::randomize(fb);
 
             if (fb.ft)
-                fb.base_n = fb_base + fb.off + 1;
+                fb.base_n = cur_n.base + cur_n.off + 1;
 
-            in_append = fb2stream(fb, fb_base, fb_off, num_append);
+            in_append = fb2stream(fb, cur_n.base, cur_n.off, num_append);
             for (int w = 0; w < num_append; ++w)
                 in_stream.push_back(in_append[w]);
 
@@ -103,8 +111,8 @@ module pc_gen_stim #(
             ftq_ids[cur_id] = 1;
 
             ++cur_id;
-            fb_base = fb.base_n;
-            fb_off  = 0;
+            cur_n.base = fb.base_n;
+            cur_n.off  = 0;
         end
 
         // consume some buffer entries
@@ -123,7 +131,29 @@ module pc_gen_stim #(
     end
 
     always_ff @(posedge clock) begin
-        if (!reset) begin
+        if (reset) begin
+            _ftq.delete();
+            _buf.delete();
+            buf_ids.delete();
+            ftq_ids.delete();
+            cur <= '{
+                base: reset_val.base,
+                off : reset_val.off
+            };
+
+        end else if (flush) begin
+            _ftq.delete();
+            _buf.delete();
+            buf_ids.delete();
+            ftq_ids.delete();
+            cur <= '{
+                base: flush_fb_base,
+                off : flush_pc_off
+            };
+
+        end else begin
+            cur <= cur_n;
+
             for (int e = 0; e < ftq_out_ren_cnt; ++e) begin
                 FTQ_ENTRY fb;
 
