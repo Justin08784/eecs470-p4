@@ -96,7 +96,7 @@
 # there should be no need to change anything for project 3
 
 # this is a global clock period variable used in the tcl script and referenced in testbenches
-export CLOCK_PERIOD = 30.0
+export CLOCK_PERIOD = 3.0
 
 # the Verilog Compiler command and arguments
 VCS =  vcs -sverilog -xprop=tmerge +vc -Mupdate -Mdir=build/csrc -line -full64 -kdb -lca -nc \
@@ -243,10 +243,10 @@ GHR_FILES = test/ghr_sva.svh # FIXME: how are you able to omit sys_def.svh like 
 build/ghr.simv: $(GHR_FILES)
 build/ghr.cov: $(GHR_FILES)
 
-PC_GEN_FILES = verilog/ring_ctr.sv
+PC_GEN_FILES = test/pc_gen_sva.svh
 build/pc_gen.simv: $(PC_GEN_FILES)
 build/pc_gen.cov: $(PC_GEN_FILES)
-synth/pc_gen.vg: $(PC_GEN_FILES)
+synth/pc_gen.vg:
 
 RS_FILES = verilog/sys_defs.svh verilog/psel_gen.sv
 build/rs.simv: $(RS_FILES)

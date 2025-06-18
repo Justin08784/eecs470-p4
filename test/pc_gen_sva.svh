@@ -327,6 +327,16 @@ module pc_gen_sva #(
         req_buf[0] = (!s.inbuf || aft_bidx[0] > 0);
         req_buf[1] = aft_bidx[1] > 0;
 
+        if (merge_l0) begin
+            fmsk[1][0]  |= fmsk[0][0];
+            is_end[1][0]|= is_end[0][0];
+        end
+
+        if (merge_l1) begin
+            fmsk[1][0]  |= fmsk[0][1];
+            is_end[1][0]|= is_end[0][1];
+        end
+
         for (int i = 0; i < avail; ++i) begin
             int e, b;
             e = pos_ftq[i];
@@ -586,6 +596,27 @@ module pc_gen_sva #(
         print_seq(dut_seq);
         print_comb(dut_comb);
         $display("diff: %b", diff);
+        $display("diff seq: off: %b, base: %b, inbuf: %b",
+            diff.off,
+            diff.base,
+            diff.inbuf
+        );
+
+        $display("diff ftq: ren_cnt: %b",
+            diff.ftq_out_ren_cnt
+        );
+
+        $display("diff ixq: wen_cnt: %b, dw: %b, fmsk: %b, is_end: %b",
+            diff.ixq_out_wen_cnt,
+            diff.ixq_out_dw,
+            diff.ixq_out_fmsk,
+            diff.ixq_out_is_end
+        );
+
+        $display("diff buf: wen_cnt: %b, dat: %b",
+            diff.buf_out_wen_cnt,
+            diff.buf_out_dat
+        );
     endtask
 
     task exit_on_error;

@@ -162,11 +162,16 @@ module pc_gen_test;
         @(negedge clock);
         reset = 0;
 
+        // WADDR       base_n,
+        // logic       ft,
+        // logic [3:0] off
+
         ixq_in_rdy_scnt = 2;
         buf_in_rdy_scnt = 2;
         ftq_in_vld_scnt = 2;
-        tmp_f0 = wr_ftq(f0, 0, 0, 15);
-        tmp_f1 = wr_ftq(f1, 0, 0, 0);
+        // tmp_f0 = wr_ftq(f0, 0, 0, 4);
+        tmp_f0 = wr_ftq(f0, 19, 1, 4);
+        tmp_f1 = wr_ftq(f1, 0, 0, 15);
         ftq_in_dat = {tmp_f1, tmp_f0};
 
         // sva_comb = '{
