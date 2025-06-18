@@ -153,12 +153,34 @@ module pc_gen #(
     end
     endgenerate
 
-    WADDR [NUM_FTQ-1:0] base_n;
-    assign base_n[0] = ftq_in_dat[0].base_n;
-    assign base_n[1] = ftq_in_dat[1].base_n;
+    logic   ftq1_vld;
+    assign  ftq1_vld = ftq_in_vld_scnt[1];
 
-    logic   iss_any;
-    logic   iss_idx;
+    logic bhe00;
+    logic bhe01;
+    logic bhe10;
+    logic bhe11;
+    assign bhe00    = blk_has_end[0][0];
+    assign bhe01    = blk_has_end[0][1];
+    assign bhe10    = blk_has_end[1][0];
+    assign bhe11    = blk_has_end[1][1];
+
+    logic merge_l0, merge_l1;
+    assign merge_l0 = ftq1_vld && bhe00 && !is_end[0][0][W_PER_DW-1] && ftq_in_dat[0].ft;
+    assign merge_l1 = ftq1_vld && bhe01 && !is_end[0][1][W_PER_DW-1] && ftq_in_dat[0].ft;
+
+    logic   iss_any;    // can issue any request?
+    logic   iss_idx;    // index of last issuable request, if any
+    assign  iss_any = ftq_in_vld_scnt != 0;
+    always_comb begin
+        iss_idx = 0;
+        unique case (1'b1)
+        merge_l0  &  bhe10: iss_idx = 0;
+        merge_l0  & ~bhe10: iss_idx = 1;
+        ~merge_l0 &  bhe00: iss_idx = ftq1_vld;
+        ~merge_l0 & ~bhe00: iss_idx = 1;
+        endcase
+    end
 
     logic   [NUM_DW-1:0] adv_bidx;  // ignore corr. idx aft_bidx if not set
     logic   [NUM_DW-1:0] adv_blk;   // ignore corr. idx aft_blk if not set
@@ -167,44 +189,6 @@ module pc_gen #(
     // ^^ assuming NUM_FTQ = 2, NUM_DW = 2, then these are just:
     // logic    [NUM_DW-1:0] aft_bidx;
     // logic    [NUM_DW-1:0] aft_blk;
-
-    DWADDR  [NUM_DW-1:0]                o_dws;
-    FB_OFF  [NUM_DW-1:0][W_PER_DW-1:0]  o_off;
-    logic   [NUM_DW-1:0][W_PER_DW-1:0]  o_fmsk;
-    logic   [NUM_DW-1:0][W_PER_DW-1:0]  o_is_end;
-
-    logic bhe00;
-    logic bhe01;
-    logic bhe10;
-    logic bhe11;
-    logic any_bh1;
-
-    assign bhe00    = blk_has_end[0][0];
-    assign bhe01    = blk_has_end[0][1];
-    assign bhe10    = blk_has_end[1][0];
-    assign bhe11    = blk_has_end[1][1];
-    assign any_bh1  = bhe10 | bhe11;
-
-    logic ftq1_vld;
-    logic merge_l0, merge_l1;
-    assign ftq1_vld = ftq_in_vld_scnt[1];
-    assign merge_l0 = ftq1_vld && bhe00 && !is_end[0][0][W_PER_DW-1] && ftq_in_dat[0].ft;
-    assign merge_l1 = ftq1_vld && bhe01 && !is_end[0][1][W_PER_DW-1] && ftq_in_dat[0].ft;
-
-    always_comb begin
-        iss_any = ftq_in_vld_scnt != 0;
-        iss_idx = 0;
-
-        unique case (1'b1)
-        merge_l0  &  bhe10: iss_idx = 0;
-        merge_l0  & ~bhe10: iss_idx = 1;
-        ~merge_l0 &  bhe00: iss_idx = ftq1_vld;
-        ~merge_l0 & ~bhe00: iss_idx = 1;
-
-        default:;
-        endcase
-    end
-
 
     // ------------------------------------------------------------------
     // adv_*[0]
@@ -244,8 +228,6 @@ module pc_gen #(
 
             aft_blk [0] = 0; // blk adv by 1
         end
-
-            default:;
         endcase
     end
 
@@ -314,8 +296,6 @@ module pc_gen #(
             adv_blk [1] = 1;
             aft_blk [1] = 0;
         end
-
-        default:;
         endcase
     end
 
@@ -406,11 +386,6 @@ module pc_gen #(
             e1 = 1;
             b1 = 0;
         end
-
-        default: begin
-            e1 = 0;
-            b1 = 0;
-        end
         endcase
     end
 
@@ -467,21 +442,9 @@ module pc_gen #(
         buf_out_wen_cnt = buf_prefix_cnt[ixq_out_wen_cnt];
     end
 
-    // DWADDR [NUM_DW-1:0] flush_dw;
-    // FB_OFF [NUM_W-1:0]  flush_off;
-    // generate
-    // assign flush_off[0] = flush_pc_off;
-    // for (genvar w = 1; w < NUM_W; ++w)
-    //     assign flush_off[w] = flush_pc_off + `UCAST_FIT(w);
-
-    // WADDR flush_start;
-    // assign flush_start = flush_fb_base + flush_pc_off;
-    // assign flush_dw[0] = flush_start[13:1];
-    // assign flush_dw[1] = flush_start[13:1] + `UCAST_FIT(1);
-    // endgenerate
-
-    // `CNT_TYPE(NUM_FTQ)  adv_base_v; // num FTQ entries we eat
-    // `CNT_TYPE(NUM_DW)   adv_blk_v;  // num cache line requests we emit
+    WADDR [NUM_FTQ-1:0] base_n;
+    assign base_n[0] = ftq_in_dat[0].base_n;
+    assign base_n[1] = ftq_in_dat[1].base_n;
 
     always_ff @(posedge clock) begin
         if (reset)
@@ -513,14 +476,7 @@ module pc_gen #(
             if (adv_blk [dwidx])
                 cur.off     <= pos_blk_off[basv][blkv];
             cur.inbuf   <= !(adv_bidx[dwidx] && basv);
-
-            // cur <= '{
-            //     off  : pos_blk_off[adv_base_v][adv_blk_v],
-            //     base : base_n[adv_base_v],
-            //     inbuf: ixq_out_wen_cnt != 0 && (adv_base_v != 2)
-            // };
         end
-
     end
 
     task print_pc_gen;
