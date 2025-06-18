@@ -301,13 +301,17 @@ module pc_gen #(
 
     function FB_OFF [W_PER_DW-1:0] merge_off(
         FB_OFF[W_PER_DW-1:0] aoff, boff,
-        logic [W_PER_DW-1:0] amsk
+        logic [W_PER_DW-1:0] amsk, bmsk
     );
         FB_OFF [W_PER_DW-1:0] rv;
         for (int w = 0; w < W_PER_DW; ++w)
-            rv[w] = amsk[w] ? aoff[w] : boff[w];
+            rv[w] = (amsk[w] ? aoff[w] : '0) | (bmsk[w] ? boff[w] : '0);
         return rv;
     endfunction
+
+    logic mer_l0, mer_l1;
+    assign mer_l0 = bhe00 && !is_end[0][0][W_PER_DW-1] && ftq_in_dat[0].ft;
+    assign mer_l1 = bhe01 && !is_end[0][1][W_PER_DW-1] && ftq_in_dat[0].ft;
 
     // Merging data
     FB_OFF  [NUM_FTQ-1:0][NUM_DW-1:0][W_PER_DW-1:0] mer_blk_off_n;
@@ -319,9 +323,8 @@ module pc_gen #(
     assign mer_blk_off_n[0]     = blk_off_n[0];
     assign mer_blk_off_n[1][0]  =
         merge_off(
-            blk_off_n[1][0],
-            fuse_blk_off_n,
-            fmsk[1][0]
+            blk_off_n[1][0], fuse_blk_off_n,
+            fmsk     [1][0], fuse_fmsk
         );
     assign mer_blk_off_n[1][1]  = blk_off_n[1][1];
 
@@ -361,6 +364,8 @@ module pc_gen #(
     assign b0 = 0;
 
     always_comb begin
+        // e1 = !(merge_l0 && bhe00 && merge_l1);
+
         unique case (1'b1)
         merge_l0 &  bhe10: begin // ignore. cant issue 2
             e1 = 0;
@@ -400,10 +405,10 @@ module pc_gen #(
     assign ixq_out_is_end[1]= mer_is_end    [e1][b1];
 
     `CNT_TYPE(NUM_FTQ) buf_lim_cnt;
-    logic [NUM_FTQ-1:0] req_buf;
-    logic [NUM_FTQ:0][`CNT_SIZE(NUM_FTQ)-1:0] buf_prefix_cnt;
+    logic [NUM_DW-1:0] req_buf;
+    logic [NUM_DW:0][`CNT_SIZE(NUM_FTQ)-1:0] buf_prefix_cnt;
     compactor #(
-        .REQW(NUM_FTQ),
+        .REQW(NUM_DW),
         .GNTW(NUM_FTQ)
     ) comp_buf_req (
         .req        (req_buf),
@@ -412,11 +417,13 @@ module pc_gen #(
         .gnt_cnt    (buf_lim_cnt)
     );
 
-    always_comb begin
-        `CNT_TYPE(NUM_DW) tmp;
-        logic dwidx;
+    assign buf_out_dat[0] = !cur.inbuf ? ftq_in_dat[0] : ftq_in_dat[1];
+    assign buf_out_dat[1] = ftq_in_dat[1];
 
-        tmp = `MIN(ftq_in_vld_scnt, ixq_in_rdy_scnt);
+    assign req_buf[0] = !cur.inbuf || adv_bidx[0];
+    assign req_buf[1] = !cur.inbuf && adv_bidx[1];
+    always_comb begin
+        logic dwidx;
 
         /*FIXME:
         We may actually request up to 3 buffer slots per cycle
@@ -426,19 +433,14 @@ module pc_gen #(
         We don't even access to the 3rd ftq entry this cycle, so we will never
         be able to push it to the reread queue.
         */
-        req_buf[0] = (!cur.inbuf || adv_bidx[0]);
-        req_buf[1] = adv_bidx[1];
 
-        ixq_out_wen_cnt = `MIN(buf_lim_cnt, tmp);
+        ixq_out_wen_cnt = `MIN(buf_lim_cnt, `MIN(ftq_in_vld_scnt, ixq_in_rdy_scnt));
 
         dwidx = ixq_out_wen_cnt[1];
         ftq_out_ren_cnt = (ixq_out_wen_cnt == 0 || !adv_bidx[dwidx])
             ? 0
             : aft_bidx[dwidx] + 1;
 
-        buf_out_dat = '0;
-        for (int i = 0; i < NUM_FTQ; ++i)
-            buf_out_dat[buf_prefix_cnt[i]] = ftq_in_dat[i];
         buf_out_wen_cnt = buf_prefix_cnt[ixq_out_wen_cnt];
     end
 
