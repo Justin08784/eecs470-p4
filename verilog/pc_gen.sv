@@ -144,41 +144,34 @@ module pc_gen #(
     assign dws[1][1] = start_pc[1][13:1] + `UCAST_FIT(1);
     endgenerate
 
-    FB_OFF  [NUM_FTQ:0][NUM_DW:0] pos_blk_off;
+    FB_OFF  [NUM_FTQ-1:0][NUM_DW-1:0] pos_blk_off;
     generate
-    assign pos_blk_off[2] = '0;
     for (genvar e = 0; e < NUM_FTQ; ++e) begin
-        assign pos_blk_off[e][0] = '0;
-
-        for (genvar b = 1; b <= NUM_DW; ++b) begin
-            assign pos_blk_off[e][b] = off_n[e][W_PER_DW*b];
+        for (genvar b = 0; b < NUM_DW; ++b) begin
+            assign pos_blk_off[e][b] = off_n[e][W_PER_DW*(b+1)];
         end
     end
     endgenerate
 
-    WADDR [NUM_FTQ:0] base_n;
-    assign base_n[0] = cur.base;
-    assign base_n[1] = ftq_in_dat[0].base_n;
-    assign base_n[2] = ftq_in_dat[1].base_n;
+    WADDR [NUM_FTQ-1:0] base_n;
+    assign base_n[0] = ftq_in_dat[0].base_n;
+    assign base_n[1] = ftq_in_dat[1].base_n;
 
-    logic   [NUM_DW:0][`CNT_SIZE(NUM_FTQ)-1:0]  adv_base;
-    logic   [NUM_DW:0][`CNT_SIZE(NUM_DW)-1:0]   adv_blk;
+    logic   iss_any;
+    logic   iss_idx;
 
-    DWADDR  [NUM_DW-1:0]    o_dws;
+    logic   [NUM_DW-1:0] adv_bidx;  // ignore corr. idx aft_bidx if not set
+    logic   [NUM_DW-1:0] adv_blk;   // ignore corr. idx aft_blk if not set
+    logic   [NUM_DW-1:0][`IDX_SIZE(NUM_FTQ)-1:0]  aft_bidx; // latest base idx we are going past
+    logic   [NUM_DW-1:0][`IDX_SIZE(NUM_DW)-1:0]   aft_blk;  // latest block idx we are going past
+    // ^^ assuming NUM_FTQ = 2, NUM_DW = 2, then these are just:
+    // logic    [NUM_DW-1:0] aft_bidx;
+    // logic    [NUM_DW-1:0] aft_blk;
+
+    DWADDR  [NUM_DW-1:0]                o_dws;
     FB_OFF  [NUM_DW-1:0][W_PER_DW-1:0]  o_off;
     logic   [NUM_DW-1:0][W_PER_DW-1:0]  o_fmsk;
     logic   [NUM_DW-1:0][W_PER_DW-1:0]  o_is_end;
-
-    logic ftq1_vld;
-    assign ftq1_vld = ftq_in_vld_scnt[1];
-
-    logic merge_l0, merge_l1;
-    assign merge_l0 = ftq1_vld
-        && !is_end[0][0][W_PER_DW-1]
-        && ftq_in_dat[0].ft;
-    assign merge_l1 = ftq1_vld
-        && !is_end[0][1][W_PER_DW-1]
-        && ftq_in_dat[0].ft;
 
     logic bhe00;
     logic bhe01;
@@ -192,78 +185,137 @@ module pc_gen #(
     assign bhe11    = blk_has_end[1][1];
     assign any_bh1  = bhe10 | bhe11;
 
-    assign adv_base [0] = 0;
-    assign adv_blk  [0] = 0;
+    logic ftq1_vld;
+    logic merge_l0, merge_l1;
+    assign ftq1_vld = ftq_in_vld_scnt[1];
+    assign merge_l0 = ftq1_vld && bhe00 && !is_end[0][0][W_PER_DW-1] && ftq_in_dat[0].ft;
+    assign merge_l1 = ftq1_vld && bhe01 && !is_end[0][1][W_PER_DW-1] && ftq_in_dat[0].ft;
+
+    always_comb begin
+        iss_any = ftq_in_vld_scnt != 0;
+        iss_idx = 0;
+
+        unique case (1'b1)
+        merge_l0  &  bhe10: iss_idx = 0;
+        merge_l0  & ~bhe10: iss_idx = 1;
+        ~merge_l0 &  bhe00: iss_idx = ftq1_vld;
+        ~merge_l0 & ~bhe00: iss_idx = 1;
+
+        default:;
+        endcase
+    end
+
+
+    // ------------------------------------------------------------------
+    // adv_*[0]
+    // ------------------------------------------------------------------
+    always_comb begin
+        adv_bidx[0]= 0;
+        adv_blk [0]= 0;
+        aft_bidx[0]= 0;
+        aft_blk [0]= 0;
+
+        unique case (1'b1)
+        merge_l0  &  bhe10: begin
+            adv_bidx[0] = 1;
+            adv_blk [0] = 0;
+
+            aft_bidx[0] = 1; // base adv by 2
+        end
+
+        merge_l0  & ~bhe10: begin
+            adv_bidx[0] = 1;
+            adv_blk [0] = 1;
+
+            aft_bidx[0] = 0; // base adv by 1
+            aft_blk [0] = 0; // blk  adv by 1
+        end
+
+        ~merge_l0 &  bhe00: begin
+            adv_bidx[0] = 1;
+            adv_blk [0] = 0;
+
+            aft_bidx[0] = 0; // base adv by 1
+        end
+
+        ~merge_l0 & ~bhe00: begin
+            adv_bidx[0] = 0;
+            adv_blk [0] = 1;
+
+            aft_blk [0] = 0; // blk adv by 1
+        end
+
+            default:;
+        endcase
+    end
 
     // ------------------------------------------------------------------
     // adv_*[1]
     // ------------------------------------------------------------------
     always_comb begin
+        adv_bidx[1]= 0;
+        adv_blk [1]= 0;
+        aft_bidx[1]= 0;
+        aft_blk [1]= 0;
+
         unique case (1'b1)
-            bhe00 &  merge_l0 &  bhe10: begin
-                adv_base[1] = 2;
-                adv_blk [1] = 0;
-            end
-            bhe00 &  merge_l0 & ~bhe10: begin
-                adv_base[1] = 1;
-                adv_blk [1] = 1;
-            end
-            bhe00 & ~merge_l0: begin
-                adv_base[1] = 1;
-                adv_blk [1] = 0;
-            end
+        merge_l0  &  bhe10:; // ignore. Can't issue 2
 
-            bhe01: begin
-                adv_base[1] = 0;
-                adv_blk [1] = 1;
-            end
+        merge_l0  & ~bhe10 &  bhe11: begin
+            adv_bidx[1] = 1;
+            aft_bidx[1] = 1; // base adv by 2
 
-            default: begin
-                adv_base[1] = 0;
-                adv_blk [1] = 1;
-            end
-        endcase
-    end
+            adv_blk [1] = 0;
+        end
 
-    // ------------------------------------------------------------------
-    // adv_*[2]
-    // ------------------------------------------------------------------
-    always_comb begin
-        unique case (1'b1)
-            bhe00 &  merge_l0 & any_bh1: begin
-                adv_base[2] = 2;
-                adv_blk [2] = 0;
-            end
-            bhe00 &  merge_l0 & ~any_bh1: begin
-                adv_base[2] = 1;
-                adv_blk [2] = 2;
-            end
-            bhe00 & ~merge_l0 &  bhe10: begin
-                adv_base[2] = 2;
-                adv_blk [2] = 0;
-            end
-            bhe00 & ~merge_l0 & ~bhe10: begin
-                adv_base[2] = 1;
-                adv_blk [2] = 1;
-            end
+        merge_l0  & ~bhe10 & ~bhe11: begin
+            adv_bidx[1] = 1;
+            aft_bidx[1] = 0; // base adv by 1
 
-            (~bhe00 & bhe01) & merge_l1 &  bhe10: begin
-                adv_base[2] = 2;
-                adv_blk [2] = 0;
-            end
-            (~bhe00 & bhe01) & merge_l1 & ~bhe10: begin
-                adv_base[2] = 1;
-                adv_blk [2] = 1;
-            end
-            (~bhe00 & bhe01) & ~merge_l1: begin
-                adv_base[2] = 1;
-                adv_blk [2] = 0;
-            end
+            adv_blk [1] = 1;
+            aft_blk [1] = 1; // blk  adv by 2
+        end
 
-            default: begin
-                adv_base[2] = 0;
-                adv_blk [2] = 2;
-            end
+        (~merge_l0 & merge_l1) &  bhe10: begin
+            // assert(~bhe00);
+            adv_bidx[1] = 1;
+            aft_bidx[1] = 1; // base adv by 2
+
+            adv_blk [1] = 0;
+        end
+
+        (~merge_l0 & merge_l1) & ~bhe10: begin
+            // assert(~bhe00);
+            adv_bidx[1] = 1;
+            aft_bidx[1] = 0; // base adv by 1
+
+            adv_blk [1] = 1;
+            aft_blk [1] = 0; // blk  adv by 1
+        end
+
+        (~merge_l0 & ~merge_l1) & ~bhe00: begin
+            adv_bidx[1] = 0;
+
+            adv_blk [1] = 1;
+            aft_blk [1] = 1; // blk  adv by 2
+        end
+
+        (~merge_l0 & ~merge_l1) &  bhe00 &  bhe10: begin
+            adv_bidx[1] = 1;
+            aft_bidx[1] = 1;
+
+            adv_blk [1] = 0;
+        end
+
+        (~merge_l0 & ~merge_l1) &  bhe00 & ~bhe10: begin
+            adv_bidx[1] = 1;
+            aft_bidx[1] = 0;
+
+            adv_blk [1] = 1;
+            aft_blk [1] = 0;
+        end
+
+        default:;
         endcase
     end
 
@@ -277,75 +329,100 @@ module pc_gen #(
         return rv;
     endfunction
 
-    // ------------------------------------------------------------------
-    // o_*[0]
-    // ------------------------------------------------------------------
+    // Merging data
+    FB_OFF  [NUM_FTQ-1:0][NUM_DW-1:0][W_PER_DW-1:0] mer_blk_off_n;
+    logic   [NUM_FTQ-1:0][NUM_DW-1:0][W_PER_DW-1:0] mer_is_end, mer_fmsk;
+    FB_OFF  [W_PER_DW-1:0] fuse_blk_off_n;
+    logic   [W_PER_DW-1:0] fuse_is_end, fuse_fmsk;
+
+    // Only 10 may need merging
+    assign mer_blk_off_n[0]     = blk_off_n[0];
+    assign mer_blk_off_n[1][0]  =
+        merge_off(
+            blk_off_n[1][0],
+            fuse_blk_off_n,
+            fmsk[1][0]
+        );
+    assign mer_blk_off_n[1][1]  = blk_off_n[1][1];
+
+    assign mer_is_end[0]        = is_end[0];
+    assign mer_is_end[1][0]     = is_end[1][0] | fuse_is_end;
+    assign mer_is_end[1][1]     = is_end[1][1];
+
+    assign mer_fmsk[0]          = fmsk[0];
+    assign mer_fmsk[1][0]       = fmsk[1][0] | fuse_fmsk;
+    assign mer_fmsk[1][1]       = fmsk[1][1];
     always_comb begin
-        o_dws[0] = dws[0][0];
-
         unique case (1'b1)
-            bhe00 &  merge_l0: begin
-                o_off   [0] = merge_off(
-                    blk_off_n   [0][0],
-                    blk_off_n   [1][0],
-                    fmsk        [0][0]
-                );
-                o_fmsk  [0] = fmsk  [0][0]  |   fmsk  [1][0];
-                o_is_end[0] = is_end[0][0]  |   is_end[1][0];
-            end
+        merge_l0: begin
+            fuse_blk_off_n  = blk_off_n [0][0];
+            fuse_is_end     = is_end    [0][0];
+            fuse_fmsk       = fmsk      [0][0];
+        end
 
-            default: begin
-                o_off   [0] = blk_off_n[0][0];
-                o_fmsk  [0] = fmsk  [0][0];
-                o_is_end[0] = is_end[0][0];
-            end
+        merge_l1: begin
+            fuse_blk_off_n  = blk_off_n [0][1];
+            fuse_is_end     = is_end    [0][1];
+            fuse_fmsk       = fmsk      [0][1];
+        end
+
+        default: begin
+            fuse_blk_off_n  = '0;
+            fuse_is_end     = '0;
+            fuse_fmsk       = '0;
+        end
         endcase
     end
 
-    // ------------------------------------------------------------------
-    // o_*[1]
-    // ------------------------------------------------------------------
+
+    logic e0, e1;
+    logic b0, b1;
+    assign e0 = merge_l0;
+    assign b0 = 0;
+
     always_comb begin
         unique case (1'b1)
-            bhe00 &  merge_l0: begin
-                o_off   [1] = blk_off_n[1][1];
-                o_dws   [1] = dws   [1][1];
-                o_fmsk  [1] = fmsk  [1][1];
-                o_is_end[1] = is_end[1][1];
-            end
-            bhe00 & ~merge_l0: begin
-                o_off   [1] = blk_off_n[1][0];
-                o_dws   [1] = dws   [1][0];
-                o_fmsk  [1] = fmsk  [1][0];
-                o_is_end[1] = is_end[1][0];
-            end
+        merge_l0 &  bhe10: begin // ignore. cant issue 2
+            e1 = 0;
+            b1 = 1;
+        end
 
-            bhe01 &  merge_l1: begin
-                o_off   [1] = merge_off(
-                    blk_off_n   [0][1],
-                    blk_off_n   [1][0],
-                    fmsk        [0][1]
-                );
-                o_dws   [1] = dws   [0][1];
-                o_fmsk  [1] = fmsk  [0][1]  |   fmsk  [1][0];
-                o_is_end[1] = is_end[0][1]  |   is_end[1][0];
-            end
-            bhe01 & ~merge_l1: begin
-                o_dws   [1] = dws   [0][1];
-                o_off   [1] = blk_off_n[0][1];
-                o_fmsk  [1] = fmsk  [0][1];
-                o_is_end[1] = is_end[0][1];
-            end
+        merge_l0 & ~bhe10: begin
+            e1 = 1;
+            b1 = 1;
+        end
 
-            default: begin
-                o_dws   [1] = dws   [0][1];
-                o_off   [1] = blk_off_n[0][1];
-                o_fmsk  [1] = fmsk  [0][1];
-                o_is_end[1] = is_end[0][1];
-            end
+        ~merge_l0 &  bhe00: begin
+            e1 = 1;
+            b1 = 0;
+        end
+
+        ~merge_l0 & ~bhe00 & ~merge_l1: begin
+            e1 = 0;
+            b1 = 1;
+        end
+
+        ~merge_l0 & ~bhe00 &  merge_l1: begin
+            e1 = 1;
+            b1 = 0;
+        end
+
+        default: begin
+            e1 = 0;
+            b1 = 0;
+        end
         endcase
     end
 
+    assign ixq_out_dw[0]    = dws           [e0][b0];
+    assign ixq_out_off[0]   = mer_blk_off_n [e0][b0];
+    assign ixq_out_fmsk[0]  = mer_fmsk      [e0][b0];
+    assign ixq_out_is_end[0]= mer_is_end    [e0][b0];
+
+    assign ixq_out_dw[1]    = dws           [e1][b1];
+    assign ixq_out_off[1]   = mer_blk_off_n [e1][b1];
+    assign ixq_out_fmsk[1]  = mer_fmsk      [e1][b1];
+    assign ixq_out_is_end[1]= mer_is_end    [e1][b1];
 
     `CNT_TYPE(NUM_FTQ) buf_lim_cnt;
     logic [NUM_FTQ-1:0] req_buf;
@@ -362,10 +439,7 @@ module pc_gen #(
 
     always_comb begin
         `CNT_TYPE(NUM_DW) tmp;
-        ixq_out_dw      = o_dws;
-        ixq_out_off     = o_off;
-        ixq_out_fmsk    = o_fmsk;
-        ixq_out_is_end  = o_is_end;
+        logic dwidx;
 
         tmp = `MIN(ftq_in_vld_scnt, ixq_in_rdy_scnt);
 
@@ -377,12 +451,15 @@ module pc_gen #(
         We don't even access to the 3rd ftq entry this cycle, so we will never
         be able to push it to the reread queue.
         */
-        req_buf[0] = (!cur.inbuf || adv_base[1] != 0);
-        req_buf[1] = (adv_base[2] != 0);
+        req_buf[0] = (!cur.inbuf || adv_bidx[0]);
+        req_buf[1] = adv_bidx[1];
 
         ixq_out_wen_cnt = `MIN(buf_lim_cnt, tmp);
 
-        ftq_out_ren_cnt = adv_base[ixq_out_wen_cnt];
+        dwidx = ixq_out_wen_cnt[1];
+        ftq_out_ren_cnt = (ixq_out_wen_cnt == 0 || !adv_bidx[dwidx])
+            ? 0
+            : aft_bidx[dwidx] + 1;
 
         buf_out_dat = '0;
         for (int i = 0; i < NUM_FTQ; ++i)
@@ -403,10 +480,8 @@ module pc_gen #(
     // assign flush_dw[1] = flush_start[13:1] + `UCAST_FIT(1);
     // endgenerate
 
-    `CNT_TYPE(NUM_FTQ)  adv_base_v; // num FTQ entries we eat
-    `CNT_TYPE(NUM_DW)   adv_blk_v;  // num cache line requests we emit
-    assign adv_base_v   = adv_base  [ixq_out_wen_cnt];
-    assign adv_blk_v    = adv_blk   [ixq_out_wen_cnt];
+    // `CNT_TYPE(NUM_FTQ)  adv_base_v; // num FTQ entries we eat
+    // `CNT_TYPE(NUM_DW)   adv_blk_v;  // num cache line requests we emit
 
     always_ff @(posedge clock) begin
         if (reset)
@@ -426,12 +501,25 @@ module pc_gen #(
                 inbuf: 0
             };
 
-        else
-            cur <= '{
-                off  : pos_blk_off[adv_base_v][adv_blk_v],
-                base : base_n[adv_base_v],
-                inbuf: ixq_out_wen_cnt != 0 && (adv_base_v != 2)
-            };
+        else if (ixq_out_wen_cnt != 0) begin
+            logic dwidx, basv, blkv;
+            dwidx = ixq_out_wen_cnt[1];
+
+            basv = aft_bidx [dwidx];
+            blkv = aft_blk  [dwidx];
+
+            if (adv_bidx[dwidx])
+                cur.base    <= base_n[basv];
+            if (adv_blk [dwidx])
+                cur.off     <= pos_blk_off[basv][blkv];
+            cur.inbuf   <= !(adv_bidx[dwidx] && basv);
+
+            // cur <= '{
+            //     off  : pos_blk_off[adv_base_v][adv_blk_v],
+            //     base : base_n[adv_base_v],
+            //     inbuf: ixq_out_wen_cnt != 0 && (adv_base_v != 2)
+            // };
+        end
 
     end
 
@@ -440,6 +528,17 @@ module pc_gen #(
         //     ftq_in_dat[0].off,
         //     ftq_in_dat[1].off,
         // );
+
+        $display("0[%b, %b], 1[%b, %b]", e0, b0, e1, b1);
+        $display("%b, %b", merge_l0, merge_l1);
+        $display("mer fmsk: [%b, %b]",
+            mer_fmsk[0],
+            mer_fmsk[1]
+        );
+        $display("mer is_end: [%b, %b]",
+            mer_is_end[0],
+            mer_is_end[1]
+        );
 
         $display("nal_off_n: [[%d, %d, %d, %d, %d], [%d, %d, %d, %d, %d]]",
             nal_off_n[0][0],
@@ -506,31 +605,36 @@ module pc_gen #(
             buf_out_dat[1].off
         );
 
-        $display("adv_base: [%d, %d, %d] -> %d",
-            adv_base[0],
-            adv_base[1],
-            adv_base[2],
-            adv_base_v
+        $display("adv_bidx: [%b, %b] |||| aft_bidx: [%b, %b]",
+            adv_bidx[0],
+            adv_bidx[1],
+            aft_bidx[0],
+            aft_bidx[1]
         );
 
-        $display("adv_blk: [%d, %d, %d] -> %d",
+        $display("adv_blk: [%b, %b] |||| aft_blk: [%b, %b]",
             adv_blk[0],
             adv_blk[1],
-            adv_blk[2],
-            adv_blk_v
+            aft_blk[0],
+            aft_blk[1]
         );
 
-        $display("pos_blk_off: [\n[%d, %d, %d],\n[%d, %d, %d],\n[%d, %d, %d]] -> %d",
+        // $display("adv_blk: [%d, %d, %d] -> %d",
+        //     adv_blk[0],
+        //     adv_blk[1],
+        //     adv_blk[2],
+        //     adv_blk_v
+        // );
+
+        $display("pos_blk_off: [\n[%d, %d],\n[%d, %d]] -> %d",
             pos_blk_off[0][0],
             pos_blk_off[0][1],
-            pos_blk_off[0][2],
+            // pos_blk_off[0][2],
             pos_blk_off[1][0],
             pos_blk_off[1][1],
-            pos_blk_off[1][2],
-            pos_blk_off[2][0],
-            pos_blk_off[2][1],
-            pos_blk_off[2][2],
-            pos_blk_off[adv_base_v][adv_blk_v]
+            // pos_blk_off[1][2],
+            0
+            // pos_blk_off[adv_base_v][adv_blk_v]
         );
 
         // $display("base_woff: %b, %b", base_woff[0], base_woff[1]);
