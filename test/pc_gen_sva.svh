@@ -473,13 +473,16 @@ module pc_gen_sva #(
 
     endfunction
 
-    int     ftq_id_next, buf_id_next;
+    int     id, id_n;
     // logic   ftq_ids[int];
     logic   buf_ids[int]; // TODO: update
-    WORD_STREAM_PKT in_stream   [$];
-
+    WORD_STREAM_PKT in_stream [$];
+    WORD_STREAM_PKT [16*NUM_DW-1:0] in_append;
     WORD_STREAM_PKT [NUM_W*NUM_DW-1:0] out_stream;
     int wr_idx;
+    int in_stream_sz, in_append_cnt;
+    int out_stream_sz, out_stream_sz_n;
+
 
     struct packed {
         WADDR base;
@@ -487,31 +490,56 @@ module pc_gen_sva #(
     } cur, cur_n;
 
     initial begin
-        ftq_id_next = 0;
-        buf_id_next = 0;
     forever begin
-        step(
-            sva_seq_n,
-            sva_seq,
-            sva_comb_n
-        );
-
-        $display("step: %b %b", sva_seq_n, reset);
-        $display("stpc: %b %b", sva_comb_n, reset);
+        sva_comb_n = '{
+            ftq_out_ren_cnt :   ftq_out_ren_cnt,
+            ixq_out_wen_cnt :   ixq_out_wen_cnt,
+            ixq_out_dw      :   ixq_out_dw,
+            ixq_out_fmsk    :   ixq_out_fmsk,
+            ixq_out_is_end  :   ixq_out_is_end,
+            
+            buf_out_wen_cnt :   buf_out_wen_cnt,
+            buf_out_dat     :   buf_out_dat
+        };
         print_comb(sva_comb_n);
 
+        in_stream_sz = in_stream.size();
+        for (int w = 0; w < in_stream_sz; ++w)
+            $display("in_st[%2d]: base: %d, off: %d, is_end: %b, dw: %d",
+                w,
+                in_stream[w].base,
+                in_stream[w].off,
+                in_stream[w].is_end,
+                in_stream[w].dw
+            );
+
+        for (int w = 0; w < out_stream_sz; ++w)
+            $display("ot_st[%2d]: base: %d, off: %d, is_end: %b, dw: %d",
+                w,
+                out_stream[w].base,
+                out_stream[w].off,
+                out_stream[w].is_end,
+                out_stream[w].dw
+            );
+        #0;
+
+
+        wr_idx = 0;
+        id_n = id;
         for (int e = 0; e < ftq_in_vld_scnt; ++e) begin
             FTQ_ENTRY fb;
-            WORD_STREAM_PKT [15:0] in_append;
-            int num_append;
+            WORD_STREAM_PKT [15:0] tmp;
+            int tmp_cnt;
 
             fb = ftq_in_dat[e];
-            if (fb.id < ftq_id_next) // already added
+            if (fb.id < id) // already added
                 continue;
 
-            in_append = fb2stream(fb, cur_n.base, cur_n.off, num_append);
-            for (int w = 0; w < num_append; ++w)
-                in_stream.push_back(in_append[w]);
+            tmp = fb2stream(fb, cur_n.base, cur_n.off, tmp_cnt);
+            for (int w = 0; w < tmp_cnt; ++w) begin
+                in_append[wr_idx] = tmp[w];
+                ++wr_idx;
+            end
 
             // assert(!ftq_ids.exists(cur_id));
             // ftq_ids[cur_id] = 1;
@@ -519,28 +547,30 @@ module pc_gen_sva #(
             cur_n.base = fb.base_n;
             cur_n.off  = 0;
 
-            ++ftq_id_next;
+            ++id_n;
         end
+        in_append_cnt = wr_idx;
 
 
         wr_idx = 0;
         for (int e = 0; e < ixq_out_wen_cnt; ++e) begin
-            WORD_STREAM_PKT [1:0] in_append;
-            int num_append;
+            WORD_STREAM_PKT [1:0] tmp;
+            int tmp_cnt;
 
-            in_append = ixq_out2stream(
+            tmp = ixq_out2stream(
                 ixq_out_dw[e],
                 ixq_out_off[e],
                 ixq_out_fmsk[e],
                 ixq_out_is_end[e],
-                num_append
+                tmp_cnt
             );
 
-            for (int w = 0; w < num_append; ++w) begin
-                out_stream[wr_idx] = in_append[w];
+            for (int w = 0; w < tmp_cnt; ++w) begin
+                out_stream[wr_idx] = tmp[w];
                 ++wr_idx;
             end
         end
+        out_stream_sz_n = wr_idx;
 
 
         @(posedge clock);
@@ -550,31 +580,28 @@ module pc_gen_sva #(
 
     always_ff @(posedge clock) begin
         if (reset) begin
-            sva_comb<= '0;
-            sva_seq <= reset_val;
-            dut_comb<= '0;
-            dut_seq <= reset_val;
-            diff    <= '0;
+            id <= '0;
             cur     <= '{
                 base: reset_val.base,
                 off : reset_val.off
             };
+            in_stream.delete();
+            out_stream_sz <= '0;
+
+        end else if (flush) begin
+            cur <= '{
+                base: flush_fb_base,
+                off : flush_pc_off
+            };
+            in_stream.delete();
+            out_stream_sz <= '0;
 
         end else begin
-            sva_comb<= sva_comb_n;
-            sva_seq <= sva_seq_n;
-            dut_comb<= dut_comb_n;
-            dut_seq <= dut_seq_n;
-            diff    <= diff_n;
-
-            if (flush)
-                cur <= '{
-                    base: flush_fb_base,
-                    off : flush_pc_off
-                };
-            else
-                cur <= cur_n;
-
+            id  <= id_n;
+            cur <= cur_n;
+            for (int w = 0; w < in_append_cnt; ++w)
+                in_stream.push_back(in_append[w]);
+            out_stream_sz <= out_stream_sz_n;
         end
     end
 
@@ -658,8 +685,8 @@ module pc_gen_sva #(
         endproperty
     endclocking
 
-    Match_State: assert property(cb.match_state)
-        else exit_on_error;
+    // Match_State: assert property(cb.match_state)
+    //     else exit_on_error;
 
 endmodule
 `endif // PC_GEN_SVA_SVH

@@ -67,16 +67,39 @@ module pc_gen_stim #(
         flush_fb_base   = '0;
         flush_pc_off    = '0;
 
+        ftq_in_vld_scnt = 0;
+        ftq_in_dat      = '0;
+        ixq_in_rdy_scnt = 0;
+        buf_in_rdy_scnt = 0;
+
     // forever begin
     // repeat (1000) begin
     repeat (10) begin
 
-        ftq_sz = _ftq.size;
-        buf_sz = _buf.size;
+        ftq_sz = _ftq.size();
+        buf_sz = _buf.size();
+
+        $display("cur: id: %4d, base: %d", cur_id, cur.base);
+        for (int e = 0; e < ftq_sz; ++e)
+            $display("ftq[%1d]: off: %d, ft: %b, base_n: %d (id: %0d)",
+                e,
+                _ftq[e].off,
+                _ftq[e].ft,
+                _ftq[e].base_n,
+                _ftq[e].id
+            );
+        for (int e = 0; e < buf_sz; ++e)
+            $display("buf[%1d]: off: %d, ft: %b, base_n: %d (id: %0d)",
+                e,
+                _buf[e].off,
+                _buf[e].ft,
+                _buf[e].base_n,
+                _buf[e].id
+            );
 
         ftq_in_vld_scnt = `MIN(ftq_sz, 2); // TODO: randomly restrict this below the true count?
         ftq_in_dat = '0;
-        for (int e = 0; e < ftq_sz; ++e)
+        for (int e = 0; e < ftq_in_vld_scnt; ++e)
             ftq_in_dat[e] = _ftq[e];
         ixq_in_rdy_scnt = 2; // TODO: make this random
         buf_in_rdy_scnt = `MIN(_BUF_SZ-buf_sz, 2); // TODO: Likewise. random restriction
