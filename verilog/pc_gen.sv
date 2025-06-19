@@ -474,8 +474,15 @@ module pc_gen #(
 
             if (adv_bidx[dwidx])
                 cur.base    <= base_n[basv];
-            if (adv_blk [dwidx])
-                cur.off     <= pos_blk_off[adv_bidx[dwidx]][blkv]; // assert !aft_bidx[dwidx]
+
+            if      (adv_blk [dwidx] && !adv_bidx [dwidx])
+                cur.off <= pos_blk_off[0][blkv];
+            else if (adv_blk [dwidx] &&  adv_bidx [dwidx])
+                cur.off <= pos_blk_off[1][blkv]; // assert !aft_bidx[dwidx]
+            else if (adv_bidx[dwidx])
+                cur.off <= '0;
+            // if (adv_blk [dwidx])
+            //     cur.off     <= pos_blk_off[adv_bidx[dwidx]][blkv]; // assert !aft_bidx[dwidx]
 
             // adv_blk is high IFF we do not advance 2 bases
             assert(adv_blk[dwidx] ? !(adv_bidx[dwidx] && basv) : 1) else $fatal;
@@ -484,9 +491,16 @@ module pc_gen #(
             cur.inbuf   <= !(adv_bidx[dwidx] && basv);
         end
 
-        if (!reset) begin
+        if (!reset && `FALSE) begin
             $display("FOGET: base: %d, off: %d", cur.base, cur.off);
-            $display("dwidx: %b, basv: %b, blkv: %b", dwidx, basv, blkv);
+            $display("base_n[0]: %d, base_n[1]: %d", base_n[0], base_n[1]);
+            $display("dwidx: %b, bidx[adv: %b, aft: %b], blk[av: %b, aft: %b]",
+                dwidx,
+                adv_bidx[dwidx],
+                aft_bidx[dwidx],
+                adv_blk[dwidx],
+                aft_blk[dwidx]
+            );
             $display("0-bidx: [adv: %b, aft: %b], 1-bidx: [adv: %b, aft: %b]",
                 adv_bidx[0],
                 aft_bidx[0],
