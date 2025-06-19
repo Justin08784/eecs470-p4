@@ -3,6 +3,14 @@
 
 `ifdef PC_GEN_TEST_MODE
 // stimulus engine
+/* NOTE:
+
+The negedge, posedge placements in the initial blocks of stim and sva are nuanced.
+stim: ... do stuff ... negedge posedge
+sva:  negedge ... do stuff ... posedge
+
+This ensures that stim always acts before sva each cycle, removing races.
+*/
 module pc_gen_stim #(
     parameter MAX_W_PER_FB  = 16,// maximum span of a fetch block / ftq entry, in words
     parameter W_PER_DW      = 2, // num words per double-word / cache line
@@ -51,17 +59,16 @@ module pc_gen_stim #(
 
     int ftq_sz, buf_sz, num_add, num_del;
 
-    int cur_id; // ignores reset/flushes. monotonic identifier
+    int cur_id, cur_id_n;
     struct packed {
         WADDR base;
+        logic [3:0] off;
     } cur, cur_n;
 
     // struct packed {
     // } rand_pkt;
 
     initial begin
-        cur_id = 0;
-
         // FIXME
         flush   = 0;
         flush_fb_base   = '0;
@@ -104,25 +111,30 @@ module pc_gen_stim #(
         ixq_in_rdy_scnt = 2; // TODO: make this random
         buf_in_rdy_scnt = `MIN(_BUF_SZ-buf_sz, 2); // TODO: Likewise. random restriction
 
-        num_add = _FTQ_SZ-ftq_sz;
+        cur_id_n = cur_id;
         cur_n = cur;
+        num_add = _FTQ_SZ-ftq_sz;
         for (int e = 0; e < num_add; ++e) begin
             // localparam MAX_OFF_VAL = 1 << 15 - MAX_W_PER_FB; // FIXME: how to handle?
             FTQ_ENTRY fb;
 
             std::randomize(fb);
 
+            if (cur_n.off > fb.off)
+                fb.off = cur_n.off;
+
             if (fb.ft)
                 fb.base_n = cur_n.base + fb.off + 1;
 
-            fb.id = cur_id;
+            fb.id = cur_id_n;
             _ftq.push_back(fb);
 
-            assert(!ftq_ids.exists(cur_id));
-            ftq_ids[cur_id] = 1;
+            assert(!ftq_ids.exists(cur_id_n));
+            ftq_ids[cur_id_n] = 1;
 
-            ++cur_id;
+            ++cur_id_n;
             cur_n.base = fb.base_n;
+            cur_n.off  = 0;
         end
 
         // consume some buffer entries
@@ -136,8 +148,8 @@ module pc_gen_stim #(
             buf_ids.delete(fb.id);
         end
 
-        @(posedge clock);
         @(negedge clock);
+        @(posedge clock);
     end
 
         $finish;
@@ -149,8 +161,11 @@ module pc_gen_stim #(
             _buf.delete();
             buf_ids.delete();
             ftq_ids.delete();
+
+            cur_id <= 0;
             cur <= '{
-                base: reset_val.base
+                base: reset_val.base,
+                off : reset_val.off
             };
 
         end else if (flush) begin
@@ -158,11 +173,14 @@ module pc_gen_stim #(
             _buf.delete();
             buf_ids.delete();
             ftq_ids.delete();
+
             cur <= '{
-                base: flush_fb_base
+                base: flush_fb_base,
+                off : flush_pc_off
             };
 
         end else begin
+            cur_id <= cur_id_n;
             cur <= cur_n;
 
             for (int e = 0; e < ftq_out_ren_cnt; ++e) begin

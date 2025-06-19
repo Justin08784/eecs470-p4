@@ -491,6 +491,8 @@ module pc_gen_sva #(
 
     initial begin
     forever begin
+
+        @(negedge clock);
         sva_comb_n = '{
             ftq_out_ren_cnt :   ftq_out_ren_cnt,
             ixq_out_wen_cnt :   ixq_out_wen_cnt,
@@ -521,17 +523,19 @@ module pc_gen_sva #(
                 out_stream[w].is_end,
                 out_stream[w].dw
             );
-        #0;
 
 
-        wr_idx = 0;
-        id_n = id;
+        id_n    = id;
+        cur_n   = cur;
+
+        wr_idx  = 0;
         for (int e = 0; e < ftq_in_vld_scnt; ++e) begin
             FTQ_ENTRY fb;
             WORD_STREAM_PKT [15:0] tmp;
             int tmp_cnt;
 
             fb = ftq_in_dat[e];
+            $display("add: e: %d, fb.id: %d (%d)", e, fb.id, id);
             if (fb.id < id) // already added
                 continue;
 
@@ -574,7 +578,6 @@ module pc_gen_sva #(
 
 
         @(posedge clock);
-        @(negedge clock);
     end
     end
 
@@ -602,6 +605,7 @@ module pc_gen_sva #(
             for (int w = 0; w < in_append_cnt; ++w)
                 in_stream.push_back(in_append[w]);
             out_stream_sz <= out_stream_sz_n;
+
         end
     end
 
