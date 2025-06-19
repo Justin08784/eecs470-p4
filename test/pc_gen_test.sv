@@ -181,30 +181,30 @@ module pc_gen_stim #(
 
     // forever begin
     // repeat (1000) begin
-    repeat (100) begin
+    repeat (1000000) begin
         cur_id_n = cur_id;
         cur_n = cur;
 
         ftq_sz = _ftq.size();
         buf_sz = _buf.size();
 
-        $display("cur: id: %4d, base: %d", cur_id, cur.base);
-        for (int e = 0; e < ftq_sz; ++e)
-            $display("ftq[%1d]: off: %d, ft: %b, base_n: %d (id: %0d)",
-                e,
-                _ftq[e].off,
-                _ftq[e].ft,
-                _ftq[e].base_n,
-                _ftq[e].id
-            );
-        for (int e = 0; e < buf_sz; ++e)
-            $display("buf[%1d]: off: %d, ft: %b, base_n: %d (id: %0d)",
-                e,
-                _buf[e].off,
-                _buf[e].ft,
-                _buf[e].base_n,
-                _buf[e].id
-            );
+        // $display("cur: id: %4d, base: %d", cur_id, cur.base);
+        // for (int e = 0; e < ftq_sz; ++e)
+        //     $display("ftq[%1d]: off: %d, ft: %b, base_n: %d (id: %0d)",
+        //         e,
+        //         _ftq[e].off,
+        //         _ftq[e].ft,
+        //         _ftq[e].base_n,
+        //         _ftq[e].id
+        //     );
+        // for (int e = 0; e < buf_sz; ++e)
+        //     $display("buf[%1d]: off: %d, ft: %b, base_n: %d (id: %0d)",
+        //         e,
+        //         _buf[e].off,
+        //         _buf[e].ft,
+        //         _buf[e].base_n,
+        //         _buf[e].id
+        //     );
 
         ftq_in_vld_scnt = `MIN(ftq_sz, 2); // TODO: randomly restrict this below the true count?
         ftq_in_dat = '0;
