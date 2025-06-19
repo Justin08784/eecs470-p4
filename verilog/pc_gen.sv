@@ -195,40 +195,32 @@ module pc_gen #(
     // adv_*[0]
     // ------------------------------------------------------------------
     always_comb begin
-        adv_bidx[0]= 0;
-        adv_blk [0]= 0;
-        aft_bidx[0]= 0;
-        aft_blk [0]= 0;
+        adv_bidx[0] = 0;
+        aft_bidx[0] = 0;
+        adv_blk [0] = 0;
+        aft_blk [0] = 0;
 
         unique case (1'b1)
-        // FIXME: These cases are not exhaustive
-        merge_l0  &  bhe10: begin
+        bhe00 & ~merge_l0: begin
             adv_bidx[0] = 1;
-            aft_bidx[0] = 1; // base adv by 2
+            aft_bidx[0] = 0;
 
             adv_blk [0] = 0;
         end
 
-        merge_l0  & ~bhe10: begin
+        bhe00 &  merge_l0: begin
             adv_bidx[0] = 1;
-            aft_bidx[0] = 0; // base adv by 1
+            aft_bidx[0] =  bhe10;
 
-            adv_blk [0] = 1;
-            aft_blk [0] = 0; // blk  adv by 1
+            adv_blk [0] = ~bhe10;
+            aft_blk [0]= 0;
         end
 
-        ~merge_l0 &  bhe00: begin
-            adv_bidx[0] = 1;
-            aft_bidx[0] = 0; // base adv by 1
-
-            adv_blk [0] = 0;
-        end
-
-        ~merge_l0 & ~bhe00: begin
+        default: begin
             adv_bidx[0] = 0;
 
             adv_blk [0] = 1;
-            aft_blk [0] = 0; // blk adv by 1
+            aft_blk [0] = 0;
         end
         endcase
     end
@@ -376,12 +368,9 @@ module pc_gen #(
         // e1 = !(merge_l0 && bhe00 && merge_l1);
 
         unique case (1'b1)
-        merge_l0 &  bhe10: begin // ignore. cant issue 2
-            e1 = 0;
-            b1 = 1;
-        end
-
-        merge_l0 & ~bhe10: begin
+        merge_l0: begin
+            // case 1:  bhe10 -> cant issue 2 (dont care)
+            // case 2: ~bhe10 -> e1=1, b1=1
             e1 = 1;
             b1 = 1;
         end
