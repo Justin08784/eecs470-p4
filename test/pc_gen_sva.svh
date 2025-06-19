@@ -22,6 +22,8 @@ typedef struct packed {
     // FTQ_ENTRY   fb;     // fb to which it belongs
 } WORD_STREAM_PKT;
 
+// TODO: need a check that buf is written AS SOON as any block in
+// the corresponding ftq entry is consumed
 function automatic WORD_STREAM_PKT [15:0] fb2stream (
     input FTQ_ENTRY     fb,
     input WADDR         base,   // of fetch block
@@ -477,8 +479,6 @@ module pc_gen_sva #(
 
     int     id, id_n;
     int     buf_id, buf_id_n;
-    // logic   ftq_ids[int];
-    logic   buf_ids[int]; // TODO: update
     WORD_STREAM_PKT in_stream [$];
     WORD_STREAM_PKT [16*NUM_DW-1:0] in_append;
     WORD_STREAM_PKT [NUM_W*NUM_DW-1:0] out_stream, in_cons;
@@ -549,6 +549,19 @@ module pc_gen_sva #(
             ++buf_id_n;
         end
 
+        // $display("dicr buf_id: %d", buf_id);
+        // $display("buf_out: wen_cnt = %d, [{id %4d, base_n: %d, ft: %b, off: %d}, {id: %4d, base_n: %d, ft: %b, off: %d}]\n",
+        //     buf_out_wen_cnt,
+        //     buf_out_dat[0].id,
+        //     buf_out_dat[0].base_n,
+        //     buf_out_dat[0].ft,
+        //     buf_out_dat[0].off,
+        //     buf_out_dat[1].id,
+        //     buf_out_dat[1].base_n,
+        //     buf_out_dat[1].ft,
+        //     buf_out_dat[1].off
+        // );
+
 
         id_n    = id;
         cur_n   = cur;
@@ -618,6 +631,8 @@ module pc_gen_sva #(
             out_stream_sz <= '0;
 
         end else if (flush) begin
+            id <= '0;
+            buf_id <= -1;
             cur <= '{
                 base: flush_fb_base,
                 off : flush_pc_off
@@ -709,6 +724,7 @@ module pc_gen_sva #(
         begin
             $display("\n\033[31m@@@ Failed at time %4d\033[0m\n", $time);
             debug;
+            $display("incr: %b", buf_id_increasing);
             $finish;
         end
     endtask

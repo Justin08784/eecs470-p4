@@ -166,10 +166,11 @@ module pc_gen_stim #(
     } cur, cur_n;
 
     // struct packed {
+    //     logic [1:0] a, b, c, d;
     // } rand_pkt;
 
     initial begin
-        // FIXME
+        // FIXME: check flush too
         flush   = 0;
         flush_fb_base   = '0;
         flush_pc_off    = '0;
@@ -206,6 +207,15 @@ module pc_gen_stim #(
         //         _buf[e].id
         //     );
 
+        std::randomize(flush_pc_off);
+        std::randomize(flush_fb_base);
+        flush = $urandom_range(99, 0) < 8;
+        // $display("flush: %b, %d %d", flush, flush_fb_base, flush_pc_off);
+        // $display("cur_id: %d, cur_id_n: %d", cur_id, cur_id_n);
+
+        /*FIXME: The problem with randomly restricting ftq_in_vld_scnt is
+        that the same entry can be seen as distinct by the dut
+        if it enters and exits validity. */
         ftq_in_vld_scnt = `MIN(ftq_sz, 2); // TODO: randomly restrict this below the true count?
         ftq_in_dat = '0;
         for (int e = 0; e < ftq_in_vld_scnt; ++e)
@@ -273,6 +283,7 @@ module pc_gen_stim #(
             buf_ids.delete();
             ftq_ids.delete();
 
+            cur_id <= 0;
             cur <= '{
                 base: flush_fb_base,
                 off : flush_pc_off
