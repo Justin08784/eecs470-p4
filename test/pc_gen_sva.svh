@@ -476,6 +476,7 @@ module pc_gen_sva #(
     endfunction
 
     int     id, id_n;
+    int     buf_id, buf_id_n;
     // logic   ftq_ids[int];
     logic   buf_ids[int]; // TODO: update
     WORD_STREAM_PKT in_stream [$];
@@ -486,6 +487,7 @@ module pc_gen_sva #(
     int out_stream_sz, out_stream_sz_n;
 
     logic match_stream; // do the streams match?
+    logic buf_id_increasing;
 
     struct packed {
         WADDR base;
@@ -507,7 +509,7 @@ module pc_gen_sva #(
             buf_out_wen_cnt :   buf_out_wen_cnt,
             buf_out_dat     :   buf_out_dat
         };
-        print_comb(sva_comb_n);
+        // print_comb(sva_comb_n);
 
         in_stream_sz = in_stream.size();
         // for (int w = 0; w < in_stream_sz; ++w)
@@ -540,6 +542,13 @@ module pc_gen_sva #(
         end
 
 
+        buf_id_n = buf_id;
+        buf_id_increasing = 1;
+        for (int w = 0; w < buf_out_wen_cnt; ++w) begin
+            buf_id_increasing &= buf_out_dat[w].id == (buf_id_n+1);
+            ++buf_id_n;
+        end
+
 
         id_n    = id;
         cur_n   = cur;
@@ -551,7 +560,7 @@ module pc_gen_sva #(
             int tmp_cnt;
 
             fb = ftq_in_dat[e];
-            $display("add: e: %d, fb.id: %d (%d)", e, fb.id, id);
+            // $display("add: e: %d, fb.id: %d (%d)", e, fb.id, id);
             if (fb.id < id) // already added
                 continue;
 
@@ -600,6 +609,7 @@ module pc_gen_sva #(
     always_ff @(posedge clock) begin
         if (reset) begin
             id <= '0;
+            buf_id <= -1;
             cur     <= '{
                 base: reset_val.base,
                 off : reset_val.off
@@ -617,6 +627,7 @@ module pc_gen_sva #(
 
         end else begin
             id  <= id_n;
+            buf_id <= buf_id_n;
             cur <= cur_n;
             for (int w = 0; w < in_append_cnt; ++w)
                 in_stream.push_back(in_append[w]);
@@ -717,6 +728,12 @@ module pc_gen_sva #(
             disable iff (reset)
             match_stream;
         endproperty
+
+        property buf_id_sequential;
+            disable iff (reset)
+            buf_id_increasing;
+        endproperty
+
     endclocking
 
     // Match_State: assert property(cb.match_state)
@@ -725,6 +742,8 @@ module pc_gen_sva #(
     In_Stream_EqLonger: assert property(cb.in_stream_eqlonger)
         else exit_on_error;
     In_Eq_Out: assert property(cb.in_eq_out)
+        else exit_on_error;
+    Buf_Id_Sequential: assert property(cb.buf_id_sequential)
         else exit_on_error;
 
 endmodule
