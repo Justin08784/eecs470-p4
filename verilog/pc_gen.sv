@@ -415,11 +415,19 @@ module pc_gen #(
         .gnt_cnt    (buf_lim_cnt)
     );
 
-    assign buf_out_dat[0] = !cur.inbuf ? ftq_in_dat[0] : ftq_in_dat[1];
+    // assign buf_out_dat[0] = !cur.inbuf ? ftq_in_dat[0] : ftq_in_dat[1];
+    assign buf_out_dat[0] = ftq_in_dat[cur.inbuf];
     assign buf_out_dat[1] = ftq_in_dat[1];
 
     assign req_buf[0] = !cur.inbuf || adv_bidx[0];
     assign req_buf[1] = !cur.inbuf && adv_bidx[1];
+
+    logic [1:0] req_raw, gnt_raw;
+    assign req_raw[0] = iss_any;
+    assign req_raw[1] = iss_any & iss_idx;
+
+    assign gnt_raw[0] = iss_any & (ixq_out_wen_cnt != 0);
+    assign gnt_raw[1] = ftq_in_vld_scnt[1] & (!iss_any || ixq_out_wen_cnt[1]);
     always_comb begin
         logic dwidx;
 
@@ -432,9 +440,9 @@ module pc_gen #(
         be able to push it to the reread queue.
         */
 
-        ixq_out_wen_cnt = `MIN(buf_lim_cnt, `MIN(ftq_in_vld_scnt, ixq_in_rdy_scnt));
+        ixq_out_wen_cnt = `MIN(buf_lim_cnt, `MIN(req_raw[0] + req_raw[1], ixq_in_rdy_scnt));
 
-        dwidx = ixq_out_wen_cnt[1];
+        dwidx = gnt_raw[1];
         ftq_out_ren_cnt = (ixq_out_wen_cnt == 0 || !adv_bidx[dwidx])
             ? 0
             : aft_bidx[dwidx] + 1;
@@ -478,7 +486,7 @@ module pc_gen #(
             };
 
         else if (ixq_out_wen_cnt != 0) begin
-            dwidx = ixq_out_wen_cnt[1];
+            dwidx = gnt_raw[1];
 
             basv = aft_bidx [dwidx];
             blkv = aft_blk  [dwidx];
@@ -503,7 +511,7 @@ module pc_gen #(
         end
 
         if (!reset && `FALSE) begin
-            $display("FOGET: base: %d, off: %d", cur.base, cur.off);
+            $display("\n\n\nFOGET: base: %d, off: %d, inbuf: %b", cur.base, cur.off, cur.inbuf);
             $display("base_n[0]: %d, base_n[1]: %d", base_n[0], base_n[1]);
             $display("dwidx: %b, bidx[adv: %b, aft: %b], blk[av: %b, aft: %b]",
                 dwidx,
@@ -612,11 +620,13 @@ module pc_gen #(
             ixq_out_is_end
         );
 
-        $display("buf_out: wen_cnt = %d, [{base_n: %d, ft: %b, off: %d}, {base_n: %d, ft: %b, off: %d}]\n",
+        $display("buf_out: wen_cnt = %d, [{id %4d, base_n: %d, ft: %b, off: %d}, {id: %4d, base_n: %d, ft: %b, off: %d}]\n",
             buf_out_wen_cnt,
+            buf_out_dat[0].id,
             buf_out_dat[0].base_n,
             buf_out_dat[0].ft,
             buf_out_dat[0].off,
+            buf_out_dat[1].id,
             buf_out_dat[1].base_n,
             buf_out_dat[1].ft,
             buf_out_dat[1].off
