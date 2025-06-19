@@ -201,32 +201,33 @@ module pc_gen #(
         aft_blk [0]= 0;
 
         unique case (1'b1)
+        // FIXME: These cases are not exhaustive
         merge_l0  &  bhe10: begin
             adv_bidx[0] = 1;
-            adv_blk [0] = 0;
-
             aft_bidx[0] = 1; // base adv by 2
+
+            adv_blk [0] = 0;
         end
 
         merge_l0  & ~bhe10: begin
             adv_bidx[0] = 1;
-            adv_blk [0] = 1;
-
             aft_bidx[0] = 0; // base adv by 1
+
+            adv_blk [0] = 1;
             aft_blk [0] = 0; // blk  adv by 1
         end
 
         ~merge_l0 &  bhe00: begin
             adv_bidx[0] = 1;
-            adv_blk [0] = 0;
-
             aft_bidx[0] = 0; // base adv by 1
+
+            adv_blk [0] = 0;
         end
 
         ~merge_l0 & ~bhe00: begin
             adv_bidx[0] = 0;
-            adv_blk [0] = 1;
 
+            adv_blk [0] = 1;
             aft_blk [0] = 0; // blk adv by 1
         end
         endcase
@@ -458,7 +459,7 @@ module pc_gen #(
 
     always_ff @(posedge clock) begin
         logic dwidx, basv, blkv;
-        
+
         if (reset)
 `ifndef PC_GEN_TEST_MODE
             cur <= '{
@@ -529,8 +530,10 @@ module pc_gen #(
         //     ftq_in_dat[1].off,
         // );
 
-        $display("0[%b, %b], 1[%b, %b]", e0, b0, e1, b1);
-        $display("%b, %b", merge_l0, merge_l1);
+        $display("(e0, b0) = (%b, %b), (e1, b1) = (%b, %b)", e0, b0, e1, b1);
+        $display("merge_l0: %b, merge_l1: %b", merge_l0, merge_l1);
+        $display("bhe00: %b, bhe01: %b, bhe10: %b, bhe11: %b", bhe00, bhe01, bhe10, bhe11);
+
         $display("mer fmsk: [%b, %b]",
             mer_fmsk[0],
             mer_fmsk[1]
