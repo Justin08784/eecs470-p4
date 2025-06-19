@@ -152,6 +152,7 @@ module pc_gen_sva #(
         `CNT_TYPE(2)    ftq_out_ren_cnt;
         // irq / iqq
         `CNT_TYPE(2)    ixq_out_wen_cnt;
+        FB_OFF[1:0][1:0]ixq_out_off;
         DWADDR[1:0]     ixq_out_dw;
         logic[1:0][1:0] ixq_out_fmsk;
         logic[1:0][1:0] ixq_out_is_end;
@@ -169,6 +170,7 @@ module pc_gen_sva #(
     assign dut_comb_n   = '{
         ftq_out_ren_cnt :ftq_out_ren_cnt,
         
+        ixq_out_off     :ixq_out_off,
         ixq_out_wen_cnt :ixq_out_wen_cnt,
         ixq_out_dw      :ixq_out_dw,
         ixq_out_fmsk    :ixq_out_fmsk,
@@ -496,6 +498,7 @@ module pc_gen_sva #(
         sva_comb_n = '{
             ftq_out_ren_cnt :   ftq_out_ren_cnt,
             ixq_out_wen_cnt :   ixq_out_wen_cnt,
+            ixq_out_off     :   ixq_out_off,
             ixq_out_dw      :   ixq_out_dw,
             ixq_out_fmsk    :   ixq_out_fmsk,
             ixq_out_is_end  :   ixq_out_is_end,
@@ -622,12 +625,16 @@ module pc_gen_sva #(
             c.ftq_out_ren_cnt
         );
 
-        $display("ixq_out: wen_cnt = %d, dw = [%d, %d], fmsk = %b, is_end = %b",
+        $display("ixq_out: wen_cnt = %d, off = [[%d, %d], [%d, %d]], fmsk = %b, is_end = %b, dw = [%d, %d]",
             c.ixq_out_wen_cnt,
-            c.ixq_out_dw[0],
-            c.ixq_out_dw[1],
+            c.ixq_out_off[0][0],
+            c.ixq_out_off[0][1],
+            c.ixq_out_off[1][0],
+            c.ixq_out_off[1][1],
             c.ixq_out_fmsk,
             c.ixq_out_is_end,
+            c.ixq_out_dw[0],
+            c.ixq_out_dw[1]
         );
 
         $display("buf_out: wen_cnt = %d, [{base_n: %d, ft: %b, off: %d}, {base_n: %d, ft: %b, off: %d}]\n",
