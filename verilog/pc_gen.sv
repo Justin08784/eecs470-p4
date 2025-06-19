@@ -439,7 +439,18 @@ module pc_gen #(
             ? 0
             : aft_bidx[dwidx] + 1;
 
-        buf_out_wen_cnt = buf_prefix_cnt[ixq_out_wen_cnt];
+        // if (ixq_out_wen_cnt == 0)
+        //     buf_out_wen_cnt = 0;
+        // else
+        //     buf_out_wen_cnt = adv_bidx[dwidx] + !cur.inbuf;
+
+        if (ixq_out_wen_cnt == 0)
+            buf_out_wen_cnt = 0;
+        else if (!cur.inbuf)
+            buf_out_wen_cnt = adv_bidx[dwidx] + 1;
+        else
+            buf_out_wen_cnt = adv_bidx[dwidx];
+        // buf_out_wen_cnt = buf_prefix_cnt[ixq_out_wen_cnt];
     end
 
     WADDR [NUM_FTQ-1:0] base_n;
