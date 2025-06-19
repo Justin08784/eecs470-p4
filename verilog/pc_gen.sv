@@ -450,6 +450,8 @@ module pc_gen #(
     assign base_n[1] = ftq_in_dat[1].base_n;
 
     always_ff @(posedge clock) begin
+        logic dwidx, basv, blkv;
+        
         if (reset)
 `ifndef PC_GEN_TEST_MODE
             cur <= '{
@@ -468,7 +470,6 @@ module pc_gen #(
             };
 
         else if (ixq_out_wen_cnt != 0) begin
-            logic dwidx, basv, blkv;
             dwidx = ixq_out_wen_cnt[1];
 
             basv = aft_bidx [dwidx];
@@ -477,8 +478,41 @@ module pc_gen #(
             if (adv_bidx[dwidx])
                 cur.base    <= base_n[basv];
             if (adv_blk [dwidx])
-                cur.off     <= pos_blk_off[basv][blkv];
+                cur.off     <= pos_blk_off[adv_bidx[dwidx]][blkv]; // assert !aft_bidx[dwidx]
+
+            // adv_blk is high IFF we do not advance 2 bases
+            assert(adv_blk[dwidx] ? !(adv_bidx[dwidx] && basv) : 1) else $fatal;
+            assert((adv_bidx[dwidx] && basv) ? !adv_blk[dwidx] : 1) else $fatal;
+
             cur.inbuf   <= !(adv_bidx[dwidx] && basv);
+        end
+
+        if (!reset) begin
+            $display("FOGET: base: %d, off: %d", cur.base, cur.off);
+            $display("dwidx: %b, basv: %b, blkv: %b", dwidx, basv, blkv);
+            $display("0-bidx: [adv: %b, aft: %b], 1-bidx: [adv: %b, aft: %b]",
+                adv_bidx[0],
+                aft_bidx[0],
+                adv_bidx[1],
+                aft_bidx[1]
+            );
+            $display("0-blk:  [adv: %b, aft: %b], 1-blk:  [adv: %b, aft: %b]",
+                adv_blk[0],
+                aft_blk[0],
+                adv_blk[1],
+                aft_blk[1]
+            );
+            for (int i = 0; i < 4; ++i) begin
+                logic x, y;
+                x = i / 2;
+                y = i % 2;
+                $display("pos_blk_off[%d][%d]: %d",
+                    x,
+                    y,
+                    pos_blk_off[x][y]
+                );
+            end
+            print_pc_gen;
         end
     end
 
