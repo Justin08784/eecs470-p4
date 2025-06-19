@@ -13,7 +13,7 @@ module pc_gen_stim #(
 ) (
     input   clock,
     input   reset,
-    output  flush,
+    output  logic flush,
 
     output  WADDR       flush_fb_base,
     output  logic [3:0] flush_pc_off,
@@ -49,15 +49,11 @@ module pc_gen_stim #(
             buf_ids[int];
     // does id exist in X? (doesn't need to have logic type, but SV doesn't support sets... right?)
 
-    WORD_STREAM_PKT in_stream   [$];
-    WORD_STREAM_PKT out_stream  [$];
-
     int ftq_sz, buf_sz, num_add, num_del;
 
     int cur_id; // ignores reset/flushes. monotonic identifier
     struct packed {
         WADDR base;
-        logic [3:0] off;
     } cur, cur_n;
 
     // struct packed {
@@ -75,8 +71,6 @@ module pc_gen_stim #(
     // repeat (1000) begin
     repeat (10) begin
 
-        @(negedge clock);
-
         ftq_sz = _ftq.size;
         buf_sz = _buf.size;
 
@@ -92,17 +86,11 @@ module pc_gen_stim #(
         for (int e = 0; e < num_add; ++e) begin
             // localparam MAX_OFF_VAL = 1 << 15 - MAX_W_PER_FB; // FIXME: how to handle?
             FTQ_ENTRY fb;
-            WORD_STREAM_PKT [15:0] in_append;
-            int num_append;
 
             std::randomize(fb);
 
             if (fb.ft)
-                fb.base_n = cur_n.base + cur_n.off + 1;
-
-            in_append = fb2stream(fb, cur_n.base, cur_n.off, num_append);
-            for (int w = 0; w < num_append; ++w)
-                in_stream.push_back(in_append[w]);
+                fb.base_n = cur_n.base + fb.off + 1;
 
             fb.id = cur_id;
             _ftq.push_back(fb);
@@ -112,7 +100,6 @@ module pc_gen_stim #(
 
             ++cur_id;
             cur_n.base = fb.base_n;
-            cur_n.off  = 0;
         end
 
         // consume some buffer entries
@@ -127,7 +114,10 @@ module pc_gen_stim #(
         end
 
         @(posedge clock);
+        @(negedge clock);
     end
+
+        $finish;
     end
 
     always_ff @(posedge clock) begin
@@ -137,8 +127,7 @@ module pc_gen_stim #(
             buf_ids.delete();
             ftq_ids.delete();
             cur <= '{
-                base: reset_val.base,
-                off : reset_val.off
+                base: reset_val.base
             };
 
         end else if (flush) begin
@@ -147,8 +136,7 @@ module pc_gen_stim #(
             buf_ids.delete();
             ftq_ids.delete();
             cur <= '{
-                base: flush_fb_base,
-                off : flush_pc_off
+                base: flush_fb_base
             };
 
         end else begin
@@ -195,6 +183,7 @@ module pc_gen_test;
     // irq / iqq
     `CNT_TYPE(2)    ixq_in_rdy_scnt;
     `CNT_TYPE(2)    ixq_out_wen_cnt;
+    FB_OFF[1:0][1:0]ixq_out_off;
     DWADDR[1:0]     ixq_out_dw;
     logic[1:0][1:0] ixq_out_fmsk;
     logic[1:0][1:0] ixq_out_is_end;
@@ -254,6 +243,7 @@ module pc_gen_test;
 
         .ixq_in_rdy_scnt,
         .ixq_out_wen_cnt,
+        .ixq_out_off,
         .ixq_out_dw,
         .ixq_out_fmsk,
         .ixq_out_is_end,
@@ -265,6 +255,40 @@ module pc_gen_test;
 
 
 `ifdef PC_GEN_TEST_MODE
+    pc_gen_stim #(
+        .MAX_W_PER_FB   (MAX_W_PER_FB),
+        .W_PER_DW       (W_PER_DW),
+        .NUM_DW         (NUM_DW),
+        .NUM_FTQ        (NUM_FTQ)
+    ) stim (
+        .clock,
+        .reset,
+        .flush,
+        .flush_fb_base,
+        .flush_pc_off,
+
+        .reset_val      ('{
+            off     : s_rst.off,
+            base    : s_rst.base,
+            inbuf   : s_rst.inbuf
+        }),
+
+        .ftq_in_vld_scnt,
+        .ftq_in_dat,
+        .ftq_out_ren_cnt,
+
+        .ixq_in_rdy_scnt,
+        .ixq_out_wen_cnt,
+        .ixq_out_off,
+        .ixq_out_dw,
+        .ixq_out_fmsk,
+        .ixq_out_is_end,
+
+        .buf_in_rdy_scnt,
+        .buf_out_wen_cnt,
+        .buf_out_dat
+    );
+
     pc_gen_sva #(
         .MAX_W_PER_FB   (MAX_W_PER_FB),
         .W_PER_DW       (W_PER_DW),
@@ -293,6 +317,7 @@ module pc_gen_test;
 
         .ixq_in_rdy_scnt,
         .ixq_out_wen_cnt,
+        .ixq_out_off,
         .ixq_out_dw,
         .ixq_out_fmsk,
         .ixq_out_is_end,
@@ -319,10 +344,6 @@ module pc_gen_test;
 
         $display("\nStart Testbench");
         clock = 0;
-        flush = 0;
-        flush_fb_base   = '0;
-        flush_pc_off    = '0;
-
 
         $display("Test 1:");
         reset = 1;
@@ -334,18 +355,18 @@ module pc_gen_test;
 
         @(negedge clock);
         reset = 0;
+    // forever begin
 
         // WADDR       base_n,
         // logic       ft,
         // logic [3:0] off
 
-        ixq_in_rdy_scnt = 2;
-        buf_in_rdy_scnt = 2;
-        ftq_in_vld_scnt = 2;
-        // tmp_f0 = wr_ftq(f0, 0, 0, 4);
-        tmp_f0 = wr_ftq(f0, 19, 1, 4);
-        tmp_f1 = wr_ftq(f1, 0, 0, 15);
-        ftq_in_dat = {tmp_f1, tmp_f0};
+        // ixq_in_rdy_scnt = 2;
+        // buf_in_rdy_scnt = 2;
+        // ftq_in_vld_scnt = 2;
+        // tmp_f0 = wr_ftq(f0, 19, 1, 4);
+        // tmp_f1 = wr_ftq(f1, 0, 0, 15);
+        // ftq_in_dat = {tmp_f1, tmp_f0};
 
         // sva_comb = '{
         //     ftq_out_ren_cnt : 0,
@@ -363,8 +384,8 @@ module pc_gen_test;
         //     inbuf   : 1
         // };
 
-        #0; dut.print_pc_gen; // 0 delay ensures all combinational signals have settled before printing
-        @(posedge clock);
+        // #0; dut.print_pc_gen; // 0 delay ensures all combinational signals have settled before printing
+        // @(posedge clock);
 
 
         // $display("Test 1:");
@@ -374,10 +395,10 @@ module pc_gen_test;
         // // code
         // @(posedge clock);
 
-        @(negedge clock);
+        // @(negedge clock);
 
 
-        $finish;
+    // end
     end
 `endif
 

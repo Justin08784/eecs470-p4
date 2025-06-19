@@ -41,6 +41,7 @@ module pc_gen #(
     output  `CNT_TYPE(2)    ftq_out_ren_cnt,
 
     // irq / iqq
+    // FIXME: these ixq_out lines should be folded into a dat struct
     input   `CNT_TYPE(2)    ixq_in_rdy_scnt, // = `MIN(iqq_*, irq_*)
     output  `CNT_TYPE(2)    ixq_out_wen_cnt,
     output  FB_OFF[1:0][1:0]ixq_out_off,
