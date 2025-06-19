@@ -480,11 +480,12 @@ module pc_gen_sva #(
     logic   buf_ids[int]; // TODO: update
     WORD_STREAM_PKT in_stream [$];
     WORD_STREAM_PKT [16*NUM_DW-1:0] in_append;
-    WORD_STREAM_PKT [NUM_W*NUM_DW-1:0] out_stream;
+    WORD_STREAM_PKT [NUM_W*NUM_DW-1:0] out_stream, in_cons;
     int wr_idx;
-    int in_stream_sz, in_append_cnt;
+    int in_stream_sz, in_append_cnt, in_cons_cnt;
     int out_stream_sz, out_stream_sz_n;
 
+    logic match_stream; // do the streams match?
 
     struct packed {
         WADDR base;
@@ -509,23 +510,35 @@ module pc_gen_sva #(
         print_comb(sva_comb_n);
 
         in_stream_sz = in_stream.size();
-        for (int w = 0; w < in_stream_sz; ++w)
-            $display("in_st[%2d]: base: %d, off: %d, is_end: %b, dw: %d",
-                w,
-                in_stream[w].base,
-                in_stream[w].off,
-                in_stream[w].is_end,
-                in_stream[w].dw
-            );
+        // for (int w = 0; w < in_stream_sz; ++w)
+        //     $display("in_st[%2d]: base: %d, off: %d, is_end: %b, dw: %d",
+        //         w,
+        //         in_stream[w].base,
+        //         in_stream[w].off,
+        //         in_stream[w].is_end,
+        //         in_stream[w].dw
+        //     );
 
-        for (int w = 0; w < out_stream_sz; ++w)
-            $display("ot_st[%2d]: base: %d, off: %d, is_end: %b, dw: %d",
-                w,
-                out_stream[w].base,
-                out_stream[w].off,
-                out_stream[w].is_end,
-                out_stream[w].dw
-            );
+        // for (int w = 0; w < out_stream_sz; ++w)
+        //     $display("ot_st[%2d]: base: %d, off: %d, is_end: %b, dw: %d",
+        //         w,
+        //         out_stream[w].base,
+        //         out_stream[w].off,
+        //         out_stream[w].is_end,
+        //         out_stream[w].dw
+        //     );
+
+        in_cons_cnt  = out_stream_sz;
+        match_stream = 1;
+        for (int w = 0; w < in_cons_cnt; ++w) begin
+            WORD_STREAM_PKT cur;
+            logic cur_match;
+
+            cur = in_stream.pop_front();
+            in_cons[w] = cur;
+            match_stream &= cur == out_stream[w];
+        end
+
 
 
         id_n    = id;
@@ -694,10 +707,25 @@ module pc_gen_sva #(
             disable iff (reset)
             diff_n == '0;
         endproperty
+
+        property in_stream_eqlonger;
+            disable iff (reset)
+            in_stream_sz >= out_stream_sz;
+        endproperty
+
+        property in_eq_out;
+            disable iff (reset)
+            match_stream;
+        endproperty
     endclocking
 
     // Match_State: assert property(cb.match_state)
     //     else exit_on_error;
+
+    In_Stream_EqLonger: assert property(cb.in_stream_eqlonger)
+        else exit_on_error;
+    In_Eq_Out: assert property(cb.in_eq_out)
+        else exit_on_error;
 
 endmodule
 `endif // PC_GEN_SVA_SVH
