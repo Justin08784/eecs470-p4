@@ -177,7 +177,7 @@ module pc_gen #(
         iss_idx = 0;
         unique case (1'b1)
         merge_l0  &  bhe10: iss_idx = 0;
-        merge_l0  & ~bhe10: iss_idx = 1;
+        merge_l0  & ~bhe10: iss_idx = ftq1_vld;
         ~merge_l0 &  bhe00: iss_idx = ftq1_vld;
         ~merge_l0 & ~bhe00: iss_idx = 1;
         endcase
@@ -235,7 +235,12 @@ module pc_gen #(
         aft_blk [1]= 0;
 
         unique case (1'b1)
-        merge_l0  &  bhe10:; // ignore. Can't issue 2
+        merge_l0  &  bhe10: begin // even though we issue 1 at most, we still consume 2
+            adv_bidx[1] = 1;
+            aft_bidx[1] = 1; // base adv by 2
+
+            adv_blk [1] = 0;
+        end
 
         merge_l0  & ~bhe10 &  bhe11: begin
             adv_bidx[1] = 1;
@@ -427,9 +432,10 @@ module pc_gen #(
     assign req_raw[1] = iss_any & iss_idx;
 
     assign gnt_raw[0] = iss_any & (ixq_out_wen_cnt != 0);
-    assign gnt_raw[1] = ftq_in_vld_scnt[1] & (!iss_any || ixq_out_wen_cnt[1]);
+    assign gnt_raw[1] = ftq1_vld & (!iss_idx || ixq_out_wen_cnt[1]);
+    logic dwidx;
+    assign dwidx = gnt_raw[1];
     always_comb begin
-        logic dwidx;
 
         /*FIXME:
         We may actually request up to 3 buffer slots per cycle
@@ -442,7 +448,6 @@ module pc_gen #(
 
         ixq_out_wen_cnt = `MIN(buf_lim_cnt, `MIN(req_raw[0] + req_raw[1], ixq_in_rdy_scnt));
 
-        dwidx = gnt_raw[1];
         ftq_out_ren_cnt = (ixq_out_wen_cnt == 0 || !adv_bidx[dwidx])
             ? 0
             : aft_bidx[dwidx] + 1;
@@ -455,9 +460,9 @@ module pc_gen #(
         if (ixq_out_wen_cnt == 0)
             buf_out_wen_cnt = 0;
         else if (!cur.inbuf)
-            buf_out_wen_cnt = adv_bidx[dwidx] + 1;
+            buf_out_wen_cnt = 2'b1 + `UCAST_LEN(adv_bidx[dwidx] & ftq1_vld, 2);
         else
-            buf_out_wen_cnt = adv_bidx[dwidx];
+            buf_out_wen_cnt = adv_bidx[dwidx] & ftq1_vld;
         // buf_out_wen_cnt = buf_prefix_cnt[ixq_out_wen_cnt];
     end
 
@@ -466,7 +471,7 @@ module pc_gen #(
     assign base_n[1] = ftq_in_dat[1].base_n;
 
     always_ff @(posedge clock) begin
-        logic dwidx, basv, blkv;
+        logic basv, blkv;
 
         if (reset)
 `ifndef PC_GEN_TEST_MODE
@@ -486,7 +491,7 @@ module pc_gen #(
             };
 
         else if (ixq_out_wen_cnt != 0) begin
-            dwidx = gnt_raw[1];
+            // dwidx = gnt_raw[1];
 
             basv = aft_bidx [dwidx];
             blkv = aft_blk  [dwidx];
@@ -510,8 +515,13 @@ module pc_gen #(
             cur.inbuf   <= !(adv_bidx[dwidx] && basv);
         end
 
-        if (!reset && `FALSE) begin
+        // if (!reset && `FALSE) begin
+        if (!reset) begin
             $display("\n\n\nFOGET: base: %d, off: %d, inbuf: %b", cur.base, cur.off, cur.inbuf);
+            $display("come the fuckon: %b %d,",
+                adv_bidx[dwidx] & ftq1_vld,
+                1 + adv_bidx[dwidx] & ftq1_vld
+            );
             $display("base_n[0]: %d, base_n[1]: %d", base_n[0], base_n[1]);
             $display("dwidx: %b, bidx[adv: %b, aft: %b], blk[av: %b, aft: %b]",
                 dwidx,
@@ -580,6 +590,7 @@ module pc_gen #(
 
         // $display("nal_is_end: %b", nal_is_end);
 
+        $display("ftq_in_vld_scnt: %d", ftq_in_vld_scnt);
         $display("ftq[0]: base_woff: %b, align_msk: %b, fmsk: %b, off_n: [%d, %d, %d, %d, %d], is_end_flat: %b",
             base_woff[0],
             align_msk[0],
