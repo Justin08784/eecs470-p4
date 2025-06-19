@@ -276,7 +276,14 @@ module pc_gen #(
             aft_blk [1] = 0; // blk  adv by 1
         end
 
-        (~merge_l0 & ~merge_l1) & ~bhe00: begin
+        (~merge_l0 & ~merge_l1) & ~bhe00 &  bhe01: begin
+            adv_bidx[1] = 1;
+            aft_bidx[1] = 0;
+
+            adv_blk [1] = 0;
+        end
+
+        (~merge_l0 & ~merge_l1) & ~bhe00 & ~bhe01: begin
             adv_bidx[1] = 0;
 
             adv_blk [1] = 1;
