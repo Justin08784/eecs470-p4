@@ -79,9 +79,17 @@ module pc_gen_stim #(
         ixq_in_rdy_scnt = 0;
         buf_in_rdy_scnt = 0;
 
+        // wait out reset
+        @(negedge clock);
+        @(negedge clock);
+        /* ^^ seems a bit hacky but if we remove these then the cur_id oscillates
+        between 8 and 0 for some reason?? */
+
     // forever begin
     // repeat (1000) begin
     repeat (10) begin
+        cur_id_n = cur_id;
+        cur_n = cur;
 
         ftq_sz = _ftq.size();
         buf_sz = _buf.size();
@@ -111,8 +119,6 @@ module pc_gen_stim #(
         ixq_in_rdy_scnt = 2; // TODO: make this random
         buf_in_rdy_scnt = `MIN(_BUF_SZ-buf_sz, 2); // TODO: Likewise. random restriction
 
-        cur_id_n = cur_id;
-        cur_n = cur;
         num_add = _FTQ_SZ-ftq_sz;
         for (int e = 0; e < num_add; ++e) begin
             // localparam MAX_OFF_VAL = 1 << 15 - MAX_W_PER_FB; // FIXME: how to handle?
