@@ -51,8 +51,7 @@ module pc_gen_stim #(
     localparam _BUF_SZ = 8;
 
     FTQ_ENTRY _ftq [$], _buf [$];
-    logic   ftq_ids[int],
-            buf_ids[int];
+    logic ftq_ids[int];
     // does id exist in X? (doesn't need to have logic type, but SV doesn't support sets... right?)
 
     int ftq_sz, buf_sz, num_add, num_del;
@@ -63,12 +62,16 @@ module pc_gen_stim #(
         logic [3:0] off;
     } cur, cur_n;
 
-    // struct packed {
-    //     logic [1:0] a, b, c, d;
-    // } rand_pkt;
+    localparam FLUSH_PROB = 8; // in percent
+    logic [1:0] ftq_in_vld_max;
+    logic [1:0] ixq_in_rdy_max;
+    logic [1:0] buf_in_rdy_max;
+    logic [1:0] buf_cons_max;
+    struct packed{
+        logic hit;
+    } rand_pkt;
 
     initial begin
-        // FIXME: check flush too
         flush   = 0;
         flush_fb_base   = '0;
         flush_pc_off    = '0;
@@ -79,13 +82,18 @@ module pc_gen_stim #(
         buf_in_rdy_scnt = 0;
 
     // forever begin
-    // repeat (1000) begin
-    repeat (1000000) begin
+    repeat (1000) begin
+    // repeat (1000000) begin
         cur_id_n = cur_id;
         cur_n = cur;
 
         ftq_sz = _ftq.size();
         buf_sz = _buf.size();
+
+        ftq_in_vld_max = $urandom_range(2, 0);
+        ixq_in_rdy_max = $urandom_range(2, 0);
+        buf_in_rdy_max = $urandom_range(2, 0);
+        buf_cons_max   = $urandom_range(2, 0);
 
         // $display("cur: id: %4d, base: %d", cur_id, cur.base);
         // for (int e = 0; e < ftq_sz; ++e)
@@ -107,7 +115,7 @@ module pc_gen_stim #(
 
         std::randomize(flush_pc_off);
         std::randomize(flush_fb_base);
-        flush = $urandom_range(99, 0) < 8;
+        flush = $urandom_range(99, 0) < FLUSH_PROB;
         // $display("flush: %b, %d %d", flush, flush_fb_base, flush_pc_off);
         // $display("cur_id: %d, cur_id_n: %d", cur_id, cur_id_n);
 
@@ -118,8 +126,8 @@ module pc_gen_stim #(
         ftq_in_dat = '0;
         for (int e = 0; e < ftq_in_vld_scnt; ++e)
             ftq_in_dat[e] = _ftq[e];
-        ixq_in_rdy_scnt = 2; // TODO: make this random
-        buf_in_rdy_scnt = `MIN(_BUF_SZ-buf_sz, 2); // TODO: Likewise. random restriction
+        ixq_in_rdy_scnt = ixq_in_rdy_max;
+        buf_in_rdy_scnt = `MIN(_BUF_SZ-buf_sz, buf_in_rdy_max);
 
         num_add = _FTQ_SZ-ftq_sz;
         for (int e = 0; e < num_add; ++e) begin
@@ -146,14 +154,13 @@ module pc_gen_stim #(
         end
 
         // consume some buffer entries
-        num_del = `MIN(buf_sz, 2); // TODO: make this random too
+        num_del = `MIN(buf_sz, buf_cons_max);
         for (int e = 0; e < num_del; ++e) begin
             FTQ_ENTRY fb;
             if (ftq_ids.exists(_buf[e].id))
                 break;
 
             fb = _buf.pop_front();
-            buf_ids.delete(fb.id);
         end
 
 
@@ -166,7 +173,6 @@ module pc_gen_stim #(
         if (reset) begin
             _ftq.delete();
             _buf.delete();
-            buf_ids.delete();
             ftq_ids.delete();
 
             cur_id <= 0;
@@ -178,7 +184,6 @@ module pc_gen_stim #(
         end else if (flush) begin
             _ftq.delete();
             _buf.delete();
-            buf_ids.delete();
             ftq_ids.delete();
 
             cur_id <= 0;
@@ -203,7 +208,6 @@ module pc_gen_stim #(
                 fb = buf_out_dat[e];
 
                 _buf.push_back(fb);
-                buf_ids[fb.id] = 1;
             end
         end
 

@@ -157,6 +157,7 @@ module pc_gen_sva #(
 
     int     id, id_n;
     int     buf_id, buf_id_n;
+    int     end_cnt, end_cnt_n;
     WORD_STREAM_PKT in_stream [$];
     WORD_STREAM_PKT [16*NUM_DW-1:0] in_append;
     WORD_STREAM_PKT [NUM_W*NUM_DW-1:0] out_stream, in_cons;
@@ -280,6 +281,10 @@ module pc_gen_sva #(
         end
         out_stream_sz_n = wr_idx;
 
+        end_cnt_n = end_cnt;
+        for (int w = 0; w < out_stream_sz_n; ++w)
+            end_cnt_n += out_stream[w].is_end;
+
 
         @(posedge clock);
     end
@@ -289,6 +294,7 @@ module pc_gen_sva #(
         if (reset) begin
             id <= '0;
             buf_id <= -1;
+            end_cnt <= 0;
             cur     <= '{
                 base: reset_val.base,
                 off : reset_val.off
@@ -299,6 +305,7 @@ module pc_gen_sva #(
         end else if (flush) begin
             id <= '0;
             buf_id <= -1;
+            end_cnt <= 0;
             cur <= '{
                 base: flush_fb_base,
                 off : flush_pc_off
@@ -309,6 +316,7 @@ module pc_gen_sva #(
         end else begin
             id  <= id_n;
             buf_id <= buf_id_n;
+            end_cnt <= end_cnt_n;
             cur <= cur_n;
             for (int w = 0; w < in_append_cnt; ++w)
                 in_stream.push_back(in_append[w]);
@@ -384,6 +392,15 @@ module pc_gen_sva #(
             buf_id_increasing;
         endproperty
 
+        property ends_lockstepw_buf_writes;
+            disable iff (reset)
+            /* Each fb has exactly 1 end. Thus, the number of encountered ends
+            should increment no faster than the number of FTQ entries written to
+            the re-read buffer, but no slower than 1 behind. 
+            (buf_id+1 = number FTQ entries written) */
+            (end_cnt == buf_id) || (end_cnt == buf_id+1);
+        endproperty
+
     endclocking
 
     In_Stream_EqLonger: assert property(cb.in_stream_eqlonger)
@@ -391,6 +408,8 @@ module pc_gen_sva #(
     In_Eq_Out: assert property(cb.in_eq_out)
         else exit_on_error;
     Buf_Id_Sequential: assert property(cb.buf_id_sequential)
+        else exit_on_error;
+    Ends_Lockstepw_Buf_Writes: assert property(cb.ends_lockstepw_buf_writes)
         else exit_on_error;
 
 endmodule
