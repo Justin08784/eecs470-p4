@@ -445,34 +445,60 @@ module pc_gen #(
         logic [NUM_DW-1:0] req_vld;// req_vld[i] = can we emit i+1 dw's at all?
         logic [NUM_DW-1:0] gnt;    // gnt[i] = are we granted to emit i+1 dw's?
 
+
+        logic [NUM_DW-1:0][NUM_FTQ-1:0] req_rr_buf_actual;
+
         struct packed {
             logic [NUM_FTQ-1:0] ixq; // req_req[i].ixq is hardcoded (bits [i:0] are set)
             logic [NUM_FTQ-1:0] rr_buf;
-        } [1:0] req_res;
+            logic ftq1;
+        } [NUM_DW-1:0] req_res;
 
         struct packed {
             logic [NUM_FTQ-1:0] ixq;
             logic [NUM_FTQ-1:0] rr_buf;
+            logic ftq1;
         } rdy_res;
     } ctl; // control struct
 
     assign ctl.req_vld[0] = ftq_in_vld_scnt != 0;
+    // do not permit merges if ft1 is not in window yet
     assign ctl.req_vld[1] = ftq_in_vld_scnt[1]
         ? ~(merge_l0 & bhe10)
-        : (ftq_in_vld_scnt != 0) & ~bhe00;
+        : (ftq_in_vld_scnt != 0) & ~bhe00 & ~merge_l1;
 
     assign ctl.req_res[0].ixq = 2'b01;
     assign ctl.req_res[1].ixq = 2'b11;
 
+    // Which buf slots do we NEED to write to emit at all?
     assign ctl.req_res[0].rr_buf[0] = ~cur.inbuf | (adv_bidx[0] & ftq_in_vld_scnt[1]);
     assign ctl.req_res[0].rr_buf[1] = ~cur.inbuf & (adv_bidx[0] & ftq_in_vld_scnt[1]);
     assign ctl.req_res[1].rr_buf[0] = ~cur.inbuf | (adv_bidx[1] & ftq_in_vld_scnt[1]);
     assign ctl.req_res[1].rr_buf[1] = ~cur.inbuf & (adv_bidx[1] & ftq_in_vld_scnt[1]);
 
+    // What buf slots must we write to qualify as fully in buf?
+    assign ctl.req_rr_buf_actual[0][0] = ~cur.inbuf | adv_bidx[0];
+    assign ctl.req_rr_buf_actual[0][1] = ~cur.inbuf & adv_bidx[0];
+    assign ctl.req_rr_buf_actual[1][0] = ~cur.inbuf | adv_bidx[1];
+    assign ctl.req_rr_buf_actual[1][1] = ~cur.inbuf & adv_bidx[1];
+
+    // And which of those slots can we actually write?
+    logic [1:0] can_buf_write;
+    assign can_buf_write[0] = ~cur.inbuf | ftq_in_vld_scnt[1];
+    assign can_buf_write[1] = ftq_in_vld_scnt[1];
+
+
+    // merges cannot be accepted until the 2nd FTQ entry is in window
+    // assign ctl.req_res[0].ftq1  = adv_bidx[0];
+    // assign ctl.req_res[1].ftq1  = adv_bidx[1];
+    assign ctl.req_res[0].ftq1  = adv_bidx[0] & (aft_bidx[0] | adv_blk[0]); // FIXME probably wrong
+    assign ctl.req_res[1].ftq1  = adv_bidx[1] & (aft_bidx[0] | adv_blk[1]);
+
     assign ctl.rdy_res.ixq[0]   = ixq_in_rdy_scnt != 0;
     assign ctl.rdy_res.ixq[1]   = ixq_in_rdy_scnt[1];
     assign ctl.rdy_res.rr_buf[0]= buf_in_rdy_scnt != 0;
     assign ctl.rdy_res.rr_buf[1]= buf_in_rdy_scnt[1];
+    assign ctl.rdy_res.ftq1     = ftq_in_vld_scnt[1];
 
     generate
     for (genvar b = 0; b < NUM_DW; ++b) begin
@@ -516,7 +542,8 @@ module pc_gen #(
         //     buf_out_wen_cnt = adv_bidx[iss_idx] + !cur.inbuf;
 
         buf_out_wen_cnt =
-            !iss_any ? 0 : $countones(ctl.req_res[iss_idx].rr_buf);
+            // !iss_any ? 0 : $countones(ctl.req_rr_buf_actual[iss_idx] & ctl.rdy_res.rr_buf);
+            !iss_any ? 0 : $countones(ctl.req_res[iss_idx].rr_buf & ctl.rdy_res.rr_buf);
 
 
         // if (ixq_out_wen_cnt == 0)
@@ -569,7 +596,12 @@ module pc_gen #(
             assert(adv_blk[iss_idx] ? !(adv_bidx[iss_idx] && basv) : 1) else $fatal;
             assert((adv_bidx[iss_idx] && basv) ? !adv_blk[iss_idx] : 1) else $fatal;
 
-            cur.inbuf   <= !(adv_bidx[iss_idx] && basv);
+            if (iss_any)
+                if (adv_bidx[iss_idx] && basv)
+                    cur.inbuf   <= 0;
+                else
+                    cur.inbuf   <= !(|(ctl.req_rr_buf_actual[iss_idx] & ~(can_buf_write & ctl.rdy_res.rr_buf)));
+                    // cur.inbuf   <= !(|(ctl.req_res[iss_idx].rr_buf & ~ctl.rdy_res.rr_buf));
         end
 
         if (!reset) begin
@@ -577,13 +609,39 @@ module pc_gen #(
                 assert(!(|is_end_flat[e]) | $onehot(is_end_flat[e])) else $fatal;
         end
 
-        if (!reset && `FALSE) begin
-        // if (!reset) begin
+        // if (!reset && `FALSE) begin
+        if (!reset) begin
+
             $display("\n\n\nFOGET: base: %d, off: %d, inbuf: %b", cur.base, cur.off, cur.inbuf);
             $display("come the fuckon: %b %d,",
                 adv_bidx[iss_idx] & ftq1_vld,
                 1 + adv_bidx[iss_idx] & ftq1_vld
             );
+
+            $display("ctl.rdy_res: {ixq= %b, rr_buf %b}",
+                ctl.rdy_res.ixq,
+                ctl.rdy_res.rr_buf
+            );
+
+            $display("ctl.req_rr_buf_actual: %b, %b",
+                ctl.req_rr_buf_actual[0],
+                ctl.req_rr_buf_actual[1]
+            );
+
+            $display("ctl.req[0]: vld=%b {ixq= %b, rr_buf %b} gnt=%b",
+                ctl.req_vld[0],
+                ctl.req_res[0].ixq,
+                ctl.req_res[0].rr_buf,
+                ctl.gnt[0]
+            );
+
+            $display("ctl.req[1]: vld=%b {ixq= %b, rr_buf %b} gnt=%b",
+                ctl.req_vld[1],
+                ctl.req_res[1].ixq,
+                ctl.req_res[1].rr_buf,
+                ctl.gnt[1]
+            );
+
             $display("base_n[0]: %d, base_n[1]: %d", base_n[0], base_n[1]);
             $display("iss_idx: %b, bidx[adv: %b, aft: %b], blk[av: %b, aft: %b]",
                 iss_idx,

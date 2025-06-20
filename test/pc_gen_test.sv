@@ -82,7 +82,7 @@ module pc_gen_stim #(
         buf_in_rdy_scnt = 0;
 
     // forever begin
-    // repeat (1000) begin
+    // repeat (10000) begin
     repeat (1000000) begin
         cur_id_n = cur_id;
         cur_n = cur;
@@ -95,23 +95,23 @@ module pc_gen_stim #(
         buf_in_rdy_max = $urandom_range(2, 0);
         buf_cons_max   = $urandom_range(2, 0);
 
-        $display("cur: id: %4d, base: %d", cur_id, cur.base);
-        for (int e = 0; e < ftq_sz; ++e)
-            $display("ftq[%1d]: off: %d, ft: %b, base_n: %d (id: %0d)",
-                e,
-                _ftq[e].off,
-                _ftq[e].ft,
-                _ftq[e].base_n,
-                _ftq[e].id
-            );
-        for (int e = 0; e < buf_sz; ++e)
-            $display("buf[%1d]: off: %d, ft: %b, base_n: %d (id: %0d)",
-                e,
-                _buf[e].off,
-                _buf[e].ft,
-                _buf[e].base_n,
-                _buf[e].id
-            );
+        // $display("cur: id: %4d, base: %d", cur_id, cur.base);
+        // for (int e = 0; e < ftq_sz; ++e)
+        //     $display("ftq[%1d]: off: %d, ft: %b, base_n: %d (id: %0d)",
+        //         e,
+        //         _ftq[e].off,
+        //         _ftq[e].ft,
+        //         _ftq[e].base_n,
+        //         _ftq[e].id
+        //     );
+        // for (int e = 0; e < buf_sz; ++e)
+        //     $display("buf[%1d]: off: %d, ft: %b, base_n: %d (id: %0d)",
+        //         e,
+        //         _buf[e].off,
+        //         _buf[e].ft,
+        //         _buf[e].base_n,
+        //         _buf[e].id
+        //     );
 
         std::randomize(flush_pc_off);
         std::randomize(flush_fb_base);
