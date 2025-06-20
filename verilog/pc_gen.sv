@@ -98,12 +98,10 @@ module pc_gen #(
             : nal_off_n[e][0];
 
         for (genvar w = 1; w <= NUM_W; ++w) begin
-            // assign off_n[e][NUM_W:1] = nal_off_n[e][!base_woff[e] +: NUM_W];
             assign off_n[e][w] = base_woff[e]
                 ? nal_off_n[e][w-1]
                 : nal_off_n[e][w];
         end
-
     end
 
     logic   [NUM_FTQ-1:0][NUM_W-1:0] align_msk, after_end;
@@ -111,10 +109,8 @@ module pc_gen #(
         assign align_msk[e]     = {NUM_W{1'b1}} << base_woff[e];
         assign is_end_flat[e]   = nal_is_end[e] << base_woff[e];
     end
-
     for (genvar e = 0; e < NUM_FTQ; ++e)
         assign after_end[e] = (after_end[e] | is_end_flat[e]) << 1;
-
     assign fmsk_flat = align_msk & ~after_end;
 
     for (genvar e = 0; e < NUM_FTQ; ++e) begin
@@ -167,19 +163,22 @@ module pc_gen #(
     assign bhe11    = blk_has_end[1][1];
 
     logic merge_l0, merge_l1;
-    assign merge_l0 = ftq1_vld && bhe00 && !is_end[0][0][W_PER_DW-1] && ftq_in_dat[0].ft;
-    assign merge_l1 = ftq1_vld && bhe01 && !is_end[0][1][W_PER_DW-1] && ftq_in_dat[0].ft;
+    assign merge_l0 = bhe00 && !is_end[0][0][W_PER_DW-1] && ftq_in_dat[0].ft;
+    assign merge_l1 = bhe01 && !is_end[0][1][W_PER_DW-1] && ftq_in_dat[0].ft;
 
     logic   iss_any;    // can issue any request?
     logic   iss_idx;    // index of last issuable request, if any
     assign  iss_any = ftq_in_vld_scnt != 0;
     always_comb begin
-        iss_idx = 0;
         unique case (1'b1)
         merge_l0  &  bhe10: iss_idx = 0;
         merge_l0  & ~bhe10: iss_idx = ftq1_vld;
         ~merge_l0 &  bhe00: iss_idx = ftq1_vld;
         ~merge_l0 & ~bhe00: iss_idx = 1;
+
+        default: begin // literally impossible
+            iss_idx = 1'bx;
+        end
         endcase
     end
 
@@ -194,80 +193,83 @@ module pc_gen #(
     // ------------------------------------------------------------------
     // adv_*[0]
     // ------------------------------------------------------------------
-    always_comb begin
-        adv_bidx[0] = 0;
-        aft_bidx[0] = 0;
-        adv_blk [0] = 0;
-        aft_blk [0] = 0;
+    assign adv_bidx[0] = bhe00;
+    assign aft_bidx[0] = bhe10 & merge_l0;
+    assign adv_blk [0] = ~bhe00 | (merge_l0 & ~bhe10);
+    assign aft_blk [0] = 0;
+    // always_comb begin
+    //     unique case (1'b1)
+    //     bhe00 & ~merge_l0:  adv_blk [0] = 0;
+    //     bhe00 &  merge_l0:  adv_blk [0] = ~bhe10;
+    //     default:            adv_blk [0] = 1;
+    //     endcase
+    // end
 
-        unique case (1'b1)
-        bhe00 & ~merge_l0: begin
-            adv_bidx[0] = 1;
-            aft_bidx[0] = 0;
+    // always_comb begin
+    //     adv_bidx[0] = 0;
+    //     aft_bidx[0] = 0;
+    //     adv_blk [0] = 0;
+    //     aft_blk [0] = 0;
 
-            adv_blk [0] = 0;
-        end
+    //     unique case (1'b1)
+    //     bhe00 & ~merge_l0: begin
+    //         adv_bidx[0] = 1;
+    //         aft_bidx[0] = 0;
 
-        bhe00 &  merge_l0: begin
-            adv_bidx[0] = 1;
-            aft_bidx[0] =  bhe10;
+    //         adv_blk [0] = 0;
+    //     end
 
-            adv_blk [0] = ~bhe10;
-            aft_blk [0]= 0;
-        end
+    //     bhe00 &  merge_l0: begin
+    //         adv_bidx[0] = 1;
+    //         aft_bidx[0] =  bhe10;
 
-        default: begin
-            adv_bidx[0] = 0;
+    //         adv_blk [0] = ~bhe10;
+    //         aft_blk [0]= 0;
+    //     end
 
-            adv_blk [0] = 1;
-            aft_blk [0] = 0;
-        end
-        endcase
-    end
+    //     default: begin
+    //         adv_bidx[0] = 0;
+
+    //         adv_blk [0] = 1;
+    //         aft_blk [0] = 0;
+    //     end
+    //     endcase
+    // end
 
     // ------------------------------------------------------------------
     // adv_*[1]
     // ------------------------------------------------------------------
+    assign adv_bidx[1] = bhe00 | bhe01;
     always_comb begin
-        adv_bidx[1]= 0;
-        adv_blk [1]= 0;
-        aft_bidx[1]= 0;
-        aft_blk [1]= 0;
-
         unique case (1'b1)
         merge_l0  &  bhe10: begin // even though we issue 1 at most, we still consume 2
-            adv_bidx[1] = 1;
             aft_bidx[1] = 1; // base adv by 2
 
             adv_blk [1] = 0;
         end
 
         merge_l0  & ~bhe10 &  bhe11: begin
-            adv_bidx[1] = 1;
             aft_bidx[1] = 1; // base adv by 2
 
             adv_blk [1] = 0;
         end
 
         merge_l0  & ~bhe10 & ~bhe11: begin
-            adv_bidx[1] = 1;
             aft_bidx[1] = 0; // base adv by 1
 
             adv_blk [1] = 1;
             aft_blk [1] = 1; // blk  adv by 2
         end
 
-        (~merge_l0 & merge_l1) &  bhe10: begin
+        merge_l1 &  bhe10: begin
             // assert(~bhe00);
-            adv_bidx[1] = 1;
             aft_bidx[1] = 1; // base adv by 2
 
             adv_blk [1] = 0;
         end
 
-        (~merge_l0 & merge_l1) & ~bhe10: begin
+        merge_l1 & ~bhe10: begin
             // assert(~bhe00);
-            adv_bidx[1] = 1;
             aft_bidx[1] = 0; // base adv by 1
 
             adv_blk [1] = 1;
@@ -275,32 +277,33 @@ module pc_gen #(
         end
 
         (~merge_l0 & ~merge_l1) & ~bhe00 &  bhe01: begin
-            adv_bidx[1] = 1;
             aft_bidx[1] = 0;
 
             adv_blk [1] = 0;
         end
 
         (~merge_l0 & ~merge_l1) & ~bhe00 & ~bhe01: begin
-            adv_bidx[1] = 0;
-
             adv_blk [1] = 1;
             aft_blk [1] = 1; // blk  adv by 2
         end
 
         (~merge_l0 & ~merge_l1) &  bhe00 &  bhe10: begin
-            adv_bidx[1] = 1;
             aft_bidx[1] = 1;
 
             adv_blk [1] = 0;
         end
 
         (~merge_l0 & ~merge_l1) &  bhe00 & ~bhe10: begin
-            adv_bidx[1] = 1;
             aft_bidx[1] = 0;
 
             adv_blk [1] = 1;
             aft_blk [1] = 0;
+        end
+
+        default: begin // dont cares / impossibles
+            aft_bidx[1] = 1'bx;
+            adv_blk [1] = 1'bx;
+            aft_blk [1] = 1'bx;
         end
         endcase
     end
@@ -314,10 +317,6 @@ module pc_gen #(
             rv[w] = (amsk[w] ? aoff[w] : '0) | (bmsk[w] ? boff[w] : '0);
         return rv;
     endfunction
-
-    logic mer_l0, mer_l1;
-    assign mer_l0 = bhe00 && !is_end[0][0][W_PER_DW-1] && ftq_in_dat[0].ft;
-    assign mer_l1 = bhe01 && !is_end[0][1][W_PER_DW-1] && ftq_in_dat[0].ft;
 
     // Merging data
     FB_OFF  [NUM_FTQ-1:0][NUM_DW-1:0][W_PER_DW-1:0] mer_blk_off_n;
@@ -370,29 +369,33 @@ module pc_gen #(
     assign b0 = 0;
 
     always_comb begin
-        // e1 = !(merge_l0 && bhe00 && merge_l1);
+        e1 = merge_l0 | bhe00 | merge_l1;
 
         unique case (1'b1)
         merge_l0: begin
             // case 1:  bhe10 -> cant issue 2 (dont care)
             // case 2: ~bhe10 -> e1=1, b1=1
-            e1 = 1;
+            // e1 = 1;
             b1 = 1;
         end
 
         ~merge_l0 &  bhe00: begin
-            e1 = 1;
+            // e1 = 1;
             b1 = 0;
         end
 
         ~merge_l0 & ~bhe00 & ~merge_l1: begin
-            e1 = 0;
+            // e1 = 0;
             b1 = 1;
         end
 
         ~merge_l0 & ~bhe00 &  merge_l1: begin
-            e1 = 1;
+            // e1 = 1;
             b1 = 0;
+        end
+
+        default: begin // impossibles
+            b1 = 1'bx;
         end
         endcase
     end
@@ -409,32 +412,28 @@ module pc_gen #(
 
     `CNT_TYPE(NUM_FTQ) buf_lim_cnt;
     logic [NUM_DW-1:0] req_buf;
-    logic [NUM_DW:0][`CNT_SIZE(NUM_FTQ)-1:0] buf_prefix_cnt;
     compactor #(
         .REQW(NUM_DW),
         .GNTW(NUM_FTQ)
     ) comp_buf_req (
         .req        (req_buf),
         .lim_cnt    (buf_in_rdy_scnt),
-        .prefix_cnt (buf_prefix_cnt),
+        .prefix_cnt (),
         .gnt_cnt    (buf_lim_cnt)
     );
 
-    // assign buf_out_dat[0] = !cur.inbuf ? ftq_in_dat[0] : ftq_in_dat[1];
     assign buf_out_dat[0] = ftq_in_dat[cur.inbuf];
     assign buf_out_dat[1] = ftq_in_dat[1];
 
     assign req_buf[0] = !cur.inbuf || adv_bidx[0];
     assign req_buf[1] = !cur.inbuf && adv_bidx[1];
 
-    logic [1:0] req_raw, gnt_raw;
+    logic [1:0] req_raw;
     assign req_raw[0] = iss_any;
     assign req_raw[1] = iss_any & iss_idx;
 
-    assign gnt_raw[0] = iss_any & (ixq_out_wen_cnt != 0);
-    assign gnt_raw[1] = ftq1_vld & (!iss_idx || ixq_out_wen_cnt[1]);
-    logic dwidx;
-    assign dwidx = gnt_raw[1];
+    logic gnt1;
+    assign gnt1 = ftq1_vld & (!iss_idx || ixq_out_wen_cnt[1]);
     always_comb begin
 
         /*FIXME:
@@ -448,22 +447,21 @@ module pc_gen #(
 
         ixq_out_wen_cnt = `MIN(buf_lim_cnt, `MIN(req_raw[0] + req_raw[1], ixq_in_rdy_scnt));
 
-        ftq_out_ren_cnt = (ixq_out_wen_cnt == 0 || !adv_bidx[dwidx])
+        ftq_out_ren_cnt = (ixq_out_wen_cnt == 0 || !adv_bidx[gnt1])
             ? 0
-            : aft_bidx[dwidx] + 1;
+            : aft_bidx[gnt1] + 1;
 
         // if (ixq_out_wen_cnt == 0)
         //     buf_out_wen_cnt = 0;
         // else
-        //     buf_out_wen_cnt = adv_bidx[dwidx] + !cur.inbuf;
+        //     buf_out_wen_cnt = adv_bidx[gnt1] + !cur.inbuf;
 
         if (ixq_out_wen_cnt == 0)
             buf_out_wen_cnt = 0;
         else if (!cur.inbuf)
-            buf_out_wen_cnt = 2'b1 + `UCAST_LEN(adv_bidx[dwidx] & ftq1_vld, 2);
+            buf_out_wen_cnt = 2'b1 + `UCAST_LEN(adv_bidx[gnt1] & ftq1_vld, 2);
         else
-            buf_out_wen_cnt = adv_bidx[dwidx] & ftq1_vld;
-        // buf_out_wen_cnt = buf_prefix_cnt[ixq_out_wen_cnt];
+            buf_out_wen_cnt = adv_bidx[gnt1] & ftq1_vld;
     end
 
     WADDR [NUM_FTQ-1:0] base_n;
@@ -491,44 +489,45 @@ module pc_gen #(
             };
 
         else if (ixq_out_wen_cnt != 0) begin
-            // dwidx = gnt_raw[1];
+            basv = aft_bidx [gnt1];
+            blkv = aft_blk  [gnt1];
 
-            basv = aft_bidx [dwidx];
-            blkv = aft_blk  [dwidx];
-
-            if (adv_bidx[dwidx])
+            if (adv_bidx[gnt1])
                 cur.base    <= base_n[basv];
 
-            if      (adv_blk [dwidx] && !adv_bidx [dwidx])
-                cur.off <= pos_blk_off[0][blkv];
-            else if (adv_blk [dwidx] &&  adv_bidx [dwidx])
-                cur.off <= pos_blk_off[1][blkv]; // assert !aft_bidx[dwidx]
-            else if (adv_bidx[dwidx])
+            if      (adv_blk [gnt1])
+                cur.off <= pos_blk_off[adv_bidx[gnt1]][blkv];
+            else if (adv_bidx[gnt1])
                 cur.off <= '0;
-            // if (adv_blk [dwidx])
-            //     cur.off     <= pos_blk_off[adv_bidx[dwidx]][blkv]; // assert !aft_bidx[dwidx]
+            // if (adv_blk [gnt1])
+            //     cur.off     <= pos_blk_off[adv_bidx[gnt1]][blkv]; // assert !aft_bidx[gnt1]
 
             // adv_blk is high IFF we do not advance 2 bases
-            assert(adv_blk[dwidx] ? !(adv_bidx[dwidx] && basv) : 1) else $fatal;
-            assert((adv_bidx[dwidx] && basv) ? !adv_blk[dwidx] : 1) else $fatal;
+            assert(adv_blk[gnt1] ? !(adv_bidx[gnt1] && basv) : 1) else $fatal;
+            assert((adv_bidx[gnt1] && basv) ? !adv_blk[gnt1] : 1) else $fatal;
 
-            cur.inbuf   <= !(adv_bidx[dwidx] && basv);
+            cur.inbuf   <= !(adv_bidx[gnt1] && basv);
         end
 
-        // if (!reset && `FALSE) begin
         if (!reset) begin
+            for (int e = 0; e < NUM_FTQ; ++e)
+                assert(!(|is_end_flat[e]) | $onehot(is_end_flat[e])) else $fatal;
+        end
+
+        if (!reset && `FALSE) begin
+        // if (!reset) begin
             $display("\n\n\nFOGET: base: %d, off: %d, inbuf: %b", cur.base, cur.off, cur.inbuf);
             $display("come the fuckon: %b %d,",
-                adv_bidx[dwidx] & ftq1_vld,
-                1 + adv_bidx[dwidx] & ftq1_vld
+                adv_bidx[gnt1] & ftq1_vld,
+                1 + adv_bidx[gnt1] & ftq1_vld
             );
             $display("base_n[0]: %d, base_n[1]: %d", base_n[0], base_n[1]);
-            $display("dwidx: %b, bidx[adv: %b, aft: %b], blk[av: %b, aft: %b]",
-                dwidx,
-                adv_bidx[dwidx],
-                aft_bidx[dwidx],
-                adv_blk[dwidx],
-                aft_blk[dwidx]
+            $display("gnt1: %b, bidx[adv: %b, aft: %b], blk[av: %b, aft: %b]",
+                gnt1,
+                adv_bidx[gnt1],
+                aft_bidx[gnt1],
+                adv_blk[gnt1],
+                aft_blk[gnt1]
             );
             $display("0-bidx: [adv: %b, aft: %b], 1-bidx: [adv: %b, aft: %b]",
                 adv_bidx[0],
