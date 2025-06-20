@@ -11,6 +11,7 @@
 
 
 typedef struct packed {
+    // int         id;
     DWADDR      dw;     // cache line to which it belongs
     logic       is_end; // is end of fb?
 
@@ -66,10 +67,7 @@ endfunction
 
 
 function automatic WORD_STREAM_PKT [1:0] ixq_out2stream (
-    input DWADDR            dw,
-    input logic [1:0][3:0]  off,
-    input logic [1:0]       fmsk,
-    input logic [1:0]       is_end,
+    input pc_gen2ixq dat,
 
     output int  num     // of packets produced
 );
@@ -77,21 +75,21 @@ function automatic WORD_STREAM_PKT [1:0] ixq_out2stream (
     WADDR   line_start, cur_pc;
     int     w;
 
-    line_start = dw << 1;
+    line_start = dat.dw << 1;
 
     rv = '0;
 
     num = 0;
     for (w = 0; w < 2; ++w) begin
         cur_pc  = line_start + w;
-        if (!fmsk[w])
+        if (!dat.fmsk[w])
             continue;
 
         rv[num] = '{
-            dw      : dw,
-            is_end  : is_end[w],
-            base    : cur_pc - off[w],
-            off     : off[w]
+            dw      : dat.dw,
+            is_end  : dat.is_end[w],
+            base    : cur_pc - dat.off[w],
+            off     : dat.off[w]
         };
 
         ++num;
@@ -134,10 +132,7 @@ module pc_gen_sva #(
     // **NOTE**: ixq_out_off is not checked
     input   `CNT_TYPE(2)    ixq_in_rdy_scnt, // = `MIN(iqq_*, irq_*)
     input   `CNT_TYPE(2)    ixq_out_wen_cnt,
-    input   FB_OFF[1:0][1:0]ixq_out_off,
-    input   DWADDR [1:0]    ixq_out_dw,
-    input   logic[1:0][1:0] ixq_out_fmsk,
-    input   logic[1:0][1:0] ixq_out_is_end,
+    input   pc_gen2ixq[1:0] ixq_out_dat,
 
     // FTQ buffer
     input   `CNT_TYPE(2)    buf_in_rdy_scnt,
@@ -154,10 +149,7 @@ module pc_gen_sva #(
         `CNT_TYPE(2)    ftq_out_ren_cnt;
         // irq / iqq
         `CNT_TYPE(2)    ixq_out_wen_cnt;
-        FB_OFF[1:0][1:0]ixq_out_off;
-        DWADDR[1:0]     ixq_out_dw;
-        logic[1:0][1:0] ixq_out_fmsk;
-        logic[1:0][1:0] ixq_out_is_end;
+        pc_gen2ixq[1:0] ixq_out_dat;
         // FTQ buffer
         `CNT_TYPE(2)    buf_out_wen_cnt;
         FTQ_ENTRY[1:0]  buf_out_dat;
@@ -174,6 +166,10 @@ module pc_gen_sva #(
 
     logic match_stream; // do the streams match?
     logic buf_id_increasing;
+    // logic not_write_buf_after_emit;
+    // not_write_buf_after_emit = 1;
+    // for (int w = 0; w < out_stream_sz_n; ++w)
+    //     not_write_buf_after_emit &= out_stream[w].id < buf_id_n;
 
     struct packed {
         WADDR base;
@@ -273,10 +269,7 @@ module pc_gen_sva #(
             int tmp_cnt;
 
             tmp = ixq_out2stream(
-                ixq_out_dw[e],
-                ixq_out_off[e],
-                ixq_out_fmsk[e],
-                ixq_out_is_end[e],
+                ixq_out_dat[e],
                 tmp_cnt
             );
 
@@ -337,16 +330,18 @@ module pc_gen_sva #(
             c.ftq_out_ren_cnt
         );
 
-        $display("ixq_out: wen_cnt = %d, off = [[%d, %d], [%d, %d]], fmsk = %b, is_end = %b, dw = [%d, %d]",
+        $display("ixq_out: wen_cnt = %d, off = [[%d, %d], [%d, %d]], fmsk = [%b, %b], is_end = [%b, %b], dw = [%d, %d]",
             c.ixq_out_wen_cnt,
-            c.ixq_out_off[0][0],
-            c.ixq_out_off[0][1],
-            c.ixq_out_off[1][0],
-            c.ixq_out_off[1][1],
-            c.ixq_out_fmsk,
-            c.ixq_out_is_end,
-            c.ixq_out_dw[0],
-            c.ixq_out_dw[1]
+            c.ixq_out_dat[0].off[0],
+            c.ixq_out_dat[0].off[1],
+            c.ixq_out_dat[1].off[0],
+            c.ixq_out_dat[1].off[1],
+            c.ixq_out_dat[0].fmsk,
+            c.ixq_out_dat[1].fmsk,
+            c.ixq_out_dat[0].is_end,
+            c.ixq_out_dat[1].is_end,
+            c.ixq_out_dat[0].dw,
+            c.ixq_out_dat[1].dw
         );
 
         $display("buf_out: wen_cnt = %d, [{base_n: %d, ft: %b, off: %d}, {base_n: %d, ft: %b, off: %d}]\n",

@@ -44,10 +44,7 @@ module pc_gen #(
     // FIXME: these ixq_out lines should be folded into a dat struct
     input   `CNT_TYPE(2)    ixq_in_rdy_scnt, // = `MIN(iqq_*, irq_*)
     output  `CNT_TYPE(2)    ixq_out_wen_cnt,
-    output  FB_OFF[1:0][1:0]ixq_out_off,
-    output  DWADDR [1:0]    ixq_out_dw,
-    output  logic[1:0][1:0] ixq_out_fmsk,
-    output  logic[1:0][1:0] ixq_out_is_end,
+    output  pc_gen2ixq[1:0] ixq_out_dat,
 
     // FTQ buffer
     input   `CNT_TYPE(2)    buf_in_rdy_scnt,
@@ -400,15 +397,21 @@ module pc_gen #(
         endcase
     end
 
-    assign ixq_out_dw[0]    = dws           [e0][b0];
-    assign ixq_out_off[0]   = mer_blk_off_n [e0][b0];
-    assign ixq_out_fmsk[0]  = mer_fmsk      [e0][b0];
-    assign ixq_out_is_end[0]= mer_is_end    [e0][b0];
 
-    assign ixq_out_dw[1]    = dws           [e1][b1];
-    assign ixq_out_off[1]   = mer_blk_off_n [e1][b1];
-    assign ixq_out_fmsk[1]  = mer_fmsk      [e1][b1];
-    assign ixq_out_is_end[1]= mer_is_end    [e1][b1];
+    assign ixq_out_dat[0] = '{
+        dw      : dws           [e0][b0],
+        off     : mer_blk_off_n [e0][b0],
+        fmsk    : mer_fmsk      [e0][b0],
+        is_end  : mer_is_end    [e0][b0]
+    };
+
+    assign ixq_out_dat[1] = '{
+        dw      : dws           [e1][b1],
+        off     : mer_blk_off_n [e1][b1],
+        fmsk    : mer_fmsk      [e1][b1],
+        is_end  : mer_is_end    [e1][b1]
+    };
+
 
     `CNT_TYPE(NUM_FTQ) buf_lim_cnt;
     logic [NUM_DW-1:0] req_buf;
@@ -618,25 +621,38 @@ module pc_gen #(
             ftq_out_ren_cnt
         );
 
-        $display("ixq_out: wen_cnt = %d, dw = [%d, %d], off = [[%d, %d], [%d, %d]], fmsk = %b, is_end = %b",
+        $display("ixq_out: wen_cnt = %d, off = [[%d, %d], [%d, %d]], fmsk = [%b, %b], is_end = [%b, %b], dw = [%d, %d]",
             ixq_out_wen_cnt,
-            ixq_out_dw[0],
-            ixq_out_dw[1],
-            ixq_out_off[0][0],
-            ixq_out_off[0][1],
-            ixq_out_off[1][0],
-            ixq_out_off[1][1],
-            ixq_out_fmsk,
-            ixq_out_is_end
+            ixq_out_dat[0].off[0],
+            ixq_out_dat[0].off[1],
+            ixq_out_dat[1].off[0],
+            ixq_out_dat[1].off[1],
+
+            ixq_out_dat[0].fmsk,
+            ixq_out_dat[1].fmsk,
+
+            ixq_out_dat[0].is_end,
+            ixq_out_dat[1].is_end,
+
+            ixq_out_dat[0].dw,
+            ixq_out_dat[1].dw
         );
 
         $display("buf_out: wen_cnt = %d, [{id %4d, base_n: %d, ft: %b, off: %d}, {id: %4d, base_n: %d, ft: %b, off: %d}]\n",
             buf_out_wen_cnt,
+`ifdef PC_GEN_TEST_MODE
             buf_out_dat[0].id,
+`else
+            0,
+`endif
             buf_out_dat[0].base_n,
             buf_out_dat[0].ft,
             buf_out_dat[0].off,
+`ifdef PC_GEN_TEST_MODE
             buf_out_dat[1].id,
+`else
+            0,
+`endif
             buf_out_dat[1].base_n,
             buf_out_dat[1].ft,
             buf_out_dat[1].off

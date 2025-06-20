@@ -80,6 +80,8 @@ typedef logic [BMASK_LEN-1:0] BMASK;
 // `define DEBUG
 // comment to disable clock cycle print
 // `define CYCLE_PRINT
+// comment out to...
+`define PC_GEN_TEST_MODE
 `endif
 
 ///////////////////////////////
@@ -521,9 +523,6 @@ typedef struct packed {
     FTB_MD1 md;
 } FTB_UPD_PKT;
 
-`ifndef SYNTH
-`define PC_GEN_TEST_MODE
-`endif
 parameter FTQ_SZ = 32;
 typedef struct packed {
 `ifdef PC_GEN_TEST_MODE
@@ -545,6 +544,14 @@ typedef struct packed {
     logic       always_take;// ft ? <IGNORE>: " of pred-taken branch
     FTB_MD1     md;         // ft ? <IGNORE>: " of pred-tkaen branch
 } FTQ_ENTRY;
+
+typedef struct packed {
+    DWADDR              dw;
+    logic   [1:0][3:0]  off;
+        // FB_OFF[1:0][1:0]ixq_out_off,
+    logic   [1:0]       fmsk;
+    logic   [1:0]       is_end;
+} pc_gen2ixq;
 
 // BTQ stuff
 // By btq

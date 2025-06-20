@@ -40,10 +40,7 @@ module pc_gen_stim #(
     // irq / iqq
     output  `CNT_TYPE(2)    ixq_in_rdy_scnt, // = `MIN(iqq_*, irq_*)
     input   `CNT_TYPE(2)    ixq_out_wen_cnt,
-    input   FB_OFF[1:0][1:0]ixq_out_off,
-    input   DWADDR [1:0]    ixq_out_dw,
-    input   logic[1:0][1:0] ixq_out_fmsk,
-    input   logic[1:0][1:0] ixq_out_is_end,
+    input   pc_gen2ixq[1:0] ixq_out_dat,
 
     // FTQ buffer
     output  `CNT_TYPE(2)    buf_in_rdy_scnt,
@@ -243,10 +240,7 @@ module pc_gen_test;
     // irq / iqq
     `CNT_TYPE(2)    ixq_in_rdy_scnt;
     `CNT_TYPE(2)    ixq_out_wen_cnt;
-    FB_OFF[1:0][1:0]ixq_out_off;
-    DWADDR[1:0]     ixq_out_dw;
-    logic[1:0][1:0] ixq_out_fmsk;
-    logic[1:0][1:0] ixq_out_is_end;
+    pc_gen2ixq[1:0] ixq_out_dat;
     // FTQ buffer
     `CNT_TYPE(2)    buf_in_rdy_scnt;
     `CNT_TYPE(2)    buf_out_wen_cnt;
@@ -303,10 +297,7 @@ module pc_gen_test;
 
         .ixq_in_rdy_scnt,
         .ixq_out_wen_cnt,
-        .ixq_out_off,
-        .ixq_out_dw,
-        .ixq_out_fmsk,
-        .ixq_out_is_end,
+        .ixq_out_dat,
 
         .buf_in_rdy_scnt,
         .buf_out_wen_cnt,
@@ -339,10 +330,7 @@ module pc_gen_test;
 
         .ixq_in_rdy_scnt,
         .ixq_out_wen_cnt,
-        .ixq_out_off,
-        .ixq_out_dw,
-        .ixq_out_fmsk,
-        .ixq_out_is_end,
+        .ixq_out_dat,
 
         .buf_in_rdy_scnt,
         .buf_out_wen_cnt,
@@ -377,10 +365,7 @@ module pc_gen_test;
 
         .ixq_in_rdy_scnt,
         .ixq_out_wen_cnt,
-        .ixq_out_off,
-        .ixq_out_dw,
-        .ixq_out_fmsk,
-        .ixq_out_is_end,
+        .ixq_out_dat,
 
         .buf_in_rdy_scnt,
         .buf_out_wen_cnt,
