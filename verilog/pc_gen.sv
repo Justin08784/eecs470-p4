@@ -165,19 +165,19 @@ module pc_gen #(
 
     logic   iss_any;    // can issue any request?
     logic   iss_idx;    // index of last issuable request, if any
-    assign  iss_any = ftq_in_vld_scnt != 0;
-    always_comb begin
-        unique case (1'b1)
-        merge_l0  &  bhe10: iss_idx = 0;
-        merge_l0  & ~bhe10: iss_idx = ftq1_vld;
-        ~merge_l0 &  bhe00: iss_idx = ftq1_vld;
-        ~merge_l0 & ~bhe00: iss_idx = 1;
+    // assign  iss_any = ftq_in_vld_scnt != 0;
+    // always_comb begin
+    //     unique case (1'b1)
+    //     merge_l0  &  bhe10: iss_idx = 0;
+    //     merge_l0  & ~bhe10: iss_idx = ftq1_vld;
+    //     ~merge_l0 &  bhe00: iss_idx = ftq1_vld;
+    //     ~merge_l0 & ~bhe00: iss_idx = 1;
 
-        default: begin // literally impossible
-            iss_idx = 1'bx;
-        end
-        endcase
-    end
+    //     default: begin // literally impossible
+    //         iss_idx = 1'bx;
+    //     end
+    //     endcase
+    // end
 
     logic   [NUM_DW-1:0] adv_bidx;  // ignore corr. idx aft_bidx if not set
     logic   [NUM_DW-1:0] adv_blk;   // ignore corr. idx aft_blk if not set
@@ -425,18 +425,63 @@ module pc_gen #(
         .gnt_cnt    (buf_lim_cnt)
     );
 
-    assign buf_out_dat[0] = ftq_in_dat[cur.inbuf];
-    assign buf_out_dat[1] = ftq_in_dat[1];
+    /* Resource requests
+    reqi = if we wish to emit i+1 dws, what resources are required?
 
-    assign req_buf[0] = !cur.inbuf || adv_bidx[0];
-    assign req_buf[1] = !cur.inbuf && adv_bidx[1];
+    CAVEAT: This works on output dw granularities, and conservatively assumes
+    a dw cannot be emitted unless ALL of its requests are satisfied. Technically, however,
+    we can emit partially filled dw's that only satisfy a subset of the requirements.
+    We do not consider these because they will probably not improve throughput much. 
+    e.g.
+    Let ftq_in_vld_scnt == 2, ixq_in_rdy_scnt == 1, buf_in_rdy_scnt == *1*,
+    and we have a (!case.inbuf & merge_l0 & bhe10) case.
 
-    logic [1:0] req_raw;
-    assign req_raw[0] = iss_any;
-    assign req_raw[1] = iss_any & iss_idx;
+    We can emit at most 1 dw, and the full dw (i.e. WITH l10 merged in) will require
+    2 buffer slots, which is more than is available. However, if we skip the merge,
+    we can emit a dw containing ONLY the l00 line. (the benefits of doing this
+    are doubtful */
 
-    logic gnt1;
-    assign gnt1 = ftq1_vld & (!iss_idx || ixq_out_wen_cnt[1]);
+    struct packed {
+        logic [NUM_DW-1:0] req_vld;// req_vld[i] = can we emit i+1 dw's at all?
+        logic [NUM_DW-1:0] gnt;    // gnt[i] = are we granted to emit i+1 dw's?
+
+        struct packed {
+            logic [NUM_FTQ-1:0] ixq; // req_req[i].ixq is hardcoded (bits [i:0] are set)
+            logic [NUM_FTQ-1:0] rr_buf;
+        } [1:0] req_res;
+
+        struct packed {
+            logic [NUM_FTQ-1:0] ixq;
+            logic [NUM_FTQ-1:0] rr_buf;
+        } rdy_res;
+    } ctl; // control struct
+
+    assign ctl.req_vld[0] = ftq_in_vld_scnt != 0;
+    assign ctl.req_vld[1] = ftq_in_vld_scnt[1]
+        ? ~(merge_l0 & bhe10)
+        : (ftq_in_vld_scnt != 0) & ~bhe00;
+
+    assign ctl.req_res[0].ixq = 2'b01;
+    assign ctl.req_res[1].ixq = 2'b11;
+
+    assign ctl.req_res[0].rr_buf[0] = ~cur.inbuf | (adv_bidx[0] & ftq_in_vld_scnt[1]);
+    assign ctl.req_res[0].rr_buf[1] = ~cur.inbuf & (adv_bidx[0] & ftq_in_vld_scnt[1]);
+    assign ctl.req_res[1].rr_buf[0] = ~cur.inbuf | (adv_bidx[1] & ftq_in_vld_scnt[1]);
+    assign ctl.req_res[1].rr_buf[1] = ~cur.inbuf & (adv_bidx[1] & ftq_in_vld_scnt[1]);
+
+    assign ctl.rdy_res.ixq[0]   = ixq_in_rdy_scnt != 0;
+    assign ctl.rdy_res.ixq[1]   = ixq_in_rdy_scnt[1];
+    assign ctl.rdy_res.rr_buf[0]= buf_in_rdy_scnt != 0;
+    assign ctl.rdy_res.rr_buf[1]= buf_in_rdy_scnt[1];
+
+    generate
+    for (genvar b = 0; b < NUM_DW; ++b) begin
+        assign ctl.gnt[b] = !(|(ctl.req_res[b] & ~ctl.rdy_res));
+    end
+    endgenerate
+
+    assign iss_any = |(ctl.req_vld & ctl.gnt);
+    assign iss_idx = ctl.req_vld[1] & ctl.gnt[1];
     always_comb begin
 
         /*FIXME:
@@ -448,23 +493,35 @@ module pc_gen #(
         be able to push it to the reread queue.
         */
 
-        ixq_out_wen_cnt = `MIN(buf_lim_cnt, `MIN(req_raw[0] + req_raw[1], ixq_in_rdy_scnt));
+        ixq_out_wen_cnt =
+            !iss_any ? 0 :
+            iss_idx ? 2 : 1;
 
-        ftq_out_ren_cnt = (ixq_out_wen_cnt == 0 || !adv_bidx[gnt1])
-            ? 0
-            : aft_bidx[gnt1] + 1;
+        // ixq_out_wen_cnt = `MIN(buf_lim_cnt, `MIN(req_raw[0] + req_raw[1], ixq_in_rdy_scnt));
+
+        ftq_out_ren_cnt =
+            (!iss_any || !adv_bidx[iss_idx]) ? 0 :
+            aft_bidx[iss_idx] ? 2 : 1;
+
+        // ftq_out_ren_cnt = (ixq_out_wen_cnt == 0 || !adv_bidx[iss_idx])
+        //     ? 0
+        //     : aft_bidx[iss_idx] + 1;
 
         // if (ixq_out_wen_cnt == 0)
         //     buf_out_wen_cnt = 0;
         // else
-        //     buf_out_wen_cnt = adv_bidx[gnt1] + !cur.inbuf;
+        //     buf_out_wen_cnt = adv_bidx[iss_idx] + !cur.inbuf;
 
-        if (ixq_out_wen_cnt == 0)
-            buf_out_wen_cnt = 0;
-        else if (!cur.inbuf)
-            buf_out_wen_cnt = 2'b1 + `UCAST_LEN(adv_bidx[gnt1] & ftq1_vld, 2);
-        else
-            buf_out_wen_cnt = adv_bidx[gnt1] & ftq1_vld;
+        buf_out_wen_cnt =
+            !iss_any ? 0 : $countones(ctl.req_res[iss_idx].rr_buf);
+
+
+        // if (ixq_out_wen_cnt == 0)
+        //     buf_out_wen_cnt = 0;
+        // else if (!cur.inbuf)
+        //     buf_out_wen_cnt = 2'b1 + `UCAST_LEN(adv_bidx[iss_idx] & ftq1_vld, 2);
+        // else
+        //     buf_out_wen_cnt = adv_bidx[iss_idx] & ftq1_vld;
     end
 
     WADDR [NUM_FTQ-1:0] base_n;
@@ -491,25 +548,25 @@ module pc_gen #(
                 inbuf: 0
             };
 
-        else if (ixq_out_wen_cnt != 0) begin
-            basv = aft_bidx [gnt1];
-            blkv = aft_blk  [gnt1];
+        else if (iss_any) begin
+            basv = aft_bidx [iss_idx];
+            blkv = aft_blk  [iss_idx];
 
-            if (adv_bidx[gnt1])
+            if (adv_bidx[iss_idx])
                 cur.base    <= base_n[basv];
 
-            if      (adv_blk [gnt1])
-                cur.off <= pos_blk_off[adv_bidx[gnt1]][blkv];
-            else if (adv_bidx[gnt1])
+            if      (adv_blk [iss_idx])
+                cur.off <= pos_blk_off[adv_bidx[iss_idx]][blkv];
+            else if (adv_bidx[iss_idx])
                 cur.off <= '0;
-            // if (adv_blk [gnt1])
-            //     cur.off     <= pos_blk_off[adv_bidx[gnt1]][blkv]; // assert !aft_bidx[gnt1]
+            // if (adv_blk [iss_idx])
+            //     cur.off     <= pos_blk_off[adv_bidx[iss_idx]][blkv]; // assert !aft_bidx[iss_idx]
 
             // adv_blk is high IFF we do not advance 2 bases
-            assert(adv_blk[gnt1] ? !(adv_bidx[gnt1] && basv) : 1) else $fatal;
-            assert((adv_bidx[gnt1] && basv) ? !adv_blk[gnt1] : 1) else $fatal;
+            assert(adv_blk[iss_idx] ? !(adv_bidx[iss_idx] && basv) : 1) else $fatal;
+            assert((adv_bidx[iss_idx] && basv) ? !adv_blk[iss_idx] : 1) else $fatal;
 
-            cur.inbuf   <= !(adv_bidx[gnt1] && basv);
+            cur.inbuf   <= !(adv_bidx[iss_idx] && basv);
         end
 
         if (!reset) begin
@@ -521,16 +578,16 @@ module pc_gen #(
         // if (!reset) begin
             $display("\n\n\nFOGET: base: %d, off: %d, inbuf: %b", cur.base, cur.off, cur.inbuf);
             $display("come the fuckon: %b %d,",
-                adv_bidx[gnt1] & ftq1_vld,
-                1 + adv_bidx[gnt1] & ftq1_vld
+                adv_bidx[iss_idx] & ftq1_vld,
+                1 + adv_bidx[iss_idx] & ftq1_vld
             );
             $display("base_n[0]: %d, base_n[1]: %d", base_n[0], base_n[1]);
-            $display("gnt1: %b, bidx[adv: %b, aft: %b], blk[av: %b, aft: %b]",
-                gnt1,
-                adv_bidx[gnt1],
-                aft_bidx[gnt1],
-                adv_blk[gnt1],
-                aft_blk[gnt1]
+            $display("iss_idx: %b, bidx[adv: %b, aft: %b], blk[av: %b, aft: %b]",
+                iss_idx,
+                adv_bidx[iss_idx],
+                aft_bidx[iss_idx],
+                adv_blk[iss_idx],
+                aft_blk[iss_idx]
             );
             $display("0-bidx: [adv: %b, aft: %b], 1-bidx: [adv: %b, aft: %b]",
                 adv_bidx[0],

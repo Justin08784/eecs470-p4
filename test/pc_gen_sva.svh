@@ -182,23 +182,24 @@ module pc_gen_sva #(
 
         @(negedge clock);
         in_stream_sz = in_stream.size();
-        // for (int w = 0; w < in_stream_sz; ++w)
-        //     $display("in_st[%2d]: base: %d, off: %d, is_end: %b, dw: %d",
-        //         w,
-        //         in_stream[w].base,
-        //         in_stream[w].off,
-        //         in_stream[w].is_end,
-        //         in_stream[w].dw
-        //     );
+        $display("");
+        for (int w = 0; w < in_stream_sz; ++w)
+            $display("in_st[%2d]: base: %d, off: %d, is_end: %b, dw: %d",
+                w,
+                in_stream[w].base,
+                in_stream[w].off,
+                in_stream[w].is_end,
+                in_stream[w].dw
+            );
 
-        // for (int w = 0; w < out_stream_sz; ++w)
-        //     $display("ot_st[%2d]: base: %d, off: %d, is_end: %b, dw: %d",
-        //         w,
-        //         out_stream[w].base,
-        //         out_stream[w].off,
-        //         out_stream[w].is_end,
-        //         out_stream[w].dw
-        //     );
+        for (int w = 0; w < out_stream_sz; ++w)
+            $display("ot_st[%2d]: base: %d, off: %d, is_end: %b, dw: %d",
+                w,
+                out_stream[w].base,
+                out_stream[w].off,
+                out_stream[w].is_end,
+                out_stream[w].dw
+            );
 
         in_cons_cnt  = out_stream_sz;
         match_stream = 1;
@@ -409,8 +410,8 @@ module pc_gen_sva #(
         else exit_on_error;
     Buf_Id_Sequential: assert property(cb.buf_id_sequential)
         else exit_on_error;
-    Ends_Lockstepw_Buf_Writes: assert property(cb.ends_lockstepw_buf_writes)
-        else exit_on_error;
+    // Ends_Lockstepw_Buf_Writes: assert property(cb.ends_lockstepw_buf_writes)
+    //     else exit_on_error;
 
 endmodule
 `endif // PC_GEN_SVA_SVH

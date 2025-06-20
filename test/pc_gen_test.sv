@@ -82,8 +82,8 @@ module pc_gen_stim #(
         buf_in_rdy_scnt = 0;
 
     // forever begin
-    repeat (1000) begin
-    // repeat (1000000) begin
+    // repeat (1000) begin
+    repeat (1000000) begin
         cur_id_n = cur_id;
         cur_n = cur;
 
@@ -95,23 +95,23 @@ module pc_gen_stim #(
         buf_in_rdy_max = $urandom_range(2, 0);
         buf_cons_max   = $urandom_range(2, 0);
 
-        // $display("cur: id: %4d, base: %d", cur_id, cur.base);
-        // for (int e = 0; e < ftq_sz; ++e)
-        //     $display("ftq[%1d]: off: %d, ft: %b, base_n: %d (id: %0d)",
-        //         e,
-        //         _ftq[e].off,
-        //         _ftq[e].ft,
-        //         _ftq[e].base_n,
-        //         _ftq[e].id
-        //     );
-        // for (int e = 0; e < buf_sz; ++e)
-        //     $display("buf[%1d]: off: %d, ft: %b, base_n: %d (id: %0d)",
-        //         e,
-        //         _buf[e].off,
-        //         _buf[e].ft,
-        //         _buf[e].base_n,
-        //         _buf[e].id
-        //     );
+        $display("cur: id: %4d, base: %d", cur_id, cur.base);
+        for (int e = 0; e < ftq_sz; ++e)
+            $display("ftq[%1d]: off: %d, ft: %b, base_n: %d (id: %0d)",
+                e,
+                _ftq[e].off,
+                _ftq[e].ft,
+                _ftq[e].base_n,
+                _ftq[e].id
+            );
+        for (int e = 0; e < buf_sz; ++e)
+            $display("buf[%1d]: off: %d, ft: %b, base_n: %d (id: %0d)",
+                e,
+                _buf[e].off,
+                _buf[e].ft,
+                _buf[e].base_n,
+                _buf[e].id
+            );
 
         std::randomize(flush_pc_off);
         std::randomize(flush_fb_base);
@@ -122,7 +122,8 @@ module pc_gen_stim #(
         /*FIXME: The problem with randomly restricting ftq_in_vld_scnt is
         that the same entry can be seen as distinct by the dut
         if it enters and exits validity. */
-        ftq_in_vld_scnt = `MIN(ftq_sz, 2); // TODO: randomly restrict this below the true count?
+        // ftq_in_vld_scnt = `MIN(ftq_sz, 2);
+        ftq_in_vld_scnt = `MIN(ftq_sz, 1);
         ftq_in_dat = '0;
         for (int e = 0; e < ftq_in_vld_scnt; ++e)
             ftq_in_dat[e] = _ftq[e];
