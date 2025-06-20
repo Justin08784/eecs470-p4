@@ -460,7 +460,7 @@ module pc_gen #(
 
     // Do we need ftq1 visible to emit?
     assign ctl.req_res[0].ftq1  = adv_bidx[0] & (aft_bidx[0] | adv_blk[0]);
-    assign ctl.req_res[1].ftq1  = adv_bidx[1] & (aft_bidx[0] | adv_blk[1]);
+    assign ctl.req_res[1].ftq1  = adv_bidx[1] & (aft_bidx[1] | adv_blk[1]);
 
     assign ctl.rdy_res.ixq[0]   = ixq_in_rdy_scnt != 0;
     assign ctl.rdy_res.ixq[1]   = ixq_in_rdy_scnt[1];

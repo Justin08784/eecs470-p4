@@ -68,7 +68,10 @@ module pc_gen_stim #(
     logic [1:0] buf_in_rdy_max;
     logic [1:0] buf_cons_max;
 
+    int iter;
     initial begin
+        iter = 0;
+
         flush           = 0;
         flush_fb_base   = '0;
         flush_pc_off    = '0;
@@ -210,6 +213,10 @@ module pc_gen_stim #(
         @(posedge clock);
         // <<<<<<<<
         // <<<<
+
+        if (iter % 100000 == 0)
+            $display("iter: %d * 10^3", iter / 1000);
+        ++iter;
     end
 
         $finish;

@@ -162,6 +162,7 @@ module pc_gen_sva #(
     // not_write_buf_after_emit = 1;
     // for (int w = 0; w < out_stream_sz_n; ++w)
     //     not_write_buf_after_emit &= out_stream[w].id < buf_id_n;
+    logic [NUM_DW-1:0] fmsk_nonzero;
 
     struct packed {
         WADDR base;
@@ -258,6 +259,7 @@ module pc_gen_sva #(
 
 
         wr_idx = 0;
+        fmsk_nonzero = '1;
         for (int e = 0; e < ixq_out_wen_cnt; ++e) begin
             WORD_STREAM_PKT [1:0] tmp;
             int tmp_cnt;
@@ -271,6 +273,8 @@ module pc_gen_sva #(
                 out_stream[wr_idx] = tmp[w];
                 ++wr_idx;
             end
+
+            fmsk_nonzero[e] = |ixq_out_dat[e].fmsk;
         end
         out_stream_sz_n = wr_idx;
 
@@ -402,6 +406,11 @@ module pc_gen_sva #(
             &&  (buf_out_wen_cnt <= buf_in_rdy_scnt);
         endproperty
 
+        property no_empty_reqs;
+            disable iff (reset)
+            &fmsk_nonzero;
+        endproperty
+
     endclocking
 
     In_Stream_EqLonger: assert property(cb.in_stream_eqlonger)
@@ -413,6 +422,8 @@ module pc_gen_sva #(
     Ends_Lockstepw_Buf_Writes: assert property(cb.ends_lockstepw_buf_writes)
         else exit_on_error;
     Res_Limits: assert property(cb.res_limits)
+        else exit_on_error;
+    No_Empty_Reqs: assert property(cb.no_empty_reqs)
         else exit_on_error;
 
 endmodule
