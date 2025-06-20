@@ -395,6 +395,13 @@ module pc_gen_sva #(
             (end_cnt == buf_id) || (end_cnt == buf_id+1);
         endproperty
 
+        property res_limits;
+            disable iff (reset)
+            (ftq_out_ren_cnt <= ftq_in_vld_scnt)
+            &&  (ixq_out_wen_cnt <= ixq_in_rdy_scnt)
+            &&  (buf_out_wen_cnt <= buf_in_rdy_scnt);
+        endproperty
+
     endclocking
 
     In_Stream_EqLonger: assert property(cb.in_stream_eqlonger)
@@ -404,6 +411,8 @@ module pc_gen_sva #(
     Buf_Id_Sequential: assert property(cb.buf_id_sequential)
         else exit_on_error;
     Ends_Lockstepw_Buf_Writes: assert property(cb.ends_lockstepw_buf_writes)
+        else exit_on_error;
+    Res_Limits: assert property(cb.res_limits)
         else exit_on_error;
 
 endmodule

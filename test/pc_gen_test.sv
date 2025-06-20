@@ -79,8 +79,8 @@ module pc_gen_stim #(
         buf_in_rdy_scnt = 0;
 
     // forever begin
-    repeat (1000) begin
-    // repeat (1000000) begin
+    // repeat (1000) begin
+    repeat (1000000) begin
         cur_id_n = cur_id;
         cur_n = cur;
 
