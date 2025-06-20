@@ -482,6 +482,9 @@ module pc_gen #(
 
     assign iss_any = |(ctl.req_vld & ctl.gnt);
     assign iss_idx = ctl.req_vld[1] & ctl.gnt[1];
+
+    assign buf_out_dat[0] = cur.inbuf ? ftq_in_dat[1] : ftq_in_dat[0];
+    assign buf_out_dat[1] = ftq_in_dat[1];
     always_comb begin
 
         /*FIXME:
