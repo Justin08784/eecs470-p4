@@ -11,7 +11,7 @@ property p_never_diverge;
     pc_gen.cur.base == $past(BPU.fb_base);
 endproperty
 
-TODO: Rename "buf" to re-read FTQ (since FTQ entries are being "re-read" at align)
+TODO: Rename "buf" to re-read buffer (since FTQ entries are being "re-read" at align)
 */
 module pc_gen #(
     parameter MAX_W_PER_FB  = 16,// maximum span of a fetch block / ftq entry, in words
@@ -412,19 +412,6 @@ module pc_gen #(
         is_end  : mer_is_end    [e1][b1]
     };
 
-
-    `CNT_TYPE(NUM_FTQ) buf_lim_cnt;
-    logic [NUM_DW-1:0] req_buf;
-    compactor #(
-        .REQW(NUM_DW),
-        .GNTW(NUM_FTQ)
-    ) comp_buf_req (
-        .req        (req_buf),
-        .lim_cnt    (buf_in_rdy_scnt),
-        .prefix_cnt (),
-        .gnt_cnt    (buf_lim_cnt)
-    );
-
     /* Resource requests
     reqi = if we wish to emit i+1 dws, what resources are required?
 
@@ -487,11 +474,8 @@ module pc_gen #(
     assign can_buf_write[0] = ~cur.inbuf | ftq_in_vld_scnt[1];
     assign can_buf_write[1] = ftq_in_vld_scnt[1];
 
-
-    // merges cannot be accepted until the 2nd FTQ entry is in window
-    // assign ctl.req_res[0].ftq1  = adv_bidx[0];
-    // assign ctl.req_res[1].ftq1  = adv_bidx[1];
-    assign ctl.req_res[0].ftq1  = adv_bidx[0] & (aft_bidx[0] | adv_blk[0]); // FIXME probably wrong
+    // Do we need ftq1 visible to emit?
+    assign ctl.req_res[0].ftq1  = adv_bidx[0] & (aft_bidx[0] | adv_blk[0]);
     assign ctl.req_res[1].ftq1  = adv_bidx[1] & (aft_bidx[0] | adv_blk[1]);
 
     assign ctl.rdy_res.ixq[0]   = ixq_in_rdy_scnt != 0;
@@ -526,32 +510,13 @@ module pc_gen #(
             !iss_any ? 0 :
             iss_idx ? 2 : 1;
 
-        // ixq_out_wen_cnt = `MIN(buf_lim_cnt, `MIN(req_raw[0] + req_raw[1], ixq_in_rdy_scnt));
-
         ftq_out_ren_cnt =
             (!iss_any || !adv_bidx[iss_idx]) ? 0 :
             aft_bidx[iss_idx] ? 2 : 1;
 
-        // ftq_out_ren_cnt = (ixq_out_wen_cnt == 0 || !adv_bidx[iss_idx])
-        //     ? 0
-        //     : aft_bidx[iss_idx] + 1;
-
-        // if (ixq_out_wen_cnt == 0)
-        //     buf_out_wen_cnt = 0;
-        // else
-        //     buf_out_wen_cnt = adv_bidx[iss_idx] + !cur.inbuf;
-
         buf_out_wen_cnt =
             // !iss_any ? 0 : $countones(ctl.req_rr_buf_actual[iss_idx] & ctl.rdy_res.rr_buf);
             !iss_any ? 0 : $countones(ctl.req_res[iss_idx].rr_buf & ctl.rdy_res.rr_buf);
-
-
-        // if (ixq_out_wen_cnt == 0)
-        //     buf_out_wen_cnt = 0;
-        // else if (!cur.inbuf)
-        //     buf_out_wen_cnt = 2'b1 + `UCAST_LEN(adv_bidx[iss_idx] & ftq1_vld, 2);
-        // else
-        //     buf_out_wen_cnt = adv_bidx[iss_idx] & ftq1_vld;
     end
 
     WADDR [NUM_FTQ-1:0] base_n;
@@ -589,8 +554,6 @@ module pc_gen #(
                 cur.off <= pos_blk_off[adv_bidx[iss_idx]][blkv];
             else if (adv_bidx[iss_idx])
                 cur.off <= '0;
-            // if (adv_blk [iss_idx])
-            //     cur.off     <= pos_blk_off[adv_bidx[iss_idx]][blkv]; // assert !aft_bidx[iss_idx]
 
             // adv_blk is high IFF we do not advance 2 bases
             assert(adv_blk[iss_idx] ? !(adv_bidx[iss_idx] && basv) : 1) else $fatal;
@@ -601,7 +564,6 @@ module pc_gen #(
                     cur.inbuf   <= 0;
                 else
                     cur.inbuf   <= !(|(ctl.req_rr_buf_actual[iss_idx] & ~(can_buf_write & ctl.rdy_res.rr_buf)));
-                    // cur.inbuf   <= !(|(ctl.req_res[iss_idx].rr_buf & ~ctl.rdy_res.rr_buf));
         end
 
         if (!reset) begin
@@ -609,8 +571,8 @@ module pc_gen #(
                 assert(!(|is_end_flat[e]) | $onehot(is_end_flat[e])) else $fatal;
         end
 
-        // if (!reset && `FALSE) begin
-        if (!reset) begin
+        if (!reset && `FALSE) begin
+        // if (!reset) begin
 
             $display("\n\n\nFOGET: base: %d, off: %d, inbuf: %b", cur.base, cur.off, cur.inbuf);
             $display("come the fuckon: %b %d,",

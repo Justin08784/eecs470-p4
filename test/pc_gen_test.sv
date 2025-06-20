@@ -67,12 +67,9 @@ module pc_gen_stim #(
     logic [1:0] ixq_in_rdy_max;
     logic [1:0] buf_in_rdy_max;
     logic [1:0] buf_cons_max;
-    struct packed{
-        logic hit;
-    } rand_pkt;
 
     initial begin
-        flush   = 0;
+        flush           = 0;
         flush_fb_base   = '0;
         flush_pc_off    = '0;
 
@@ -82,8 +79,8 @@ module pc_gen_stim #(
         buf_in_rdy_scnt = 0;
 
     // forever begin
-    // repeat (10000) begin
-    repeat (1000000) begin
+    repeat (1000) begin
+    // repeat (1000000) begin
         cur_id_n = cur_id;
         cur_n = cur;
 
@@ -119,11 +116,7 @@ module pc_gen_stim #(
         // $display("flush: %b, %d %d", flush, flush_fb_base, flush_pc_off);
         // $display("cur_id: %d, cur_id_n: %d", cur_id, cur_id_n);
 
-        /*FIXME: The problem with randomly restricting ftq_in_vld_scnt is
-        that the same entry can be seen as distinct by the dut
-        if it enters and exits validity. */
-        // ftq_in_vld_scnt = `MIN(ftq_sz, 2);
-        ftq_in_vld_scnt = `MIN(ftq_sz, 1);
+        ftq_in_vld_scnt = `MIN(ftq_sz, ftq_in_vld_max);
         ftq_in_dat = '0;
         for (int e = 0; e < ftq_in_vld_scnt; ++e)
             ftq_in_dat[e] = _ftq[e];
@@ -405,50 +398,6 @@ module pc_gen_test;
 
         @(negedge clock);
         reset = 0;
-    // forever begin
-
-        // WADDR       base_n,
-        // logic       ft,
-        // logic [3:0] off
-
-        // ixq_in_rdy_scnt = 2;
-        // buf_in_rdy_scnt = 2;
-        // ftq_in_vld_scnt = 2;
-        // tmp_f0 = wr_ftq(f0, 19, 1, 4);
-        // tmp_f1 = wr_ftq(f1, 0, 0, 15);
-        // ftq_in_dat = {tmp_f1, tmp_f0};
-
-        // sva_comb = '{
-        //     ftq_out_ren_cnt : 0,
-        //     ixq_out_wen_cnt : 2,
-        //     ixq_out_dw      : {DWADDR'(9), DWADDR'(8)},
-        //     ixq_out_fmsk    : {2'b11, 2'b10},
-        //     ixq_out_is_end  : {2'b00, 2'b00},
-        //     buf_out_wen_cnt : 1,
-        //     buf_out_dat     : {tmp_f1, tmp_f0}
-        // };
-
-        // n = '{
-        //     off     : 6,
-        //     base    : 14,
-        //     inbuf   : 1
-        // };
-
-        // #0; dut.print_pc_gen; // 0 delay ensures all combinational signals have settled before printing
-        // @(posedge clock);
-
-
-        // $display("Test 1:");
-        // reset = 1;
-        // s_rst = '0;
-        // @(negedge clock);
-        // // code
-        // @(posedge clock);
-
-        // @(negedge clock);
-
-
-    // end
     end
 `endif
 

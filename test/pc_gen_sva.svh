@@ -4,12 +4,6 @@
 `ifndef PC_GEN_SVA_SVH
 `define PC_GEN_SVA_SVH
 
-// `define PC_GEN_SYNTH_MODE
-// `ifndef PC_GEN_SYNTH_MODE
-// `define PC_GEN_TEST_MODE
-// `endif
-
-
 typedef struct packed {
     // int         id;
     DWADDR      dw;     // cache line to which it belongs
@@ -23,8 +17,6 @@ typedef struct packed {
     // FTQ_ENTRY   fb;     // fb to which it belongs
 } WORD_STREAM_PKT;
 
-// TODO: need a check that buf is written AS SOON as any block in
-// the corresponding ftq entry is consumed
 function automatic WORD_STREAM_PKT [15:0] fb2stream (
     input FTQ_ENTRY     fb,
     input WADDR         base,   // of fetch block
@@ -129,7 +121,6 @@ module pc_gen_sva #(
     input   `CNT_TYPE(2)    ftq_out_ren_cnt,
 
     // irq / iqq
-    // **NOTE**: ixq_out_off is not checked
     input   `CNT_TYPE(2)    ixq_in_rdy_scnt, // = `MIN(iqq_*, irq_*)
     input   `CNT_TYPE(2)    ixq_out_wen_cnt,
     input   pc_gen2ixq[1:0] ixq_out_dat,
