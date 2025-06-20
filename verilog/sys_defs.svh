@@ -81,7 +81,7 @@ typedef logic [BMASK_LEN-1:0] BMASK;
 // comment to disable clock cycle print
 // `define CYCLE_PRINT
 // comment out to...
-`define PC_GEN_TEST_MODE
+// `define PC_GEN_TEST_MODE
 `endif
 
 ///////////////////////////////

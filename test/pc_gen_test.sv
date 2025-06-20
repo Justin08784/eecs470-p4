@@ -374,7 +374,7 @@ module pc_gen_test;
 
 `ifndef PC_GEN_TEST_MODE
     initial begin
-        $fatal("\n\033[31mPC_GEN_TEST_MODE (in pc_gen.sv) must be defined!\033[0m\n");
+        $fatal("\n\033[31mPC_GEN_TEST_MODE (in sys_defs.svh) must be defined!\033[0m\n");
     end
 `else
     initial begin

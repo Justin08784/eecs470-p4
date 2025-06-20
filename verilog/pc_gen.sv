@@ -163,22 +163,6 @@ module pc_gen #(
     assign merge_l0 = bhe00 && !is_end[0][0][W_PER_DW-1] && ftq_in_dat[0].ft;
     assign merge_l1 = bhe01 && !is_end[0][1][W_PER_DW-1] && ftq_in_dat[0].ft;
 
-    logic   iss_any;    // can issue any request?
-    logic   iss_idx;    // index of last issuable request, if any
-    // assign  iss_any = ftq_in_vld_scnt != 0;
-    // always_comb begin
-    //     unique case (1'b1)
-    //     merge_l0  &  bhe10: iss_idx = 0;
-    //     merge_l0  & ~bhe10: iss_idx = ftq1_vld;
-    //     ~merge_l0 &  bhe00: iss_idx = ftq1_vld;
-    //     ~merge_l0 & ~bhe00: iss_idx = 1;
-
-    //     default: begin // literally impossible
-    //         iss_idx = 1'bx;
-    //     end
-    //     endcase
-    // end
-
     logic   [NUM_DW-1:0] adv_bidx;  // ignore corr. idx aft_bidx if not set
     logic   [NUM_DW-1:0] adv_blk;   // ignore corr. idx aft_blk if not set
     logic   [NUM_DW-1:0][`IDX_SIZE(NUM_FTQ)-1:0]  aft_bidx; // latest base idx we are going past
@@ -490,6 +474,8 @@ module pc_gen #(
     end
     endgenerate
 
+    logic  iss_any; // can emit a dw?
+    logic  iss_idx; // index of last emitted dw, if any
     assign iss_any = |(ctl.req_vld & ctl.gnt);
     assign iss_idx = ctl.req_vld[1] & ctl.gnt[1];
 
@@ -515,7 +501,6 @@ module pc_gen #(
             aft_bidx[iss_idx] ? 2 : 1;
 
         buf_out_wen_cnt =
-            // !iss_any ? 0 : $countones(ctl.req_rr_buf_actual[iss_idx] & ctl.rdy_res.rr_buf);
             !iss_any ? 0 : $countones(ctl.req_res[iss_idx].rr_buf & ctl.rdy_res.rr_buf);
     end
 
