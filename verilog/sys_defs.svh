@@ -961,6 +961,32 @@ typedef struct packed {
 } mem2fetch;
 
 typedef struct packed {
+    DWADDR          dw;
+    logic[1:0][3:0] off;
+    logic   [1:0]   fmsk;   // which words to fetch.
+        /* Invariants:
+        1. At least bit 0 (word 0) set
+        2. Bits set contiguously from 0
+
+        FUTURE: Invariant 2 may no longer hold if we detect when a branch in an
+        early word targets into a later word *in the same cache line*,
+        AND we allow storing them together in a single cache line. Then and all insns
+        between the branch and target would have fmsk set to 0.
+            Idea: if the branch target is in the same cache line as the
+            branch (much more likely with larger cache lines), we may reuse
+            the 14-bit tgt field in the FTB branch slot as a [$clog2(cache_line_sz)-1:0]
+            in-line offset (possible with a carry bit for faster computation).
+        */
+    logic   [1:0]   is_end;
+        /* Does word i *terminate* an FB?
+        Both bits can be 1 when word0 ends FB-A and word1 ends FB-B (a 1-insn block). */
+    
+    MEM_BLOCK       blk;
+    BRANCH_MD[1:0]  md;
+
+} ICACHE_RESPONSE;
+
+typedef struct packed {
     `CNT_TYPE(`N) d_vld_scnt;
     ID_RESULT   [`N-1:0]        d_dat;
 } decode2dispatch;

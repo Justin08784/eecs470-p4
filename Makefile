@@ -190,6 +190,7 @@ GREP = grep -E --color=auto
 
 # TODO: add more modules here
 MODULES = cpu \
+	align \
 	bpu \
 	fetch \
 	fifo \
