@@ -67,7 +67,7 @@ module align(
         assign before_indw_last [b][W_PER_DW-1] = 0;
         for (genvar i = 0; i < W_PER_DW-1; ++i)
             assign before_indw_last[b][W_PER_DW-1 - (i+1)] =
-                before_indw_last[W_PER_DW-1 - i] | raw.fmsk[W_PER_DW-1 - i];
+                before_indw_last[b][W_PER_DW-1 - i] | cur.fmsk[W_PER_DW-1 - i];
 
         for (genvar w = 0; w < W_PER_DW; ++w) begin
             localparam flat_idx = W_PER_DW*b+w;
@@ -120,55 +120,64 @@ module align(
         assign bal.f_dat    [hi]    = raw.f_dat[hi];
     end
 
-    begin : word_align
-        localparam lo = 1;
-        localparam hi = 3;
+    // word_align
+    assign wal.brch     [3:1]   = bal.brch      [3:1]   >> shl.mid;
+    assign wal.fmsk     [3:1]   = bal.fmsk      [3:1]   >> shl.mid;
+    assign wal.is_end   [3:1]   = bal.is_end    [3:1]   >> shl.mid;
+    assign wal.indw_last[3:1]   = bal.indw_last [3:1]   >> shl.mid;
 
-        assign wal.brch     [3:1]   = bal.brch      [3:1]   >> shl.mid;
-        assign wal.fmsk     [3:1]   = bal.fmsk      [3:1]   >> shl.mid;
-        assign wal.is_end   [3:1]   = bal.is_end    [3:1]   >> shl.mid;
-        assign wal.indw_last[3:1]   = bal.indw_last [3:1]   >> shl.mid;
-
-        assign wal.f_dat    [0]     = bal.f_dat[0];
-        assign wal.f_dat    [3]     = bal.f_dat[3];
-        assign wal.f_dat    [1]     = shl.mid ? bal.f_dat[2] : bal.f_dat[1];
-        assign wal.f_dat    [2]     = shl.mid ? bal.f_dat[3] : bal.f_dat[2];
-    end
+    assign wal.f_dat    [0]     = bal.f_dat[0];
+    assign wal.f_dat    [3]     = bal.f_dat[3];
+    assign wal.f_dat    [1]     = shl.mid ? bal.f_dat[2] : bal.f_dat[1];
+    assign wal.f_dat    [2]     = shl.mid ? bal.f_dat[3] : bal.f_dat[2];
 
     typedef struct packed {
-        logic [NUM_W-1:0] wr_ibuf, wr_btq, rd_rrb;
-    } RESOURCE;
+        `CNT_TYPE(NUM_W) wr_ibuf, wr_btq, rd_rrb;
+        `CNT_TYPE(2) rd_irq;
+    } RESO;
 
     struct packed {
-        logic   [NUM_W-1:0] req, gnt;
-        RESOURCE[NUM_W-1:0] req_res;
-        RESOURCE gnt_res;
+        logic   [NUM_W-1:0] req, gnt, rng;
+        RESO    [NUM_W-1:0] req_res;
+        RESO    gnt_res;
+        struct packed {
+            logic wr_ibuf, wr_btq, rd_rrb, rd_irq;
+        } [NUM_W-1:0] sat;
     } ctl;
 
-    generate
     for (genvar w = 0; w < NUM_W; ++w) begin
-        logic [NUM_FU-1:0][PART_SZ-1:0] gbus_can_issue;
-        psel_gen #(
-            .WIDTH  (PART_SZ),
-            .REQS   (NUM_FU)
-        ) sel_iss (
-            .req    (can_issue),
-            .gnt_bus(gbus_can_issue)
-        );
+        localparam sz = `CNT_SIZE(w+1);
+        assign ctl.req[w] = wal.fmsk[w];
+        assign ctl.req_res[w].wr_ibuf   [sz-1:0] = sz'($countones(wal.fmsk[w:0]));
+        assign ctl.req_res[w].wr_btq    [sz-1:0] = sz'($countones(wal.brch[w:0]));
+        assign ctl.req_res[w].rd_rrb    [sz-1:0] = sz'($countones(wal.is_end[w:0]));
+        assign ctl.req_res[w].rd_irq             = sz'($countones(wal.indw_last[w:0]));
+
+        if (sz < `CNT_SIZE(NUM_W)) begin
+            assign ctl.req_res[w].wr_ibuf  [`CNT_SIZE(NUM_W)-1:sz] = '0;
+            assign ctl.req_res[w].wr_btq   [`CNT_SIZE(NUM_W)-1:sz] = '0;
+            assign ctl.req_res[w].rd_rrb   [`CNT_SIZE(NUM_W)-1:sz] = '0;
         end
-    endgenerate
-
-
-    assign ctl.gnt_res.wr_ibuf [0] = ibuf_in_rdy_scnt != 0;
-    assign ctl.gnt_res.wr_btq  [0] = btq_in.btq_rdy_scnt != 0;
-    for (genvar w = 1; w < NUM_W; ++w) begin
-        assign ctl.gnt_res.wr_ibuf [w] = `UCAST_FIT(w) < ibuf_in_rdy_scnt;
-        assign ctl.gnt_res.wr_btq  [w] = (w < N) && (`UCAST_FIT(w) < btq_in.btq_rdy_scnt);
     end
-    assign ctl.gnt_res.rd_rrb = {{(NUM_W-2){1'b0}}, 2'b11};
+
+    assign ctl.gnt_res.wr_ibuf  = ibuf_in_rdy_scnt;
+    assign ctl.gnt_res.wr_btq   = btq_in.btq_rdy_scnt;
+    assign ctl.gnt_res.rd_rrb   = 2;
         /* pc_gen guarantees that an ftq entry arrives in rrb BEFORE or SIMULTANEOUSLY WITH
         the earliest associated cache line request. However, the rrb exposes
         at most 2 FTQ entries to the aligner. */
+    localparam rrb_sz = `CNT_SIZE(2);
+    localparam btq_sz = `CNT_SIZE(N);
+    for (genvar w = 0; w < NUM_W; ++w) begin
+        localparam sz = `CNT_SIZE(w+1);
+        assign ctl.sat[w].wr_ibuf   = ctl.req_res[w].wr_ibuf[sz-1:0] <= ctl.gnt_res.wr_ibuf;
+        assign ctl.sat[w].wr_btq    = ctl.req_res[w].wr_btq [sz-1:0] <= ctl.gnt_res.wr_btq[btq_sz-1:0];
+        assign ctl.sat[w].rd_rrb    = ctl.req_res[w].rd_rrb [sz-1:0] <= ctl.gnt_res.rd_rrb[rrb_sz-1:0];
+        assign ctl.sat[w].rd_irq    = 1;
+        assign ctl.gnt[w] = &ctl.sat[w];
+        assign ctl.rng[w] = ctl.req[w] & ctl.gnt[w]; // rng = request and grant
+    end
+
 
 
     // assign bal = '{
@@ -176,6 +185,35 @@ module align(
 
     // }
     endgenerate
+
+    logic iss_any;
+    `IDX_TYPE(NUM_W) iss_idx;
+    assign iss_any = |ctl.rng;
+    always_comb begin
+        iss_idx = 0;
+        for (int w = 0; w < NUM_W; ++w) begin
+            if (ctl.rng[w])
+                iss_idx = w; // find highest set
+        end
+    end
+
+    // generate
+    // if (iss_any) begin
+    assign ibuf_out_wen_cnt = !iss_any ? 0 : ctl.req_res[iss_idx].wr_ibuf;
+    assign btq_out.en_cnt   = !iss_any ? 0 : ctl.req_res[iss_idx].wr_btq;
+    assign irq_out_ren_cnt  = !iss_any ? 0 : ctl.req_res[iss_idx].rd_irq;
+    assign rrb_out_wen_cnt  = !iss_any ? 0 : ctl.req_res[iss_idx].rd_rrb;
+
+    // end else begin
+    //     assign ibuf_out_wen_cnt = 0;
+    //     assign btq_out.en_cnt   = 0;
+    //     assign irq_out_ren_cnt  = 0;
+    //     assign rrb_out_wen_cnt  = 0;
+
+    // end
+    // endgenerate
+
+    assign ibuf_out_dat     = wal.f_dat;
 
 
     // always_comb begin
