@@ -154,7 +154,8 @@ module align(
         assign ctl.req_res[w].wr_ibuf   [sz-1:0] = sz'($countones(wal.fmsk[w:0]));
         assign ctl.req_res[w].wr_btq    [sz-1:0] = sz'($countones(wal.brch[w:0]));
         assign ctl.req_res[w].rd_rrb    [sz-1:0] = sz'($countones(wal.is_end[w:0]));
-        assign ctl.req_res[w].rd_irq             = sz'($countones(wal.indw_last[w:0]));
+        assign ctl.req_res[w].rd_irq             = unsigned'(sz'($countones(wal.indw_last[w:0])));
+            // FIXME FIXME ^^ if we dont do unsigned' the rd_irq goes to 3 sometimes wtf
 
         if (sz < `CNT_SIZE(NUM_W)) begin
             assign ctl.req_res[w].wr_ibuf  [`CNT_SIZE(NUM_W)-1:sz] = '0;
