@@ -147,9 +147,10 @@ module align(
         } [NUM_W-1:0] sat;
     } ctl;
 
+    assign ctl.req = wal.irq_vld & wal.fmsk & wal.indw_last;
+        /* ^^ Q: indw_last guard, why? A: do not allow partial cache line consumption */
     for (genvar w = 0; w < NUM_W; ++w) begin
         localparam sz = `CNT_SIZE(w+1);
-        assign ctl.req[w] = wal.irq_vld[w] & wal.fmsk[w];
         assign ctl.req_res[w].wr_ibuf   [sz-1:0] = sz'($countones(wal.fmsk[w:0]));
         assign ctl.req_res[w].wr_btq    [sz-1:0] = sz'($countones(wal.brch[w:0]));
         assign ctl.req_res[w].rd_rrb    [sz-1:0] = sz'($countones(wal.is_end[w:0]));
