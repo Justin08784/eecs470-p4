@@ -43,7 +43,7 @@ typedef struct packed {
 // } ICACHE_RESPONSE;
 
 // icache response queue
-module IRQ #(
+module irq #(
     parameter DEPTH=IRQ_SZ,
     type PTR=`IDX_TYPE(DEPTH)
 ) (
@@ -56,19 +56,12 @@ module IRQ #(
     output  PTR [2:0]       wr_idxs_n,
     output  `CNT_TYPE(2)    rdy_scnt,
     input   `CNT_TYPE(2)    wen_cnt,
-    input   struct packed {
-        DWADDR      dw;
-        logic [1:0] fmsk;
-        logic [1:0] is_end;
-    } [1:0] wdat,
+    input   pc_gen2ixq[1:0] wdat,
 
     // icache completions
     input   logic [1:0]     cen,
     input   PTR [1:0]       cidx,
-    input   struct packed {
-        MEM_BLOCK       blk;
-        BRANCH_MD[1:0]  md;
-    } [1:0] cdat,
+    input   mem2fetch       cdat,
 
     // read
     output  `CNT_TYPE(2)    vld_scnt,
@@ -111,7 +104,8 @@ module IRQ #(
     `IDX_TYPE(2)rwin_ncpl_idx;
     generate
     for (genvar i = 0; i < 2; ++i) begin
-        assign rwin_cpl[i] = cpl[rd_idxs_n[i]];
+        assign rwin_cpl[i]  = cpl[rd_idxs_n[i]];
+        assign rdat[i]      = state[rd_idxs_n[i]];
     end
     endgenerate
     ffs #(
@@ -122,10 +116,40 @@ module IRQ #(
         .o_idx(rwin_ncpl_idx)
     );
 
+    assign rdy_scnt = free_scnt;
+
     assign vld_scnt = `MIN(
         used_scnt,
         rwin_ncpl_any ? rwin_ncpl_idx : 2
     );
+
+    // always_ff @(posedge clock) begin
+    //     if (!reset) begin
+    //         $display(">> IRQ");
+    //         $display("vld_scnt: %d, rdy_scnt: %d", vld_scnt, rdy_scnt);
+    //         $display("ren_cnt: %d, wen_cnt: %d", ren_cnt, wen_cnt);
+    //         $display("rd[%d, %d, %d], wr[%d, %d, %d]",
+    //             rd_idxs_n[0],
+    //             rd_idxs_n[1],
+    //             rd_idxs_n[2],
+    //             wr_idxs_n[0],
+    //             wr_idxs_n[1],
+    //             wr_idxs_n[2]
+    //         );
+    //         for (int i = 0; i < IRQ_SZ; ++i)
+    //             $display("irq[%d]: cpl: %b, dw: %d, off: [%d, %d], fmsk: %b, is_end: %b, blk: [%x, %x]",
+    //                 i,
+    //                 cpl[i],
+    //                 state[i].dw,
+    //                 state[i].off[0],
+    //                 state[i].off[1],
+    //                 state[i].fmsk,
+    //                 state[i].is_end,
+    //                 state[i].blk.word_level[0],
+    //                 state[i].blk.word_level[1]
+    //             );
+    //     end
+    // end
 
     always_ff @(posedge clock) begin
         if (reset) begin
@@ -142,8 +166,8 @@ module IRQ #(
                 cur = cidx[i];
 
                 cpl  [cur]      <= 1;
-                state[cur].blk  <= cdat[i].blk;
-                state[cur].md   <= cdat[i].md;
+                state[cur].blk  <= cdat.data[i];
+                state[cur].md   <= cdat.insn_md[i];
             end
 
             for (int i = 0; i < `MIN(wen_cnt, 2); ++i) begin
@@ -152,11 +176,289 @@ module IRQ #(
 
                 cpl  [cur]          <= 0;
                 state[cur].dw       <=  wdat[i].dw;
+                state[cur].off      <=  wdat[i].off;
                 state[cur].fmsk     <=  wdat[i].fmsk;
                 state[cur].is_end   <=  wdat[i].is_end;
             end
 
         end
+    end
+
+endmodule
+
+module dcf (
+    input   clock,
+    input   reset,
+    input   flush,
+    input   BMASK clmsk,
+    // input   WADDR flush_PC,
+        /*
+        WRONG >> 
+            FIXME: this should/would be an FB base...?
+        <<
+        If branch was mispred NT-resolved T, then flush_PC indeed will be an fb_base.
+        However, if branch was mispred T-resolved NT, then flush_PC may NOT be an
+        fb_base–– instead flush_PC is more likely to be a nonzero offset INO the FB.
+        */
+    input   WADDR flush_fb_base,
+    input   logic [3:0] flush_pc_off,
+
+    input   decode2fetch d_in,
+    output  fetch2decode d_out,
+
+    input   btq2fetch   btq_in,
+    output  fetch2btq   btq_out,
+
+    // execute
+    input   execute2complete_bru cbru_in,
+
+    input   rename2snap_bus snap_in, // unused
+
+    output  fetch2mem   mem_out,
+    input   mem2fetch   mem_in
+
+);
+    // bpu <-> ftq plumbing
+    struct packed {
+        logic       en;
+        FTQ_ENTRY   dat;
+    } bpu2ftq;
+    struct packed {
+        logic       rdy;
+    } ftq2bpu;
+
+    bpu bpu0 (
+        .clock,
+        .reset,
+
+        .flush,
+        .flush_fb_base,
+        .flush_pc_off,
+        .clmsk,
+        .cbru_in,
+
+        .i_uen      (btq_in.bp_upd.en),
+        .i_udat     (btq_in.bp_upd.dat),
+
+        .i_ftq_rdy  (ftq2bpu.rdy),
+        .o_ftq_en   (bpu2ftq.en),
+        .o_ftq_dat  (bpu2ftq.dat)
+    );
+
+
+    // ftq <-> pc_gen plumbing
+    FTQ_ENTRY [1:0] ftq2pc_gen_dat;
+    `CNT_TYPE(2)    ftq2pc_gen_vld_scnt;
+    `CNT_TYPE(2)    pc_gen2ftq_ren_cnt;
+
+    ftq ftq0 (
+        .clock,
+        .reset,
+        .flush,
+
+        .rdy        (ftq2bpu.rdy),
+        .wen        (bpu2ftq.en),
+        .wdat       (bpu2ftq.dat),
+
+        .vld_scnt   (ftq2pc_gen_vld_scnt),
+        .rdat       (ftq2pc_gen_dat),
+        .ren_cnt    (pc_gen2ftq_ren_cnt)
+    );
+
+    pc_gen2ixq [1:0]pc_gen2ixq_dat;
+    `CNT_TYPE(2)    pc_gen2ixq_wen_cnt;
+    `CNT_TYPE(2)    ixq2pc_gen_rdy_scnt;
+
+    FTQ_ENTRY [1:0] pc_gen2rrb_dat;
+    `CNT_TYPE(2)    pc_gen2rrb_wen_cnt;
+    `CNT_TYPE(2)    rrb2pc_gen_rdy_scnt;
+
+    pc_gen pc_gen0 (
+        .clock,
+        .reset,
+        .flush,
+
+        .flush_fb_base,
+        .flush_pc_off,
+
+        .ftq_in_vld_scnt    (ftq2pc_gen_vld_scnt),
+        .ftq_in_dat         (ftq2pc_gen_dat),
+        .ftq_out_ren_cnt    (pc_gen2ftq_ren_cnt),
+
+        .ixq_in_rdy_scnt    (ixq2pc_gen_rdy_scnt),
+        .ixq_out_wen_cnt    (pc_gen2ixq_wen_cnt),
+        .ixq_out_dat        (pc_gen2ixq_dat),
+
+        .buf_in_rdy_scnt    (rrb2pc_gen_rdy_scnt),
+        .buf_out_wen_cnt    (pc_gen2rrb_wen_cnt),
+        .buf_out_dat        (pc_gen2rrb_dat)
+    );
+
+    // ""iqq""
+    logic [2:0][`IDX_SIZE(IRQ_SZ)-1:0] irq_wr_idxs_n;
+    struct packed {
+        logic   [1:0]   vld;
+        DWADDR  [1:0]   dw;
+        logic   [1:0][`IDX_SIZE(IRQ_SZ)-1:0] irq_idx;
+    } iqq, iqq_n;
+
+    generate
+    for (genvar i = 0; i < 2; ++i) begin
+        assign iqq_n.vld    [i] = i < pc_gen2ixq_wen_cnt;
+
+        assign iqq_n.dw     [i] = pc_gen2ixq_dat[i].dw;
+        assign iqq_n.irq_idx[i] = irq_wr_idxs_n[i];
+    end
+    endgenerate
+
+    // always_ff @(posedge clock) begin
+    //     if (!reset) begin
+    //         $display("iqq!");
+    //         for (int i = 0; i < 2; ++i)
+    //             $display("iqq[%d]: vld: %b, dw: %d, irq_idx: %d",
+    //                 i,
+    //                 iqq.vld[i],
+    //                 iqq.dw[i],
+    //                 iqq.irq_idx[i]
+    //             );
+    //     end
+    // end
+
+    struct packed {
+        logic   [1:0]   vld;
+        logic   [1:0][`IDX_SIZE(IRQ_SZ)-1:0] irq_idx;
+        mem2fetch   mem_dat;
+    } idat, idat_n;
+
+    generate
+    // assign mem_out.PCdws = iqq.dw;
+    for (genvar i = 0; i < 2; ++i) begin
+        assign mem_out.PCdws [i] = iqq.dw[i];
+        assign idat_n.vld    [i] = iqq.vld[i];
+        assign idat_n.irq_idx[i] = iqq.irq_idx[i];
+    end
+    assign idat_n.mem_dat = mem_in;
+    endgenerate
+
+    ICACHE_RESPONSE[1:0]irq2align_dat;
+    `CNT_TYPE(2)        irq2align_vld_scnt;
+    `CNT_TYPE(2)        align2irq_ren_cnt;
+
+    irq irq0 (
+        .clock,
+        .reset,
+        .flush,
+        .clmsk  ('0),
+
+        .wr_idxs_n  (irq_wr_idxs_n),
+        .rdy_scnt   (ixq2pc_gen_rdy_scnt),  // TODO: change irq when has backpressure
+        .wen_cnt    (pc_gen2ixq_wen_cnt),
+        .wdat       (pc_gen2ixq_dat),
+
+        .cen        (idat.vld),
+        .cidx       (idat.irq_idx),
+        .cdat       (idat.mem_dat),
+
+        .vld_scnt   (irq2align_vld_scnt),
+        .ren_cnt    (align2irq_ren_cnt),
+        .rdat       (irq2align_dat)
+    );
+
+    FTQ_ENTRY[1:0]  rrb2align_dat;
+    `CNT_TYPE(2)    align2rrb_ren_cnt;
+
+    fifo #(
+        .DEPTH(IRQ_SZ),
+        .WIDTH($bits(FTQ_ENTRY)),
+        .NUM_RPORTS(2),
+        .NUM_WPORTS(2),
+        .FLUSH_MODE(FIFO_FLUSH_RESET),
+        .ENABLE_INTR_FWD(`FALSE),
+        .INSTANCE_ID(2)
+    ) rrb (
+        .clock,
+        .reset,
+        .flush,
+
+        // >> unused inputs
+        .flush_snap ('0),
+        .clmsk      ('0),
+        .wr_bmask   ('0),
+        // << unused inputs
+
+        .wr_en_cnt  (pc_gen2rrb_wen_cnt),
+        .wr_data    (pc_gen2rrb_dat),
+        .rd_en_cnt  (align2rrb_ren_cnt),
+        .rd_data    (rrb2align_dat),
+        .free_scnt  (rrb2pc_gen_rdy_scnt),
+        .used_scnt  ()
+    );
+
+    IF_ID_PACKET[3:0]   align2ibuf_dat;
+    `CNT_TYPE(4)        align2ibuf_wen_cnt;
+    `CNT_TYPE(4)        ibuf2align_rdy_scnt;
+
+    align align0 (
+        .clock,
+        .reset,
+        .rrb_in_dat     (rrb2align_dat),
+        .rrb_out_ren_cnt(align2rrb_ren_cnt),
+
+        .irq_in_vld_scnt(irq2align_vld_scnt),
+        .irq_in_dat     (irq2align_dat),
+        .irq_out_ren_cnt(align2irq_ren_cnt),
+
+        .btq_in,
+        .btq_out,
+
+        .ibuf_in_rdy_scnt   (ibuf2align_rdy_scnt),
+        .ibuf_out_wen_cnt   (align2ibuf_wen_cnt),
+        .ibuf_out_dat       (align2ibuf_dat)
+    );
+
+
+    `CNT_TYPE(`N) used_scnt;
+    assign d_out.f_en_cnt = `MIN(used_scnt, d_in.d_rdy_cnt);
+    fifo #(
+        .DEPTH(4*`N),
+        .WIDTH($bits(IF_ID_PACKET)),
+        .NUM_RPORTS(`N),
+        .NUM_WPORTS(4),
+        .FLUSH_MODE(FIFO_FLUSH_RESET),
+        .ENABLE_INTR_FWD(`FALSE),
+        .INSTANCE_ID(2)
+    ) insn_buf (
+        .clock,
+        .reset,
+        .flush,
+
+        // >> unused inputs
+        .flush_snap ('0),
+        .clmsk      ('0),
+        .wr_bmask   ('0),
+        // << unused inputs
+
+        .wr_en_cnt  (align2ibuf_wen_cnt),
+        .wr_data    (align2ibuf_dat),
+        .rd_en_cnt  (d_out.f_en_cnt),
+        .rd_data    (d_out.f_dat),
+        .free_scnt  (ibuf2align_rdy_scnt),
+        .used_scnt  (used_scnt)
+    );
+
+    always_ff @(posedge clock) begin
+        if (reset || flush) begin
+            // iqq.vld <= '0;
+            // idat.vld<= '0;
+            iqq     <= '0;
+            idat    <= '0;
+
+        end else begin
+            iqq     <= iqq_n;
+            idat    <= idat_n;
+
+        end
+
     end
 
 endmodule

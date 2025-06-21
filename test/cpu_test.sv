@@ -568,7 +568,10 @@ module testbench;
     endtask
 
     task print_fetch;
-        verisimpleV.fetch0.print_fetch();
+        // verisimpleV.fetch0.print_fetch();
+        // verisimpleV.fetch0.ftq0.print_ftq();
+        verisimpleV.fetch0.align0.print_align();
+
     endtask
 
     // task print_btb;

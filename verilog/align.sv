@@ -2,6 +2,8 @@
 
 // combinational align
 module align(
+    input clock,
+    input reset,
     // read (re-read buffer)
     // input   `CNT_TYPE(2)    rrb_in_vld_scnt, // do we even need this?
     input   FTQ_ENTRY[1:0]  rrb_in_dat,
@@ -34,7 +36,7 @@ module align(
     WADDR [NUM_W-1:0] raw_pc;
     BRANCH_MD [NUM_W-1:0] raw_md;
     struct packed {
-        logic [NUM_W-1:0] brch, fmsk, is_end, indw_last;
+        logic [NUM_W-1:0] brch, fmsk, irq_vld, is_end, indw_last;
         IF_ID_PACKET [NUM_W-1:0] f_dat;
     } raw, bal, wal;
     
@@ -77,6 +79,7 @@ module align(
             assign raw_md   [flat_idx]  = cur.md[w];
             assign raw.brch [flat_idx]  = cur.md[w].brch;
             assign raw.fmsk [flat_idx]  = cur.fmsk[w];
+            assign raw.irq_vld[flat_idx]= (b < irq_in_vld_scnt);
             assign raw.is_end[flat_idx] = cur.is_end[w];
             assign raw.f_dat [flat_idx]  = '{
                 PC      : raw_pc[flat_idx],
@@ -103,6 +106,7 @@ module align(
         // full shift controls (cannot permit duplicates)
         assign bal.brch     [hi:lo] = raw.brch      [hi:lo] >> shl.blk[b];
         assign bal.fmsk     [hi:lo] = raw.fmsk      [hi:lo] >> shl.blk[b];
+        assign bal.irq_vld  [hi:lo] = raw.irq_vld   [hi:lo] >> shl.blk[b];
         assign bal.is_end   [hi:lo] = raw.is_end    [hi:lo] >> shl.blk[b];
         assign bal.indw_last[hi:lo] = raw.indw_last [hi:lo] >> shl.blk[b];
 
@@ -112,8 +116,15 @@ module align(
     end
 
     // word_align
+    assign wal.brch     [0]     = bal.brch      [0];
+    assign wal.fmsk     [0]     = bal.fmsk      [0];
+    assign wal.irq_vld  [0]     = bal.irq_vld   [0];
+    assign wal.is_end   [0]     = bal.is_end    [0];
+    assign wal.indw_last[0]     = bal.indw_last [0];
+
     assign wal.brch     [3:1]   = bal.brch      [3:1]   >> shl.mid;
     assign wal.fmsk     [3:1]   = bal.fmsk      [3:1]   >> shl.mid;
+    assign wal.irq_vld  [3:1]   = bal.irq_vld   [3:1]   >> shl.mid;
     assign wal.is_end   [3:1]   = bal.is_end    [3:1]   >> shl.mid;
     assign wal.indw_last[3:1]   = bal.indw_last [3:1]   >> shl.mid;
 
@@ -138,7 +149,7 @@ module align(
 
     for (genvar w = 0; w < NUM_W; ++w) begin
         localparam sz = `CNT_SIZE(w+1);
-        assign ctl.req[w] = wal.fmsk[w];
+        assign ctl.req[w] = wal.irq_vld[w] & wal.fmsk[w];
         assign ctl.req_res[w].wr_ibuf   [sz-1:0] = sz'($countones(wal.fmsk[w:0]));
         assign ctl.req_res[w].wr_btq    [sz-1:0] = sz'($countones(wal.brch[w:0]));
         assign ctl.req_res[w].rd_rrb    [sz-1:0] = sz'($countones(wal.is_end[w:0]));
@@ -185,6 +196,38 @@ module align(
     assign btq_out.en_cnt   = !iss_any ? 0 : ctl.req_res[iss_idx].wr_btq;
     assign irq_out_ren_cnt  = !iss_any ? 0 : ctl.req_res[iss_idx].rd_irq;
     assign rrb_out_ren_cnt  = !iss_any ? 0 : ctl.req_res[iss_idx].rd_rrb;
+
+    task print_align;
+        $display("fyooooo. iss_any: %b, iss_idx: %b, raw.fmsk: %b, wal.fmsk: %b", iss_any, iss_idx, raw.fmsk, wal.fmsk);
+        $display("shl.blk[0]: %b, shl.blk[1]: %b, shl.mid: %b",
+            shl.blk[0],
+            shl.blk[1],
+            shl.mid
+        );
+
+        $display("::f_wen_cnt: %d, %b", ibuf_out_wen_cnt, ibuf_out_wen_cnt);
+        $display("::btq_wen_cnt: %d", btq_out.en_cnt);
+        $display("::rrb_ren_cnt: %d", rrb_out_ren_cnt);
+        $display("::irq_ren_cnt %d", irq_out_ren_cnt);
+        for (int i = 0; i < 4; ++i) begin
+            $display("::f_dat[i]: pc: %d, inst: %x",
+                ibuf_out_dat[i].PC,
+                ibuf_out_dat[i].inst
+            );
+            $display("  req_res: ibuf: %b, btq: %b, rrb: %b, irq: %b",
+                ctl.req_res[i].wr_ibuf,
+                ctl.req_res[i].wr_btq,
+                ctl.req_res[i].rd_rrb,
+                ctl.req_res[i].rd_irq
+            );
+            $display("  ctl.sat: ibuf: %b, btq: %b, rrb: %b, irq: %b",
+                ctl.sat[i].wr_ibuf,
+                ctl.sat[i].wr_btq,
+                ctl.sat[i].rd_rrb,
+                ctl.sat[i].rd_irq
+            );
+        end
+    endtask
 
     assign ibuf_out_dat     = wal.f_dat;
 

@@ -57,7 +57,7 @@ module cpu (
     rename2snap_bus rnme_2_snap;
     execute2complete_bru ex_2_cbru;
 
-    fetch fetch0 (
+    dcf fetch0 (
         .clock,
         .reset,
         .flush,

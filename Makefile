@@ -277,33 +277,35 @@ CPU_TESTBENCH = test/pipeline_print.c \
 
 # verilog/cpu.sv is implicit
 CPU_SOURCES = verilog/cpu.sv \
-			  verilog/checkpoints.sv \
-			  verilog/fetch.sv \
-			  verilog/regfile.sv \
-              verilog/memDP.sv \
-			  verilog/mult.sv \
-			  verilog/rs.sv \
-			  verilog/psel_gen.sv \
-			  verilog/arch_map.sv \
-			  verilog/dispatch.sv \
-			  verilog/map_table.sv \
-			  verilog/rob.sv \
-			  verilog/prf.sv \
-			  verilog/free_list.sv \
-			  verilog/stage_id_p4.sv \
-			  verilog/ring_ctr.sv \
-			  verilog/fifo.sv \
-			  verilog/fetch.sv \
-			  verilog/execute.sv \
-			  verilog/uftb.sv \
-			  verilog/ftq.sv \
-			  verilog/bpu.sv \
-			  verilog/btq.sv \
-			  verilog/ghr.sv \
-			  verilog/skid_buffer.sv \
-			  verilog/retire.sv \
-			  verilog/victim.sv \
-			  verilog/dcache_block_direct.sv
+			verilog/align.sv \
+			verilog/checkpoints.sv \
+			verilog/fetch.sv \
+			verilog/regfile.sv \
+			verilog/memDP.sv \
+			verilog/mult.sv \
+			verilog/rs.sv \
+			verilog/pc_gen.sv \
+			verilog/psel_gen.sv \
+			verilog/arch_map.sv \
+			verilog/dispatch.sv \
+			verilog/map_table.sv \
+			verilog/rob.sv \
+			verilog/prf.sv \
+			verilog/free_list.sv \
+			verilog/stage_id_p4.sv \
+			verilog/ring_ctr.sv \
+			verilog/fifo.sv \
+			verilog/fetch.sv \
+			verilog/execute.sv \
+			verilog/uftb.sv \
+			verilog/ftq.sv \
+			verilog/bpu.sv \
+			verilog/btq.sv \
+			verilog/ghr.sv \
+			verilog/skid_buffer.sv \
+			verilog/retire.sv \
+			verilog/victim.sv \
+			verilog/dcache_block_direct.sv
 # verilog/ras.sv
 # verilog/gshare.sv
 # verilog/btb.sv
