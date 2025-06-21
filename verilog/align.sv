@@ -2,8 +2,6 @@
 
 // combinational align
 module align(
-    input clock,
-    input reset,
     // read (re-read buffer)
     // input   `CNT_TYPE(2)    rrb_in_vld_scnt, // do we even need this?
     input   FTQ_ENTRY[1:0]  rrb_in_dat,
@@ -172,6 +170,7 @@ module align(
         at most 2 FTQ entries to the aligner. */
     localparam rrb_sz = `CNT_SIZE(2);
     localparam btq_sz = `CNT_SIZE(N);
+    assign ctl.rng = ctl.req & ctl.gnt; // rng = request and grant
     for (genvar w = 0; w < NUM_W; ++w) begin
         localparam sz = `CNT_SIZE(w+1);
         assign ctl.sat[w].wr_ibuf   = ctl.req_res[w].wr_ibuf[sz-1:0] <= ctl.gnt_res.wr_ibuf;
@@ -179,7 +178,6 @@ module align(
         assign ctl.sat[w].rd_rrb    = ctl.req_res[w].rd_rrb [sz-1:0] <= ctl.gnt_res.rd_rrb[rrb_sz-1:0];
         assign ctl.sat[w].rd_irq    = 1;
         assign ctl.gnt[w] = &ctl.sat[w];
-        assign ctl.rng[w] = ctl.req[w] & ctl.gnt[w]; // rng = request and grant
     end
     endgenerate
 
@@ -198,38 +196,6 @@ module align(
     assign btq_out.en_cnt   = !iss_any ? 0 : ctl.req_res[iss_idx].wr_btq;
     assign irq_out_ren_cnt  = !iss_any ? 0 : ctl.req_res[iss_idx].rd_irq;
     assign rrb_out_ren_cnt  = !iss_any ? 0 : ctl.req_res[iss_idx].rd_rrb;
-
-    task print_align;
-        $display("fyooooo. iss_any: %b, iss_idx: %b, raw.fmsk: %b, wal.fmsk: %b", iss_any, iss_idx, raw.fmsk, wal.fmsk);
-        $display("shl.blk[0]: %b, shl.blk[1]: %b, shl.mid: %b",
-            shl.blk[0],
-            shl.blk[1],
-            shl.mid
-        );
-
-        $display("::f_wen_cnt: %d, %b", ibuf_out_wen_cnt, ibuf_out_wen_cnt);
-        $display("::btq_wen_cnt: %d", btq_out.en_cnt);
-        $display("::rrb_ren_cnt: %d", rrb_out_ren_cnt);
-        $display("::irq_ren_cnt %d", irq_out_ren_cnt);
-        for (int i = 0; i < 4; ++i) begin
-            $display("::f_dat[i]: pc: %d, inst: %x",
-                ibuf_out_dat[i].PC,
-                ibuf_out_dat[i].inst
-            );
-            $display("  req_res: ibuf: %b, btq: %b, rrb: %b, irq: %b",
-                ctl.req_res[i].wr_ibuf,
-                ctl.req_res[i].wr_btq,
-                ctl.req_res[i].rd_rrb,
-                ctl.req_res[i].rd_irq
-            );
-            $display("  ctl.sat: ibuf: %b, btq: %b, rrb: %b, irq: %b",
-                ctl.sat[i].wr_ibuf,
-                ctl.sat[i].wr_btq,
-                ctl.sat[i].rd_rrb,
-                ctl.sat[i].rd_irq
-            );
-        end
-    endtask
 
     assign ibuf_out_dat     = wal.f_dat;
 
@@ -311,4 +277,65 @@ module align(
     assign btq_out.hash     [N-1:0] = btq_wr_comp.hash      [N-1:0]; // FIXME
     assign btq_out.ghr_base [N-1:0] = btq_wr_comp.ghr_base  [N-1:0]; // FIXME
     endgenerate
+
+`ifdef DEBUG
+    task print_align;
+        $display("fyooooo. iss_any: %b, iss_idx: %d, raw.fmsk: %b, wal.fmsk: %b, req: %b", iss_any, iss_idx, raw.fmsk, wal.fmsk, ctl.req);
+
+        $display("rrb_prefix: %b, wal.indw_last: %b", rrb_prefix, wal.indw_last);
+        $display("shl.blk[0]: %b, shl.blk[1]: %b, shl.mid: %b",
+            shl.blk[0],
+            shl.blk[1],
+            shl.mid
+        );
+
+        $display("::f_wen_cnt: %d, %b", ibuf_out_wen_cnt, ibuf_out_wen_cnt);
+        $display("::btq_wen_cnt: %d", btq_out.en_cnt);
+        $display("::rrb_ren_cnt: %d", rrb_out_ren_cnt);
+        $display("::irq_ren_cnt %d", irq_out_ren_cnt);
+        for (int i = 0; i < 4; ++i) begin
+            $display("::irq_in[%d]: pc: %d, inst: %x",
+                i,
+                raw_pc[i],
+                irq_in_dat[i/2].blk.word_level[i%2]
+            );
+
+        end
+
+        $display("shit: %0d, %0d, %0d, %0d",
+            $countones(wal.indw_last[0:0]),
+            $countones(wal.indw_last[1:0]),
+            $countones(wal.indw_last[2:0]),
+            $countones(wal.indw_last[3:0])
+        );
+
+        $display("fuck: %0d, %0d, %0d, %0d",
+            ctl.req_res[0].rd_irq,
+            ctl.req_res[1].rd_irq,
+            ctl.req_res[2].rd_irq,
+            ctl.req_res[3].rd_irq
+        );
+
+        for (int i = 0; i < 4; ++i) begin
+            $display("::f_dat[%d]: pc: %d, inst: %x",
+                i,
+                ibuf_out_dat[i].PC,
+                ibuf_out_dat[i].inst
+            );
+            // $display("  req_res: ibuf: %b, btq: %b, rrb: %b, irq: %b",
+            //     ctl.req_res[i].wr_ibuf,
+            //     ctl.req_res[i].wr_btq,
+            //     ctl.req_res[i].rd_rrb,
+            //     ctl.req_res[i].rd_irq
+            // );
+            // $display("  ctl.sat: ibuf: %b, btq: %b, rrb: %b, irq: %b",
+            //     ctl.sat[i].wr_ibuf,
+            //     ctl.sat[i].wr_btq,
+            //     ctl.sat[i].rd_rrb,
+            //     ctl.sat[i].rd_irq
+            // );
+        end
+    endtask
+`endif
+
 endmodule

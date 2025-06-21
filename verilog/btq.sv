@@ -169,7 +169,7 @@ module btq #(
         .NUM_RPORTS(1),
         .NUM_WPORTS(NUM_RPORTS),
         .ENABLE_INTR_FWD(`FALSE),
-        .INSTANCE_ID(2)
+        .INSTANCE_ID(200)
     ) puq ( // predictor update queue
         .clock      (clock),
         .reset      (reset),
@@ -270,7 +270,7 @@ module btq #(
                 continue;
             end
 
-            $write("BTQ[%2d]: {pc: %d (fb_base: %d, off: %d)}, {rslv: %b take: %b, tgt: %x}, ghr_base: %2d, hash: %b  ",
+            $write("BTQ[%2d]: {pc: %d (fb_base: %d, off: %d)}, {rslv: %b take: %b, tgt: %x}, ghr_base: %2d, hash: %b  hit: %b, hit_slot: %b at: %b, md: %b, is_tail: %b ",
                 i,
                 state[i].PC,
                 state[i].PC - state[i].off,
@@ -279,7 +279,12 @@ module btq #(
                 state[i].take,
                 state[i].tgt,
                 state[i].ghr_base,
-                state[i].hash
+                state[i].hash,
+                state[i].hit,
+                state[i].hit_slot,
+                state[i].always_take,
+                state[i].md,
+                state[i].is_tail
             );
 
             if(|state[i].b1hot)

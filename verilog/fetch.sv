@@ -374,7 +374,7 @@ module dcf (
         .NUM_WPORTS(2),
         .FLUSH_MODE(FIFO_FLUSH_RESET),
         .ENABLE_INTR_FWD(`FALSE),
-        .INSTANCE_ID(2)
+        .INSTANCE_ID(72)
     ) rrb (
         .clock,
         .reset,
@@ -399,8 +399,6 @@ module dcf (
     `CNT_TYPE(4)        ibuf2align_rdy_scnt;
 
     align align0 (
-        .clock,
-        .reset,
         .rrb_in_dat     (rrb2align_dat),
         .rrb_out_ren_cnt(align2rrb_ren_cnt),
 
@@ -426,7 +424,7 @@ module dcf (
         .NUM_WPORTS(4),
         .FLUSH_MODE(FIFO_FLUSH_RESET),
         .ENABLE_INTR_FWD(`FALSE),
-        .INSTANCE_ID(2)
+        .INSTANCE_ID(48)
     ) insn_buf (
         .clock,
         .reset,
@@ -448,10 +446,10 @@ module dcf (
 
     always_ff @(posedge clock) begin
         if (reset || flush) begin
-            // iqq.vld <= '0;
-            // idat.vld<= '0;
-            iqq     <= '0;
-            idat    <= '0;
+            iqq.vld <= '0;
+            idat.vld<= '0;
+            // iqq     <= '0;
+            // idat    <= '0;
 
         end else begin
             iqq     <= iqq_n;
@@ -743,7 +741,7 @@ module fetch (
         .NUM_WPORTS(`N),
         .FLUSH_MODE(FIFO_FLUSH_RESET),
         .ENABLE_INTR_FWD(`FALSE),
-        .INSTANCE_ID(2)
+        .INSTANCE_ID(98)
     ) pc_buf (
         .clock,
         .reset,
