@@ -25,23 +25,14 @@ module align(
     localparam NUM_DW = 2;
     localparam NUM_W = NUM_DW*W_PER_DW;
     localparam N = `N;
-
-    // typedef struct packed {
-    //     DWADDR      dw;
-    //     logic       woff;   // in-dw word offset
-    //     logic [3:0] off;    // in-fb word offset
-    //     // logic       fmsk;
-    //     logic       is_end;
-        
-    //     INST        inst;
-    //     BRANCH_MD   md;
-    // } IRES_WORD;
-
     /*
     raw: not aligned
     bal: block aligned (compaction WITHIN blocks)
     wal: block AND word aligned (compaction across entire array) */
 
+    logic [NUM_W-1:0][3:0] raw_off;
+    WADDR [NUM_W-1:0] raw_pc;
+    BRANCH_MD [NUM_W-1:0] raw_md;
     struct packed {
         logic [NUM_W-1:0] brch, fmsk, is_end, indw_last;
         IF_ID_PACKET [NUM_W-1:0] f_dat;
@@ -52,12 +43,21 @@ module align(
         logic   mid;        // cross from b1 into b0?
     } shl; // shift lefts
 
+    logic [NUM_W:0][`CNT_SIZE(N)-1:0] brch_prefix_cnt;
+    compactor #(
+        .REQW(NUM_W),
+        .GNTW(N)
+    ) comp_brch (
+        .req        (raw.fmsk & raw.brch),
+        .lim_cnt    (),
+        .prefix_cnt (brch_prefix_cnt),
+        .gnt_cnt    ()
+    );
+
     generate
-    logic [NUM_W-1:0] brch_prefix;
     logic [NUM_DW-1:0][W_PER_DW-1:0] before_indw_last;
 
-    assign brch_prefix = (brch_prefix | (raw.fmsk & raw.brch)) << 1;
-        // ^^ prefix mechanism hardcoded for N=2
+       // ^^ prefix mechanism hardcoded for N=2
     assign raw.indw_last = raw.fmsk & ~before_indw_last;
 
     for (genvar b = 0; b < NUM_DW; ++b) begin
@@ -72,21 +72,17 @@ module align(
         for (genvar w = 0; w < W_PER_DW; ++w) begin
             localparam flat_idx = W_PER_DW*b+w;
 
+            assign raw_off  [flat_idx]  = cur.off[w];
+            assign raw_pc   [flat_idx]  = {cur.dw, w[0]};
+            assign raw_md   [flat_idx]  = cur.md[w];
             assign raw.brch [flat_idx]  = cur.md[w].brch;
             assign raw.fmsk [flat_idx]  = cur.fmsk[w];
             assign raw.is_end[flat_idx] = cur.is_end[w];
             assign raw.f_dat [flat_idx]  = '{
-                PC      : {cur.dw, w[0]},
+                PC      : raw_pc[flat_idx],
                 inst    : cur.blk.word_level[w],
-                btq_idx : btq_in.btq_idxs_n[brch_prefix[flat_idx]],
+                btq_idx : btq_in.btq_idxs_n[brch_prefix_cnt[flat_idx]],
                 ras_snap: '0 // FIXME
-
-                // dw      : cur.dw,
-                // woff    : w,
-                // off     : cur.off[w],
-                // is_end  : cur.is_end[w],
-                // dat     : cur.blk.word_level[w],
-                // md      : cur.md[w]
             };
         end
     end
@@ -99,11 +95,6 @@ module align(
             /* since each cache line contains at least 1 valid word,
             the cross (mid) shift is at most 1 */
     };
-
-    // struct packed {
-    //     logic [NUM_W-1:0] brch, fmsk, is_end, indw_last;
-    //     IF_ID_PACKET [NUM_W-1:0] f_dat;
-    // );
 
     for (genvar b = 0; b < NUM_DW; ++b) begin : block_align
         localparam lo = W_PER_DW*b;
@@ -177,13 +168,6 @@ module align(
         assign ctl.gnt[w] = &ctl.sat[w];
         assign ctl.rng[w] = ctl.req[w] & ctl.gnt[w]; // rng = request and grant
     end
-
-
-
-    // assign bal = '{
-    //     brch: raw.brch >> shl
-
-    // }
     endgenerate
 
     logic iss_any;
@@ -197,64 +181,85 @@ module align(
         end
     end
 
-    // generate
-    // if (iss_any) begin
     assign ibuf_out_wen_cnt = !iss_any ? 0 : ctl.req_res[iss_idx].wr_ibuf;
     assign btq_out.en_cnt   = !iss_any ? 0 : ctl.req_res[iss_idx].wr_btq;
     assign irq_out_ren_cnt  = !iss_any ? 0 : ctl.req_res[iss_idx].rd_irq;
-    assign rrb_out_wen_cnt  = !iss_any ? 0 : ctl.req_res[iss_idx].rd_rrb;
-
-    // end else begin
-    //     assign ibuf_out_wen_cnt = 0;
-    //     assign btq_out.en_cnt   = 0;
-    //     assign irq_out_ren_cnt  = 0;
-    //     assign rrb_out_wen_cnt  = 0;
-
-    // end
-    // endgenerate
+    assign rrb_out_ren_cnt  = !iss_any ? 0 : ctl.req_res[iss_idx].rd_rrb;
 
     assign ibuf_out_dat     = wal.f_dat;
 
+    logic [NUM_W-1:0] rrb_prefix;
+    assign rrb_prefix = (rrb_prefix | (raw.fmsk & raw.is_end)) << 1;
 
-    // always_comb begin
-    //     for (genvar w = 0; w < NUM_W; ++w) begin
-    //         logic   win_idx; // index into btq write window
-    //         logic   eq_end;
-    //         win_idx = brch_prefix[w];
-    //         eq_end  = ires_l1[w].off == r.off;
+    generate
+    struct packed {
+        logic   [NUM_W-1:0]        is_tail;
+        WADDR   [NUM_W-1:0]        PC;
+        logic   [NUM_W-1:0][3:0]   off;
+        logic   [NUM_W-1:0]        pred;
+        WADDR   [NUM_W-1:0]        pred_tgt;
+        logic   [NUM_W-1:0]        always_take;
+        FTB_MD1 [NUM_W-1:0]        md;
 
-    //         f_dat[i].btq_idx = btq_in.btq_idxs_n[win_idx];
+        logic   [NUM_W-1:0]        hit;
+        logic   [NUM_W-1:0]        hit_slot;
+        logic   [NUM_W-1:0][GHR_LEN-1:0] hash; // gshare hash index
+        logic   [NUM_W-1:0][`IDX_SIZE(GHR_BUF_SZ)-1:0] ghr_base;
+    } btq_wr_cand, btq_wr_comp;
 
-    //         btq_out.is_tail     [win_idx] = (r.pred_idx == 1) && eq_end;
-    //             /* FIXME (unsure): Probably not necessary to check for "off_geq_tail",
-    //             i.e. (r.pred_idx == 1) && (off_n[i] >= r.off), because branches after (>)
-    //             the tail slot would not even be in the same fetch block? */
-    //         btq_out.PC          [win_idx] = pc_n[i];
-    //         btq_out.off         [win_idx] = off_n[0][i];
-    //         btq_out.pred        [win_idx] = !r.ft && eq_end;
-    //         btq_out.pred_tgt    [win_idx] = r.base_n;
-    //         btq_out.always_take [win_idx] = !r.ft && eq_end ? r.always_take : 0;
-    //         btq_out.md          [win_idx] = md[i];
-    //             // TODO: fix RAS if pred ret but not ret (likewise for call)
+    for (genvar w = 0; w < NUM_W; ++w) begin
+        FTQ_ENTRY r;
+        logic is_end;
+        assign r = rrb_in_dat[rrb_prefix[w]];
+        assign is_end = raw.is_end[w];
+        assign btq_wr_cand.is_tail     [w] = (r.pred_idx == 1) && is_end;
+            /* FIXME (unsure): Probably not necessary to check for "off_geq_tail",
+            i.e. (r.pred_idx == 1) && (off_n[i] >= r.off), because branches after (>)
+            the tail slot would not even be in the same fetch block? */
+        assign btq_wr_cand.PC          [w] = raw_pc[w];
+        assign btq_wr_cand.off         [w] = raw_off[w];
+        assign btq_wr_cand.pred        [w] = !r.ft && is_end;
+        assign btq_wr_cand.pred_tgt    [w] = r.base_n;
+        assign btq_wr_cand.always_take [w] = !r.ft && is_end ? r.always_take : 0;
+        assign btq_wr_cand.md          [w] = raw_md[w];
+            // TODO: fix RAS if pred ret but not ret (likewise for call)
 
-    //         btq_out.hit         [win_idx] = r.hit;
-    //         btq_out.hit_slot    [win_idx] =
-    //                 (r.slot[0].vld && (r.slot[0].off == off_n[0][i]))
-    //             ||  (r.slot[1].vld && (r.slot[1].off == off_n[0][i]));
-    //         btq_out.hash        [win_idx] = '0; // FIXME
-    //         btq_out.ghr_base    [win_idx] = '0; // FIXME
-    //     end
-    // end
+        assign btq_wr_cand.hit         [w] = r.hit;
+        assign btq_wr_cand.hit_slot    [w] =
+                (r.slot[0].vld && (r.slot[0].off == raw_off[w]))
+            ||  (r.slot[1].vld && (r.slot[1].off == raw_off[w]));
+        assign btq_wr_cand.hash        [w] = '0; // FIXME
+        assign btq_wr_cand.ghr_base    [w] = '0; // FIXME
+    end
+    endgenerate
 
+    always_comb begin
+        btq_wr_comp = '0;
+        for (int w = 0; w < NUM_W; ++w) begin
+            int win_idx;
+            win_idx = brch_prefix_cnt[w];
 
-    logic [NUM_W:0][`CNT_SIZE(NUM_W)-1:0] words_prefix_cnt;
-    compactor #(
-        .REQW(NUM_W),
-        .GNTW(NUM_W)
-    ) comp_words (
-        .req        (),
-        .lim_cnt    (),
-        .prefix_cnt (),
-        .gnt_cnt    ()
-    );
+            btq_wr_comp.is_tail     [win_idx] = btq_wr_cand.is_tail [w];
+            btq_wr_comp.PC          [win_idx] = btq_wr_cand.PC      [w];
+            btq_wr_comp.off         [win_idx] = btq_wr_cand.off     [w];
+            btq_wr_comp.pred        [win_idx] = btq_wr_cand.pred    [w];
+            btq_wr_comp.pred_tgt    [win_idx] = btq_wr_cand.pred_tgt[w];
+            btq_wr_comp.hit         [win_idx] = btq_wr_cand.hit     [w];
+            btq_wr_comp.hit_slot    [win_idx] = btq_wr_cand.hit_slot[w];
+            btq_wr_comp.hash        [win_idx] = btq_wr_cand.hash    [w]; // FIXME
+            btq_wr_comp.ghr_base    [win_idx] = btq_wr_cand.ghr_base[w]; // FIXME
+        end
+    end
+
+    generate
+    assign btq_out.is_tail  [N-1:0] = btq_wr_comp.is_tail   [N-1:0];
+    assign btq_out.PC       [N-1:0] = btq_wr_comp.PC        [N-1:0];
+    assign btq_out.off      [N-1:0] = btq_wr_comp.off       [N-1:0];
+    assign btq_out.pred     [N-1:0] = btq_wr_comp.pred      [N-1:0];
+    assign btq_out.pred_tgt [N-1:0] = btq_wr_comp.pred_tgt  [N-1:0];
+    assign btq_out.hit      [N-1:0] = btq_wr_comp.hit       [N-1:0];
+    assign btq_out.hit_slot [N-1:0] = btq_wr_comp.hit_slot  [N-1:0];
+    assign btq_out.hash     [N-1:0] = btq_wr_comp.hash      [N-1:0]; // FIXME
+    assign btq_out.ghr_base [N-1:0] = btq_wr_comp.ghr_base  [N-1:0]; // FIXME
+    endgenerate
 endmodule
