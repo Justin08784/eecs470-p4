@@ -556,78 +556,75 @@ module pc_gen #(
                 assert(!(|is_end_flat[e]) | $onehot(is_end_flat[e])) else $fatal;
         end
 
-        if (!reset && `FALSE) begin
-        // if (!reset) begin
-
-            $display("\n\n\nFOGET: base: %d, off: %d, inbuf: %b", cur.base, cur.off, cur.inbuf);
-            $display("come the fuckon: %b %d,",
-                adv_bidx[iss_idx] & ftq1_vld,
-                1 + adv_bidx[iss_idx] & ftq1_vld
-            );
-
-            $display("ctl.rdy_res: {ixq= %b, rr_buf %b}",
-                ctl.rdy_res.ixq,
-                ctl.rdy_res.rr_buf
-            );
-
-            $display("ctl.req_rr_buf_actual: %b, %b",
-                ctl.req_rr_buf_actual[0],
-                ctl.req_rr_buf_actual[1]
-            );
-
-            $display("ctl.req[0]: vld=%b {ixq= %b, rr_buf %b} gnt=%b",
-                ctl.req_vld[0],
-                ctl.req_res[0].ixq,
-                ctl.req_res[0].rr_buf,
-                ctl.gnt[0]
-            );
-
-            $display("ctl.req[1]: vld=%b {ixq= %b, rr_buf %b} gnt=%b",
-                ctl.req_vld[1],
-                ctl.req_res[1].ixq,
-                ctl.req_res[1].rr_buf,
-                ctl.gnt[1]
-            );
-
-            $display("base_n[0]: %d, base_n[1]: %d", base_n[0], base_n[1]);
-            $display("iss_idx: %b, bidx[adv: %b, aft: %b], blk[av: %b, aft: %b]",
-                iss_idx,
-                adv_bidx[iss_idx],
-                aft_bidx[iss_idx],
-                adv_blk[iss_idx],
-                aft_blk[iss_idx]
-            );
-            $display("0-bidx: [adv: %b, aft: %b], 1-bidx: [adv: %b, aft: %b]",
-                adv_bidx[0],
-                aft_bidx[0],
-                adv_bidx[1],
-                aft_bidx[1]
-            );
-            $display("0-blk:  [adv: %b, aft: %b], 1-blk:  [adv: %b, aft: %b]",
-                adv_blk[0],
-                aft_blk[0],
-                adv_blk[1],
-                aft_blk[1]
-            );
-            for (int i = 0; i < 4; ++i) begin
-                logic x, y;
-                x = i / 2;
-                y = i % 2;
-                $display("pos_blk_off[%d][%d]: %d",
-                    x,
-                    y,
-                    pos_blk_off[x][y]
-                );
-            end
-            print_pc_gen;
-        end
     end
 
+`ifdef DEBUG
     task print_pc_gen;
         // $display("ftq_in_dat[*].off: [%d, %d]",
         //     ftq_in_dat[0].off,
         //     ftq_in_dat[1].off,
         // );
+
+        $display("\n\n\nFOGET: base: %d, off: %d, inbuf: %b", cur.base, cur.off, cur.inbuf);
+        $display("come the fuckon: %b %d,",
+            adv_bidx[iss_idx] & ftq1_vld,
+            1 + adv_bidx[iss_idx] & ftq1_vld
+        );
+
+        $display("ctl.rdy_res: {ixq= %b, rr_buf %b}",
+            ctl.rdy_res.ixq,
+            ctl.rdy_res.rr_buf
+        );
+
+        $display("ctl.req_rr_buf_actual: %b, %b",
+            ctl.req_rr_buf_actual[0],
+            ctl.req_rr_buf_actual[1]
+        );
+
+        $display("ctl.req[0]: vld=%b {ixq= %b, rr_buf %b} gnt=%b",
+            ctl.req_vld[0],
+            ctl.req_res[0].ixq,
+            ctl.req_res[0].rr_buf,
+            ctl.gnt[0]
+        );
+
+        $display("ctl.req[1]: vld=%b {ixq= %b, rr_buf %b} gnt=%b",
+            ctl.req_vld[1],
+            ctl.req_res[1].ixq,
+            ctl.req_res[1].rr_buf,
+            ctl.gnt[1]
+        );
+
+        $display("base_n[0]: %d, base_n[1]: %d", base_n[0], base_n[1]);
+        $display("iss_idx: %b, bidx[adv: %b, aft: %b], blk[av: %b, aft: %b]",
+            iss_idx,
+            adv_bidx[iss_idx],
+            aft_bidx[iss_idx],
+            adv_blk[iss_idx],
+            aft_blk[iss_idx]
+        );
+        $display("0-bidx: [adv: %b, aft: %b], 1-bidx: [adv: %b, aft: %b]",
+            adv_bidx[0],
+            aft_bidx[0],
+            adv_bidx[1],
+            aft_bidx[1]
+        );
+        $display("0-blk:  [adv: %b, aft: %b], 1-blk:  [adv: %b, aft: %b]",
+            adv_blk[0],
+            aft_blk[0],
+            adv_blk[1],
+            aft_blk[1]
+        );
+        for (int i = 0; i < 4; ++i) begin
+            logic x, y;
+            x = i / 2;
+            y = i % 2;
+            $display("pos_blk_off[%d][%d]: %d",
+                x,
+                y,
+                pos_blk_off[x][y]
+            );
+        end
 
         $display("(e0, b0) = (%b, %b), (e1, b1) = (%b, %b)", e0, b0, e1, b1);
         $display("merge_l0: %b, merge_l1: %b", merge_l0, merge_l1);
@@ -780,5 +777,6 @@ module pc_gen #(
         // $display("o_dws [%d, %d]", dut.o_dws[0], dut.o_dws[1]);
 
     endtask
+`endif
 
 endmodule
