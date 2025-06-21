@@ -287,6 +287,8 @@ module align(
             btq_wr_comp.off         [win_idx] = btq_wr_cand.off     [w];
             btq_wr_comp.pred        [win_idx] = btq_wr_cand.pred    [w];
             btq_wr_comp.pred_tgt    [win_idx] = btq_wr_cand.pred_tgt[w];
+            btq_wr_comp.always_take [win_idx] = btq_wr_cand.always_take[w];
+            btq_wr_comp.md          [win_idx] = btq_wr_cand.md      [w];
             btq_wr_comp.hit         [win_idx] = btq_wr_cand.hit     [w];
             btq_wr_comp.hit_slot    [win_idx] = btq_wr_cand.hit_slot[w];
             btq_wr_comp.hash        [win_idx] = btq_wr_cand.hash    [w]; // FIXME
@@ -300,6 +302,8 @@ module align(
     assign btq_out.off      [N-1:0] = btq_wr_comp.off       [N-1:0];
     assign btq_out.pred     [N-1:0] = btq_wr_comp.pred      [N-1:0];
     assign btq_out.pred_tgt [N-1:0] = btq_wr_comp.pred_tgt  [N-1:0];
+    assign btq_out.always_take[N-1:0]=btq_wr_comp.always_take[N-1:0];
+    assign btq_out.md       [N-1:0] = btq_wr_comp.md        [N-1:0];
     assign btq_out.hit      [N-1:0] = btq_wr_comp.hit       [N-1:0];
     assign btq_out.hit_slot [N-1:0] = btq_wr_comp.hit_slot  [N-1:0];
     assign btq_out.hash     [N-1:0] = btq_wr_comp.hash      [N-1:0]; // FIXME
