@@ -6,8 +6,8 @@ Free List
 ================================================
 */
 module free_list #(parameter 
-    N=`N,
-    localparam DEPTH = `ROB_SZ,
+    N=N,
+    localparam DEPTH = ROB_SZ,
     localparam WIDTH = $bits(PHYS_REG_IDX)
 ) (
     input clock, reset, flush,
@@ -78,12 +78,12 @@ module free_list #(parameter
     the FIFO (you still have to do it *somewhere*).
     */
     struct packed {
-        `CNT_TYPE(`N)  r_en_cnt;
-        PHYS_REG_IDX [`N-1:0] t_old;
+        `CNT_TYPE(N)  r_en_cnt;
+        PHYS_REG_IDX [N-1:0] t_old;
     } r_in;
 
-    `CNT_TYPE(`N) free_cnt;
-    PHYS_REG_IDX [`N-1:0] told_packed;
+    `CNT_TYPE(N) free_cnt;
+    PHYS_REG_IDX [N-1:0] told_packed;
     always_comb begin
         free_cnt    = 0;
         told_packed = '0;
@@ -103,8 +103,8 @@ module free_list #(parameter
         .INSTANCE_ID(0),
         .DEPTH(DEPTH),
         .WIDTH(WIDTH),
-        .NUM_RPORTS(`N),
-        .NUM_WPORTS(`N),
+        .NUM_RPORTS(N),
+        .NUM_WPORTS(N),
         .FLUSH_MODE(FIFO_FLUSH_SNAP_HEAD),
         .ENABLE_INTR_FWD(`FALSE),
         .RESET_STATE(RESET_STATE)
@@ -131,7 +131,7 @@ module free_list #(parameter
     );
 
     general_snaps #(
-        .WIDTH(`IDX_SIZE(`ROB_SZ))
+        .WIDTH(`IDX_SIZE(ROB_SZ))
     ) fl_heads0 (
         .clock,
 
@@ -156,12 +156,12 @@ module free_list #(parameter
 
 `ifdef DEBUG
     task print_fl();
-        logic [`ROB_SZ-1:0] fl_vld;
+        logic [ROB_SZ-1:0] fl_vld;
         logic dup;
         `IDX_TYPE(DEPTH) head, tail;
         logic [DEPTH-1:0][WIDTH-1:0]    state;
         `CNT_TYPE(DEPTH) used;
-        localparam half_sz = `ROB_SZ / 2;
+        localparam half_sz = ROB_SZ / 2;
 
         head = lst.head;
         tail = lst.tail;
@@ -203,7 +203,7 @@ module free_list #(parameter
         $display("");
         //             rnme_snap_out.fl_head[i] = free_in.fl_heads_n[free_prefix_cnt[i]];
         // $display()
-        // for (int i = 0; i < `N; ++i)
+        // for (int i = 0; i < N; ++i)
         //     $display()
         for (int i = 0; i < BMASK_LEN; ++i) begin
             `IDX_TYPE(DEPTH) head;

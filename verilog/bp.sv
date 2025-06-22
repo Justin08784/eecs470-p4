@@ -19,27 +19,27 @@ module bp #(
     // puq updates
     input   puq2fetch i_upd
 );
-    logic [`N-1:0] brch, cond, call, ret;
+    logic [N-1:0] brch, cond, call, ret;
     assign brch = f_in.brch;
     assign cond = f_in.cond;
     assign call = f_in.call;
     assign ret  = f_in.ret;
 
-    WADDR [`N:0] PC_n;
+    WADDR [N:0] PC_n;
     assign PC_n = f_in.PC_n;
 
-    logic [`N-1:0] f_en;
+    logic [N-1:0] f_en;
     assign f_en = f_in.f_en;
 
-    logic [`N-1:0] btb_hit;
-    WADDR [`N-1:0] btb_tgt;
+    logic [N-1:0] btb_hit;
+    WADDR [N-1:0] btb_tgt;
     btb #(
-        .QUERY_SZ(`N)
+        .QUERY_SZ(N)
     ) btb0 (
         .clock,
         .reset,
 
-        .i_qry(PC_n[`N-1:0]),
+        .i_qry(PC_n[N-1:0]),
         .o_vld(btb_hit),
         .o_tgt(btb_tgt),
 
@@ -47,10 +47,10 @@ module bp #(
     );
 
     // stop fetching beyond the first predicted taken branch
-    logic [`N-1:0] raw_take, raw_take_comp;
-    logic [`N-1:0] cond_take, sel_pred, cond_take_comp_gshare, cond_take_comp_bim;
+    logic [N-1:0] raw_take, raw_take_comp;
+    logic [N-1:0] cond_take, sel_pred, cond_take_comp_gshare, cond_take_comp_bim;
     logic take_any;
-    `IDX_TYPE(`N) take_idx;
+    `IDX_TYPE(N) take_idx;
     logic empty; // ras empty?
 
     assign raw_take =
@@ -60,7 +60,7 @@ module bp #(
     | (btb_hit & ((brch & ~cond) | (cond & cond_take)));
 
     ffs #(
-        .VECW(`N)
+        .VECW(N)
     ) ff_take (
         .i_vec(raw_take),
         .o_vld(take_any),
@@ -94,13 +94,13 @@ module bp #(
         .empty
     );
 
-    WADDR [`N-1:0] brPC_n;
-    logic [`N-1:0][GHR_LEN-1:0] ghr_vec;
+    WADDR [N-1:0] brPC_n;
+    logic [N-1:0][GHR_LEN-1:0] ghr_vec;
     always_comb begin
         brPC_n = '0;
         raw_take_comp = '0;
         cond_take = '0;
-        for (int i = 0; i < `N; ++i) begin
+        for (int i = 0; i < N; ++i) begin
             brPC_n[f_in.brch_prefix_cnt[i]] = PC_n[i];
             raw_take_comp[f_in.brch_prefix_cnt[i]] = raw_take[i];
             cond_take[i] = sel_pred[f_in.brch_prefix_cnt[i]]
@@ -109,13 +109,13 @@ module bp #(
         end
     end
 
-    `CNT_TYPE(`N) f_brch_cnt;
+    `CNT_TYPE(N) f_brch_cnt;
     assign f_brch_cnt = f_in.brch_prefix_cnt[f_in.f_cnt];
     ghr #(
         .DEPTH      (GHR_BUF_SZ),
-        .NUM_FU_BRU (`NUM_FU_BRU),
+        .NUM_FU_BRU (NUM_FU_BRU),
         .GHR_LEN    (GHR_LEN),
-        .N          (`N)
+        .N          (N)
     ) ghr0 (
         .clock,
         .reset,
@@ -138,7 +138,7 @@ module bp #(
 
     chooser #(
         .GHR_LEN    (GHR_LEN),
-        .N          (`N)
+        .N          (N)
     ) chooser0 (
         .clock,
         .reset,
@@ -152,7 +152,7 @@ module bp #(
     assign f_out.pred_bim = cond_take_comp_bim;
     bim #(
         .GHR_LEN    (GHR_LEN),
-        .N          (`N)
+        .N          (N)
     ) bim0 (
         .clock,
         .reset,
@@ -166,7 +166,7 @@ module bp #(
     assign f_out.pred_gshare = cond_take_comp_gshare;
     gshare #(
         .GHR_LEN    (GHR_LEN),
-        .N          (`N)
+        .N          (N)
     ) gshare0 (
         .clock,
         .reset,
@@ -180,10 +180,10 @@ module bp #(
     );
 
     assign f_out.take   = raw_take;
-    assign f_out.lim_cnt= take_any ? take_idx + `UCAST_FIT(1) : `N;
+    assign f_out.lim_cnt= take_any ? take_idx + `UCAST_FIT(1) : N;
 
     generate
-    for (genvar i = 0; i < `N; ++i) begin
+    for (genvar i = 0; i < N; ++i) begin
         assign f_out.tgt[i] =
             ret[i] && !empty    ? ras_tgt :
             btb_hit[i]          ? btb_tgt[i]: PC_n[i+1];

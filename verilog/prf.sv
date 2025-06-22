@@ -2,9 +2,9 @@
 
 module prf #(
     parameter WIDTH = $bits(DATA),
-    parameter DEPTH = `PHYS_REG_SZ_R10K,
+    parameter DEPTH = PHYS_REG_SZ_R10K,
     parameter N     = 2,
-    parameter NUM_RPORTS = `NUM_FU_TOTAL
+    parameter NUM_RPORTS = NUM_FU_TOTAL
 ) (
 `ifdef DEBUG
     output logic [DEPTH-1:0][WIDTH-1:0] dbg_file,

@@ -1,7 +1,7 @@
 `include "sys_defs.svh"
 
 module dispatch #(parameter 
-    N=`N
+    N=N
 ) (
     input   clock,
     input   reset,
@@ -39,16 +39,16 @@ module dispatch #(parameter
     output  dispatch2map_table map_out
 );
 
-    logic [`PHYS_REG_SZ_R10K-1:0] cpl_lst;
+    logic [PHYS_REG_SZ_R10K-1:0] cpl_lst;
 
     /* >> ==== 1. Rename stage ==== >> */
     // Gate by availability
-    logic [`N-1:0] has_dst;
-    logic [`N:0][`CNT_SIZE(`N)-1:0] free_prefix_cnt;
-    `CNT_TYPE(`N) free_lim_cnt;
+    logic [N-1:0] has_dst;
+    logic [N:0][`CNT_SIZE(N)-1:0] free_prefix_cnt;
+    `CNT_TYPE(N) free_lim_cnt;
     compactor #(
-        .REQW(`N),
-        .GNTW(`N)
+        .REQW(N),
+        .GNTW(N)
     ) comp_free (
         .req        (has_dst),
         .lim_cnt    (free_in.free_rdy_scnt),
@@ -64,14 +64,14 @@ module dispatch #(parameter
     `CNT_TYPE(N) rename_vld_scnt;
     `CNT_TYPE(N) rename_rdy_scnt;
     `CNT_TYPE(N) rename_en_cnt;
-    logic [`N-1:0]      rename_en;
+    logic [N-1:0]      rename_en;
 
-    logic [`N-1:0] rnme_is_brch;
-    logic [`N:0][`CNT_SIZE(`N)-1:0] rnme_snap_prefix_cnt;
-    `CNT_TYPE(`N) rnme_snap_lim_cnt;
+    logic [N-1:0] rnme_is_brch;
+    logic [N:0][`CNT_SIZE(N)-1:0] rnme_snap_prefix_cnt;
+    `CNT_TYPE(N) rnme_snap_lim_cnt;
     compactor #(
-        .REQW(`N),
-        .GNTW(`N)
+        .REQW(N),
+        .GNTW(N)
     ) comp_rnme_snap (
         .req        (rnme_is_brch),
         .lim_cnt    (bman_in.snap_rdy_scnt),
@@ -98,7 +98,7 @@ module dispatch #(parameter
         map_out = '0;
         map_out.en_cnt  = rename_en_cnt;
 
-        for (int i = 0; i < `N; i++) begin
+        for (int i = 0; i < N; i++) begin
             //handling dest register
             map_out.ts[i]       = has_dst[i] ? free_in.d_ts[free_prefix_cnt[i]] : '0;
             map_out.dsts[i]     = d_in.d_dat[i].has_dst
@@ -110,11 +110,11 @@ module dispatch #(parameter
         end
     end
 
-    RENAME_COMMIT_PKT [`N-1:0] rename2commit;
-    BMASK             [`N-1:0] rename2commit_bmask;
+    RENAME_COMMIT_PKT [N-1:0] rename2commit;
+    BMASK             [N-1:0] rename2commit_bmask;
     always_comb begin
         rename2commit = '0;
-        for (int i = 0; i < `N; ++i) begin
+        for (int i = 0; i < N; ++i) begin
             rename2commit[i] = '{
 `ifdef DEBUG
                 id          : d_in.d_dat[i].id,
@@ -152,8 +152,8 @@ module dispatch #(parameter
             rename2commit_bmask[i] = bman_in.bmask_n[rnme_snap_prefix_cnt[i]];
         end
 
-        for (int i = 0; i < `N; ++i) begin
-            `CNT_TYPE(`BTQ_SZ) btq_carry;
+        for (int i = 0; i < N; ++i) begin
+            `CNT_TYPE(BTQ_SZ) btq_carry;
 
             rnme_snap_out.snap_en[i] = rnme_is_brch[i] && (i < rename_en_cnt);
             rnme_snap_out.b1hot_n[i] = bman_in.b1hot_n[rnme_snap_prefix_cnt[i]]; // only valid if snap_en
@@ -162,7 +162,7 @@ module dispatch #(parameter
                 // head immediately AFTER the branch. The next free_list head is incremented IFF we consume a preg.
 
             btq_carry = d_in.d_dat[i].btq_idx + `UCAST_FIT(1);
-            rnme_snap_out.btq_tail[i]= btq_carry >= `UCAST_FIT(`BTQ_SZ) ? 0 : btq_carry;
+            rnme_snap_out.btq_tail[i]= btq_carry >= `UCAST_FIT(BTQ_SZ) ? 0 : btq_carry;
             rnme_snap_out.ras_snap[i]= d_in.d_dat[i].ras_snap;
 `ifdef DEBUG
             rnme_snap_out.btq_idx[i] = d_in.d_dat[i].btq_idx;
@@ -172,20 +172,20 @@ module dispatch #(parameter
 
     /*
     NOTE:
-    To save area, we can size this buffer to 2*`N and use
+    To save area, we can size this buffer to 2*N and use
     combinational backpressure:
     rename_en_cnt = `MIN(rename_rdy_scnt + commit_en_cnt, rename_en_cnt);
     */
-    RENAME_COMMIT_PKT [`N-1:0]  commit_in;
-    BMASK [`N-1:0] commit_in_bmask;
+    RENAME_COMMIT_PKT [N-1:0]  commit_in;
+    BMASK [N-1:0] commit_in_bmask;
     `CNT_TYPE(N) commit_en_cnt;
-    logic [`N-1:0]      commit_en;
+    logic [N-1:0]      commit_en;
     fifo #(
         .INSTANCE_ID(40),
-        .DEPTH(2*`N),
+        .DEPTH(2*N),
         .WIDTH($bits(RENAME_COMMIT_PKT)),
-        .NUM_RPORTS(`N),
-        .NUM_WPORTS(`N),
+        .NUM_RPORTS(N),
+        .NUM_WPORTS(N),
         .FLUSH_MODE(FIFO_FLUSH_RESET),
         .ENABLE_INTR_FWD(`FALSE)
     ) rename_buf (
@@ -207,13 +207,13 @@ module dispatch #(parameter
 
     /* >> ==== 2. Commit Stage ==== >> */
 
-    logic [`N-1:0] comm_is_brch;
+    logic [N-1:0] comm_is_brch;
     // handle rs output 
     always_comb begin
-        logic [`FU_IDX_NUM-1:0][`N-1:0] en_by_fu;
-        logic [`N-1:0] commit_en;
-        logic [`N-1:0] rd_src1s;
-        logic [`N-1:0] rd_src2s;
+        logic [FU_IDX_NUM-1:0][N-1:0] en_by_fu;
+        logic [N-1:0] commit_en;
+        logic [N-1:0] rd_src1s;
+        logic [N-1:0] rd_src2s;
 
         foreach (comm_is_brch[n])
             comm_is_brch[n] = commit_in[n].fu_idx == FU_BRU;
@@ -229,7 +229,7 @@ module dispatch #(parameter
         foreach (en_by_fu[f, n])
             commit_en[n] |= en_by_fu[f][n];
         // enforce in-order dispatch
-        for (int n = 1; n < `N; ++n)
+        for (int n = 1; n < N; ++n)
             commit_en[n] &= commit_en[n - 1];
 
         commit_en_cnt       = $countones(commit_en);
@@ -238,7 +238,7 @@ module dispatch #(parameter
         end
 
         rs_out.dat    = '0;
-        for (int i = 0; i < `N; i++) begin
+        for (int i = 0; i < N; i++) begin
             rs_out.dat[i] = '{
 `ifdef DEBUG
                 id          : commit_in[i].id,
@@ -282,7 +282,7 @@ module dispatch #(parameter
                 || commit_in[i].fu_idx == FU_STR;
             rs_out.dat[i].t1_rdy = !rd_src1s[i];
             rs_out.dat[i].t2_rdy = !rd_src2s[i];
-            for (int c = 0; c < `N; ++c) begin
+            for (int c = 0; c < N; ++c) begin
                 rs_out.dat[i].t1_rdy |= ctag_in.en[c] & (ctag_in.ts[c] == commit_in[i].t1);
                 rs_out.dat[i].t2_rdy |= ctag_in.en[c] & (ctag_in.ts[c] == commit_in[i].t2);
             end
@@ -302,7 +302,7 @@ module dispatch #(parameter
     always_comb begin
         rob_out.d_en_cnt = commit_en_cnt;
 
-        for (int i = 0; i < `N; i++) begin
+        for (int i = 0; i < N; i++) begin
             //handling src tags
             rob_out.fu_idx[i]   = commit_in[i].fu_idx;
             rob_out.tag[i]      = commit_in[i].t;
@@ -325,7 +325,7 @@ module dispatch #(parameter
                 if (map_out.dsts[i] != `ZERO_REG)
                     cpl_lst[map_out.ts[i]] <= 0;
             end
-            for (int c = 0; c < `N; ++c) begin
+            for (int c = 0; c < N; ++c) begin
                 if (ctag_in.en[c])
                     cpl_lst[ctag_in.ts[c]] <= 1;
             end
@@ -351,16 +351,16 @@ module dispatch #(parameter
         $display("free_in.free_rdy_scnt: %d [%d, %d]",  free_in.free_rdy_scnt, free_in.d_ts[0], free_in.d_ts[1]);
 
         $display("");
-        for (int i = 0; i < `N+1; ++i) begin
+        for (int i = 0; i < N+1; ++i) begin
             $display("prefix_cnt[%2d]: rnme_snap: %2d free: %2d",
             i, rnme_snap_prefix_cnt[i], free_prefix_cnt[i]);
         end
 
-        for (int i = 0; i < `N+1; ++i) begin
+        for (int i = 0; i < N+1; ++i) begin
             $display("free_in.fl_heads_n[%2d]: %2d", i, free_in.fl_heads_n[i]);
         end
 
-        for (int i = 0; i < `N; ++i) begin
+        for (int i = 0; i < N; ++i) begin
             $display("rnme_snap_out[%2d]: en: %b, b1hot_n: %b, fl_head: %2d, btq_tail: %2d",
                 i,
                 rnme_snap_out.snap_en[i],

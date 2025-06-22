@@ -22,7 +22,7 @@ module retire (
     output retire_final retire_exec
 );
     // decode retire operations
-    RETIRE_OP [`N-1:0] ret;
+    RETIRE_OP [N-1:0] ret;
     always_comb begin
         foreach (ret[i]) begin
             unique case (rob_in.entries[i].fu_idx)
@@ -40,7 +40,7 @@ module retire (
     end
 
     // general retire
-    `CNT_TYPE(`N) r_en_cnt;
+    `CNT_TYPE(N) r_en_cnt;
 
     always_comb begin
         r_en_cnt    = 0;
@@ -63,13 +63,13 @@ module retire (
     end
 
     always_comb begin
-        PHYS_REG_IDX [`N-1:0] tag;
-        PHYS_REG_IDX [`N-1:0] t_old;
-        REG_IDX      [`N-1:0] dst;
-        logic        [`N-1:0] halt;
-        logic        [`N-1:0] illegal;
+        PHYS_REG_IDX [N-1:0] tag;
+        PHYS_REG_IDX [N-1:0] t_old;
+        REG_IDX      [N-1:0] dst;
+        logic        [N-1:0] halt;
+        logic        [N-1:0] illegal;
 
-        for (int i = 0; i < `N; ++i) begin
+        for (int i = 0; i < N; ++i) begin
             tag[i]     = rob_in.entries[i].tag;
             t_old[i]   = rob_in.entries[i].t_old;
             dst[i]     = rob_in.entries[i].dst;

@@ -5,7 +5,7 @@
 `include "test/rob_sva.svh"
 
 module rob_test();
-    localparam ROB_SZ = `ROB_SZ;  // num elements
+    localparam ROB_SZ = ROB_SZ;  // num elements
     localparam NUM_RPORTS = 2;
     localparam NUM_DPORTS = 2;
     localparam NUM_CPORTS = 2;
@@ -50,8 +50,8 @@ module rob_test();
 
     always @(negedge clock) begin
         foreach (d_in.tag[i]) begin
-            d_in.tag[i]     = $urandom_range(`PHYS_REG_SZ_R10K-1, 1);
-            d_in.t_old[i]   = $urandom_range(`PHYS_REG_SZ_R10K-1, 1);
+            d_in.tag[i]     = $urandom_range(PHYS_REG_SZ_R10K-1, 1);
+            d_in.t_old[i]   = $urandom_range(PHYS_REG_SZ_R10K-1, 1);
         end
     end
 

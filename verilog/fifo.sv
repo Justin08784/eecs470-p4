@@ -1,7 +1,7 @@
 `include "sys_defs.svh"
 
 module fifo #(
-    parameter int DEPTH=`ROB_SZ,            // num elements
+    parameter int DEPTH=ROB_SZ,            // num elements
     parameter int WIDTH=$bits(PHYS_REG_IDX),// num bits per element
     type FIFO_STATE = struct packed {
         logic [DEPTH-1:0][WIDTH-1:0]state;
@@ -9,8 +9,8 @@ module fifo #(
         `CNT_TYPE(DEPTH) used;
     },
     parameter int FLUSH_MODE=FIFO_FLUSH_RESET,
-    parameter int NUM_RPORTS=`N, // also cap for used_scnt
-    parameter int NUM_WPORTS=`N, // also cap for free_scnt
+    parameter int NUM_RPORTS=N, // also cap for used_scnt
+    parameter int NUM_WPORTS=N, // also cap for free_scnt
 
     /* UPDATE: Prevew has been made the default mode! The consumer may read as
     many as they wish from rd_data. If they consume some rd_data they are obliged to

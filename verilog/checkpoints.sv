@@ -10,9 +10,9 @@ module general_snaps #(
     output  logic [WIDTH-1:0] rdat,
 
     // write line
-    input   logic [`N-1:0] wen,
-    input   BMASK [`N-1:0] wmsk,
-    input   logic [`N-1:0][WIDTH-1:0] wdat
+    input   logic [N-1:0] wen,
+    input   BMASK [N-1:0] wmsk,
+    input   logic [N-1:0][WIDTH-1:0] wdat
 );
     logic [BMASK_LEN-1:0][WIDTH-1:0] snaps;
 
@@ -25,7 +25,7 @@ module general_snaps #(
     end
 
     always_ff @(posedge clock) begin
-        for (int n = 0; n < `N; ++n) begin
+        for (int n = 0; n < N; ++n) begin
             if (!wen[n])
                 continue;
             for (int i = 0; i < BMASK_LEN; ++i) begin
@@ -44,19 +44,19 @@ module mt_snaps #(
 
     // read
     input   BMASK rmsk,
-    output  PHYS_REG_IDX [`NUM_ARCH_REG-1:0] rdat,
+    output  PHYS_REG_IDX [NUM_ARCH_REG-1:0] rdat,
 
     // retire updates
-    input   `CNT_TYPE(`N)        uen_cnt,
-    input   REG_IDX     [`N-1:0] udst,
-    input   PHYS_REG_IDX[`N-1:0] ut,
+    input   `CNT_TYPE(N)        uen_cnt,
+    input   REG_IDX     [N-1:0] udst,
+    input   PHYS_REG_IDX[N-1:0] ut,
 
     // write line
-    input   logic [`N-1:0] wen,
-    input   BMASK [`N-1:0] wmsk,
-    input   PHYS_REG_IDX [`N-1:0][`NUM_ARCH_REG-1:0] wdat
+    input   logic [N-1:0] wen,
+    input   BMASK [N-1:0] wmsk,
+    input   PHYS_REG_IDX [N-1:0][NUM_ARCH_REG-1:0] wdat
 );
-    PHYS_REG_IDX [BMASK_LEN-1:0][`NUM_ARCH_REG-1:0] snaps;
+    PHYS_REG_IDX [BMASK_LEN-1:0][NUM_ARCH_REG-1:0] snaps;
 
     always_comb begin
         rdat = '0;
@@ -67,7 +67,7 @@ module mt_snaps #(
     end
 
     always_ff @(posedge clock) begin
-        for (int n = 0; n < `N; ++n) begin
+        for (int n = 0; n < N; ++n) begin
             if (!wen[n])
                 continue;
             for (int i = 0; i < BMASK_LEN; ++i) begin
@@ -99,12 +99,12 @@ module branch_manager (
 );
     BMASK bmask_reg;
     
-    logic [`N-1:0]  b1hot_rdy_n;
-    BMASK [`N-1:0]  b1hot_n;
-    BMASK [`N:0]    bmask_n, cum_b1hot_n;
+    logic [N-1:0]  b1hot_rdy_n;
+    BMASK [N-1:0]  b1hot_n;
+    BMASK [N:0]    bmask_n, cum_b1hot_n;
     psel_gen #(
         .WIDTH  (BMASK_LEN),
-        .REQS   (`N)
+        .REQS   (N)
     ) sel_b1hot (
         .req    (~bmask_reg),
         .gnt_bus(b1hot_n)
@@ -113,7 +113,7 @@ module branch_manager (
     generate
     assign cum_b1hot_n[0]   = '0; 
     assign bmask_n    [0]   = bmask_reg & ~clmsk;
-    for (genvar n = 0; n < `N; ++n) begin       
+    for (genvar n = 0; n < N; ++n) begin       
         assign cum_b1hot_n[n+1] = cum_b1hot_n[n] | b1hot_n[n];
         assign bmask_n    [n+1] = bmask_n[0] | cum_b1hot_n[n+1];
         assign b1hot_rdy_n[n]   = |b1hot_n[n];
@@ -123,7 +123,7 @@ module branch_manager (
     always_comb begin
         dis_out.b1hot_n = b1hot_n;
         dis_out.bmask_n = bmask_n;
-        dis_out.snap_rdy_scnt = `N;
+        dis_out.snap_rdy_scnt = N;
         
         foreach (b1hot_rdy_n[rev]) begin
             if (!b1hot_rdy_n[rev])
@@ -172,7 +172,7 @@ module branch_manager (
         $display("  %3d | >> Branch manager >>", $time);
         // $display("r_in.btq_rdy_scnt: %d",   btq_in.btq_rdy_scnt);
         // $display("btq_in.btq_rdy_scnt: %d",   btq_in.btq_rdy_scnt);
-        for (int i = 0; i < `N+1; ++i) begin
+        for (int i = 0; i < N+1; ++i) begin
             $display("bmask_n[%2d]: %b, b1hot_n: %b, cum_b1hot_n: %b",
                 i,
                 bmask_n[i],

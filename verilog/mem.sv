@@ -35,9 +35,9 @@ module mem (
     wire [31:3] block_addr = proc2mem_addr[31:3];
     wire [2:0] byte_addr = proc2mem_addr[2:0];
 
-    logic [63:0] loaded_data     [`NUM_MEM_TAGS:1];
-    logic [15:0] cycles_left     [`NUM_MEM_TAGS:1];
-    logic        waiting_for_bus [`NUM_MEM_TAGS:1];
+    logic [63:0] loaded_data     [NUM_MEM_TAGS:1];
+    logic [15:0] cycles_left     [NUM_MEM_TAGS:1];
+    logic        waiting_for_bus [NUM_MEM_TAGS:1];
 
     logic acquire_tag, bus_filled, valid_address;
 
@@ -90,7 +90,7 @@ module mem (
         acquire_tag = valid_address && (proc2mem_command == MEM_LOAD ||
                                         proc2mem_command == MEM_STORE);
 
-        for (int i = 1; i <= `NUM_MEM_TAGS; i = i+1) begin
+        for (int i = 1; i <= NUM_MEM_TAGS; i = i+1) begin
             if (cycles_left[i] > 16'd0) begin
                 cycles_left[i] = cycles_left[i] - 16'd1;
 
@@ -129,7 +129,7 @@ module mem (
         mem2proc_transaction_tag = 4'd0;
         mem2proc_data_tag = 4'd0;
         mem2proc_data     = 64'bx;
-        for (int i = 1; i <= `NUM_MEM_TAGS; i = i+1) begin
+        for (int i = 1; i <= NUM_MEM_TAGS; i = i+1) begin
             loaded_data[i] = 64'bx;
             cycles_left[i] = 16'd0;
             waiting_for_bus[i] = 1'b0;

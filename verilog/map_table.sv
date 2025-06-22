@@ -12,11 +12,11 @@ Map Table
 // src1s[j], src2s[j] may potentially be dsts[i]. i.e. there is a serial dependency
 // TODO: implement internal forwarding ala fifo.sv?
 module map_table #(parameter 
-    N=`N
+    N=N
 ) (
 `ifdef DEBUG
     input struct packed {
-        logic [`PHYS_REG_SZ_R10K-1:0][$bits(DATA)-1:0] file;
+        logic [PHYS_REG_SZ_R10K-1:0][$bits(DATA)-1:0] file;
     } dbg_prf,
 `endif
     input  clock,
@@ -29,7 +29,7 @@ module map_table #(parameter
     input  dispatch2map_table   d_in,
     output map_table2dispatch   d_out
 );
-    PHYS_REG_IDX [`NUM_ARCH_REG-1:0] entries;
+    PHYS_REG_IDX [NUM_ARCH_REG-1:0] entries;
     /*
     NOTE: We have N intermediate stages, not N-1!!
     0: current
@@ -40,15 +40,15 @@ module map_table #(parameter
     can you simply sommehow "checkpoint" the desired intermediate state as you
     incrementally update a single entries_n.
     */
-    PHYS_REG_IDX [`N:0][`NUM_ARCH_REG-1:0] entries_n;
-    PHYS_REG_IDX [`NUM_ARCH_REG-1:0] snap;
+    PHYS_REG_IDX [N:0][NUM_ARCH_REG-1:0] entries_n;
+    PHYS_REG_IDX [NUM_ARCH_REG-1:0] snap;
 
     always_comb begin
         entries_n[0] = entries;
         d_out = '0;
 
         // handle renames
-        for (int i = 0; i < `N; ++i) begin
+        for (int i = 0; i < N; ++i) begin
             entries_n[i + 1] = entries_n[i];
             /*
             Idea: how about we always map ZERO_REG -> preg #0, cpl=1,
@@ -86,7 +86,7 @@ module map_table #(parameter
 
         .wen    (snap_in.snap_en),
         .wmsk   (snap_in.b1hot_n),
-        .wdat   (entries_n[`N:1])
+        .wdat   (entries_n[N:1])
             // Q: Why "+ has_dst[i]"? A: Remember, we want to snapshot the map_table state
             // immediately AFTER the branch. For entries_n[i+1] is the state after rename of insn i.
     );
@@ -94,10 +94,10 @@ module map_table #(parameter
     always_ff @(posedge clock) begin
         if (reset) begin
             entries[`ZERO_REG] <= '0;
-            for (int r = 1; r < `NUM_ARCH_REG; ++r)
+            for (int r = 1; r < NUM_ARCH_REG; ++r)
                 entries[r] <= r;
         end else if (flush) begin
-            for (int r = 1; r < `NUM_ARCH_REG; ++r)
+            for (int r = 1; r < NUM_ARCH_REG; ++r)
                 entries[r] <= snap[r];
         end else begin
             entries <= entries_n[d_in.en_cnt];
@@ -133,10 +133,10 @@ module map_table #(parameter
             d_out.t1s[1],
             d_out.t2s[1]
         );
-        for (int r = 0; r < `NUM_ARCH_REG; ++r) begin
+        for (int r = 0; r < NUM_ARCH_REG; ++r) begin
             logic duplicate;
             duplicate = 0;
-            for (int rp = 0; rp < `NUM_ARCH_REG; ++rp) begin
+            for (int rp = 0; rp < NUM_ARCH_REG; ++rp) begin
                 if (rp != r && entries[rp] == entries[r]) begin
                     duplicate = 1;
                     break;

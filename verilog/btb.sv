@@ -1,7 +1,7 @@
 `include "sys_defs.svh"
 
 module btb #(parameter
-    QUERY_SZ=`N,
+    QUERY_SZ=N,
     NUM_LINES=256
 ) (
     input clock,

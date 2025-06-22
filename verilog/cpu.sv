@@ -202,8 +202,8 @@ module cpu (
 
     /* >> ==== ROB ==== >> */
     rob #(
-        .ROB_SZ(`ROB_SZ),
-        .N(`N)
+        .ROB_SZ(ROB_SZ),
+        .N(N)
     ) rob0 (
         .clock,
         .reset,
@@ -248,12 +248,12 @@ module cpu (
     arch_map2map_table am_2_mt;
 `ifdef DEBUG
     struct packed {
-        logic [`PHYS_REG_SZ_R10K-1:0][$bits(DATA)-1:0] file;
+        logic [PHYS_REG_SZ_R10K-1:0][$bits(DATA)-1:0] file;
     } dbg_prf;
 `endif
 
     map_table #(
-        .N(`N)
+        .N(N)
     ) map_table0 (
 `ifdef DEBUG
         .dbg_prf,
@@ -275,7 +275,7 @@ module cpu (
     it may be useful to instantiate this in cpu_test.sv for debugging.
     */
     // arch_map #(
-    //     .N(`N)
+    //     .N(N)
     // ) arch_map0 (
     //     .clock,
     //     .reset,
@@ -288,7 +288,7 @@ module cpu (
 
     /* >> ==== Free list ==== >> */
     free_list #(
-        .N(`N)
+        .N(N)
     ) free_list0 (
         .clock,
         .reset,
@@ -303,7 +303,7 @@ module cpu (
 
     /* >> ==== Physical register file (PRF) ==== >> */
     prf #(
-        .N(`N)
+        .N(N)
     ) prf0 (
 `ifdef DEBUG
         .dbg_file   (dbg_prf.file),

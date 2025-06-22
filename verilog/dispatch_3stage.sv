@@ -1,7 +1,7 @@
 `include "sys_defs.svh"
 
 module dispatch #(parameter 
-    N=`N
+    N=N
 ) (
     input   clock,
     input   reset,
@@ -39,7 +39,7 @@ module dispatch #(parameter
     output  dispatch2map_table map_out
 );
 
-    logic [`PHYS_REG_SZ_R10K-1:0] cpl_lst;
+    logic [PHYS_REG_SZ_R10K-1:0] cpl_lst;
 
     /* >> ==== 1. Alloc Stage ==== >> */
     `CNT_TYPE(N) alloc_en_cnt;
@@ -47,11 +47,11 @@ module dispatch #(parameter
     `CNT_TYPE(N) alloc_vld_scnt;
 
     // Gate by availability
-    logic [`N-1:0] has_dst;
-    logic [`N:0][`CNT_SIZE(N)-1:0] free_prefix_cnt;
-    `CNT_TYPE(`N) free_lim_cnt;
+    logic [N-1:0] has_dst;
+    logic [N:0][`CNT_SIZE(N)-1:0] free_prefix_cnt;
+    `CNT_TYPE(N) free_lim_cnt;
     compactor #(
-        .WIDTH(`N)
+        .WIDTH(N)
     ) comp_free (
         .req        (has_dst),
         .rdy        (free_in.free_rdy_scnt),
@@ -74,12 +74,12 @@ module dispatch #(parameter
         free_out.free_d_en_cnt = free_prefix_cnt[alloc_en_cnt];
     end
 
-    ALLOC_RENAME_PKT [`N-1:0] tmp_decode2alloc;
+    ALLOC_RENAME_PKT [N-1:0] tmp_decode2alloc;
     always_comb begin
         int rd_idx;
 
         tmp_decode2alloc = '0;
-        for (int i = 0; i < `N; ++i) begin
+        for (int i = 0; i < N; ++i) begin
             // logic [$bits(ALLOC_RENAME_PKT)-$bits(ID_RESULT)-1:0] diff;
             // diff = '0;
             // tmp_decode2alloc[i] = ALLOC_RENAME_PKT'({d_in.d_dat[i], diff});
@@ -111,17 +111,17 @@ module dispatch #(parameter
         end
     end
 
-    ALLOC_RENAME_PKT [`N-1:0]  rename_in;
+    ALLOC_RENAME_PKT [N-1:0]  rename_in;
     `CNT_TYPE(N) rename_vld_scnt;
     `CNT_TYPE(N) rename_rdy_scnt;
     `CNT_TYPE(N) rename_en_cnt;
-    logic [`N-1:0]      rename_en;
+    logic [N-1:0]      rename_en;
     fifo #(
         .INSTANCE_ID(39),
-        .DEPTH(2*`N),
+        .DEPTH(2*N),
         .WIDTH($bits(ALLOC_RENAME_PKT)),
-        .NUM_RPORTS(`N),
-        .NUM_WPORTS(`N),
+        .NUM_RPORTS(N),
+        .NUM_WPORTS(N),
         .FLUSH_MODE(FIFO_FLUSH_RESET),
         .ENABLE_INTR_FWD(`FALSE)
     ) alloc_buf (
@@ -139,11 +139,11 @@ module dispatch #(parameter
 
     /* >> ==== 2. Rename Stage ==== >> */
 
-    logic [`N-1:0] rnme_is_brch;
-    logic [`N:0][`CNT_SIZE(`N)-1:0] rnme_snap_prefix_cnt;
-    `CNT_TYPE(`N) rnme_snap_lim_cnt;
+    logic [N-1:0] rnme_is_brch;
+    logic [N:0][`CNT_SIZE(N)-1:0] rnme_snap_prefix_cnt;
+    `CNT_TYPE(N) rnme_snap_lim_cnt;
     compactor #(
-        .WIDTH(`N)
+        .WIDTH(N)
     ) comp_rnme_snap (
         .req        (rnme_is_brch),
         .rdy        (bman_in.snap_rdy_scnt),
@@ -178,14 +178,14 @@ module dispatch #(parameter
         end
     end
 
-    RENAME_COMMIT_PKT [`N-1:0] tmp_alloc2rename;
-    BMASK             [`N-1:0] tmp_alloc2rename_bmask;
+    RENAME_COMMIT_PKT [N-1:0] tmp_alloc2rename;
+    BMASK             [N-1:0] tmp_alloc2rename_bmask;
     always_comb begin
-        logic [`N-1:0] rd_src1s;
-        logic [`N-1:0] rd_src2s;
+        logic [N-1:0] rd_src1s;
+        logic [N-1:0] rd_src2s;
 
         tmp_alloc2rename = '0;
-        for (int i = 0; i < `N; ++i) begin
+        for (int i = 0; i < N; ++i) begin
             // logic [$bits(RENAME_COMMIT_PKT)-$bits(ALLOC_RENAME_PKT)-1:0] diff;
             // diff = '0;
             // tmp_alloc2rename[i] = RENAME_COMMIT_PKT'({rename_in[i], diff});
@@ -238,8 +238,8 @@ module dispatch #(parameter
             tmp_alloc2rename[i].t2_rdy  = !rd_src2s[i];
         end
 
-        for (int i = 0; i < `N; ++i) begin
-            `CNT_TYPE(`BTQ_SZ) btq_carry;
+        for (int i = 0; i < N; ++i) begin
+            `CNT_TYPE(BTQ_SZ) btq_carry;
 
             rnme_snap_out.snap_en[i] = rnme_is_brch[i] && (i < rename_en_cnt);
             rnme_snap_out.b1hot_n[i] = bman_in.b1hot_n[rnme_snap_prefix_cnt[i]]; // only valid if snap_en
@@ -249,20 +249,20 @@ module dispatch #(parameter
             rnme_snap_out.btq_idx[i] = rename_in[i].btq_idx;
 `endif
             btq_carry = d_in.d_dat[i].btq_idx + `UCAST_FIT(1);
-            rnme_snap_out.btq_tail[i]= btq_carry >= `UCAST_FIT(`BTQ_SZ) ? 0 : btq_carry;
+            rnme_snap_out.btq_tail[i]= btq_carry >= `UCAST_FIT(BTQ_SZ) ? 0 : btq_carry;
         end
     end
 
-    RENAME_COMMIT_PKT [`N-1:0]  commit_in;
-    BMASK [`N-1:0] commit_in_bmask;
+    RENAME_COMMIT_PKT [N-1:0]  commit_in;
+    BMASK [N-1:0] commit_in_bmask;
     `CNT_TYPE(N) commit_en_cnt;
-    logic [`N-1:0]      commit_en;
+    logic [N-1:0]      commit_en;
     fifo #(
         .INSTANCE_ID(40),
-        .DEPTH(2*`N),
+        .DEPTH(2*N),
         .WIDTH($bits(RENAME_COMMIT_PKT)),
-        .NUM_RPORTS(`N),
-        .NUM_WPORTS(`N),
+        .NUM_RPORTS(N),
+        .NUM_WPORTS(N),
         .FLUSH_MODE(FIFO_FLUSH_RESET),
         .ENABLE_INTR_FWD(`FALSE)
     ) rename_buf (
@@ -284,10 +284,10 @@ module dispatch #(parameter
 
     /* >> ==== 3. Commit Stage ==== >> */
 
-    logic [`N-1:0] comm_is_brch;
-    logic [`N:0][`CNT_SIZE(`N)-1:0] comm_snap_prefix_cnt;
+    logic [N-1:0] comm_is_brch;
+    logic [N:0][`CNT_SIZE(N)-1:0] comm_snap_prefix_cnt;
     compactor #(
-        .WIDTH(`N)
+        .WIDTH(N)
     ) comp_comm_snap (
         .req        (comm_is_brch),
         .rdy        (),
@@ -297,8 +297,8 @@ module dispatch #(parameter
 
     // handle rs output 
     always_comb begin
-        logic [`FU_IDX_NUM-1:0][`N-1:0] en_by_fu;
-        logic [`N-1:0] commit_en;
+        logic [FU_IDX_NUM-1:0][N-1:0] en_by_fu;
+        logic [N-1:0] commit_en;
 
         foreach (comm_is_brch[n])
             comm_is_brch[n] = commit_in[n].fu_idx == FU_BRU;
@@ -313,7 +313,7 @@ module dispatch #(parameter
         foreach (en_by_fu[f, n])
             commit_en[n] |= en_by_fu[f][n];
         // enforce in-order dispatch
-        for (int n = 1; n < `N; ++n)
+        for (int n = 1; n < N; ++n)
             commit_en[n] &= commit_en[n - 1];
 
         commit_en_cnt       = $countones(commit_en);
@@ -322,7 +322,7 @@ module dispatch #(parameter
         end
 
         rs_out.dat    = '0;
-        for (int i = 0; i < `N; i++) begin
+        for (int i = 0; i < N; i++) begin
             // logic [$bits(COMMIT_RS_PKT)-$bits(RENAME_COMMIT_PKT)-1:0] diff;
             // diff = '0;
             // rs_out.dat[i] = COMMIT_RS_PKT'({commit_in[i], diff});
@@ -361,7 +361,7 @@ module dispatch #(parameter
             };
 
             rs_out.dat[i].rob_idx = rob_in.rob_idxs_n[i];
-            for (int c = 0; c < `N; ++c) begin
+            for (int c = 0; c < N; ++c) begin
                 rs_out.dat[i].t1_rdy |= ctag_in.en[c] & (ctag_in.ts[c] == commit_in[i].t1);
                 rs_out.dat[i].t2_rdy |= ctag_in.en[c] & (ctag_in.ts[c] == commit_in[i].t2);
             end
@@ -381,7 +381,7 @@ module dispatch #(parameter
     always_comb begin
         rob_out.d_en_cnt = commit_en_cnt;
 
-        for (int i = 0; i < `N; i++) begin
+        for (int i = 0; i < N; i++) begin
             //handling src tags
             rob_out.fu_idx[i]   = commit_in[i].fu_idx;
             rob_out.tag[i]      = commit_in[i].t;
@@ -404,7 +404,7 @@ module dispatch #(parameter
                 if (map_out.dsts[i] != `ZERO_REG)
                     cpl_lst[map_out.ts[i]] <= 0;
             end
-            for (int c = 0; c < `N; ++c) begin
+            for (int c = 0; c < N; ++c) begin
                 if (ctag_in.en[c])
                     cpl_lst[ctag_in.ts[c]] <= 1;
             end

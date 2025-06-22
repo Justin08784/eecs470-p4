@@ -8,7 +8,7 @@ typedef logic [4:0]  REG_IDX;
 typedef logic [BMASK_LEN-1:0] BMASK;
 
 // ROB stuff
-`define FU_IDX_NUM 5
+parameter int FU_IDX_NUM = 5;
 typedef enum logic [2:0] {
     FU_ALU  = 'd0,
     FU_MUL = 'd1,
@@ -17,9 +17,9 @@ typedef enum logic [2:0] {
     FU_BRU  = 'd4
 } FU_IDX;
 
-typedef `IDX_TYPE(`BTQ_SZ) BTQ_IDX;
-typedef `IDX_TYPE(`ROB_SZ) ROB_IDX;
-typedef `IDX_TYPE(`LSQ_SZ) LSQ_IDX;
+typedef `IDX_TYPE(BTQ_SZ) BTQ_IDX;
+typedef `IDX_TYPE(ROB_SZ) ROB_IDX;
+typedef `IDX_TYPE(LSQ_SZ) LSQ_IDX;
 
 
 ///////////////////////////////
@@ -38,7 +38,7 @@ NOTE: We will use PHYS_REG_IDX = 0 as a sentinel (to denote "no register" / "is 
 While we lose out on a single physical register, this greatly simplifies logic 
 (the alternative is to pipe around 'is valid src_reg' bit signals everywhere).
 */
-typedef `IDX_TYPE(`PHYS_REG_SZ_R10K) PHYS_REG_IDX;
+typedef `IDX_TYPE(PHYS_REG_SZ_R10K) PHYS_REG_IDX;
 
 // the zero register
 // In RISC-V, any read of this register returns zero and any writes are thrown away

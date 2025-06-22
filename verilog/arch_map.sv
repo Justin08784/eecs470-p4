@@ -4,7 +4,7 @@ Architectural Map
 ================================================
 */
 module arch_map #(parameter 
-    N=`N
+    N=N
 ) (
     input clock, reset, flush,
 
@@ -14,7 +14,7 @@ module arch_map #(parameter
     // retire
     input  retire_final r_in
 );
-    PHYS_REG_IDX [`NUM_ARCH_REG-1:0] entries, entries_n;
+    PHYS_REG_IDX [NUM_ARCH_REG-1:0] entries, entries_n;
     assign mt_out.entries = entries;
 
     always_comb begin
@@ -30,7 +30,7 @@ module arch_map #(parameter
     always_ff @(posedge clock) begin
         if (reset) begin
             entries[`ZERO_REG] <= '0;
-            for (int r = 1; r < `NUM_ARCH_REG; ++r)
+            for (int r = 1; r < NUM_ARCH_REG; ++r)
                 entries[r] <= r;
         end else if (!flush) begin
             entries <= entries_n;

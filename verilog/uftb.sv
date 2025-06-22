@@ -17,7 +17,7 @@ typedef struct packed {
     logic   cond;   // is a conditional branch?
 
     logic   [GHR_LEN-1:0] hash; // gshare hash index
-    logic   [`N-1:0][`IDX_SIZE(GHR_BUF_SZ)-1:0] ghr_base;
+    logic   [N-1:0][`IDX_SIZE(GHR_BUF_SZ)-1:0] ghr_base;
     logic   pred_bim;
     logic   pred_gshare;
 

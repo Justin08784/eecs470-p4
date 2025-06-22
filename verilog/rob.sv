@@ -1,8 +1,8 @@
 `include "sys_defs.svh"
 
 module rob #(
-    parameter ROB_SZ = `ROB_SZ,  // num elements
-    parameter N=`N
+    parameter ROB_SZ = ROB_SZ,  // num elements
+    parameter N=N
 ) (
     input clock, reset, flush,
     input  BMASK clmsk,
@@ -58,7 +58,7 @@ module rob #(
     );
 
     general_snaps #(
-        .WIDTH(`IDX_SIZE(`ROB_SZ))
+        .WIDTH(`IDX_SIZE(ROB_SZ))
     ) rob_tails (
         .clock,
 
@@ -125,12 +125,12 @@ module rob #(
     
 `ifdef DEBUG
     task print_rob;
-        logic [`ROB_SZ-1:0] rob_vld;
+        logic [ROB_SZ-1:0] rob_vld;
         logic t_dup, told_dup;
-        localparam half_sz = `ROB_SZ / 2;
+        localparam half_sz = ROB_SZ / 2;
 
         $display("  | >> ROB >>");
-        for (int i = 0; i < `N; ++i) begin
+        for (int i = 0; i < N; ++i) begin
             $display("snap_in[%1d]: en: %b, b1hot_n: %b, rob_tail: %2d",
                 i,
                 snap_in.snap_en[i],
@@ -149,7 +149,7 @@ module rob #(
 
         $display("r_out: vld_cnt: %d", r_out.r_vld_cnt);
         $display("head: %2d, tail: %2d, used: %2d", head, tail, used);
-        for (int i = 0; i < `N; ++i) begin
+        for (int i = 0; i < N; ++i) begin
             string name;
             get_fu_name(r_out.entries[i].fu_idx, name);
             $display("r_out[%d]: tag: %d, t_old: %d, dst: %d, fu_idx: %s, halt: %d, illegal: %d",
@@ -165,14 +165,14 @@ module rob #(
 
         rob_vld = '0;
         for (int cnt = 0; cnt < used; ++cnt)
-            rob_vld[(head + cnt) % `ROB_SZ] = 1;
+            rob_vld[(head + cnt) % ROB_SZ] = 1;
 
         for (int i = 0; i < half_sz; ++i) begin
             string ls, rs, name;
 
             t_dup = 0;
             told_dup = 0;
-            for (int j = 0; j < `ROB_SZ; ++j) begin
+            for (int j = 0; j < ROB_SZ; ++j) begin
                 if (!rob_vld[j] || i == j)
                     continue;
                 if (state[i].tag == state[j].tag && state[i].tag != '0)

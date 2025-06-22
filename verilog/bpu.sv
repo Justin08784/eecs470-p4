@@ -187,7 +187,7 @@ module bpu (
 
     // ghr #(
     //     .DEPTH      (GHR_BUF_SZ),
-    //     .NUM_FU_BRU (`NUM_FU_BRU),
+    //     .NUM_FU_BRU (NUM_FU_BRU),
     //     .GHR_LEN    (GHR_LEN),
     //     .N          (NUM_BR_SLOTS) // up to 2 branches per FTB_ENTRY
     // ) ghr0 (

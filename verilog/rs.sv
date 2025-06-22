@@ -36,7 +36,7 @@ module rs_part #(
     type PAYLOAD=_RS_PAYLOAD_STUB,
     type ENTRY  =_RS_ENTRY_STUB,
     parameter   FU=FU_ALU,
-    parameter   N=`N,
+    parameter   N=N,
     parameter   PART_SZ=1,
     parameter   NUM_FU=1,
     parameter   ISS_CDB_ARB=`FALSE
@@ -97,8 +97,8 @@ module rs_part #(
     endgenerate
 
     // SECTION: cdb completion
-    logic [`N-1:0][PART_SZ-1:0] to_t1_rdy_per_cpl;
-    logic [`N-1:0][PART_SZ-1:0] to_t2_rdy_per_cpl;
+    logic [N-1:0][PART_SZ-1:0] to_t1_rdy_per_cpl;
+    logic [N-1:0][PART_SZ-1:0] to_t2_rdy_per_cpl;
     logic [PART_SZ-1:0] to_t1_rdy;
     logic [PART_SZ-1:0] to_t2_rdy;
     always_comb begin
@@ -295,12 +295,12 @@ reads.)
 */
 
 module rs #(parameter 
-    N=`N,
-    FU_IDX_NUM=`FU_IDX_NUM,
-    NUM_FU_ALU=`NUM_FU_ALU,
-    NUM_FU_MUL=`NUM_FU_MUL,
-    NUM_FU_LOD=`NUM_FU_LOD,
-    NUM_FU_STR=`NUM_FU_STR
+    N=N,
+    FU_IDX_NUM=FU_IDX_NUM,
+    NUM_FU_ALU=NUM_FU_ALU,
+    NUM_FU_MUL=NUM_FU_MUL,
+    NUM_FU_LOD=NUM_FU_LOD,
+    NUM_FU_STR=NUM_FU_STR
 ) (
     input clock,
     input reset,
@@ -327,7 +327,7 @@ module rs #(parameter
     // complete (CDB)
     input execute2complete_tag  ctag_in
 );
-    RS_ALU_PAYLOAD [`N-1:0] tmp_dat_alu;
+    RS_ALU_PAYLOAD [N-1:0] tmp_dat_alu;
     always_comb begin
         foreach (d_in.dat[i]) begin
             tmp_dat_alu[i] = '{
@@ -353,7 +353,7 @@ module rs #(parameter
         end
     end
 
-    RS_MUL_PAYLOAD [`N-1:0] tmp_dat_mult;
+    RS_MUL_PAYLOAD [N-1:0] tmp_dat_mult;
     always_comb begin
         foreach (d_in.dat[i]) begin
             tmp_dat_mult[i] = '{
@@ -375,7 +375,7 @@ module rs #(parameter
         end
     end
 
-    RS_BRU_PAYLOAD [`N-1:0] tmp_dat_bru;
+    RS_BRU_PAYLOAD [N-1:0] tmp_dat_bru;
     always_comb begin
         foreach (d_in.dat[i]) begin
             tmp_dat_bru[i] = '{
@@ -409,7 +409,7 @@ module rs #(parameter
         .PAYLOAD    (RS_ALU_PAYLOAD),
         .ENTRY      (RS_ALU_ENTRY),
         .PART_SZ    (RS_ALU_SZ),
-        .NUM_FU     (`NUM_FU_ALU),
+        .NUM_FU     (NUM_FU_ALU),
         .ISS_CDB_ARB(`TRUE)
     ) rs_alu (
         .clock  (clock),
@@ -437,7 +437,7 @@ module rs #(parameter
         .PAYLOAD    (RS_MUL_PAYLOAD),
         .ENTRY      (RS_MULT_ENTRY),
         .PART_SZ    (RS_MUL_SZ),
-        .NUM_FU     (`NUM_FU_MUL),
+        .NUM_FU     (NUM_FU_MUL),
         .ISS_CDB_ARB(`FALSE)
     ) rs_mul (
         .clock  (clock),
@@ -465,7 +465,7 @@ module rs #(parameter
         .PAYLOAD    (RS_BRU_PAYLOAD),
         .ENTRY      (RS_BRU_ENTRY),
         .PART_SZ    (RS_BRU_SZ),
-        .NUM_FU     (`NUM_FU_BRU),
+        .NUM_FU     (NUM_FU_BRU),
         .ISS_CDB_ARB(`TRUE)
     ) rs_bru (
         .clock  (clock),
@@ -577,7 +577,7 @@ module rs #(parameter
     task automatic print_rs;
         $display("  | >> RS >>");
         $display("flush: %b, clmsk: %b", flush, clmsk);
-        for (int n = 0; n < `N; ++n)
+        for (int n = 0; n < N; ++n)
             print_commit_rs_pkt(d_in.dat[n]);
         $display("      >> RS_ALU");
         print_rs_alu(rs_alu.entries);

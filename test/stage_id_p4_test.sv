@@ -2,7 +2,7 @@
 `include "test/stage_id_p4_sva.svh"
 
 module stage_id_p4_test();
-    localparam DEPTH = `ROB_SZ;
+    localparam DEPTH = ROB_SZ;
     localparam WIDTH = $bits(PHYS_REG_IDX);
     localparam NUM_RPORTS = 2;
     localparam NUM_WPORTS = 2;

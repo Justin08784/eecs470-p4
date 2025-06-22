@@ -134,7 +134,7 @@ module testbench;
     MEM_SIZE    proc2mem_size;
 
     COMMIT_PACKET commit;
-    ADDR [`N-1:0] PC_reg;
+    ADDR [N-1:0] PC_reg;
     EXCEPTION_CODE error_status = NO_ERROR;
 
     DBG_dcache      dbg_dcache;
@@ -192,12 +192,12 @@ module testbench;
     );
 
     always_comb begin
-        for (int i = 0; i < `N; ++i)
+        for (int i = 0; i < N; ++i)
             mem2f.data[i] = memory.unified_memory[f2mem.PCdws[i]];
     end
 
     generate
-    for (genvar blk = 0; blk < `N; ++blk) begin : gen_predecs
+    for (genvar blk = 0; blk < N; ++blk) begin : gen_predecs
         for (genvar woff = 0; woff < 2; ++woff) begin
             predecoder predec_i (
                 .inst   (mem2f.data[blk].word_level[woff]),
@@ -303,7 +303,7 @@ module testbench;
 `ifndef SYNTH
             // Add new dispatches to rob
             // TODO: Should this be cleared on branch mispredict?
-            for (int i = 0, int cur_idx = 0; i < `N; ++i) begin
+            for (int i = 0, int cur_idx = 0; i < N; ++i) begin
                 if (i >= verisimpleV.rob0.d_in.d_en_cnt)
                     break;
                 cur_idx = verisimpleV.rob0.comm_idxs_n[i];
@@ -426,7 +426,7 @@ module testbench;
         end
 
         // V1: original
-        // for (int n = 0; n < `N; ++n) begin
+        // for (int n = 0; n < N; ++n) begin
         //     if (committed_insts[n].valid) begin
         //         // update the count for every committed instruction
         //         instr_count = instr_count + 1;

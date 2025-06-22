@@ -243,25 +243,25 @@ module stage_id_p4 (
 
 
     // assign d_out.d_dat[0].valid = if_id_reg[0].valid;
-    `CNT_TYPE(`N) used_scnt;
-    `CNT_TYPE(`N) free_scnt;
-    `CNT_TYPE(`N) prvw_vld_cnt;
+    `CNT_TYPE(N) used_scnt;
+    `CNT_TYPE(N) free_scnt;
+    `CNT_TYPE(N) prvw_vld_cnt;
     assign f_out.d_rdy_cnt  = free_scnt;
     assign d_out.d_vld_scnt = used_scnt;
 
-    logic [`N-1:0] tmp_has_dst;
+    logic [N-1:0] tmp_has_dst;
 `ifdef DEBUG
     int insn_id;
 `endif
 
-    ID_RESULT [`N-1:0] tmp;
-    ID_RESULT [`N-1:0] wr_fifo;
+    ID_RESULT [N-1:0] tmp;
+    ID_RESULT [N-1:0] wr_fifo;
     // number of legal fetched insns until the 1st illegal insn
-    `CNT_TYPE(`N) non_illegal_cnt; // TODO: do we need stall fetch when we get an illegal?
+    `CNT_TYPE(N) non_illegal_cnt; // TODO: do we need stall fetch when we get an illegal?
 
     // Instantiate the instruction decoder
     generate
-    for (genvar i = 0; i < `N; ++i) begin : gen_decoders
+    for (genvar i = 0; i < N; ++i) begin : gen_decoders
         decoder_p4 decoder_i (
             // Inputs
             .inst  (f_in.f_dat[i].inst),
@@ -282,7 +282,7 @@ module stage_id_p4 (
 
     always_comb begin
         wr_fifo = '0;
-        for (int unsigned i = 0; i < `N; ++i) begin
+        for (int unsigned i = 0; i < N; ++i) begin
             wr_fifo[i] = '{
 `ifdef DEBUG
                 id          : insn_id + i,
@@ -307,7 +307,7 @@ module stage_id_p4 (
         end
 
         non_illegal_cnt = '0;
-        for (int unsigned i = 0; i < `N; ++i, ++non_illegal_cnt) begin
+        for (int unsigned i = 0; i < N; ++i, ++non_illegal_cnt) begin
             if (wr_fifo[i].illegal)
                 break;
         end
@@ -320,7 +320,7 @@ module stage_id_p4 (
 
     A: To decouple fetch from dispatch and avoid critical path dependencies.
 
-    Let’s assume the FIFO depth is only `N` (issue width), and its initial state is:
+    Let’s assume the FIFO depth is only N` (issue width), and its initial state is:
     [insn0, -]
 
     Cycle 1:
@@ -349,16 +349,16 @@ module stage_id_p4 (
     **Better Solution:**
     Increase the FIFO depth to 2× issue width.
 
-    - This gives fetch enough buffer room to write aggressively (up to `N` entries per cycle).
-    - It guarantees that dispatch cannot underflow the FIFO, even when it pulls `N` entries every cycle.
+    - This gives fetch enough buffer room to write aggressively (up to N` entries per cycle).
+    - It guarantees that dispatch cannot underflow the FIFO, even when it pulls N` entries every cycle.
     - It breaks the dependency between fetch and dispatch, improving timing.
     */
     fifo #(
         .INSTANCE_ID(1),
-        .DEPTH(2*`N),
+        .DEPTH(2*N),
         .WIDTH($bits(ID_RESULT)),
-        .NUM_RPORTS(`N),
-        .NUM_WPORTS(`N),
+        .NUM_RPORTS(N),
+        .NUM_WPORTS(N),
         .FLUSH_MODE(FIFO_FLUSH_RESET),
         /* Disable internal forwarding just to make it 100% clear to the synthesizer
         that there are no dependencies between fetch and dispatch (across decode).*/

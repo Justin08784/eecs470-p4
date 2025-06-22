@@ -2,9 +2,9 @@
 
 module ghr #(
     parameter DEPTH     = 32, // must be geq than 2*GHR_LEN and a power of 2
-    parameter NUM_FU_BRU= `NUM_FU_BRU,
+    parameter NUM_FU_BRU= NUM_FU_BRU,
     parameter GHR_LEN   = GHR_LEN,
-    parameter N         = `N,
+    parameter N         = N,
     type VEC = logic [DEPTH-1:0],
     type PTR = logic [$clog2(DEPTH)-1:0]
 ) (
@@ -181,7 +181,7 @@ module ghr #(
 
         // runtime assertions
         if (!reset) begin
-            logic [`N-1:0] en_pred;
+            logic [N-1:0] en_pred;
             assert(!flush || !rslv[flush_base]) else
                 $fatal("ghr: flush base %2d is already resolved", flush_base);
             // assert(!flush || hist[flush_base] != flush_take) else

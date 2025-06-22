@@ -2,8 +2,8 @@
 
 /* Branch target queue */
 module btq #(
-    parameter BTQ_SZ = `BTQ_SZ,  // num elements
-    parameter N=`N
+    parameter BTQ_SZ = BTQ_SZ,  // num elements
+    parameter N=N
 ) (
     input  clock,
     input  reset,
@@ -24,7 +24,7 @@ module btq #(
 );
     localparam NUM_FPORTS = N; // fetch ports (in-order)
     localparam NUM_RPORTS = N; // retire ports (in-order)
-    localparam NUM_CPORTS = `NUM_FU_BRU; // complete ports (*OUT-OF-ORDER*)
+    localparam NUM_CPORTS = NUM_FU_BRU; // complete ports (*OUT-OF-ORDER*)
 
     BTQ_ENTRY [BTQ_SZ-1:0]      state;
     `IDX_TYPE(BTQ_SZ)       head, tail, snap;
@@ -60,7 +60,7 @@ module btq #(
     );
 
     general_snaps #(
-        .WIDTH(`IDX_SIZE(`BTQ_SZ))
+        .WIDTH(`IDX_SIZE(BTQ_SZ))
     ) btq_tails (
         .clock,
 
@@ -151,7 +151,7 @@ module btq #(
         f_out.btq_idxs_n    = f_idxs_n;
 
         // handle reads (execute)
-        for (int i = 0; i < `NUM_FU_BRU; ++i) begin
+        for (int i = 0; i < NUM_FU_BRU; ++i) begin
             int idx;
             idx = ex_in.btq_idx[i];
             ex_out.is_tail[i]  = state[idx].is_tail;
@@ -300,7 +300,7 @@ module btq #(
             $display("btq_tail[%8b]: %2d", 1 << i, tail);
         end
 
-        for (int i = 0; i < `NUM_FU_BRU; ++i) begin
+        for (int i = 0; i < NUM_FU_BRU; ++i) begin
             $display("cbru_in[%0d]: en: %b, btq_idx: %d, take: %b, tgt: %x",
                 i,
                 cbru_in.en[i],

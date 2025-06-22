@@ -4,7 +4,7 @@
 // meta-chooser for 2 predictors
 module chooser #(
     parameter GHR_LEN   = GHR_LEN,
-    parameter N         = `N
+    parameter N         = N
 ) (
     input   clock,
     input   reset,
@@ -51,7 +51,7 @@ endmodule
 // 2-bit sc bimodal table
 module bim #(
     parameter GHR_LEN   = GHR_LEN,
-    parameter N         = `N
+    parameter N         = N
 ) (
     input   clock,
     input   reset,
@@ -84,7 +84,7 @@ endmodule
 
 module gshare #(
     parameter GHR_LEN   = GHR_LEN,
-    parameter N         = `N
+    parameter N         = N
 ) (
     input   clock,
     input   reset,

@@ -21,7 +21,7 @@ module fifo_test();
     function automatic FIFO_STATE gen_reset_state();
         logic [DEPTH-1:0][WIDTH-1:0] state;
         logic [WIDTH-1:0] start = 32;
-        // `ROB_SZ = `PHYS_REG_SZ_R10K - 32
+        // ROB_SZ = PHYS_REG_SZ_R10K - 32
         for (int unsigned i = 0; i < $unsigned(DEPTH); ++i) begin
             state[i] = start + i;
         end

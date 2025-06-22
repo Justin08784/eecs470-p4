@@ -3,7 +3,7 @@
 module prf_test();
 
 localparam WIDTH = 32;
-localparam DEPTH = `PHYS_REG_SZ_R10K;
+localparam DEPTH = PHYS_REG_SZ_R10K;
 localparam N = 2;
 localparam BYPASS_EN  = 1;
 

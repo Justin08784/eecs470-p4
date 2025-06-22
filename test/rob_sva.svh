@@ -2,7 +2,7 @@
 `define ROB_SVA_SVH
 
 module rob_sva #(
-    parameter ROB_SZ = `ROB_SZ,  // num elements
+    parameter ROB_SZ = ROB_SZ,  // num elements
     parameter N=`N
 ) (
     `ifdef DEBUG
@@ -30,8 +30,8 @@ module rob_sva #(
     logic cpls[int]; // idx to cpl
     struct packed {
         int idx;
-        logic [$clog2(`PHYS_REG_SZ_R10K)-1:0] tag;
-        logic [$clog2(`PHYS_REG_SZ_R10K)-1:0] t_old;
+        logic [$clog2(PHYS_REG_SZ_R10K)-1:0] tag;
+        logic [$clog2(PHYS_REG_SZ_R10K)-1:0] t_old;
         REG_IDX dst;
     } entries [$], tmp_entry;
 
@@ -176,8 +176,8 @@ module rob_sva #(
         
         property dispatch_complete_retire(i);
             // Step 1) Dispatch
-            logic [$clog2(`PHYS_REG_SZ_R10K)-1:0] tag_in;
-            logic [$clog2(`PHYS_REG_SZ_R10K)-1:0] t_old_in;
+            logic [$clog2(PHYS_REG_SZ_R10K)-1:0] tag_in;
+            logic [$clog2(PHYS_REG_SZ_R10K)-1:0] t_old_in;
             REG_IDX dst_in;
             int idx_in; 
             int cnt_idx; (

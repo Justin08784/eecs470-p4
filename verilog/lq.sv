@@ -2,9 +2,9 @@
 
 
 module lq #(parameter 
-    N=`N,
+    N=N,
     LSQ_SZ=`LSQ_SZ,
-    NUM_FU_STR=`NUM_FU_STR,
+    NUM_FU_STR=NUM_FU_STR,
     NUM_FU_LOD=`LD_BAY_SZ
 ) (
 `ifdef DEBUG

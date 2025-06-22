@@ -134,7 +134,7 @@ Re-order Buffer (ROB)
 ================================================
 */
 module rob #(
-    parameter ROB_SZ = `ROB_SZ,  // num elements
+    parameter ROB_SZ = ROB_SZ,  // num elements
     parameter N=`N
 ) (
     `ifdef DEBUG
@@ -174,8 +174,8 @@ module rob #(
         logic [$clog2(N):0]     d_en_cnt;
             // From: dispatch
             // - Number of enabled dispatch lines?
-        logic [N-1:0][$clog2(`PHYS_REG_SZ_R10K)-1:0] tag;
-        logic [N-1:0][$clog2(`PHYS_REG_SZ_R10K)-1:0] t_old;
+        logic [N-1:0][$clog2(PHYS_REG_SZ_R10K)-1:0] tag;
+        logic [N-1:0][$clog2(PHYS_REG_SZ_R10K)-1:0] t_old;
             // From: dispatch
             // - IMPORTANT: Set from lowest indices in program-order. NO GAPS!!!
     } d_in

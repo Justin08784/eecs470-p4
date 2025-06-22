@@ -1,7 +1,7 @@
 `include "sys_defs.svh"
 
 module ras #(
-    parameter DEPTH = `RAS_SZ,
+    parameter DEPTH = RAS_SZ,
     type PTR = `IDX_TYPE(DEPTH),
     type CNT = `CNT_TYPE(DEPTH)
 ) (
@@ -102,7 +102,7 @@ module ras #(
 
         ras_vld = '0;
         for (int cnt = 0; cnt < used; ++cnt)
-            ras_vld[(top - (cnt + 1)) % `ROB_SZ] = 1;
+            ras_vld[(top - (cnt + 1)) % ROB_SZ] = 1;
 
         $display(">> RAS >>");
         // $display("used_n: %2d, top_n: %2d, full: %b, empty: %b", used_n, top_n, full, empty);

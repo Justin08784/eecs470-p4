@@ -415,12 +415,12 @@ module dcf (
     );
 
 
-    `CNT_TYPE(`N) used_scnt;
+    `CNT_TYPE(N) used_scnt;
     assign d_out.f_en_cnt = `MIN(used_scnt, d_in.d_rdy_cnt);
     fifo #(
-        .DEPTH(4*`N),
+        .DEPTH(4*N),
         .WIDTH($bits(IF_ID_PACKET)),
-        .NUM_RPORTS(`N),
+        .NUM_RPORTS(N),
         .NUM_WPORTS(4),
         .FLUSH_MODE(FIFO_FLUSH_RESET),
         .ENABLE_INTR_FWD(`FALSE),
@@ -575,31 +575,31 @@ module fetch (
     endgenerate
 
 
-    // logic [`N:0][3:0]   off_n;
-    WADDR [`N:0]        pc_n;
+    // logic [N:0][3:0]   off_n;
+    WADDR [N:0]        pc_n;
     generate
     // assign off_n[0] = cur.off;
-    // for (genvar i = 1; i < `N+1; ++i) begin
+    // for (genvar i = 1; i < N+1; ++i) begin
     //     assign off_n[i] = cur.off + `UCAST_FIT(i);
     // end
 
-    for (genvar i = 0; i < `N+1; ++i) begin
+    for (genvar i = 0; i < N+1; ++i) begin
         assign pc_n[i] = cur.fb_base + off_n[0][i];
     end
 
     assign mem_out.PCdws[0] = pc_n[0][13:1];
-    for (genvar i = 1; i < `N; ++i) begin // FIXME: These are mem blocks btw. Only works for `N = 2;
+    for (genvar i = 1; i < N; ++i) begin // FIXME: These are mem blocks btw. Only works for N = 2;
         assign mem_out.PCdws[i] = pc_n[0][13:1] + `UCAST_FIT(i); // w -> dw
     end
     endgenerate
 
     // Align
-    BRANCH_MD [2*`N-1:0] md_raw;
-    INST      [2*`N-1:0] inst_raw;
-    BRANCH_MD [`N-1:0] md;
-    INST      [`N-1:0] inst;
+    BRANCH_MD [2*N-1:0] md_raw;
+    INST      [2*N-1:0] inst_raw;
+    BRANCH_MD [N-1:0] md;
+    INST      [N-1:0] inst;
     generate
-    for (genvar i = 0; i < `N; ++i) begin
+    for (genvar i = 0; i < N; ++i) begin
         for (genvar woff = 0; woff < 2; ++woff) begin
             assign md_raw   [2*i + woff] = mem_in.insn_md[i][woff];
             assign inst_raw [2*i + woff] = mem_in.data[i].word_level[woff];
@@ -608,15 +608,15 @@ module fetch (
 
     logic base_woff;
     assign base_woff = pc_n[0];
-    for (genvar i = 0; i < `N; ++i) begin
+    for (genvar i = 0; i < N; ++i) begin
         assign md[i]    = base_woff ? md_raw    [i+1] : md_raw  [i];
         assign inst[i]  = base_woff ? inst_raw  [i+1] : inst_raw[i];
     end
     endgenerate
 
-    logic [`N-1:0] brch, cond, call, ret, jalr;
+    logic [N-1:0] brch, cond, call, ret, jalr;
     generate
-    for (genvar i = 0; i < `N; ++i) begin
+    for (genvar i = 0; i < N; ++i) begin
         assign brch[i] = md[i].brch;
         assign cond[i] = md[i].cond;
         assign call[i] = md[i].call;
@@ -630,16 +630,16 @@ module fetch (
     assign r = ftq_io.rdat;
 
         // Detect FB end
-    logic [`N-1:0] is_fb_end;
+    logic [N-1:0] is_fb_end;
     logic fb_end_any;
-    `IDX_TYPE(`N) fb_end_idx;
+    `IDX_TYPE(N) fb_end_idx;
     generate
-    for (genvar i = 0; i < `N; ++i)
+    for (genvar i = 0; i < N; ++i)
         assign is_fb_end[i] = off_n[0][i] == r.off;
     endgenerate
 
     ffs #(
-        .VECW(`N)
+        .VECW(N)
     ) ff_end (
         .i_vec(is_fb_end),
         .o_vld(fb_end_any),
@@ -647,12 +647,12 @@ module fetch (
     );
 
         // Fetch-FSM: consume FTQ entry
-    `CNT_TYPE(`N) fsm_lim_cnt, f_cnt;
+    `CNT_TYPE(N) fsm_lim_cnt, f_cnt;
     always_comb begin
         fsm_lim_cnt =
             (ftq_io.vld_scnt == 0) ? 0 :
             fb_end_any  ? fb_end_idx + `UCAST_FIT(1) :
-            `N;
+            N;
 
         cur_n = cur;
         ftq_io.ren_cnt = 0;
@@ -672,14 +672,14 @@ module fetch (
     end
 
     // Handle count
-    `CNT_TYPE(`N)   free_scnt, used_scnt;
-    IF_ID_PACKET [`N-1:0]   f_dat;
+    `CNT_TYPE(N)   free_scnt, used_scnt;
+    IF_ID_PACKET [N-1:0]   f_dat;
         // BTQ limit
-    `CNT_TYPE(`N) brch_lim_cnt;
-    logic [`N:0][`CNT_SIZE(`N)-1:0] brch_prefix_cnt;
+    `CNT_TYPE(N) brch_lim_cnt;
+    logic [N:0][`CNT_SIZE(N)-1:0] brch_prefix_cnt;
     compactor #(
-        .REQW(`N),
-        .GNTW(`N)
+        .REQW(N),
+        .GNTW(N)
     ) comp_brch (
         .req        (brch),
         .lim_cnt    (btq_in.btq_rdy_scnt),
@@ -693,7 +693,7 @@ module fetch (
     end
 
     always_comb begin
-        for (int unsigned i = 0; i < `N; ++i) begin
+        for (int unsigned i = 0; i < N; ++i) begin
             f_dat[i] = '{
                 inst    : inst[i],
                 PC      : pc_n[i],
@@ -705,7 +705,7 @@ module fetch (
         btq_out = '0;
         btq_out.en_cnt = brch_prefix_cnt[f_cnt];
 
-        for (int i = 0; i < `N; ++i) begin
+        for (int i = 0; i < N; ++i) begin
             int     win_idx; // index into btq write window
             logic   eq_end;
             win_idx = brch_prefix_cnt[i];
@@ -735,10 +735,10 @@ module fetch (
     end
 
     fifo #(
-        .DEPTH(2*`N),
+        .DEPTH(2*N),
         .WIDTH($bits(IF_ID_PACKET)),
-        .NUM_RPORTS(`N),
-        .NUM_WPORTS(`N),
+        .NUM_RPORTS(N),
+        .NUM_WPORTS(N),
         .FLUSH_MODE(FIFO_FLUSH_RESET),
         .ENABLE_INTR_FWD(`FALSE),
         .INSTANCE_ID(98)
@@ -778,15 +778,15 @@ module fetch (
 
 `ifdef DEBUG
     task print_fetch;
-        logic [2*`N-1:0] insn_buf_vld;
+        logic [2*N-1:0] insn_buf_vld;
 
         $display(">> Fetch >>");
         bpu0.print_bpu;
         // insn_buf_vld = '0;
         // for (int cnt = 0; cnt < insn_buf.used; ++cnt)
-        //     insn_buf_vld[(insn_buf.head + cnt) % (2*`N)] = 1;
+        //     insn_buf_vld[(insn_buf.head + cnt) % (2*N)] = 1;
         // $display("insn_buf_vld: %b", insn_buf_vld);
-        // for (int i = 0; i < `N; ++i)
+        // for (int i = 0; i < N; ++i)
         //     $display("[%1d]: %1d", i, brch_prefix_cnt[i]);
         $display("flush: %b, flush_fb_base: %d, flush_pc_off", flush, flush_fb_base, flush_pc_off);
         $display("pc_reg: %d", bpu0.pc_reg);

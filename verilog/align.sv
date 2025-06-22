@@ -24,7 +24,7 @@ module align(
     localparam W_PER_DW = 2;
     localparam NUM_DW = 2;
     localparam NUM_W = NUM_DW*W_PER_DW;
-    localparam N = `N;
+    localparam N = N;
     /*
     raw: not aligned
     bal: block aligned (compaction WITHIN blocks)
