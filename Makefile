@@ -288,6 +288,7 @@ CPU_SOURCES = verilog/cpu.sv \
 			verilog/checkpoints.sv \
 			verilog/compactor.sv \
 			verilog/fetch.sv \
+			verilog/ffs.sv \
 			verilog/regfile.sv \
 			verilog/memDP.sv \
 			verilog/mult.sv \
