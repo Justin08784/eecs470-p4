@@ -28,7 +28,6 @@
 parameter GHR_BUF_SZ= 32;
 parameter GHR_LEN   = 8;
 parameter BMASK_LEN = 8; // i.e. number of branch checkpoints
-typedef logic [BMASK_LEN-1:0] BMASK;
 
 // functional units (you should decide if you want more or fewer types of FUs)
 `define NUM_FU_ALU 2
