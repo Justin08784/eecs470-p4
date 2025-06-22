@@ -163,7 +163,7 @@ module align(
     end
 
     assign ctl.gnt_res.wr_ibuf  = ibuf_in_rdy_scnt;
-    assign ctl.gnt_res.wr_btq   = btq_in.btq_rdy_scnt;
+    assign ctl.gnt_res.wr_btq   = btq_in.rdy_scnt;
     assign ctl.gnt_res.rd_rrb   = 2;
         /* pc_gen guarantees that an ftq entry arrives in rrb BEFORE or SIMULTANEOUSLY WITH
         the earliest associated cache line request. However, the rrb exposes
@@ -193,7 +193,7 @@ module align(
     end
 
     assign ibuf_out_wen_cnt = !iss_any ? 0 : ctl.req_res[iss_idx].wr_ibuf;
-    assign btq_out.en_cnt   = !iss_any ? 0 : ctl.req_res[iss_idx].wr_btq;
+    assign btq_out.wen_cnt  = !iss_any ? 0 : ctl.req_res[iss_idx].wr_btq;
     assign irq_out_ren_cnt  = !iss_any ? 0 : ctl.req_res[iss_idx].rd_irq;
     assign rrb_out_ren_cnt  = !iss_any ? 0 : ctl.req_res[iss_idx].rd_rrb;
 

@@ -303,7 +303,7 @@ module testbench;
             // Add new dispatches to rob
             // TODO: Should this be cleared on branch mispredict?
             for (int i = 0, int cur_idx = 0; i < N; ++i) begin
-                if (i >= verisimpleV.rob0.d_in.d_en_cnt)
+                if (i >= verisimpleV.rob0.d_in.wen_cnt)
                     break;
                 cur_idx = verisimpleV.rob0.comm_idxs_n[i];
                 rob_debug[cur_idx] = '{
@@ -359,9 +359,9 @@ module testbench;
         do not work in synthesis
         */
         // update the count for every committed instruction
-        instr_count += commit.r_en_cnt;
+        instr_count += commit.wen_cnt;
 
-        for (int n = 0, int cur_idx = 0; n < commit.r_en_cnt; ++n) begin
+        for (int n = 0, int cur_idx = 0; n < commit.wen_cnt; ++n) begin
             halt    = commit.halt[n];
             illegal = commit.illegal[n];
 

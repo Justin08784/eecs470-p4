@@ -135,6 +135,8 @@ typedef `IDX_TYPE(BTQ_SZ) BTQ_IDX;
 typedef `IDX_TYPE(ROB_SZ) ROB_IDX;
 typedef `IDX_TYPE(LSQ_SZ) LSQ_IDX;
 
+typedef `CNT_TYPE(N) N_CNT;
+
 // address types
 typedef logic [31:0] ADDR;  // full address
 typedef logic [15:0] BADDR; // address (restricted to only used 16 LSB). i.e. byte index
@@ -260,13 +262,13 @@ typedef enum logic [2:0] {
     M_MULHU
 } MUL_FUNC;
 
-typedef enum logic [0:1] {
+typedef enum logic [1:0] {
     FIFO_FLUSH_RESET     = 0, // default
     FIFO_FLUSH_SNAP_HEAD = 1, // wind head to checkpoint
     FIFO_FLUSH_SNAP_TAIL = 2  // wind tail to checkpoint
 } FIFO_FLUSH_MODE;
 
-typedef enum logic [0:1] {
+typedef enum logic [1:0] {
     SKID_FLUSH_RESET  = 0,
     SKID_FLUSH_MASK   = 1,
     SKID_FLUSH_IGNORE = 2
@@ -362,9 +364,8 @@ typedef struct packed {
     FTB_MD1     md;
 
     // predictor-specific fields
-    logic en_dir_update;    // update direction predictors?
+    logic       en_dir_update;    // update direction predictors?
     logic [GHR_LEN-1:0] hash; // gshare hash
-
 } BPU_UPD_PKT;
 
 
@@ -461,7 +462,7 @@ typedef struct packed {
 } mem2fetch; // FIXME: mem-owned, not fetch-owned. Wrong section.
 
 typedef struct packed {
-    `CNT_TYPE(N)           en_cnt;
+    `CNT_TYPE(N)           wen_cnt;
         // How many branch instructions dispatching?
         // Sender must ensure branch insns packed to lowest indices.
     logic   [N-1:0]        is_tail;
@@ -479,8 +480,8 @@ typedef struct packed {
 } fetch2btq;
 
 typedef struct packed {
-    `CNT_TYPE(N)   f_en_cnt;
-    IF_ID_PACKET    [N-1:0]    f_dat;
+    `CNT_TYPE(N)    wen_cnt;
+    IF_ID_PACKET    [N-1:0]    dat;
 } fetch2decode;
 
 typedef struct packed {
@@ -489,10 +490,10 @@ typedef struct packed {
 } puq2fetch;
 
 typedef struct packed {
-    `CNT_TYPE(N) btq_rdy_scnt;
-    BTQ_IDX [N-1:0]        btq_idxs_n;
+    `CNT_TYPE(N)    rdy_scnt;
+    BTQ_IDX [N-1:0] btq_idxs_n;
 
-    puq2fetch   bp_upd;
+    puq2fetch       bp_upd;
 } btq2fetch;
 
 typedef struct packed {
@@ -535,13 +536,14 @@ typedef struct packed {
 
 // I/O: Decode
 typedef struct packed {
-    `CNT_TYPE(N) d_rdy_cnt;
+    `CNT_TYPE(N)    rdy_scnt;
 } decode2fetch;
 
 typedef struct packed {
-    `CNT_TYPE(N) d_vld_scnt;
-    ID_RESULT   [N-1:0]        d_dat;
+    `CNT_TYPE(N)    vld_scnt;
+    ID_RESULT[N-1:0]dat;
 } decode2dispatch;
+
 
 // ================
 // Owner: Dispatch
@@ -614,7 +616,7 @@ typedef struct packed {
 typedef struct packed {
     // NOTE: This is the only place where a transaction is
     // RECEIVER-decided!!! (i.e. receiver broadcasts enable signals)
-    `CNT_TYPE(N) dispatch_en_cnt;
+    `CNT_TYPE(N) ren_cnt;
 } dispatch2decode;
 
 typedef struct packed {
@@ -670,7 +672,7 @@ typedef struct packed {
 typedef struct packed {
     /* Rename */
     /* Commit */
-    `CNT_TYPE(N) d_en_cnt;
+    `CNT_TYPE(N) wen_cnt;
         // To: ROB
         // - Number of enabled dispatch lines?
     PHYS_REG_IDX [N-1:0] tag;
@@ -684,7 +686,7 @@ typedef struct packed {
 } dispatch2rob;
 
 typedef struct packed {
-    `CNT_TYPE(N) free_d_en_cnt;
+    `CNT_TYPE(N) ren_cnt;
         // To: Free list
         // - number of enabled dispatch lines WHO NEED A DEST PREG 
         //   (e.g. no stores)
@@ -709,19 +711,19 @@ typedef struct packed {
 
 // I/O: ROB
 typedef struct packed {
-    `CNT_TYPE(N)rob_rdy_scnt;
+    `CNT_TYPE(N)    rdy_scnt;
         // From: ROB
         // saturating counter for number of free rob entries
-    ROB_IDX [N:0] rob_idxs_n;
+    ROB_IDX [N:0]   rob_idxs_n;
         // To: dispatch
         // rob idxs of entries that can be allocated this cycle
 } rob2dispatch;
 
 typedef struct packed {
-    `CNT_TYPE(N) r_vld_cnt;
+    `CNT_TYPE(N)        vld_scnt;
         // From: retire (ROB)
         // - number of valid retire lines
-    ROB_ENTRY   [N-1:0]        entries; 
+    ROB_ENTRY   [N-1:0] entries; 
         // - IMPORTANT: Set from lowest indices in program-order. NO GAPS!!!
 } rob2retire;
 
@@ -857,14 +859,14 @@ typedef struct packed {
 // Packets: Execute
 // I/O: Execute
 typedef struct packed {
-    logic       [NUM_FU_ALU-1:0]   fu_rdy_alu;
-    logic       [NUM_FU_MUL-1:0]  fu_rdy_mul;
-    logic       [NUM_FU_STR-1:0]   fu_rdy_str;
-    logic       [NUM_FU_LOD-1:0]  fu_rdy_lod;
-    logic       [NUM_FU_BRU-1:0]   fu_rdy_bru;
+    logic   [NUM_FU_ALU-1:0]    fu_rdy_alu;
+    logic   [NUM_FU_MUL-1:0]    fu_rdy_mul;
+    logic   [NUM_FU_STR-1:0]    fu_rdy_str;
+    logic   [NUM_FU_LOD-1:0]    fu_rdy_lod;
+    logic   [NUM_FU_BRU-1:0]    fu_rdy_bru;
 
-    logic       [NUM_FU_ALU-1:0]   fu_cdb_gnt_alu; // 1-cycle insns need to win CDB arb. to issue
-    logic       [NUM_FU_BRU-1:0]   fu_cdb_gnt_bru; // 1-cycle insns need to win CDB arb. to issue
+    logic   [NUM_FU_ALU-1:0]    fu_cdb_gnt_alu; // 1-cycle insns need to win CDB arb. to issue
+    logic   [NUM_FU_BRU-1:0]    fu_cdb_gnt_bru; // 1-cycle insns need to win CDB arb. to issue
 } execute2rs;
 
 typedef struct packed {
@@ -940,19 +942,19 @@ typedef struct packed {
  * some slight changes
  */
 typedef struct packed {
-    `CNT_TYPE(N) r_en_cnt;
+    `CNT_TYPE(N)    wen_cnt;
     logic   [N-1:0] halt;
     logic   [N-1:0] illegal;
 } COMMIT_PACKET;
 
 // I/O: Retire
 typedef struct packed {
-    `CNT_TYPE(N) r_en_cnt; // final final
-    PHYS_REG_IDX [N-1:0]   tag;
-    PHYS_REG_IDX [N-1:0]   t_old;
-    REG_IDX      [N-1:0]   dst;
-    logic        [N-1:0]   halt;
-    logic        [N-1:0]   illegal;
+    `CNT_TYPE(N)            en_cnt; // final final
+    PHYS_REG_IDX [N-1:0]    tag;
+    PHYS_REG_IDX [N-1:0]    t_old;
+    REG_IDX      [N-1:0]    dst;
+    logic        [N-1:0]    halt;
+    logic        [N-1:0]    illegal;
 } retire_final;
 
 
@@ -960,9 +962,9 @@ typedef struct packed {
 // Only-owned I/Os
 // ================
 typedef struct packed {
-    `CNT_TYPE(N) snap_rdy_scnt;
-    BMASK [N-1:0]  b1hot_n;
-    BMASK [N:0]    bmask_n;
+    `CNT_TYPE(N)    snap_rdy_scnt;
+    BMASK [N-1:0]   b1hot_n;
+    BMASK [N:0]     bmask_n;
 } bman2rename;
 
 typedef struct packed {
@@ -972,11 +974,11 @@ typedef struct packed {
 } map_table2dispatch;
 
 typedef struct packed {
-    `CNT_TYPE(N) free_rdy_scnt;
+    `CNT_TYPE(N) vld_scnt;
         // From: Free list
         // - sat. count of number of free pregs in free list;
         //   count reflects any pregs returned in retire! (i.e. AFTER retires)
-    PHYS_REG_IDX [N-1:0]   d_ts;
+    PHYS_REG_IDX [N-1:0] ts;
         // From: Free list
         // - newly allocated pregs
 

@@ -328,7 +328,7 @@ module cpu (
     /* >> ==== Pipeline outputs ==== >> */
     // Output committed instructions to the testbench for counting
     assign commit = '{
-        r_en_cnt: retire_exec.r_en_cnt,
+        wen_cnt : retire_exec.en_cnt,
         halt    : retire_exec.halt,
         illegal : retire_exec.illegal
     };

@@ -384,7 +384,7 @@ module dcf (
 
 
     `CNT_TYPE(N) used_scnt;
-    assign d_out.f_en_cnt = `MIN(used_scnt, d_in.d_rdy_cnt);
+    assign d_out.wen_cnt = `MIN(used_scnt, d_in.rdy_scnt);
     fifo #(
         .DEPTH(4*N),
         .WIDTH($bits(IF_ID_PACKET)),
@@ -406,8 +406,8 @@ module dcf (
 
         .wr_en_cnt  (align2ibuf_wen_cnt),
         .wr_data    (align2ibuf_dat),
-        .rd_en_cnt  (d_out.f_en_cnt),
-        .rd_data    (d_out.f_dat),
+        .rd_en_cnt  (d_out.wen_cnt),
+        .rd_data    (d_out.dat),
         .free_scnt  (ibuf2align_rdy_scnt),
         .used_scnt  (used_scnt)
     );
@@ -650,13 +650,13 @@ module fetch (
         .GNTW(N)
     ) comp_brch (
         .req        (brch),
-        .lim_cnt    (btq_in.btq_rdy_scnt),
+        .lim_cnt    (btq_in.rdy_scnt),
         .prefix_cnt (brch_prefix_cnt),
         .gnt_cnt    (brch_lim_cnt)
     );
 
     always_comb begin
-        d_out.f_en_cnt = `MIN(used_scnt, d_in.d_rdy_cnt);
+        d_out.wen_cnt = `MIN(used_scnt, d_in.rdy_scnt);
         f_cnt = `MIN(fsm_lim_cnt, `MIN(brch_lim_cnt, free_scnt));
     end
 
@@ -671,7 +671,7 @@ module fetch (
         end
 
         btq_out = '0;
-        btq_out.en_cnt = brch_prefix_cnt[f_cnt];
+        btq_out.wen_cnt = brch_prefix_cnt[f_cnt];
 
         for (int i = 0; i < N; ++i) begin
             int     win_idx; // index into btq write window
@@ -723,8 +723,8 @@ module fetch (
 
         .wr_en_cnt  (f_cnt),
         .wr_data    (f_dat),
-        .rd_en_cnt  (d_out.f_en_cnt),
-        .rd_data    (d_out.f_dat),
+        .rd_en_cnt  (d_out.wen_cnt),
+        .rd_data    (d_out.dat),
         .free_scnt  (free_scnt),
         .used_scnt  (used_scnt)
     );
@@ -758,14 +758,14 @@ module fetch (
         //     $display("[%1d]: %1d", i, brch_prefix_cnt[i]);
         $display("flush: %b, flush_fb_base: %d, flush_pc_off", flush, flush_fb_base, flush_pc_off);
         $display("pc_reg: %d", bpu0.pc_reg);
-        // $display("step: %b, pred:%b, f_en_cnt:%d, pred_any: %b, pred_idx: %b",
+        // $display("step: %b, pred:%b, wen_cnt:%d, pred_any: %b, pred_idx: %b",
         //     bpu0.step,
         //     bpu0.pred,
-        //     bpu0.ghr0.f_en_cnt,
+        //     bpu0.ghr0.wen_cnt,
         //     bpu0.pred_any,
         //     bpu0.pred_idx
         // );
-        $display("d_out: {f_en_cnt: %b, dat: [%x, %x]}", d_out.f_en_cnt, d_out.f_dat[0], d_out.f_dat[1]);
+        $display("d_out: {wen_cnt: %b, dat: [%x, %x]}", d_out.wen_cnt, d_out.dat[0], d_out.dat[1]);
         $display("brch: %b, pc_n: [%d, %d, %d]",
             brch,
             pc_n[0],

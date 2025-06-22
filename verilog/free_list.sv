@@ -78,7 +78,7 @@ module free_list #(parameter
     the FIFO (you still have to do it *somewhere*).
     */
     struct packed {
-        `CNT_TYPE(N)  r_en_cnt;
+        `CNT_TYPE(N) en_cnt;
         PHYS_REG_IDX [N-1:0] t_old;
     } r_in;
 
@@ -89,7 +89,7 @@ module free_list #(parameter
         told_packed = '0;
 
         // pack all returning pregs to lowest indices
-        for (int unsigned i = 0; i < r_in.r_en_cnt; ++i) begin
+        for (int unsigned i = 0; i < r_in.en_cnt; ++i) begin
             if (r_in.t_old[i] != `ZERO_REG) begin
                 told_packed[free_cnt] = r_in.t_old[i];
                 ++free_cnt;
@@ -119,15 +119,15 @@ module free_list #(parameter
         .wr_bmask   ('0),
         // << unused inputs
 
-        .wr_en_cnt(free_cnt),
-        .wr_data(told_packed),
+        .wr_en_cnt  (free_cnt),
+        .wr_data    (told_packed),
 
-        .rd_en_cnt(d_in.free_d_en_cnt),
-        .rd_data(d_out.d_ts),
-        .rd_idxs_n(d_out.fl_heads_n),
+        .rd_en_cnt  (d_in.ren_cnt),
+        .rd_data    (d_out.ts),
+        .rd_idxs_n  (d_out.fl_heads_n),
 
-        .free_scnt(), // do we need this? how would even retire return more pregs than in existence?
-        .used_scnt(d_out.free_rdy_scnt)
+        .free_scnt  (), // do we need this? how would even retire return more pregs than in existence?
+        .used_scnt  (d_out.vld_scnt)
     );
 
     general_snaps #(
@@ -149,7 +149,7 @@ module free_list #(parameter
             r_in <= '0;
         else
             r_in <= '{
-                r_en_cnt: r_in_n.r_en_cnt,
+                en_cnt  : r_in_n.en_cnt,
                 t_old   : r_in_n.t_old
             };
     end

@@ -43,8 +43,8 @@ module rob #(
         .flush,
         .flush_snap (snap),
 
-        .rd_en_cnt  (r_in.r_en_cnt),
-        .wr_en_cnt  (d_in.d_en_cnt),
+        .rd_en_cnt  (r_in.en_cnt),
+        .wr_en_cnt  (d_in.wen_cnt),
 
         .head,
         .tail,
@@ -73,7 +73,7 @@ module rob #(
     always_comb begin
         // handle retire (outs)
         r_out = '0;
-        r_out.r_vld_cnt = used_scnt;
+        r_out.vld_scnt = used_scnt;
         for (int unsigned i = 0; i < used_scnt; ++i) begin
             /* preview mode–– just display all valid entries in read window even
             if not all will get retired this cycle */
@@ -82,7 +82,7 @@ module rob #(
 
         // handle dispatch (outs)
         d_out = '{
-            rob_rdy_scnt: free_scnt,
+            rdy_scnt    : free_scnt,
             rob_idxs_n  : comm_idxs_n
         };
     end
@@ -92,9 +92,9 @@ module rob #(
             state   <= '0;
         end else begin
 `ifndef SYNTH
-            if (d_in.d_en_cnt > free + r_out.r_vld_cnt)
+            if (d_in.wen_cnt > free + r_out.vld_scnt)
                 $error("ROB overflow!");
-            if (r_out.r_vld_cnt > used + d_in.d_en_cnt)
+            if (r_out.vld_scnt > used + d_in.wen_cnt)
                 $error("ROB underflow!");
 `endif
             // handle complete (ins)
@@ -107,7 +107,7 @@ module rob #(
 
             // handle dispatch (ins)
             for (int unsigned i = 0, int cur_idx = 0; i < NUM_DPORTS; ++i) begin
-                if (i >= d_in.d_en_cnt)
+                if (i >= d_in.wen_cnt)
                     continue;
                 cur_idx = comm_idxs_n[i];
                 state[cur_idx] <= '{
@@ -147,7 +147,7 @@ module rob #(
         //     &&verisimpleV.free_list0.told_packed[0]!=0
         // );
 
-        $display("r_out: vld_cnt: %d", r_out.r_vld_cnt);
+        $display("r_out: vld_scnt: %d", r_out.vld_scnt);
         $display("head: %2d, tail: %2d, used: %2d", head, tail, used);
         for (int i = 0; i < N; ++i) begin
             string name;

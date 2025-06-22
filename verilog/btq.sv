@@ -74,7 +74,7 @@ module btq #(
         .flush_snap (snap),
 
         .rd_en_cnt  (rd_en_cnt),
-        .wr_en_cnt  (f_in.en_cnt),
+        .wr_en_cnt  (f_in.wen_cnt),
 
         .head,
         .tail,
@@ -84,7 +84,7 @@ module btq #(
         .used,
         .free,
         .used_scnt(btq_vld_scnt),
-        .free_scnt(f_out.btq_rdy_scnt)
+        .free_scnt(f_out.rdy_scnt)
     );
 
     general_snaps #(
@@ -222,7 +222,7 @@ module btq #(
         if (reset) begin
             state   <= '0;
         end else begin
-            if (f_in.en_cnt > free)
+            if (f_in.wen_cnt > free)
                 $error("BTQ overflow!");
             if (rd_en_cnt > used)
                 $error("BTQ underflow!");
@@ -253,7 +253,7 @@ module btq #(
             // handle fetch (ins)
             for (int i = 0, int idx = 0; i < NUM_FPORTS; ++i) begin
                 idx = f_idxs_n[i];
-                if (i >= f_in.en_cnt)
+                if (i >= f_in.wen_cnt)
                     continue;
 
                 state[idx] <= '{

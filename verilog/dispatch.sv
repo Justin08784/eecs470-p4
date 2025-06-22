@@ -51,14 +51,14 @@ module dispatch #(parameter
         .GNTW(N)
     ) comp_free (
         .req        (has_dst),
-        .lim_cnt    (free_in.free_rdy_scnt),
+        .lim_cnt    (free_in.vld_scnt),
         .prefix_cnt (free_prefix_cnt),
         .gnt_cnt    (free_lim_cnt)
     );
 
     always_comb begin
         foreach (has_dst[n])
-            has_dst[n] = d_in.d_dat[n].has_dst;
+            has_dst[n] = d_in.dat[n].has_dst;
     end
 
     `CNT_TYPE(N) rename_vld_scnt;
@@ -81,16 +81,16 @@ module dispatch #(parameter
 
     always_comb begin
         foreach (rnme_is_brch[n])
-            rnme_is_brch[n] = d_in.d_dat[n].fu_idx == FU_BRU;
+            rnme_is_brch[n] = d_in.dat[n].fu_idx == FU_BRU;
 
-        rename_en_cnt = d_in.d_vld_scnt;
+        rename_en_cnt = d_in.vld_scnt;
         rename_en_cnt = `MIN(free_lim_cnt, rename_en_cnt);
         rename_en_cnt = `MIN(rename_rdy_scnt, rename_en_cnt);
         rename_en_cnt = `MIN(rnme_snap_lim_cnt, rename_en_cnt);
 
-        d_out.dispatch_en_cnt  = rename_en_cnt;
-        free_out.free_d_en_cnt = free_prefix_cnt[rename_en_cnt];
-        bman_out.snap_en_cnt = rnme_snap_prefix_cnt[rename_en_cnt];
+        d_out.ren_cnt       = rename_en_cnt;
+        free_out.ren_cnt    = free_prefix_cnt[rename_en_cnt];
+        bman_out.snap_en_cnt= rnme_snap_prefix_cnt[rename_en_cnt];
     end
 
     // handle map table output 
@@ -100,13 +100,13 @@ module dispatch #(parameter
 
         for (int i = 0; i < N; i++) begin
             //handling dest register
-            map_out.ts[i]       = has_dst[i] ? free_in.d_ts[free_prefix_cnt[i]] : '0;
-            map_out.dsts[i]     = d_in.d_dat[i].has_dst
-                ? d_in.d_dat[i].inst.r.rd
+            map_out.ts[i]       = has_dst[i] ? free_in.ts[free_prefix_cnt[i]] : '0;
+            map_out.dsts[i]     = d_in.dat[i].has_dst
+                ? d_in.dat[i].inst.r.rd
                 : `ZERO_REG;
             //handling src tags
-            map_out.src1s[i]    = d_in.d_dat[i].inst.r.rs1;
-            map_out.src2s[i]    = d_in.d_dat[i].inst.r.rs2;
+            map_out.src1s[i]    = d_in.dat[i].inst.r.rs1;
+            map_out.src2s[i]    = d_in.dat[i].inst.r.rs2;
         end
     end
 
@@ -117,22 +117,22 @@ module dispatch #(parameter
         for (int i = 0; i < N; ++i) begin
             rename2commit[i] = '{
 `ifdef DEBUG
-                id          : d_in.d_dat[i].id,
+                id          : d_in.dat[i].id,
 `endif
-                PC          : d_in.d_dat[i].PC,
-                inst        : d_in.d_dat[i].inst,
-                fu_idx      : d_in.d_dat[i].fu_idx,
+                PC          : d_in.dat[i].PC,
+                inst        : d_in.dat[i].inst,
+                fu_idx      : d_in.dat[i].fu_idx,
 
-                alu_func    : d_in.d_dat[i].alu_func,
-                opa_select  : d_in.d_dat[i].opa_select,
-                opb_select  : d_in.d_dat[i].opb_select,
+                alu_func    : d_in.dat[i].alu_func,
+                opa_select  : d_in.dat[i].opa_select,
+                opb_select  : d_in.dat[i].opb_select,
 
-                has_dst     : d_in.d_dat[i].has_dst,
-                cond_branch : d_in.d_dat[i].cond_branch,
-                halt        : d_in.d_dat[i].halt,
-                illegal     : d_in.d_dat[i].illegal,
-                csr_op      : d_in.d_dat[i].csr_op,
-                btq_idx     : d_in.d_dat[i].btq_idx,
+                has_dst     : d_in.dat[i].has_dst,
+                cond_branch : d_in.dat[i].cond_branch,
+                halt        : d_in.dat[i].halt,
+                illegal     : d_in.dat[i].illegal,
+                csr_op      : d_in.dat[i].csr_op,
+                btq_idx     : d_in.dat[i].btq_idx,
 
                 // alloc
                 t           : '0,
@@ -161,11 +161,11 @@ module dispatch #(parameter
                 // Q: Why "+ has_dst[i]"? A: Remember, we want to snapshot the free_list
                 // head immediately AFTER the branch. The next free_list head is incremented IFF we consume a preg.
 
-            btq_carry = d_in.d_dat[i].btq_idx + `UCAST_FIT(1);
+            btq_carry = d_in.dat[i].btq_idx + `UCAST_FIT(1);
             rnme_snap_out.btq_tail[i]= btq_carry >= `UCAST_FIT(BTQ_SZ) ? 0 : btq_carry;
-            rnme_snap_out.ras_snap[i]= d_in.d_dat[i].ras_snap;
+            rnme_snap_out.ras_snap[i]= d_in.dat[i].ras_snap;
 `ifdef DEBUG
-            rnme_snap_out.btq_idx[i] = d_in.d_dat[i].btq_idx;
+            rnme_snap_out.btq_idx[i] = d_in.dat[i].btq_idx;
 `endif
         end
     end
@@ -220,7 +220,7 @@ module dispatch #(parameter
 
         foreach (en_by_fu[f, n]) begin
             en_by_fu[f][n] = (n < rename_vld_scnt)
-                && (n < rob_in.rob_rdy_scnt)
+                && (n < rob_in.rdy_scnt)
                 && commit_in[n].fu_idx == f
                 && rs_in.rdy_sbus[f][n];
         end
@@ -300,7 +300,7 @@ module dispatch #(parameter
 
     // handle rob output 
     always_comb begin
-        rob_out.d_en_cnt = commit_en_cnt;
+        rob_out.wen_cnt = commit_en_cnt;
 
         for (int i = 0; i < N; i++) begin
             //handling src tags
@@ -346,9 +346,9 @@ module dispatch #(parameter
         $display("bman_in.snap_rdy_scnt: %1d", bman_in.snap_rdy_scnt);
         $display("bman_out.snap_en_cnt: %1d", bman_out.snap_en_cnt);
         $display("rnme_snap_out.snap_en: %b", rnme_snap_out.snap_en);
-        $display("rob_in.rob_rdy_scnt: %d",  rob_in.rob_rdy_scnt);
-        $display("d_in.d_vld_scnt: %d",  d_in.d_vld_scnt);
-        $display("free_in.free_rdy_scnt: %d [%d, %d]",  free_in.free_rdy_scnt, free_in.d_ts[0], free_in.d_ts[1]);
+        $display("rob_in.rdy_scnt: %d",  rob_in.rdy_scnt);
+        $display("d_in.vld_scnt: %d",  d_in.vld_scnt);
+        $display("free_in.free_rdy_scnt: %d [%d, %d]",  free_in.free_rdy_scnt, free_in.ts[0], free_in.ts[1]);
 
         $display("");
         for (int i = 0; i < N+1; ++i) begin

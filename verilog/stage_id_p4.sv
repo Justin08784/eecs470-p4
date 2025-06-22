@@ -246,8 +246,8 @@ module stage_id_p4 (
     `CNT_TYPE(N) used_scnt;
     `CNT_TYPE(N) free_scnt;
     `CNT_TYPE(N) prvw_vld_cnt;
-    assign f_out.d_rdy_cnt  = free_scnt;
-    assign d_out.d_vld_scnt = used_scnt;
+    assign f_out.rdy_scnt  = free_scnt;
+    assign d_out.vld_scnt = used_scnt;
 
     logic [N-1:0] tmp_has_dst;
 `ifdef DEBUG
@@ -264,7 +264,7 @@ module stage_id_p4 (
     for (genvar i = 0; i < N; ++i) begin : gen_decoders
         decoder_p4 decoder_i (
             // Inputs
-            .inst  (f_in.f_dat[i].inst),
+            .inst  (f_in.dat[i].inst),
 
             // Outputs
             .fu_idx        (tmp[i].fu_idx),
@@ -289,8 +289,8 @@ module stage_id_p4 (
 `endif
                 fu_idx      : tmp[i].fu_idx,
 
-                inst        : f_in.f_dat[i].inst,
-                PC          : f_in.f_dat[i].PC,
+                inst        : f_in.dat[i].inst,
+                PC          : f_in.dat[i].PC,
 
                 opa_select  : tmp[i].opa_select,
                 opb_select  : tmp[i].opb_select,
@@ -301,8 +301,8 @@ module stage_id_p4 (
                 halt        : tmp[i].halt,
                 illegal     : tmp[i].illegal,
                 csr_op      : tmp[i].csr_op,
-                ras_snap    : f_in.f_dat[i].ras_snap,
-                btq_idx     : f_in.f_dat[i].btq_idx
+                ras_snap    : f_in.dat[i].ras_snap,
+                btq_idx     : f_in.dat[i].btq_idx
             };
         end
 
@@ -311,7 +311,7 @@ module stage_id_p4 (
             if (wr_fifo[i].illegal)
                 break;
         end
-        non_illegal_cnt = `MIN(non_illegal_cnt, f_in.f_en_cnt);
+        non_illegal_cnt = `MIN(non_illegal_cnt, f_in.wen_cnt);
     end
 
 
@@ -337,7 +337,7 @@ module stage_id_p4 (
 
     ---
 
-    **Possible Fix:** Let fetch use `free_scnt + dispatch_en_cnt` as the available space,
+    **Possible Fix:** Let fetch use `free_scnt + d_in.ren_cnt` as the available space,
     assuming dispatch frees entries during the same cycle.
 
     **Why is that bad?**
@@ -376,8 +376,8 @@ module stage_id_p4 (
 
         .wr_en_cnt  (non_illegal_cnt), // accept only legal insns into FIFO
         .wr_data    (wr_fifo),
-        .rd_en_cnt  (d_in.dispatch_en_cnt),
-        .rd_data    (d_out.d_dat),
+        .rd_en_cnt  (d_in.ren_cnt),
+        .rd_data    (d_out.dat),
         .free_scnt  (free_scnt),
         .used_scnt  (used_scnt)
     );
@@ -399,22 +399,22 @@ module stage_id_p4 (
         //     free_scnt
         // );
         $display("f_in:  {f_en_cnt: %d, PC: [%x, %x], inst: [%x, %x]}",
-            f_in.f_en_cnt,
-            f_in.f_en_cnt > 0 ? f_in.f_dat[0].PC : 0,
-            f_in.f_en_cnt > 1 ? f_in.f_dat[1].PC : 0,
-            f_in.f_en_cnt > 0 ? f_in.f_dat[0].inst : 0,
-            f_in.f_en_cnt > 1 ? f_in.f_dat[1].inst : 0,
+            f_in.wen_cnt,
+            f_in.wen_cnt > 0 ? f_in.dat[0].PC : 0,
+            f_in.wen_cnt > 1 ? f_in.dat[1].PC : 0,
+            f_in.wen_cnt > 0 ? f_in.dat[0].inst : 0,
+            f_in.wen_cnt > 1 ? f_in.dat[1].inst : 0,
         );
 
         $display("d_out: {d_en_cnt: %d, PC: [%x, %x], inst: [%x, %x]}",
-            d_in.dispatch_en_cnt,
-            d_out.d_dat[0].PC, 
-            d_out.d_dat[1].PC,
-            d_out.d_dat[0].inst, 
-            d_out.d_dat[1].inst
+            d_in.ren_cnt,
+            d_out.dat[0].PC, 
+            d_out.dat[1].PC,
+            d_out.dat[0].inst, 
+            d_out.dat[1].inst
         );
-        print_id_result(d_out.d_dat[0]);
-        print_id_result(d_out.d_dat[1]);
+        print_id_result(d_out.dat[0]);
+        print_id_result(d_out.dat[1]);
         // $display("d_out.d_dat[0]: %b", d_out.d_dat[0]);
         // $display("d_out.d_dat[1]: %b", d_out.d_dat[1]);
         $display("<< ID <<", $time);

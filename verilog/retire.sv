@@ -40,12 +40,12 @@ module retire (
     end
 
     // general retire
-    `CNT_TYPE(N) r_en_cnt;
+    `CNT_TYPE(N) retire_en_cnt;
 
     always_comb begin
-        r_en_cnt    = 0;
+        retire_en_cnt   = 0;
 
-        for (int i = 0; i < rob_in.r_vld_cnt; ++i) begin
+        for (int i = 0; i < rob_in.vld_scnt; ++i) begin
             if (!rob_in.entries[i].cpl)
                 break;
 
@@ -56,7 +56,7 @@ module retire (
             RET_LOD,
             RET_BRU,
             RET_STR: begin
-                ++r_en_cnt;
+                ++retire_en_cnt;
             end
             endcase
         end
@@ -80,14 +80,14 @@ module retire (
         // retire_exec = flush ? '0 : '{
         retire_exec = '{
             // only the count *may* be adjusted
-            r_en_cnt : r_en_cnt,
+            en_cnt  : retire_en_cnt,
 
             // the rest of the fields stay the same
-            tag      : tag,
-            t_old    : t_old,
-            dst      : dst,
-            halt     : halt,
-            illegal  : illegal
+            tag     : tag,
+            t_old   : t_old,
+            dst     : dst,
+            halt    : halt,
+            illegal : illegal
         };
     end
 
@@ -95,7 +95,7 @@ module retire (
     task print_retire;
         $display("  | >> retire >>");
 
-        $display("retire_exec.r_en_cnt: %0d", retire_exec.r_en_cnt);
+        $display("retire_exec.retire_en_cnt: %0d", retire_exec.retire_en_cnt);
         $display("  | << retire <<");
     endtask
 `endif

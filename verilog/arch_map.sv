@@ -24,7 +24,7 @@ module arch_map #(parameter
     always_comb begin
         entries_n = entries;
         // handle retires
-        for (int i = 0; i < r_in.r_en_cnt; ++i) begin
+        for (int i = 0; i < r_in.en_cnt; ++i) begin
             if (r_in.dst[i] == `ZERO_REG) // e.g. store, brch insns have 0 dest preg
                 continue;
             entries_n[r_in.dst[i]] = r_in.tag[i];
