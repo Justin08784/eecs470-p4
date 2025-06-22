@@ -274,22 +274,8 @@ typedef enum logic [0:1] {
 
 
 // ================
-// Datapath packets
+// Owner: BPU (branch prediction unit)
 // ================
-
-/**
- * Packets are used to move many variables between modules with
- * just one datatype, but can be cumbersome in some circumstances.
- *
- * Define new ones in project 4 at your own discretion
- */
-
-typedef struct packed {
-    logic [N-1:0][`IDX_SIZE(RAS_SZ)-1:0] top;
-    logic [N-1:0][`CNT_SIZE(RAS_SZ)-1:0] used;
-} RAS_SNAP;
-
-// BPU stuff
 typedef enum logic [1:0] {
     SN = 2'b00,
     WN = 2'b01,
@@ -311,7 +297,7 @@ function automatic logic query_sc(input logic [1:0] sc);
     return sc[1];
 endfunction
 
-
+// Packets: BPU
 typedef struct packed {
     logic [1:0] sc;
     logic       vld;
@@ -366,6 +352,43 @@ typedef struct packed {
 } FTB_UPD_PKT;
 
 typedef struct packed {
+    // FTB_UPD_PKT fields
+    WADDR       base;
+    logic [3:0] pc_off; // pc = base + pc_off
+    logic       take;
+    WADDR       tgt;
+
+    logic       always_take; // i.e. a cond branch that is always taken?
+    FTB_MD1     md;
+
+    // predictor-specific fields
+    logic en_dir_update;    // update direction predictors?
+    logic [GHR_LEN-1:0] hash; // gshare hash
+
+} BPU_UPD_PKT;
+
+
+// ================
+// Owner: Fetch
+// ================
+// Packets: fetch
+typedef struct packed {
+    logic [N-1:0][`IDX_SIZE(RAS_SZ)-1:0] top;
+    logic [N-1:0][`CNT_SIZE(RAS_SZ)-1:0] used;
+} RAS_SNAP;
+
+typedef struct packed {
+    // struct guard
+    logic brch; // 1 iff is any form of control insn
+
+    // fields valid iff branch high
+    logic cond;
+    logic call;
+    logic ret;
+    logic jalr;
+} BRANCH_MD;
+
+typedef struct packed {
 `ifdef PC_GEN_TEST_MODE
     int id;
 `endif
@@ -385,18 +408,6 @@ typedef struct packed {
     logic       always_take;// ft ? <IGNORE>: " of pred-taken branch
     FTB_MD1     md;         // ft ? <IGNORE>: " of pred-tkaen branch
 } FTQ_ENTRY;
-
-
-typedef struct packed {
-    // struct guard
-    logic brch; // 1 iff is any form of control insn
-
-    // fields valid iff branch high
-    logic cond;
-    logic call;
-    logic ret;
-    logic jalr;
-} BRANCH_MD;
 
 typedef struct packed {
     DWADDR          dw;
@@ -421,46 +432,8 @@ typedef struct packed {
     
     MEM_BLOCK       blk;
     BRANCH_MD[1:0]  md;
-
 } ICACHE_RESPONSE;
 
-
-
-// BTQ stuff
-typedef struct packed {
-    // FTB_UPD_PKT fields
-    WADDR       base;
-    logic [3:0] pc_off; // pc = base + pc_off
-    logic       take;
-    WADDR       tgt;
-
-    logic       always_take; // i.e. a cond branch that is always taken?
-    FTB_MD1     md;
-
-    // predictor-specific fields
-    logic en_dir_update;    // update direction predictors?
-    logic [GHR_LEN-1:0] hash; // gshare hash
-
-} BPU_UPD_PKT;
-
-typedef struct packed {
-    logic en;
-    WADDR pc;
-    WADDR tgt;
-} puq2btb;
-
-typedef struct packed {
-    DWADDR              dw;
-    logic   [1:0][3:0]  off;
-        // FB_OFF[1:0][1:0]ixq_out_off,
-    logic   [1:0]       fmsk;
-    logic   [1:0]       is_end;
-} pc_gen2ixq;
-
-/**
- * IF_ID Packet:
- * Data exchanged from the IF to the ID stage
- */
 typedef struct packed {
     INST  inst;
     WADDR PC;
@@ -469,23 +442,23 @@ typedef struct packed {
     BTQ_IDX btq_idx;
 } IF_ID_PACKET;
 
-
-// ================
-// I/O structs
-// ================
+// I/O: fetch
+typedef struct packed {
+    DWADDR              dw;
+    logic   [1:0][3:0]  off;
+        // FB_OFF[1:0][1:0]ixq_out_off,
+    logic   [1:0]       fmsk;
+    logic   [1:0]       is_end;
+} pc_gen2ixq;
 
 typedef struct packed {
-    logic       en;
-    BPU_UPD_PKT dat;
-} puq2fetch;
+    DWADDR [N-1:0] PCdws; // PC double word indices
+} fetch2mem;
 
 typedef struct packed {
-    `CNT_TYPE(N) btq_rdy_scnt;
-    BTQ_IDX [N-1:0]        btq_idxs_n;
-
-    puq2fetch   bp_upd;
-} btq2fetch;
-
+    MEM_BLOCK   [N-1:0] data;
+    BRANCH_MD   [N-1:0][1:0] insn_md; // [dw][w]
+} mem2fetch; // FIXME: mem-owned, not fetch-owned. Wrong section.
 
 typedef struct packed {
     `CNT_TYPE(N)           en_cnt;
@@ -505,23 +478,224 @@ typedef struct packed {
     logic   [N-1:0][`IDX_SIZE(GHR_BUF_SZ)-1:0] ghr_base;
 } fetch2btq;
 
-
-
-
-/**
- * Commit Packet:
- * This is an output of the processor and used in the testbench for counting
- * committed instructions
- *
- * It also acts as a "WB_PACKET", and can be reused in the final project with
- * some slight changes
- */
 typedef struct packed {
-    `CNT_TYPE(N) r_en_cnt;
+    `CNT_TYPE(N)   f_en_cnt;
+    IF_ID_PACKET    [N-1:0]    f_dat;
+} fetch2decode;
+
+typedef struct packed {
+    logic       en;
+    BPU_UPD_PKT dat;
+} puq2fetch;
+
+typedef struct packed {
+    `CNT_TYPE(N) btq_rdy_scnt;
+    BTQ_IDX [N-1:0]        btq_idxs_n;
+
+    puq2fetch   bp_upd;
+} btq2fetch;
+
+typedef struct packed {
+    // WADDR [NUM_FU_BRU-1:0] PC; // Does BRU need to carry PC if we can supply it like so?
+    logic [NUM_FU_BRU-1:0] is_tail;
+    logic [NUM_FU_BRU-1:0] pred;
+    WADDR [NUM_FU_BRU-1:0] pred_tgt;
+    logic [NUM_FU_BRU-1:0][3:0] pc_off;
+    logic [NUM_FU_BRU-1:0][`IDX_SIZE(GHR_BUF_SZ)-1:0] ghr_base;
+} btq2execute;
+
+// ================
+// Owner: Decode
+// ================
+// Packets: Decode
+/* 
+The following structs are enrichments of the previous.
+ID_RESULT -> ALLOC_RENAME_PKT -> RENAME_COMMIT_PKT -> COMMIT_RS_PKT
+*/
+typedef struct packed {
+`ifdef DEBUG
+    int             id;
+`endif
+    WADDR           PC;
+    INST            inst;
+    FU_IDX          fu_idx;
+
+    ALU_FUNC        alu_func;   // ALU function select (ALU_xxx *)
+    ALU_OPA_SELECT  opa_select; // ALU opa mux select (ALU_OPA_xxx *)
+    ALU_OPB_SELECT  opb_select; // ALU opb mux select (ALU_OPB_xxx *)
+
+    logic           has_dst;    // does insn have destination register?
+    logic           cond_branch;// Is inst a conditional branch? (0 = not branch OR not cond_branch, 1 = cond_branch)
+    logic           halt;       // Is this a halt?
+    logic           illegal;    // Is this instruction illegal?
+    logic           csr_op;     // Is this a CSR operation? (we only used this as a cheap way to get return code)
+    RAS_SNAP        ras_snap;
+    BTQ_IDX         btq_idx;
+} ID_RESULT;
+
+// I/O: Decode
+typedef struct packed {
+    `CNT_TYPE(N) d_rdy_cnt;
+} decode2fetch;
+
+typedef struct packed {
+    `CNT_TYPE(N) d_vld_scnt;
+    ID_RESULT   [N-1:0]        d_dat;
+} decode2dispatch;
+
+// ================
+// Owner: Dispatch
+// ================
+// Packets: Dispatch
+typedef struct packed {
+    // from ID_RESULT
+`ifdef DEBUG
+    int             id;
+`endif
+    WADDR           PC;
+    INST            inst;
+    FU_IDX          fu_idx;
+
+    ALU_FUNC        alu_func;   // ALU function select (ALU_xxx *)
+    ALU_OPA_SELECT  opa_select; // ALU opa mux select (ALU_OPA_xxx *)
+    ALU_OPB_SELECT  opb_select; // ALU opb mux select (ALU_OPB_xxx *)
+
+    logic           has_dst;    // does insn have destination register?
+    logic           cond_branch;// Is inst a conditional branch? (0 = not branch OR not cond_branch, 1 = cond_branch)
+    logic           halt;       // Is this a halt?
+    logic           illegal;    // Is this instruction illegal?
+    logic           csr_op;     // Is this a CSR operation? (we only used this as a cheap way to get return code)
+    BTQ_IDX         btq_idx;
+
+    // alloc
+    PHYS_REG_IDX    t;
+    // rename
+    BMASK           b1hot;
+    PHYS_REG_IDX    t_old;
+    PHYS_REG_IDX    t1;
+    PHYS_REG_IDX    t2;
+} RENAME_COMMIT_PKT;
+
+typedef struct packed {
+    // from ID_RESULT
+`ifdef DEBUG
+    int             id;
+`endif
+    WADDR           PC;
+    INST            inst;
+    FU_IDX          fu_idx;
+
+    ALU_FUNC        alu_func;   // ALU function select (ALU_xxx *)
+    ALU_OPA_SELECT  opa_select; // ALU opa mux select (ALU_OPA_xxx *)
+    ALU_OPB_SELECT  opb_select; // ALU opb mux select (ALU_OPB_xxx *)
+
+    logic           has_dst;    // does insn have destination register?
+    logic           cond_branch;// Is inst a conditional branch? (0 = not branch OR not cond_branch, 1 = cond_branch)
+    logic           halt;       // Is this a halt?
+    logic           illegal;    // Is this instruction illegal?
+    logic           csr_op;     // Is this a CSR operation? (we only used this as a cheap way to get return code)
+    BTQ_IDX         btq_idx;
+
+    // alloc
+    PHYS_REG_IDX    t;
+    // rename
+    BMASK           b1hot;
+    BMASK           bmask;
+    PHYS_REG_IDX    t_old; // should be unused in RS
+    PHYS_REG_IDX    t1;
+    PHYS_REG_IDX    t2;
+    logic           t1_rdy;
+    logic           t2_rdy;
+    // commit
+    ROB_IDX         rob_idx;
+} COMMIT_RS_PKT; // purely combinational
+
+// I/O: Dispatch
+typedef struct packed {
+    // NOTE: This is the only place where a transaction is
+    // RECEIVER-decided!!! (i.e. receiver broadcasts enable signals)
+    `CNT_TYPE(N) dispatch_en_cnt;
+} dispatch2decode;
+
+typedef struct packed {
+    `CNT_TYPE(N) snap_en_cnt;
+} rename2bman;
+
+typedef struct packed {
+    `CNT_TYPE(N) en_cnt;
+        // - Number of enabled dispatch lines?
+        // - NOTE: For in-order stuff with serial deps (like dispatch), use c(ou)nts;
+        // otherwise use en(able) buses.
+    REG_IDX       [N-1:0] src1s;
+    REG_IDX       [N-1:0] src2s;
+    REG_IDX       [N-1:0] dsts;
+    PHYS_REG_IDX  [N-1:0] ts;
+        // To: Map table
+        // - IMPORTANT: Set from lowest indices in program-order. NO GAPS!!!
+} dispatch2map_table;
+
+typedef struct packed {
+    logic [N-1:0] snap_en;
+    BMASK [N-1:0] b1hot_n;
+`ifdef DEBUG
+    BTQ_IDX [N-1:0] btq_idx;
+`endif
+    BTQ_IDX [N-1:0] btq_tail;
+    logic [N-1:0][`IDX_SIZE(ROB_SZ)-1:0] fl_head;
+    RAS_SNAP [N-1:0] ras_snap;
+    // mt checkpoints are handled locally
+} rename2snap_bus;
+
+typedef struct packed {
+    logic [N-1:0] snap_en;
+    BMASK [N-1:0] b1hot_n;
+    ROB_IDX [N-1:0] rob_tail;
+} comm2snap_bus;
+
+typedef struct packed {
+    /* Alloc */
+    /* Rename */
+    /* Commit */
+    logic   [FU_IDX_NUM-1:0][N-1:0] en;
+        // - To: RS
+        // - Number of enabled dispatch lines? (replacement for d_vld)
+        // - Question: permit
+        // 1) only N dispatches, OR
+        // 2) a different limit number of dispatches DIS_MAX: N ≤ DIS_MAX ≤ RS_SZ
+        // (DIS_MAX will be a new sys_defs.svh constant) ?
+    COMMIT_RS_PKT [N-1:0] dat; //shouldn't have dispatch feed to RS,
+        // - To: RS               //should come directly from dispatch
+} dispatch2rs;
+
+typedef struct packed {
+    /* Rename */
+    /* Commit */
+    `CNT_TYPE(N) d_en_cnt;
+        // To: ROB
+        // - Number of enabled dispatch lines?
+    PHYS_REG_IDX [N-1:0] tag;
+    PHYS_REG_IDX [N-1:0] t_old;
+        // From: dispatch
+        // - IMPORTANT: Set from lowest indices in program-order. NO GAPS!!!
+    FU_IDX  [N-1:0] fu_idx;
+    REG_IDX [N-1:0] dst;
     logic   [N-1:0] halt;
     logic   [N-1:0] illegal;
-} COMMIT_PACKET;
+} dispatch2rob;
 
+typedef struct packed {
+    `CNT_TYPE(N) free_d_en_cnt;
+        // To: Free list
+        // - number of enabled dispatch lines WHO NEED A DEST PREG 
+        //   (e.g. no stores)
+        //   (i.e. may only be a strict subset of dispatching insns!)
+} dispatch2free_list;
+
+
+// ================
+// Owner: ROB
+// ================
+// Packets: ROB
 typedef struct packed {
     logic           cpl;
     PHYS_REG_IDX    tag;
@@ -533,54 +707,36 @@ typedef struct packed {
     logic           illegal;
 } ROB_ENTRY;
 
+// I/O: ROB
 typedef struct packed {
-    // for reading
-    BTQ_IDX [NUM_FU_BRU-1:0] btq_idx;
-
-    struct packed {
-        logic   en;
-        // BTQ-specific completion stuff
-        BTQ_IDX btq_idx; 
-            // Entries to which we are completing
-        logic   take;
-        WADDR   tgt;
-    } [NUM_FU_BRU-1:0] dat;
-} execute2btq;
-
-
-// branch completion bus
-typedef struct packed {
-    logic   [NUM_FU_BRU-1:0] en;
-    
-    // BTQ-specific completion stuff
-    struct packed {
-        BTQ_IDX btq_idx; 
-            // Entries to which we are completing
-        logic   take;
-        WADDR   tgt;
-        logic   [`IDX_SIZE(GHR_BUF_SZ)-1:0] ghr_base;
-    } [NUM_FU_BRU-1:0] dat;
-} execute2complete_bru;
+    `CNT_TYPE(N)rob_rdy_scnt;
+        // From: ROB
+        // saturating counter for number of free rob entries
+    ROB_IDX [N:0] rob_idxs_n;
+        // To: dispatch
+        // rob idxs of entries that can be allocated this cycle
+} rob2dispatch;
 
 typedef struct packed {
-    // WADDR [NUM_FU_BRU-1:0] PC; // Does BRU need to carry PC if we can supply it like so?
-    logic [NUM_FU_BRU-1:0] is_tail;
-    logic [NUM_FU_BRU-1:0] pred;
-    WADDR [NUM_FU_BRU-1:0] pred_tgt;
-    logic [NUM_FU_BRU-1:0][3:0] pc_off;
-    logic [NUM_FU_BRU-1:0][`IDX_SIZE(GHR_BUF_SZ)-1:0] ghr_base;
-} btq2execute;
+    `CNT_TYPE(N) r_vld_cnt;
+        // From: retire (ROB)
+        // - number of valid retire lines
+    ROB_ENTRY   [N-1:0]        entries; 
+        // - IMPORTANT: Set from lowest indices in program-order. NO GAPS!!!
+} rob2retire;
 
+
+// ================
+// Owner: RS
+// ================
+// Packets: RS
 typedef struct packed {
-    `CNT_TYPE(N) r_en_cnt; // final final
-    PHYS_REG_IDX [N-1:0]   tag;
-    PHYS_REG_IDX [N-1:0]   t_old;
-    REG_IDX      [N-1:0]   dst;
-    logic        [N-1:0]   halt;
-    logic        [N-1:0]   illegal;
-} retire_final;
+    logic bypass1;
+    logic bypass2;
+    `IDX_TYPE(N) cdb_idx1;
+    `IDX_TYPE(N) cdb_idx2;
+} BYPASS_TAG;
 
-// Reservation station stuff
 typedef struct packed {
 `ifdef DEBUG
     int             id; // debug only; unique insn identifier
@@ -665,294 +821,11 @@ typedef struct packed {
     logic           cond_branch;
 } RS_BRU_PAYLOAD;
 
-/* 
-The following structs are enrichments of the previous.
-ID_RESULT -> ALLOC_RENAME_PKT -> RENAME_COMMIT_PKT -> COMMIT_RS_PKT
-*/
-typedef struct packed {
-`ifdef DEBUG
-    int             id;
-`endif
-    WADDR           PC;
-    INST            inst;
-    FU_IDX          fu_idx;
-
-    ALU_FUNC        alu_func;   // ALU function select (ALU_xxx *)
-    ALU_OPA_SELECT  opa_select; // ALU opa mux select (ALU_OPA_xxx *)
-    ALU_OPB_SELECT  opb_select; // ALU opb mux select (ALU_OPB_xxx *)
-
-    logic           has_dst;    // does insn have destination register?
-    logic           cond_branch;// Is inst a conditional branch? (0 = not branch OR not cond_branch, 1 = cond_branch)
-    logic           halt;       // Is this a halt?
-    logic           illegal;    // Is this instruction illegal?
-    logic           csr_op;     // Is this a CSR operation? (we only used this as a cheap way to get return code)
-    RAS_SNAP        ras_snap;
-    BTQ_IDX         btq_idx;
-} ID_RESULT;
-
-typedef struct packed {
-    // from ID_RESULT
-`ifdef DEBUG
-    int             id;
-`endif
-    WADDR           PC;
-    INST            inst;
-    FU_IDX          fu_idx;
-
-    ALU_FUNC        alu_func;   // ALU function select (ALU_xxx *)
-    ALU_OPA_SELECT  opa_select; // ALU opa mux select (ALU_OPA_xxx *)
-    ALU_OPB_SELECT  opb_select; // ALU opb mux select (ALU_OPB_xxx *)
-
-    logic           has_dst;    // does insn have destination register?
-    logic           cond_branch;// Is inst a conditional branch? (0 = not branch OR not cond_branch, 1 = cond_branch)
-    logic           halt;       // Is this a halt?
-    logic           illegal;    // Is this instruction illegal?
-    logic           csr_op;     // Is this a CSR operation? (we only used this as a cheap way to get return code)
-    BTQ_IDX         btq_idx;
-
-    // alloc
-    PHYS_REG_IDX    t;
-    `IDX_TYPE(ROB_SZ) fl_head_snap;
-} ALLOC_RENAME_PKT;
-
-typedef struct packed {
-    // from ID_RESULT
-`ifdef DEBUG
-    int             id;
-`endif
-    WADDR           PC;
-    INST            inst;
-    FU_IDX          fu_idx;
-
-    ALU_FUNC        alu_func;   // ALU function select (ALU_xxx *)
-    ALU_OPA_SELECT  opa_select; // ALU opa mux select (ALU_OPA_xxx *)
-    ALU_OPB_SELECT  opb_select; // ALU opb mux select (ALU_OPB_xxx *)
-
-    logic           has_dst;    // does insn have destination register?
-    logic           cond_branch;// Is inst a conditional branch? (0 = not branch OR not cond_branch, 1 = cond_branch)
-    logic           halt;       // Is this a halt?
-    logic           illegal;    // Is this instruction illegal?
-    logic           csr_op;     // Is this a CSR operation? (we only used this as a cheap way to get return code)
-    BTQ_IDX         btq_idx;
-
-    // alloc
-    PHYS_REG_IDX    t;
-    // rename
-    BMASK           b1hot;
-    PHYS_REG_IDX    t_old;
-    PHYS_REG_IDX    t1;
-    PHYS_REG_IDX    t2;
-} RENAME_COMMIT_PKT;
-
-typedef struct packed {
-    // from ID_RESULT
-`ifdef DEBUG
-    int             id;
-`endif
-    WADDR           PC;
-    INST            inst;
-    FU_IDX          fu_idx;
-
-    ALU_FUNC        alu_func;   // ALU function select (ALU_xxx *)
-    ALU_OPA_SELECT  opa_select; // ALU opa mux select (ALU_OPA_xxx *)
-    ALU_OPB_SELECT  opb_select; // ALU opb mux select (ALU_OPB_xxx *)
-
-    logic           has_dst;    // does insn have destination register?
-    logic           cond_branch;// Is inst a conditional branch? (0 = not branch OR not cond_branch, 1 = cond_branch)
-    logic           halt;       // Is this a halt?
-    logic           illegal;    // Is this instruction illegal?
-    logic           csr_op;     // Is this a CSR operation? (we only used this as a cheap way to get return code)
-    BTQ_IDX         btq_idx;
-
-    // alloc
-    PHYS_REG_IDX    t;
-    // rename
-    BMASK           b1hot;
-    BMASK           bmask;
-    PHYS_REG_IDX    t_old; // should be unused in RS
-    PHYS_REG_IDX    t1;
-    PHYS_REG_IDX    t2;
-    logic           t1_rdy;
-    logic           t2_rdy;
-    // commit
-    ROB_IDX         rob_idx;
-} COMMIT_RS_PKT; // purely combinational
-
-
-// By Fetch
-typedef struct packed {
-    // insn md flattened
-    logic   [N-1:0]    brch, cond, call, ret;
-    WADDR   [N:0]      PC_n; // branch pc
-    logic   [N:0][`CNT_SIZE(N)-1:0] brch_prefix_cnt;
-
-    `CNT_TYPE(N)       f_cnt;
-    logic   [N-1:0]    f_en;
-} fetch2bp;
-
-typedef struct packed {
-    // fetch sublimit
-    `CNT_TYPE(N) lim_cnt; // f_cnt limit (cap at first taken)
-    `CNT_TYPE(N) ghr_rdy_scnt;
-
-    // btq_entry contributions
-    logic   [N-1:0] take;
-    WADDR   [N-1:0] tgt;
-    logic   [N-1:0][GHR_LEN-1:0] hash;
-
-    // if_id_packet contributions
-    RAS_SNAP[N-1:0] ras_snap;
-    logic   [N-1:0][`IDX_SIZE(GHR_BUF_SZ)-1:0] ghr_base;
-    logic   [N-1:0] pred_gshare;
-    logic   [N-1:0] pred_bim;
-} bp2fetch;
-
-typedef struct packed {
-    `CNT_TYPE(N)   f_en_cnt;
-    IF_ID_PACKET    [N-1:0]    f_dat;
-} fetch2decode;
-
-typedef struct packed {
-    WADDR [N-1:0] pc;
-} fetch2btb;
-
-typedef struct packed {
-    logic [N-1:0] vld; // i.e. hit?
-    WADDR [N-1:0] tgt;
-} btb2fetch;
-
-// By decode
-typedef struct packed {
-    `CNT_TYPE(N) d_rdy_cnt;
-} decode2fetch;
-
-typedef struct packed {
-    DWADDR [N-1:0] PCdws; // PC double word indices
-} fetch2mem;
-
-typedef struct packed {
-    MEM_BLOCK   [N-1:0] data;
-    BRANCH_MD   [N-1:0][1:0] insn_md; // [dw][w]
-} mem2fetch;
-
-typedef struct packed {
-    `CNT_TYPE(N) d_vld_scnt;
-    ID_RESULT   [N-1:0]        d_dat;
-} decode2dispatch;
-
-// By Arch Map
-parameter int NUM_ARCH_REG = 32;
-typedef struct packed {
-    PHYS_REG_IDX [NUM_ARCH_REG-1:0] entries;
-} arch_map2map_table;
-
-// By Dispatch
-typedef struct packed {
-    // NOTE: This is the only place where a transaction is
-    // RECEIVER-decided!!! (i.e. receiver broadcasts enable signals)
-    `CNT_TYPE(N) dispatch_en_cnt;
-} dispatch2decode;
-
-typedef struct packed {
-    `CNT_TYPE(N) snap_en_cnt;
-} rename2bman;
-
-typedef struct packed {
-    `CNT_TYPE(N) snap_rdy_scnt;
-    BMASK [N-1:0]  b1hot_n;
-    BMASK [N:0]    bmask_n;
-} bman2rename;
-
-typedef struct packed {
-    logic [N-1:0] snap_en;
-    BMASK [N-1:0] b1hot_n;
-`ifdef DEBUG
-    BTQ_IDX [N-1:0] btq_idx;
-`endif
-    BTQ_IDX [N-1:0] btq_tail;
-    logic [N-1:0][`IDX_SIZE(ROB_SZ)-1:0] fl_head;
-    RAS_SNAP [N-1:0] ras_snap;
-    // mt checkpoints are handled locally
-} rename2snap_bus;
-
-typedef struct packed {
-    logic [N-1:0] snap_en;
-    BMASK [N-1:0] b1hot_n;
-    ROB_IDX [N-1:0] rob_tail;
-} comm2snap_bus;
-
-typedef struct packed {
-    /* Alloc */
-    /* Rename */
-    /* Commit */
-    logic   [FU_IDX_NUM-1:0][N-1:0] en;
-        // - To: RS
-        // - Number of enabled dispatch lines? (replacement for d_vld)
-        // - Question: permit
-        // 1) only N dispatches, OR
-        // 2) a different limit number of dispatches DIS_MAX: N ≤ DIS_MAX ≤ RS_SZ
-        // (DIS_MAX will be a new sys_defs.svh constant) ?
-    COMMIT_RS_PKT [N-1:0] dat; //shouldn't have dispatch feed to RS,
-        // - To: RS               //should come directly from dispatch
-} dispatch2rs;
-
-typedef struct packed {
-    /* Rename */
-    /* Commit */
-    `CNT_TYPE(N) d_en_cnt;
-        // To: ROB
-        // - Number of enabled dispatch lines?
-    PHYS_REG_IDX [N-1:0] tag;
-    PHYS_REG_IDX [N-1:0] t_old;
-        // From: dispatch
-        // - IMPORTANT: Set from lowest indices in program-order. NO GAPS!!!
-    FU_IDX  [N-1:0] fu_idx;
-    REG_IDX [N-1:0] dst;
-    logic   [N-1:0] halt;
-    logic   [N-1:0] illegal;
-} dispatch2rob;
-
-typedef struct packed {
-    `CNT_TYPE(N) free_d_en_cnt;
-        // To: Free list
-        // - number of enabled dispatch lines WHO NEED A DEST PREG 
-        //   (e.g. no stores)
-        //   (i.e. may only be a strict subset of dispatching insns!)
-} dispatch2free_list;
-
-typedef struct packed {
-    `CNT_TYPE(N) en_cnt;
-        // - Number of enabled dispatch lines?
-        // - NOTE: For in-order stuff with serial deps (like dispatch), use c(ou)nts;
-        // otherwise use en(able) buses.
-    REG_IDX       [N-1:0] src1s;
-    REG_IDX       [N-1:0] src2s;
-    REG_IDX       [N-1:0] dsts;
-    PHYS_REG_IDX  [N-1:0] ts;
-        // To: Map table
-        // - IMPORTANT: Set from lowest indices in program-order. NO GAPS!!!
-} dispatch2map_table;
-
-
-// By Map Table
-typedef struct packed {
-    PHYS_REG_IDX [N-1:0] t1s;
-    PHYS_REG_IDX [N-1:0] t2s;
-    PHYS_REG_IDX [N-1:0] ts_old;
-} map_table2dispatch;
-
-// By RS
+// I/O: RS
 typedef struct packed {
     logic   [FU_IDX_NUM-1:0][N-1:0] rdy_sbus;
         // - From: RS
 } rs2dispatch;
-
-typedef struct packed {
-    logic bypass1;
-    logic bypass2;
-    `IDX_TYPE(N) cdb_idx1;
-    `IDX_TYPE(N) cdb_idx2;
-} BYPASS_TAG;
 
 typedef struct packed {
     /* Requested by issue arbiter 
@@ -977,25 +850,12 @@ typedef struct packed {
     BYPASS_TAG [NUM_FU_BRU-1:0] bytag_bru;
 } rs2execute;
 
-// By ROB
-typedef struct packed {
-    `CNT_TYPE(N)rob_rdy_scnt;
-        // From: ROB
-        // saturating counter for number of free rob entries
-    ROB_IDX [N:0] rob_idxs_n;
-        // To: dispatch
-        // rob idxs of entries that can be allocated this cycle
-} rob2dispatch;
 
-typedef struct packed {
-    `CNT_TYPE(N) r_vld_cnt;
-        // From: retire (ROB)
-        // - number of valid retire lines
-    ROB_ENTRY   [N-1:0]        entries; 
-        // - IMPORTANT: Set from lowest indices in program-order. NO GAPS!!!
-} rob2retire;
-
-// By Execute
+// ================
+// Owner: Execute
+// ================
+// Packets: Execute
+// I/O: Execute
 typedef struct packed {
     logic       [NUM_FU_ALU-1:0]   fu_rdy_alu;
     logic       [NUM_FU_MUL-1:0]  fu_rdy_mul;
@@ -1008,10 +868,41 @@ typedef struct packed {
 } execute2rs;
 
 typedef struct packed {
+    // for reading
+    BTQ_IDX [NUM_FU_BRU-1:0] btq_idx;
+
+    struct packed {
+        logic   en;
+        // BTQ-specific completion stuff
+        BTQ_IDX btq_idx; 
+            // Entries to which we are completing
+        logic   take;
+        WADDR   tgt;
+    } [NUM_FU_BRU-1:0] dat;
+} execute2btq;
+
+`define BY_FU(type) \
+struct packed { \
+    type [NUM_FU_ALU-1:0]  alu; \
+    type [NUM_FU_MUL-1:0]  mul; \
+    type [NUM_FU_LOD-1:0]  lod; \
+    type [NUM_FU_STR-1:0]  str; \
+    type [NUM_FU_BRU-1:0]  bru; \
+}
+typedef struct packed {
+    `BY_FU(logic)           en1s;
+    `BY_FU(logic)           en2s;
+    `BY_FU(PHYS_REG_IDX)    t1s;
+    `BY_FU(PHYS_REG_IDX)    t2s;
+} execute2prf;
+
+// tag completion bus (i.e. early wakeup bus)
+typedef struct packed {
     logic           [N-1:0] en;
     PHYS_REG_IDX    [N-1:0] ts;
 } execute2complete_tag;
 
+// data completion bus (i.e. CDB)
 typedef struct packed {
     logic           [N-1:0] en;
     PHYS_REG_IDX    [N-1:0] ts;
@@ -1021,7 +912,65 @@ typedef struct packed {
     DATA            [N-1:0] data;
 } execute2complete_dat;
 
-// By Free List
+// branch completion bus
+typedef struct packed {
+    logic   [NUM_FU_BRU-1:0] en;
+    
+    // BTQ-specific completion stuff
+    struct packed {
+        BTQ_IDX btq_idx; 
+            // Entries to which we are completing
+        logic   take;
+        WADDR   tgt;
+        logic   [`IDX_SIZE(GHR_BUF_SZ)-1:0] ghr_base;
+    } [NUM_FU_BRU-1:0] dat;
+} execute2complete_bru;
+
+
+// ================
+// Owner: Retire
+// ================
+// Packets: Retire
+/**
+ * Commit Packet:
+ * This is an output of the processor and used in the testbench for counting
+ * committed instructions
+ *
+ * It also acts as a "WB_PACKET", and can be reused in the final project with
+ * some slight changes
+ */
+typedef struct packed {
+    `CNT_TYPE(N) r_en_cnt;
+    logic   [N-1:0] halt;
+    logic   [N-1:0] illegal;
+} COMMIT_PACKET;
+
+// I/O: Retire
+typedef struct packed {
+    `CNT_TYPE(N) r_en_cnt; // final final
+    PHYS_REG_IDX [N-1:0]   tag;
+    PHYS_REG_IDX [N-1:0]   t_old;
+    REG_IDX      [N-1:0]   dst;
+    logic        [N-1:0]   halt;
+    logic        [N-1:0]   illegal;
+} retire_final;
+
+
+// ================
+// Only-owned I/Os
+// ================
+typedef struct packed {
+    `CNT_TYPE(N) snap_rdy_scnt;
+    BMASK [N-1:0]  b1hot_n;
+    BMASK [N:0]    bmask_n;
+} bman2rename;
+
+typedef struct packed {
+    PHYS_REG_IDX [N-1:0] t1s;
+    PHYS_REG_IDX [N-1:0] t2s;
+    PHYS_REG_IDX [N-1:0] ts_old;
+} map_table2dispatch;
+
 typedef struct packed {
     `CNT_TYPE(N) free_rdy_scnt;
         // From: Free list
@@ -1034,26 +983,9 @@ typedef struct packed {
     logic [N:0][`IDX_SIZE(ROB_SZ)-1:0] fl_heads_n;
 } free_list2dispatch;
 
-`define BY_FU(type) \
-struct packed { \
-    type [NUM_FU_ALU-1:0]  alu; \
-    type [NUM_FU_MUL-1:0]  mul; \
-    type [NUM_FU_LOD-1:0]  lod; \
-    type [NUM_FU_STR-1:0]  str; \
-    type [NUM_FU_BRU-1:0]  bru; \
-}
-
-typedef struct packed {
-    `BY_FU(logic)           en1s;
-    `BY_FU(logic)           en2s;
-    `BY_FU(PHYS_REG_IDX)    t1s;
-    `BY_FU(PHYS_REG_IDX)    t2s;
-} execute2prf;
-
 typedef struct packed{
     `BY_FU(DATA)    v1s;
     `BY_FU(DATA)    v2s;
 } prf2execute;
-
 
 `endif // __SYS_DEFS_SVH__

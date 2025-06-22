@@ -3,6 +3,10 @@
 Architectural Map
 ================================================
 */
+typedef struct packed {
+    PHYS_REG_IDX [NUM_ARCH_REG-1:0] entries;
+} arch_map2map_table;
+
 module arch_map #(parameter 
     N=N
 ) (

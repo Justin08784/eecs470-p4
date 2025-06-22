@@ -237,6 +237,8 @@ localparam RV32_Jimm_width_gp     = 20;
 // ---- Instruction Typedef ---- //
 ///////////////////////////////////
 
+parameter NUM_ARCH_REG = 32;
+
 // from the RISC-V ISA spec
 typedef union packed {
     logic [31:0] inst;

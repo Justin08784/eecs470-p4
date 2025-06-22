@@ -245,7 +245,6 @@ module cpu (
 
 
     /* >> ==== Map table ==== >> */
-    arch_map2map_table am_2_mt;
 `ifdef DEBUG
     struct packed {
         logic [PHYS_REG_SZ_R10K-1:0][$bits(DATA)-1:0] file;

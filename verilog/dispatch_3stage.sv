@@ -1,5 +1,30 @@
 `include "sys_defs.svh"
 
+typedef struct packed {
+    // from ID_RESULT
+`ifdef DEBUG
+    int             id;
+`endif
+    WADDR           PC;
+    INST            inst;
+    FU_IDX          fu_idx;
+
+    ALU_FUNC        alu_func;   // ALU function select (ALU_xxx *)
+    ALU_OPA_SELECT  opa_select; // ALU opa mux select (ALU_OPA_xxx *)
+    ALU_OPB_SELECT  opb_select; // ALU opb mux select (ALU_OPB_xxx *)
+
+    logic           has_dst;    // does insn have destination register?
+    logic           cond_branch;// Is inst a conditional branch? (0 = not branch OR not cond_branch, 1 = cond_branch)
+    logic           halt;       // Is this a halt?
+    logic           illegal;    // Is this instruction illegal?
+    logic           csr_op;     // Is this a CSR operation? (we only used this as a cheap way to get return code)
+    BTQ_IDX         btq_idx;
+
+    // alloc
+    PHYS_REG_IDX    t;
+    `IDX_TYPE(ROB_SZ) fl_head_snap;
+} ALLOC_RENAME_PKT;
+
 module dispatch #(parameter 
     N=N
 ) (
