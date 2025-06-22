@@ -96,7 +96,7 @@
 # there should be no need to change anything for project 3
 
 # this is a global clock period variable used in the tcl script and referenced in testbenches
-export CLOCK_PERIOD = 5.0
+export CLOCK_PERIOD = 30.0
 
 # the Verilog Compiler command and arguments
 VCS =  vcs -sverilog -xprop=tmerge +vc -Mupdate -Mdir=build/csrc -line -full64 -kdb -lca -nc \
@@ -206,6 +206,11 @@ MODULES = cpu \
 # TODO: update this if you add more header files
 ALL_HEADERS = $(CPU_HEADERS)
 
+ALIGN_FILES = include/sys_defs.svh verilog/compactor.sv
+build/align.simv: $(ALIGN_FILES)
+build/align.cov: $(ALIGN_FILES)
+synth/align.vg: $(ALIGN_FILES)
+
 BPU_FILES = include/sys_defs.svh verilog/uftb.sv verilog/skid_buffer.sv verilog/ghr.sv
 build/bpu.simv: $(BPU_FILES)
 build/bpu.cov: $(BPU_FILES)
@@ -281,6 +286,7 @@ CPU_TESTBENCH = test/pipeline_print.c \
 CPU_SOURCES = verilog/cpu.sv \
 			verilog/align.sv \
 			verilog/checkpoints.sv \
+			verilog/compactor.sv \
 			verilog/fetch.sv \
 			verilog/regfile.sv \
 			verilog/memDP.sv \

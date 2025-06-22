@@ -14,7 +14,7 @@
 // comment to disable clock cycle print
 // `define CYCLE_PRINT
 // comment out to...
-`define PC_GEN_TEST_MODE
+// `define PC_GEN_TEST_MODE
 `endif
 
 ///////////////////////////////////
@@ -31,9 +31,10 @@ parameter N = 2;
 // sizes
 parameter ROB_SZ= 64;
 parameter BTQ_SZ= 16;
-parameter RAS_SZ= 16;
     /* BTQ_SZ doubled (form 8). This improved CPI on tight loop
     programs like branchy.s and branchy_nested.s */
+parameter RAS_SZ= 16;
+parameter FTQ_SZ = 32;
 parameter PHYS_REG_SZ_P6    = 32;
 parameter PHYS_REG_SZ_R10K  = (32 + ROB_SZ);
 

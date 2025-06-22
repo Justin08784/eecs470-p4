@@ -1,9 +1,17 @@
 `ifndef TYPES_SVH
 `define TYPES_SVH
 
+`include "util_macros.svh"
+
 // word and register sizes
 typedef logic [31:0] DATA;
 typedef logic [4:0]  REG_IDX;
+
+typedef logic [31:0] ADDR;
+typedef logic [15:0] BADDR;
+typedef logic [14:0] HADDR;
+typedef logic [13:0] WADDR;
+typedef logic [12:0] DWADDR;
 
 typedef logic [BMASK_LEN-1:0] BMASK;
 
@@ -20,6 +28,34 @@ typedef enum logic [2:0] {
 typedef `IDX_TYPE(BTQ_SZ) BTQ_IDX;
 typedef `IDX_TYPE(ROB_SZ) ROB_IDX;
 typedef `IDX_TYPE(LSQ_SZ) LSQ_IDX;
+
+// A memory or cache block
+typedef union packed {
+    logic [7:0][7:0]  byte_level;
+    logic [3:0][15:0] half_level;
+    logic [1:0][31:0] word_level;
+    logic      [63:0] dbbl_level;
+} MEM_BLOCK;
+typedef union packed {
+    logic [3:0][7:0]  byte_level;
+    logic [1:0][15:0] half_level;
+    logic      [31:0] word_level;
+} DATA_BLOCK;
+
+typedef enum logic [1:0] {
+    BYTE   = 2'h0,
+    HALF   = 2'h1,
+    WORD   = 2'h2,
+    DOUBLE = 2'h3
+} MEM_SIZE;
+
+// Memory bus commands
+typedef enum logic [1:0] {
+    MEM_NONE = 2'h0,
+    MEM_LOAD = 2'h1,
+    MEM_STORE= 2'h2
+} MEM_COMMAND;
+
 
 
 ///////////////////////////////

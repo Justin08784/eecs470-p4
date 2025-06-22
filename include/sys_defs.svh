@@ -15,6 +15,7 @@
 `include "config.svh"
 `include "types.svh"
 `include "mem.svh"
+`include "frontend.svh"
 
 
 ////////////////////////////////
@@ -27,22 +28,6 @@
  *
  * Define new ones in project 4 at your own discretion
  */
-
-/**
- * IF_ID Packet:
- * Data exchanged from the IF to the ID stage
- */
-typedef struct packed {
-    logic [N-1:0][`IDX_SIZE(RAS_SZ)-1:0] top;
-    logic [N-1:0][`CNT_SIZE(RAS_SZ)-1:0] used;
-} RAS_SNAP;
-typedef struct packed {
-    INST  inst;
-    WADDR PC;
-
-    RAS_SNAP ras_snap;
-    BTQ_IDX btq_idx;
-} IF_ID_PACKET;
 
 /**
  * Commit Packet:
@@ -70,110 +55,6 @@ typedef struct packed {
 } ROB_ENTRY;
 
 typedef struct packed {
-    logic _dummy;
-} SQ_ENTRY;
-
-typedef struct packed {
-    logic _dummy;
-} LQ_ENTRY;
-
-// BPU stuff
-typedef enum logic [1:0] {
-    SN = 2'b00,
-    WN = 2'b01,
-    WT = 2'b10,
-    ST = 2'b11
-} SC_STATE;
-
-function automatic logic [1:0] update_sc(
-    input logic unsigned [1:0] sc,
-    input logic take
-);
-    if (take)
-        return sc == 2'b11 ? 2'b11 : sc + `UCAST_FIT(1);
-    else
-        return sc == 0 ? 0 : sc - `UCAST_FIT(1);
-endfunction
-
-function automatic logic query_sc(input logic [1:0] sc);
-    return sc[1];
-endfunction
-
-typedef struct packed {
-    logic [1:0] sc;
-    logic       vld;
-    WADDR       tgt;
-    logic [3:0] off;
-        /* TODO (critical path opt.): Use either...
-            A. cry, lo4 scheme:
-                cry = idx-4 carry bit,
-                lo4 = lowest 4 bits of branch pc
-                pc  = {base + cry, lo4}
-                ++ cheap to reconstruct pc (simply concat lowest bits)
-                -- costlier update_fb offset comparisons
-
-            B. cry, off scheme:
-                cry = same as above
-                off = pc - base
-                pc  = {base + cry, (base + off)[3:0]}
-                -- costlier to reconstruct pc (add offset)
-                ++ cheaper update_fb offset comparisons
-
-            Maybe lo4 for fallthrough (end_off), off for branch pc_off?
-        */
-    logic       always_take; // i.e. a cond branch that is always taken?
-} FTB_BR_SLOT;
-typedef struct packed {
-    logic cond;         // = "sharing" bit
-    logic call;
-    logic ret;
-    logic jalr;
-} FTB_MD1;
-
-typedef struct packed {
-    // fallthrough npc (i.e. npc if no branch taken)
-    logic [3:0] end_off;    // offset of last insn in the FB. ft_npc = base + end_off + 1
-        // TODO: see FTB_BR_SLOT (above) for alternative schemes
-
-    // two branch slots: [0, 1]
-    FTB_BR_SLOT [1:0] br_slot;
-
-    // metadata re: br1/tail slot
-    FTB_MD1 md1;
-} FTB_ENTRY;
-
-typedef struct packed {
-    WADDR       base;
-    logic [3:0] pc_off; // pc = base + pc_off
-    logic       take;
-    WADDR       tgt;
-
-    FTB_MD1 md;
-} FTB_UPD_PKT;
-
-parameter FTQ_SZ = 32;
-typedef struct packed {
-`ifdef PC_GEN_TEST_MODE
-    int id;
-`endif
-    WADDR       base_n;     // base address of *next* FB
-
-    logic       ft;         // fallthrough? else took a branch
-    logic       pred_idx;   // ft ? <IGNORE>: slot of pred-taken branch
-    logic [3:0] off;        // ft ? end_off : slot[pred_idx].off
-    logic       hit;
-
-    // pared down FTB entry
-    struct packed {
-        logic       vld;
-        logic [3:0] off;
-    } [1:0] slot;
-
-    logic       always_take;// ft ? <IGNORE>: " of pred-taken branch
-    FTB_MD1     md;         // ft ? <IGNORE>: " of pred-tkaen branch
-} FTQ_ENTRY;
-
-typedef struct packed {
     DWADDR              dw;
     logic   [1:0][3:0]  off;
         // FB_OFF[1:0][1:0]ixq_out_off,
@@ -181,66 +62,6 @@ typedef struct packed {
     logic   [1:0]       is_end;
 } pc_gen2ixq;
 
-// BTQ stuff
-// By btq
-typedef struct packed {
-`ifdef DEBUG
-    BMASK   b1hot;
-`endif
-    WADDR   PC;
-    logic   is_tail;
-        /*  In BPU, if hit in FTB, is the offset of this branch greater than or equal
-        to the offset of the branch in the tail slot / br1, if any? */
-    logic   [3:0] off; // offset in fb (if taken, equals offset in FTQ_ENTRY)
-
-    logic   rslv; // resolved? 0: take, tgt are predictions, 1: " are real values
-    logic   take;
-    WADDR   tgt;
-        // NOTE: We used to have separate pred, pred_tgt fields.
-
-    logic   always_take;
-        /* During retire-time update, this is sent to the direction predictors,
-        and not the FTB. We will use "take" to update the always_take in-place
-        in the FTB. */
-    FTB_MD1 md;
-
-    logic   [N-1:0]        hit;        // hit an entry with base in FTB?
-    logic   [N-1:0]        hit_slot;   // hit a slot in entry? (valid only if hit)
-    logic   [GHR_LEN-1:0]   hash;       // gshare hash index
-    logic   [N-1:0][`IDX_SIZE(GHR_BUF_SZ)-1:0] ghr_base;
-} BTQ_ENTRY;
-
-typedef struct packed {
-    // FTB_UPD_PKT fields
-    WADDR       base;
-    logic [3:0] pc_off; // pc = base + pc_off
-    logic       take;
-    WADDR       tgt;
-
-    logic       always_take; // i.e. a cond branch that is always taken?
-    FTB_MD1     md;
-
-    // predictor-specific fields
-    logic en_dir_update;    // update direction predictors?
-    logic [GHR_LEN-1:0] hash; // gshare hash
-
-} BPU_UPD_PKT;
-
-// typedef struct packed {
-//     logic take;
-//     WADDR pc;
-//     WADDR tgt;
-//     logic cond;
-//     logic [GHR_LEN-1:0] hash;
-//     logic pred_bim;
-//     logic pred_gshare;
-// } PUQ_ENTRY;
-
-typedef struct packed {
-    logic en;
-    WADDR pc;
-    WADDR tgt;
-} puq2btb;
 
 typedef struct packed {
     // for reading
@@ -527,35 +348,6 @@ typedef struct packed {
 } fetch2decode;
 
 typedef struct packed {
-    logic       en;
-    BPU_UPD_PKT dat;
-} puq2fetch;
-typedef struct packed {
-    `CNT_TYPE(N) btq_rdy_scnt;
-    BTQ_IDX [N-1:0]        btq_idxs_n;
-
-    puq2fetch   bp_upd;
-} btq2fetch;
-
-typedef struct packed {
-    `CNT_TYPE(N)           en_cnt;
-        // How many branch instructions dispatching?
-        // Sender must ensure branch insns packed to lowest indices.
-    logic   [N-1:0]        is_tail;
-    WADDR   [N-1:0]        PC;
-    logic   [N-1:0][3:0]   off;
-    logic   [N-1:0]        pred;
-    WADDR   [N-1:0]        pred_tgt;
-    logic   [N-1:0]        always_take;
-    FTB_MD1 [N-1:0]        md;
-
-    logic   [N-1:0]        hit;
-    logic   [N-1:0]        hit_slot;
-    logic   [N-1:0][GHR_LEN-1:0] hash; // gshare hash index
-    logic   [N-1:0][`IDX_SIZE(GHR_BUF_SZ)-1:0] ghr_base;
-} fetch2btq;
-
-typedef struct packed {
     WADDR [N-1:0] pc;
 } fetch2btb;
 
@@ -574,45 +366,9 @@ typedef struct packed {
 } fetch2mem;
 
 typedef struct packed {
-    // struct guard
-    logic brch; // 1 iff is any form of control insn
-
-    // fields valid iff branch high
-    logic cond;
-    logic call;
-    logic ret;
-    logic jalr;
-} BRANCH_MD;
-typedef struct packed {
     MEM_BLOCK   [N-1:0] data;
     BRANCH_MD   [N-1:0][1:0] insn_md; // [dw][w]
 } mem2fetch;
-
-typedef struct packed {
-    DWADDR          dw;
-    logic[1:0][3:0] off;
-    logic   [1:0]   fmsk;   // which words to fetch.
-        /* Invariants:
-        1. At least bit 0 (word 0) set
-        2. Bits set contiguously from 0
-
-        FUTURE: Invariant 2 may no longer hold if we detect when a branch in an
-        early word targets into a later word *in the same cache line*,
-        AND we allow storing them together in a single cache line. Then and all insns
-        between the branch and target would have fmsk set to 0.
-            Idea: if the branch target is in the same cache line as the
-            branch (much more likely with larger cache lines), we may reuse
-            the 14-bit tgt field in the FTB branch slot as a [$clog2(cache_line_sz)-1:0]
-            in-line offset (possible with a carry bit for faster computation).
-        */
-    logic   [1:0]   is_end;
-        /* Does word i *terminate* an FB?
-        Both bits can be 1 when word0 ends FB-A and word1 ends FB-B (a 1-insn block). */
-    
-    MEM_BLOCK       blk;
-    BRANCH_MD[1:0]  md;
-
-} ICACHE_RESPONSE;
 
 typedef struct packed {
     `CNT_TYPE(N) d_vld_scnt;
@@ -848,199 +604,6 @@ typedef struct packed {
 } DBG_fl;
 
 
-// find first set index
-module ffs_exp #(
-    parameter int VECW  =N
-) (
-    input   logic [VECW-1:0] i_vec,
-    output  logic o_vld,
-    output  `IDX_TYPE(VECW) o_idx
-);
-    localparam LEVELS = `CNT_SIZE(VECW);
-    logic [LEVELS-1:0][VECW-1:0] lset;
-
-    generate
-    assign lset[0] = i_vec << 1;
-    for (genvar h = 1; h < LEVELS; ++h) begin
-        localparam DIST = 1 << (h-1);
-        assign lset[h] = lset[h-1] | (lset[h-1] << DIST);
-    end
-    endgenerate
-
-    logic [VECW-1:0] onehot;
-    assign onehot = i_vec & ~lset[LEVELS-1];
-    assign o_vld = |i_vec;
-    always_comb begin
-        o_idx = '0;
-        for (int i = 0; i < VECW; ++i) begin
-            if (onehot[i]) begin
-                o_idx = i; 
-            end
-        end
-    end
-
-endmodule
-
-module compactor_exp #(
-    parameter int REQW=1,
-    parameter int GNTW=1
-) (
-    input   logic [REQW-1:0] req, // in-order, sparse
-    input   `CNT_TYPE(GNTW) lim_cnt,
-
-    output  `CNT_TYPE(REQW) gnt_cnt,
-    output  logic [REQW:0][`CNT_SIZE(GNTW)-1:0] prefix_cnt
-        // prefix_cnt[i] "left-compacted index" for the i-th lane.
-        // (valid iff req[i])
-);
-    localparam SUM_LEVELS = `CNT_SIZE(REQW);
-    logic [SUM_LEVELS-1:0][REQW:0][`CNT_SIZE(REQW)-1:0] sums;
-    generate
-    assign sums[0][0] = 0;
-    for (genvar i = 1; i < REQW+1; ++i) begin
-        assign sums[0][i] = req[i-1];
-    end
-    endgenerate
-
-    generate
-    for (genvar h = 1; h < SUM_LEVELS; ++h) begin
-        localparam DIST = 1 << (h-1);
-        for (genvar i = 0; i < DIST; ++i) begin
-            assign sums[h][i] = sums[h-1][i];
-        end
-        for (genvar i = DIST; i < REQW+1; ++i) begin
-            assign sums[h][i] = sums[h-1][i] + sums[h-1][i-DIST];
-        end
-    end
-    endgenerate
-
-    generate
-    for (genvar i = 0; i < REQW+1; ++i) begin
-        assign prefix_cnt[i] = sums[SUM_LEVELS-1][i];
-    end
-    endgenerate
-
-    generate
-        logic [REQW-1:0] exceeds;
-        logic found;
-        `IDX_TYPE(REQW) first;
-
-        for (genvar i = 0; i < REQW; ++i) begin
-            assign exceeds[i] = (sums[SUM_LEVELS-1][i] + req[i]) > lim_cnt;
-        end
-
-        ffs_exp #(
-            .VECW(REQW)
-        ) ff_exceed (
-            .i_vec  (exceeds),
-            .o_vld  (found),
-            .o_idx  (first)
-        );
-
-        assign gnt_cnt = found ? first : REQW;
-    endgenerate
-endmodule
-
-
-module ffs #(
-    parameter int VECW=2
-) (
-    input   logic [VECW-1:0] i_vec,
-    output  logic o_vld,
-    output  `IDX_TYPE(VECW) o_idx
-);
-    always_comb begin
-        o_vld = |i_vec;
-        o_idx = 0;
-
-        // TRICKY: iterate highest -> lowest index. Find lowest set index, if any.
-        // (This improves timing compared to having an explicit `break;`.
-        // See uftb/btb way-searching in locate for other applications)
-        foreach (i_vec[rev]) begin
-            if (i_vec[rev])
-                o_idx = rev; // last/lowest qualifying assignment wins
-        end
-    end
-endmodule
-
-module compactor #(
-    parameter int REQW=2,
-    parameter int GNTW=1,
-    type RCNT = `CNT_TYPE(REQW),
-    type GCNT = `CNT_TYPE(GNTW)
-) (
-    input   logic [REQW-1:0]req, // in-order, sparse
-    input   GCNT            lim_cnt,
-
-    output  GCNT  [REQW:0]  prefix_cnt,
-    output  RCNT            gnt_cnt
-        // prefix_cnt[i] "left-compacted index" for the i-th lane.
-        // (valid iff req[i])
-);
-`ifdef SYNTH // ferocious bit twiddling version
-    initial begin
-        assert(REQW >= GNTW) else $fatal("compactor: reqw (%d) < gntw (%d)", REQW, GNTW);
-        assert(REQW >= 2)    else $fatal("compactor: reqw less than 2");
-    end
-
-    RCNT [REQW:0] raw_prefix_cnt;
-    generate
-    assign raw_prefix_cnt[0] = 0;
-    assign raw_prefix_cnt[1] = req[0];
-    for (genvar i = 2; i <= REQW; ++i) begin
-        assign raw_prefix_cnt[i][`CNT_SIZE(i)-1:0] = `UCAST_LEN(raw_prefix_cnt[i-1], i-1) + req[i-1];
-    end
-
-    for (genvar i = 2; i < REQW; ++i) begin
-        for (genvar j = `CNT_SIZE(i); j < $bits(RCNT); ++j) begin
-            assign raw_prefix_cnt[i][j] = 1'b0;
-        end
-    end
-    endgenerate
-
-    generate
-    for (genvar i = 0; i <= REQW; ++i) begin
-        assign prefix_cnt[i] = (i <= GNTW || raw_prefix_cnt[i] <= GNTW)
-            ? raw_prefix_cnt[i]
-            : GNTW;
-    end
-    endgenerate
-
-    logic [REQW-1:0] exceeds;
-    generate
-    for (genvar i = 0; i < REQW; ++i) begin
-        assign exceeds[i] = `UCAST_LEN(raw_prefix_cnt[i+1], i+1) > lim_cnt;
-    end
-    endgenerate
-    always_comb begin
-        gnt_cnt = REQW;
-
-        foreach (exceeds[rev]) begin
-            if (exceeds[rev])
-                gnt_cnt = rev;
-        end
-    end
-
-`else // faster for simulation
-    always_comb begin
-        prefix_cnt[0] = 0;
-        for (int i = 0; i < REQW; ++i)
-            prefix_cnt[i+1] = prefix_cnt[i] + req[i];
-    end
-
-    always_comb begin
-        RCNT cnt;
-
-        cnt     = 0;
-        gnt_cnt = REQW;
-        for (int i = 0; i < REQW; ++i) begin
-            cnt += req[i];
-            if (cnt > lim_cnt && gnt_cnt == REQW)
-                gnt_cnt = i;
-        end
-    end
-`endif
-endmodule
 
 `ifdef DEBUG
 // OPTIONAL: Print our your data here

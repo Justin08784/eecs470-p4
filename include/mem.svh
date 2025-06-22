@@ -12,12 +12,6 @@
 parameter int DCACHE_LINES = 32;
 
 /* Constants */
-typedef logic [31:0] ADDR;
-typedef logic [15:0] BADDR;
-typedef logic [14:0] HADDR;
-typedef logic [13:0] WADDR;
-typedef logic [12:0] DWADDR;
-
 // Double word address (restricted to only used 16 LSB)
 function automatic DWADDR addr2dw(input ADDR addr);
     return addr[15:3];
@@ -59,32 +53,5 @@ typedef logic [3:0] MEM_TAG;
 
 `define MEM_SIZE_IN_BYTES (64*1024)
 `define MEM_64BIT_LINES   (`MEM_SIZE_IN_BYTES/8)
-
-// A memory or cache block
-typedef union packed {
-    logic [7:0][7:0]  byte_level;
-    logic [3:0][15:0] half_level;
-    logic [1:0][31:0] word_level;
-    logic      [63:0] dbbl_level;
-} MEM_BLOCK;
-typedef union packed {
-    logic [3:0][7:0]  byte_level;
-    logic [1:0][15:0] half_level;
-    logic      [31:0] word_level;
-} DATA_BLOCK;
-
-typedef enum logic [1:0] {
-    BYTE   = 2'h0,
-    HALF   = 2'h1,
-    WORD   = 2'h2,
-    DOUBLE = 2'h3
-} MEM_SIZE;
-
-// Memory bus commands
-typedef enum logic [1:0] {
-    MEM_NONE = 2'h0,
-    MEM_LOAD = 2'h1,
-    MEM_STORE= 2'h2
-} MEM_COMMAND;
 
 `endif // MEM_SVH 
