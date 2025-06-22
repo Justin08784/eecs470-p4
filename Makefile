@@ -100,7 +100,7 @@ export CLOCK_PERIOD = 30.0
 
 # the Verilog Compiler command and arguments
 VCS =  vcs -sverilog -xprop=tmerge +vc -Mupdate -Mdir=build/csrc -line -full64 -kdb -lca -nc \
-      -debug_access+all+reverse $(VCS_BAD_WARNINGS) +define+CLOCK_PERIOD=$(CLOCK_PERIOD) +incdir+verilog/
+      -debug_access+all+reverse $(VCS_BAD_WARNINGS) +define+CLOCK_PERIOD=$(CLOCK_PERIOD) +incdir+include/
 # a SYNTH define is added when compiling for synthesis that can be used in testbenches
 
 RUN_VERDI = -gui=verdi -verdi_opts "-ultra"
@@ -266,8 +266,10 @@ synth/victim.vg: $(VICTIM_FILES)
 # We also reuse this section to compile the cpu, but not to run it
 # You should still run programs in the same way as project 3
 
-CPU_HEADERS = verilog/sys_defs.svh \
-              verilog/ISA.svh
+CPU_HEADERS = include/sys_defs.svh \
+			include/ISA.svh \
+			include/dcache_block_direct.svh \
+			include/execute.svh
 
 # test/cpu_test.sv is implicit
 CPU_TESTBENCH = test/pipeline_print.c \

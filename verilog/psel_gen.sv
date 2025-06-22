@@ -73,7 +73,7 @@
     
  */
 
-`include "verilog/sys_defs.svh"
+`include "sys_defs.svh"
 
 
 module psel_gen #(parameter WIDTH, REQS) (
