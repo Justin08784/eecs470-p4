@@ -1,27 +1,6 @@
 `include "sys_defs.svh"
 
 typedef struct packed {
-`ifdef PC_GEN_TEST_MODE
-    int id;
-`endif
-    WADDR       base_n;     // base address of *next* FB
-
-    logic       ft;         // fallthrough? else took a branch
-    logic       pred_idx;   // ft ? <IGNORE>: slot of pred-taken branch
-    logic [3:0] off;        // ft ? end_off : slot[pred_idx].off
-    logic       hit;
-
-    // pared down FTB entry
-    struct packed {
-        logic       vld;
-        logic [3:0] off;
-    } [1:0] slot;
-
-    logic       always_take;// ft ? <IGNORE>: " of pred-taken branch
-    FTB_MD1     md;         // ft ? <IGNORE>: " of pred-tkaen branch
-} FTQ_ENTRY;
-
-typedef struct packed {
     DWADDR          dw;
     logic[1:0][3:0] off;
     logic   [1:0]   fmsk;   // which words to fetch.

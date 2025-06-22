@@ -28,7 +28,7 @@
 // Compil. Controls
 // ================
 
-// `define SYNTH // synth only constructions // FIXME: how can we implement this in Makefile?
+`define SYNTH // synth only constructions // FIXME: how can we implement this in Makefile?
 
 `ifndef SYNTH
 // `define DEBUG
@@ -333,6 +333,18 @@ typedef struct packed {
 } FTB_MD1;
 
 typedef struct packed {
+    // fallthrough npc (i.e. npc if no branch taken)
+    logic [3:0] end_off;    // offset of last insn in the FB. ft_npc = base + end_off + 1
+        // TODO: see FTB_BR_SLOT (above) for alternative schemes
+
+    // two branch slots: [0, 1]
+    FTB_BR_SLOT [1:0] br_slot;
+
+    // metadata re: br1/tail slot
+    FTB_MD1 md1;
+} FTB_ENTRY;
+
+typedef struct packed {
     WADDR       base;
     logic [3:0] pc_off; // pc = base + pc_off
     logic       take;
@@ -365,6 +377,28 @@ typedef struct packed {
     logic [N-1:0][`IDX_SIZE(RAS_SZ)-1:0] top;
     logic [N-1:0][`CNT_SIZE(RAS_SZ)-1:0] used;
 } RAS_SNAP;
+
+typedef struct packed {
+`ifdef PC_GEN_TEST_MODE
+    int id;
+`endif
+    WADDR       base_n;     // base address of *next* FB
+
+    logic       ft;         // fallthrough? else took a branch
+    logic       pred_idx;   // ft ? <IGNORE>: slot of pred-taken branch
+    logic [3:0] off;        // ft ? end_off : slot[pred_idx].off
+    logic       hit;
+
+    // pared down FTB entry
+    struct packed {
+        logic       vld;
+        logic [3:0] off;
+    } [1:0] slot;
+
+    logic       always_take;// ft ? <IGNORE>: " of pred-taken branch
+    FTB_MD1     md;         // ft ? <IGNORE>: " of pred-tkaen branch
+} FTQ_ENTRY;
+
 
 typedef struct packed {
     // struct guard
