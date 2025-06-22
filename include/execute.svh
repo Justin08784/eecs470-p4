@@ -82,6 +82,7 @@ typedef struct packed {
     ALU_OPB_SELECT opb_select;
 } ID_BRU_VIEW;
 
+
 typedef struct packed {
     BYPASS_TAG      bytag;
     union packed {
@@ -100,6 +101,7 @@ typedef struct packed {
     PHYS_REG_IDX    t;
     ROB_IDX         rob_idx;
 } ALU_REGS;
+
 typedef struct packed {
     DATA            rs1;
     DATA            rs2;
@@ -111,15 +113,18 @@ typedef struct packed {
     PHYS_REG_IDX    t;
     ROB_IDX         rob_idx;
 } MUL_REGS;
+
 typedef struct packed {
     DATA rs1;
     ID_LOD_VIEW dat;
 } LOD_REGS;
+
 typedef struct packed {
     DATA rs1;
     DATA rs2;
     ID_STR_VIEW dat;
 } STR_REGS;
+
 typedef struct packed {
     BYPASS_TAG      bytag;
     BMASK           b1hot;
@@ -138,6 +143,7 @@ typedef struct packed {
     ROB_IDX         rob_idx;
     BTQ_IDX         btq_idx;
 } BRU_REGS;
+
 
 /* CDB snooping/bypassing functions */
 function automatic ALU_REGS alu_snoop(
@@ -209,47 +215,4 @@ function automatic BRU_REGS bru_snoop(
         rv.rs2 = cdat.data[rv.bytag.cdb_idx2];
     return rv;
 endfunction
-
-
-typedef struct packed {
-    execute2btq btq_out;
-    execute2complete_tag ctag_out;
-    execute2complete_dat cdat_out;
-
-    struct packed {
-        `BY_FU(logic)   i_rdy;
-        `BY_FU(logic)   o_vld;
-        struct packed {
-            ID_ALU_VIEW [NUM_FU_ALU-1:0]   alu;
-            ID_MUL_VIEW [NUM_FU_MUL-1:0]   mul;
-            ID_LOD_VIEW [NUM_FU_LOD-1:0]   lod;
-            ID_STR_VIEW [NUM_FU_STR-1:0]   str;
-        } i_dat, o_dat;
-    } iss;
-
-    struct packed {
-        `BY_FU(logic) i_rdy;
-        `BY_FU(logic) o_vld;
-        struct packed {
-            ALU_REGS [NUM_FU_ALU-1:0]  alu;
-            MUL_REGS [NUM_FU_MUL-1:0]  mul;
-            LOD_REGS [NUM_FU_LOD-1:0]  lod;
-            STR_REGS [NUM_FU_STR-1:0]  str;
-        } i_dat, o_dat;
-    } regs;
-
-    `BY_FU(CPL_CAND) cands;
-    CPL_CAND [NUM_FU_TOTAL-1:0] cands_flat;
-
-    `BY_FU(PHYS_REG_IDX) ctag_ts;
-    PHYS_REG_IDX [NUM_FU_TOTAL-1:0] ctag_ts_flat;
-
-    logic [1:0][N-1:0][NUM_FU_TOTAL-1:0]  cdb2fu_gbus_shr;
-    logic [N-1:0][NUM_FU_TOTAL-1:0]       cdb2fu_gbus;
-    `BY_FU(logic) [1:0] cdb_gnt_shr;
-
-    `BY_FU(logic) cdb_req;
-    `BY_FU(logic) cdb_gnt;
-} DBG_execute;
-
 `endif // __EXECUTE_DEFS_SVH__

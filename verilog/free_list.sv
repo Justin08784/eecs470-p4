@@ -177,9 +177,9 @@ module free_list #(parameter
 
         fl_vld = '0;
         for (int cnt = 0; cnt < used; ++cnt)
-            fl_vld[(head + cnt) % FL_DEPTH] = 1;
+            fl_vld[(head + cnt) % FREE_LIST_SZ] = 1;
 
-        for (int i = 0; i < FL_DEPTH / 2; ++i) begin
+        for (int i = 0; i < FREE_LIST_SZ / 2; ++i) begin
             string ls, rs, name;
             if (!fl_vld[i])
                 ls = $sformatf("Fl[%2d]: ", i);

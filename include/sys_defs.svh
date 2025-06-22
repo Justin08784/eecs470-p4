@@ -1,19 +1,16 @@
-/////////////////////////////////////////////////////////////////////////
-//                                                                     //
-//   Modulename :  sys_defs.svh                                        //
-//                                                                     //
-//  Description :  This file defines macros and data structures used   //
-//                 throughout the processor.                           //
-//                                                                     //
-/////////////////////////////////////////////////////////////////////////
-
 `ifndef __SYS_DEFS_SVH__
 `define __SYS_DEFS_SVH__
+
+`include "ISA.svh"
 
 // all files should `include "sys_defs.svh" to at least define the timescale
 `timescale 1ns/100ps
 
-// helpful macros
+
+// ================
+// Macros
+// ================
+
 `define MIN(a, b) ((a) < (b) ? (a) : (b))
 `define MAX(a, b) ((a) > (b) ? (a) : (b))
 
@@ -26,28 +23,36 @@
 `define UCAST_LEN(n, max) ($clog2(max+1)'(unsigned'(n)))
 `define UCAST_FIT(n) (($clog2(n+1))'(unsigned'(n)))    // cast fit unsigned
 
-///////////////////////////////
-// --- Compil. Controls ---- //
-///////////////////////////////
-/* How can we implement this in the Makefile? */
-// `define SYNTH // synth only constructions
+
+// ================
+// Compil. Controls
+// ================
+
+// `define SYNTH // synth only constructions // FIXME: how can we implement this in Makefile?
 
 `ifndef SYNTH
 // `define DEBUG
 // `define CYCLE_PRINT // clock cycle print
 // `define PC_GEN_TEST_MODE
+// `define FORMAL
 `endif
 
 /* Memory config */
-// Cache mode removes the byte-level interface from memory, so it always returns
-// a double word. The original processor won't work with this defined. Your new
-// processor will have to account for this effect on mem.
-// Notably, you can no longer write data without first reading.
-// TODO: uncomment this line once you've implemented your cache
 `define CACHE_MODE
+    // Cache mode removes the byte-level interface from memory, so it always returns
+    // a double word. The original processor won't work with this defined. Your new
+    // processor will have to account for this effect on mem.
+    // Notably, you can no longer write data without first reading.
+    // TODO: uncomment this line once you've implemented your cache
 
 
-/* Constants */
+// ================
+// Parameters
+// ================
+
+// some starting parameters that you should set
+// this is *your* processor, you decide these values (try analyzing which is best!)
+
 // you are not allowed to change this definition for your final processor
 // the project 3 processor has a massive boost in performance just from having no mem latency
 // see if you can beat it's CPI in project 4 even with a 100ns latency!
@@ -59,132 +64,120 @@
 // memory tags represent a unique id for outstanding mem transactions
 // 0 is a sentinel value and is not a valid tag
 `define NUM_MEM_TAGS 15
-typedef logic [3:0] MEM_TAG;
 
 `define MEM_SIZE_IN_BYTES (64*1024)
 `define MEM_64BIT_LINES   (`MEM_SIZE_IN_BYTES/8)
 
 
-///////////////////////////////////
-// ---- Starting Parameters ---- //
-///////////////////////////////////
-
-// some starting parameters that you should set
-// this is *your* processor, you decide these values (try analyzing which is best!)
-
-// superscalar width
-parameter N = 2;
+parameter N = 2;    // superscalar width
 // parameter CDB_SZ= N // This MUST match your superscalar width
 
-// sizes
-parameter ROB_SZ= 64;
-parameter BTQ_SZ= 16;
-    /* BTQ_SZ doubled (form 8). This improved CPI on tight loop
-    programs like branchy.s and branchy_nested.s */
-parameter RAS_SZ= 16;
-parameter FTQ_SZ= 32;
-parameter PHYS_REG_SZ_P6    = 32;
-parameter PHYS_REG_SZ_R10K  = (32 + ROB_SZ);
-
-parameter IQQ_SZ= 4;
-parameter IRQ_SZ= 8;
-parameter DCACHE_LINES = 32;
-
-// worry about these later
-parameter BRANCH_PRED_SZ= 'x;
-parameter LSQ_SZ        = 12;
-parameter SQ_RET_BUF_SZ = 4;
+// bpu
+parameter BRANCH_PRED_SZ= 'x; // FIXME
 parameter GHR_BUF_SZ    = 32;
 parameter GHR_LEN       = 8;
-parameter BMASK_LEN     = 8; // i.e. number of branch checkpoints
+parameter RAS_SZ        = 16;
+parameter FTQ_SZ        = 32;
 
-// functional units (you should decide if you want more or fewer types of FUs)
+// fetch
+parameter IQQ_SZ        = 4;
+parameter IRQ_SZ        = 8;
+parameter BTQ_SZ        = 16;
+    // (BTQ_SZ doubled from 8. This improved CPI on tight loop programs like
+    // branchy.s and branchy_nested.s.)
+
+// rename/checkpoints
+parameter BMASK_LEN     = 8; // i.e. number of branch checkpoints
+parameter ROB_SZ        = 64;
+parameter FREE_LIST_SZ  = ROB_SZ;
+
+// reservation station
+    // num entries per partition
+parameter RS_ALU_SZ     = 8;
+parameter RS_MUL_SZ     = 8;
+parameter RS_LOD_SZ     = 4;
+parameter RS_STOR_SZ    = 4;
+parameter RS_BRU_SZ     = 4;
+
+// execute
+    // functional units (you should decide if you want more or fewer types of FUs)
 parameter NUM_FU_ALU    = 2;
 parameter NUM_FU_MUL    = 1;
 parameter NUM_FU_LOD    = 1;
 parameter NUM_FU_STR    = 1;
 parameter NUM_FU_BRU    = 1;
 parameter NUM_FU_TOTAL  = NUM_FU_ALU + NUM_FU_MUL + NUM_FU_LOD + NUM_FU_STR + NUM_FU_BRU;
+    // per-FU config
+parameter LD_BAY_SZ     = 2; // number of load bays in load FU
+parameter MUL_STAGES    = 16;// number of mult stages (2, 4) (you likely don't need 8)
+    // Justin: funny enough we need at least 8 or else multiply is on critical path
 
-parameter LD_BAY_SZ     = 2; //num load bays in the FU
+parameter PHYS_REG_SZ_P6    = 32;
+parameter PHYS_REG_SZ_R10K  = (32 + ROB_SZ);
 
-// number of mult stages (2, 4) (you likely don't need 8)
-parameter MUL_STAGES    = 16;
-// Justin: funny enough we need at least 8 or else multiply is on critical path
+// worry about these later
+parameter DCACHE_LINES  = 32;
+parameter LSQ_SZ        = 12;
+parameter SQ_RET_BUF_SZ = 4;
 
 
-/* Types */
-// word and register sizes
-typedef logic [31:0] DATA;
+// ================
+// Types
+// ================
+
+// index types
 typedef logic [4:0]  REG_IDX;
-
-typedef logic [31:0] ADDR;
-typedef logic [15:0] BADDR;
-typedef logic [14:0] HADDR;
-typedef logic [13:0] WADDR;
-typedef logic [12:0] DWADDR;
-
-typedef logic [BMASK_LEN-1:0] BMASK;
-
-// Double word address (restricted to only used 16 LSB)
-function automatic DWADDR addr2dw(input ADDR addr);
-    return addr[15:3];
-endfunction
-function automatic ADDR dw2addr(input DWADDR addr);
-    return {16'b0, addr, 3'b0};
-endfunction
-
-// Word address
-function automatic WADDR addr2w(input ADDR addr);
-    return addr[15:2];
-endfunction
-function automatic ADDR w2addr(input WADDR addr);
-    return {16'b0, addr, 2'b0};
-endfunction
-
-// In-word byte offset
-function automatic logic[1:0] iw_off(input ADDR addr);
-    return addr[1:0];
-endfunction
-
-// In-double-word byte offset
-function automatic logic[2:0] idw_off(input ADDR addr);
-    return addr[2:0];
-endfunction
-
-parameter int FU_IDX_NUM = 5;
-typedef enum logic [2:0] {
-    FU_ALU  = 'd0,
-    FU_MUL = 'd1,
-    FU_LOD = 'd2,
-    FU_STR  = 'd3,
-    FU_BRU  = 'd4
-} FU_IDX;
-
+typedef `IDX_TYPE(PHYS_REG_SZ_R10K) PHYS_REG_IDX;
+    /* NOTE: PHYS_REG_IDX = 0 is a sentinel (to denote "no register" / "is immediate operand").
+    While we lose out on a single physical register, this greatly simplifies logic 
+    (the alternative is to pipe around 'is valid src_reg' bit signals everywhere). */
 typedef `IDX_TYPE(BTQ_SZ) BTQ_IDX;
 typedef `IDX_TYPE(ROB_SZ) ROB_IDX;
 typedef `IDX_TYPE(LSQ_SZ) LSQ_IDX;
 
-// A memory or cache block
+// address types
+typedef logic [31:0] ADDR;  // full address
+typedef logic [15:0] BADDR; // address (restricted to only used 16 LSB). i.e. byte index
+typedef logic [14:0] HADDR; // half index
+typedef logic [13:0] WADDR; // word index
+typedef logic [12:0] DWADDR;// double-word (dw) index
+
+typedef logic [BMASK_LEN-1:0] BMASK;
+
+// address conversion functions
+    // addr <-> double-word
+function automatic DWADDR   addr2dw(input ADDR addr);   return addr[15:3];          endfunction
+function automatic ADDR     dw2addr(input DWADDR addr); return {16'b0, addr, 3'b0}; endfunction
+    // addr <-> word
+function automatic WADDR    addr2w(input ADDR addr);    return addr[15:2];          endfunction
+function automatic ADDR     w2addr(input WADDR addr);   return {16'b0, addr, 2'b0}; endfunction
+
+    // in-word byte offset
+function automatic logic[1:0] iw_off(input ADDR addr);  return addr[1:0];           endfunction
+    // in-double-word byte offset
+function automatic logic[2:0] idw_off(input ADDR addr); return addr[2:0];           endfunction
+
+// word and register sizes
+typedef logic [31:0] DATA;
+typedef union packed {
+    logic [3:0][7:0]  byte_level;
+    logic [1:0][15:0] half_level;
+    logic      [31:0] word_level;
+} DATA_BLOCK;
 typedef union packed {
     logic [7:0][7:0]  byte_level;
     logic [3:0][15:0] half_level;
     logic [1:0][31:0] word_level;
     logic      [63:0] dbbl_level;
 } MEM_BLOCK;
-typedef union packed {
-    logic [3:0][7:0]  byte_level;
-    logic [1:0][15:0] half_level;
-    logic      [31:0] word_level;
-} DATA_BLOCK;
 
+typedef logic [3:0]  MEM_TAG;
 typedef enum logic [1:0] {
     BYTE   = 2'h0,
     HALF   = 2'h1,
     WORD   = 2'h2,
     DOUBLE = 2'h3
 } MEM_SIZE;
-
 // Memory bus commands
 typedef enum logic [1:0] {
     MEM_NONE = 2'h0,
@@ -193,24 +186,25 @@ typedef enum logic [1:0] {
 } MEM_COMMAND;
 
 
+parameter FU_IDX_NUM = 5;
+typedef enum logic [2:0] {
+    FU_ALU  = 'd0,
+    FU_MUL  = 'd1,
+    FU_LOD  = 'd2,
+    FU_STR  = 'd3,
+    FU_BRU  = 'd4
+} FU_IDX;
 
-///////////////////////////////
-// ---- Basic Constants ---- //
-///////////////////////////////
+
+// ================
+// Basic constants
+// ================
 
 // NOTE: the global CLOCK_PERIOD is defined in the Makefile
 
 // useful boolean single-bit definitions
 `define FALSE 1'h0
 `define TRUE  1'h1
-
-/* 
-NEED CLARIFICATION:
-NOTE: We will use PHYS_REG_IDX = 0 as a sentinel (to denote "no register" / "is immediate operand").
-While we lose out on a single physical register, this greatly simplifies logic 
-(the alternative is to pipe around 'is valid src_reg' bit signals everywhere).
-*/
-typedef `IDX_TYPE(PHYS_REG_SZ_R10K) PHYS_REG_IDX;
 
 // the zero register
 // In RISC-V, any read of this register returns zero and any writes are thrown away
@@ -221,89 +215,9 @@ typedef `IDX_TYPE(PHYS_REG_SZ_R10K) PHYS_REG_IDX;
 `define NOP 32'h00000013
 
 
-///////////////////////////////////
-// ---- Instruction Typedef ---- //
-///////////////////////////////////
-
-// from the RISC-V ISA spec
-typedef union packed {
-    logic [31:0] inst;
-    struct packed {
-        logic [6:0] funct7;
-        logic [4:0] rs2; // source register 2
-        logic [4:0] rs1; // source register 1
-        logic [2:0] funct3;
-        logic [4:0] rd; // destination register
-        logic [6:0] opcode;
-    } r; // register-to-register instructions
-    struct packed {
-        logic [11:0] imm; // immediate value for calculating address
-        logic [4:0]  rs1; // source register 1 (used as address base)
-        logic [2:0]  funct3;
-        logic [4:0]  rd;  // destination register
-        logic [6:0]  opcode;
-    } i; // immediate or load instructions
-    struct packed {
-        logic [6:0] off; // offset[11:5] for calculating address
-        logic [4:0] rs2; // source register 2
-        logic [4:0] rs1; // source register 1 (used as address base)
-        logic [2:0] funct3;
-        logic [4:0] set; // offset[4:0] for calculating address
-        logic [6:0] opcode;
-    } s; // store instructions
-    struct packed {
-        logic       of;  // offset[12]
-        logic [5:0] s;   // offset[10:5]
-        logic [4:0] rs2; // source register 2
-        logic [4:0] rs1; // source register 1
-        logic [2:0] funct3;
-        logic [3:0] et;  // offset[4:1]
-        logic       f;   // offset[11]
-        logic [6:0] opcode;
-    } b; // branch instructions
-    struct packed {
-        logic [19:0] imm; // immediate value
-        logic [4:0]  rd; // destination register
-        logic [6:0]  opcode;
-    } u; // upper-immediate instructions
-    struct packed {
-        logic       of; // offset[20]
-        logic [9:0] et; // offset[10:1]
-        logic       s;  // offset[11]
-        logic [7:0] f;  // offset[19:12]
-        logic [4:0] rd; // destination register
-        logic [6:0] opcode;
-    } j;  // jump instructions
-
-// extensions for other instruction types
-`ifdef ATOMIC_EXT
-    struct packed {
-        logic [4:0] funct5;
-        logic       aq;
-        logic       rl;
-        logic [4:0] rs2;
-        logic [4:0] rs1;
-        logic [2:0] funct3;
-        logic [4:0] rd;
-        logic [6:0] opcode;
-    } a; // atomic instructions
-`endif
-`ifdef SYSTEM_EXT
-    struct packed {
-        logic [11:0] csr;
-        logic [4:0]  rs1;
-        logic [2:0]  funct3;
-        logic [4:0]  rd;
-        logic [6:0]  opcode;
-    } sys; // system call instructions
-`endif
-
-} INST; // instruction typedef, this should cover all types of instructions
-
-
-////////////////////////////////////////
-// ---- Datapath Control Signals ---- //
-////////////////////////////////////////
+// ================
+// Datapath control signals
+// ================
 
 // ALU opA input mux selects
 typedef enum logic [1:0] {
@@ -359,9 +273,9 @@ typedef enum logic [0:1] {
 } SKID_FLUSH_MODE;
 
 
-////////////////////////////////
-// ---- Datapath Packets ---- //
-////////////////////////////////
+// ================
+// Datapath packets
+// ================
 
 /**
  * Packets are used to move many variables between modules with
@@ -543,9 +457,6 @@ typedef struct packed {
     logic   [1:0]       is_end;
 } pc_gen2ixq;
 
-
-
-/* i/o structs */
 /**
  * IF_ID Packet:
  * Data exchanged from the IF to the ID stage
@@ -558,6 +469,10 @@ typedef struct packed {
     BTQ_IDX btq_idx;
 } IF_ID_PACKET;
 
+
+// ================
+// I/O structs
+// ================
 
 typedef struct packed {
     logic       en;
@@ -666,11 +581,6 @@ typedef struct packed {
 } retire_final;
 
 // Reservation station stuff
-parameter RS_ALU_SZ     = 8;
-parameter RS_MUL_SZ    = 8;
-parameter RS_LOD_SZ    = 4;
-parameter RS_STOR_SZ    = 4;
-parameter RS_BRU_SZ     = 4;
 typedef struct packed {
 `ifdef DEBUG
     int             id; // debug only; unique insn identifier
@@ -1145,92 +1055,5 @@ typedef struct packed{
     `BY_FU(DATA)    v2s;
 } prf2execute;
 
-localparam FL_DEPTH = ROB_SZ;
-localparam FL_WIDTH = $bits(PHYS_REG_IDX);
-typedef struct packed {
-    retire_final r_in;
-    dispatch2free_list d_in;
-    free_list2dispatch d_out;
-    struct packed {
-        logic [FL_DEPTH-1:0][FL_WIDTH-1:0] state;
-        `IDX_TYPE(FL_DEPTH) head, tail;
-        `CNT_TYPE(FL_DEPTH) used;
-    } fifo;
-} DBG_fl;
-
-
-
-`ifdef DEBUG
-// OPTIONAL: Print our your data here
-// It will go to the $program.log file
-function print_id_result(input ID_RESULT x);
-    $display("ID_RESULT: id=%3d PC=%h fu_idx=%2d inst=%h opa_select=%1d opb_select=%1d alu_func=%1d cond_branch=%b halt=%b illegal=%b csr_op=%b btq_idx=%2d ",
-        x.id,
-        x.PC,
-        x.fu_idx,
-        x.inst,
-        x.opa_select,
-        x.opb_select,
-        x.alu_func,
-        x.cond_branch,
-        x.halt,
-        x.illegal,
-        x.csr_op,
-        x.btq_idx
-    );
-endfunction
-
-function print_commit_rs_pkt(input COMMIT_RS_PKT x);
-    $display("COMMIT_RS_PKT: {bmask: %b} id=%3d PC=%h fu_idx=%2d inst=%h opa_select=%1d opb_select=%1d alu_func=%1d cond_branch=%b halt=%b illegal=%b csr_op=%b btq_idx=%2d b1hot=%b",
-        x.bmask,
-        x.id,
-        x.PC,
-        x.fu_idx,
-        x.inst,
-        x.opa_select,
-        x.opb_select,
-        x.alu_func,
-        x.cond_branch,
-        x.halt,
-        x.illegal,
-        x.csr_op,
-        x.btq_idx,
-        x.b1hot
-    );
-endfunction
-
-function get_fu_name(input FU_IDX fu_idx, output string name);
-    case (fu_idx)
-        FU_ALU:  name = "ALU";
-        FU_MUL: name = "MUL";
-        FU_LOD: name = "LOD";
-        FU_STR:  name = "STR";
-        FU_BRU:  name = "BRU";
-        default: name = "Unknown FU";
-    endcase
-endfunction
-
-function automatic string dbg_mem_cmd(input MEM_COMMAND cmd);
-    string rv;
-    case (cmd)
-        MEM_NONE:  rv = "NONE";
-        MEM_STORE: rv = "STOR";
-        MEM_LOAD:  rv = "LOAD";
-    endcase
-    return rv;
-endfunction
-
-function automatic string dbg_mem_size(input MEM_SIZE size);
-    string rv;
-    rv = "unknown mem size";
-    case (size)
-        BYTE:   rv = "BYTE";
-        HALF:   rv = "HALF";
-        WORD:   rv = "WORD";
-        DOUBLE: rv = "DOUBLE";
-    endcase
-    return rv;
-endfunction;
-`endif
 
 `endif // __SYS_DEFS_SVH__
