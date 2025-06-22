@@ -40,7 +40,7 @@ module testbench;
     MEM_SIZE    proc2mem_size;
 `endif
 
-    COMMIT_PACKET [`N-1:0] committed_insts;
+    COMMIT_PKT [`N-1:0] committed_insts;
     EXCEPTION_CODE error_status = NO_ERROR;
 
     ADDR  if_NPC_dbg;
@@ -231,11 +231,11 @@ module testbench;
         // g: IF/ID   h: ID/EX  i: EX/MEM  j: MEM/WB
 
         // IF signals (5) - prefix 'f'
-        $display("fNPC 8:%h",         verisimpleV.if_packet.NPC);
-        $display("finst 8:%h",        verisimpleV.if_packet.inst);
+        $display("fNPC 8:%h",         verisimpleV.if_PKT.NPC);
+        $display("finst 8:%h",        verisimpleV.if_PKT.inst);
         $display("fImem_addr 8:%h",   verisimpleV.stage_if_0.Imem_addr);
         $display("fPC_reg 8:%h",      verisimpleV.stage_if_0.PC_reg);
-        $display("fvalid 1:%h",       verisimpleV.if_packet.valid);
+        $display("fvalid 1:%h",       verisimpleV.if_PKT.valid);
 
         // IF/ID signals (4) - prefix 'g'
         $display("genable 1:%h",      verisimpleV.if_id_enable);
@@ -244,19 +244,19 @@ module testbench;
         $display("gvalid 1:%h",       verisimpleV.if_id_reg.valid);
 
         // ID signals (13) - prefix 'd'
-        $display("drs1 8:%h",         verisimpleV.id_packet.rs1_value);
-        $display("drs2 8:%h",         verisimpleV.id_packet.rs2_value);
-        $display("ddest_reg 2:%h",    verisimpleV.id_packet.dest_reg_idx);
-        $display("drd_mem 1:%h",      verisimpleV.id_packet.rd_mem);
-        $display("dwr_mem 1:%h",      verisimpleV.id_packet.wr_mem);
-        $display("dopa_sel 1:%h",     verisimpleV.id_packet.opa_select);
-        $display("dopb_sel 1:%h",     verisimpleV.id_packet.opb_select);
-        $display("dalu_func 2:%h",    verisimpleV.id_packet.alu_func);
-        $display("dcond_br 1:%h",     verisimpleV.id_packet.cond_branch);
-        $display("duncond_br 1:%h",   verisimpleV.id_packet.uncond_branch);
-        $display("dhalt 1:%h",        verisimpleV.id_packet.halt);
-        $display("dillegal 1:%h",     verisimpleV.id_packet.illegal);
-        $display("dvalid 1:%h",       verisimpleV.id_packet.valid);
+        $display("drs1 8:%h",         verisimpleV.id_PKT.rs1_value);
+        $display("drs2 8:%h",         verisimpleV.id_PKT.rs2_value);
+        $display("ddest_reg 2:%h",    verisimpleV.id_PKT.dest_reg_idx);
+        $display("drd_mem 1:%h",      verisimpleV.id_PKT.rd_mem);
+        $display("dwr_mem 1:%h",      verisimpleV.id_PKT.wr_mem);
+        $display("dopa_sel 1:%h",     verisimpleV.id_PKT.opa_select);
+        $display("dopb_sel 1:%h",     verisimpleV.id_PKT.opb_select);
+        $display("dalu_func 2:%h",    verisimpleV.id_PKT.alu_func);
+        $display("dcond_br 1:%h",     verisimpleV.id_PKT.cond_branch);
+        $display("duncond_br 1:%h",   verisimpleV.id_PKT.uncond_branch);
+        $display("dhalt 1:%h",        verisimpleV.id_PKT.halt);
+        $display("dillegal 1:%h",     verisimpleV.id_PKT.illegal);
+        $display("dvalid 1:%h",       verisimpleV.id_PKT.valid);
 
         // ID/EX signals (17) - prefix 'h'
         $display("henable 1:%h",      verisimpleV.id_ex_enable);
@@ -280,8 +280,8 @@ module testbench;
         // EX signals (4) - prefix 'e'
         $display("eopa_mux 8:%h",     verisimpleV.stage_ex_0.opa_mux_out);
         $display("eopb_mux 8:%h",     verisimpleV.stage_ex_0.opb_mux_out);
-        $display("ealu_result 8:%h",  verisimpleV.ex_packet.alu_result);
-        $display("etake_branch 1:%h", verisimpleV.ex_packet.take_branch);
+        $display("ealu_result 8:%h",  verisimpleV.ex_PKT.alu_result);
+        $display("etake_branch 1:%h", verisimpleV.ex_PKT.take_branch);
 
         // EX/MEM signals (14) - prefix 'i'
         $display("ienable 1:%h",      verisimpleV.ex_mem_enable);
@@ -319,9 +319,9 @@ module testbench;
         $display("jvalid 1:%h",       verisimpleV.mem_wb_reg.valid);
 
         // WB signals (3) - prefix 'w'
-        $display("wwr_data 8:%h",     verisimpleV.wb_packet.data);
-        $display("wwr_idx 2:%h",      verisimpleV.wb_packet.reg_idx);
-        $display("wwr_en 1:%h",       verisimpleV.wb_packet.valid);
+        $display("wwr_data 8:%h",     verisimpleV.wb_PKT.data);
+        $display("wwr_idx 2:%h",      verisimpleV.wb_PKT.reg_idx);
+        $display("wwr_en 1:%h",       verisimpleV.wb_PKT.valid);
 
         // Misc signals(2) - prefix 'v'
         $display("vcompleted 1:%h",   committed_insts[0].valid);

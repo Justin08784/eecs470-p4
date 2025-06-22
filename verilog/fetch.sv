@@ -209,7 +209,7 @@ module align (
 
     input   `CNT_TYPE(4)    ibuf_in_rdy_scnt,
     output  `CNT_TYPE(4)    ibuf_out_wen_cnt,
-    output  IF_ID_PACKET[3:0]   ibuf_out_dat
+    output  IF_ID_PKT[3:0]   ibuf_out_dat
 
 );
     localparam W_PER_DW = 2;
@@ -226,7 +226,7 @@ module align (
     BRANCH_MD [NUM_W-1:0] raw_md;
     struct packed {
         logic [NUM_W-1:0] brch, fmsk, irq_vld, is_end, indw_last;
-        IF_ID_PACKET [NUM_W-1:0] f_dat;
+        IF_ID_PKT [NUM_W-1:0] f_dat;
     } raw, bal, wal;
     
     struct packed {
@@ -739,7 +739,7 @@ module dcf (
         .used_scnt  ()
     );
 
-    IF_ID_PACKET[3:0]   align2ibuf_dat;
+    IF_ID_PKT[3:0]   align2ibuf_dat;
     `CNT_TYPE(4)        align2ibuf_wen_cnt;
     `CNT_TYPE(4)        ibuf2align_rdy_scnt;
 
@@ -764,7 +764,7 @@ module dcf (
     assign d_out.wen_cnt = `MIN(used_scnt, d_in.rdy_scnt);
     fifo #(
         .DEPTH(4*N),
-        .WIDTH($bits(IF_ID_PACKET)),
+        .WIDTH($bits(IF_ID_PKT)),
         .NUM_RPORTS(N),
         .NUM_WPORTS(4),
         .FLUSH_MODE(FIFO_FLUSH_RESET),

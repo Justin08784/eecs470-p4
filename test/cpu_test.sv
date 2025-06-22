@@ -132,7 +132,7 @@ module testbench;
     MEM_TAG     mem2proc_data_tag;
     MEM_SIZE    proc2mem_size;
 
-    COMMIT_PACKET commit;
+    COMMIT_PKT commit;
     ADDR [N-1:0] PC_reg;
     EXCEPTION_CODE error_status = NO_ERROR;
 

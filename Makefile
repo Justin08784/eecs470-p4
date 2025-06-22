@@ -287,19 +287,17 @@ CPU_SOURCES = verilog/cpu.sv \
 			verilog/compactor.sv \
 			verilog/fetch.sv \
 			verilog/ffs.sv \
-			verilog/regfile.sv \
 			verilog/memDP.sv \
 			verilog/mult.sv \
 			verilog/rs.sv \
 			verilog/pc_gen.sv \
 			verilog/psel_gen.sv \
-			verilog/arch_map.sv \
 			verilog/dispatch.sv \
 			verilog/map_table.sv \
 			verilog/rob.sv \
 			verilog/prf.sv \
 			verilog/free_list.sv \
-			verilog/stage_id_p4.sv \
+			verilog/decode.sv \
 			verilog/ring_ctr.sv \
 			verilog/fifo.sv \
 			verilog/fetch.sv \
@@ -311,8 +309,7 @@ CPU_SOURCES = verilog/cpu.sv \
 			verilog/ghr.sv \
 			verilog/skid_buffer.sv \
 			verilog/retire.sv \
-			verilog/victim.sv \
-			verilog/dcache_block_direct.sv
+			verilog/victim.sv
 # verilog/ras.sv
 # verilog/gshare.sv
 # verilog/btb.sv

@@ -10,7 +10,7 @@ module decoder_tb;
     // Inputs
     logic clock;
     logic reset;
-    IF_ID_PACKET [N-1:0] if_id_reg;
+    IF_ID_PKT [N-1:0] if_id_reg;
     logic [$clog2(N):0] valid;
 
     // Outputs

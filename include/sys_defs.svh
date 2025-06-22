@@ -383,7 +383,7 @@ typedef struct packed {
 
     RAS_SNAP ras_snap;
     BTQ_IDX btq_idx;
-} IF_ID_PACKET;
+} IF_ID_PKT;
 
 // I/O: fetch
 typedef struct packed {
@@ -423,7 +423,7 @@ typedef struct packed {
 
 typedef struct packed {
     `CNT_TYPE(N)    wen_cnt;
-    IF_ID_PACKET    [N-1:0]    dat;
+    IF_ID_PKT    [N-1:0]    dat;
 } fetch2decode;
 
 typedef struct packed {
@@ -877,14 +877,14 @@ typedef struct packed {
  * This is an output of the processor and used in the testbench for counting
  * committed instructions
  *
- * It also acts as a "WB_PACKET", and can be reused in the final project with
+ * It also acts as a "WB_PKT", and can be reused in the final project with
  * some slight changes
  */
 typedef struct packed {
     `CNT_TYPE(N)    wen_cnt;
     logic   [N-1:0] halt;
     logic   [N-1:0] illegal;
-} COMMIT_PACKET;
+} COMMIT_PKT;
 
 // I/O: Retire
 typedef struct packed {

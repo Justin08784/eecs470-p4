@@ -31,7 +31,7 @@ module cpu (
 
 //     output DBG_dcache   dbg_dcache,
 // << TODO: memory stubbed
-    output COMMIT_PACKET commit
+    output COMMIT_PKT commit
 );
     /* Global controls*/
     logic flush;
@@ -82,7 +82,7 @@ module cpu (
     decode2dispatch de_2_disp;
     dispatch2decode disp_2_de;
 
-    stage_id_p4 decode0 (
+    stage_id decode0 (
         .clock,
         .reset,
         .flush,

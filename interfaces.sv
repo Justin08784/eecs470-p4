@@ -33,7 +33,7 @@ module fetch(
     input MEM_TAG       Imem2proc_data_tag,
 
     output MEM_COMMAND  Imem_command, // Command sent to memory
-    output IF_ID_PACKET [N-1:0] if_packet,
+    output IF_ID_PKT [N-1:0] if_PKT,
     output ADDR         Imem_addr // address sent to Instruction memory
 );
 endmodule
@@ -47,12 +47,12 @@ module decode(
     input clock,           // system clock
     input reset,           // system reset
 
-    input IF_ID_PACKET  [N-1:0] if_id_reg,
+    input IF_ID_PKT  [N-1:0] if_id_reg,
     input               [N-1:0] wb_regfile_en,   // Reg write enable from WB Stage
     input REG_IDX       [N-1:0] wb_regfile_idx,  // Reg write index from WB Stage
     input DATA          [N-1:0] wb_regfile_data, // Reg write data from WB Stage
 
-    output ID_EX_PACKET [N-1:0] id_packet
+    output ID_EX_PKT [N-1:0] id_PKT
 );
 endmodule
 
@@ -62,9 +62,9 @@ Execute / Functional units
 ================================================
 */
 module execute(
-    input ID_EX_PACKET   [N-1:0] id_ex_reg,
+    input ID_EX_PKT   [N-1:0] id_ex_reg,
 
-    output EX_MEM_PACKET [N-1:0] ex_packet
+    output EX_MEM_PKT [N-1:0] ex_PKT
 );
 endmodule
 

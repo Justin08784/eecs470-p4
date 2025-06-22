@@ -211,7 +211,7 @@ module dcf_v1 (
 
     // Handle count
     `CNT_TYPE(N)   free_scnt, used_scnt;
-    IF_ID_PACKET [N-1:0]   f_dat;
+    IF_ID_PKT [N-1:0]   f_dat;
         // BTQ limit
     `CNT_TYPE(N) brch_lim_cnt;
     logic [N:0][`CNT_SIZE(N)-1:0] brch_prefix_cnt;
@@ -274,7 +274,7 @@ module dcf_v1 (
 
     fifo #(
         .DEPTH(2*N),
-        .WIDTH($bits(IF_ID_PACKET)),
+        .WIDTH($bits(IF_ID_PKT)),
         .NUM_RPORTS(N),
         .NUM_WPORTS(N),
         .FLUSH_MODE(FIFO_FLUSH_RESET),
@@ -400,7 +400,7 @@ module stage_if_p4 (
 
     `CNT_TYPE(N)   free_scnt, used_scnt, f_cnt;
     logic [N-1:0] f_en;
-    IF_ID_PACKET [N-1:0]   f_dat;
+    IF_ID_PKT [N-1:0]   f_dat;
 
     generate
     DWADDR PC_dw;
@@ -559,7 +559,7 @@ module stage_if_p4 (
 
     fifo #(
         .DEPTH(2*N),
-        .WIDTH($bits(IF_ID_PACKET)),
+        .WIDTH($bits(IF_ID_PKT)),
         .NUM_RPORTS(N),
         .NUM_WPORTS(N),
         .FLUSH_MODE(FIFO_FLUSH_RESET),

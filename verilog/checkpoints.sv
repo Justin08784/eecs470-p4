@@ -37,56 +37,6 @@ module general_snaps #(
     end
 endmodule
 
-module mt_snaps #(
-
-) (
-    input   clock,
-
-    // read
-    input   BMASK rmsk,
-    output  PHYS_REG_IDX [NUM_ARCH_REG-1:0] rdat,
-
-    // retire updates
-    input   `CNT_TYPE(N)        uen_cnt,
-    input   REG_IDX     [N-1:0] udst,
-    input   PHYS_REG_IDX[N-1:0] ut,
-
-    // write line
-    input   logic [N-1:0] wen,
-    input   BMASK [N-1:0] wmsk,
-    input   PHYS_REG_IDX [N-1:0][NUM_ARCH_REG-1:0] wdat
-);
-    PHYS_REG_IDX [BMASK_LEN-1:0][NUM_ARCH_REG-1:0] snaps;
-
-    always_comb begin
-        rdat = '0;
-        foreach (rmsk[i]) begin
-            if (rmsk[i])
-                rdat = snaps[i];
-        end
-    end
-
-    always_ff @(posedge clock) begin
-        for (int n = 0; n < N; ++n) begin
-            if (!wen[n])
-                continue;
-            for (int i = 0; i < BMASK_LEN; ++i) begin
-                if (!wmsk[n][i])
-                    continue;
-                snaps[i] <= wdat[n];
-            end
-        end
-
-        // QUESTION: does this ensure retires are applied onto same-cycle new snapshots?
-        for (int n = 0; n < uen_cnt; ++n) begin
-            if (udst[n] == `ZERO_REG)
-                continue;
-            foreach (snaps[i])
-                snaps[i][udst[n]] <= ut[n];
-        end
-    end
-endmodule
-
 module branch_manager (
     input   clock,
     input   reset,
