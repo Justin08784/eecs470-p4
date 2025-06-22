@@ -1,14 +1,50 @@
-/////////////////////////////////////////////////////////////////////////
-//                                                                     //
-//   Modulename :  stage_if.sv                                         //
-//                                                                     //
-//  Description :  instruction fetch (IF) stage of the pipeline;       //
-//                 fetch instruction, compute next PC location, and    //
-//                 send them down the pipeline.                        //
-//                                                                     //
-/////////////////////////////////////////////////////////////////////////
-
 `include "sys_defs.svh"
+
+typedef struct packed {
+`ifdef PC_GEN_TEST_MODE
+    int id;
+`endif
+    WADDR       base_n;     // base address of *next* FB
+
+    logic       ft;         // fallthrough? else took a branch
+    logic       pred_idx;   // ft ? <IGNORE>: slot of pred-taken branch
+    logic [3:0] off;        // ft ? end_off : slot[pred_idx].off
+    logic       hit;
+
+    // pared down FTB entry
+    struct packed {
+        logic       vld;
+        logic [3:0] off;
+    } [1:0] slot;
+
+    logic       always_take;// ft ? <IGNORE>: " of pred-taken branch
+    FTB_MD1     md;         // ft ? <IGNORE>: " of pred-tkaen branch
+} FTQ_ENTRY;
+
+typedef struct packed {
+    DWADDR          dw;
+    logic[1:0][3:0] off;
+    logic   [1:0]   fmsk;   // which words to fetch.
+        /* Invariants:
+        1. At least bit 0 (word 0) set
+        2. Bits set contiguously from 0
+
+        FUTURE: Invariant 2 may no longer hold if we detect when a branch in an
+        early word targets into a later word *in the same cache line*,
+        AND we allow storing them together in a single cache line. Then and all insns
+        between the branch and target would have fmsk set to 0.
+            Idea: if the branch target is in the same cache line as the
+            branch (much more likely with larger cache lines), we may reuse
+            the 14-bit tgt field in the FTB branch slot as a [$clog2(cache_line_sz)-1:0]
+            in-line offset (possible with a carry bit for faster computation).
+        */
+    logic   [1:0]   is_end;
+        /* Does word i *terminate* an FB?
+        Both bits can be 1 when word0 ends FB-A and word1 ends FB-B (a 1-insn block). */
+    
+    MEM_BLOCK       blk;
+    BRANCH_MD[1:0]  md;
+} ICACHE_RESPONSE;
 
 // icache response queue
 module irq #(
@@ -153,6 +189,347 @@ module irq #(
     end
 
 endmodule
+
+
+// combinational align
+module align (
+    // read (re-read buffer)
+    // input   `CNT_TYPE(2)    rrb_in_vld_scnt, // do we even need this?
+    input   FTQ_ENTRY[1:0]  rrb_in_dat,
+    output  `CNT_TYPE(2)    rrb_out_ren_cnt,
+
+    // read (icache response queue)
+    input   `CNT_TYPE(2)    irq_in_vld_scnt,
+    input   ICACHE_RESPONSE[1:0] irq_in_dat,
+    output  `CNT_TYPE(2)    irq_out_ren_cnt,
+
+    // write (branch target queue)
+    input   btq2fetch       btq_in,
+    output  fetch2btq       btq_out,
+
+    input   `CNT_TYPE(4)    ibuf_in_rdy_scnt,
+    output  `CNT_TYPE(4)    ibuf_out_wen_cnt,
+    output  IF_ID_PACKET[3:0]   ibuf_out_dat
+
+);
+    localparam W_PER_DW = 2;
+    localparam NUM_DW = 2;
+    localparam NUM_W = NUM_DW*W_PER_DW;
+    localparam N = N;
+    /*
+    raw: not aligned
+    bal: block aligned (compaction WITHIN blocks)
+    wal: block AND word aligned (compaction across entire array) */
+
+    logic [NUM_W-1:0][3:0] raw_off;
+    WADDR [NUM_W-1:0] raw_pc;
+    BRANCH_MD [NUM_W-1:0] raw_md;
+    struct packed {
+        logic [NUM_W-1:0] brch, fmsk, irq_vld, is_end, indw_last;
+        IF_ID_PACKET [NUM_W-1:0] f_dat;
+    } raw, bal, wal;
+    
+    struct packed {
+        logic   [1:0] blk;  // compact inside block i?
+        logic   mid;        // cross from b1 into b0?
+    } shl; // shift lefts
+
+    logic [NUM_W:0][`CNT_SIZE(N)-1:0] brch_prefix_cnt;
+    compactor #(
+        .REQW(NUM_W),
+        .GNTW(N)
+    ) comp_brch (
+        .req        (raw.fmsk & raw.brch),
+        .lim_cnt    (),
+        .prefix_cnt (brch_prefix_cnt),
+        .gnt_cnt    ()
+    );
+
+    generate
+    logic [NUM_DW-1:0][W_PER_DW-1:0] before_indw_last;
+
+       // ^^ prefix mechanism hardcoded for N=2
+    assign raw.indw_last = raw.fmsk & ~before_indw_last;
+
+    for (genvar b = 0; b < NUM_DW; ++b) begin
+        ICACHE_RESPONSE cur;
+        assign cur  = irq_in_dat[b];
+
+        assign before_indw_last [b][W_PER_DW-1] = 0;
+        for (genvar i = 0; i < W_PER_DW-1; ++i)
+            assign before_indw_last[b][W_PER_DW-1 - (i+1)] =
+                before_indw_last[b][W_PER_DW-1 - i] | cur.fmsk[W_PER_DW-1 - i];
+
+        for (genvar w = 0; w < W_PER_DW; ++w) begin
+            localparam flat_idx = W_PER_DW*b+w;
+
+            assign raw_off  [flat_idx]  = cur.off[w];
+            assign raw_pc   [flat_idx]  = {cur.dw, w[0]};
+            assign raw_md   [flat_idx]  = cur.md[w];
+            assign raw.brch [flat_idx]  = cur.md[w].brch;
+            assign raw.fmsk [flat_idx]  = cur.fmsk[w];
+            assign raw.irq_vld[flat_idx]= (b < irq_in_vld_scnt);
+            assign raw.is_end[flat_idx] = cur.is_end[w];
+            assign raw.f_dat [flat_idx]  = '{
+                PC      : raw_pc[flat_idx],
+                inst    : cur.blk.word_level[w],
+                btq_idx : btq_in.btq_idxs_n[brch_prefix_cnt[flat_idx]],
+                ras_snap: '0 // FIXME
+            };
+        end
+    end
+    endgenerate
+
+    generate
+    assign shl = '{
+        blk : {~raw.fmsk[2], ~raw.fmsk[0]},
+        mid : |(~raw.fmsk[1:0])
+            /* since each cache line contains at least 1 valid word,
+            the cross (mid) shift is at most 1 */
+    };
+
+    for (genvar b = 0; b < NUM_DW; ++b) begin : block_align
+        localparam lo = W_PER_DW*b;
+        localparam hi = W_PER_DW*(b+1) - 1;
+
+        // full shift controls (cannot permit duplicates)
+        assign bal.brch     [hi:lo] = raw.brch      [hi:lo] >> shl.blk[b];
+        assign bal.fmsk     [hi:lo] = raw.fmsk      [hi:lo] >> shl.blk[b];
+        assign bal.irq_vld  [hi:lo] = raw.irq_vld   [hi:lo] >> shl.blk[b];
+        assign bal.is_end   [hi:lo] = raw.is_end    [hi:lo] >> shl.blk[b];
+        assign bal.indw_last[hi:lo] = raw.indw_last [hi:lo] >> shl.blk[b];
+
+        // bleed/copy shift data (duplicates fine–– guarded by controls)
+        assign bal.f_dat    [lo]    = shl.blk[b] ? raw.f_dat[hi] : raw.f_dat[lo];
+        assign bal.f_dat    [hi]    = raw.f_dat[hi];
+    end
+
+    // word_align
+    assign wal.brch     [0]     = bal.brch      [0];
+    assign wal.fmsk     [0]     = bal.fmsk      [0];
+    assign wal.irq_vld  [0]     = bal.irq_vld   [0];
+    assign wal.is_end   [0]     = bal.is_end    [0];
+    assign wal.indw_last[0]     = bal.indw_last [0];
+
+    assign wal.brch     [3:1]   = bal.brch      [3:1]   >> shl.mid;
+    assign wal.fmsk     [3:1]   = bal.fmsk      [3:1]   >> shl.mid;
+    assign wal.irq_vld  [3:1]   = bal.irq_vld   [3:1]   >> shl.mid;
+    assign wal.is_end   [3:1]   = bal.is_end    [3:1]   >> shl.mid;
+    assign wal.indw_last[3:1]   = bal.indw_last [3:1]   >> shl.mid;
+
+    assign wal.f_dat    [0]     = bal.f_dat[0];
+    assign wal.f_dat    [3]     = bal.f_dat[3];
+    assign wal.f_dat    [1]     = shl.mid ? bal.f_dat[2] : bal.f_dat[1];
+    assign wal.f_dat    [2]     = shl.mid ? bal.f_dat[3] : bal.f_dat[2];
+
+    typedef struct packed {
+        `CNT_TYPE(NUM_W) wr_ibuf, wr_btq, rd_rrb;
+        `CNT_TYPE(2) rd_irq;
+    } RESO;
+
+    struct packed {
+        logic   [NUM_W-1:0] req, gnt, rng;
+        RESO    [NUM_W-1:0] req_res;
+        RESO    gnt_res;
+        struct packed {
+            logic wr_ibuf, wr_btq, rd_rrb, rd_irq;
+        } [NUM_W-1:0] sat;
+    } ctl;
+
+    assign ctl.req = wal.irq_vld & wal.fmsk & wal.indw_last;
+        /* ^^ Q: indw_last guard, why? A: do not allow partial cache line consumption */
+    for (genvar w = 0; w < NUM_W; ++w) begin
+        localparam sz = `CNT_SIZE(w+1);
+        assign ctl.req_res[w].wr_ibuf   [sz-1:0] = sz'($countones(wal.fmsk[w:0]));
+        assign ctl.req_res[w].wr_btq    [sz-1:0] = sz'($countones(wal.brch[w:0]));
+        assign ctl.req_res[w].rd_rrb    [sz-1:0] = sz'($countones(wal.is_end[w:0]));
+        assign ctl.req_res[w].rd_irq             = unsigned'(sz'($countones(wal.indw_last[w:0])));
+            // FIXME FIXME ^^ if we dont do unsigned' the rd_irq goes to 3 sometimes wtf
+
+        if (sz < `CNT_SIZE(NUM_W)) begin
+            assign ctl.req_res[w].wr_ibuf  [`CNT_SIZE(NUM_W)-1:sz] = '0;
+            assign ctl.req_res[w].wr_btq   [`CNT_SIZE(NUM_W)-1:sz] = '0;
+            assign ctl.req_res[w].rd_rrb   [`CNT_SIZE(NUM_W)-1:sz] = '0;
+        end
+    end
+
+    assign ctl.gnt_res.wr_ibuf  = ibuf_in_rdy_scnt;
+    assign ctl.gnt_res.wr_btq   = btq_in.rdy_scnt;
+    assign ctl.gnt_res.rd_rrb   = 2;
+        /* pc_gen guarantees that an ftq entry arrives in rrb BEFORE or SIMULTANEOUSLY WITH
+        the earliest associated cache line request. However, the rrb exposes
+        at most 2 FTQ entries to the aligner. */
+    localparam rrb_sz = `CNT_SIZE(2);
+    localparam btq_sz = `CNT_SIZE(N);
+    assign ctl.rng = ctl.req & ctl.gnt; // rng = request and grant
+    for (genvar w = 0; w < NUM_W; ++w) begin
+        localparam sz = `CNT_SIZE(w+1);
+        assign ctl.sat[w].wr_ibuf   = ctl.req_res[w].wr_ibuf[sz-1:0] <= ctl.gnt_res.wr_ibuf;
+        assign ctl.sat[w].wr_btq    = ctl.req_res[w].wr_btq [sz-1:0] <= ctl.gnt_res.wr_btq[btq_sz-1:0];
+        assign ctl.sat[w].rd_rrb    = ctl.req_res[w].rd_rrb [sz-1:0] <= ctl.gnt_res.rd_rrb[rrb_sz-1:0];
+        assign ctl.sat[w].rd_irq    = 1;
+        assign ctl.gnt[w] = &ctl.sat[w];
+    end
+    endgenerate
+
+    logic iss_any;
+    `IDX_TYPE(NUM_W) iss_idx;
+    assign iss_any = |ctl.rng;
+    always_comb begin
+        iss_idx = 0;
+        for (int w = 0; w < NUM_W; ++w) begin
+            if (ctl.rng[w])
+                iss_idx = w; // find highest set
+        end
+    end
+
+    assign ibuf_out_wen_cnt = !iss_any ? 0 : ctl.req_res[iss_idx].wr_ibuf;
+    assign btq_out.wen_cnt  = !iss_any ? 0 : ctl.req_res[iss_idx].wr_btq;
+    assign irq_out_ren_cnt  = !iss_any ? 0 : ctl.req_res[iss_idx].rd_irq;
+    assign rrb_out_ren_cnt  = !iss_any ? 0 : ctl.req_res[iss_idx].rd_rrb;
+
+    assign ibuf_out_dat     = wal.f_dat;
+
+    logic [NUM_W-1:0] rrb_prefix;
+    assign rrb_prefix = (rrb_prefix | (raw.fmsk & raw.is_end)) << 1;
+
+    generate
+    struct packed {
+        logic   [NUM_W-1:0]        is_tail;
+        WADDR   [NUM_W-1:0]        PC;
+        logic   [NUM_W-1:0][3:0]   off;
+        logic   [NUM_W-1:0]        pred;
+        WADDR   [NUM_W-1:0]        pred_tgt;
+        logic   [NUM_W-1:0]        always_take;
+        FTB_MD1 [NUM_W-1:0]        md;
+
+        logic   [NUM_W-1:0]        hit;
+        logic   [NUM_W-1:0]        hit_slot;
+        logic   [NUM_W-1:0][GHR_LEN-1:0] hash; // gshare hash index
+        logic   [NUM_W-1:0][`IDX_SIZE(GHR_BUF_SZ)-1:0] ghr_base;
+    } btq_wr_cand, btq_wr_comp;
+
+    for (genvar w = 0; w < NUM_W; ++w) begin
+        FTQ_ENTRY r;
+        logic is_end;
+        assign r = rrb_in_dat[rrb_prefix[w]];
+        assign is_end = raw.is_end[w];
+        assign btq_wr_cand.is_tail     [w] = (r.pred_idx == 1) && is_end;
+            /* FIXME (unsure): Probably not necessary to check for "off_geq_tail",
+            i.e. (r.pred_idx == 1) && (off_n[i] >= r.off), because branches after (>)
+            the tail slot would not even be in the same fetch block? */
+        assign btq_wr_cand.PC          [w] = raw_pc[w];
+        assign btq_wr_cand.off         [w] = raw_off[w];
+        assign btq_wr_cand.pred        [w] = !r.ft && is_end;
+        assign btq_wr_cand.pred_tgt    [w] = r.base_n;
+        assign btq_wr_cand.always_take [w] = !r.ft && is_end ? r.always_take : 0;
+        assign btq_wr_cand.md          [w] = raw_md[w];
+            // TODO: fix RAS if pred ret but not ret (likewise for call)
+
+        assign btq_wr_cand.hit         [w] = r.hit;
+        assign btq_wr_cand.hit_slot    [w] =
+                (r.slot[0].vld && (r.slot[0].off == raw_off[w]))
+            ||  (r.slot[1].vld && (r.slot[1].off == raw_off[w]));
+        assign btq_wr_cand.hash        [w] = '0; // FIXME
+        assign btq_wr_cand.ghr_base    [w] = '0; // FIXME
+    end
+    endgenerate
+
+    always_comb begin
+        btq_wr_comp = '0;
+        for (int w = 0; w < NUM_W; ++w) begin
+            int win_idx;
+            win_idx = brch_prefix_cnt[w];
+
+            btq_wr_comp.is_tail     [win_idx] = btq_wr_cand.is_tail [w];
+            btq_wr_comp.PC          [win_idx] = btq_wr_cand.PC      [w];
+            btq_wr_comp.off         [win_idx] = btq_wr_cand.off     [w];
+            btq_wr_comp.pred        [win_idx] = btq_wr_cand.pred    [w];
+            btq_wr_comp.pred_tgt    [win_idx] = btq_wr_cand.pred_tgt[w];
+            btq_wr_comp.always_take [win_idx] = btq_wr_cand.always_take[w];
+            btq_wr_comp.md          [win_idx] = btq_wr_cand.md      [w];
+            btq_wr_comp.hit         [win_idx] = btq_wr_cand.hit     [w];
+            btq_wr_comp.hit_slot    [win_idx] = btq_wr_cand.hit_slot[w];
+            btq_wr_comp.hash        [win_idx] = btq_wr_cand.hash    [w]; // FIXME
+            btq_wr_comp.ghr_base    [win_idx] = btq_wr_cand.ghr_base[w]; // FIXME
+        end
+    end
+
+    generate
+    assign btq_out.is_tail  [N-1:0] = btq_wr_comp.is_tail   [N-1:0];
+    assign btq_out.PC       [N-1:0] = btq_wr_comp.PC        [N-1:0];
+    assign btq_out.off      [N-1:0] = btq_wr_comp.off       [N-1:0];
+    assign btq_out.pred     [N-1:0] = btq_wr_comp.pred      [N-1:0];
+    assign btq_out.pred_tgt [N-1:0] = btq_wr_comp.pred_tgt  [N-1:0];
+    assign btq_out.always_take[N-1:0]=btq_wr_comp.always_take[N-1:0];
+    assign btq_out.md       [N-1:0] = btq_wr_comp.md        [N-1:0];
+    assign btq_out.hit      [N-1:0] = btq_wr_comp.hit       [N-1:0];
+    assign btq_out.hit_slot [N-1:0] = btq_wr_comp.hit_slot  [N-1:0];
+    assign btq_out.hash     [N-1:0] = btq_wr_comp.hash      [N-1:0]; // FIXME
+    assign btq_out.ghr_base [N-1:0] = btq_wr_comp.ghr_base  [N-1:0]; // FIXME
+    endgenerate
+
+`ifdef DEBUG
+    task print_align;
+        $display("fyooooo. iss_any: %b, iss_idx: %d, raw.fmsk: %b, wal.fmsk: %b, req: %b", iss_any, iss_idx, raw.fmsk, wal.fmsk, ctl.req);
+
+        $display("rrb_prefix: %b, wal.indw_last: %b", rrb_prefix, wal.indw_last);
+        $display("shl.blk[0]: %b, shl.blk[1]: %b, shl.mid: %b",
+            shl.blk[0],
+            shl.blk[1],
+            shl.mid
+        );
+
+        $display("::f_wen_cnt: %d, %b", ibuf_out_wen_cnt, ibuf_out_wen_cnt);
+        $display("::btq_wen_cnt: %d", btq_out.en_cnt);
+        $display("::rrb_ren_cnt: %d", rrb_out_ren_cnt);
+        $display("::irq_ren_cnt %d", irq_out_ren_cnt);
+        for (int i = 0; i < 4; ++i) begin
+            $display("::irq_in[%d]: pc: %d, inst: %x",
+                i,
+                raw_pc[i],
+                irq_in_dat[i/2].blk.word_level[i%2]
+            );
+
+        end
+
+        $display("shit: %0d, %0d, %0d, %0d",
+            $countones(wal.indw_last[0:0]),
+            $countones(wal.indw_last[1:0]),
+            $countones(wal.indw_last[2:0]),
+            $countones(wal.indw_last[3:0])
+        );
+
+        $display("fuck: %0d, %0d, %0d, %0d",
+            ctl.req_res[0].rd_irq,
+            ctl.req_res[1].rd_irq,
+            ctl.req_res[2].rd_irq,
+            ctl.req_res[3].rd_irq
+        );
+
+        for (int i = 0; i < 4; ++i) begin
+            $display("::f_dat[%d]: pc: %d, inst: %x",
+                i,
+                ibuf_out_dat[i].PC,
+                ibuf_out_dat[i].inst
+            );
+            // $display("  req_res: ibuf: %b, btq: %b, rrb: %b, irq: %b",
+            //     ctl.req_res[i].wr_ibuf,
+            //     ctl.req_res[i].wr_btq,
+            //     ctl.req_res[i].rd_rrb,
+            //     ctl.req_res[i].rd_irq
+            // );
+            // $display("  ctl.sat: ibuf: %b, btq: %b, rrb: %b, irq: %b",
+            //     ctl.sat[i].wr_ibuf,
+            //     ctl.sat[i].wr_btq,
+            //     ctl.sat[i].rd_rrb,
+            //     ctl.sat[i].rd_irq
+            // );
+        end
+    endtask
+`endif
+endmodule
+
 
 module dcf (
     input   clock,
@@ -426,380 +803,5 @@ module dcf (
         end
 
     end
-
-endmodule
-
-// decoupled fetch
-module fetch (
-    input   clock,
-    input   reset,
-    input   flush,
-    input   BMASK clmsk,
-    // input   WADDR flush_PC,
-        /*
-        WRONG >> 
-            FIXME: this should/would be an FB base...?
-        <<
-        If branch was mispred NT-resolved T, then flush_PC indeed will be an fb_base.
-        However, if branch was mispred T-resolved NT, then flush_PC may NOT be an
-        fb_base–– instead flush_PC is more likely to be a nonzero offset INO the FB.
-        */
-    input   WADDR flush_fb_base,
-    input   logic [3:0] flush_pc_off,
-
-    input   decode2fetch d_in,
-    output  fetch2decode d_out,
-
-    input   btq2fetch   btq_in,
-    output  fetch2btq   btq_out,
-
-    // execute
-    input   execute2complete_bru cbru_in,
-
-    input   rename2snap_bus snap_in, // unused
-
-    output  fetch2mem   mem_out,
-    input   mem2fetch   mem_in
-);
-    struct packed {
-        logic [3:0] off;
-        WADDR fb_base;
-    } cur, cur_n;
-
-    // bpu <-> ftq plumbing
-    struct packed {
-        logic       en;
-        FTQ_ENTRY   dat;
-    } bpu2ftq;
-    struct packed {
-        logic       rdy;
-    } ftq2bpu;
-
-    // ftq <-> fetch (us) plumbing
-    struct packed {
-        FTQ_ENTRY [1:0] rdat;
-        `CNT_TYPE(2)    vld_scnt, ren_cnt;
-    } ftq_io;
-
-    bpu bpu0 (
-        .clock,
-        .reset,
-
-        .flush,
-        .flush_fb_base,
-        .flush_pc_off,
-        .clmsk,
-        .cbru_in,
-
-        .i_uen      (btq_in.bp_upd.en),
-        .i_udat     (btq_in.bp_upd.dat),
-
-        .i_ftq_rdy  (ftq2bpu.rdy),
-        .o_ftq_en   (bpu2ftq.en),
-        .o_ftq_dat  (bpu2ftq.dat)
-    );
-
-    ftq ftq0 (
-        .clock,
-        .reset,
-        .flush,
-
-        .rdy    (ftq2bpu.rdy),
-        .wen    (bpu2ftq.en),
-        .wdat   (bpu2ftq.dat),
-
-        .vld_scnt   (ftq_io.vld_scnt),
-        .rdat       (ftq_io.rdat),
-        .ren_cnt    (ftq_io.ren_cnt)
-    );
-
-    // Form indices: fb offsets, PCs, block DWs
-    logic   [1:0][4:0][3:0] off_n;
-    DWADDR  [1:0][1:0] blk;
-    logic   [1:0][1:0] blk_has_end;
-    logic   [1:0][3:0] word_is_end;
-    generate
-    assign blk[0][0] = cur.fb_base[13:1]; // FIXME This is worng
-    assign blk[0][1] = blk[0][0] + `UCAST_FIT(1); // FIXME and this too
-    assign blk[1][0] = ftq_io.rdat[0].base_n;
-    assign blk[1][1] = blk[1][0] + `UCAST_FIT(1);
-
-    assign off_n[0][0] = cur.off;
-    assign off_n[1][0] = 0;
-    for (genvar i = 1; i <= 4; ++i) begin
-        assign off_n[0][i] = cur.off + `UCAST_FIT(i);
-        assign off_n[1][i] = i;
-    end
-
-    for (genvar e = 0; e < 2; ++e) begin
-        for (genvar w = 0; w < 4; ++w) begin
-            assign word_is_end[e][w] = off_n[e][w] == ftq_io.rdat[e].off;
-        end
-        for (genvar b = 0; b < 2; ++b) begin
-            assign blk_has_end[e][b] =
-                word_is_end[e][2*b] || word_is_end[e][2*b+1];
-        end
-    end
-    endgenerate
-
-
-    // logic [N:0][3:0]   off_n;
-    WADDR [N:0]        pc_n;
-    generate
-    // assign off_n[0] = cur.off;
-    // for (genvar i = 1; i < N+1; ++i) begin
-    //     assign off_n[i] = cur.off + `UCAST_FIT(i);
-    // end
-
-    for (genvar i = 0; i < N+1; ++i) begin
-        assign pc_n[i] = cur.fb_base + off_n[0][i];
-    end
-
-    assign mem_out.PCdws[0] = pc_n[0][13:1];
-    for (genvar i = 1; i < N; ++i) begin // FIXME: These are mem blocks btw. Only works for N = 2;
-        assign mem_out.PCdws[i] = pc_n[0][13:1] + `UCAST_FIT(i); // w -> dw
-    end
-    endgenerate
-
-    // Align
-    BRANCH_MD [2*N-1:0] md_raw;
-    INST      [2*N-1:0] inst_raw;
-    BRANCH_MD [N-1:0] md;
-    INST      [N-1:0] inst;
-    generate
-    for (genvar i = 0; i < N; ++i) begin
-        for (genvar woff = 0; woff < 2; ++woff) begin
-            assign md_raw   [2*i + woff] = mem_in.insn_md[i][woff];
-            assign inst_raw [2*i + woff] = mem_in.data[i].word_level[woff];
-        end
-    end
-
-    logic base_woff;
-    assign base_woff = pc_n[0];
-    for (genvar i = 0; i < N; ++i) begin
-        assign md[i]    = base_woff ? md_raw    [i+1] : md_raw  [i];
-        assign inst[i]  = base_woff ? inst_raw  [i+1] : inst_raw[i];
-    end
-    endgenerate
-
-    logic [N-1:0] brch, cond, call, ret, jalr;
-    generate
-    for (genvar i = 0; i < N; ++i) begin
-        assign brch[i] = md[i].brch;
-        assign cond[i] = md[i].cond;
-        assign call[i] = md[i].call;
-        assign ret [i] = md[i].ret;
-        assign jalr[i] = md[i].jalr;
-    end
-    endgenerate
-
-    // Process FTQ entry
-    FTQ_ENTRY r;
-    assign r = ftq_io.rdat;
-
-        // Detect FB end
-    logic [N-1:0] is_fb_end;
-    logic fb_end_any;
-    `IDX_TYPE(N) fb_end_idx;
-    generate
-    for (genvar i = 0; i < N; ++i)
-        assign is_fb_end[i] = off_n[0][i] == r.off;
-    endgenerate
-
-    ffs #(
-        .VECW(N)
-    ) ff_end (
-        .i_vec(is_fb_end),
-        .o_vld(fb_end_any),
-        .o_idx(fb_end_idx)
-    );
-
-        // Fetch-FSM: consume FTQ entry
-    `CNT_TYPE(N) fsm_lim_cnt, f_cnt;
-    always_comb begin
-        fsm_lim_cnt =
-            (ftq_io.vld_scnt == 0) ? 0 :
-            fb_end_any  ? fb_end_idx + `UCAST_FIT(1) :
-            N;
-
-        cur_n = cur;
-        ftq_io.ren_cnt = 0;
-        if ((ftq_io.vld_scnt != 0) && fb_end_any && (fsm_lim_cnt == f_cnt)) begin
-            // finished consuming FTQ entry (entry is valid and reached FB end)
-            cur_n = '{
-                fb_base : r.base_n, // advance FB base
-                off     : 0         // reset in-fb offset
-            };
-
-            // signal consume to FTQ
-            ftq_io.ren_cnt = 1;
-
-        end else
-            cur_n.off = off_n[0][f_cnt];
-
-    end
-
-    // Handle count
-    `CNT_TYPE(N)   free_scnt, used_scnt;
-    IF_ID_PACKET [N-1:0]   f_dat;
-        // BTQ limit
-    `CNT_TYPE(N) brch_lim_cnt;
-    logic [N:0][`CNT_SIZE(N)-1:0] brch_prefix_cnt;
-    compactor #(
-        .REQW(N),
-        .GNTW(N)
-    ) comp_brch (
-        .req        (brch),
-        .lim_cnt    (btq_in.rdy_scnt),
-        .prefix_cnt (brch_prefix_cnt),
-        .gnt_cnt    (brch_lim_cnt)
-    );
-
-    always_comb begin
-        d_out.wen_cnt = `MIN(used_scnt, d_in.rdy_scnt);
-        f_cnt = `MIN(fsm_lim_cnt, `MIN(brch_lim_cnt, free_scnt));
-    end
-
-    always_comb begin
-        for (int unsigned i = 0; i < N; ++i) begin
-            f_dat[i] = '{
-                inst    : inst[i],
-                PC      : pc_n[i],
-                ras_snap: '0, // FIXME
-                btq_idx : '0 // filled below
-            };
-        end
-
-        btq_out = '0;
-        btq_out.wen_cnt = brch_prefix_cnt[f_cnt];
-
-        for (int i = 0; i < N; ++i) begin
-            int     win_idx; // index into btq write window
-            logic   eq_end;
-            win_idx = brch_prefix_cnt[i];
-            eq_end  = off_n[0][i] == r.off;
-
-            f_dat[i].btq_idx = btq_in.btq_idxs_n[win_idx];
-
-            btq_out.is_tail     [win_idx] = (r.pred_idx == 1) && eq_end;
-                /* FIXME (unsure): Probably not necessary to check for "off_geq_tail",
-                i.e. (r.pred_idx == 1) && (off_n[i] >= r.off), because branches after (>)
-                the tail slot would not even be in the same fetch block? */
-            btq_out.PC          [win_idx] = pc_n[i];
-            btq_out.off         [win_idx] = off_n[0][i];
-            btq_out.pred        [win_idx] = !r.ft && eq_end;
-            btq_out.pred_tgt    [win_idx] = r.base_n;
-            btq_out.always_take [win_idx] = !r.ft && eq_end ? r.always_take : 0;
-            btq_out.md          [win_idx] = md[i];
-                // TODO: fix RAS if pred ret but not ret (likewise for call)
-
-            btq_out.hit         [win_idx] = r.hit;
-            btq_out.hit_slot    [win_idx] =
-                    (r.slot[0].vld && (r.slot[0].off == off_n[0][i]))
-                ||  (r.slot[1].vld && (r.slot[1].off == off_n[0][i]));
-            btq_out.hash        [win_idx] = '0; // FIXME
-            btq_out.ghr_base    [win_idx] = '0; // FIXME
-        end
-    end
-
-    fifo #(
-        .DEPTH(2*N),
-        .WIDTH($bits(IF_ID_PACKET)),
-        .NUM_RPORTS(N),
-        .NUM_WPORTS(N),
-        .FLUSH_MODE(FIFO_FLUSH_RESET),
-        .ENABLE_INTR_FWD(`FALSE),
-        .INSTANCE_ID(98)
-    ) pc_buf (
-        .clock,
-        .reset,
-        .flush,
-
-        // >> unused inputs
-        .flush_snap ('0),
-        .clmsk      ('0),
-        .wr_bmask   ('0),
-        // << unused inputs
-
-        .wr_en_cnt  (f_cnt),
-        .wr_data    (f_dat),
-        .rd_en_cnt  (d_out.wen_cnt),
-        .rd_data    (d_out.dat),
-        .free_scnt  (free_scnt),
-        .used_scnt  (used_scnt)
-    );
-
-    always_ff @(posedge clock) begin
-        if (reset)
-            cur <= '0;
-
-        else if (flush)
-            cur <= '{
-                fb_base : flush_fb_base,
-                off     : flush_pc_off
-            };
-
-        else
-            cur <= cur_n;
-
-    end
-
-`ifdef DEBUG
-    task print_fetch;
-        logic [2*N-1:0] insn_buf_vld;
-
-        $display(">> Fetch >>");
-        bpu0.print_bpu;
-        // insn_buf_vld = '0;
-        // for (int cnt = 0; cnt < insn_buf.used; ++cnt)
-        //     insn_buf_vld[(insn_buf.head + cnt) % (2*N)] = 1;
-        // $display("insn_buf_vld: %b", insn_buf_vld);
-        // for (int i = 0; i < N; ++i)
-        //     $display("[%1d]: %1d", i, brch_prefix_cnt[i]);
-        $display("flush: %b, flush_fb_base: %d, flush_pc_off", flush, flush_fb_base, flush_pc_off);
-        $display("pc_reg: %d", bpu0.pc_reg);
-        // $display("step: %b, pred:%b, wen_cnt:%d, pred_any: %b, pred_idx: %b",
-        //     bpu0.step,
-        //     bpu0.pred,
-        //     bpu0.ghr0.wen_cnt,
-        //     bpu0.pred_any,
-        //     bpu0.pred_idx
-        // );
-        $display("d_out: {wen_cnt: %b, dat: [%x, %x]}", d_out.wen_cnt, d_out.dat[0], d_out.dat[1]);
-        $display("brch: %b, pc_n: [%d, %d, %d]",
-            brch,
-            pc_n[0],
-            pc_n[1],
-            pc_n[2]
-        );
-        $display("cur: {fb_base: %d, off: %d}",
-            cur.fb_base,
-            cur.off
-        );
-
-        $display("f_cnt: %d, off_n: [%d, %d, %d], mem_out [%d, %d]",
-            f_cnt,
-            off_n[0][0],
-            off_n[0][1],
-            off_n[0][2],
-            mem_out.PCdws[0],
-            mem_out.PCdws[1]
-        );
-
-        // bpu0.ghr0.print_ghr;
-
-        $display("bpu_upd: {en: %b, base: %d, pc_off: %d, take: %b, tgt: %d, md: %b}",
-            btq_in.bp_upd.en,
-            btq_in.bp_upd.dat.base,
-            btq_in.bp_upd.dat.pc_off,
-            btq_in.bp_upd.dat.take,
-            btq_in.bp_upd.dat.tgt,
-            btq_in.bp_upd.dat.md
-        );
-        bpu0.uftb0.print_uftb;
-        // ftq0.print_ftq;
-        $display("<< Fetch <<");
-    endtask
-`endif
 
 endmodule

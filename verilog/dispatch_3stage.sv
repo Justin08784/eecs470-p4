@@ -1,7 +1,7 @@
 `include "sys_defs.svh"
 
 typedef struct packed {
-    // from ID_RESULT
+    // from ID_RENAME_PKT
 `ifdef DEBUG
     int             id;
 `endif
@@ -105,11 +105,11 @@ module dispatch #(parameter
 
         tmp_decode2alloc = '0;
         for (int i = 0; i < N; ++i) begin
-            // logic [$bits(ALLOC_RENAME_PKT)-$bits(ID_RESULT)-1:0] diff;
+            // logic [$bits(ALLOC_RENAME_PKT)-$bits(ID_RENAME_PKT)-1:0] diff;
             // diff = '0;
             // tmp_decode2alloc[i] = ALLOC_RENAME_PKT'({d_in.d_dat[i], diff});
             tmp_decode2alloc[i] = '{
-                // from ID_RESULT
+                // from ID_RENAME_PKT
 `ifdef DEBUG
                 id          : d_in.d_dat[i].id,
 `endif
@@ -215,7 +215,7 @@ module dispatch #(parameter
             // diff = '0;
             // tmp_alloc2rename[i] = RENAME_COMMIT_PKT'({rename_in[i], diff});
             tmp_alloc2rename[i] = '{
-                // from ID_RESULT
+                // from ID_RENAME_PKT
 `ifdef DEBUG
                 id          : rename_in[i].id,
 `endif
@@ -352,7 +352,7 @@ module dispatch #(parameter
             // diff = '0;
             // rs_out.dat[i] = COMMIT_RS_PKT'({commit_in[i], diff});
             rs_out.dat[i] = '{
-                // from ID_RESULT
+                // from ID_RENAME_PKT
 `ifdef DEBUG
                 id          : commit_in[i].id,
 `endif

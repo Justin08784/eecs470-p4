@@ -1,5 +1,18 @@
 `include "sys_defs.svh"
 
+typedef struct packed {
+    // fallthrough npc (i.e. npc if no branch taken)
+    logic [3:0] end_off;    // offset of last insn in the FB. ft_npc = base + end_off + 1
+        // TODO: see FTB_BR_SLOT (above) for alternative schemes
+
+    // two branch slots: [0, 1]
+    FTB_BR_SLOT [1:0] br_slot;
+
+    // metadata re: br1/tail slot
+    FTB_MD1 md1;
+} FTB_ENTRY;
+
+
 /* TODO: Test lru_man, especially masking logic. */
 module lru_man #(
     parameter SETW=16

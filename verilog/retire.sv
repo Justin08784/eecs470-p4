@@ -25,16 +25,16 @@ module retire (
     RETIRE_OP [N-1:0] ret;
     always_comb begin
         foreach (ret[i]) begin
-            unique case (rob_in.entries[i].fu_idx)
+            unique case (rob_in.fu_idx[i])
             FU_LOD: ret[i] = RET_LOD;
             FU_STR: ret[i] = RET_STR;
             FU_BRU: ret[i] = RET_BRU;
             default:ret[i] = RET_GEN;
             endcase
 
-            if (rob_in.entries[i].illegal)
+            if (rob_in.illegal[i])
                 ret[i] = RET_ILL;
-            else if (rob_in.entries[i].halt)
+            else if (rob_in.halt[i])
                 ret[i] = RET_HLT;
         end
     end
@@ -46,7 +46,7 @@ module retire (
         retire_en_cnt   = 0;
 
         for (int i = 0; i < rob_in.vld_scnt; ++i) begin
-            if (!rob_in.entries[i].cpl)
+            if (!rob_in.cpl[i])
                 break;
 
             unique case (ret[i])
@@ -62,34 +62,17 @@ module retire (
         end
     end
 
-    always_comb begin
-        PHYS_REG_IDX [N-1:0] tag;
-        PHYS_REG_IDX [N-1:0] t_old;
-        REG_IDX      [N-1:0] dst;
-        logic        [N-1:0] halt;
-        logic        [N-1:0] illegal;
+    assign retire_exec = '{
+        // only the count *may* be adjusted
+        en_cnt  : retire_en_cnt,
 
-        for (int i = 0; i < N; ++i) begin
-            tag[i]     = rob_in.entries[i].tag;
-            t_old[i]   = rob_in.entries[i].t_old;
-            dst[i]     = rob_in.entries[i].dst;
-            halt[i]    = rob_in.entries[i].halt;
-            illegal[i] = rob_in.entries[i].illegal;
-        end
-
-        // retire_exec = flush ? '0 : '{
-        retire_exec = '{
-            // only the count *may* be adjusted
-            en_cnt  : retire_en_cnt,
-
-            // the rest of the fields stay the same
-            tag     : tag,
-            t_old   : t_old,
-            dst     : dst,
-            halt    : halt,
-            illegal : illegal
-        };
-    end
+        // the rest of the fields stay the same
+        tag     : rob_in.tag,
+        t_old   : rob_in.t_old,
+        dst     : rob_in.dst,
+        halt    : rob_in.halt,
+        illegal : rob_in.illegal
+    };
 
 `ifdef DEBUG
     task print_retire;

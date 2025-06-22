@@ -190,7 +190,6 @@ GREP = grep -E --color=auto
 
 # TODO: add more modules here
 MODULES = cpu \
-	align \
 	bpu \
 	fetch \
 	fifo \
@@ -284,7 +283,6 @@ CPU_TESTBENCH = test/pipeline_print.c \
 
 # verilog/cpu.sv is implicit
 CPU_SOURCES = verilog/cpu.sv \
-			verilog/align.sv \
 			verilog/checkpoints.sv \
 			verilog/compactor.sv \
 			verilog/fetch.sv \

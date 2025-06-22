@@ -254,8 +254,8 @@ module stage_id_p4 (
     int insn_id;
 `endif
 
-    ID_RESULT [N-1:0] tmp;
-    ID_RESULT [N-1:0] wr_fifo;
+    ID_RENAME_PKT [N-1:0] tmp;
+    ID_RENAME_PKT [N-1:0] wr_fifo;
     // number of legal fetched insns until the 1st illegal insn
     `CNT_TYPE(N) non_illegal_cnt; // TODO: do we need stall fetch when we get an illegal?
 
@@ -356,7 +356,7 @@ module stage_id_p4 (
     fifo #(
         .INSTANCE_ID(1),
         .DEPTH(2*N),
-        .WIDTH($bits(ID_RESULT)),
+        .WIDTH($bits(ID_RENAME_PKT)),
         .NUM_RPORTS(N),
         .NUM_WPORTS(N),
         .FLUSH_MODE(FIFO_FLUSH_RESET),
@@ -413,8 +413,8 @@ module stage_id_p4 (
             d_out.dat[0].inst, 
             d_out.dat[1].inst
         );
-        print_id_result(d_out.dat[0]);
-        print_id_result(d_out.dat[1]);
+        print_ID_RENAME_PKT(d_out.dat[0]);
+        print_ID_RENAME_PKT(d_out.dat[1]);
         // $display("d_out.d_dat[0]: %b", d_out.d_dat[0]);
         // $display("d_out.d_dat[1]: %b", d_out.d_dat[1]);
         $display("<< ID <<", $time);

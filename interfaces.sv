@@ -87,7 +87,7 @@ module rs #(parameter
     // dispatch
     output  logic       [$clog2(N):0] rs_rdy_scnt, // TODO: rename to rs_rdy_scnt
         // To: dispatch
-    input   ID_RESULT   [N-1:0] d_dat,
+    input   ID_RENAME_PKT   [N-1:0] d_dat,
         // - From: dispatch
     input   logic       [$clog2(N):0] d_en_cnt,
         // - From: dispatch
@@ -98,7 +98,7 @@ module rs #(parameter
         // (DIS_MAX will be a new sys_defs.svh constant) ?
 
     // >> UNSURE
-    output  ID_RESULT   [RS_SZ-1:0] rs_rdy,
+    output  ID_RENAME_PKT   [RS_SZ-1:0] rs_rdy,
         // To: dispatch
         // - rs_rdy[i] = !rs_table[i].busy
     input   logic       [N-1:0][RS_SZ-1:0] d_dat2rs,
@@ -116,7 +116,7 @@ module rs #(parameter
         // - From: EX
     output  logic       [NUM_FU_X-1:0]    fu_vld_X, // TODO: rename to fu_en_X
         // To: EX
-    output  ID_RESULT   [NUM_FU_X-1:0]    fu_dat_X,
+    output  ID_RENAME_PKT   [NUM_FU_X-1:0]    fu_dat_X,
         // To: EX
         // - TODO: ...we should let a submodule handle issuing logic
 
@@ -272,7 +272,7 @@ module dispatch #(parameter
 
     // DECODE
     input struct packed {
-        ID_RESULT   [N-1:0]     d_dat;
+        ID_RENAME_PKT   [N-1:0]     d_dat;
     } decode_in,
 
     output struct packed {

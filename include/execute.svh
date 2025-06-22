@@ -10,7 +10,7 @@ typedef struct packed {
     DATA data;
 } CPL_CAND;
 
-/* Slices (or "views") of ID_RESULT needed for each FU type */
+/* Slices (or "views") of ID_RENAME_PKT needed for each FU type */
 typedef struct packed {
     BYPASS_TAG      bytag;
 

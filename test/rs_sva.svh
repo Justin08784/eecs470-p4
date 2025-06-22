@@ -19,7 +19,7 @@ module rs_sva #(parameter
     // dispatch
     input   logic           [$clog2(N):0] rs_rdy_scnt, // to dispatcher
     input   logic           [N-1:0] d_vld,     // which dispatch lines are valid? (from dispatcher; dep. on rs_rdy_scnt)
-    input   ID_RESULT       [N-1:0] d_dat,
+    input   ID_RENAME_PKT       [N-1:0] d_dat,
     // issue
     input   logic           [NUM_FU_ALU-1:0]    fu_rdy_alu,
     input   logic           [NUM_FU_MULT-1:0]   fu_rdy_mult,
@@ -40,10 +40,10 @@ module rs_sva #(parameter
     input   logic           [NUM_FU_MULT-1:0]   fu_vld_mult_dut,
     input   logic           [NUM_FU_STORE-1:0]  fu_vld_store_dut,
     input   logic           [NUM_FU_LOAD-1:0]   fu_vld_load_dut,
-    input   ID_RESULT       [NUM_FU_ALU-1:0]    fu_dat_alu_dut,
-    input   ID_RESULT       [NUM_FU_MULT-1:0]   fu_dat_mult_dut,
-    input   ID_RESULT       [NUM_FU_STORE-1:0]  fu_dat_store_dut,
-    input   ID_RESULT       [NUM_FU_LOAD-1:0]   fu_dat_load_dut,
+    input   ID_RENAME_PKT       [NUM_FU_ALU-1:0]    fu_dat_alu_dut,
+    input   ID_RENAME_PKT       [NUM_FU_MULT-1:0]   fu_dat_mult_dut,
+    input   ID_RENAME_PKT       [NUM_FU_STORE-1:0]  fu_dat_store_dut,
+    input   ID_RENAME_PKT       [NUM_FU_LOAD-1:0]   fu_dat_load_dut,
     input   RS_ENTRY        [RS_SZ-1:0]         entries_dut
 );
     localparam DEBUG = 1;
@@ -105,10 +105,10 @@ module rs_sva #(parameter
     logic               [NUM_FU_MULT-1:0]   fu_vld_mult;
     logic               [NUM_FU_STORE-1:0]  fu_vld_store;
     logic               [NUM_FU_LOAD-1:0]   fu_vld_load;
-    ID_RESULT           [NUM_FU_ALU-1:0]    fu_dat_alu;
-    ID_RESULT           [NUM_FU_MULT-1:0]   fu_dat_mult;
-    ID_RESULT           [NUM_FU_STORE-1:0]  fu_dat_store;
-    ID_RESULT           [NUM_FU_LOAD-1:0]   fu_dat_load;
+    ID_RENAME_PKT           [NUM_FU_ALU-1:0]    fu_dat_alu;
+    ID_RENAME_PKT           [NUM_FU_MULT-1:0]   fu_dat_mult;
+    ID_RENAME_PKT           [NUM_FU_STORE-1:0]  fu_dat_store;
+    ID_RENAME_PKT           [NUM_FU_LOAD-1:0]   fu_dat_load;
     int num_free_fus    [FU_IDX_NUM];
     int num_issue_fus   [FU_IDX_NUM];
     int cdb_tags [int];
@@ -145,7 +145,7 @@ module rs_sva #(parameter
     logic   [NUM_FU_STORE-1:0]  fu_dat_store_eqs;
     struct packed {
         int vld;
-        ID_RESULT dat;
+        ID_RENAME_PKT dat;
     } fu_dat_sva_sorted[MAX_NUM_FU], fu_dat_dut_sorted[MAX_NUM_FU];
 
     // always_comb begin

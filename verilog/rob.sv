@@ -1,5 +1,16 @@
 `include "sys_defs.svh"
 
+typedef struct packed {
+    logic           cpl;
+    PHYS_REG_IDX    tag;
+    PHYS_REG_IDX    t_old;
+    REG_IDX         dst;
+
+    FU_IDX          fu_idx;
+    logic           halt;
+    logic           illegal;
+} ROB_ENTRY;
+
 module rob #(
     parameter ROB_SZ = ROB_SZ,  // num elements
     parameter N=N
@@ -74,10 +85,18 @@ module rob #(
         // handle retire (outs)
         r_out = '0;
         r_out.vld_scnt = used_scnt;
-        for (int unsigned i = 0; i < used_scnt; ++i) begin
+        for (int i = 0; i < used_scnt; ++i) begin
+            ROB_ENTRY cur;
+            cur = state[rtre_idxs_n[i]];
             /* preview mode–– just display all valid entries in read window even
             if not all will get retired this cycle */
-            r_out.entries[i] = state[rtre_idxs_n[i]];
+            r_out.cpl   [i] = cur.cpl;
+            r_out.tag   [i] = cur.tag;
+            r_out.t_old [i] = cur.t_old;
+            r_out.dst   [i] = cur.dst;
+            r_out.fu_idx[i] = cur.fu_idx;
+            r_out.halt  [i] = cur.halt;
+            r_out.illegal[i]= cur.illegal;
         end
 
         // handle dispatch (outs)

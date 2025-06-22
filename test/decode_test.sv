@@ -14,7 +14,7 @@ module decoder_tb;
     logic [$clog2(N):0] valid;
 
     // Outputs
-    ID_RESULT [N-1:0] decode_out;
+    ID_RENAME_PKT [N-1:0] decode_out;
     logic [$clog2(N):0] valid_out;
 
     // Instantiate the decoder module

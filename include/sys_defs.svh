@@ -333,18 +333,6 @@ typedef struct packed {
 } FTB_MD1;
 
 typedef struct packed {
-    // fallthrough npc (i.e. npc if no branch taken)
-    logic [3:0] end_off;    // offset of last insn in the FB. ft_npc = base + end_off + 1
-        // TODO: see FTB_BR_SLOT (above) for alternative schemes
-
-    // two branch slots: [0, 1]
-    FTB_BR_SLOT [1:0] br_slot;
-
-    // metadata re: br1/tail slot
-    FTB_MD1 md1;
-} FTB_ENTRY;
-
-typedef struct packed {
     WADDR       base;
     logic [3:0] pc_off; // pc = base + pc_off
     logic       take;
@@ -388,52 +376,6 @@ typedef struct packed {
     logic ret;
     logic jalr;
 } BRANCH_MD;
-
-typedef struct packed {
-`ifdef PC_GEN_TEST_MODE
-    int id;
-`endif
-    WADDR       base_n;     // base address of *next* FB
-
-    logic       ft;         // fallthrough? else took a branch
-    logic       pred_idx;   // ft ? <IGNORE>: slot of pred-taken branch
-    logic [3:0] off;        // ft ? end_off : slot[pred_idx].off
-    logic       hit;
-
-    // pared down FTB entry
-    struct packed {
-        logic       vld;
-        logic [3:0] off;
-    } [1:0] slot;
-
-    logic       always_take;// ft ? <IGNORE>: " of pred-taken branch
-    FTB_MD1     md;         // ft ? <IGNORE>: " of pred-tkaen branch
-} FTQ_ENTRY;
-
-typedef struct packed {
-    DWADDR          dw;
-    logic[1:0][3:0] off;
-    logic   [1:0]   fmsk;   // which words to fetch.
-        /* Invariants:
-        1. At least bit 0 (word 0) set
-        2. Bits set contiguously from 0
-
-        FUTURE: Invariant 2 may no longer hold if we detect when a branch in an
-        early word targets into a later word *in the same cache line*,
-        AND we allow storing them together in a single cache line. Then and all insns
-        between the branch and target would have fmsk set to 0.
-            Idea: if the branch target is in the same cache line as the
-            branch (much more likely with larger cache lines), we may reuse
-            the 14-bit tgt field in the FTB branch slot as a [$clog2(cache_line_sz)-1:0]
-            in-line offset (possible with a carry bit for faster computation).
-        */
-    logic   [1:0]   is_end;
-        /* Does word i *terminate* an FB?
-        Both bits can be 1 when word0 ends FB-A and word1 ends FB-B (a 1-insn block). */
-    
-    MEM_BLOCK       blk;
-    BRANCH_MD[1:0]  md;
-} ICACHE_RESPONSE;
 
 typedef struct packed {
     INST  inst;
@@ -511,7 +453,7 @@ typedef struct packed {
 // Packets: Decode
 /* 
 The following structs are enrichments of the previous.
-ID_RESULT -> ALLOC_RENAME_PKT -> RENAME_COMMIT_PKT -> COMMIT_RS_PKT
+ID_RENAME_PKT -> ALLOC_RENAME_PKT -> RENAME_COMMIT_PKT -> COMMIT_RS_PKT
 */
 typedef struct packed {
 `ifdef DEBUG
@@ -532,7 +474,7 @@ typedef struct packed {
     logic           csr_op;     // Is this a CSR operation? (we only used this as a cheap way to get return code)
     RAS_SNAP        ras_snap;
     BTQ_IDX         btq_idx;
-} ID_RESULT;
+} ID_RENAME_PKT;
 
 // I/O: Decode
 typedef struct packed {
@@ -541,7 +483,7 @@ typedef struct packed {
 
 typedef struct packed {
     `CNT_TYPE(N)    vld_scnt;
-    ID_RESULT[N-1:0]dat;
+    ID_RENAME_PKT[N-1:0]dat;
 } decode2dispatch;
 
 
@@ -550,7 +492,7 @@ typedef struct packed {
 // ================
 // Packets: Dispatch
 typedef struct packed {
-    // from ID_RESULT
+    // from ID_RENAME_PKT
 `ifdef DEBUG
     int             id;
 `endif
@@ -579,7 +521,7 @@ typedef struct packed {
 } RENAME_COMMIT_PKT;
 
 typedef struct packed {
-    // from ID_RESULT
+    // from ID_RENAME_PKT
 `ifdef DEBUG
     int             id;
 `endif
@@ -698,17 +640,6 @@ typedef struct packed {
 // Owner: ROB
 // ================
 // Packets: ROB
-typedef struct packed {
-    logic           cpl;
-    PHYS_REG_IDX    tag;
-    PHYS_REG_IDX    t_old;
-    REG_IDX         dst;
-
-    FU_IDX          fu_idx;
-    logic           halt;
-    logic           illegal;
-} ROB_ENTRY;
-
 // I/O: ROB
 typedef struct packed {
     `CNT_TYPE(N)    rdy_scnt;
@@ -723,7 +654,15 @@ typedef struct packed {
     `CNT_TYPE(N)        vld_scnt;
         // From: retire (ROB)
         // - number of valid retire lines
-    ROB_ENTRY   [N-1:0] entries; 
+
+    logic       [N-1:0] cpl;
+    PHYS_REG_IDX[N-1:0] tag;
+    PHYS_REG_IDX[N-1:0] t_old;
+    REG_IDX     [N-1:0] dst;
+
+    FU_IDX      [N-1:0] fu_idx;
+    logic       [N-1:0] halt;
+    logic       [N-1:0] illegal;
         // - IMPORTANT: Set from lowest indices in program-order. NO GAPS!!!
 } rob2retire;
 

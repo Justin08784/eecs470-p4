@@ -6,8 +6,8 @@
 `ifdef DEBUG
 // OPTIONAL: Print our your data here
 // It will go to the $program.log file
-function print_id_result(input ID_RESULT x);
-    $display("ID_RESULT: id=%3d PC=%h fu_idx=%2d inst=%h opa_select=%1d opb_select=%1d alu_func=%1d cond_branch=%b halt=%b illegal=%b csr_op=%b btq_idx=%2d ",
+function print_ID_RENAME_PKT(input ID_RENAME_PKT x);
+    $display("ID_RENAME_PKT: id=%3d PC=%h fu_idx=%2d inst=%h opa_select=%1d opb_select=%1d alu_func=%1d cond_branch=%b halt=%b illegal=%b csr_op=%b btq_idx=%2d ",
         x.id,
         x.PC,
         x.fu_idx,
