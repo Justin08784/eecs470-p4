@@ -9,7 +9,7 @@
 // TODO: uncomment this line once you've implemented your cache
 `define CACHE_MODE
 
-`define DCACHE_LINES 32
+parameter int DCACHE_LINES = 32;
 
 /* Constants */
 typedef logic [31:0] ADDR;

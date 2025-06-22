@@ -1,6 +1,22 @@
 `ifndef CONFIG_SVH
 `define CONFIG_SVH
 
+///////////////////////////////
+// --- Compil. Controls ---- //
+///////////////////////////////
+/* How can we implement this in the Makefile? */
+// comment out to enable synth only constructions
+// `define SYNTH
+
+`ifndef SYNTH
+// comment out to disable DEBUG:
+// `define DEBUG
+// comment to disable clock cycle print
+// `define CYCLE_PRINT
+// comment out to...
+`define PC_GEN_TEST_MODE
+`endif
+
 ///////////////////////////////////
 // ---- Starting Parameters ---- //
 ///////////////////////////////////
@@ -42,21 +58,5 @@ parameter LD_BAY_SZ     = 2; //num load bays in the FU
 // number of mult stages (2, 4) (you likely don't need 8)
 parameter MUL_STAGES    = 16;
 // Justin: funny enough we need at least 8 or else multiply is on critical path
-
-///////////////////////////////
-// --- Compil. Controls ---- //
-///////////////////////////////
-/* How can we implement this in the Makefile? */
-// comment out to enable synth only constructions
-// `define SYNTH
-
-`ifndef SYNTH
-// comment out to disable DEBUG:
-// `define DEBUG
-// comment to disable clock cycle print
-// `define CYCLE_PRINT
-// comment out to...
-// `define PC_GEN_TEST_MODE
-`endif
 
 `endif // CONFIG_SVH

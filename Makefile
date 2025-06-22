@@ -206,12 +206,12 @@ MODULES = cpu \
 # TODO: update this if you add more header files
 ALL_HEADERS = $(CPU_HEADERS)
 
-BPU_FILES = verilog/sys_defs.svh verilog/uftb.sv verilog/skid_buffer.sv verilog/ghr.sv
+BPU_FILES = include/sys_defs.svh verilog/uftb.sv verilog/skid_buffer.sv verilog/ghr.sv
 build/bpu.simv: $(BPU_FILES)
 build/bpu.cov: $(BPU_FILES)
 synth/bpu.vg: $(BPU_FILES)
 
-FETCH_FILES = verilog/sys_defs.svh \
+FETCH_FILES = include/sys_defs.svh \
 	verilog/uftb.sv \
 	verilog/skid_buffer.sv \
 	verilog/ghr.sv \
@@ -230,12 +230,12 @@ build/fetch.simv: $(FETCH_FILES)
 build/fetch.cov: $(FETCH_FILES)
 synth/fetch.vg: $(FETCH_FILES)
 
-FIFO_FILES = verilog/sys_defs.svh verilog/ring_ctr.sv
+FIFO_FILES = include/sys_defs.svh verilog/ring_ctr.sv
 build/fifo.simv: $(FIFO_FILES)
 build/fifo.cov: $(FIFO_FILES)
 synth/fifo.vg: $(FIFO_FILES)
 
-FTQ_FILES = verilog/sys_defs.svh verilog/ring_ctr.sv
+FTQ_FILES = include/sys_defs.svh verilog/ring_ctr.sv
 build/ftq.simv: $(FTQ_FILES)
 build/ftq.cov: $(FTQ_FILES)
 synth/ftq.vg: $(FTQ_FILES)
@@ -249,12 +249,12 @@ build/pc_gen.simv: $(PC_GEN_FILES)
 build/pc_gen.cov: $(PC_GEN_FILES)
 synth/pc_gen.vg:
 
-RS_FILES = verilog/sys_defs.svh verilog/psel_gen.sv
+RS_FILES = include/sys_defs.svh verilog/psel_gen.sv
 build/rs.simv: $(RS_FILES)
 build/rs.cov: $(RS_FILES)
 synth/rs.vg: $(RS_FILES)
 
-VICTIM_FILES = verilog/sys_defs.svh verilog/psel_gen.sv
+VICTIM_FILES = include/sys_defs.svh verilog/psel_gen.sv
 build/victim.simv: $(VICTIM_FILES)
 build/victim.cov: $(VICTIM_FILES)
 synth/victim.vg: $(VICTIM_FILES)

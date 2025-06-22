@@ -7,9 +7,9 @@
 
 module ghr_sva #(
     parameter DEPTH     = 32, // must be geq than 2*GHR_LEN and a power of 2
-    parameter NUM_FU_BRU= `NUM_FU_BRU,
+    parameter NUM_FU_BRU= NUM_FU_BRU,
     parameter GHR_LEN   = GHR_LEN,
-    parameter N         = `N,
+    parameter N         = N,
     type VEC = logic [DEPTH-1:0],
     type PTR = logic [$clog2(DEPTH)-1:0]
 ) (

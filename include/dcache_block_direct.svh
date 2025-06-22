@@ -5,7 +5,7 @@
 
 localparam ASSOC   = 4; // i.e. NUM_WAYS
 localparam MSHR_SZ = 16;
-localparam NUM_CACHE_LINES  =  `DCACHE_LINES;
+localparam NUM_CACHE_LINES  = DCACHE_LINES;
 localparam NUM_SETS         = NUM_CACHE_LINES / ASSOC;
 localparam SET_INDEX_BITS   = `IDX_SIZE(NUM_SETS);
 localparam OFFSET_BITS      = 3;

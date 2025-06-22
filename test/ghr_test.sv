@@ -25,8 +25,8 @@ module ghr_test #(
     logic   flush_take;
 
     // ex (correct resolutions)
-    logic [`NUM_FU_BRU-1:0] ex_en;
-    PTR   [`NUM_FU_BRU-1:0] ex_idx;
+    logic [NUM_FU_BRU-1:0] ex_en;
+    PTR   [NUM_FU_BRU-1:0] ex_idx;
 
     // fetch
     `CNT_TYPE(N)    f_en_cnt, f_rdy_scnt;

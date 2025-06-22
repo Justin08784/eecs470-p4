@@ -32,15 +32,15 @@ import "DPI-C" function string decode_inst(int inst);
 //import "DPI-C" function void close_pipeline_output_file();
 
 
-`define TB_MAX_CYCLES 50000000
-// `define TB_MAX_CYCLES 500
-// `define TB_MAX_CYCLES 160100
+parameter int TB_MAX_CYCLES = 50000000;
+// parameter int TB_MAX_CYCLES = 500;
+// parameter int TB_MAX_CYCLES = 160100;
 
 
 // Debug cycle limits, both inclusive
-localparam DBG_CYCLE_MIN = 0;
-localparam DBG_CYCLE_MAX = `TB_MAX_CYCLES;
-// localparam DBG_CYCLE_MAX = 500;
+localparam int DBG_CYCLE_MIN = 0;
+localparam int DBG_CYCLE_MAX = TB_MAX_CYCLES;
+// localparam int DBG_CYCLE_MAX = 500;
 
 /*
 - unsure about correctness of call/ret checking; make sure to
@@ -320,7 +320,7 @@ module testbench;
 `endif // SYNTH
 
             // stop the processor
-            if (error_status != NO_ERROR || clock_count > `TB_MAX_CYCLES) begin
+            if (error_status != NO_ERROR || clock_count > TB_MAX_CYCLES) begin
 
                 $display("  %16t : Processor Finished", $realtime);
 
@@ -473,7 +473,7 @@ module testbench;
     endtask // task output_cpi_file
 
 
-    localparam CACHE_LINES  = `DCACHE_LINES;
+    localparam CACHE_LINES  = DCACHE_LINES;
     localparam INDEX_BITS   = $clog2(CACHE_LINES);
     localparam OFFSET_BITS  = 3;
     localparam TAG_WIDTH    = 32 - INDEX_BITS - OFFSET_BITS;

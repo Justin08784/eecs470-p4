@@ -4,13 +4,13 @@
 `define RS_CHK_SVH
 
 module rs_chk #(parameter 
-    N=`N,
-    RS_SZ=`RS_SZ,
-    FU_IDX_NUM=`FU_IDX_NUM,
-    NUM_FU_ALU=`NUM_FU_ALU,
-    NUM_FU_MULT=`NUM_FU_MULT,
-    NUM_FU_LOAD=`NUM_FU_LOAD,
-    NUM_FU_STORE=`NUM_FU_STORE
+    N=N,
+    RS_SZ=RS_SZ,
+    FU_IDX_NUM=FU_IDX_NUM,
+    NUM_FU_ALU=NUM_FU_ALU,
+    NUM_FU_MULT=NUM_FU_MULT,
+    NUM_FU_LOAD=NUM_FU_LOAD,
+    NUM_FU_STORE=NUM_FU_STORE
 ) (
     // ==== input lines so we can do our own parallel computation
     input clock,
