@@ -1,5 +1,5 @@
 `include "sys_defs.svh"
-`include "dcache_block_direct.svh"
+// `include "dcache_block_direct.svh"
 
 module cpu (
     input  clock,

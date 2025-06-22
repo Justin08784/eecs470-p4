@@ -229,7 +229,6 @@ FETCH_FILES = include/sys_defs.svh \
 # verilog/gshare.sv
 # verilog/btb.sv
 # verilog/bp.sv
-
 build/fetch.simv: $(FETCH_FILES)
 build/fetch.cov: $(FETCH_FILES)
 synth/fetch.vg: $(FETCH_FILES)
@@ -272,7 +271,6 @@ synth/victim.vg: $(VICTIM_FILES)
 
 CPU_HEADERS = include/sys_defs.svh \
 			include/ISA.svh \
-			include/dcache_block_direct.svh \
 			include/execute.svh
 
 # test/cpu_test.sv is implicit
@@ -283,32 +281,31 @@ CPU_TESTBENCH = test/pipeline_print.c \
 
 # verilog/cpu.sv is implicit
 CPU_SOURCES = verilog/cpu.sv \
-			verilog/checkpoints.sv \
-			verilog/compactor.sv \
-			verilog/fetch.sv \
-			verilog/ffs.sv \
-			verilog/memDP.sv \
-			verilog/mult.sv \
-			verilog/rs.sv \
-			verilog/pc_gen.sv \
-			verilog/psel_gen.sv \
-			verilog/dispatch.sv \
-			verilog/map_table.sv \
-			verilog/rob.sv \
-			verilog/prf.sv \
-			verilog/free_list.sv \
-			verilog/decode.sv \
-			verilog/ring_ctr.sv \
-			verilog/fifo.sv \
-			verilog/fetch.sv \
-			verilog/execute.sv \
-			verilog/uftb.sv \
-			verilog/ftq.sv \
 			verilog/bpu.sv \
 			verilog/btq.sv \
+			verilog/checkpoints.sv \
+			verilog/compactor.sv \
+			verilog/decode.sv \
+			verilog/dispatch.sv \
+			verilog/execute.sv \
+			verilog/fetch.sv \
+			verilog/ffs.sv \
+			verilog/fifo.sv \
+			verilog/free_list.sv \
+			verilog/ftq.sv \
 			verilog/ghr.sv \
-			verilog/skid_buffer.sv \
+			verilog/map_table.sv \
+			verilog/memDP.sv \
+			verilog/mult.sv \
+			verilog/pc_gen.sv \
+			verilog/prf.sv \
+			verilog/psel_gen.sv \
 			verilog/retire.sv \
+			verilog/ring_ctr.sv \
+			verilog/rob.sv \
+			verilog/rs.sv \
+			verilog/skid_buffer.sv \
+			verilog/uftb.sv \
 			verilog/victim.sv
 # verilog/ras.sv
 # verilog/gshare.sv

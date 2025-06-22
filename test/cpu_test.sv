@@ -8,7 +8,7 @@
 /////////////////////////////////////////////////////////////////////////
 
 `include "sys_defs.svh"
-`include "dcache_block_direct.svh"
+// `include "dcache_block_direct.svh"
 `include "execute.svh"
 `include "ISA.svh"
 
@@ -136,13 +136,13 @@ module testbench;
     ADDR [N-1:0] PC_reg;
     EXCEPTION_CODE error_status = NO_ERROR;
 
-    DBG_dcache      dbg_dcache;
+    // DBG_dcache      dbg_dcache;
 
     assign proc2mem_command = '0;
     assign proc2mem_addr    = '0;
     assign proc2mem_data    = '0;
     assign proc2mem_size    = '0;
-    assign dbg_dcache       = '0;
+    // assign dbg_dcache       = '0;
 
     // Instantiate the Pipeline
     cpu verisimpleV (
@@ -472,27 +472,27 @@ module testbench;
     endtask // task output_cpi_file
 
 
-    localparam CACHE_LINES  = DCACHE_LINES;
-    localparam INDEX_BITS   = $clog2(CACHE_LINES);
-    localparam OFFSET_BITS  = 3;
-    localparam TAG_WIDTH    = 32 - INDEX_BITS - OFFSET_BITS;
-    function automatic ADDR recons_addr(
-        input logic [INDEX_BITS-1:0] way,
-        input logic [TAG_WIDTH-1:0]  tag
-    );
-        return {
-            tag,
-            way,
-            3'b000
-        };
-    endfunction
+    // localparam CACHE_LINES  = DCACHE_LINES;
+    // localparam INDEX_BITS   = $clog2(CACHE_LINES);
+    // localparam OFFSET_BITS  = 3;
+    // localparam TAG_WIDTH    = 32 - INDEX_BITS - OFFSET_BITS;
+    // function automatic ADDR recons_addr(
+    //     input logic [INDEX_BITS-1:0] way,
+    //     input logic [TAG_WIDTH-1:0]  tag
+    // );
+    //     return {
+    //         tag,
+    //         way,
+    //         3'b000
+    //     };
+    // endfunction
 
     // Show contents of Unified Memory in both hex and decimal
     // Also output the final processor status
     task show_final_mem_and_status;
         input EXCEPTION_CODE final_status;
         int showing_data;
-        QUERY_CACHE_RES cache_res;
+        // QUERY_CACHE_RES cache_res;
         begin
             MEM_BLOCK blk, cache_blk, mem_blk;
             $fdisplay(out_fileno, "\nFinal memory state and exit status:\n");
@@ -500,13 +500,14 @@ module testbench;
             $fdisplay(out_fileno, "@@@");
             showing_data = 0;
             for (int k = 0; k <= `MEM_64BIT_LINES - 1; k = k+1) begin
-                cache_res = _query_cache(
-                    dbg_dcache.hdr,
-                    dbg_dcache.memDP,
-                    k
-                );
-                mem_blk     = memory.unified_memory[k];
-                blk         = cache_res.vdm ? cache_res.blk : mem_blk;
+                // cache_res = _query_cache(
+                //     dbg_dcache.hdr,
+                //     dbg_dcache.memDP,
+                //     k
+                // );
+                mem_blk = memory.unified_memory[k];
+                // blk     = cache_res.vdm ? cache_res.blk : mem_blk;
+                blk     = mem_blk;
                 if (blk != 0) begin
                     $fdisplay(out_fileno, "@@@ mem[%5d] = %x : %0d", k*8, blk, blk);
                     showing_data = 1;
