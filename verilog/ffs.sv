@@ -1,4 +1,4 @@
-`include "timescale.svh"
+`include "sys_defs.svh"
 
 module ffs #(
     parameter int VECW=2

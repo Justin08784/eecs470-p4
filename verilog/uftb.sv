@@ -1,5 +1,4 @@
-`include "timescale.svh"
-`include "frontend.svh"
+`include "sys_defs.svh"
 
 /* TODO: Test lru_man, especially masking logic. */
 module lru_man #(

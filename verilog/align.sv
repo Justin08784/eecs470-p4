@@ -1,6 +1,4 @@
-`include "timescale.svh"
-`include "config.svh"
-`include "frontend.svh"
+`include "sys_defs.svh"
 
 // combinational align
 module align(

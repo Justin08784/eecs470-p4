@@ -1,4 +1,4 @@
-`include "timescale.svh"
+`include "sys_defs.svh"
 
 module compactor #(
     parameter int REQW=2,

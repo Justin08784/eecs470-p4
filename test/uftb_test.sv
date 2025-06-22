@@ -1,5 +1,4 @@
-`include "timescale.svh"
-`include "frontend.svh"
+`include "sys_defs.svh"
 
 // enable to synthesize uFTB (via `make uftb.syn.out`)
 // `define SYNTH_UFTB

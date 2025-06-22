@@ -11,7 +11,6 @@
 `include "dcache_block_direct.svh"
 `include "execute.svh"
 `include "ISA.svh"
-`include "exceptions.svh"
 
 // P4 TODO: Add your own debugging framework. Basic printing of data structures
 //          is an absolute necessity for the project. You can use C functions 
