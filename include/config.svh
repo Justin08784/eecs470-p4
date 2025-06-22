@@ -34,9 +34,12 @@ parameter BTQ_SZ= 16;
     /* BTQ_SZ doubled (form 8). This improved CPI on tight loop
     programs like branchy.s and branchy_nested.s */
 parameter RAS_SZ= 16;
-parameter FTQ_SZ = 32;
+parameter FTQ_SZ= 32;
 parameter PHYS_REG_SZ_P6    = 32;
 parameter PHYS_REG_SZ_R10K  = (32 + ROB_SZ);
+
+parameter IQQ_SZ= 4;
+parameter IRQ_SZ= 8;
 
 // worry about these later
 parameter BRANCH_PRED_SZ= 'x;

@@ -146,34 +146,6 @@ typedef struct packed {
 
 
 // BTQ stuff
-// By btq
-typedef struct packed {
-`ifdef DEBUG
-    BMASK   b1hot;
-`endif
-    WADDR   PC;
-    logic   is_tail;
-        /*  In BPU, if hit in FTB, is the offset of this branch greater than or equal
-        to the offset of the branch in the tail slot / br1, if any? */
-    logic   [3:0] off; // offset in fb (if taken, equals offset in FTQ_ENTRY)
-
-    logic   rslv; // resolved? 0: take, tgt are predictions, 1: " are real values
-    logic   take;
-    WADDR   tgt;
-        // NOTE: We used to have separate pred, pred_tgt fields.
-
-    logic   always_take;
-        /* During retire-time update, this is sent to the direction predictors,
-        and not the FTB. We will use "take" to update the always_take in-place
-        in the FTB. */
-    FTB_MD1 md;
-
-    logic   [N-1:0]        hit;        // hit an entry with base in FTB?
-    logic   [N-1:0]        hit_slot;   // hit a slot in entry? (valid only if hit)
-    logic   [GHR_LEN-1:0]   hash;       // gshare hash index
-    logic   [N-1:0][`IDX_SIZE(GHR_BUF_SZ)-1:0] ghr_base;
-} BTQ_ENTRY;
-
 typedef struct packed {
     // FTB_UPD_PKT fields
     WADDR       base;
@@ -195,6 +167,15 @@ typedef struct packed {
     WADDR pc;
     WADDR tgt;
 } puq2btb;
+
+typedef struct packed {
+    DWADDR              dw;
+    logic   [1:0][3:0]  off;
+        // FB_OFF[1:0][1:0]ixq_out_off,
+    logic   [1:0]       fmsk;
+    logic   [1:0]       is_end;
+} pc_gen2ixq;
+
 
 
 /* i/o structs */

@@ -1,4 +1,4 @@
-`include "sys_defs.svh"
+`include "timescale.svh"
 
 `ifdef  PC_GEN_TEST_MODE
 `ifndef PC_GEN_SVA_SVH

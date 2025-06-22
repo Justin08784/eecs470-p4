@@ -1,6 +1,7 @@
 `ifndef TYPES_SVH
 `define TYPES_SVH
 
+`include "config.svh"
 `include "util_macros.svh"
 
 // word and register sizes

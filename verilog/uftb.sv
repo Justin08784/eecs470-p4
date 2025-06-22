@@ -1,31 +1,5 @@
-`include "sys_defs.svh"
-
-typedef struct packed {
-`ifdef DEBUG
-    BMASK   b1hot;
-`endif
-    WADDR   PC;
-
-    /* TODO: have a single take, tgt field, initialized by the BPU, but later
-    overwritten by decode/EX when the branch resolves */
-    logic   pred;
-    WADDR   pred_tgt;
-    logic   take;
-    WADDR   tgt;
-
-    logic   ret;    // is a ret instruction? (heuristic only; see predecoder for spec)
-    logic   cond;   // is a conditional branch?
-
-    logic   [GHR_LEN-1:0] hash; // gshare hash index
-    logic   [N-1:0][`IDX_SIZE(GHR_BUF_SZ)-1:0] ghr_base;
-    logic   pred_bim;
-    logic   pred_gshare;
-
-    logic   [3:0] off; // offset in fb (if taken, equals offset in FTQ_ENTRY)
-    `IDX_TYPE(FTQ_SZ) ftq_idx; // pointer to owning FTQ entry
-        /* Since multiple contiguous BTQ entries may be associated with an FTQ entry,
-        an FTQ entry cannot dequeue until the "last" in the BTQ entry span is reached. */
-} _BTQ_ENTRY;
+`include "timescale.svh"
+`include "frontend.svh"
 
 /* TODO: Test lru_man, especially masking logic. */
 module lru_man #(

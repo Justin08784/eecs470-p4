@@ -1,4 +1,5 @@
-`include "sys_defs.svh"
+`include "timescale.svh"
+
 
 /* NOTE:
 Since the FTQ_ENTRY does not store the current base (it only stores base_n),

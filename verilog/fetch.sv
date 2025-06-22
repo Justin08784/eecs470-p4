@@ -10,38 +10,6 @@
 
 `include "sys_defs.svh"
 
-localparam IQQ_SZ = 4;
-localparam IRQ_SZ = 8;
-typedef struct packed {
-    DWADDR dw;
-    `IDX_TYPE(IRQ_SZ) irq_idx;
-} ICACHE_QUERY;
-
-// typedef struct packed {
-//     // general
-//     MEM_BLOCK   blk;
-//     WADDR       base;
-//     logic [3:0] off;        // in-fb offset of word 0 in the cache line.
-
-//     // branch-specific
-//     WADDR       base_n;
-//     logic       ft;         // fallthrough? else took a branch
-//     logic       pred_w;     // ft ? <IGNORE? : word index of pred-taken branch
-
-
-//     logic       hit;
-//     logic [1:0] hit_slot;   // hit_slot[i] = hit FTB && hit slot i
-//                             // Thus hit = |hit_slot
-
-
-//     logic       is_tail;    // ft ? <IGNORE>: does pred-taken branch occupy tail slot?
-//     logic       always_take;// ft ? <IGNORE>: " of pred-taken branch
-//     BRANCH_MD   md;         // ft ? <IGNORE>: " of pred-tkaen branch
-//                             // (selectively overwrite with icache results)
-//     logic [GHR_LEN-1]       hash;
-//     `IDX_TYPE(GHR_BUF_SZ)   ghr_base;
-// } ICACHE_RESPONSE;
-
 // icache response queue
 module irq #(
     parameter DEPTH=IRQ_SZ,

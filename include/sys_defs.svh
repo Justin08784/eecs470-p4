@@ -55,15 +55,6 @@ typedef struct packed {
 } ROB_ENTRY;
 
 typedef struct packed {
-    DWADDR              dw;
-    logic   [1:0][3:0]  off;
-        // FB_OFF[1:0][1:0]ixq_out_off,
-    logic   [1:0]       fmsk;
-    logic   [1:0]       is_end;
-} pc_gen2ixq;
-
-
-typedef struct packed {
     // for reading
     BTQ_IDX [NUM_FU_BRU-1:0] btq_idx;
 
