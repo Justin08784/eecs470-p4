@@ -34,7 +34,7 @@
 // `define DEBUG
 // `define CYCLE_PRINT // clock cycle print
 // `define PC_GEN_TEST_MODE
-// `define FORMAL
+`define FORMAL
 `endif
 
 /* Memory config */
@@ -73,6 +73,11 @@ parameter N = 2;    // superscalar width
 // parameter CDB_SZ= N // This MUST match your superscalar width
 
 // bpu
+    // FTB entry config
+parameter NUM_BR_SLOTS  = 2;
+parameter MAX_FB_SPAN   = 16; // maximum span of a fetch block (in words/insns)
+    // ^^ WARNING: many of the fetch/BPU structures are hardcoded, independent of these params
+
 parameter BRANCH_PRED_SZ= 'x; // FIXME
 parameter GHR_BUF_SZ    = 32;
 parameter GHR_LEN       = 8;
@@ -135,7 +140,9 @@ typedef `IDX_TYPE(BTQ_SZ) BTQ_IDX;
 typedef `IDX_TYPE(ROB_SZ) ROB_IDX;
 typedef `IDX_TYPE(LSQ_SZ) LSQ_IDX;
 
+// superscalar-width convenience types
 typedef `CNT_TYPE(N) N_CNT;
+typedef `CNT_TYPE(N) N_IDX;
 
 // address types
 typedef logic [31:0] ADDR;  // full address

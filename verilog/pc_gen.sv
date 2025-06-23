@@ -15,11 +15,10 @@ endproperty
 TODO: Rename "buf" to re-read buffer (since FTQ entries are being "re-read" at align)
 */
 module pc_gen #(
-    parameter MAX_W_PER_FB  = 16,// maximum span of a fetch block / ftq entry, in words
     parameter W_PER_DW      = 2, // num words per double-word / cache line
     parameter NUM_DW        = 2, // num double words we can process per cycle
     parameter NUM_FTQ       = 2, // num FTQ entries we can process per cycle
-    type FB_OFF=`IDX_TYPE(MAX_W_PER_FB),
+    type FB_OFF             =`IDX_TYPE(MAX_FB_SPAN),
     localparam  NUM_W       = NUM_DW*W_PER_DW
 ) (
     input   clock,

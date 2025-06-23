@@ -1,8 +1,5 @@
 `include "sys_defs.svh"
 
-parameter NUM_BR_SLOTS = 2;
-// parameter MAX_FB_SPAN  = 16;
-
 /* Branch predictor unit (BPU):
 generates PCs for decoupled fetch (experimental) */
 
@@ -47,7 +44,7 @@ module bpu (
     struct packed {
         // fetch
         `CNT_TYPE(NUM_BR_SLOTS) f_en_cnt;
-        logic [NUM_BR_SLOTS-1:0]       f_pred;
+        logic [NUM_BR_SLOTS-1:0]f_pred;
         `CNT_TYPE(NUM_BR_SLOTS) f_rdy_scnt;
 
         logic [NUM_BR_SLOTS-1:0][`IDX_SIZE(GHR_BUF_SZ)-1:0] f_base;
