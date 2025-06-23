@@ -11,8 +11,6 @@ property p_never_diverge;
     disable iff (reset)
     pc_gen.cur.base == $past(BPU.fb_base);
 endproperty
-
-TODO: Rename "buf" to re-read buffer (since FTQ entries are being "re-read" at align)
 */
 module pc_gen #(
     parameter W_PER_DW      = 2, // num words per double-word / cache line
@@ -47,13 +45,19 @@ module pc_gen #(
     output  pc_gen2ixq[1:0] ixq_out_dat,
 
     // FTQ buffer
-    input   `CNT_TYPE(2)    buf_in_rdy_scnt,
-    output  `CNT_TYPE(2)    buf_out_wen_cnt,
-    output  FTQ_ENTRY[1:0]  buf_out_dat
+    input   `CNT_TYPE(2)    rrb_in_rdy_scnt,
+    output  `CNT_TYPE(2)    rrb_out_wen_cnt,
+    output  FTQ_ENTRY[1:0]  rrb_out_dat
 );
     localparam FB_OFF off_rst = '0;
     localparam WADDR base_rst = '0;
     localparam logic inbuf_rst = 0;
+
+    initial begin
+        /* impl is hardcoded/tuned to the following params */
+        assert (NUM_DW == 2)    else $fatal;
+        assert (NUM_FTQ == 2)   else $fatal;
+    end
 
     struct packed {
         FB_OFF  off;
@@ -404,7 +408,7 @@ module pc_gen #(
     we can emit partially filled dw's that only satisfy a subset of the requirements.
     We do not consider these because they will probably not improve throughput much. 
     e.g.
-    Let ftq_in_vld_scnt == 2, ixq_in_rdy_scnt == 1, buf_in_rdy_scnt == *1*,
+    Let ftq_in_vld_scnt == 2, ixq_in_rdy_scnt == 1, rrb_in_rdy_scnt == *1*,
     and we have a (!case.inbuf & merge_l0 & bhe10) case.
 
     We can emit at most 1 dw, and the full dw (i.e. WITH l10 merged in) will require
@@ -464,8 +468,8 @@ module pc_gen #(
 
     assign ctl.rdy_res.ixq[0]   = ixq_in_rdy_scnt != 0;
     assign ctl.rdy_res.ixq[1]   = ixq_in_rdy_scnt[1];
-    assign ctl.rdy_res.rr_buf[0]= buf_in_rdy_scnt != 0;
-    assign ctl.rdy_res.rr_buf[1]= buf_in_rdy_scnt[1];
+    assign ctl.rdy_res.rr_buf[0]= rrb_in_rdy_scnt != 0;
+    assign ctl.rdy_res.rr_buf[1]= rrb_in_rdy_scnt[1];
     assign ctl.rdy_res.ftq1     = ftq_in_vld_scnt[1];
 
     generate
@@ -479,8 +483,8 @@ module pc_gen #(
     assign iss_any = |(ctl.req_vld & ctl.gnt);
     assign iss_idx = ctl.req_vld[1] & ctl.gnt[1];
 
-    assign buf_out_dat[0] = cur.inbuf ? ftq_in_dat[1] : ftq_in_dat[0];
-    assign buf_out_dat[1] = ftq_in_dat[1];
+    assign rrb_out_dat[0] = cur.inbuf ? ftq_in_dat[1] : ftq_in_dat[0];
+    assign rrb_out_dat[1] = ftq_in_dat[1];
     always_comb begin
 
         /*FIXME:
@@ -500,7 +504,7 @@ module pc_gen #(
             (!iss_any || !adv_bidx[iss_idx]) ? 0 :
             aft_bidx[iss_idx] ? 2 : 1;
 
-        buf_out_wen_cnt =
+        rrb_out_wen_cnt =
             !iss_any ? 0 : $countones(ctl.req_res[iss_idx].rr_buf & ctl.rdy_res.rr_buf);
     end
 
@@ -508,7 +512,10 @@ module pc_gen #(
     assign base_n[0] = ftq_in_dat[0].base_n;
     assign base_n[1] = ftq_in_dat[1].base_n;
 
-    logic basv, blkv;
+    logic   basv, blkv;
+    assign  basv = aft_bidx [iss_idx];
+    assign  blkv = aft_blk  [iss_idx];
+
     always_ff @(posedge clock) begin
         if (reset)
 `ifndef PC_GEN_TEST_MODE
@@ -528,9 +535,6 @@ module pc_gen #(
             };
 
         else if (iss_any) begin
-            basv = aft_bidx [iss_idx];
-            blkv = aft_blk  [iss_idx];
-
             if (adv_bidx[iss_idx])
                 cur.base    <= base_n[basv];
 
@@ -708,24 +712,24 @@ module pc_gen #(
             ixq_out_dat[1].dw
         );
 
-        $display("buf_out: wen_cnt = %d, [{id %4d, base_n: %d, ft: %b, off: %d}, {id: %4d, base_n: %d, ft: %b, off: %d}]\n",
-            buf_out_wen_cnt,
+        $display("rrb_out: wen_cnt = %d, [{id %4d, base_n: %d, ft: %b, off: %d}, {id: %4d, base_n: %d, ft: %b, off: %d}]\n",
+            rrb_out_wen_cnt,
 `ifdef PC_GEN_TEST_MODE
-            buf_out_dat[0].id,
+            rrb_out_dat[0].id,
 `else
             0,
 `endif
-            buf_out_dat[0].base_n,
-            buf_out_dat[0].ft,
-            buf_out_dat[0].off,
+            rrb_out_dat[0].base_n,
+            rrb_out_dat[0].ft,
+            rrb_out_dat[0].off,
 `ifdef PC_GEN_TEST_MODE
-            buf_out_dat[1].id,
+            rrb_out_dat[1].id,
 `else
             0,
 `endif
-            buf_out_dat[1].base_n,
-            buf_out_dat[1].ft,
-            buf_out_dat[1].off
+            rrb_out_dat[1].base_n,
+            rrb_out_dat[1].ft,
+            rrb_out_dat[1].off
         );
 
         $display("adv_bidx: [%b, %b] |||| aft_bidx: [%b, %b]",

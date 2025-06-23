@@ -106,34 +106,6 @@ module irq #(
         rwin_ncpl_any ? rwin_ncpl_idx : 2
     );
 
-    // always_ff @(posedge clock) begin
-    //     if (!reset) begin
-    //         $display(">> IRQ");
-    //         $display("vld_scnt: %d, rdy_scnt: %d", vld_scnt, rdy_scnt);
-    //         $display("ren_cnt: %d, wen_cnt: %d", ren_cnt, wen_cnt);
-    //         $display("rd[%d, %d, %d], wr[%d, %d, %d]",
-    //             rd_idxs_n[0],
-    //             rd_idxs_n[1],
-    //             rd_idxs_n[2],
-    //             wr_idxs_n[0],
-    //             wr_idxs_n[1],
-    //             wr_idxs_n[2]
-    //         );
-    //         for (int i = 0; i < IRQ_SZ; ++i)
-    //             $display("irq[%d]: cpl: %b, dw: %d, off: [%d, %d], fmsk: %b, is_end: %b, blk: [%x, %x]",
-    //                 i,
-    //                 cpl[i],
-    //                 state[i].dw,
-    //                 state[i].off[0],
-    //                 state[i].off[1],
-    //                 state[i].fmsk,
-    //                 state[i].is_end,
-    //                 state[i].blk.word_level[0],
-    //                 state[i].blk.word_level[1]
-    //             );
-    //     end
-    // end
-
     always_ff @(posedge clock) begin
         if (reset) begin
             state   <= '0;
@@ -167,6 +139,36 @@ module irq #(
         end
     end
 
+
+`ifdef DEBUG
+    task print_irq;
+        $display(">> IRQ");
+        $display("vld_scnt: %d, rdy_scnt: %d", vld_scnt, rdy_scnt);
+        $display("ren_cnt: %d, wen_cnt: %d", ren_cnt, wen_cnt);
+        $display("rd[%d, %d, %d], wr[%d, %d, %d]",
+            rd_idxs_n[0],
+            rd_idxs_n[1],
+            rd_idxs_n[2],
+            wr_idxs_n[0],
+            wr_idxs_n[1],
+            wr_idxs_n[2]
+        );
+        for (int i = 0; i < IRQ_SZ; ++i)
+            $display("irq[%d]: cpl: %b, dw: %d, off: [%d, %d], fmsk: %b, is_end: %b, blk: [%x, %x]",
+                i,
+                cpl[i],
+                state[i].dw,
+                state[i].off[0],
+                state[i].off[1],
+                state[i].fmsk,
+                state[i].is_end,
+                state[i].blk.word_level[0],
+                state[i].blk.word_level[1]
+            );
+    endtask
+`endif
+
+
 endmodule
 
 
@@ -188,13 +190,20 @@ module align (
 
     input   `CNT_TYPE(4)    ibuf_in_rdy_scnt,
     output  `CNT_TYPE(4)    ibuf_out_wen_cnt,
-    output  IF_ID_PKT[3:0]   ibuf_out_dat
+    output  IF_ID_PKT[3:0]  ibuf_out_dat
 
 );
     localparam W_PER_DW = 2;
-    localparam NUM_DW = 2;
-    localparam NUM_W = NUM_DW*W_PER_DW;
-    localparam N = N;
+    localparam NUM_DW   = 2;
+    localparam NUM_FTQ  = 2;
+    localparam NUM_W    = NUM_DW*W_PER_DW;
+
+    initial begin
+        /* impl is hardcoded/tuned to the following params */
+        assert (NUM_DW == 2)    else $fatal;
+        assert (NUM_FTQ == 2)   else $fatal;
+    end
+
     /*
     raw: not aligned
     bal: block aligned (compaction WITHIN blocks)
@@ -473,14 +482,14 @@ module align (
 
         end
 
-        $display("shit: %0d, %0d, %0d, %0d",
+        $display("wal.indw_last: %0d, %0d, %0d, %0d",
             $countones(wal.indw_last[0:0]),
             $countones(wal.indw_last[1:0]),
             $countones(wal.indw_last[2:0]),
             $countones(wal.indw_last[3:0])
         );
 
-        $display("fuck: %0d, %0d, %0d, %0d",
+        $display("req_res.rd_irq: %0d, %0d, %0d, %0d",
             ctl.req_res[0].rd_irq,
             ctl.req_res[1].rd_irq,
             ctl.req_res[2].rd_irq,
@@ -508,9 +517,11 @@ module align (
         end
     endtask
 `endif
+
 endmodule
 
 
+// decoupled fetch engine
 module dcf (
     input   clock,
     input   reset,
@@ -614,9 +625,9 @@ module dcf (
         .ixq_out_wen_cnt    (pc_gen2ixq_wen_cnt),
         .ixq_out_dat        (pc_gen2ixq_dat),
 
-        .buf_in_rdy_scnt    (rrb2pc_gen_rdy_scnt),
-        .buf_out_wen_cnt    (pc_gen2rrb_wen_cnt),
-        .buf_out_dat        (pc_gen2rrb_dat)
+        .rrb_in_rdy_scnt    (rrb2pc_gen_rdy_scnt),
+        .rrb_out_wen_cnt    (pc_gen2rrb_wen_cnt),
+        .rrb_out_dat        (pc_gen2rrb_dat)
     );
 
     // ""iqq""
@@ -784,4 +795,20 @@ module dcf (
 
     end
 
+`ifdef FORMAL
+    /* Since the FTQ_ENTRY does not store the current base (it only stores base_n),
+    it is *vital* that upon reset, flush, or–– in the future–– steer, the BPU and
+    pc_gen are both reset to same fb base AND in-fb offset. */
+
+    property bpu_pcgen_converge_after_redirect;
+        @(posedge clock)
+            disable iff (reset)
+            flush |=> // TODO: add steer too
+                (bpu0.pc_reg== pc_gen0.cur.base) &&
+                (bpu0.off   == pc_gen0.cur.off);
+    endproperty
+
+    Bpu_Pcgen_Converge_After_Redirect: assert property(bpu_pcgen_converge_after_redirect)
+        else $fatal;
+`endif
 endmodule
