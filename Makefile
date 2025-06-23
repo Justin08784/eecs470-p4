@@ -195,6 +195,7 @@ MODULES = cpu \
 	fifo \
 	ftq \
 	ghr \
+	gshare \
 	mult \
 	pc_gen \
 	rs \

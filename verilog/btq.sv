@@ -21,8 +21,9 @@ typedef struct packed {
         in the FTB. */
     FTB_MD1 md;
 
-    logic   [N-1:0]        hit;        // hit an entry with base in FTB?
-    logic   [N-1:0]        hit_slot;   // hit a slot in entry? (valid only if hit)
+    logic   [N-1:0]         hit;        // hit an entry with base in FTB?
+    logic   [N-1:0]         hit_slot;   // hit a slot in entry? (valid only if hit)
+    logic   [N-1:0]         slot_idx;   // hit a slot in entry? (valid only if hit)
     logic   [GHR_LEN-1:0]   hash;       // gshare hash index
     logic   [N-1:0][`IDX_SIZE(GHR_BUF_SZ)-1:0] ghr_base;
 } BTQ_ENTRY;
@@ -165,6 +166,7 @@ module btq #(
                 md      : cur.md,
 
                 en_dir_update : cur.hit && cur.hit_slot,
+                slot_idx: cur.slot_idx,
                 hash    : cur.hash
             };
 
@@ -273,6 +275,7 @@ module btq #(
 
                     hit     : f_in.hit[i],
                     hit_slot: f_in.hit_slot[i],
+                    slot_idx: f_in.slot_idx[i],
                     hash    : f_in.hash[i],
                     ghr_base: f_in.ghr_base[i]
                 };

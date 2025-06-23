@@ -371,8 +371,9 @@ typedef struct packed {
     FTB_MD1     md;
 
     // predictor-specific fields
-    logic       en_dir_update;    // update direction predictors?
-    logic [GHR_LEN-1:0] hash; // gshare hash
+    logic       en_dir_update;  // update direction predictors?
+    logic       slot_idx;
+    logic [GHR_LEN-1:0] hash;   // gshare hash
 } BPU_UPD_PKT;
 
 
@@ -448,16 +449,17 @@ typedef struct packed {
     `CNT_TYPE(N)           wen_cnt;
         // How many branch instructions dispatching?
         // Sender must ensure branch insns packed to lowest indices.
-    logic   [N-1:0]        is_tail;
-    WADDR   [N-1:0]        PC;
-    logic   [N-1:0][3:0]   off;
-    logic   [N-1:0]        pred;
-    WADDR   [N-1:0]        pred_tgt;
-    logic   [N-1:0]        always_take;
-    FTB_MD1 [N-1:0]        md;
+    logic   [N-1:0]     is_tail;
+    WADDR   [N-1:0]     PC;
+    logic   [N-1:0][3:0]off;
+    logic   [N-1:0]     pred;
+    WADDR   [N-1:0]     pred_tgt;
+    logic   [N-1:0]     always_take;
+    FTB_MD1 [N-1:0]     md;
 
-    logic   [N-1:0]        hit;
-    logic   [N-1:0]        hit_slot;
+    logic   [N-1:0]     hit;
+    logic   [N-1:0]     hit_slot;
+    logic   [N-1:0]     slot_idx;
     logic   [N-1:0][GHR_LEN-1:0] hash; // gshare hash index
     logic   [N-1:0][`IDX_SIZE(GHR_BUF_SZ)-1:0] ghr_base;
 } fetch2btq;
