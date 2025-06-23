@@ -643,7 +643,8 @@ module uftb #(
         end
     end
 
-`ifndef SYNTH
+
+`ifndef FORMAL
     // runtime assertions
     always_ff @(posedge clock) begin
         if (!reset) begin
@@ -658,6 +659,7 @@ module uftb #(
         end
     end
 `endif
+
 
 `ifdef DEBUG
     task automatic print_uftb();
@@ -718,4 +720,5 @@ module uftb #(
         $display("<< uftb <<");
     endtask
 `endif
+
 endmodule

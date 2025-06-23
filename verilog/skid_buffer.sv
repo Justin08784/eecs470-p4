@@ -108,13 +108,16 @@ module skid #(
 
         // ---- hold / snoop path ----
         end else begin
+`ifdef FORMAL
             assert (vld && !o_rdy && !kill) else $fatal("skid: snoop: unexpected");
+`endif
             msk <= msk & ~clmsk;
             if (ENABLE_SNOOP)
                 dat <= i_snoop;
 
         end
     end
+
 endmodule
 
 module ppln_skid #(

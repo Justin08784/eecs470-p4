@@ -85,8 +85,6 @@ module branch_manager (
         // dep_table[i][j] := branch w/ b1hot j is dependent on branch w/ b1hot i
 
     always_ff @(posedge clock) begin
-        assert ($onehot0({reset,clmsk})) else $fatal("clmsk not one-hot");
-
         if (reset) begin
             bmask_reg <= '0;
             dep_table <= '0;
@@ -116,6 +114,14 @@ module branch_manager (
             end
         end
     end
+
+
+`ifdef FORMAL
+    always_ff @(posedge clock) begin
+        assert ($onehot0({reset,clmsk})) else $fatal("clmsk not one-hot");
+    end
+`endif
+
 
 `ifdef DEBUG
     task print_bman;

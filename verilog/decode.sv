@@ -382,6 +382,7 @@ module stage_id (
         .used_scnt  (used_scnt)
     );
 
+
 `ifdef DEBUG
     always_ff @(posedge clock) begin
         if (reset) begin
@@ -419,7 +420,6 @@ module stage_id (
         // $display("d_out.d_dat[1]: %b", d_out.d_dat[1]);
         $display("<< ID <<", $time);
     endtask
-
 `endif
 
 endmodule // stage_id

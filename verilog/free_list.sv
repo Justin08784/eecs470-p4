@@ -154,6 +154,7 @@ module free_list #(parameter
             };
     end
 
+
 `ifdef DEBUG
     task print_fl();
         logic [ROB_SZ-1:0] fl_vld;
@@ -216,4 +217,5 @@ module free_list #(parameter
     endtask
 
 `endif
+
 endmodule

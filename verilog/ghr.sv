@@ -178,7 +178,11 @@ module ghr #(
             base_oh <= base_oh_n[f_en_cnt];
         end
 
+    end
 
+
+`ifdef FORMAL
+    always_ff @(posedge clock) begin
         // runtime assertions
         if (!reset) begin
             logic [N-1:0] en_pred;
@@ -210,6 +214,8 @@ module ghr #(
         end
 
     end
+`endif
+
 
 `ifdef DEBUG
     task print_ghr;
@@ -241,14 +247,4 @@ module ghr #(
     endtask
 `endif
 
-
 endmodule
-
-// cool part-slice indexing trick
-// if (base >= GHR_LEN)
-//     f_ghr[0] = hist[base-1 -: GHR_LEN];
-// else
-//     f_ghr[0] = {
-//         hist[DEPTH-1 -: (GHR_LEN-base)], // this is illegal
-//         hist[base-1 -: GHR_LEN]
-//     };

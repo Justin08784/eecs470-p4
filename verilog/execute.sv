@@ -1028,6 +1028,7 @@ module stage_ex_p4 (
         end
     end
 
+
 `ifdef DEBUG
     task print_execute();
         $display("  %3d | >> EXECUTE", $time);

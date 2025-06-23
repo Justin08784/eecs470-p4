@@ -250,6 +250,7 @@ module bpu (
         end
     end
 
+`ifdef DEBUG
     task print_bpu;
         $display(">> bpu");
         $display("(pc_reg: %d, off: %0d, pred: [%b, %b]), step: %b, buf_rdy: %b, ftq_rdy: %b",
@@ -264,5 +265,6 @@ module bpu (
 
         $display("<< bpu");
     endtask
+`endif
 
 endmodule

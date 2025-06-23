@@ -332,6 +332,7 @@ module dispatch #(parameter
         end
     end
 
+
 `ifdef DEBUG
     task print_dispatch;
         $display("  %3d | >> Dispatch >>", $time);
@@ -374,5 +375,3 @@ module dispatch #(parameter
 `endif
 
 endmodule
-
-

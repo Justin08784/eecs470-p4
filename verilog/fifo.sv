@@ -144,6 +144,7 @@ module fifo #(
         end
     end
 
+`ifdef FORMAL
     // runtime assertions
     always_ff @(posedge clock) begin
         if (!reset) begin
@@ -180,4 +181,6 @@ module fifo #(
 
         end
     end
+`endif
+
 endmodule

@@ -81,8 +81,6 @@ module ras #(
     end
 
     always_ff @(posedge clock) begin
-        // CHECK: we accept at most 1 predict taken per cycle, so ren, wen must be exclusive
-        assert(reset || !(wen & ren)) else $error("RAS: both wen and ren asserted");
         if (reset) begin
             used <= '0;
             top  <= '0;
@@ -95,6 +93,17 @@ module ras #(
                 state[top] <= wtgt;
         end
     end
+
+
+`ifdef FORMAL
+    always_ff @(posedge clock) begin
+        if (!reset) begin
+            // CHECK: we accept at most 1 predict taken per cycle, so ren, wen must be exclusive
+            assert(reset || !(wen & ren)) else $error("RAS: both wen and ren asserted");
+        end
+    end
+`endif
+
 
 `ifdef DEBUG
     task print_ras;
@@ -135,5 +144,7 @@ module ras #(
 
         $display("<< RAS <<");
     endtask
+
 `endif
+
 endmodule

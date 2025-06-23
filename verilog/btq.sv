@@ -280,6 +280,7 @@ module btq #(
         end
     end
 
+
 `ifdef DEBUG
     task print_btq;
         logic [BTQ_SZ-1:0] btq_vld;
@@ -342,5 +343,4 @@ module btq #(
     endtask
 
 `endif
-
 endmodule

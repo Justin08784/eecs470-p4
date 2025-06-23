@@ -70,6 +70,7 @@ module retire (
         illegal : rob_in.illegal
     };
 
+
 `ifdef DEBUG
     task print_retire;
         $display("  | >> retire >>");
@@ -78,4 +79,5 @@ module retire (
         $display("  | << retire <<");
     endtask
 `endif
+
 endmodule

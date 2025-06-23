@@ -144,6 +144,7 @@ module rob #(
         end
     end
     
+
 `ifdef DEBUG
     task print_rob;
         logic [ROB_SZ-1:0] rob_vld;
@@ -247,6 +248,7 @@ module rob #(
 
         $display("  | << ROB <<");
     endtask
+
 `endif
 
 endmodule

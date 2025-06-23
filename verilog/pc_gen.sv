@@ -509,9 +509,8 @@ module pc_gen #(
     assign base_n[0] = ftq_in_dat[0].base_n;
     assign base_n[1] = ftq_in_dat[1].base_n;
 
+    logic basv, blkv;
     always_ff @(posedge clock) begin
-        logic basv, blkv;
-
         if (reset)
 `ifndef PC_GEN_TEST_MODE
             cur <= '{
@@ -541,10 +540,6 @@ module pc_gen #(
             else if (adv_bidx[iss_idx])
                 cur.off <= '0;
 
-            // adv_blk is high IFF we do not advance 2 bases
-            assert(adv_blk[iss_idx] ? !(adv_bidx[iss_idx] && basv) : 1) else $fatal;
-            assert((adv_bidx[iss_idx] && basv) ? !adv_blk[iss_idx] : 1) else $fatal;
-
             if (iss_any)
                 if (adv_bidx[iss_idx] && basv)
                     cur.inbuf   <= 0;
@@ -552,12 +547,25 @@ module pc_gen #(
                     cur.inbuf   <= !(|(ctl.req_rr_buf_actual[iss_idx] & ~(can_buf_write & ctl.rdy_res.rr_buf)));
         end
 
+    end
+
+
+`ifdef FORMAL
+    always_ff @(posedge clock) begin
         if (!reset) begin
             for (int e = 0; e < NUM_FTQ; ++e)
                 assert(!(|is_end_flat[e]) | $onehot(is_end_flat[e])) else $fatal;
+
+            if (iss_any) begin
+                // adv_blk is high IFF we do not advance 2 bases
+                assert(adv_blk[iss_idx] ? !(adv_bidx[iss_idx] && basv) : 1) else $fatal;
+                assert((adv_bidx[iss_idx] && basv) ? !adv_blk[iss_idx] : 1) else $fatal;
+            end
         end
 
     end
+`endif
+
 
 `ifdef DEBUG
     task print_pc_gen;

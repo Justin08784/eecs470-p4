@@ -71,6 +71,7 @@ module ftq #(
         end
     end
 
+
 `ifdef DEBUG
     task print_ftq;
         logic [FTQ_SZ-1:0] ftq_vld;
@@ -102,6 +103,5 @@ module ftq #(
     endtask
 
 `endif
-
 
 endmodule
