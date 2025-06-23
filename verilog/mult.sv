@@ -75,7 +75,7 @@ module mult #(
     // instantiate an array of mult_stage modules
     // this uses concatenation syntax for internal wiring, see lab 2 slides
     logic   [MUL_STAGES:0] vlds;
-    BMASK   [MUL_STAGES:0] msks;
+    BMASK   [MUL_STAGES-1:0] msks;
     logic   [MUL_STAGES:0] rdys;
     MUL_PKT [MUL_STAGES:0] pkts;
 
@@ -186,7 +186,7 @@ module mult #(
                 .i_dat(pkts[i]),
 
                 .o_vld(vlds[i+1]),
-                .o_msk(msks[i+1]),
+                .o_msk(),
                 .o_dat(pkts[i+1])
             );
 

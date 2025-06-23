@@ -28,7 +28,7 @@
 // Compil. Controls
 // ================
 
-`define SYNTH // synth only constructions // FIXME: how can we implement this in Makefile?
+// `define SYNTH // synth only constructions // FIXME: how can we implement this in Makefile?
 
 `ifndef SYNTH
 // `define DEBUG
@@ -689,10 +689,12 @@ typedef struct packed {
         // From: retire (ROB)
         // - number of valid retire lines
 
-    logic       [N-1:0] cpl;
+`ifndef SYNTH
     PHYS_REG_IDX[N-1:0] tag;
-    PHYS_REG_IDX[N-1:0] t_old;
     REG_IDX     [N-1:0] dst;
+`endif
+    logic       [N-1:0] cpl;
+    PHYS_REG_IDX[N-1:0] t_old;
 
     FU_IDX      [N-1:0] fu_idx;
     logic       [N-1:0] halt;
@@ -922,13 +924,11 @@ typedef struct packed {
 
 // I/O: Retire
 typedef struct packed {
-    `CNT_TYPE(N)            en_cnt; // final final
-    PHYS_REG_IDX [N-1:0]    tag;
+    `CNT_TYPE(N)            en_cnt;
     PHYS_REG_IDX [N-1:0]    t_old;
-    REG_IDX      [N-1:0]    dst;
     logic        [N-1:0]    halt;
     logic        [N-1:0]    illegal;
-} retire_final;
+} RETIRE_PKT;
 
 
 // ================

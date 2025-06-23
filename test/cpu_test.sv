@@ -373,11 +373,11 @@ module testbench;
             pc      = rob_debug[cur_idx].NPC - 4;
             block   = memory.unified_memory[pc[31:3]];
             inst    = block.word_level[pc[2]];
-            reg_idx = verisimpleV.retire_exec.dst[n];
-            tag     = verisimpleV.retire_exec.tag[n];
-            t_old   = verisimpleV.retire_exec.t_old[n];
+            reg_idx = verisimpleV.rob_2_retire.dst[n];
+            tag     = verisimpleV.rob_2_retire.tag[n];
+            t_old   = verisimpleV.rob_2_retire.t_old[n];
             data    = verisimpleV.prf0.file[
-                verisimpleV.retire_exec.tag[n]
+                verisimpleV.rob_2_retire.tag[n]
             ];
             // print the committed instructions to the writeback output file
             if (reg_idx == `ZERO_REG) begin

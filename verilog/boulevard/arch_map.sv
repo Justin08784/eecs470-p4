@@ -16,7 +16,7 @@ module arch_map #(parameter
     output arch_map2map_table mt_out,
 
     // retire
-    input  retire_final r_in
+    input  RETIRE_PKT r_in
 );
     PHYS_REG_IDX [NUM_ARCH_REG-1:0] entries, entries_n;
     assign mt_out.entries = entries;

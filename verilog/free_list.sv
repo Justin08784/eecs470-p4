@@ -14,7 +14,7 @@ module free_list #(parameter
     input BMASK clmsk,
 
     // retire
-    input retire_final r_in_n,
+    input RETIRE_PKT r_in_n,
 
     // complete ?? 
     // issue ??

@@ -20,7 +20,7 @@ module rob #(
 
     // retire (read)
     output rob2retire r_out,
-    input  retire_final r_in,
+    input  RETIRE_PKT r_in,
 
     // complete (write)
     input  execute2complete_dat cdat_in,
@@ -90,10 +90,12 @@ module rob #(
             cur = state[rtre_idxs_n[i]];
             /* preview mode–– just display all valid entries in read window even
             if not all will get retired this cycle */
-            r_out.cpl   [i] = cur.cpl;
+`ifndef SYNTH
             r_out.tag   [i] = cur.tag;
-            r_out.t_old [i] = cur.t_old;
             r_out.dst   [i] = cur.dst;
+`endif
+            r_out.cpl   [i] = cur.cpl;
+            r_out.t_old [i] = cur.t_old;
             r_out.fu_idx[i] = cur.fu_idx;
             r_out.halt  [i] = cur.halt;
             r_out.illegal[i]= cur.illegal;

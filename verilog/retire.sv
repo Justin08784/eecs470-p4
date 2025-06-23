@@ -15,16 +15,14 @@ typedef enum logic [2:0] {
 } RETIRE_OP;
 
 module retire (
-    input  clock, reset,
-
     input  rob2retire rob_in,
 
-    output retire_final retire_exec
+    output RETIRE_PKT retire_exec
 );
     // decode retire operations
     RETIRE_OP [N-1:0] ret;
     always_comb begin
-        foreach (ret[i]) begin
+        for (int i = 0; i < N; ++i) begin
             unique case (rob_in.fu_idx[i])
             FU_LOD: ret[i] = RET_LOD;
             FU_STR: ret[i] = RET_STR;
@@ -67,9 +65,7 @@ module retire (
         en_cnt  : retire_en_cnt,
 
         // the rest of the fields stay the same
-        tag     : rob_in.tag,
         t_old   : rob_in.t_old,
-        dst     : rob_in.dst,
         halt    : rob_in.halt,
         illegal : rob_in.illegal
     };

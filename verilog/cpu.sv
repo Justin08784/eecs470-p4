@@ -148,12 +148,9 @@ module cpu (
 
     /* >> ==== Retire ==== >> */
     rob2retire rob_2_retire;
-    retire_final    retire_exec;
+    RETIRE_PKT    retire_exec;
 
     retire retire0 (
-        .clock,
-        .reset,
-
         .rob_in (rob_2_retire),
 
         .retire_exec
