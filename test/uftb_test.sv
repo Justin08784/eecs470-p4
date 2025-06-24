@@ -24,7 +24,7 @@ module uftb_test;
     );
         udat = '0;
 
-        udat.pc_off = off;
+        udat.fb_off = off;
         udat.tgt    = tgt;
 
         udat.md     = md;

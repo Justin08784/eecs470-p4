@@ -15,7 +15,7 @@ module dcf_v1 (
         fb_base–– instead flush_PC is more likely to be a nonzero offset INO the FB.
         */
     input   WADDR flush_fb_base,
-    input   logic [3:0] flush_pc_off,
+    input   logic [3:0] flush_fb_off,
 
     input   decode2fetch d_in,
     output  fetch2decode d_out,
@@ -57,7 +57,7 @@ module dcf_v1 (
 
         .flush,
         .flush_fb_base,
-        .flush_pc_off,
+        .flush_fb_off,
         .clmsk,
         .cbru_in,
 
@@ -306,7 +306,7 @@ module dcf_v1 (
         else if (flush)
             cur <= '{
                 fb_base : flush_fb_base,
-                off     : flush_pc_off
+                off     : flush_fb_off
             };
 
         else
@@ -326,7 +326,7 @@ module dcf_v1 (
         // $display("insn_buf_vld: %b", insn_buf_vld);
         // for (int i = 0; i < N; ++i)
         //     $display("[%1d]: %1d", i, brch_prefix_cnt[i]);
-        $display("flush: %b, flush_fb_base: %d, flush_pc_off", flush, flush_fb_base, flush_pc_off);
+        $display("flush: %b, flush_fb_base: %d, flush_fb_off", flush, flush_fb_base, flush_fb_off);
         $display("pc_reg: %d", bpu0.pc_reg);
         // $display("step: %b, pred:%b, wen_cnt:%d, pred_any: %b, pred_idx: %b",
         //     bpu0.step,
@@ -358,10 +358,10 @@ module dcf_v1 (
 
         // bpu0.ghr0.print_ghr;
 
-        $display("bpu_upd: {en: %b, base: %d, pc_off: %d, take: %b, tgt: %d, md: %b}",
+        $display("bpu_upd: {en: %b, base: %d, fb_off: %d, take: %b, tgt: %d, md: %b}",
             btq_in.bp_upd.en,
             btq_in.bp_upd.dat.base,
-            btq_in.bp_upd.dat.pc_off,
+            btq_in.bp_upd.dat.fb_off,
             btq_in.bp_upd.dat.take,
             btq_in.bp_upd.dat.tgt,
             btq_in.bp_upd.dat.md

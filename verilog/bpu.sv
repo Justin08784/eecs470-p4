@@ -14,7 +14,7 @@ module bpu (
     // TODO: wrap flush, clmsk, flush_take/base into a single "bru_res" bus.
     input   flush,
     input   WADDR   flush_fb_base,
-    input   logic [3:0] flush_pc_off,
+    input   logic [3:0] flush_fb_off,
     input   BMASK   clmsk,
     input   execute2complete_bru cbru_in,
 
@@ -55,7 +55,7 @@ module bpu (
     assign uftb_io.i_uen = i_uen;
     assign uftb_io.i_udat= '{
         base        : i_udat.base,
-        pc_off      : i_udat.pc_off,
+        fb_off      : i_udat.fb_off,
         take        : i_udat.take,
         tgt         : i_udat.tgt,
 
@@ -240,7 +240,7 @@ module bpu (
             off    <= '0;
         end else if (flush) begin
             pc_reg <= flush_fb_base;
-            off    <= flush_pc_off;
+            off    <= flush_fb_off;
         end else if (step) begin
             pc_reg <= pc_reg_n;
             off    <= '0;

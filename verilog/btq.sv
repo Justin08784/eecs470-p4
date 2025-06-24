@@ -156,7 +156,7 @@ module btq #(
 
             puq_enq_raw[i] = '{
                 base    : cur.PC - cur.off,
-                pc_off  : cur.off,
+                fb_off  : cur.off,
                 take    : cur.take,
                 tgt     : cur.tgt,
                 always_take : cur.always_take && cur.take,
@@ -187,7 +187,7 @@ module btq #(
             ex_out.is_tail  [i] = cur.is_tail;
             ex_out.pred     [i] = cur.take;
             ex_out.pred_tgt [i] = cur.tgt;
-            ex_out.pc_off   [i] = cur.off;
+            ex_out.fb_off   [i] = cur.off;
             ex_out.ghr_vld  [i] = cur.hit && cur.hit_slot;
             ex_out.ghr_base [i] = cur.ghr_base;
         end

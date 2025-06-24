@@ -25,7 +25,7 @@ module pc_gen_stim #(
     output  logic flush,
 
     output  WADDR       flush_fb_base,
-    output  logic [3:0] flush_pc_off,
+    output  logic [3:0] flush_fb_off,
     input   struct packed {
         logic [3:0] off;
         WADDR       base;
@@ -43,18 +43,18 @@ module pc_gen_stim #(
     input   pc_gen2ixq[1:0] ixq_out_dat,
 
     // FTQ buffer
-    output  `CNT_TYPE(2)    buf_in_rdy_scnt,
-    input   `CNT_TYPE(2)    buf_out_wen_cnt,
-    input   FTQ_ENTRY[1:0]  buf_out_dat
+    output  `CNT_TYPE(2)    rrb_in_rdy_scnt,
+    input   `CNT_TYPE(2)    rrb_out_wen_cnt,
+    input   FTQ_ENTRY[1:0]  rrb_out_dat
 );
     localparam _FTQ_SZ = 8;
-    localparam _BUF_SZ = 8;
+    localparam _RRB_SZ = 8;
 
     FTQ_ENTRY _ftq [$], _buf [$];
     logic ftq_ids[int];
     // does id exist in X? (doesn't need to have logic type, but SV doesn't support sets... right?)
 
-    int ftq_sz, buf_sz, num_add, num_del;
+    int ftq_sz, rrb_sz, num_add, num_del;
 
     int cur_id, cur_id_n;
     struct packed {
@@ -65,8 +65,8 @@ module pc_gen_stim #(
     localparam FLUSH_PROB = 8; // in percent
     logic [1:0] ftq_in_vld_max;
     logic [1:0] ixq_in_rdy_max;
-    logic [1:0] buf_in_rdy_max;
-    logic [1:0] buf_cons_max;
+    logic [1:0] rrb_in_rdy_max;
+    logic [1:0] rrb_cons_max;
 
     int iter;
     initial begin
@@ -74,12 +74,12 @@ module pc_gen_stim #(
 
         flush           = 0;
         flush_fb_base   = '0;
-        flush_pc_off    = '0;
+        flush_fb_off    = '0;
 
         ftq_in_vld_scnt = 0;
         ftq_in_dat      = '0;
         ixq_in_rdy_scnt = 0;
-        buf_in_rdy_scnt = 0;
+        rrb_in_rdy_scnt = 0;
 
     // forever begin
     // repeat (1000) begin
@@ -88,12 +88,12 @@ module pc_gen_stim #(
         cur_n = cur;
 
         ftq_sz = _ftq.size();
-        buf_sz = _buf.size();
+        rrb_sz = _buf.size();
 
         ftq_in_vld_max = $urandom_range(2, 0);
         ixq_in_rdy_max = $urandom_range(2, 0);
-        buf_in_rdy_max = $urandom_range(2, 0);
-        buf_cons_max   = $urandom_range(2, 0);
+        rrb_in_rdy_max = $urandom_range(2, 0);
+        rrb_cons_max   = $urandom_range(2, 0);
 
         // $display("cur: id: %4d, base: %d", cur_id, cur.base);
         // for (int e = 0; e < ftq_sz; ++e)
@@ -104,7 +104,7 @@ module pc_gen_stim #(
         //         _ftq[e].base_n,
         //         _ftq[e].id
         //     );
-        // for (int e = 0; e < buf_sz; ++e)
+        // for (int e = 0; e < rrb_sz; ++e)
         //     $display("buf[%1d]: off: %d, ft: %b, base_n: %d (id: %0d)",
         //         e,
         //         _buf[e].off,
@@ -113,10 +113,10 @@ module pc_gen_stim #(
         //         _buf[e].id
         //     );
 
-        std::randomize(flush_pc_off);
+        std::randomize(flush_fb_off);
         std::randomize(flush_fb_base);
         flush = $urandom_range(99, 0) < FLUSH_PROB;
-        // $display("flush: %b, %d %d", flush, flush_fb_base, flush_pc_off);
+        // $display("flush: %b, %d %d", flush, flush_fb_base, flush_fb_off);
         // $display("cur_id: %d, cur_id_n: %d", cur_id, cur_id_n);
 
         ftq_in_vld_scnt = `MIN(ftq_sz, ftq_in_vld_max);
@@ -124,7 +124,7 @@ module pc_gen_stim #(
         for (int e = 0; e < ftq_in_vld_scnt; ++e)
             ftq_in_dat[e] = _ftq[e];
         ixq_in_rdy_scnt = ixq_in_rdy_max;
-        buf_in_rdy_scnt = `MIN(_BUF_SZ-buf_sz, buf_in_rdy_max);
+        rrb_in_rdy_scnt = `MIN(_RRB_SZ-rrb_sz, rrb_in_rdy_max);
 
         num_add = _FTQ_SZ-ftq_sz;
         for (int e = 0; e < num_add; ++e) begin
@@ -151,7 +151,7 @@ module pc_gen_stim #(
         end
 
         // consume some buffer entries
-        num_del = `MIN(buf_sz, buf_cons_max);
+        num_del = `MIN(rrb_sz, rrb_cons_max);
         for (int e = 0; e < num_del; ++e) begin
             FTQ_ENTRY fb;
             if (ftq_ids.exists(_buf[e].id))
@@ -186,7 +186,7 @@ module pc_gen_stim #(
             cur_id <= 0;
             cur <= '{
                 base: flush_fb_base,
-                off : flush_pc_off
+                off : flush_fb_off
             };
 
         end else begin
@@ -200,9 +200,9 @@ module pc_gen_stim #(
                 ftq_ids.delete(fb.id);
             end
 
-            for (int e = 0; e < buf_out_wen_cnt; ++e) begin
+            for (int e = 0; e < rrb_out_wen_cnt; ++e) begin
                 FTQ_ENTRY fb;
-                fb = buf_out_dat[e];
+                fb = rrb_out_dat[e];
 
                 _buf.push_back(fb);
             end
@@ -237,7 +237,7 @@ module pc_gen_test;
     logic   reset;
     logic   flush;
     WADDR   flush_fb_base;
-    FB_OFF  flush_pc_off;
+    FB_OFF  flush_fb_off;
 
     `CNT_TYPE(2)    ftq_in_vld_scnt;
     FTQ_ENTRY[1:0]  ftq_in_dat;
@@ -247,9 +247,9 @@ module pc_gen_test;
     `CNT_TYPE(2)    ixq_out_wen_cnt;
     pc_gen2ixq[1:0] ixq_out_dat;
     // FTQ buffer
-    `CNT_TYPE(2)    buf_in_rdy_scnt;
-    `CNT_TYPE(2)    buf_out_wen_cnt;
-    FTQ_ENTRY[1:0]  buf_out_dat;
+    `CNT_TYPE(2)    rrb_in_rdy_scnt;
+    `CNT_TYPE(2)    rrb_out_wen_cnt;
+    FTQ_ENTRY[1:0]  rrb_out_dat;
 
     always begin
         #(`CLOCK_PERIOD/2) clock = ~clock;
@@ -286,7 +286,7 @@ module pc_gen_test;
         .reset,
         .flush,
         .flush_fb_base,
-        .flush_pc_off,
+        .flush_fb_off,
 
 `ifdef PC_GEN_TEST_MODE
         .reset_val      ('{
@@ -304,9 +304,9 @@ module pc_gen_test;
         .ixq_out_wen_cnt,
         .ixq_out_dat,
 
-        .buf_in_rdy_scnt,
-        .buf_out_wen_cnt,
-        .buf_out_dat
+        .rrb_in_rdy_scnt,
+        .rrb_out_wen_cnt,
+        .rrb_out_dat
     );
 
 
@@ -321,7 +321,7 @@ module pc_gen_test;
         .reset,
         .flush,
         .flush_fb_base,
-        .flush_pc_off,
+        .flush_fb_off,
 
         .reset_val      ('{
             off     : s_rst.off,
@@ -337,9 +337,9 @@ module pc_gen_test;
         .ixq_out_wen_cnt,
         .ixq_out_dat,
 
-        .buf_in_rdy_scnt,
-        .buf_out_wen_cnt,
-        .buf_out_dat
+        .rrb_in_rdy_scnt,
+        .rrb_out_wen_cnt,
+        .rrb_out_dat
     );
 
     pc_gen_sva #(
@@ -356,7 +356,7 @@ module pc_gen_test;
         .reset,
         .flush,
         .flush_fb_base,
-        .flush_pc_off,
+        .flush_fb_off,
 
         .reset_val      ('{
             off     : s_rst.off,
@@ -372,9 +372,9 @@ module pc_gen_test;
         .ixq_out_wen_cnt,
         .ixq_out_dat,
 
-        .buf_in_rdy_scnt,
-        .buf_out_wen_cnt,
-        .buf_out_dat
+        .rrb_in_rdy_scnt,
+        .rrb_out_wen_cnt,
+        .rrb_out_dat
     );
 `endif
 

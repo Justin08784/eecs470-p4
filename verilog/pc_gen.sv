@@ -24,7 +24,7 @@ module pc_gen #(
     input   flush,
 
     input   WADDR       flush_fb_base,
-    input   logic [3:0] flush_pc_off,
+    input   logic [3:0] flush_fb_off,
 `ifdef PC_GEN_TEST_MODE
     input   struct packed {
         logic [3:0] off;
@@ -529,7 +529,7 @@ module pc_gen #(
 `endif
         else if (flush)
             cur <= '{
-                off  : flush_pc_off,
+                off  : flush_fb_off,
                 base : flush_fb_base,
                 inbuf: 0
             };

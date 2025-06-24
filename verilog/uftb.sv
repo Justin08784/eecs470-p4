@@ -242,7 +242,7 @@ module uftb #(
             sc  : sc,
             vld : 1,
             tgt : udat.tgt,
-            off : udat.pc_off,
+            off : udat.fb_off,
             always_take : always_take 
         };
 
@@ -262,7 +262,7 @@ module uftb #(
             sc  : sc,
             vld : 1,
             tgt : udat.tgt,
-            off : udat.pc_off,
+            off : udat.fb_off,
             always_take : always_take
         };
 
@@ -302,13 +302,13 @@ module uftb #(
         rv = dst;
         vld[0] = dst.br_slot[0].vld;
         vld[1] = dst.br_slot[1].vld;
-        // eq0 = udat.pc_off == dst.br_slot[0].off;
-        // lt0 = udat.pc_off <  dst.br_slot[0].off;
-        // eq1 = udat.pc_off == dst.br_slot[1].off;
-        // gt1 = udat.pc_off >  dst.br_slot[1].off;
+        // eq0 = udat.fb_off == dst.br_slot[0].off;
+        // lt0 = udat.fb_off <  dst.br_slot[0].off;
+        // eq1 = udat.fb_off == dst.br_slot[1].off;
+        // gt1 = udat.fb_off >  dst.br_slot[1].off;
 
-        cmp4(udat.pc_off, dst.br_slot[0].off, eq0, lt0);
-        cmp4(dst.br_slot[1].off, udat.pc_off, eq1, gt1);
+        cmp4(udat.fb_off, dst.br_slot[0].off, eq0, lt0);
+        cmp4(dst.br_slot[1].off, udat.fb_off, eq1, gt1);
 
         spill = vld[1] && gt1;
         hit0  = (vld[0] && eq0);
@@ -423,7 +423,7 @@ module uftb #(
             rv = wr_br0(rv, at_new, sc_new, udat);
 
         end else begin
-            rv.end_off = udat.pc_off;
+            rv.end_off = udat.fb_off;
             rv = wr_br1(rv, at_new, sc_new, udat);
 
         end

@@ -542,7 +542,7 @@ module dcf (
         fb_base–– instead flush_PC is more likely to be a nonzero offset INO the FB.
         */
     input   WADDR flush_fb_base,
-    input   logic [3:0] flush_pc_off,
+    input   logic [3:0] flush_fb_off,
 
     input   decode2fetch d_in,
     output  fetch2decode d_out,
@@ -574,7 +574,7 @@ module dcf (
 
         .flush,
         .flush_fb_base,
-        .flush_pc_off,
+        .flush_fb_off,
         .clmsk,
         .cbru_in,
 
@@ -620,7 +620,7 @@ module dcf (
         .flush,
 
         .flush_fb_base,
-        .flush_pc_off,
+        .flush_fb_off,
 
         .ftq_in_vld_scnt    (ftq2pc_gen_vld_scnt),
         .ftq_in_dat         (ftq2pc_gen_dat),

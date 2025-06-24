@@ -328,7 +328,7 @@ typedef struct packed {
                 -- costlier to reconstruct pc (add offset)
                 ++ cheaper update_fb offset comparisons
 
-            Maybe lo4 for fallthrough (end_off), off for branch pc_off?
+            Maybe lo4 for fallthrough (end_off), off for branch fb_off?
         */
     logic       always_take; // i.e. a cond branch that is always taken?
 } FTB_BR_SLOT;
@@ -354,7 +354,7 @@ typedef struct packed {
 
 typedef struct packed {
     WADDR       base;
-    logic [3:0] pc_off; // pc = base + pc_off
+    logic [3:0] fb_off; // pc = base + fb_off
     logic       take;
     WADDR       tgt;
 
@@ -364,7 +364,7 @@ typedef struct packed {
 typedef struct packed {
     // FTB_UPD_PKT fields
     WADDR       base;
-    logic [3:0] pc_off; // pc = base + pc_off
+    logic [3:0] fb_off; // pc = base + fb_off
     logic       take;
     WADDR       tgt;
 
@@ -486,7 +486,7 @@ typedef struct packed {
     logic [NUM_FU_BRU-1:0] is_tail;
     logic [NUM_FU_BRU-1:0] pred;
     WADDR [NUM_FU_BRU-1:0] pred_tgt;
-    logic [NUM_FU_BRU-1:0][3:0] pc_off;
+    logic [NUM_FU_BRU-1:0][3:0] fb_off;
     logic   [NUM_FU_BRU-1:0]ghr_vld;
     GHR_IDX [NUM_FU_BRU-1:0]ghr_base;
 } btq2execute;
@@ -905,7 +905,7 @@ typedef struct packed {
     // misprediction
     logic       flush;
     WADDR       flush_fb_base;
-    logic[3:0]  flush_pc_off;
+    logic[3:0]  flush_fb_off;
         /* Invariants:
         - if flush is high, only en[0] should be high (by convention, we shall
         store the metadata of the mispredicted branch in index 0 of the above arrays)

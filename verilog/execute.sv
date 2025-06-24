@@ -253,7 +253,7 @@ module bru_ex(
 
     logic mispred;
     WADDR flush_fb_base;
-    logic [3:0] flush_pc_off;
+    logic [3:0] flush_fb_off;
     BMASK clmsk;
     assign cbru_out = '{
         en      : i_vld,
@@ -266,7 +266,7 @@ module bru_ex(
         clmsk   : i_vld ? i_reg.b1hot : '0,
         flush           : i_vld & mispred,
         flush_fb_base   : flush_fb_base,
-        flush_pc_off    : flush_pc_off
+        flush_fb_off    : flush_fb_off
     };
 
 
@@ -285,7 +285,7 @@ module bru_ex(
 
         mispred = 0;
         flush_fb_base   = '0;
-        flush_pc_off    = '0;
+        flush_fb_off    = '0;
 
 
         unique casez ({pred, take, corr_tgt})
@@ -295,22 +295,22 @@ module bru_ex(
             mispred = 1;
 
             flush_fb_base   = tgt;
-            flush_pc_off    = '0;
+            flush_fb_off    = '0;
         end
 
         3'b100,
         3'b101: begin
             mispred = 1;
 
-            if (&btq_in.pc_off  // i.e. btq_in.pc_off == 15. npc would be in next fetch block
+            if (&btq_in.fb_off  // i.e. btq_in.fb_off == 15. npc would be in next fetch block
             || btq_in.is_tail
             ) begin
-                flush_pc_off    = '0;
+                flush_fb_off    = '0;
                 flush_fb_base   = npc;
 
             end else begin
-                flush_fb_base   = i_reg.PC - btq_in.pc_off;
-                flush_pc_off    = btq_in.pc_off + `UCAST_FIT(1);
+                flush_fb_base   = i_reg.PC - btq_in.fb_off;
+                flush_fb_off    = btq_in.fb_off + `UCAST_FIT(1);
 
             end
         end
@@ -327,7 +327,7 @@ module stage_ex_p4 (
     input reset,
     output  flush,
     output  WADDR flush_fb_base,
-    output  logic [3:0] flush_pc_off,
+    output  logic [3:0] flush_fb_off,
     output  BMASK clmsk,
 
     input   rs2execute rs_in,
@@ -914,7 +914,7 @@ module stage_ex_p4 (
     assign flush = cbru_out.flush;
     assign clmsk = cbru_out.clmsk;
     assign flush_fb_base= cbru_out.flush_fb_base;
-    assign flush_pc_off = cbru_out.flush_pc_off;
+    assign flush_fb_off = cbru_out.flush_fb_off;
 
     /* >> ======== STAGE 4/?: CDB data/tag broadcast ======== >> */
     // Tag broadcast occurs with CDB arbitration

@@ -108,7 +108,7 @@ module pc_gen_sva #(
     input   flush,
 
     input   WADDR           flush_fb_base,
-    input   logic [3:0]     flush_pc_off,
+    input   logic [3:0]     flush_fb_off,
     input   struct packed {
         logic [3:0] off;
         WADDR       base;
@@ -126,9 +126,9 @@ module pc_gen_sva #(
     input   pc_gen2ixq[1:0] ixq_out_dat,
 
     // FTQ buffer
-    input   `CNT_TYPE(2)    buf_in_rdy_scnt,
-    input   `CNT_TYPE(2)    buf_out_wen_cnt,
-    input   FTQ_ENTRY[1:0]  buf_out_dat
+    input   `CNT_TYPE(2)    rrb_in_rdy_scnt,
+    input   `CNT_TYPE(2)    rrb_out_wen_cnt,
+    input   FTQ_ENTRY[1:0]  rrb_out_dat
 );
     typedef struct packed {
         FB_OFF  off;
@@ -142,12 +142,12 @@ module pc_gen_sva #(
         `CNT_TYPE(2)    ixq_out_wen_cnt;
         pc_gen2ixq[1:0] ixq_out_dat;
         // FTQ buffer
-        `CNT_TYPE(2)    buf_out_wen_cnt;
-        FTQ_ENTRY[1:0]  buf_out_dat;
+        `CNT_TYPE(2)    rrb_out_wen_cnt;
+        FTQ_ENTRY[1:0]  rrb_out_dat;
     } COMB_LINES;
 
     int     id, id_n;
-    int     buf_id, buf_id_n;
+    int     rrb_id, rrb_id_n;
     int     end_cnt, end_cnt_n;
     WORD_STREAM_PKT in_stream [$];
     WORD_STREAM_PKT [16*NUM_DW-1:0] in_append;
@@ -157,11 +157,11 @@ module pc_gen_sva #(
     int out_stream_sz, out_stream_sz_n;
 
     logic match_stream; // do the streams match?
-    logic buf_id_increasing;
-    // logic not_write_buf_after_emit;
-    // not_write_buf_after_emit = 1;
+    logic rrb_id_increasing;
+    // logic not_write_rrb_after_emit;
+    // not_write_rrb_after_emit = 1;
     // for (int w = 0; w < out_stream_sz_n; ++w)
-    //     not_write_buf_after_emit &= out_stream[w].id < buf_id_n;
+    //     not_write_rrb_after_emit &= out_stream[w].id < rrb_id_n;
     logic [NUM_DW-1:0] fmsk_nonzero;
 
     struct packed {
@@ -206,24 +206,24 @@ module pc_gen_sva #(
         end
 
 
-        buf_id_n = buf_id;
-        buf_id_increasing = 1;
-        for (int w = 0; w < buf_out_wen_cnt; ++w) begin
-            buf_id_increasing &= buf_out_dat[w].id == (buf_id_n+1);
-            ++buf_id_n;
+        rrb_id_n = rrb_id;
+        rrb_id_increasing = 1;
+        for (int w = 0; w < rrb_out_wen_cnt; ++w) begin
+            rrb_id_increasing &= rrb_out_dat[w].id == (rrb_id_n+1);
+            ++rrb_id_n;
         end
 
-        // $display("dicr buf_id: %d", buf_id);
-        // $display("buf_out: wen_cnt = %d, [{id %4d, base_n: %d, ft: %b, off: %d}, {id: %4d, base_n: %d, ft: %b, off: %d}]\n",
-        //     buf_out_wen_cnt,
-        //     buf_out_dat[0].id,
-        //     buf_out_dat[0].base_n,
-        //     buf_out_dat[0].ft,
-        //     buf_out_dat[0].off,
-        //     buf_out_dat[1].id,
-        //     buf_out_dat[1].base_n,
-        //     buf_out_dat[1].ft,
-        //     buf_out_dat[1].off
+        // $display("dicr rrb_id: %d", rrb_id);
+        // $display("rrb_out: wen_cnt = %d, [{id %4d, base_n: %d, ft: %b, off: %d}, {id: %4d, base_n: %d, ft: %b, off: %d}]\n",
+        //     rrb_out_wen_cnt,
+        //     rrb_out_dat[0].id,
+        //     rrb_out_dat[0].base_n,
+        //     rrb_out_dat[0].ft,
+        //     rrb_out_dat[0].off,
+        //     rrb_out_dat[1].id,
+        //     rrb_out_dat[1].base_n,
+        //     rrb_out_dat[1].ft,
+        //     rrb_out_dat[1].off
         // );
 
 
@@ -290,7 +290,7 @@ module pc_gen_sva #(
     always_ff @(posedge clock) begin
         if (reset) begin
             id <= '0;
-            buf_id <= -1;
+            rrb_id <= -1;
             end_cnt <= 0;
             cur     <= '{
                 base: reset_val.base,
@@ -301,18 +301,18 @@ module pc_gen_sva #(
 
         end else if (flush) begin
             id <= '0;
-            buf_id <= -1;
+            rrb_id <= -1;
             end_cnt <= 0;
             cur <= '{
                 base: flush_fb_base,
-                off : flush_pc_off
+                off : flush_fb_off
             };
             in_stream.delete();
             out_stream_sz <= '0;
 
         end else begin
             id  <= id_n;
-            buf_id <= buf_id_n;
+            rrb_id <= rrb_id_n;
             end_cnt <= end_cnt_n;
             cur <= cur_n;
             for (int w = 0; w < in_append_cnt; ++w)
@@ -349,14 +349,14 @@ module pc_gen_sva #(
             c.ixq_out_dat[1].dw
         );
 
-        $display("buf_out: wen_cnt = %d, [{base_n: %d, ft: %b, off: %d}, {base_n: %d, ft: %b, off: %d}]\n",
-            c.buf_out_wen_cnt,
-            c.buf_out_dat[0].base_n,
-            c.buf_out_dat[0].ft,
-            c.buf_out_dat[0].off,
-            c.buf_out_dat[1].base_n,
-            c.buf_out_dat[1].ft,
-            c.buf_out_dat[1].off
+        $display("rrb_out: wen_cnt = %d, [{base_n: %d, ft: %b, off: %d}, {base_n: %d, ft: %b, off: %d}]\n",
+            c.rrb_out_wen_cnt,
+            c.rrb_out_dat[0].base_n,
+            c.rrb_out_dat[0].ft,
+            c.rrb_out_dat[0].off,
+            c.rrb_out_dat[1].base_n,
+            c.rrb_out_dat[1].ft,
+            c.rrb_out_dat[1].off
         );
     endtask
 
@@ -368,8 +368,8 @@ module pc_gen_sva #(
         begin
             $display("\n\033[31m@@@ Failed at time %4d\033[0m\n", $time);
             debug;
-            $display("end_cnt: %d, buf_id: %d", end_cnt, buf_id);
-            $display("incr: %b", buf_id_increasing);
+            $display("end_cnt: %d, rrb_id: %d", end_cnt, rrb_id);
+            $display("incr: %b", rrb_id_increasing);
             $finish;
         end
     endtask
@@ -385,25 +385,25 @@ module pc_gen_sva #(
             match_stream;
         endproperty
 
-        property buf_id_sequential;
+        property rrb_id_sequential;
             disable iff (reset)
-            buf_id_increasing;
+            rrb_id_increasing;
         endproperty
 
-        property ends_lockstepw_buf_writes;
+        property ends_lockstepw_rrb_writes;
             disable iff (reset)
             /* Each fb has exactly 1 end. Thus, the number of encountered ends
             should increment no faster than the number of FTQ entries written to
             the re-read buffer, but no slower than 1 behind. 
-            (buf_id+1 = number FTQ entries written) */
-            (end_cnt == buf_id) || (end_cnt == buf_id+1);
+            (rrb_id+1 = number FTQ entries written) */
+            (end_cnt == rrb_id) || (end_cnt == rrb_id+1);
         endproperty
 
         property res_limits;
             disable iff (reset)
             (ftq_out_ren_cnt <= ftq_in_vld_scnt)
             &&  (ixq_out_wen_cnt <= ixq_in_rdy_scnt)
-            &&  (buf_out_wen_cnt <= buf_in_rdy_scnt);
+            &&  (rrb_out_wen_cnt <= rrb_in_rdy_scnt);
         endproperty
 
         property no_empty_reqs;
@@ -417,9 +417,9 @@ module pc_gen_sva #(
         else exit_on_error;
     In_Eq_Out: assert property(cb.in_eq_out)
         else exit_on_error;
-    Buf_Id_Sequential: assert property(cb.buf_id_sequential)
+    Rrb_Id_Sequential: assert property(cb.rrb_id_sequential)
         else exit_on_error;
-    Ends_Lockstepw_Buf_Writes: assert property(cb.ends_lockstepw_buf_writes)
+    Ends_Lockstepw_Rrb_Writes: assert property(cb.ends_lockstepw_rrb_writes)
         else exit_on_error;
     Res_Limits: assert property(cb.res_limits)
         else exit_on_error;
