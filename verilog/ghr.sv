@@ -2,34 +2,37 @@
 
 module ghr #(
     parameter DEPTH     = 32, // must be geq than 2*GHR_LEN and a power of 2
-    parameter NUM_FU_BRU= NUM_FU_BRU,
     parameter GHR_LEN   = GHR_LEN,
-    parameter N         = N,
+
+    parameter CPORTS    = NUM_FU_BRU,   // number of branch resolutions
+    parameter WPORTS    = NUM_BR_SLOTS, // number of predictions that can be shifted in
+    parameter RPORTS    = 1,            // number of ghr slices that must be read
     type VEC = logic [DEPTH-1:0],
     type PTR = logic [$clog2(DEPTH)-1:0]
 ) (
-    input           clock,
-    input           reset,
+    input   clock,
+    input   reset,
+    input   flush,
 
     // misprediction flush (i.e. incorrect resolution)
-    input           flush,
-    input   BMASK   clmsk,
-    input   logic   flush_take,
-    input   PTR     flush_base, // base BEFORE shifting in current branch's pred
+    // input   logic   flush_take,
+    // input   PTR     flush_base, // base BEFORE shifting in current branch's pred
 
-    // ex (correct resolutions)
-    input   logic [NUM_FU_BRU-1:0] ex_en,
-    input   PTR   [NUM_FU_BRU-1:0] ex_idx,
+    // ex (resolutions)
+    input   logic [CPORTS-1:0]  cen,
+    input   logic [CPORTS-1:0]  ctake,
+    input   PTR   [CPORTS-1:0]  cidx,
 
     // fetch
-    input   `CNT_TYPE(N) f_en_cnt,
-    input   logic [N-1:0]       f_pred,
-    output  `CNT_TYPE(N) f_rdy_scnt,
-    output  PTR   [N-1:0]       f_base,
-    output  logic [N-1:0][GHR_LEN-1:0] f_ghr
+    output  `CNT_TYPE(WPORTS)   rdy_scnt,
+    input   `CNT_TYPE(WPORTS)   wen_cnt,
+    input   logic [WPORTS-1:0]  wpred,
+
+    output  PTR [WPORTS:0]      base_n,
+    output  logic[RPORTS-1:0][GHR_LEN-1:0] rghr
 );
     initial begin
-        assert(N < DEPTH) else
+        assert(N < DEPTH) else // FIXME
             $fatal("GHR: N (%0d) must be smaller than DEPTH (%0d)", N, DEPTH);
 
         assert ((DEPTH != 0) && ((DEPTH & (DEPTH - 1)) == 0))
@@ -87,18 +90,16 @@ module ghr #(
     VEC base_oh;
     VEC okay; // okay to overwrite?
 
-    PTR [N:0]           base_n;
-    VEC [N:0]           base_oh_n;      // oh's to prescribe writes
+    VEC [WPORTS:0]      base_oh_n;      // oh's to prescribe writes
     VEC [GHR_LEN-1:0]   base_oh_win;    // oh's to prescribe GHR window
     generate
     assign base_n[0] = base;
-    for (genvar k = 1; k < N+1; ++k) begin
-        assign base_n[k] = base - PTR'(k);
+    for (genvar k = 1; k < WPORTS+1; ++k) begin
+        assign base_n[k] = base - PTR'(k); // FIXME: do ucast on k
     end
-    assign f_base = base_n[N:1];
 
     assign base_oh_n[0] = base_oh;
-    for (genvar k = 1; k < N+1; ++k) begin
+    for (genvar k = 1; k < WPORTS+1; ++k) begin
         assign base_oh_n[k] = rotr(base_oh, k);
     end
 
@@ -110,27 +111,27 @@ module ghr #(
 
 
     generate
-    for (genvar i = 0; i < N; ++i) begin : GEN_GHR
+    for (genvar i = 0; i < RPORTS; ++i) begin : GEN_GHR
         for (genvar j = 0; j < GHR_LEN; ++j) begin : GEN_BIT
             if (j < i)
-                assign f_ghr[i][j] = 1'b0; // new bits; default ntaken
+                assign rghr[i][j] = 1'b0; // new bits; default ntaken
             else
-                assign f_ghr[i][j] = |(hist & base_oh_win[j-i]);
+                assign rghr[i][j] = |(hist & base_oh_win[j-i]);
         end
     end
     endgenerate
 
 
-    logic [N-1:0] rdy;
+    logic [WPORTS-1:0] rdy;
     always_comb begin
         // if we advance base, then we will push 1 more branch into the nrz.
         // we must ensure said branch is resolved (and thus does not require recovery).
         okay = rotl(rslv, GHR_LEN-1);
 
         rdy[0] = |(okay & base_oh_n[1]);
-        for (int i = 1; i < N; ++i)
+        for (int i = 1; i < WPORTS; ++i)
             rdy[i] = rdy[i-1] && |(okay & base_oh_n[i+1]);
-        f_rdy_scnt = $countones(rdy);
+        rdy_scnt = $countones(rdy);
     end
 
     // these _n's are for normal path updates (not for flush!)
@@ -140,8 +141,8 @@ module ghr #(
         hist_n = hist;
         rslv_n = rslv;
 
-        for (int i = 0; i < f_en_cnt; ++i) begin
-            if (f_pred[i])
+        for (int i = 0; i < wen_cnt; ++i) begin
+            if (wpred[i])
                 hist_n |= base_oh_n[i+1];
             else
                 hist_n &= ~base_oh_n[i+1];
@@ -149,10 +150,10 @@ module ghr #(
             rslv_n &= ~base_oh_n[i+1];
         end
 
-        for (int i = 0; i < NUM_FU_BRU; ++i) begin
-            if (!ex_en[i])
+        for (int i = 0; i < CPORTS; ++i) begin
+            if (!cen[i])
                 continue;
-            rslv_n[ex_idx[i]] = 1;
+            rslv_n[cidx[i]] = 1;
         end
     end
     
@@ -165,17 +166,18 @@ module ghr #(
             base_oh <= VEC'(1) << (DEPTH-1);
 
         end else if (flush) begin
-            rslv            <= rslv | get_arc(base, flush_base);
+            rslv    <= rslv | get_arc(base, cidx[0]);
                 // everything in rlsv[flush_base,..(mod+), base] must be set
-            hist[flush_base]<= flush_take;
-            base            <= flush_base;
-            base_oh         <= VEC'(1) << flush_base;
+            hist[cidx[0]] <= ctake[0];
+            base    <= cidx[0];
+            base_oh <= VEC'(1) << cidx[0];
 
         end else begin
             rslv    <= rslv_n;
             hist    <= hist_n;
-            base    <= base_n[f_en_cnt];
-            base_oh <= base_oh_n[f_en_cnt];
+            base    <= base_n[wen_cnt];
+            base_oh <= base_oh_n[wen_cnt];
+
         end
 
     end
@@ -185,9 +187,9 @@ module ghr #(
     always_ff @(posedge clock) begin
         // runtime assertions
         if (!reset) begin
-            logic [N-1:0] en_pred;
-            assert(!flush || !rslv[flush_base]) else
-                $fatal("ghr: flush base %2d is already resolved", flush_base);
+            logic [WPORTS-1:0] en_pred;
+            assert(!flush || !rslv[cidx[0]]) else
+                $fatal("ghr: flush base %2d is already resolved", cidx[0]);
             // assert(!flush || hist[flush_base] != flush_take) else
             //     $fatal("ghr: flush take %b matches existing history", flush_take);
             /* Reason for disabling this asssertion:
@@ -199,16 +201,16 @@ module ghr #(
             cannot move to a simple "invert" hist value iff flush.)
             */
 
-            for (int i = 0; i < NUM_FU_BRU; ++i) begin
-                assert(!ex_en[i] || !rslv[ex_idx[i]]) else
-                    $fatal("ghr: ex_idx %2d is already resolved", ex_idx[i]);
+            for (int i = 0; i < CPORTS; ++i) begin
+                assert(!cen[i] || !rslv[cidx[i]]) else
+                    $fatal("ghr: ex_idx %2d is already resolved", cidx[i]);
             end
             // assert(!(|f_pred) || $onehot(f_pred)) else
             //     $fatal("ghr: f_pred (%b) is not one-hot", f_pred);
 
             en_pred = '0;
-            for (int i = 0; i < f_en_cnt; ++i)
-                en_pred[i] = f_pred[i];
+            for (int i = 0; i < wen_cnt; ++i)
+                en_pred[i] = wpred[i];
             assert(!(|en_pred) || $onehot(en_pred)) else
                 $fatal("ghr: en_pred (%b) is not one-hot", en_pred);
         end
@@ -222,26 +224,26 @@ module ghr #(
         $display(">> ghr >>");
         $display("  %3d | fetch: {en_cnt: %1d, pred: [%b, %b]}, ex_in: {en: %b, idx: %2d}, flush: {%b, base: %2d, take: %b}",
             $time,
-            f_en_cnt,
-            f_pred[0],
-            f_pred[1],
-            ex_en,
-            ex_idx,
+            wen_cnt,
+            wpred[0],
+            wpred[1],
+            cen,
+            cidx,
             flush,
-            flush_base,
-            flush_take
+            cidx[0],
+            ctake[0],
         );
 
         // foreach(sva.nres[i])
         //     $display("  nres[%2d]: %2d", i, sva.nres[i]);
 
         $display("got: ghr: [%b, %b], hist: %b, rslv: %b, base: %2d (f_rdy_scnt: %2d)",
-            f_ghr[0],
-            f_ghr[1],
+            rghr[0],
+            rghr[1],
             hist,
             rslv,
             base,
-            f_rdy_scnt
+            rdy_scnt
         );
         $display("<< ghr <<");
     endtask

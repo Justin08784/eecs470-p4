@@ -7,9 +7,11 @@
 
 module ghr_sva #(
     parameter DEPTH     = 32, // must be geq than 2*GHR_LEN and a power of 2
-    parameter NUM_FU_BRU= NUM_FU_BRU,
     parameter GHR_LEN   = GHR_LEN,
-    parameter N         = N,
+
+    parameter CPORTS    = NUM_FU_BRU,   // number of branch resolutions
+    parameter WPORTS    = NUM_BR_SLOTS, // number of predictions that can be shifted in
+    parameter RPORTS    = 1,            // number of ghr slices that must be read
     type VEC = logic [DEPTH-1:0],
     type PTR = logic [$clog2(DEPTH)-1:0]
 ) (
@@ -21,20 +23,17 @@ module ghr_sva #(
 
     input           clock,
     input           reset,
-
-    // misprediction flush (i.e. incorrect resolution)
     input           flush,
-    input   PTR     flush_base, // base BEFORE shifting in current branch's pred
-    input   logic   flush_take,
 
-    // ex (correct resolutions)
-    input   logic [NUM_FU_BRU-1:0] ex_en,
-    input   PTR   [NUM_FU_BRU-1:0] ex_idx,
+    // ex (resolutions)
+    input   logic [CPORTS-1:0]  cen,
+    input   logic [CPORTS-1:0]  ctake,
+    input   PTR   [CPORTS-1:0]  cidx,
 
     // fetch
-    input   `CNT_TYPE(N) f_en_cnt, f_rdy_scnt,
-    input   logic [N-1:0]       f_pred,
-    input   logic [N-1:0][GHR_LEN-1:0] f_ghr
+    input   `CNT_TYPE(WPORTS)   wen_cnt, rdy_scnt,
+    input   logic [WPORTS-1:0]  wpred,
+    input   logic [RPORTS-1:0][GHR_LEN-1:0] rghr
 );
     typedef struct packed {
         PTR base;
@@ -45,8 +44,8 @@ module ghr_sva #(
 
     GHR_STATE s, n;
     struct packed {
-        logic [$clog2(N):0] f_rdy_scnt;
-        logic [N-1:0][GHR_LEN-1:0] f_ghr;
+        logic [$clog2(WPORTS):0] rdy_scnt;
+        logic [RPORTS-1:0][GHR_LEN-1:0] rghr;
     } sva_comb;
 
     always_ff @(posedge clock) begin
@@ -63,7 +62,7 @@ module ghr_sva #(
 
             if (flush) begin
                 while (`TRUE) begin
-                    if (nres[$] == flush_base) begin
+                    if (nres[$] == cidx[0]) begin
                         nres.pop_back();
                         break;
                     end
@@ -77,18 +76,18 @@ module ghr_sva #(
                 end
 
             end else begin
-                for (int i = 0; i < NUM_FU_BRU; ++i) begin
-                    if (!ex_en[i])
+                for (int i = 0; i < CPORTS; ++i) begin
+                    if (!cen[i])
                         continue;
                     foreach (nres[j]) begin
-                        if (nres[j] == ex_idx[i]) begin
+                        if (nres[j] == cidx[i]) begin
                             nres.delete(j);
                             break;
                         end
                     end
                 end
 
-                for (int i = 0; i < f_en_cnt; ++i) begin
+                for (int i = 0; i < wen_cnt; ++i) begin
                     PTR idx;
                     idx = s.base - (i+1);
                     nres.push_back(idx);
@@ -101,35 +100,33 @@ module ghr_sva #(
     function automatic GHR_STATE ghr_step (
         input GHR_STATE             s,
         input logic                 flush,
-        input PTR                   flush_base,
-        input logic                 flush_take,
-        input logic [NUM_FU_BRU-1:0]ex_en,
-        input PTR   [NUM_FU_BRU-1:0]ex_idx,
-        input logic [$clog2(N):0]   f_en_cnt,
-        input logic [N-1:0]         f_pred
+        input logic [CPORTS-1:0]    cen,
+        input PTR   [CPORTS-1:0]    cidx,
+        input logic [$clog2(WPORTS):0]wen_cnt,
+        input logic [WPORTS-1:0]    wpred
     );
         n = s;
         if (flush) begin
-            for (PTR i = s.base; i != flush_base; ++i)
+            for (PTR i = s.base; i != cidx[0]; ++i)
                 n.rslv[i] = 1'b1;
-            n.rslv[flush_base]= 1'b1;
+            n.rslv[cidx[0]]= 1'b1;
 
-            n.base = flush_base;
-            n.hist[flush_base] = flush_take;
+            n.base = cidx[0];
+            n.hist[cidx[0]] = ctake[0];
 
         end else begin
-            for (int i = 0; i < NUM_FU_BRU; ++i) begin
-                if (ex_en[i])
-                    n.rslv[ex_idx[i]] = 1'b1;
+            for (int i = 0; i < CPORTS; ++i) begin
+                if (cen[i])
+                    n.rslv[cidx[i]] = 1'b1;
             end
 
-            for (int i = 0; i < f_en_cnt; ++i) begin
+            for (int i = 0; i < wen_cnt; ++i) begin
                 PTR widx;
                 widx = s.base - (i+1);
-                n.hist[widx] = f_pred[i];
+                n.hist[widx] = wpred[i];
                 n.rslv[widx] = 1'b0;
             end
-            n.base = s.base - f_en_cnt;
+            n.base = s.base - wen_cnt;
         end
 
         return n;
@@ -147,30 +144,28 @@ module ghr_sva #(
         n = ghr_step(
             s,
             flush,
-            flush_base,
-            flush_take,
-            ex_en,
-            ex_idx,
-            f_en_cnt,
-            f_pred
+            cen,
+            cidx,
+            wen_cnt,
+            wpred
         );
 
-        sva_comb.f_rdy_scnt = 0;
-        for (int i = 0; i < N; ++i) begin
+        sva_comb.rdy_scnt = 0;
+        for (int i = 0; i < WPORTS; ++i) begin
             PTR widx, last_dep;
             widx = s.base - (i+1);
             last_dep = widx - (GHR_LEN-1);
             if (!s.rslv[last_dep])
                 break;
 
-            ++sva_comb.f_rdy_scnt;
+            ++sva_comb.rdy_scnt;
         end
 
-        for (int i = 0; i < N; ++i) begin
+        for (int i = 0; i < RPORTS; ++i) begin
             PTR idx;
             for (int j = 0; j < GHR_LEN; ++j) begin
                 idx = s.base + j - i;
-                sva_comb.f_ghr[i][j] = (j < i)
+                sva_comb.rghr[i][j] = (j < i)
                     ? 1'b0
                     : s.hist[idx];
             end
@@ -185,9 +180,9 @@ module ghr_sva #(
         begin
             $display("\n\033[31m@@@ Failed at time %4d\033[0m\n", $time);
             $display("%b, %b", n.hist, hist);
-            $display("%2d, %2d", f_rdy_scnt, sva_comb.f_rdy_scnt);
-            $display("%b, %b] %b, %b]", f_ghr[0],f_ghr[1],
-            sva_comb.f_ghr[0], sva_comb.f_ghr[1]);
+            $display("%2d, %2d", rdy_scnt, sva_comb.rdy_scnt);
+            $display("%b, %b] %b, %b]", rghr[0],rghr[1],
+            sva_comb.rghr[0], sva_comb.rghr[1]);
             // $display("used %d free %d us %d fs %d reset: %b", used, free, used_scnt, free_scnt, reset);
             $finish;
         end
@@ -229,14 +224,14 @@ module ghr_sva #(
     endfunction
 
     clocking cb @(posedge clock);
-        property f_rdy_correct;
+        property rdy_correct;
             disable iff (reset)
-            f_rdy_scnt == sva_comb.f_rdy_scnt;
+            rdy_scnt == sva_comb.rdy_scnt;
         endproperty
 
-        property f_ghr_correct;
+        property rghr_correct;
             disable iff (reset)
-            f_ghr == sva_comb.f_ghr;
+            rghr == sva_comb.rghr;
         endproperty
 
         property rslv_correct;
@@ -265,9 +260,9 @@ module ghr_sva #(
         endproperty
     endclocking
 
-    match_f_rdy: assert property(cb.f_rdy_correct)
+    match_rdy: assert property(cb.rdy_correct)
         else exit_on_error;
-    match_f_ghr: assert property(cb.f_ghr_correct)
+    match_rghr: assert property(cb.rghr_correct)
         else exit_on_error;
     match_rslv: assert property(cb.rslv_correct)
         else exit_on_error;
