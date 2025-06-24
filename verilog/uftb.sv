@@ -519,7 +519,7 @@ module uftb #(
     end
 
     // s2
-`ifndef SYNTH
+`ifdef FORMAL
     logic hit_slot_spill_mex;
 `endif
     always_comb begin
@@ -551,7 +551,7 @@ module uftb #(
             cycles, which is only possible if update_fb is conditinally executed.)
             */
         wfb     = s1.hit ? upd_fb : new_fb;
-`ifndef SYNTH
+`ifdef FORMAL
         hit_slot_spill_mex = !s1.en || !(hit_slot && spill);
 `endif
 
@@ -644,7 +644,7 @@ module uftb #(
     end
 
 
-`ifndef FORMAL
+`ifdef FORMAL
     // runtime assertions
     always_ff @(posedge clock) begin
         if (!reset) begin
