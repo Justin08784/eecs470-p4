@@ -35,9 +35,9 @@ module cpu (
 );
     /* Global controls*/
     logic flush;
-    logic [3:0] flush_fb_off;
-    WADDR flush_fb_base;
     BMASK clmsk;
+    assign flush = ex_2_cbru.flush;
+    assign clmsk = ex_2_cbru.clmsk;
 
     /* Memory stubs */
     // always_comb begin
@@ -60,10 +60,7 @@ module cpu (
     dcf fetch0 (
         .clock,
         .reset,
-        .flush,
-        .clmsk,
-        .flush_fb_base,
-        .flush_fb_off,
+        .cbru_in(ex_2_cbru),
 
         .d_in   (decode_2_f),
         .d_out  (f_2_decode),
@@ -71,7 +68,6 @@ module cpu (
         .btq_out(f_2_btq),
 
         .snap_in(rnme_2_snap),
-        .cbru_in(ex_2_cbru),
 
         .mem_out(f2mem),
         .mem_in (mem2f)
@@ -164,13 +160,12 @@ module cpu (
     btq btq0(
         .clock,
         .reset,
-        .flush,
-        .clmsk,
+        .cbru_in(ex_2_cbru),
+
         .snap_in(rnme_2_snap),
 
         .ex_in  (ex_2_btq),
         .ex_out (btq_2_ex),
-        .cbru_in(ex_2_cbru),
 
         .f_in   (f_2_btq),
         .f_out  (btq_2_f)
@@ -221,10 +216,6 @@ module cpu (
     stage_ex_p4 ex0 (
         .clock,
         .reset,
-        .flush,
-        .flush_fb_base,
-        .flush_fb_off,
-        .clmsk,
 
         .rs_in      (rs_2_ex),
         .rs_out     (ex_2_rs),

@@ -33,7 +33,6 @@ module irq #(
     input   clock,
     input   reset,
     input   flush,
-    input   BMASK clmsk,
 
     // write
     output  PTR [2:0]       wr_idxs_n,
@@ -530,8 +529,7 @@ endmodule
 module dcf (
     input   clock,
     input   reset,
-    input   flush,
-    input   BMASK clmsk,
+    input   execute2complete_bru cbru_in,
     // input   WADDR flush_PC,
         /*
         WRONG >> 
@@ -541,8 +539,6 @@ module dcf (
         However, if branch was mispred T-resolved NT, then flush_PC may NOT be an
         fb_base–– instead flush_PC is more likely to be a nonzero offset INO the FB.
         */
-    input   WADDR flush_fb_base,
-    input   logic [3:0] flush_fb_off,
 
     input   decode2fetch d_in,
     output  fetch2decode d_out,
@@ -550,15 +546,16 @@ module dcf (
     input   btq2fetch   btq_in,
     output  fetch2btq   btq_out,
 
-    // execute
-    input   execute2complete_bru cbru_in,
-
     input   rename2snap_bus snap_in, // unused
 
     output  fetch2mem   mem_out,
     input   mem2fetch   mem_in
 
 );
+    logic flush;
+    assign flush = cbru_in.flush;
+
+
     // bpu <-> ftq plumbing
     struct packed {
         logic       en;
@@ -571,11 +568,6 @@ module dcf (
     bpu bpu0 (
         .clock,
         .reset,
-
-        .flush,
-        .flush_fb_base,
-        .flush_fb_off,
-        .clmsk,
         .cbru_in,
 
         .i_uen      (btq_in.bpu_uen),
@@ -617,10 +609,10 @@ module dcf (
     pc_gen pc_gen0 (
         .clock,
         .reset,
-        .flush,
 
-        .flush_fb_base,
-        .flush_fb_off,
+        .flush,
+        .flush_fb_base      (cbru_in.flush_fb_base),
+        .flush_fb_off       (cbru_in.flush_fb_off),
 
         .ftq_in_vld_scnt    (ftq2pc_gen_vld_scnt),
         .ftq_in_dat         (ftq2pc_gen_dat),
@@ -689,7 +681,6 @@ module dcf (
         .clock,
         .reset,
         .flush,
-        .clmsk  ('0),
 
         .wr_idxs_n  (irq_wr_idxs_n),
         .rdy_scnt   (ixq2pc_gen_rdy_scnt),  // TODO: change irq when has backpressure

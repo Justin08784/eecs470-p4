@@ -36,13 +36,12 @@ module btq #(
 ) (
     input  clock,
     input  reset,
-    input  flush,
-    input  BMASK clmsk,
-
     // complete (write)
+    input  execute2complete_bru cbru_in,
+
+    // prf re-read
     input  execute2btq  ex_in,
     output btq2execute  ex_out,
-    input  execute2complete_bru cbru_in,
 
     // dispatch (alloc snapshot)
     input  rename2snap_bus snap_in,
@@ -51,6 +50,11 @@ module btq #(
     input  fetch2btq    f_in,
     output btq2fetch    f_out
 );
+    logic flush;
+    BMASK clmsk;
+    assign flush = cbru_in.flush;
+    assign clmsk = cbru_in.clmsk;
+
     localparam NUM_FPORTS = N; // fetch ports (in-order)
     localparam NUM_RPORTS = N; // retire ports (in-order)
     localparam NUM_CPORTS = NUM_FU_BRU; // complete ports (*OUT-OF-ORDER*)
@@ -204,9 +208,9 @@ module btq #(
     ) puq ( // predictor update queue
         .clock      (clock),
         .reset      (reset),
-        .flush      ('0),
 
         // >> unused inputs
+        .flush      ('0),
         .flush_snap ('0),
         .clmsk      ('0),
         .wr_bmask   ('0),
@@ -334,13 +338,12 @@ module btq #(
         end
 
         for (int i = 0; i < NUM_FU_BRU; ++i) begin
-            $display("cbru_in[%0d]: en: %b, btq_idx: %d, take: %b, tgt: %x, ghr_vld: %b",
+            $display("cbru_in[%0d]: en: %b, btq_idx: %d, take: %b, tgt: %x",
                 i,
                 cbru_in.en[i],
                 cbru_in.btq_idx[i],
                 cbru_in.take[i],
-                cbru_in.tgt[i],
-                cbru_in.ghr_vld[i]
+                cbru_in.tgt[i]
             );
         end
 

@@ -323,12 +323,10 @@ module bru_ex(
 endmodule
 
 module stage_ex_p4 (
-    input clock,
-    input reset,
-    output  flush,
-    output  WADDR flush_fb_base,
-    output  logic [3:0] flush_fb_off,
-    output  BMASK clmsk,
+    input   clock,
+    input   reset,
+
+    /* NOTE: no flush/clmsk inputs–– they are generated here! */
 
     input   rs2execute rs_in,
     output  execute2rs rs_out,
@@ -347,6 +345,12 @@ module stage_ex_p4 (
     output  execute2complete_dat cdat_out
 
 );
+    // local convenience variables
+    logic flush;
+    BMASK clmsk;
+    assign flush = cbru_out.flush;
+    assign clmsk = cbru_out.clmsk;
+
     /* >> ======== STAGE 1: Issue Staging ======== >> */
     // (where just-issued insns wait for 1 cycle)
     struct packed {
@@ -911,10 +915,6 @@ module stage_ex_p4 (
         .cbru_out   (cbru_out_n),
         .o_cand (cands.bru)
     );
-    assign flush = cbru_out.flush;
-    assign clmsk = cbru_out.clmsk;
-    assign flush_fb_base= cbru_out.flush_fb_base;
-    assign flush_fb_off = cbru_out.flush_fb_off;
 
     /* >> ======== STAGE 4/?: CDB data/tag broadcast ======== >> */
     // Tag broadcast occurs with CDB arbitration
@@ -1050,7 +1050,7 @@ module stage_ex_p4 (
             );
         end
         $display("$> bru_ex");
-        $display("i_vld: %b", bru_ex0.i_vld[0]);
+        $display("i_vld: %b", bru_ex0.i_vld);
         $display("pred: %b, pred_tgt: %x",
             btq_in.pred,
             btq_in.pred_tgt

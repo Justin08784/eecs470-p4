@@ -10,12 +10,6 @@ See "5.3.1. L1 FTB Miss and L2 FTB Hit" in Reinman's paper "Optimizations Enable
 module bpu (
     input   clock,
     input   reset,
-
-    // TODO: wrap flush, clmsk, flush_take/base into a single "bru_res" bus.
-    input   flush,
-    input   WADDR   flush_fb_base,
-    input   logic [3:0] flush_fb_off,
-    input   BMASK   clmsk,
     input   execute2complete_bru cbru_in,
 
     input   logic       i_uen,
@@ -25,6 +19,9 @@ module bpu (
     output  logic       o_ftq_en,
     output  FTQ_ENTRY   o_ftq_dat
 );
+    logic flush;
+    assign flush = cbru_in.flush;
+
     logic step;
     logic [3:0] off; // in-FB offset
     WADDR pc_reg, pc_reg_n; // current fb/ftb base
@@ -219,7 +216,7 @@ module bpu (
         .clock,
         .reset,
         .flush,
-        .clmsk,
+        .clmsk  ('0), // unused
 
         .i_vld (step), // FIXME: should this be step without the buf_io.i_rdy component?
         .i_rdy (buf_io.i_rdy),
@@ -239,8 +236,8 @@ module bpu (
             pc_reg <= '0;
             off    <= '0;
         end else if (flush) begin
-            pc_reg <= flush_fb_base;
-            off    <= flush_fb_off;
+            pc_reg <= cbru_in.flush_fb_base;
+            off    <= cbru_in.flush_fb_off;
         end else if (step) begin
             pc_reg <= pc_reg_n;
             off    <= '0;
