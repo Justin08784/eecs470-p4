@@ -391,7 +391,7 @@ typedef struct packed {
 `ifdef PC_GEN_TEST_MODE
     int id;
 `endif
-    // logic[GHR_LEN-1:0] hash;
+    logic[GHR_LEN-1:0] hash;
     // GHR_IDX [1:0] ghr_base;
 
     WADDR       base_n;     // base address of *next* FB
@@ -405,8 +405,10 @@ typedef struct packed {
     struct packed {
         logic       vld;
         logic [3:0] off;
+        logic       in_ghr;
     } [1:0] slot;
 
+    GHR_IDX     ghr_base_n1;
     logic       always_take;// ft ? <IGNORE>: " of pred-taken branch
     FTB_MD1     md;         // ft ? <IGNORE>: " of pred-tkaen branch
 } FTQ_ENTRY;

@@ -36,7 +36,7 @@ module ghr_test #(
     `CNT_TYPE(WPORTS)   wen_cnt, rdy_scnt;
     logic [WPORTS-1:0]  wpred;
     logic [RPORTS-1:0][GHR_LEN-1:0] rghr;
-    PTR   [WPORTS:0]    base_n;
+    PTR  base_n1;
     
     // Variable to count values written to FIFO
     int cnt;
@@ -64,7 +64,7 @@ module ghr_test #(
         .rdy_scnt,
         .wen_cnt,
         .wpred,
-        .base_n,
+        .base_n1,
         .rghr
     );
 
@@ -208,7 +208,7 @@ task automatic push_new_fetches();
         pend_t b;
 
         // remember the branch in scoreboard
-        b.idx        = base_n[i+1];   // <-- comes straight from DUT
+        b.idx        = base_n1 - PTR'(i);   // <-- comes straight from DUT
         b.pred_take  = wpred[i];
         pend.push_back(b);          // youngest at the BACK
     end

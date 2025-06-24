@@ -40,13 +40,18 @@ module bpu (
 
     struct packed {
         // fetch
-        `CNT_TYPE(NUM_BR_SLOTS) f_en_cnt;
-        logic [NUM_BR_SLOTS-1:0]f_pred;
-        `CNT_TYPE(NUM_BR_SLOTS) f_rdy_scnt;
+        `CNT_TYPE(NUM_BR_SLOTS) wen_cnt;
+        logic [NUM_BR_SLOTS-1:0]wpred;
+        `CNT_TYPE(NUM_BR_SLOTS) rdy_scnt;
 
-        GHR_IDX [NUM_BR_SLOTS-1:0]  f_base;
-        logic [NUM_BR_SLOTS-1:0][GHR_LEN-1:0] f_ghr;
+        GHR_IDX base_n1;
+        logic [GHR_LEN-1:0] rghr;
     } ghr_io;
+
+    struct packed {
+        logic [NUM_BR_SLOTS-1:0] pred;
+        logic [GHR_LEN-1:0] hash;
+    } gshare_io;
 
     assign uftb_io.i_qry = pc_reg;
     assign uftb_io.i_uen = i_uen;
@@ -85,11 +90,13 @@ module bpu (
         .o_idx(pred_idx)
     );
 
+    logic [NUM_BR_SLOTS-1:0] in_ghr;
     always_comb begin
         FTB_ENTRY e;
         FTB_BR_SLOT slot;
         WADDR pc_flt, pc_jmp;
         logic leq0, leq1;
+        `CNT_TYPE(NUM_BR_SLOTS) ghr_wvld_cnt;
 
         const FTB_MD1 COND_MD = '{
             cond : 1,
@@ -109,23 +116,31 @@ module bpu (
         leq1 = off <= e.br_slot[1].off;
         pred[0] =
             !e.br_slot[0].vld ? 0 :
-            leq0 && query_sc(e.br_slot[0].sc);
+            leq0 && gshare_io.pred[0];
+            // leq0 && query_sc(e.br_slot[0].sc);
         pred[1] =
             !e.br_slot[1].vld ? 0 :
-            leq1 && (!e.md1.cond || query_sc(e.br_slot[1].sc));
+            leq1 && (!e.md1.cond || gshare_io.pred[1]);
+            // leq1 && (!e.md1.cond || query_sc(e.br_slot[1].sc));
         if (!uftb_io.o_vld)
             pred = '0;
 
+        in_ghr[0] =
+            (!e.br_slot[0].vld || !leq0) ? 0 : 1;
+        in_ghr[1] =
+            (!e.br_slot[1].vld || !leq1) ? 0 :
+            ~(pred_any & ~pred_idx);
+        ghr_wvld_cnt = $countones(in_ghr);
+
         slot = e.br_slot[pred_idx];
-        step = buf_io.i_rdy && (!pred_any || (pred_idx < ghr_io.f_rdy_scnt));
+        step = buf_io.i_rdy & (ghr_wvld_cnt <= ghr_io.rdy_scnt);
+
 
         if (!step || !uftb_io.o_vld)
-            ghr_io.f_en_cnt = 0;
+            ghr_io.wen_cnt = 0;
         else
-            ghr_io.f_en_cnt = pred_any
-                ? pred_idx + `UCAST_FIT(1)
-                : NUM_BR_SLOTS;
-        ghr_io.f_pred = pred;
+            ghr_io.wen_cnt = ghr_wvld_cnt;
+        ghr_io.wpred = pred;
 
         pc_flt = pc_reg + `UCAST_LEN(
             (e.end_off == 4'd15)
@@ -141,6 +156,7 @@ module bpu (
 
         buf_io.i_dat = '{
             base_n      : pc_reg_n,
+            hash        : gshare_io.hash,
 
             ft          : !pred_any,
             pred_idx    : pred_idx,
@@ -150,6 +166,7 @@ module bpu (
             hit         : uftb_io.o_vld,
             
             slot        : '0, // filled below
+            ghr_base_n1 : ghr_io.base_n1,
             always_take : slot.always_take,
             md          : (pred_idx == 0) ? COND_MD : e.md1
         };
@@ -157,7 +174,8 @@ module bpu (
         for (int i = 0; i < NUM_BR_SLOTS; ++i) begin
             buf_io.i_dat.slot[i] = '{
                 vld : e.br_slot[i].vld,
-                off : e.br_slot[i].off
+                off : e.br_slot[i].off,
+                in_ghr : in_ghr[i]
             };
         end
     end
@@ -177,31 +195,44 @@ module bpu (
     They will only ever start receiving their own ghr_base if they are ever taken
     and added to a branch_slot.
     */
-    assign ghr_io.f_rdy_scnt = NUM_BR_SLOTS;
+    ghr #(
+        .DEPTH      (GHR_BUF_SZ),
+        .GHR_LEN    (GHR_LEN),
 
-    // ghr #(
-    //     .DEPTH      (GHR_BUF_SZ),
-    //     .NUM_FU_BRU (NUM_FU_BRU),
-    //     .GHR_LEN    (GHR_LEN),
-    //     .N          (NUM_BR_SLOTS) // up to 2 branches per FTB_ENTRY
-    // ) ghr0 (
-    //     .clock,
-    //     .reset,
+        .CPORTS     (NUM_FU_BRU),
+        .WPORTS     (NUM_BR_SLOTS),
+        .RPORTS     (1)
+    ) ghr0 (
+        .clock,
+        .reset,
+        .flush,
 
-    //     .flush,
-    //     .clmsk,
-    //     .flush_take (cbru_in.dat[0].take),
-    //     .flush_base (cbru_in.dat[0].ghr_base),
+        .cen        (cbru_in.en),
+        .ctake      (cbru_in.take),
+        .cidx       (cbru_in.ghr_base),
 
-    //     .ex_en      (cbru_in.en[0]),
-    //     .ex_idx     (cbru_in.dat[0].ghr_base),
+        .rdy_scnt   (ghr_io.rdy_scnt),
+        .wen_cnt    (ghr_io.wen_cnt),
+        .wpred      (ghr_io.wpred),
+        .base_n1    (ghr_io.base_n1),
+        .rghr       (ghr_io.rghr)
+    );
 
-    //     .f_en_cnt   (ghr_io.f_en_cnt),
-    //     .f_pred     (ghr_io.f_pred),
-    //     .f_rdy_scnt (ghr_io.f_rdy_scnt),
-    //     .f_base     (ghr_io.f_base),
-    //     .f_ghr      (ghr_io.f_ghr)
-    // );
+    gshare gshare0 (
+        .clock,
+        .reset,
+
+        .i_uen,
+        .i_udat,
+
+        .i_ghr  (ghr_io.rghr),
+        .i_qry  (pc_reg),
+
+        .o_hash (gshare_io.hash),
+        .o_pred (gshare_io.pred)
+
+    );
+
 
     struct packed {
         logic i_rdy;
@@ -242,6 +273,8 @@ module bpu (
             pc_reg <= pc_reg_n;
             off    <= '0;
         end
+        // $display("ghr_rdy_scnt: %d", ghr_io.rdy_scnt);
+        // ghr0.print_ghr;
     end
 
 `ifdef DEBUG

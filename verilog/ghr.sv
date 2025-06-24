@@ -28,7 +28,7 @@ module ghr #(
     input   `CNT_TYPE(WPORTS)   wen_cnt,
     input   logic [WPORTS-1:0]  wpred,
 
-    output  PTR [WPORTS:0]      base_n,
+    output  PTR base_n1,
     output  logic[RPORTS-1:0][GHR_LEN-1:0] rghr
 );
     initial begin
@@ -90,6 +90,7 @@ module ghr #(
     VEC base_oh;
     VEC okay; // okay to overwrite?
 
+    PTR [WPORTS:0]      base_n;
     VEC [WPORTS:0]      base_oh_n;      // oh's to prescribe writes
     VEC [GHR_LEN-1:0]   base_oh_win;    // oh's to prescribe GHR window
     generate
@@ -97,6 +98,7 @@ module ghr #(
     for (genvar k = 1; k < WPORTS+1; ++k) begin
         assign base_n[k] = base - PTR'(k); // FIXME: do ucast on k
     end
+    assign base_n1 = base_n[1];
 
     assign base_oh_n[0] = base_oh;
     for (genvar k = 1; k < WPORTS+1; ++k) begin

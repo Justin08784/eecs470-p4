@@ -409,8 +409,11 @@ module align (
     for (genvar w = 0; w < NUM_W; ++w) begin
         FTQ_ENTRY r;
         logic is_end, ve0, ve1;
+        logic vgt0, vgt1;
         assign ve0 = r.slot[0].vld && (r.slot[0].off == raw_off[w]);
         assign ve1 = r.slot[1].vld && (r.slot[1].off == raw_off[w]);
+        assign vgt0= r.slot[0].in_ghr && r.slot[0].vld && (raw_off[w] > r.slot[0].off);
+        assign vgt1= r.slot[1].in_ghr && r.slot[1].vld && (raw_off[w] > r.slot[1].off);
 
         assign r = rrb_in_dat[rrb_prefix[w]];
         assign is_end = raw.is_end[w];
@@ -429,8 +432,32 @@ module align (
         assign btq_wr_cand.hit         [w] = r.hit;
         assign btq_wr_cand.hit_slot    [w] = ve0 || ve1;
         assign btq_wr_cand.slot_idx    [w] = ve1;
-        assign btq_wr_cand.hash        [w] = '0; // FIXME
-        assign btq_wr_cand.ghr_base    [w] = '0; // FIXME
+        assign btq_wr_cand.hash        [w] = r.hash; // FIXME
+        // assign btq_wr_cand.ghr_base    [w] = r.ghr_base_n1 - (2'(vgt0) + 2'(vgt1)); // FIXME
+        assign btq_wr_cand.ghr_base    [w] = r.ghr_base_n1 - (vgt0 + vgt1); // FIXME
+
+        // i, i-1, i-2
+        // 0,  1,  2
+
+        // vld0, gt0, vld1,  gt1   -> 2
+        // vld0, gt0, vld1, !gt1   -> 1
+        // vld0, gt0, !vld1, gt1   -> 1
+        // vld0, gt0, !vld1, !gt1  -> 1
+
+        // vld0, !gt0, vld1,  gt1  -> 0 // impossible
+        // vld0, !gt0, vld1, !gt1  -> 0
+        // vld0, !gt0,!vld1, gt1   -> 0
+        // vld0, !gt0,!vld1, !gt1  -> 0
+
+        // !vld0, gt0, vld1,  gt1  -> 1
+        // !vld0, gt0, vld1, !gt1  -> 0
+        // !vld0, gt0,!vld1, gt1   -> 0
+        // !vld0, gt0,!vld1, !gt1  -> 0
+
+        // !vld0,!gt0, vld1,  gt1  -> 1
+        // !vld0,!gt0, vld1, !gt1  -> 0
+        // !vld0,!gt0,!vld1, gt1   -> 0
+        // !vld0,!gt0,!vld1, !gt1  -> 0
 
 `ifdef FORMAL
         assign uftb_md[w] = '{
@@ -553,6 +580,24 @@ module align (
 
 `ifdef DEBUG
     task print_align;
+        // $display("ghr_base_n1: [%d, %d]", rrb_in_dat[0].ghr_base_n1, rrb_in_dat[1].ghr_base_n1);
+        // for (int w = 0; w < NUM_W; ++w) begin
+        //     FTQ_ENTRY r;
+        //     logic vgt0, vgt1;
+
+        //     r = rrb_in_dat[rrb_prefix[w]];
+        //     vgt0= r.slot[0].in_ghr && r.slot[0].vld && (raw_off[w] > r.slot[0].off);
+        //     vgt1= r.slot[1].in_ghr && r.slot[1].vld && (raw_off[w] > r.slot[1].off);
+
+        //     $display("base: %d, vgt: [%b %b], ma: %d",
+        //         r.ghr_base_n1,
+        //         vgt0,
+        //         vgt1,
+        //         r.ghr_base_n1 - (2'(vgt0) + 2'(vgt1))
+        //     );
+
+        // end
+
         $display("fyooooo. iss_any: %b, iss_idx: %d, raw.fmsk: %b, wal.fmsk: %b, req: %b", iss_any, iss_idx, raw.fmsk, wal.fmsk, ctl.req);
 
         $display("rrb_prefix: %b, wal.indw_last: %b", rrb_prefix, wal.indw_last);
