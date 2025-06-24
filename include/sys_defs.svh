@@ -139,6 +139,7 @@ typedef `IDX_TYPE(PHYS_REG_SZ_R10K) PHYS_REG_IDX;
 typedef `IDX_TYPE(BTQ_SZ) BTQ_IDX;
 typedef `IDX_TYPE(ROB_SZ) ROB_IDX;
 typedef `IDX_TYPE(LSQ_SZ) LSQ_IDX;
+typedef `IDX_TYPE(GHR_BUF_SZ) GHR_IDX;
 
 // superscalar-width convenience types
 typedef `CNT_TYPE(N) N_CNT;
@@ -390,6 +391,9 @@ typedef struct packed {
 `ifdef PC_GEN_TEST_MODE
     int id;
 `endif
+    // logic[GHR_LEN-1:0] hash;
+    // GHR_IDX [1:0] ghr_base;
+
     WADDR       base_n;     // base address of *next* FB
 
     logic       ft;         // fallthrough? else took a branch
@@ -461,24 +465,20 @@ typedef struct packed {
     logic   [N-1:0]     hit_slot;
     logic   [N-1:0]     slot_idx;
     logic   [N-1:0][GHR_LEN-1:0] hash; // gshare hash index
-    logic   [N-1:0][`IDX_SIZE(GHR_BUF_SZ)-1:0] ghr_base;
+    GHR_IDX [N-1:0]     ghr_base;
 } fetch2btq;
 
 typedef struct packed {
     `CNT_TYPE(N)    wen_cnt;
-    IF_ID_PKT    [N-1:0]    dat;
+    IF_ID_PKT   [N-1:0] dat;
 } fetch2decode;
-
-typedef struct packed {
-    logic       en;
-    BPU_UPD_PKT dat;
-} puq2fetch;
 
 typedef struct packed {
     `CNT_TYPE(N)    rdy_scnt;
     BTQ_IDX [N-1:0] btq_idxs_n;
 
-    puq2fetch       bp_upd;
+    logic       bpu_uen;
+    BPU_UPD_PKT bpu_udat;
 } btq2fetch;
 
 typedef struct packed {
@@ -487,7 +487,8 @@ typedef struct packed {
     logic [NUM_FU_BRU-1:0] pred;
     WADDR [NUM_FU_BRU-1:0] pred_tgt;
     logic [NUM_FU_BRU-1:0][3:0] pc_off;
-    logic [NUM_FU_BRU-1:0][`IDX_SIZE(GHR_BUF_SZ)-1:0] ghr_base;
+    logic   [NUM_FU_BRU-1:0]ghr_vld;
+    GHR_IDX [NUM_FU_BRU-1:0]ghr_base;
 } btq2execute;
 
 // ================
@@ -855,16 +856,7 @@ typedef struct packed {
 
 typedef struct packed {
     // for reading
-    BTQ_IDX [NUM_FU_BRU-1:0] btq_idx;
-
-    struct packed {
-        logic   en;
-        // BTQ-specific completion stuff
-        BTQ_IDX btq_idx; 
-            // Entries to which we are completing
-        logic   take;
-        WADDR   tgt;
-    } [NUM_FU_BRU-1:0] dat;
+    BTQ_IDX [NUM_FU_BRU-1:0] btq_ridx;
 } execute2btq;
 
 `define BY_FU(type) \
@@ -900,16 +892,24 @@ typedef struct packed {
 
 // branch completion bus
 typedef struct packed {
+    // resolution
     logic   [NUM_FU_BRU-1:0] en;
-    
-    // BTQ-specific completion stuff
-    struct packed {
-        BTQ_IDX btq_idx; 
-            // Entries to which we are completing
-        logic   take;
-        WADDR   tgt;
-        logic   [`IDX_SIZE(GHR_BUF_SZ)-1:0] ghr_base;
-    } [NUM_FU_BRU-1:0] dat;
+    logic   [NUM_FU_BRU-1:0] take;
+    WADDR   [NUM_FU_BRU-1:0] tgt;
+    BTQ_IDX [NUM_FU_BRU-1:0] btq_idx;
+    logic   [NUM_FU_BRU-1:0] ghr_vld;   // was the branch shifted into the GHR at all?
+    GHR_IDX [NUM_FU_BRU-1:0] ghr_base;
+
+    BMASK       clmsk; // OR of all b1hots of resolving branches
+
+    // misprediction
+    logic       flush;
+    WADDR       flush_fb_base;
+    logic[3:0]  flush_pc_off;
+        /* Invariants:
+        - if flush is high, only en[0] should be high (by convention, we shall
+        store the metadata of the mispredicted branch in index 0 of the above arrays)
+        - the number of set bits in clmsk should equal the number of set bits in en */
 } execute2complete_bru;
 
 

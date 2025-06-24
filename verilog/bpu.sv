@@ -47,7 +47,7 @@ module bpu (
         logic [NUM_BR_SLOTS-1:0]f_pred;
         `CNT_TYPE(NUM_BR_SLOTS) f_rdy_scnt;
 
-        logic [NUM_BR_SLOTS-1:0][`IDX_SIZE(GHR_BUF_SZ)-1:0] f_base;
+        GHR_IDX [NUM_BR_SLOTS-1:0]  f_base;
         logic [NUM_BR_SLOTS-1:0][GHR_LEN-1:0] f_ghr;
     } ghr_io;
 

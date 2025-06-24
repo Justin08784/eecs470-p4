@@ -21,11 +21,11 @@ typedef struct packed {
         in the FTB. */
     FTB_MD1 md;
 
-    logic   [N-1:0]         hit;        // hit an entry with base in FTB?
-    logic   [N-1:0]         hit_slot;   // hit a slot in entry? (valid only if hit)
-    logic   [N-1:0]         slot_idx;   // hit a slot in entry? (valid only if hit)
+    logic   hit;        // hit an entry with base in FTB?
+    logic   hit_slot;   // hit a slot in entry? (valid only if hit)
+    logic   slot_idx;   // hit a slot in entry? (valid only if hit)
     logic   [GHR_LEN-1:0]   hash;       // gshare hash index
-    logic   [N-1:0][`IDX_SIZE(GHR_BUF_SZ)-1:0] ghr_base;
+    GHR_IDX ghr_base;
 } BTQ_ENTRY;
 
 
@@ -177,18 +177,19 @@ module btq #(
             puq_enq_flt[nret_prefix_cnt[i]] = puq_enq_raw[i];
 
         // handle fetch (outs)
-        f_out.bp_upd.en     = !puq_empty;
-        f_out.btq_idxs_n    = f_idxs_n;
+        f_out.bpu_uen   = !puq_empty;
+        f_out.btq_idxs_n= f_idxs_n;
 
         // handle reads (execute)
         for (int i = 0; i < NUM_FU_BRU; ++i) begin
-            int idx;
-            idx = ex_in.btq_idx[i];
-            ex_out.is_tail[i]  = state[idx].is_tail;
-            ex_out.pred[i]     = state[idx].take;
-            ex_out.pred_tgt[i] = state[idx].tgt;
-            ex_out.pc_off[i]   = state[idx].off;
-            ex_out.ghr_base[i] = state[idx].ghr_base;
+            BTQ_ENTRY cur;
+            cur = state[ex_in.btq_ridx[i]];
+            ex_out.is_tail  [i] = cur.is_tail;
+            ex_out.pred     [i] = cur.take;
+            ex_out.pred_tgt [i] = cur.tgt;
+            ex_out.pc_off   [i] = cur.off;
+            ex_out.ghr_vld  [i] = cur.hit && cur.hit_slot;
+            ex_out.ghr_base [i] = cur.ghr_base;
         end
     end
 
@@ -213,8 +214,8 @@ module btq #(
 
         .wr_en_cnt  (nret_prefix_cnt[rd_en_cnt]),
         .wr_data    (puq_enq_flt),
-        .rd_en_cnt  (f_out.bp_upd.en),
-        .rd_data    (f_out.bp_upd.dat),
+        .rd_en_cnt  (f_out.bpu_uen),
+        .rd_data    (f_out.bpu_udat),
         .free_scnt  (puq_rdy_scnt),
         .used_scnt  (),
         .empty      (puq_empty)
@@ -231,13 +232,13 @@ module btq #(
 
             // handle complete (ins)
             for (int i = 0, int idx = 0; i < NUM_CPORTS; ++i) begin
-                idx = cbru_in.dat[i].btq_idx;
+                idx = cbru_in.btq_idx[i];
                 if (!cbru_in.en[i])
                     continue;
 
                 state[idx].rslv <= 1;
-                state[idx].tgt  <= cbru_in.dat[i].tgt;
-                state[idx].take <= cbru_in.dat[i].take;
+                state[idx].tgt  <= cbru_in.tgt[i];
+                state[idx].take <= cbru_in.take[i];
 `ifdef DEBUG
                 state[idx].b1hot<= '0;
 `endif
@@ -333,12 +334,13 @@ module btq #(
         end
 
         for (int i = 0; i < NUM_FU_BRU; ++i) begin
-            $display("cbru_in[%0d]: en: %b, btq_idx: %d, take: %b, tgt: %x",
+            $display("cbru_in[%0d]: en: %b, btq_idx: %d, take: %b, tgt: %x, ghr_vld: %b",
                 i,
                 cbru_in.en[i],
-                cbru_in.dat[i].btq_idx,
-                cbru_in.dat[i].take,
-                cbru_in.dat[i].tgt
+                cbru_in.btq_idx[i],
+                cbru_in.take[i],
+                cbru_in.tgt[i],
+                cbru_in.ghr_vld[i]
             );
         end
 

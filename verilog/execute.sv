@@ -63,17 +63,13 @@ endmodule // alu
 
 
 module alu_ex(
-    input clock,
-    input reset,
-    input flush,
-
     /* FRONTEND */
-    logic [NUM_FU_ALU-1:0]             i_vld,
-    input  ALU_REGS [NUM_FU_ALU-1:0]   i_regs,
+    input   logic [NUM_FU_ALU-1:0]      i_vld,
+    input   ALU_REGS [NUM_FU_ALU-1:0]   i_regs,
         // insn metadata/operands
 
     /* BACKEND */
-    output CPL_CAND [NUM_FU_ALU-1:0]   o_cands
+    output CPL_CAND [NUM_FU_ALU-1:0]    o_cands
 );
     // execute
     generate
@@ -196,108 +192,101 @@ module bru (
 endmodule // bru
 
 module bru_ex(
-    input clock,
-    input reset,
-    output logic flush,
-    output WADDR flush_fb_base,
-    output logic [3:0] flush_pc_off,
-    output BMASK clmsk,
-
-
     /* FRONTEND */
-    input  logic [NUM_FU_BRU-1:0]      i_vld,
-    input  btq2execute                  btq_in,
-    input  BRU_REGS [NUM_FU_BRU-1:0]   i_regs,
+    input  logic        i_vld,
+    input  BRU_REGS     i_reg,
+    input  btq2execute  btq_in,
         // insn metadata/operands
 
     /* BACKEND */
-    output execute2complete_bru         cbru_out,
-    output CPL_CAND [NUM_FU_BRU-1:0]   o_cands
+    output execute2complete_bru cbru_out,
+    output CPL_CAND             o_cand
 );
     initial begin
         assert (NUM_FU_BRU == 1) else $fatal("bru_ex: assumes 1 BRU");
     end
 
-    ADDR    [NUM_FU_BRU-1:0] pc_addrs, npc_addrs;
-    DATA    [NUM_FU_BRU-1:0] opa, opb;
-    always_comb begin
-        foreach(opa[i]) begin
-            pc_addrs[i]     = w2addr(i_regs[i].PC);
-            npc_addrs[i]    = w2addr(i_regs[i].PC + `UCAST_FIT(1));
-            // BRU opA mux
-            case (i_regs[i].opa_select)
-                OPA_IS_PC:   opa[i] = pc_addrs[i];
-                OPA_IS_RS1:  opa[i] = i_regs[i].rs1;
-                default:     opa[i] = 32'hdeadface; // dead face
-            endcase
+    ADDR pc_addr, npc_addr;
+    assign pc_addr  = w2addr(i_reg.PC);
+    assign npc_addr = w2addr(i_reg.PC + `UCAST_FIT(1));
 
-            // BRU opB mux
-            opb[i] = i_regs[i].opb_is_rs2
-                ? i_regs[i].rs2
-                : i_regs[i].imm32b;
-        end
+    DATA opa, opb;
+    always_comb begin
+        // BRU opA mux
+        case (i_reg.opa_select)
+            OPA_IS_PC:  opa = pc_addr;
+            OPA_IS_RS1: opa = i_reg.rs1;
+            default:    opa = 32'hdeadface; // dead face
+        endcase
+
+        // BRU opB mux
+        opb = i_reg.opb_is_rs2
+            ? i_reg.rs2
+            : i_reg.imm32b;
     end
 
     // execute
-    generate
-        DATA        [NUM_FU_BRU-1:0] tmp_res;
-        logic       [NUM_FU_BRU-1:0] cond_take, tmp_take;
-        for (genvar i = 0; i < NUM_FU_BRU; ++i) begin : gen_brus
-            bru bru_0 ( 
-                // Inputs
-                .opa        (opa[i]),
-                .opb        (opb[i]),
-                .rs1        (i_regs[i].rs1),
-                .rs2        (i_regs[i].rs2),
-                .branch_func(i_regs[i].func),
+    DATA    tmp_res;
+    logic   cond_take, tmp_take;
+    bru bru_0 ( 
+        // Inputs
+        .opa        (opa),
+        .opb        (opb),
+        .rs1        (i_reg.rs1),
+        .rs2        (i_reg.rs2),
+        .branch_func(i_reg.func),
 
-                // Output (directly to cdat_out)
-                .take       (cond_take[i]),
-                .result     (tmp_res[i])
-            );
+        // Output (directly to cdat_out)
+        .take       (cond_take),
+        .result     (tmp_res)
+    );
 
-            assign tmp_take[i] = !i_regs[i].cond_branch || cond_take[i];
+    assign tmp_take = !i_reg.cond_branch || cond_take;
 
-            assign o_cands[i] = '{
-                vld     : i_vld[i],
-                t       : i_regs[i].t,
-                rob_idx : i_regs[i].rob_idx,
-                data    : tmp_take[i] ? npc_addrs[i] : tmp_res[i]
-            };
+    assign o_cand = '{
+        vld     : i_vld,
+        t       : i_reg.t,
+        rob_idx : i_reg.rob_idx,
+        data    : tmp_take ? npc_addr : tmp_res
+    };
 
-            assign cbru_out.en[i]  = i_vld[i];
-            assign cbru_out.dat[i] = '{
-                btq_idx : i_regs[i].btq_idx,
-                take    : tmp_take[i],
-                ghr_base: btq_in.ghr_base[i],
-                tgt     : addr2w(tmp_res[i])
-            };
 
-        end
-    endgenerate
+    logic mispred;
+    WADDR flush_fb_base;
+    logic [3:0] flush_pc_off;
+    BMASK clmsk;
+    assign cbru_out = '{
+        en      : i_vld,
+        take    : tmp_take,
+        tgt     : addr2w(tmp_res),
+        btq_idx : i_reg.btq_idx,
+        ghr_vld : btq_in.ghr_vld,
+        ghr_base: btq_in.ghr_base,
 
-    logic flush_n;
-    WADDR flush_fb_base_n;
-    logic [3:0] flush_pc_off_n;
-    BMASK clmsk_n;
+        clmsk   : i_vld ? i_reg.b1hot : '0,
+        flush           : i_vld & mispred,
+        flush_fb_base   : flush_fb_base,
+        flush_pc_off    : flush_pc_off
+    };
+
+
     always_comb begin
-        logic mispred;
-
         logic pred;
         logic take;
         logic corr_tgt;
         WADDR npc;
         WADDR tgt;
 
-        mispred         = 0;
-        flush_fb_base_n = '0;
-        flush_pc_off_n  = '0;
+        pred     = btq_in.pred;
+        take     = cbru_out.take;
+        corr_tgt = btq_in.pred_tgt == cbru_out.tgt;
+        npc      = i_reg.PC + `UCAST_FIT(1);
+        tgt      = cbru_out.tgt;
 
-        pred     = btq_in.pred[0];
-        take     = cbru_out.dat[0].take;
-        corr_tgt = btq_in.pred_tgt[0] == cbru_out.dat[0].tgt;
-        npc      = i_regs[0].PC + `UCAST_FIT(1);
-        tgt      = cbru_out.dat[0].tgt;
+        mispred = 0;
+        flush_fb_base   = '0;
+        flush_pc_off    = '0;
+
 
         unique casez ({pred, take, corr_tgt})
         3'b010,
@@ -305,49 +294,30 @@ module bru_ex(
         3'b110: begin
             mispred = 1;
 
-            flush_fb_base_n = tgt;
-            flush_pc_off_n  = '0;
+            flush_fb_base   = tgt;
+            flush_pc_off    = '0;
         end
 
         3'b100,
         3'b101: begin
             mispred = 1;
 
-            if (&btq_in.pc_off[0]   // i.e. btq_in.pc_off == 15. npc would be in next fetch block
-                || btq_in.is_tail[0]
+            if (&btq_in.pc_off  // i.e. btq_in.pc_off == 15. npc would be in next fetch block
+            || btq_in.is_tail
             ) begin
-                flush_pc_off_n  = '0;
-                flush_fb_base_n = npc;
+                flush_pc_off    = '0;
+                flush_fb_base   = npc;
 
             end else begin
-                flush_fb_base_n = i_regs[0].PC - btq_in.pc_off[0];
-                flush_pc_off_n  = btq_in.pc_off[0] + `UCAST_FIT(1);
+                flush_fb_base   = i_reg.PC - btq_in.pc_off;
+                flush_pc_off    = btq_in.pc_off + `UCAST_FIT(1);
 
             end
         end
 
         default:;
+
         endcase
-
-        clmsk_n = i_vld[0] ? i_regs[0].b1hot : '0;
-        flush_n = i_vld[0] && mispred;
-    end
-
-
-    always_ff @(posedge clock) begin
-        if (reset) begin
-            clmsk           <= '0;
-            flush           <= '0;
-            flush_pc_off    <= flush_pc_off_n;
-            flush_fb_base   <= flush_fb_base_n;
-        end else begin
-/* ======================================== */
-            clmsk           <= clmsk_n;
-            flush           <= flush_n;
-            flush_pc_off    <= flush_pc_off_n;
-            flush_fb_base   <= flush_fb_base_n;
-/* ======================================== */
-        end
     end
 
 endmodule
@@ -714,7 +684,7 @@ module stage_ex_p4 (
                 default:      imm32b = 32'hfacefeed; // face feed
             endcase
 
-            btq_out_n.btq_idx[i] = iss.o_dat.bru[i].btq_idx;
+            btq_out_n.btq_ridx[i] = iss.o_dat.bru[i].btq_idx;
 
             regs.i_dat.bru[i] = '{
                 bytag : iss.o_dat.bru[i].bytag,
@@ -905,10 +875,6 @@ module stage_ex_p4 (
     // Includes operand decode/CDB bypass just before 1st cycle of execution.
 
     alu_ex alu_ex0 (
-        .clock  (clock),
-        .reset  (reset),
-        .flush  (flush),
-
         .i_vld  (regs.o_vld.alu),
         .i_regs (regs.o_dat.alu),
 
@@ -919,9 +885,9 @@ module stage_ex_p4 (
     PHYS_REG_IDX [NUM_FU_TOTAL-1:0] ctag_ts_flat;
 
     mul_ex mul_ex0 (
-        .clock  (clock),
-        .reset  (reset),
-        .flush  (flush),
+        .clock,
+        .reset,
+        .flush,
         .clmsk,
 
         .i_vld  (regs.o_vld.mul),
@@ -938,22 +904,17 @@ module stage_ex_p4 (
 
     execute2complete_bru cbru_out_n;
     bru_ex bru_ex0 (
-        .clock  (clock),
-        .reset  (reset),
-    // == >>>> == //
-        .flush  (flush),
-        .flush_fb_base,
-        .flush_pc_off,
-        .clmsk,
-    // == <<<< == //
-
         .i_vld  (regs.o_vld.bru),
+        .i_reg  (regs.o_dat.bru),
         .btq_in (btq_in),
-        .i_regs (regs.o_dat.bru),
 
-        .cbru_out(cbru_out_n),
-        .o_cands(cands.bru)
+        .cbru_out   (cbru_out_n),
+        .o_cand (cands.bru)
     );
+    assign flush = cbru_out.flush;
+    assign clmsk = cbru_out.clmsk;
+    assign flush_fb_base= cbru_out.flush_fb_base;
+    assign flush_pc_off = cbru_out.flush_pc_off;
 
     /* >> ======== STAGE 4/?: CDB data/tag broadcast ======== >> */
     // Tag broadcast occurs with CDB arbitration
@@ -1015,6 +976,12 @@ module stage_ex_p4 (
             cbru_out <= cbru_out_n;
             btq_out  <= btq_out_n;
 
+        end
+    end
+
+`ifdef FORMAL
+    always_ff @(posedge clock) begin
+        if (!reset) begin
             if (ctag_out.en[0] && ctag_out.en[1]
                 && ctag_out.ts[0] == ctag_out.ts[1]
                 && ctag_out.ts[0] != '0) begin
@@ -1027,6 +994,7 @@ module stage_ex_p4 (
             end
         end
     end
+`endif
 
 
 `ifdef DEBUG
@@ -1087,7 +1055,7 @@ module stage_ex_p4 (
             btq_in.pred,
             btq_in.pred_tgt
         );
-        $display("i_regs: %b", bru_ex0.i_regs);
+        $display("i_reg: %b", bru_ex0.i_reg);
         // $display("bytag: %b, b1hot: %b, rs1: %d, rs2: %d, PC: %x");
         // $display("opa_sel: %2d, opb_is_rs2: %b, imm32b: %d, cond_branch: %b");
         // $display("func: %d, t: %2d, rob_idx: %2d, btq_idx");

@@ -33,6 +33,7 @@ import "DPI-C" function string decode_inst(int inst);
 
 parameter int TB_MAX_CYCLES = 50000000;
 // parameter int TB_MAX_CYCLES = 500;
+// parameter int TB_MAX_CYCLES = 200;
 // parameter int TB_MAX_CYCLES = 160100;
 
 
@@ -572,6 +573,8 @@ module testbench;
         // verisimpleV.fetch0.print_fetch();
         // verisimpleV.fetch0.ftq0.print_ftq();
         verisimpleV.fetch0.align0.print_align();
+        verisimpleV.fetch0.bpu0.uftb0.print_uftb;
+        // verisimpleV.fetch0.bpu0.ghr0.print_ghr;
 
     endtask
 

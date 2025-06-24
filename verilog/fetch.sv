@@ -395,7 +395,7 @@ module align (
         logic   [NUM_W-1:0]        hit_slot;
         logic   [NUM_W-1:0]        slot_idx;
         logic   [NUM_W-1:0][GHR_LEN-1:0] hash; // gshare hash index
-        logic   [NUM_W-1:0][`IDX_SIZE(GHR_BUF_SZ)-1:0] ghr_base;
+        GHR_IDX [NUM_W-1:0] ghr_base;
     } btq_wr_cand, btq_wr_comp;
 
     for (genvar w = 0; w < NUM_W; ++w) begin
@@ -578,8 +578,8 @@ module dcf (
         .clmsk,
         .cbru_in,
 
-        .i_uen      (btq_in.bp_upd.en),
-        .i_udat     (btq_in.bp_upd.dat),
+        .i_uen      (btq_in.bpu_uen),
+        .i_udat     (btq_in.bpu_udat),
 
         .i_ftq_rdy  (ftq2bpu.rdy),
         .o_ftq_en   (bpu2ftq.en),
