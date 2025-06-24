@@ -237,9 +237,8 @@ module ghr #(
         // foreach(sva.nres[i])
         //     $display("  nres[%2d]: %2d", i, sva.nres[i]);
 
-        $display("got: ghr: [%b, %b], hist: %b, rslv: %b, base: %2d (f_rdy_scnt: %2d)",
-            rghr[0],
-            rghr[1],
+        $display("got: ghr: %b, hist: %b, rslv: %b, base: %2d (f_rdy_scnt: %2d)",
+            rghr,
             hist,
             rslv,
             base,

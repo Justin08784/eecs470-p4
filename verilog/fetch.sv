@@ -153,7 +153,7 @@ module irq #(
             wr_idxs_n[2]
         );
         for (int i = 0; i < IRQ_SZ; ++i)
-            $display("irq[%d]: cpl: %b, dw: %d, off: [%d, %d], fmsk: %b, is_end: %b, blk: [%x, %x]",
+            $display("irq[%d]: cpl: %b, dw: %d, off: [%d, %d], fmsk: %b, is_end: %b, blk: [%x, %x], md: [%b, %b]",
                 i,
                 cpl[i],
                 state[i].dw,
@@ -162,7 +162,9 @@ module irq #(
                 state[i].fmsk,
                 state[i].is_end,
                 state[i].blk.word_level[0],
-                state[i].blk.word_level[1]
+                state[i].blk.word_level[1],
+                state[i].md[0],
+                state[i].md[1]
             );
     endtask
 `endif
@@ -173,6 +175,10 @@ endmodule
 
 // combinational align
 module align (
+`ifdef FORMAL
+    input   clock,
+    input   reset,
+`endif
     // read (re-read buffer)
     // input   `CNT_TYPE(2)    rrb_in_vld_scnt, // do we even need this?
     input   FTQ_ENTRY[1:0]  rrb_in_dat,
@@ -381,6 +387,9 @@ module align (
     assign rrb_prefix = (rrb_prefix | (raw.fmsk & raw.is_end)) << 1;
 
     generate
+`ifdef FORMAL
+    BRANCH_MD [NUM_W-1:0] uftb_md;
+`endif
     struct packed {
         logic   [NUM_W-1:0]        is_tail;
         WADDR   [NUM_W-1:0]        PC;
@@ -422,6 +431,16 @@ module align (
         assign btq_wr_cand.slot_idx    [w] = ve1;
         assign btq_wr_cand.hash        [w] = '0; // FIXME
         assign btq_wr_cand.ghr_base    [w] = '0; // FIXME
+
+`ifdef FORMAL
+        assign uftb_md[w] = '{
+            brch:   r.hit & (ve0 | ve1), // uftb only identifies slot-occupying branches as branches
+            cond:   ve0 | (ve1 & r.md.cond),
+            call:   r.md.call,
+            ret :   r.md.ret,
+            jalr:   r.md.jalr
+        };
+`endif
     end
     endgenerate
 
@@ -460,6 +479,76 @@ module align (
     assign btq_out.hash     [N-1:0] = btq_wr_comp.hash      [N-1:0]; // FIXME
     assign btq_out.ghr_base [N-1:0] = btq_wr_comp.ghr_base  [N-1:0]; // FIXME
     endgenerate
+
+`ifdef FORMAL
+    /* uftb_no_false_positive:
+    - 1. if not fetching, don't care
+    - 2. if icache predecode asserts "is not branch", then uftb must not assert "is branch"
+    - 2. if both icache predecode and uftb asserts "is branch", then all the branch metadata
+    fields should match exactly
+
+    We expect this property to hold because the uftb does not skimp bits on its tag. However,
+    if we DO skimp bits, then some non-branch insns may be misidentified as branches,
+    and potentially cause the ghr to halt (BPU would shift predictions for non-branches
+    into the GHR, and they would never be resolved because non-branches do not get
+    allocated to the BTQ).
+    */
+    logic [NUM_W-1:0] uftb_no_false_positive;
+    always_comb begin
+        for (int w = 0; w < NUM_W; ++w) begin
+            logic vld;
+            vld = raw.irq_vld[w] & raw.fmsk[w];
+
+            if (~vld)
+                uftb_no_false_positive[w] = 1;
+            else if (vld & ~raw_md[w].brch)
+                uftb_no_false_positive[w] = ~uftb_md[w].brch;
+            else if (vld & raw_md[w].brch & ~uftb_md[w].brch)
+                uftb_no_false_positive[w] = 1;
+            else if (vld & raw_md[w].brch & uftb_md[w].brch) begin
+                uftb_no_false_positive[w] =
+                    (raw_md[w].cond == uftb_md[w].cond)
+                &   (
+                        (~raw_md[w].cond)
+                    |   (
+                            (raw_md[w].call == uftb_md[w].call)
+                        &   (raw_md[w].ret  == uftb_md[w].ret)
+                        &   (raw_md[w].jalr == uftb_md[w].jalr)
+                        )
+                    );
+            end
+        end
+    end
+
+    task error_uftb_no_false_positive;
+        $display("uftb_no_false_positive: %b", uftb_no_false_positive);
+        for (int w = 0; w < NUM_W; ++w)
+            $display("fmsk: %b, raw_pc: %d, aw: {brch: %b, cond: %b, call: %b, ret: %b, jalr: %b} uftb_md: {brch: %b, cond: %b, call: %b, ret: %b, jalr: %b}",
+                raw.fmsk[w],
+                raw_pc[w],
+                raw_md[w].brch,
+                raw_md[w].cond,
+                raw_md[w].call,
+                raw_md[w].ret,
+                raw_md[w].jalr,
+
+                uftb_md[w].brch,
+                uftb_md[w].cond,
+                uftb_md[w].call,
+                uftb_md[w].ret,
+                uftb_md[w].jalr
+            );
+    endtask
+
+    property p_uftb_no_false_positive;
+        @(posedge clock)
+            disable iff (reset)
+            &uftb_no_false_positive;
+    endproperty
+
+    Uftb_No_False_Positive: assert property(p_uftb_no_false_positive)
+        else error_uftb_no_false_positive();
+`endif
 
 
 `ifdef DEBUG
@@ -674,8 +763,8 @@ module dcf (
     endgenerate
 
     ICACHE_RESPONSE[1:0]irq2align_dat;
-    `CNT_TYPE(2)        irq2align_vld_scnt;
-    `CNT_TYPE(2)        align2irq_ren_cnt;
+    `CNT_TYPE(2)    irq2align_vld_scnt;
+    `CNT_TYPE(2)    align2irq_ren_cnt;
 
     irq irq0 (
         .clock,
@@ -726,11 +815,15 @@ module dcf (
         .used_scnt  ()
     );
 
-    IF_ID_PKT[3:0]   align2ibuf_dat;
-    `CNT_TYPE(4)        align2ibuf_wen_cnt;
-    `CNT_TYPE(4)        ibuf2align_rdy_scnt;
+    IF_ID_PKT[3:0]  align2ibuf_dat;
+    `CNT_TYPE(4)    align2ibuf_wen_cnt;
+    `CNT_TYPE(4)    ibuf2align_rdy_scnt;
 
     align align0 (
+`ifdef FORMAL
+        .clock,
+        .reset,
+`endif
         .rrb_in_dat     (rrb2align_dat),
         .rrb_out_ren_cnt(align2rrb_ren_cnt),
 
