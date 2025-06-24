@@ -87,35 +87,34 @@ module gshare (
     input   reset,
 
     // puq updates
-    input   puq2fetch i_upd,
+    input   logic       i_uen,
+    input   BPU_UPD_PKT i_udat,
 
     // fetch
     input   logic [GHR_LEN-1:0] i_ghr,
     input   WADDR   i_qry, // fetch block base
-    output  logic   o_hash,
+    output  logic [GHR_LEN-1:0] o_hash,
     output  logic [NUM_BR_SLOTS-1:0] o_pred
 );
     localparam PHT_SZ = 1 << GHR_LEN;
     // logic [1:0] pht [PHT_SZ-1:0]; // ram inference?
     SC_STATE [PHT_SZ-1:0][NUM_BR_SLOTS-1:0] pht;
     SC_STATE [NUM_BR_SLOTS-1:0] rrec, urec; // read, update records
-    BPU_UPD_PKT upd;
 
     assign o_hash = i_ghr ^ i_qry[GHR_LEN-1:0];
     assign rrec = pht[o_hash];
     assign o_pred[0] = query_sc(rrec[0]);
     assign o_pred[1] = query_sc(rrec[1]);
 
-    assign upd  = i_upd.dat;
-    assign urec = pht[upd.hash];
+    assign urec = pht[i_udat.hash];
 
     always_ff @(posedge clock) begin
         if (reset)
             for (int i = 0; i < PHT_SZ; ++i)
                 pht[i] <= {WT, WT};
-        else if (i_upd.en && upd.en_dir_update && upd.md.cond) begin // train only on conditional branches!
-            pht[upd.hash][0] <= upd.slot_idx ? urec[0] : update_sc(urec[0], upd.take);
-            pht[upd.hash][1] <= upd.slot_idx ? update_sc(urec[1], upd.take) : urec[1];
+        else if (i_uen && i_udat.en_dir_update && i_udat.md.cond) begin // train only on conditional branches!
+            pht[i_udat.hash][0] <= i_udat.slot_idx ? urec[0] : update_sc(urec[0], i_udat.take);
+            pht[i_udat.hash][1] <= i_udat.slot_idx ? update_sc(urec[1], i_udat.take) : urec[1];
         end
     end
 
@@ -128,7 +127,7 @@ module gshare (
             o_pred[0],
             o_pred[1]
         );
-        $display("upd: {en: %b, hash: %b, take: %b}", i_upd.en, upd.hash, upd.take);
+        $display("upd: {en: %b, hash: %b, take: %b}", i_uen, i_udat.hash, i_udat.take);
         $display("<< gshare");
     endtask
 
