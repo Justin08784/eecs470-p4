@@ -272,6 +272,7 @@ synth/victim.vg: $(VICTIM_FILES)
 
 CPU_HEADERS = include/sys_defs.svh \
 			include/ISA.svh \
+			include/debug.svh \
 			include/execute.svh
 
 # test/cpu_test.sv is implicit

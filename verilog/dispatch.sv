@@ -349,7 +349,7 @@ module dispatch #(parameter
         $display("rnme_snap_out.snap_en: %b", rnme_snap_out.snap_en);
         $display("rob_in.rdy_scnt: %d",  rob_in.rdy_scnt);
         $display("d_in.vld_scnt: %d",  d_in.vld_scnt);
-        $display("free_in.free_rdy_scnt: %d [%d, %d]",  free_in.free_rdy_scnt, free_in.ts[0], free_in.ts[1]);
+        $display("free_in.vld_scnt: %d [%d, %d]",  free_in.vld_scnt, free_in.ts[0], free_in.ts[1]);
 
         $display("");
         for (int i = 0; i < N+1; ++i) begin

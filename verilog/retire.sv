@@ -75,7 +75,7 @@ module retire (
     task print_retire;
         $display("  | >> retire >>");
 
-        $display("retire_exec.retire_en_cnt: %0d", retire_exec.retire_en_cnt);
+        $display("retire_exec.en_cnt: %0d", retire_exec.en_cnt);
         $display("  | << retire <<");
     endtask
 `endif

@@ -972,4 +972,8 @@ typedef struct packed{
     `BY_FU(DATA)    v2s;
 } prf2execute;
 
+`ifdef DEBUG
+`include "debug.svh"
+`endif
+
 `endif // __SYS_DEFS_SVH__

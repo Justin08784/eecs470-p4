@@ -475,7 +475,7 @@ module align (
         );
 
         $display("::f_wen_cnt: %d, %b", ibuf_out_wen_cnt, ibuf_out_wen_cnt);
-        $display("::btq_wen_cnt: %d", btq_out.en_cnt);
+        $display("::btq_wen_cnt: %d", btq_out.wen_cnt);
         $display("::rrb_ren_cnt: %d", rrb_out_ren_cnt);
         $display("::irq_ren_cnt %d", irq_out_ren_cnt);
         for (int i = 0; i < 4; ++i) begin

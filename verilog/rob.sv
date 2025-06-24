@@ -173,15 +173,15 @@ module rob #(
         $display("head: %2d, tail: %2d, used: %2d", head, tail, used);
         for (int i = 0; i < N; ++i) begin
             string name;
-            get_fu_name(r_out.entries[i].fu_idx, name);
+            get_fu_name(r_out.fu_idx[i], name);
             $display("r_out[%d]: tag: %d, t_old: %d, dst: %d, fu_idx: %s, halt: %d, illegal: %d",
                 i,
-                r_out.entries[i].tag,
-                r_out.entries[i].t_old,
-                r_out.entries[i].dst,
+                r_out.tag[i],
+                r_out.t_old[i],
+                r_out.dst[i],
                 name,
-                r_out.entries[i].halt,
-                r_out.entries[i].illegal
+                r_out.halt[i],
+                r_out.illegal[i]
             );
         end
 

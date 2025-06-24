@@ -3,7 +3,6 @@
 
 // TODO: add perf counters/types
 
-`ifdef DEBUG
 // OPTIONAL: Print our your data here
 // It will go to the $program.log file
 function print_ID_RENAME_PKT(input ID_RENAME_PKT x);
@@ -75,4 +74,4 @@ function automatic string dbg_mem_size(input MEM_SIZE size);
     return rv;
 endfunction;
 
-`endif
+`endif // DEBUG_SVH
