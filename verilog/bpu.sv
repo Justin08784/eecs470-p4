@@ -151,7 +151,7 @@ module bpu (
             
             slot        : '0, // filled below
             always_take : slot.always_take,
-            md          : (pred_idx == 0) ? COND_MD : e.md1.cond
+            md          : (pred_idx == 0) ? COND_MD : e.md1
         };
 
         for (int i = 0; i < NUM_BR_SLOTS; ++i) begin
