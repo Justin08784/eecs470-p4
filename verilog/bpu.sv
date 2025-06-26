@@ -139,7 +139,10 @@ module bpu (
             ghr_io.wen_cnt = 0;
         else
             ghr_io.wen_cnt = ghr_wvld_cnt;
-        ghr_io.wpred = pred;
+        ghr_io.wpred = pred >> !leq0;
+            /* FIXME: extremely hacky
+            When the current fb off is BEYOND the 1st branch slot, then
+            the first branch we can shift into the GHR is the 2nd branch slot. */
 
         pc_flt = pc_reg + `UCAST_LEN(
             (e.end_off == 4'd15)
@@ -234,7 +237,9 @@ module bpu (
         .wshf_out   (ghr_io.wshf_out),
         .base_n1    (ghr_io.base_n1),
 
-        .ridx       (i_udat.ghr_base),
+        .ridx       (i_udat.ghr_base + 1'b1),
+            /* FIXME: hacky fix. We want the history LEADING UP TO the branch––
+            should not include the branch itself!! */
         .rd_ghist   (ghr_io.rd_ghist)
     );
 
