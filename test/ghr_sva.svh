@@ -14,6 +14,7 @@ module ghr_sva #(
     type PTR = logic [$clog2(DEPTH)-1:0]
 ) (
     input   VEC hist,
+    input   logic [GHR_LEN-1:0] ghist,
     input   PTR base,
 
     input   clock,
@@ -26,12 +27,12 @@ module ghr_sva #(
 
     // fetch
     input   `CNT_TYPE(WPORTS)   wen_cnt,
-    input   logic [WPORTS-1:0]  wpred,
+    input   logic [WPORTS-1:0]  wshf_in,
     input   PTR     base_n1,
 
     // retire
     input   PTR     ridx,
-    input   logic [GHR_LEN-1:0] ghist
+    input   logic [GHR_LEN-1:0] rd_ghist
 );
     typedef struct packed {
         VEC hist;
@@ -42,7 +43,7 @@ module ghr_sva #(
     GHR_STATE s, n;
     struct packed {
         PTR base_n1;
-        logic [GHR_LEN-1:0] ghist;
+        logic [GHR_LEN-1:0] rd_ghist;
     } sva_comb;
 
     always_ff @(posedge clock) begin
@@ -99,19 +100,20 @@ module ghr_sva #(
             n.hist[flush_idx] = flush_take;
 
         end else begin
+            n.base = s.base - wen_cnt;
             for (int i = 0; i < wen_cnt; ++i) begin
                 PTR idx;
                 idx = s.base - (i+1);
-                n.hist[idx] = wpred[i];
+                n.hist[idx] = wshf_in[i];
             end
-            n.base = s.base - wen_cnt;
         end
 
         return n;
     endfunction
 
         
-    PTR ghist_base;
+    logic ghist_eq;
+    PTR rd_ghist_base;
     initial begin
         // wait until 1st reset: ensures no Xs are floating around
         // (if there are Xs we get errors like indexing with Xs into assoc. arrays)
@@ -122,11 +124,20 @@ module ghr_sva #(
     forever begin
         n = ghr_step(s);
 
-        ghist_base = flush ? flush_idx : ridx;
+        rd_ghist_base = flush ? flush_idx : ridx;
         for (int i = 0; i < GHR_LEN; ++i) begin
             PTR idx;
-            idx = ghist_base + i;
-            sva_comb.ghist[i] = s.hist[idx];
+            idx = rd_ghist_base + i;
+            sva_comb.rd_ghist[i] = s.hist[idx];
+        end
+        if (flush)
+            sva_comb.rd_ghist[0] = flush_take;
+
+        ghist_eq = 1;
+        for (int i = 0; i < GHR_LEN; ++i) begin
+            PTR idx;
+            idx = base + i;
+            ghist_eq &= ghist[i] == hist[idx];
         end
 
         @(posedge clock);
@@ -189,7 +200,12 @@ module ghr_sva #(
 
         property ghist_correct;
             disable iff (reset)
-            ghist == sva_comb.ghist;
+            ghist_eq;
+        endproperty
+
+        property rd_ghist_correct;
+            disable iff (reset)
+            rd_ghist == sva_comb.rd_ghist;
         endproperty
 
         // property rslv_correct;
@@ -220,7 +236,9 @@ module ghr_sva #(
 
     // match_rdy: assert property(cb.rdy_correct)
     //     else exit_on_error;
-    match_rghr: assert property(cb.ghist_correct)
+    match_ghist: assert property(cb.ghist_correct)
+        else exit_on_error;
+    match_rd_ghist: assert property(cb.rd_ghist_correct)
         else exit_on_error;
     // match_rslv: assert property(cb.rslv_correct)
     //     else exit_on_error;

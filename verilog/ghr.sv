@@ -1,5 +1,32 @@
 `include "sys_defs.svh"
 
+
+// module fhr #(
+//     parameter GHR_LEN   = 80,
+//     parameter FH_LEN    = 10,
+
+//     parameter WPORTS    = NUM_BR_SLOTS
+// ) (
+//     input   clock,
+//     input   reset,
+
+//     // misprediction flush
+//     input           flush,
+//     input   logic   flush_take,
+//     input   PTR     flush_idx,
+//     input   logic [GHR_LEN-1:0] flush_ghist,
+
+//     // fetch
+//     input   `CNT_TYPE(WPORTS)   wen_cnt,
+//     input   logic [WPORTS-1:0]  wshf_out
+//     input   logic [WPORTS-1:0]  wshf_in
+// );
+//     logic [FH_LEN-1:0] fh;
+
+
+
+// endmodule
+
 /*
 TODO: The ghr must be sized large enough so that base does not write into the
 non-recoverable zone (NRZ). This invariant is what allows us to to eliminate the
@@ -30,7 +57,8 @@ module ghr #(
 
     // fetch
     input   `CNT_TYPE(WPORTS)   wen_cnt,
-    input   logic [WPORTS-1:0]  wpred,
+    input   logic [WPORTS-1:0]  wshf_in,
+    output  logic [WPORTS-1:0]  wshf_out,
     output  PTR     base_n1,
 
     // retire
@@ -38,7 +66,7 @@ module ghr #(
 
     // ghist slice (flush and retire use the same rotator; flush takes precedence)
     // FIXME: must stall retire during flush
-    output  logic [GHR_LEN-1:0] ghist
+    output  logic [GHR_LEN-1:0] rd_ghist
 );
     initial begin
         assert(N < DEPTH) else // FIXME
@@ -52,6 +80,7 @@ module ghr #(
     end
 
     VEC hist; // {0=ntake, 1=take}
+    logic [GHR_LEN-1:0] ghist;
     PTR base; // to youngest entry in the GHR window; (base-1) % DEPTH is the write head
 
     PTR [WPORTS:0]      base_n;
@@ -68,22 +97,41 @@ module ghr #(
     generate
     assign wen[0]   = flush | (wen_cnt != 0);
     assign widx[0]  = flush ? flush_idx : base_n[1];
-    assign wval[0]  = flush ? flush_take: wpred[0];
+    assign wval[0]  = flush ? flush_take: wshf_in[0];
     for (genvar i = 1; i < WPORTS; ++i) begin
         assign wen [i] = i < wen_cnt;
         assign widx[i] = base_n[i+1];
-        assign wval[i] = wpred[i];
+        assign wval[i] = wshf_in[i];
     end
     endgenerate
 
     // ghist slice: mux flush and retire read
-    assign ghist = {hist, hist} >> (flush ? flush_idx : ridx);
-    
+    always_comb begin
+        rd_ghist = {hist, hist} >> (flush ? flush_idx : ridx);
+        if (flush) begin
+            rd_ghist &= ~(1'b1);
+            rd_ghist |= flush_take;
+        end
+    end
+
+    generate
+    assign wshf_out = ghist[GHR_LEN-1 -: WPORTS];
+
+    logic [GHR_LEN+WPORTS-1:0] ghist_win;
+    logic [WPORTS-1:0] rev_wshf_in;
+    for (genvar i = 0; i < WPORTS; ++i)
+        assign rev_wshf_in[i] = wshf_in[WPORTS-i-1];
+
+    // assign ghist_win = {ghist, rev_wshf_in} << `MIN(wen_cnt, WPORTS);
+    assign ghist_win = {ghist, rev_wshf_in} << wen_cnt;
+    endgenerate
+
     always_ff @(posedge clock) begin
         if (reset) begin
             hist    <= '0;
                 // hist <= 'hACE1; // heuristic seed to avoid cold start
             base    <= '0;
+            ghist   <= '0;
 
         end else begin
             for (int i = 0; i < WPORTS; ++i) begin
@@ -91,7 +139,12 @@ module ghr #(
                     continue;
                 hist[widx[i]] <= wval[i];
             end
-            base    <= flush ? flush_idx : base_n[wen_cnt];
+            base    <= flush
+                ? flush_idx
+                : base_n[wen_cnt];
+            ghist   <= flush
+                ? rd_ghist
+                : ghist_win[WPORTS +: GHR_LEN];
 
         end
 
@@ -125,7 +178,7 @@ module ghr #(
 
 //             en_pred = '0;
 //             for (int i = 0; i < wen_cnt; ++i)
-//                 en_pred[i] = wpred[i];
+//                 en_pred[i] = wshf_in[i];
 //             assert(!(|en_pred) || $onehot(en_pred)) else
 //                 $fatal("ghr: en_pred (%b) is not one-hot", en_pred);
 //         end
@@ -140,8 +193,8 @@ module ghr #(
 //         $display("  %3d | fetch: {en_cnt: %1d, pred: [%b, %b]}, ex_in: {en: %b, idx: %2d}, flush: {%b, base: %2d, take: %b}",
 //             $time,
 //             wen_cnt,
-//             wpred[0],
-//             wpred[1],
+//             wshf_in[0],
+//             wshf_in[1],
 //             cen,
 //             cidx,
 //             flush,

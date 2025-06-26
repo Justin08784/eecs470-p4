@@ -23,10 +23,10 @@ module ghr_test;
     PTR     flush_idx;
 
     `CNT_TYPE(WPORTS)   wen_cnt;
-    logic [WPORTS-1:0]  wpred;
+    logic [WPORTS-1:0]  wshf_in;
     PTR base_n1;
     PTR ridx;
-    logic [GHR_LEN-1:0] ghist;
+    logic [GHR_LEN-1:0] rd_ghist;
     
     always begin
         #(`CLOCK_PERIOD/2) clock = ~clock;
@@ -46,11 +46,11 @@ module ghr_test;
         .flush_idx,
 
         .wen_cnt,
-        .wpred,
+        .wshf_in,
         .base_n1,
 
         .ridx,
-        .ghist
+        .rd_ghist
     );
 
     VEC hist;
@@ -66,6 +66,7 @@ module ghr_test;
     ) sva (
         .hist,
         .base,
+        .ghist(dut.ghist),
 
         .clock,
         .reset,
@@ -75,11 +76,11 @@ module ghr_test;
         .flush_idx,
 
         .wen_cnt,
-        .wpred,
+        .wshf_in,
         .base_n1,
 
         .ridx,
-        .ghist
+        .rd_ghist
     );
 
     logic DEBUG = 1;
@@ -88,23 +89,23 @@ module ghr_test;
             $display("  %3d | fetch: {en_cnt: %1d, pred: [%b, %b]}, flush: {%b, idx: %2d, take: %b}",
                 $time,
                 wen_cnt,
-                wpred[0],
-                wpred[1],
+                wshf_in[0],
+                wshf_in[1],
                 flush,
                 flush_idx,
                 flush_take
             );
 
-            $display("got: hist: %b, base: %2d, ghist: %b",
+            $display("got: hist: %b, base: %2d, rd_ghist: %b",
                 hist,
                 base,
-                ghist
+                rd_ghist
             );
 
-            $display("exp: hist: %b, base: %2d, ghist: %b",
+            $display("exp: hist: %b, base: %2d, rd_ghist: %b",
                 sva.s.hist,
                 sva.s.base,
-                sva.sva_comb.ghist
+                sva.sva_comb.rd_ghist
             );
         end
     end
@@ -135,7 +136,7 @@ task automatic push_new_fetches();
     logic [N-1:0] raw_take;
 
     wen_cnt = 0;
-    wpred   = '0;
+    wshf_in   = '0;
     if (flush)
         return;
 
@@ -152,7 +153,7 @@ task automatic push_new_fetches();
     for (int n = 0; n < N; ++n) begin
         if (raw_take[n]) begin
             eff_cnt = n+1;
-            wpred[n]= 1'b1;
+            wshf_in[n]= 1'b1;
             break;
         end
     end
@@ -163,7 +164,7 @@ task automatic push_new_fetches();
 
         // remember the branch in scoreboard
         b.idx        = base_n1 - PTR'(i);   // <-- comes straight from DUT
-        b.pred_take  = wpred[i];
+        b.pred_take  = wshf_in[i];
         pend.push_back(b);          // youngest at the BACK
     end
 endtask
@@ -227,7 +228,7 @@ endtask
         flush_idx = '0;
 
         wen_cnt = 0;
-        wpred   = '0;
+        wshf_in   = '0;
 
         ridx    = '0; // FIXME
 
@@ -239,7 +240,7 @@ endtask
 
         // // ---------- Test 1 ---------- //
         // $display("\nTest 1");
-        // wpred[0] = 1'b1;
+        // wshf_in[0] = 1'b1;
         // wen_cnt = 1;
 
         // while (rdy_scnt > 0)
