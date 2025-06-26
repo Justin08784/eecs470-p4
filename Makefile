@@ -190,6 +190,7 @@ GREP = grep -E --color=auto
 
 # TODO: add more modules here
 MODULES = cpu \
+	barrel \
 	bpu \
 	fetch \
 	fifo \
@@ -244,7 +245,7 @@ build/ftq.simv: $(FTQ_FILES)
 build/ftq.cov: $(FTQ_FILES)
 synth/ftq.vg: $(FTQ_FILES)
 
-GHR_FILES = test/ghr_sva.svh # FIXME: how are you able to omit sys_def.svh like so and it still works???
+GHR_FILES = test/ghr_sva.svh
 build/ghr.simv: $(GHR_FILES)
 build/ghr.cov: $(GHR_FILES)
 
