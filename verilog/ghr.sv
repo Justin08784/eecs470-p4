@@ -1,31 +1,88 @@
 `include "sys_defs.svh"
 
 
-// module fhr #(
-//     parameter GHR_LEN   = 80,
-//     parameter FH_LEN    = 10,
+module fhr #(
+    parameter GHR_LEN   = 80,
+    parameter FH_LEN    = 10,
 
-//     parameter WPORTS    = NUM_BR_SLOTS
-// ) (
-//     input   clock,
-//     input   reset,
+    parameter WPORTS    = NUM_BR_SLOTS
+) (
+    input   clock,
+    input   reset,
 
-//     // misprediction flush
-//     input           flush,
-//     input   logic   flush_take,
-//     input   PTR     flush_idx,
-//     input   logic [GHR_LEN-1:0] flush_ghist,
+    // misprediction flush
+    input   flush,
+    input   logic [GHR_LEN-1:0] flush_ghist,
 
-//     // fetch
-//     input   `CNT_TYPE(WPORTS)   wen_cnt,
-//     input   logic [WPORTS-1:0]  wshf_out
-//     input   logic [WPORTS-1:0]  wshf_in
-// );
-//     logic [FH_LEN-1:0] fh;
+    // fetch
+    input   `CNT_TYPE(WPORTS)   wen_cnt,
+    input   logic [WPORTS-1:0]  wshf_in,
+    input   logic [WPORTS-1:0]  wshf_out,
+    output  logic [FH_LEN-1:0]  fh
+);
+    logic [FH_LEN-1:0] fh_flush;
+    logic [WPORTS:0][FH_LEN-1:0] fh_n;
+    localparam last = (GHR_LEN-1) % FH_LEN;
 
+    initial begin
+        assert (GHR_LEN >= FH_LEN) else $fatal;
+    end
 
+    function automatic logic [FH_LEN-1:0] compute_fh (
+        input logic [GHR_LEN-1:0] ghist
+    );
+        localparam H = (GHR_LEN + FH_LEN - 1) / FH_LEN; // round up integer division
+        logic [FH_LEN-1:0] rv;
 
-// endmodule
+        rv = ghist[FH_LEN-1:0];
+        for (int i = 0; i < FH_LEN; ++i) begin
+            for (int h = 1; h < H; ++h) begin
+                int unsigned idx;
+                idx = FH_LEN*h + i;
+                if (idx < GHR_LEN)
+                    rv[i] ^= ghist[idx];
+                else
+                    continue;
+            end
+        end
+
+        return rv;
+    endfunction
+
+    localparam logic [FH_LEN-1:0] fh_rst = compute_fh('0);
+    assign fh_flush = compute_fh(flush_ghist);
+
+    function automatic logic [FH_LEN-1:0] update_fh (
+        input logic [FH_LEN-1:0] pre,
+        input logic in,
+        input logic out
+    );
+        logic [FH_LEN-1:0] rv;
+        logic [2*FH_LEN-1:0] cat_shf;
+        rv = pre;
+        rv[last]^= out;
+        cat_shf = {rv, rv} << 1;
+        rv = cat_shf[FH_LEN +: FH_LEN];
+        rv[0]   ^= in;
+
+        return rv;
+    endfunction
+
+    generate
+    assign fh_n[0] = fh;
+
+    for (genvar i = 1; i <= WPORTS; ++i)
+        assign fh_n[i] = update_fh(fh_n[i-1], wshf_in[i-1], wshf_out[i-1]);
+    endgenerate
+
+    always_ff @(posedge clock) begin
+        if (reset)
+            fh <= fh_rst;
+        else
+            fh <= flush ? fh_flush : fh_n[wen_cnt];
+    end
+
+endmodule
 
 /*
 TODO: The ghr must be sized large enough so that base does not write into the
@@ -115,7 +172,8 @@ module ghr #(
     end
 
     generate
-    assign wshf_out = ghist[GHR_LEN-1 -: WPORTS];
+    for (genvar i = 0; i < WPORTS; ++i)
+        assign wshf_out[i] = ghist[GHR_LEN-i-1];
 
     logic [GHR_LEN+WPORTS-1:0] ghist_win;
     logic [WPORTS-1:0] rev_wshf_in;

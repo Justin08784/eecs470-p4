@@ -8,6 +8,7 @@
 module ghr_sva #(
     parameter DEPTH     = 32, // must be geq than 2*GHR_LEN and a power of 2
     parameter GHR_LEN   = GHR_LEN,
+    parameter FH_LEN    = 1,
 
     parameter WPORTS    = NUM_BR_SLOTS, // number of predictions that can be shifted in
     type VEC = logic [DEPTH-1:0],
@@ -16,6 +17,8 @@ module ghr_sva #(
     input   VEC hist,
     input   logic [GHR_LEN-1:0] ghist,
     input   PTR base,
+    input   logic [FH_LEN-1:0] fh,
+    input   logic [FH_LEN-1:0] raw_fh,
 
     input   clock,
     input   reset,
@@ -208,6 +211,11 @@ module ghr_sva #(
             rd_ghist == sva_comb.rd_ghist;
         endproperty
 
+        property fh_correct;
+            disable iff (reset)
+            raw_fh == fh;
+        endproperty
+
         // property rslv_correct;
         //     disable iff (reset)
         //     rslv == s.rslv;
@@ -239,6 +247,8 @@ module ghr_sva #(
     match_ghist: assert property(cb.ghist_correct)
         else exit_on_error;
     match_rd_ghist: assert property(cb.rd_ghist_correct)
+        else exit_on_error;
+    match_fh: assert property(cb.fh_correct)
         else exit_on_error;
     // match_rslv: assert property(cb.rslv_correct)
     //     else exit_on_error;

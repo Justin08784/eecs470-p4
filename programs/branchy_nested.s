@@ -1,14 +1,23 @@
-    li x1, 10
+    li x1, 100
 loop1:
-    li x2, 7
+    li x2, 2
 loop2:
-    li x3, 20
+    li x3, 6
 loop3:
     add x3, x3, -1
+    nop
+    nop
+    nop
     bnez x3, loop3
     add x2, x2, -1
+    nop
+    nop
+    nop
     bnez x2, loop2
     add x1, x1, -1
+    nop
+    nop
+    nop
     bnez x1, loop1
 wfi
 

@@ -9,12 +9,16 @@ module ghr_test;
     // params and types
     localparam DEPTH    = 128;
     localparam GHR_LEN  = 40;
+    localparam FH_LEN   = 10;
+    // localparam DEPTH    = 8;
+    // localparam GHR_LEN  = 4;
+    // localparam FH_LEN   = 2;
 
     localparam WPORTS   = 2;
     typedef logic [DEPTH-1:0] VEC;
     typedef logic [$clog2(DEPTH)-1:0] PTR;
 
-    // declare signals
+    // ghr signals
     logic   clock;
     logic   reset;
 
@@ -24,9 +28,14 @@ module ghr_test;
 
     `CNT_TYPE(WPORTS)   wen_cnt;
     logic [WPORTS-1:0]  wshf_in;
+    logic [WPORTS-1:0]  wshf_out;
     PTR base_n1;
     PTR ridx;
     logic [GHR_LEN-1:0] rd_ghist;
+
+    // fhr signals
+    logic [GHR_LEN-1:0] flush_ghist;
+    logic [FH_LEN-1:0]  fh;
     
     always begin
         #(`CLOCK_PERIOD/2) clock = ~clock;
@@ -37,7 +46,7 @@ module ghr_test;
         .GHR_LEN    (GHR_LEN),
 
         .WPORTS     (WPORTS)
-    ) dut (
+    ) dut_ghr (
         .clock,
         .reset,
 
@@ -47,26 +56,51 @@ module ghr_test;
 
         .wen_cnt,
         .wshf_in,
+        .wshf_out,
         .base_n1,
 
         .ridx,
         .rd_ghist
     );
 
+    fhr #(
+        .GHR_LEN    (GHR_LEN),
+        .FH_LEN     (FH_LEN),
+
+        .WPORTS     (WPORTS)
+    ) dut_fhr (
+        .clock,
+        .reset,
+
+        .flush,
+        .flush_ghist    (rd_ghist),
+
+        .wen_cnt,
+        .wshf_in,
+        .wshf_out,
+        .fh
+    );
+
     VEC hist;
     PTR base;
-    assign hist = dut.hist;
-    assign base = dut.base;
+    logic [FH_LEN-1:0] raw_fh;
+    assign hist = dut_ghr.hist;
+    assign base = dut_ghr.base;
+    assign raw_fh = dut_fhr.compute_fh(dut_ghr.ghist);
 
     ghr_sva #(
         .DEPTH      (DEPTH),
         .GHR_LEN    (GHR_LEN),
+        .FH_LEN     (FH_LEN),
 
         .WPORTS     (WPORTS)
     ) sva (
         .hist,
         .base,
-        .ghist(dut.ghist),
+        .ghist(dut_ghr.ghist),
+
+        .fh,    // iterative fh
+        .raw_fh,
 
         .clock,
         .reset,
@@ -95,6 +129,17 @@ module ghr_test;
                 flush_idx,
                 flush_take
             );
+
+            // $display("iter fh: %b", fh);
+
+            // $display("raw  fh: %b", raw_fh);
+            // $display("wshf_out: [%b, %b]", wshf_out[0], wshf_out[1]);
+            // $display("wshf_in : [%b, %b]", wshf_in[0], wshf_in[1]);
+            // $display("fh_n: [%b, %b, %b]",
+            //     dut_fhr.fh_n[0],
+            //     dut_fhr.fh_n[1],
+            //     dut_fhr.fh_n[2]);
+            // $display("ghist: %b", dut_ghr.ghist);
 
             $display("got: hist: %b, base: %2d, rd_ghist: %b",
                 hist,
