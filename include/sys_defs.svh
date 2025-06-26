@@ -31,7 +31,7 @@
 // `define SYNTH // synth only constructions // FIXME: how can we implement this in Makefile?
 
 `ifndef SYNTH
-// `define DEBUG
+`define DEBUG
 // `define CYCLE_PRINT // clock cycle print
 // `define PC_GEN_TEST_MODE
 `define FORMAL
@@ -79,10 +79,16 @@ parameter MAX_FB_SPAN   = 16; // maximum span of a fetch block (in words/insns)
     // ^^ WARNING: many of the fetch/BPU structures are hardcoded, independent of these params
 
 parameter BRANCH_PRED_SZ= 'x; // FIXME
-parameter GHR_BUF_SZ    = 32;
-parameter GHR_LEN       = 8;
+parameter GHR_BUF_SZ    = 128;
+parameter GHR_LEN       = 10;
+parameter FH_LEN        = 10;
+    /* FIXME: GHR_LEN == FH_LEN makes this non-folded gshare and yet it still
+    performs poorly on branchy_nested.s -> this indicates we broke something */
+// parameter GHR_LEN       = 32;
+// parameter FH_LEN        = 14;
 parameter RAS_SZ        = 16;
-parameter FTQ_SZ        = 32;
+// parameter FTQ_SZ        = 32;
+parameter FTQ_SZ        = 16;
 
 // fetch
 parameter IQQ_SZ        = 4;
@@ -374,7 +380,8 @@ typedef struct packed {
     // predictor-specific fields
     logic       en_dir_update;  // update direction predictors?
     logic       slot_idx;
-    logic [GHR_LEN-1:0] hash;   // gshare hash
+    GHR_IDX     ghr_base;
+    // logic [GHR_LEN-1:0] hash;   // gshare hash
 } BPU_UPD_PKT;
 
 
@@ -391,7 +398,7 @@ typedef struct packed {
 `ifdef PC_GEN_TEST_MODE
     int id;
 `endif
-    logic[GHR_LEN-1:0] hash;
+    // logic[GHR_LEN-1:0] hash;
     // GHR_IDX [1:0] ghr_base;
 
     WADDR       base_n;     // base address of *next* FB
@@ -466,7 +473,7 @@ typedef struct packed {
     logic   [N-1:0]     hit;
     logic   [N-1:0]     hit_slot;
     logic   [N-1:0]     slot_idx;
-    logic   [N-1:0][GHR_LEN-1:0] hash; // gshare hash index
+    // logic   [N-1:0][GHR_LEN-1:0] hash; // gshare hash index
     GHR_IDX [N-1:0]     ghr_base;
 } fetch2btq;
 

@@ -34,7 +34,7 @@ module ghr_test;
     logic [GHR_LEN-1:0] rd_ghist;
 
     // fhr signals
-    logic [GHR_LEN-1:0] flush_ghist;
+    logic [GHR_LEN-1:0] qry_ghist;
     logic [FH_LEN-1:0]  fh;
     
     always begin
@@ -73,7 +73,7 @@ module ghr_test;
         .reset,
 
         .flush,
-        .flush_ghist    (rd_ghist),
+        .qry_ghist    (rd_ghist),
 
         .wen_cnt,
         .wshf_in,
@@ -139,19 +139,19 @@ module ghr_test;
             //     dut_fhr.fh_n[0],
             //     dut_fhr.fh_n[1],
             //     dut_fhr.fh_n[2]);
-            // $display("ghist: %b", dut_ghr.ghist);
+            $display("ghist: %b", dut_ghr.ghist);
 
-            $display("got: hist: %b, base: %2d, rd_ghist: %b",
-                hist,
-                base,
-                rd_ghist
-            );
+            // $display("got: hist: %b, base: %2d, rd_ghist: %b",
+            //     hist,
+            //     base,
+            //     rd_ghist
+            // );
 
-            $display("exp: hist: %b, base: %2d, rd_ghist: %b",
-                sva.s.hist,
-                sva.s.base,
-                sva.sva_comb.rd_ghist
-            );
+            // $display("exp: hist: %b, base: %2d, rd_ghist: %b",
+            //     sva.s.hist,
+            //     sva.s.base,
+            //     sva.sva_comb.rd_ghist
+            // );
         end
     end
 

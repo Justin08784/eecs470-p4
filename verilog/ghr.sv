@@ -12,7 +12,9 @@ module fhr #(
 
     // misprediction flush
     input   flush,
-    input   logic [GHR_LEN-1:0] flush_ghist,
+
+    input   logic [GHR_LEN-1:0] qry_ghist,
+    output  logic [FH_LEN-1:0]  rd_fh,
 
     // fetch
     input   `CNT_TYPE(WPORTS)   wen_cnt,
@@ -26,6 +28,7 @@ module fhr #(
 
     initial begin
         assert (GHR_LEN >= FH_LEN) else $fatal;
+        assert (FH_LEN <= $bits(WADDR)) else $fatal;
     end
 
     function automatic logic [FH_LEN-1:0] compute_fh (
@@ -50,7 +53,8 @@ module fhr #(
     endfunction
 
     localparam logic [FH_LEN-1:0] fh_rst = compute_fh('0);
-    assign fh_flush = compute_fh(flush_ghist);
+    assign fh_flush = compute_fh(qry_ghist);
+    assign rd_fh = fh_flush;
 
     function automatic logic [FH_LEN-1:0] update_fh (
         input logic [FH_LEN-1:0] pre,
@@ -166,8 +170,9 @@ module ghr #(
     always_comb begin
         rd_ghist = {hist, hist} >> (flush ? flush_idx : ridx);
         if (flush) begin
-            rd_ghist &= ~(1'b1);
-            rd_ghist |= flush_take;
+            rd_ghist[0] &= 0;
+            // rd_ghist &= ~(1'b1);
+            rd_ghist[0] |= flush_take;
         end
     end
 
@@ -245,33 +250,34 @@ module ghr #(
 // `endif
 
 
-// `ifdef DEBUG
-//     task print_ghr;
-//         $display(">> ghr >>");
-//         $display("  %3d | fetch: {en_cnt: %1d, pred: [%b, %b]}, ex_in: {en: %b, idx: %2d}, flush: {%b, base: %2d, take: %b}",
-//             $time,
-//             wen_cnt,
-//             wshf_in[0],
-//             wshf_in[1],
-//             cen,
-//             cidx,
-//             flush,
-//             cidx[0],
-//             ctake[0],
-//         );
+`ifdef DEBUG
+    task print_ghr;
+        $display(">> ghr >>");
+        $display("  %3d | fetch: {en_cnt: %1d, pred: [%b, %b]}, flush: {%b, base: %2d, take: %b}",
+            $time,
+            wen_cnt,
+            wshf_in[0],
+            wshf_in[1],
 
-//         // foreach(sva.nres[i])
-//         //     $display("  nres[%2d]: %2d", i, sva.nres[i]);
+            flush,
+            flush_idx,
+            flush_take
+        );
 
-//         $display("got: ghr: %b, hist: %b, rslv: %b, base: %2d (f_rdy_scnt: %2d)",
-//             rghr,
-//             hist,
-//             rslv,
-//             base,
-//             rdy_scnt
-//         );
-//         $display("<< ghr <<");
-//     endtask
-// `endif
+        $display("ghist: %b. hist: %b", ghist, hist);
+
+        // foreach(sva.nres[i])
+        //     $display("  nres[%2d]: %2d", i, sva.nres[i]);
+
+        // $display("got: ghr: %b, hist: %b, rslv: %b, base: %2d (f_rdy_scnt: %2d)",
+        //     rghr,
+        //     hist,
+        //     rslv,
+        //     base,
+        //     rdy_scnt
+        // );
+        // $display("<< ghr <<");
+    endtask
+`endif
 
 endmodule

@@ -88,47 +88,46 @@ module gshare (
 
     // puq updates
     input   logic       i_uen,
+    input   logic [FH_LEN-1:0] i_uhash,
     input   BPU_UPD_PKT i_udat,
 
     // fetch
-    input   logic [GHR_LEN-1:0] i_ghr,
-    input   WADDR   i_qry, // fetch block base
-    output  logic [GHR_LEN-1:0] o_hash,
+    input   logic [FH_LEN-1:0] i_hash,
     output  logic [NUM_BR_SLOTS-1:0] o_pred
 );
-    localparam PHT_SZ = 1 << GHR_LEN;
+    localparam PHT_SZ = 1 << FH_LEN;
     // logic [1:0] pht [PHT_SZ-1:0]; // ram inference?
     SC_STATE [PHT_SZ-1:0][NUM_BR_SLOTS-1:0] pht;
     SC_STATE [NUM_BR_SLOTS-1:0] rrec, urec; // read, update records
 
-    assign o_hash = i_ghr ^ i_qry[GHR_LEN-1:0];
-    assign rrec = pht[o_hash];
+    // assign i_hash = i_ghr ^ i_qry[GHR_LEN-1:0];
+    assign rrec = pht[i_hash];
     assign o_pred[0] = query_sc(rrec[0]);
     assign o_pred[1] = query_sc(rrec[1]);
 
-    assign urec = pht[i_udat.hash];
+    assign urec = pht[i_uhash];
 
     always_ff @(posedge clock) begin
         if (reset)
             for (int i = 0; i < PHT_SZ; ++i)
                 pht[i] <= {WT, WT};
         else if (i_uen && i_udat.en_dir_update && i_udat.md.cond) begin // train only on conditional branches!
-            pht[i_udat.hash][0] <= i_udat.slot_idx ? urec[0] : update_sc(urec[0], i_udat.take);
-            pht[i_udat.hash][1] <= i_udat.slot_idx ? update_sc(urec[1], i_udat.take) : urec[1];
+            pht[i_uhash][0] <= i_udat.slot_idx ? urec[0] : update_sc(urec[0], i_udat.take);
+            pht[i_uhash][1] <= i_udat.slot_idx ? update_sc(urec[1], i_udat.take) : urec[1];
         end
     end
 
-    task print_gshare;
-        $display(">> gshare");
-        $display("i_ghr: %b, i_qry: %x, o_hash: %b, o_pred: [%b, %b]",
-            i_ghr,
-            i_qry,
-            o_hash,
-            o_pred[0],
-            o_pred[1]
-        );
-        $display("upd: {en: %b, hash: %b, take: %b}", i_uen, i_udat.hash, i_udat.take);
-        $display("<< gshare");
-    endtask
+    // task print_gshare;
+    //     $display(">> gshare");
+    //     $display("i_ghr: %b, i_qry: %x, i_hash: %b, o_pred: [%b, %b]",
+    //         i_ghr,
+    //         i_qry,
+    //         i_hash,
+    //         o_pred[0],
+    //         o_pred[1]
+    //     );
+    //     $display("upd: {en: %b, hash: %b, take: %b}", i_uen, i_udat.hash, i_udat.take);
+    //     $display("<< gshare");
+    // endtask
 
 endmodule

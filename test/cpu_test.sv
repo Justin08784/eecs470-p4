@@ -38,7 +38,7 @@ parameter int TB_MAX_CYCLES = 50000000;
 
 
 // Debug cycle limits, both inclusive
-localparam int DBG_CYCLE_MIN = 0;
+localparam int DBG_CYCLE_MIN = 7400;
 localparam int DBG_CYCLE_MAX = TB_MAX_CYCLES;
 // localparam int DBG_CYCLE_MAX = 500;
 
@@ -572,9 +572,9 @@ module testbench;
     task print_fetch;
         // verisimpleV.fetch0.print_fetch();
         // verisimpleV.fetch0.ftq0.print_ftq();
-        verisimpleV.fetch0.align0.print_align();
-        verisimpleV.fetch0.bpu0.uftb0.print_uftb;
-        // verisimpleV.fetch0.bpu0.ghr0.print_ghr;
+        // verisimpleV.fetch0.align0.print_align();
+        // verisimpleV.fetch0.bpu0.uftb0.print_uftb;
+        verisimpleV.fetch0.bpu0.ghr0.print_ghr;
 
     endtask
 

@@ -41,11 +41,10 @@ module bpu (
     struct packed {
         // fetch
         `CNT_TYPE(NUM_BR_SLOTS) wen_cnt;
-        logic [NUM_BR_SLOTS-1:0]wpred;
-        `CNT_TYPE(NUM_BR_SLOTS) rdy_scnt;
+        logic [NUM_BR_SLOTS-1:0]wpred, wshf_out;
 
         GHR_IDX base_n1;
-        logic [GHR_LEN-1:0] rghr;
+        logic [GHR_LEN-1:0] rd_ghist;
     } ghr_io;
 
     struct packed {
@@ -133,7 +132,7 @@ module bpu (
         ghr_wvld_cnt = $countones(in_ghr);
 
         slot = e.br_slot[pred_idx];
-        step = buf_io.i_rdy & (ghr_wvld_cnt <= ghr_io.rdy_scnt);
+        step = buf_io.i_rdy;
 
 
         if (!step || !uftb_io.o_vld)
@@ -156,7 +155,7 @@ module bpu (
 
         buf_io.i_dat = '{
             base_n      : pc_reg_n,
-            hash        : gshare_io.hash,
+            // hash        : gshare_io.hash,
 
             ft          : !pred_any,
             pred_idx    : pred_idx,
@@ -195,40 +194,66 @@ module bpu (
     They will only ever start receiving their own ghr_base if they are ever taken
     and added to a branch_slot.
     */
+    logic [FH_LEN-1:0] fh, rd_fh;
+    fhr #(
+        .GHR_LEN    (GHR_LEN),
+        .FH_LEN     (FH_LEN),
+
+        .WPORTS     (NUM_BR_SLOTS)
+    ) fhr0 (
+        .clock,
+        .reset,
+
+        .flush,
+
+        .qry_ghist  (ghr_io.rd_ghist),
+        .rd_fh,
+
+        .wen_cnt    (ghr_io.wen_cnt),
+        .wshf_in    (ghr_io.wpred),
+        .wshf_out   (ghr_io.wshf_out),
+
+        .fh
+    );
+
     ghr #(
         .DEPTH      (GHR_BUF_SZ),
         .GHR_LEN    (GHR_LEN),
 
-        .CPORTS     (NUM_FU_BRU),
-        .WPORTS     (NUM_BR_SLOTS),
-        .RPORTS     (1)
+        .WPORTS     (NUM_BR_SLOTS)
     ) ghr0 (
         .clock,
         .reset,
+
         .flush,
+        .flush_take (cbru_in.take),
+        .flush_idx  (cbru_in.ghr_base),
 
-        .cen        (cbru_in.en),
-        .ctake      (cbru_in.take),
-        .cidx       (cbru_in.ghr_base),
-
-        .rdy_scnt   (ghr_io.rdy_scnt),
         .wen_cnt    (ghr_io.wen_cnt),
-        .wpred      (ghr_io.wpred),
+        .wshf_in    (ghr_io.wpred),
+        .wshf_out   (ghr_io.wshf_out),
         .base_n1    (ghr_io.base_n1),
-        .rghr       (ghr_io.rghr)
+
+        .ridx       (i_udat.ghr_base),
+        .rd_ghist   (ghr_io.rd_ghist)
     );
 
+    always_ff @(posedge clock) begin
+        if (!reset)
+            assert (fhr0.fh == fhr0.compute_fh(ghr0.ghist)) else $fatal;
+    end
+
+    // WADDR tmp;
+    // assign tmp = i_udat.base - i_udat.fb_off;
     gshare gshare0 (
         .clock,
         .reset,
 
         .i_uen,
+        .i_uhash(rd_fh ^ i_udat.base[FH_LEN-1:0]),
         .i_udat,
 
-        .i_ghr  (ghr_io.rghr),
-        .i_qry  (pc_reg),
-
-        .o_hash (gshare_io.hash),
+        .i_hash (fh ^ pc_reg[FH_LEN-1:0]),
         .o_pred (gshare_io.pred)
 
     );

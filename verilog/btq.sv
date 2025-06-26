@@ -24,7 +24,7 @@ typedef struct packed {
     logic   hit;        // hit an entry with base in FTB?
     logic   hit_slot;   // hit a slot in entry? (valid only if hit)
     logic   slot_idx;   // hit a slot in entry? (valid only if hit)
-    logic   [GHR_LEN-1:0]   hash;       // gshare hash index
+    // logic   [GHR_LEN-1:0]   hash;       // gshare hash index
     GHR_IDX ghr_base;
 } BTQ_ENTRY;
 
@@ -171,7 +171,8 @@ module btq #(
 
                 en_dir_update : cur.hit && cur.hit_slot,
                 slot_idx: cur.slot_idx,
-                hash    : cur.hash
+                ghr_base: cur.ghr_base
+                // hash    : cur.hash
             };
 
         end
@@ -181,7 +182,9 @@ module btq #(
             puq_enq_flt[nret_prefix_cnt[i]] = puq_enq_raw[i];
 
         // handle fetch (outs)
-        f_out.bpu_uen   = !puq_empty;
+        f_out.bpu_uen   = !puq_empty & !flush;
+            /* GHR has only 1 barrel shift port (rd_ghist), and flush takes
+            precedence over retire-time BPU updates */
         f_out.btq_idxs_n= f_idxs_n;
 
         // handle reads (execute)
@@ -281,7 +284,7 @@ module btq #(
                     hit     : f_in.hit[i],
                     hit_slot: f_in.hit_slot[i],
                     slot_idx: f_in.slot_idx[i],
-                    hash    : f_in.hash[i],
+                    // hash    : f_in.hash[i],
                     ghr_base: f_in.ghr_base[i]
                 };
             end
@@ -307,7 +310,7 @@ module btq #(
                 continue;
             end
 
-            $write("BTQ[%2d]: {pc: %d (fb_base: %d, off: %d)}, {rslv: %b take: %b, tgt: %x}, ghr_base: %2d, hash: %b  hit: %b, hit_slot: %b at: %b, md: %b, is_tail: %b ",
+            $write("BTQ[%2d]: {pc: %d (fb_base: %d, off: %d)}, {rslv: %b take: %b, tgt: %x}, ghr_base: %2d, hit: %b, hit_slot: %b at: %b, md: %b, is_tail: %b ",
                 i,
                 state[i].PC,
                 state[i].PC - state[i].off,
@@ -316,7 +319,7 @@ module btq #(
                 state[i].take,
                 state[i].tgt,
                 state[i].ghr_base,
-                state[i].hash,
+                // state[i].hash,
                 state[i].hit,
                 state[i].hit_slot,
                 state[i].always_take,
