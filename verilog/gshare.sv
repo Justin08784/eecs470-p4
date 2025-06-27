@@ -117,7 +117,7 @@ module gshare (
             touched <= '0;
 `endif
             for (int i = 0; i < PHT_SZ; ++i)
-                pht[i] <= {WN, WN};
+                pht[i] <= {WT, WT};
         end else if (i_uen && i_udat.en_dir_update && i_udat.md.cond) begin // train only on conditional branches!
 `ifdef DEBUG
             touched[i_uhash][i_udat.slot_idx] <= '1;

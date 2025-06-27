@@ -38,7 +38,7 @@ parameter int TB_MAX_CYCLES = 50000000;
 
 
 // Debug cycle limits, both inclusive
-localparam int DBG_CYCLE_MIN = 3500;
+localparam int DBG_CYCLE_MIN = 15000;
 localparam int DBG_CYCLE_MAX = TB_MAX_CYCLES;
 // localparam int DBG_CYCLE_MAX = 500;
 
@@ -608,11 +608,13 @@ module testbench;
         $display("  | >> CYCLE: %3d (t: %3d)", clock_count-1, $time);
         // print_btb();
         print_btq();
-        verisimpleV.fetch0.bpu0.print_udat;
-        verisimpleV.fetch0.bpu0.gshare0.print_gshare;
-        verisimpleV.fetch0.bpu0.uftb0.print_uftb;
-        $display("decode_en_cnt: %d", verisimpleV.decode0.f_in.wen_cnt);
-        $display("true_ghr: %b", verisimpleV.true_ghr);
+
+        // verisimpleV.fetch0.bpu0.print_udat;
+        // verisimpleV.fetch0.bpu0.gshare0.print_gshare;
+        // verisimpleV.fetch0.bpu0.uftb0.print_uftb;
+        // $display("decode_en_cnt: %d", verisimpleV.decode0.f_in.wen_cnt);
+        // $display("true_ghr: %b", verisimpleV.true_ghr);
+
         // print_fetch();
         // print_decode();
         // print_fl();

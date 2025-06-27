@@ -1,8 +1,8 @@
     li x1, 100
 loop1:
-    li x2, 2
+    li x2, 8
 loop2:
-    li x3, 3
+    li x3, 5
 loop3:
     add x3, x3, -1
     nop

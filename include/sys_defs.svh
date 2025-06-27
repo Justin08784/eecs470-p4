@@ -80,8 +80,8 @@ parameter MAX_FB_SPAN   = 16; // maximum span of a fetch block (in words/insns)
 
 parameter BRANCH_PRED_SZ= 'x; // FIXME
 parameter GHR_BUF_SZ    = 128;
-parameter GHR_LEN       = 6;
-parameter FH_LEN        = 6;
+parameter GHR_LEN       = 80;
+parameter FH_LEN        = 14;
     /* FIXME: GHR_LEN == FH_LEN makes this non-folded gshare and yet it still
     performs poorly on branchy_nested.s -> this indicates we broke something */
 // parameter GHR_LEN       = 32;
