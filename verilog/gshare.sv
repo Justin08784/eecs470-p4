@@ -96,29 +96,60 @@ module gshare (
     output  logic [NUM_BR_SLOTS-1:0] o_pred
 );
     localparam PHT_SZ = 1 << FH_LEN;
+`ifdef DEBUG
+    logic [PHT_SZ-1:0][1:0] touched;
+`endif
     // logic [1:0] pht [PHT_SZ-1:0]; // ram inference?
-    SC_STATE [PHT_SZ-1:0][NUM_BR_SLOTS-1:0] pht;
-    SC_STATE [NUM_BR_SLOTS-1:0] rrec, urec; // read, update records
+    logic [PHT_SZ-1:0][3:0] pht;
+    logic [3:0] rrec;
+    logic [3:0] urec; // read, update records
 
     // assign i_hash = i_ghr ^ i_qry[GHR_LEN-1:0];
     assign rrec = pht[i_hash];
-    assign o_pred[0] = query_sc(rrec[0]);
-    assign o_pred[1] = query_sc(rrec[1]);
+    assign o_pred[0] = query_sc(rrec[1:0]);
+    assign o_pred[1] = query_sc(rrec[3:2]);
 
     assign urec = pht[i_uhash];
 
     always_ff @(posedge clock) begin
-        if (reset)
+        if (reset) begin
+            touched <= '0;
             for (int i = 0; i < PHT_SZ; ++i)
-                pht[i] <= {WT, WT};
-        else if (i_uen && i_udat.en_dir_update && i_udat.md.cond) begin // train only on conditional branches!
-            pht[i_uhash][0] <= i_udat.slot_idx ? urec[0] : update_sc(urec[0], i_udat.take);
-            pht[i_uhash][1] <= i_udat.slot_idx ? update_sc(urec[1], i_udat.take) : urec[1];
+                pht[i] <= {WN, WN};
+        end else if (i_uen && i_udat.en_dir_update && i_udat.md.cond) begin // train only on conditional branches!
+            touched[i_uhash][i_udat.slot_idx] <= '1;
+            if (i_udat.slot_idx)
+                pht[i_uhash][3:2] <= update_sc(urec[3:2], i_udat.take);
+                // pht[i_uhash][3:2] <= update_sc(pht[i_uhash][3:2], i_udat.take);
+            else
+                pht[i_uhash][1:0] <= update_sc(urec[1:0], i_udat.take);
+                // pht[i_uhash][1:0] <= update_sc(pht[i_uhash][1:0], i_udat.take);
+            // pht[i_uhash][1:0] <= i_udat.slot_idx ? urec[1:0] : update_sc(urec[1:0], i_udat.take);
+            // pht[i_uhash][3:2] <= i_udat.slot_idx ? update_sc(urec[3:2], i_udat.take) : urec[3:2];
         end
     end
 
-    // task print_gshare;
-    //     $display(">> gshare");
+    task print_gshare;
+        $display(">> gshare");
+        if (i_uen && i_udat.en_dir_update && i_udat.md.cond)
+            $display("i_uhash: %b, take: %b, slot_idx: %b, urec: [%b, %b]",
+                i_uhash,
+                i_udat.take,
+                i_udat.slot_idx,
+                urec[1:0],
+                urec[3:2]
+            );
+        else
+            $display("N/A!");
+
+        for (int i = 0; i < PHT_SZ; ++i) begin
+            if (|touched[i])
+                $display("pht[%6b]: (%b, %b)",
+                    i,
+                    touched[i][0] ? pht[i][1:0] : 2'bxx,
+                    touched[i][1] ? pht[i][3:2] : 2'bxx
+                );
+        end
     //     $display("i_ghr: %b, i_qry: %x, i_hash: %b, o_pred: [%b, %b]",
     //         i_ghr,
     //         i_qry,
@@ -126,8 +157,8 @@ module gshare (
     //         o_pred[0],
     //         o_pred[1]
     //     );
-    //     $display("upd: {en: %b, hash: %b, take: %b}", i_uen, i_udat.hash, i_udat.take);
-    //     $display("<< gshare");
-    // endtask
+        $display("upd: {en: %b, base: %d, take: %b, i_uhash: %b, slot_idx: %b}", i_uen, i_udat.base, i_udat.take, i_uhash, i_udat.slot_idx);
+        $display("<< gshare");
+    endtask
 
 endmodule

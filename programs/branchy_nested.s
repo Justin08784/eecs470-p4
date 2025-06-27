@@ -2,7 +2,7 @@
 loop1:
     li x2, 2
 loop2:
-    li x3, 6
+    li x3, 3
 loop3:
     add x3, x3, -1
     nop

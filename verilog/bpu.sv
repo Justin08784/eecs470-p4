@@ -255,14 +255,29 @@ module bpu (
         .reset,
 
         .i_uen,
-        .i_uhash(rd_fh ^ i_udat.base[FH_LEN-1:0]),
+        .i_uhash(rd_fh),
+        // .i_uhash(rd_fh ^ i_udat.base[FH_LEN-1:0]),
         .i_udat,
 
-        .i_hash (fh ^ pc_reg[FH_LEN-1:0]),
+        .i_hash (fh),
+        // .i_hash (fh ^ pc_reg[FH_LEN-1:0]),
         .o_pred (gshare_io.pred)
 
     );
 
+
+    task automatic print_udat;
+        $display("base: %d, pred_fh: %b, pred: %b, wpred: %b", pc_reg, fh, gshare_io.pred, pred);
+        // if (i_uen)
+        //     $display("base: %d, off: %d, pc: %2d, take: %b (hist: %b) edu: %b",
+        //         i_udat.base,
+        //         i_udat.fb_off,
+        //         i_udat.base + i_udat.fb_off,
+        //         i_udat.take,
+        //         ghr_io.rd_ghist,
+        //         i_udat.en_dir_update
+        //     );
+    endtask
 
     struct packed {
         logic i_rdy;

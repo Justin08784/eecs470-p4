@@ -310,7 +310,7 @@ module btq #(
                 continue;
             end
 
-            $write("BTQ[%2d]: {pc: %d (fb_base: %d, off: %d)}, {rslv: %b take: %b, tgt: %x}, ghr_base: %2d, hit: %b, hit_slot: %b at: %b, md: %b, is_tail: %b ",
+            $write("BTQ[%2d]: {pc: %d (fb_base: %d, off: %d)}, {rslv: %b take: %b, tgt: %x}, ghr_base: %2d, hit & hit_slot: %b, slot_idx: %b, at: %b, md: %b, is_tail: %b ",
                 i,
                 state[i].PC,
                 state[i].PC - state[i].off,
@@ -320,8 +320,8 @@ module btq #(
                 state[i].tgt,
                 state[i].ghr_base,
                 // state[i].hash,
-                state[i].hit,
-                state[i].hit_slot,
+                state[i].hit & state[i].hit_slot,
+                state[i].slot_idx,
                 state[i].always_take,
                 state[i].md,
                 state[i].is_tail

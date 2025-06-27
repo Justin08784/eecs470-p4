@@ -171,6 +171,14 @@ module cpu (
         .f_out  (btq_2_f)
     );
 
+    logic [GHR_BUF_SZ-1:0] true_ghr;
+    always_ff @(posedge clock) begin
+        if (reset)
+            true_ghr <= '0;
+        else if (btq_2_f.bpu_uen)
+            true_ghr <= (true_ghr << 1) | btq_2_f.bpu_udat.take;
+    end
+
 
     /* >> ==== Reservation station (RS) ==== >> */
     execute2rs      ex_2_rs; 
