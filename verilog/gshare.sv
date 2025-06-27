@@ -113,11 +113,15 @@ module gshare (
 
     always_ff @(posedge clock) begin
         if (reset) begin
+`ifdef DEBUG
             touched <= '0;
+`endif
             for (int i = 0; i < PHT_SZ; ++i)
                 pht[i] <= {WN, WN};
         end else if (i_uen && i_udat.en_dir_update && i_udat.md.cond) begin // train only on conditional branches!
+`ifdef DEBUG
             touched[i_uhash][i_udat.slot_idx] <= '1;
+`endif
             if (i_udat.slot_idx)
                 pht[i_uhash][3:2] <= update_sc(urec[3:2], i_udat.take);
                 // pht[i_uhash][3:2] <= update_sc(pht[i_uhash][3:2], i_udat.take);
@@ -129,6 +133,7 @@ module gshare (
         end
     end
 
+`ifdef DEBUG
     task print_gshare;
         $display(">> gshare");
         if (i_uen && i_udat.en_dir_update && i_udat.md.cond)
@@ -160,5 +165,6 @@ module gshare (
         $display("upd: {en: %b, base: %d, take: %b, i_uhash: %b, slot_idx: %b}", i_uen, i_udat.base, i_udat.take, i_uhash, i_udat.slot_idx);
         $display("<< gshare");
     endtask
+`endif
 
 endmodule

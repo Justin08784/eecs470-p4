@@ -24,6 +24,7 @@ typedef struct packed {
     logic   hit;        // hit an entry with base in FTB?
     logic   hit_slot;   // hit a slot in entry? (valid only if hit)
     logic   slot_idx;   // hit a slot in entry? (valid only if hit)
+    logic[1:0]in_ghr;
     // logic   [GHR_LEN-1:0]   hash;       // gshare hash index
     GHR_IDX ghr_base;
 } BTQ_ENTRY;
@@ -172,6 +173,34 @@ module btq #(
                 en_dir_update : cur.hit && cur.hit_slot,
                 slot_idx: cur.slot_idx,
                 ghr_base: cur.ghr_base
+                    + 1'b1 // skip the current branch (gets branch history LEADING UP to the branch)
+                    + (cur.slot_idx & cur.in_ghr[0])
+
+                    /* Why the two "+" terms are needed:
+
+                    >> Begin: Aside
+                        We keep TWO 2-bit saturating counters in every gshare row:
+                        bits[1:0] → slot-0 branch in this UFTB entry
+                        bits[3:2] → slot-1 branch in this UFTB entry
+                        
+                        The predictor **looks up only one row** per fetch block, then
+                        reads both 2-bit counters to predict the two branches.
+                    << End : Aside
+
+                    A. [[ +1 ]]
+                        - universal: we want the history that ends *before* the branch we're retiring.
+                    
+                    B. [[ +(slot_idx & in_ghr[0]) ]]
+                        - slot-1 **only if** slot-0 actually entered the GHR this cycle
+
+                        After the A. +1 we are on slot-0's bit. We must advance **one more**
+                        step so that slot-1 trains the *same* PHT row as slot-0, just a different
+                        2-bit slice/counter.
+
+                        Without this extra hop the second update lands in the next
+                        gshare row; the BPU never looks at that row, so slot-1's
+                        counter is trained but never read -> accuracy collapses.
+                     */
                 // hash    : cur.hash
             };
 
@@ -284,6 +313,7 @@ module btq #(
                     hit     : f_in.hit[i],
                     hit_slot: f_in.hit_slot[i],
                     slot_idx: f_in.slot_idx[i],
+                    in_ghr  : f_in.in_ghr[i],
                     // hash    : f_in.hash[i],
                     ghr_base: f_in.ghr_base[i]
                 };

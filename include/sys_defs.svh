@@ -31,7 +31,7 @@
 // `define SYNTH // synth only constructions // FIXME: how can we implement this in Makefile?
 
 `ifndef SYNTH
-`define DEBUG
+// `define DEBUG
 // `define CYCLE_PRINT // clock cycle print
 // `define PC_GEN_TEST_MODE
 `define FORMAL
@@ -411,8 +411,8 @@ typedef struct packed {
     struct packed {
         logic       vld;
         logic [3:0] off;
-        logic       in_ghr;
     } [1:0] slot;
+    logic [1:0] in_ghr;
 
     GHR_IDX     ghr_base_n1;
     logic       always_take;// ft ? <IGNORE>: " of pred-taken branch
@@ -472,6 +472,7 @@ typedef struct packed {
     logic   [N-1:0]     hit;
     logic   [N-1:0]     hit_slot;
     logic   [N-1:0]     slot_idx;
+    logic   [N-1:0][1:0]in_ghr;
     // logic   [N-1:0][GHR_LEN-1:0] hash; // gshare hash index
     GHR_IDX [N-1:0]     ghr_base;
 } fetch2btq;

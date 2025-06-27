@@ -402,6 +402,7 @@ module align (
         logic   [NUM_W-1:0]        hit;
         logic   [NUM_W-1:0]        hit_slot;
         logic   [NUM_W-1:0]        slot_idx;
+        logic   [NUM_W-1:0][1:0]   in_ghr;
         // logic   [NUM_W-1:0][GHR_LEN-1:0] hash; // gshare hash index
         GHR_IDX [NUM_W-1:0] ghr_base;
     } btq_wr_cand, btq_wr_comp;
@@ -412,8 +413,8 @@ module align (
         logic vgt0, vgt1;
         assign ve0 = r.slot[0].vld && (r.slot[0].off == raw_off[w]);
         assign ve1 = r.slot[1].vld && (r.slot[1].off == raw_off[w]);
-        assign vgt0= r.slot[0].in_ghr && r.slot[0].vld && (raw_off[w] > r.slot[0].off);
-        assign vgt1= r.slot[1].in_ghr && r.slot[1].vld && (raw_off[w] > r.slot[1].off);
+        assign vgt0= r.in_ghr[0] && r.slot[0].vld && (raw_off[w] > r.slot[0].off);
+        assign vgt1= r.in_ghr[1] && r.slot[1].vld && (raw_off[w] > r.slot[1].off);
 
         assign r = rrb_in_dat[rrb_prefix[w]];
         assign is_end = raw.is_end[w];
@@ -432,6 +433,7 @@ module align (
         assign btq_wr_cand.hit         [w] = r.hit;
         assign btq_wr_cand.hit_slot    [w] = ve0 || ve1;
         assign btq_wr_cand.slot_idx    [w] = ve1;
+        assign btq_wr_cand.in_ghr      [w] = r.in_ghr;
         // assign btq_wr_cand.hash        [w] = r.hash; // FIXME
         // assign btq_wr_cand.ghr_base    [w] = r.ghr_base_n1 - (2'(vgt0) + 2'(vgt1)); // FIXME
         assign btq_wr_cand.ghr_base    [w] = r.ghr_base_n1 - (vgt0 + vgt1); // FIXME
@@ -487,6 +489,7 @@ module align (
             btq_wr_comp.hit         [win_idx] = btq_wr_cand.hit     [w];
             btq_wr_comp.hit_slot    [win_idx] = btq_wr_cand.hit_slot[w];
             btq_wr_comp.slot_idx    [win_idx] = btq_wr_cand.slot_idx[w];
+            btq_wr_comp.in_ghr      [win_idx] = btq_wr_cand.in_ghr  [w];
             // btq_wr_comp.hash        [win_idx] = btq_wr_cand.hash    [w]; // FIXME
             btq_wr_comp.ghr_base    [win_idx] = btq_wr_cand.ghr_base[w]; // FIXME
         end
@@ -503,6 +506,7 @@ module align (
     assign btq_out.hit      [N-1:0] = btq_wr_comp.hit       [N-1:0];
     assign btq_out.hit_slot [N-1:0] = btq_wr_comp.hit_slot  [N-1:0];
     assign btq_out.slot_idx [N-1:0] = btq_wr_comp.slot_idx  [N-1:0];
+    assign btq_out.in_ghr   [N-1:0] = btq_wr_comp.in_ghr    [N-1:0];
     // assign btq_out.hash     [N-1:0] = btq_wr_comp.hash      [N-1:0]; // FIXME
     assign btq_out.ghr_base [N-1:0] = btq_wr_comp.ghr_base  [N-1:0]; // FIXME
     endgenerate

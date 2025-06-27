@@ -168,6 +168,7 @@ module bpu (
             hit         : uftb_io.o_vld,
             
             slot        : '0, // filled below
+            in_ghr      : in_ghr,
             ghr_base_n1 : ghr_io.base_n1,
             always_take : slot.always_take,
             md          : (pred_idx == 0) ? COND_MD : e.md1
@@ -176,8 +177,7 @@ module bpu (
         for (int i = 0; i < NUM_BR_SLOTS; ++i) begin
             buf_io.i_dat.slot[i] = '{
                 vld : e.br_slot[i].vld,
-                off : e.br_slot[i].off,
-                in_ghr : in_ghr[i]
+                off : e.br_slot[i].off
             };
         end
     end
@@ -237,7 +237,7 @@ module bpu (
         .wshf_out   (ghr_io.wshf_out),
         .base_n1    (ghr_io.base_n1),
 
-        .ridx       (i_udat.ghr_base + 1'b1),
+        .ridx       (i_udat.ghr_base),
             /* FIXME: hacky fix. We want the history LEADING UP TO the branch––
             should not include the branch itself!! */
         .rd_ghist   (ghr_io.rd_ghist)
@@ -255,12 +255,12 @@ module bpu (
         .reset,
 
         .i_uen,
-        .i_uhash(rd_fh),
-        // .i_uhash(rd_fh ^ i_udat.base[FH_LEN-1:0]),
+        // .i_uhash(rd_fh),
+        .i_uhash(rd_fh ^ i_udat.base[FH_LEN-1:0]),
         .i_udat,
 
-        .i_hash (fh),
-        // .i_hash (fh ^ pc_reg[FH_LEN-1:0]),
+        // .i_hash (fh),
+        .i_hash (fh ^ pc_reg[FH_LEN-1:0]),
         .o_pred (gshare_io.pred)
 
     );
