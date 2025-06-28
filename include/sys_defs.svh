@@ -81,11 +81,7 @@ parameter MAX_FB_SPAN   = 16; // maximum span of a fetch block (in words/insns)
 parameter BRANCH_PRED_SZ= 'x; // FIXME
 parameter GHR_BUF_SZ    = 128;
 parameter GHR_LEN       = 80;
-parameter FH_LEN        = 14;
-    /* FIXME: GHR_LEN == FH_LEN makes this non-folded gshare and yet it still
-    performs poorly on branchy_nested.s -> this indicates we broke something */
-// parameter GHR_LEN       = 32;
-// parameter FH_LEN        = 14;
+parameter FH_LEN        = 10;
 parameter RAS_SZ        = 16;
 parameter FTQ_SZ        = 32;
 
@@ -491,12 +487,10 @@ typedef struct packed {
 } btq2fetch;
 
 typedef struct packed {
-    // WADDR [NUM_FU_BRU-1:0] PC; // Does BRU need to carry PC if we can supply it like so?
     logic [NUM_FU_BRU-1:0] is_tail;
     logic [NUM_FU_BRU-1:0] pred;
     WADDR [NUM_FU_BRU-1:0] pred_tgt;
     logic [NUM_FU_BRU-1:0][3:0] fb_off;
-    logic   [NUM_FU_BRU-1:0]ghr_vld;
     GHR_IDX [NUM_FU_BRU-1:0]ghr_base;
 } btq2execute;
 
@@ -906,13 +900,12 @@ typedef struct packed {
     logic   [NUM_FU_BRU-1:0] take;
     WADDR   [NUM_FU_BRU-1:0] tgt;
     BTQ_IDX [NUM_FU_BRU-1:0] btq_idx;
-    logic   [NUM_FU_BRU-1:0] ghr_vld;   // was the branch shifted into the GHR at all?
-    GHR_IDX [NUM_FU_BRU-1:0] ghr_base;
 
     BMASK       clmsk; // OR of all b1hots of resolving branches
 
     // misprediction
     logic       flush;
+    GHR_IDX     flush_ghr_base;
     WADDR       flush_fb_base;
     logic[3:0]  flush_fb_off;
         /* Invariants:

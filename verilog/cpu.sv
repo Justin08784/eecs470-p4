@@ -171,6 +171,7 @@ module cpu (
         .f_out  (btq_2_f)
     );
 
+`ifdef DEBUG
     logic [GHR_BUF_SZ-1:0] true_ghr;
     always_ff @(posedge clock) begin
         if (reset)
@@ -178,6 +179,7 @@ module cpu (
         else if (btq_2_f.bpu_uen)
             true_ghr <= (true_ghr << 1) | btq_2_f.bpu_udat.take;
     end
+`endif
 
 
     /* >> ==== Reservation station (RS) ==== >> */

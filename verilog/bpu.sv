@@ -139,7 +139,7 @@ module bpu (
             ghr_io.wen_cnt = 0;
         else
             ghr_io.wen_cnt = ghr_wvld_cnt;
-        ghr_io.wpred = pred >> !leq0;
+        ghr_io.wpred = pred >> !leq0; // !leq0 is in_ghr[0] without the validity check
             /* FIXME: extremely hacky
             When the current fb off is BEYOND the 1st branch slot, then
             the first branch we can shift into the GHR is the 2nd branch slot. */
@@ -230,7 +230,7 @@ module bpu (
 
         .flush,
         .flush_take (cbru_in.take),
-        .flush_idx  (cbru_in.ghr_base),
+        .flush_idx  (cbru_in.flush_ghr_base),
 
         .wen_cnt    (ghr_io.wen_cnt),
         .wshf_in    (ghr_io.wpred),

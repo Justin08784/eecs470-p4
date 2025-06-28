@@ -260,11 +260,10 @@ module bru_ex(
         take    : tmp_take,
         tgt     : addr2w(tmp_res),
         btq_idx : i_reg.btq_idx,
-        ghr_vld : btq_in.ghr_vld,
-        ghr_base: btq_in.ghr_base,
 
         clmsk   : i_vld ? i_reg.b1hot : '0,
         flush           : i_vld & mispred,
+        flush_ghr_base  : btq_in.ghr_base,
         flush_fb_base   : flush_fb_base,
         flush_fb_off    : flush_fb_off
     };
