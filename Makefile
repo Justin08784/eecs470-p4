@@ -297,6 +297,7 @@ CPU_SOURCES = verilog/cpu.sv \
 			verilog/free_list.sv \
 			verilog/ftq.sv \
 			verilog/ghr.sv \
+			verilog/ghr_chk.sv \
 			verilog/gshare.sv \
 			verilog/map_table.sv \
 			verilog/memDP.sv \

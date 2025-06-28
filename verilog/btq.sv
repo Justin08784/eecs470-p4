@@ -224,7 +224,7 @@ module btq #(
             puq_enq_flt[nret_prefix_cnt[i]] = puq_enq_raw[i];
 
         // handle fetch (outs)
-        f_out.bpu_uen   = !puq_empty & !flush;
+        f_out.bpu_uen   = !puq_empty & !flush; // FIXME: !flush should not be hardcoded here. It should be packaged as part of bpu_urdy_scnt broadcast from bpu
             /* GHR has only 1 barrel shift port (rd_ghist), and flush takes
             precedence over retire-time BPU updates */
         f_out.btq_idxs_n= f_idxs_n;

@@ -88,11 +88,6 @@ module fhr #(
 
 endmodule
 
-/*
-TODO: The ghr must be sized large enough so that base does not write into the
-non-recoverable zone (NRZ). This invariant is what allows us to to eliminate the
-expensive "rslv" maintenance logic. Need assertions to check this during runtime.
-*/
 module ghr #(
     // parameter DEPTH     = 512, // must be geq than 2*GHR_LEN and a power of 2
     // parameter GHR_LEN   = 384,
@@ -125,14 +120,14 @@ module ghr #(
     output  logic [GHR_LEN-1:0] rd_ghist
 );
     initial begin
-        assert(N < DEPTH) else // FIXME
-            $fatal("GHR: N (%0d) must be smaller than DEPTH (%0d)", N, DEPTH);
+        assert(WPORTS < DEPTH) else
+            $fatal("GHR: WPORTS (%0d) must be smaller than DEPTH (%0d)", WPORTS, DEPTH);
+
+        assert(DEPTH >= GHR_LEN) else
+            $fatal("GHR: DEPTH (%0d) must be greater than or equal to GHR_LEN (%0d)", DEPTH, GHR_LEN);
 
         assert ((DEPTH != 0) && ((DEPTH & (DEPTH - 1)) == 0))
             else $fatal("GHR DEPTH must be a power of 2");
-
-        // assert (DEPTH >= 2*GHR_LEN)
-        //     else $fatal("GHR DEPTH must be >= 2*GHR_LEN");
     end
 
     VEC hist; // {0=ntake, 1=take}

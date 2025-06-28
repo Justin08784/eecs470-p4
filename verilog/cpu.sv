@@ -331,4 +331,34 @@ module cpu (
         illegal : retire_exec.illegal
     };
 
+`ifdef FORMAL
+    /* >> ==== Multi-module formal ==== >> */
+    begin
+        GHR_IDX [N-1:0] ret_ghr_base;
+        for (genvar i = 0; i < N; ++i)
+            assign ret_ghr_base[i] = btq0.rdat[i].ghr_base;
+
+        ghr_chk ghr_chk0 (
+            .clock,
+            .reset,
+
+            .base   (fetch0.bpu0.ghr0.base),
+            .hist   (fetch0.bpu0.ghr0.hist),
+
+            .flush,
+            .flush_ghr_base (ex_2_cbru.flush_ghr_base),
+
+            .retire_en_cnt  (btq0.rd_en_cnt),
+            .retire_ghr_base(ret_ghr_base),
+
+            .wshf_in_en_cnt (fetch0.bpu0.ghr0.wen_cnt),
+            .wshf_in        (fetch0.bpu0.ghr0.wshf_in),
+
+            .ubpu_ren       (fetch0.bpu0.upd_s2_n.uen_gshare),
+            .ubpu_ghr_base  (fetch0.bpu0.i_udat.ghr_base)
+        );
+
+    end
+`endif
+
 endmodule // pipeline

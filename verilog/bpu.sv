@@ -342,7 +342,7 @@ module bpu (
         else if (step)
             cur <= cur_n;
 
-        if (reset | flush)
+        if (reset)
             upd_s2  <= '0;
         else
             upd_s2  <= upd_s2_n;
