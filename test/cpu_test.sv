@@ -317,7 +317,7 @@ module testbench;
                     NPC     : w2addr(verisimpleV.rs0.d_in.dat[i].PC + 1)
                 };
             end
-`endif // SYNTH
+`endif
 
             // stop the processor
             if (error_status != NO_ERROR || clock_count > TB_MAX_CYCLES) begin
@@ -332,6 +332,9 @@ module testbench;
                 show_final_mem_and_status(error_status);
                 // output the final CPI
                 output_cpi_file();
+`ifdef DEBUG
+                verisimpleV.btq0.print_pred_stats;
+`endif
 
                 $display("\n---- Finished CPU Testbench ----\n");
                 $finish;
@@ -384,9 +387,7 @@ module testbench;
             if (reg_idx == `ZERO_REG) begin
 `ifdef CYCLE_PRINT
                     $fdisplay(wb_fileno, "(%4d) PC %4x:%-8s| ---          | CYCLE=%0d", id, pc, decode_inst(inst), clock_count);
-`endif
-
-`ifndef CYCLE_PRINT
+`else
                     $fdisplay(wb_fileno, "PC %4x:%-8s| ---", pc, decode_inst(inst));
 `endif
             end else begin
@@ -402,9 +403,7 @@ module testbench;
                           t_old,
                           tag
                 );
-`endif 
-
-`ifndef CYCLE_PRINT
+`else
                 $fdisplay(wb_fileno, "PC %4x:%-8s| r%02d=%-8x",
                           pc,
                           decode_inst(inst),
@@ -605,9 +604,9 @@ module testbench;
         if (!print_en)
             return;
 
-        $display("  | >> CYCLE: %3d (t: %3d)", clock_count-1, $time);
+        // $display("  | >> CYCLE: %3d (t: %3d)", clock_count-1, $time);
         // print_btb();
-        print_btq();
+        // print_btq();
 
         // verisimpleV.fetch0.bpu0.print_udat;
         // verisimpleV.fetch0.bpu0.gshare0.print_gshare;
@@ -627,7 +626,7 @@ module testbench;
         // print_execute();
         // print_dcache();
         // print_retire();
-        $display("  | << CYCLE: %3d (t: %3d)", clock_count-1, $time);
+        // $display("  | << CYCLE: %3d (t: %3d)", clock_count-1, $time);
 
         // $display("---- rob_debug contents ----");
         // foreach (rob_debug[idx]) begin

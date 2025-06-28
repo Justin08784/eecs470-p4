@@ -1,4 +1,24 @@
 `include "sys_defs.svh"
+module pred_s1 (
+    input   clock,
+    input   reset,
+    input   execute2complete_bru cbru_in,
+
+    input   logic       i_ftq_rdy,
+    output  logic       o_ftq_en,
+    output  FTQ_ENTRY   o_ftq_dat
+);
+    logic   flush;
+    assign  flush = cbru_in.flush;
+
+    logic   step;
+    struct packed {
+        logic[3:0]  off;    // in-FB offset
+        WADDR       base;   // current FB/FTB base
+    } cur, cur_n;
+    assign cur_n.off = '0;
+
+endmodule;
 
 /* Branch predictor unit (BPU):
 generates PCs for decoupled fetch (experimental) */
@@ -246,6 +266,20 @@ module bpu (
         .rd_ghist   (ghr_io.rd_ghist)
     );
 
+    struct packed {
+        logic   take;
+        logic   slot_idx;
+
+        logic   uen_gshare;
+        logic   [FH_LEN-1:0] hash_gshare;
+    } upd_s2, upd_s2_n;
+    assign upd_s2_n = '{
+        take        : i_udat.take,
+        slot_idx    : i_udat.slot_idx,
+        uen_gshare  : i_uen && i_udat.en_dir_update && i_udat.md.cond, // train only on conditional branches!
+        hash_gshare : rd_fh ^ i_udat.base[FH_LEN-1:0]
+    };
+
     always_ff @(posedge clock) begin
         if (!reset)
             assert (fhr0.fh == fhr0.compute_fh(ghr0.ghist)) else $fatal;
@@ -257,10 +291,10 @@ module bpu (
         .clock,
         .reset,
 
-        .i_uen,
-        // .i_uhash(rd_fh),
-        .i_uhash(rd_fh ^ i_udat.base[FH_LEN-1:0]),
-        .i_udat,
+        .i_uen      (upd_s2.uen_gshare),
+        .i_utake    (upd_s2.take),
+        .i_uslot_idx(upd_s2.slot_idx),
+        .i_uhash    (upd_s2.hash_gshare),
 
         // .i_hash (fh),
         .i_hash (fh ^ cur.base[FH_LEN-1:0]),
@@ -307,6 +341,11 @@ module bpu (
             };
         else if (step)
             cur <= cur_n;
+
+        if (reset | flush)
+            upd_s2  <= '0;
+        else
+            upd_s2  <= upd_s2_n;
     end
 
 `ifdef DEBUG
@@ -314,7 +353,7 @@ module bpu (
         $display(">> bpu");
         $display("(cur.base: %d, off: %0d, pred: [%b, %b]), step: %b, buf_rdy: %b, ftq_rdy: %b",
             cur.base,
-            off,
+            cur.off,
             pred[0],
             pred[1],
             step,

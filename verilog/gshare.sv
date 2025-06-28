@@ -87,9 +87,10 @@ module gshare (
     input   reset,
 
     // puq updates
-    input   logic       i_uen,
+    input   logic   i_uen,
+    input   logic   i_utake,
+    input   logic   i_uslot_idx,
     input   logic [FH_LEN-1:0] i_uhash,
-    input   BPU_UPD_PKT i_udat,
 
     // fetch
     input   logic [FH_LEN-1:0] i_hash,
@@ -118,29 +119,25 @@ module gshare (
 `endif
             for (int i = 0; i < PHT_SZ; ++i)
                 pht[i] <= {WT, WT};
-        end else if (i_uen && i_udat.en_dir_update && i_udat.md.cond) begin // train only on conditional branches!
+        end else if (i_uen) begin
 `ifdef DEBUG
-            touched[i_uhash][i_udat.slot_idx] <= '1;
+            touched[i_uhash][i_uslot_idx] <= '1;
 `endif
-            if (i_udat.slot_idx)
-                pht[i_uhash][3:2] <= update_sc(urec[3:2], i_udat.take);
-                // pht[i_uhash][3:2] <= update_sc(pht[i_uhash][3:2], i_udat.take);
+            if (i_uslot_idx)
+                pht[i_uhash][3:2] <= update_sc(urec[3:2], i_utake);
             else
-                pht[i_uhash][1:0] <= update_sc(urec[1:0], i_udat.take);
-                // pht[i_uhash][1:0] <= update_sc(pht[i_uhash][1:0], i_udat.take);
-            // pht[i_uhash][1:0] <= i_udat.slot_idx ? urec[1:0] : update_sc(urec[1:0], i_udat.take);
-            // pht[i_uhash][3:2] <= i_udat.slot_idx ? update_sc(urec[3:2], i_udat.take) : urec[3:2];
+                pht[i_uhash][1:0] <= update_sc(urec[1:0], i_utake);
         end
     end
 
 `ifdef DEBUG
     task print_gshare;
         $display(">> gshare");
-        if (i_uen && i_udat.en_dir_update && i_udat.md.cond)
+        if (i_uen)
             $display("i_uhash: %b, take: %b, slot_idx: %b, urec: [%b, %b]",
                 i_uhash,
-                i_udat.take,
-                i_udat.slot_idx,
+                i_utake,
+                i_uslot_idx,
                 urec[1:0],
                 urec[3:2]
             );
@@ -162,7 +159,7 @@ module gshare (
     //         o_pred[0],
     //         o_pred[1]
     //     );
-        $display("upd: {en: %b, base: %d, take: %b, i_uhash: %b, slot_idx: %b}", i_uen, i_udat.base, i_udat.take, i_uhash, i_udat.slot_idx);
+        $display("upd: {en: %b, take: %b, i_uhash: %b, slot_idx: %b}", i_uen, i_utake, i_uhash, i_uslot_idx);
         $display("<< gshare");
     endtask
 `endif

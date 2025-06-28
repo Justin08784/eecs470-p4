@@ -3,6 +3,7 @@
 typedef struct packed {
 `ifdef DEBUG
     BMASK   b1hot;
+    BRANCH_RESO_CODE reso;
 `endif
     WADDR   PC;
     logic   is_tail;
@@ -67,6 +68,13 @@ module btq #(
 
     logic [NUM_RPORTS:0][`IDX_SIZE(BTQ_SZ)-1:0] r_idxs_n;
     logic [NUM_FPORTS:0][`IDX_SIZE(BTQ_SZ)-1:0] f_idxs_n;
+
+`ifdef DEBUG
+    int num_branches_retired;
+    int num_branches_mispred [$];
+
+    logic [NUM_RPORTS-1:0] new_branches_mispred;
+`endif
 
     ring_ctr #(
         .DEPTH(BTQ_SZ),
@@ -158,6 +166,11 @@ module btq #(
         for (int i = 0; i < NUM_RPORTS; ++i) begin
             BTQ_ENTRY cur;
             cur = rdat[i];
+`ifdef DEBUG
+            new_branches_mispred[i] =
+                cur.reso.pred != cur.reso.take  ? 1 :
+                cur.reso.pred                   ? !cur.reso.corr_tgt : 0;
+`endif
 
             puq_enq_raw[i] = '{
                 base    : cur.PC - cur.off,
@@ -276,6 +289,7 @@ module btq #(
                 state[idx].take <= cbru_in.take[i];
 `ifdef DEBUG
                 state[idx].b1hot<= '0;
+                state[idx].reso <= cbru_in.reso[i];
 `endif
             end
 
@@ -297,6 +311,7 @@ module btq #(
                 state[idx] <= '{
 `ifdef DEBUG
                     b1hot   : '0,
+                    reso    : '0,
 `endif
                     PC      : f_in.PC[i],
                     is_tail : f_in.is_tail[i],
@@ -322,6 +337,38 @@ module btq #(
 
 
 `ifdef DEBUG
+    localparam branch_bin_sz = 200;
+    always_ff @(posedge clock) begin
+        if (reset) begin
+            num_branches_retired <= 0;
+
+        end else begin
+            int num_bins;
+            num_bins = num_branches_mispred.size;
+
+            num_branches_retired <= num_branches_retired + rd_en_cnt;
+
+            for (int i = 0; i < rd_en_cnt; ++i) begin
+                int bin;
+                bin = (num_branches_retired + i) / branch_bin_sz;
+                if (bin >= num_bins)
+                    num_branches_mispred.push_back(0);
+
+                num_branches_mispred[$] += new_branches_mispred[i];
+            end
+
+        end
+    end
+    
+    task print_pred_stats;
+        int num_bins;
+        num_bins = num_branches_mispred.size;
+        $display("num_bins: %d", num_bins);
+        $display("num_branches_retired: %d", num_branches_retired);
+        for (int i = 0; i < num_bins; ++i)
+            $display("%4d-%4d: %4d", branch_bin_sz*i, branch_bin_sz*(i+1), num_branches_mispred[i]);
+    endtask
+
     task print_btq;
         logic [BTQ_SZ-1:0] btq_vld;
 

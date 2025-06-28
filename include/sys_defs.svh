@@ -895,6 +895,12 @@ typedef struct packed {
 
 // branch completion bus
 typedef struct packed {
+    logic pred;
+    logic take;
+    logic corr_tgt;
+} BRANCH_RESO_CODE;
+
+typedef struct packed {
     // resolution
     logic   [NUM_FU_BRU-1:0] en;
     logic   [NUM_FU_BRU-1:0] take;
@@ -904,6 +910,9 @@ typedef struct packed {
     BMASK       clmsk; // OR of all b1hots of resolving branches
 
     // misprediction
+`ifdef DEBUG
+    BRANCH_RESO_CODE [NUM_FU_BRU-1:0] reso;
+`endif
     logic       flush;
     GHR_IDX     flush_ghr_base;
     WADDR       flush_fb_base;

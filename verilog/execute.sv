@@ -251,6 +251,19 @@ module bru_ex(
     };
 
 
+    logic pred;
+    logic take;
+    logic corr_tgt;
+
+`ifdef DEBUG
+    BRANCH_RESO_CODE reso;
+    assign reso = '{
+        pred    :pred,
+        take    :take,
+        corr_tgt:corr_tgt
+    };
+`endif
+
     logic mispred;
     WADDR flush_fb_base;
     logic [3:0] flush_fb_off;
@@ -261,6 +274,9 @@ module bru_ex(
         tgt     : addr2w(tmp_res),
         btq_idx : i_reg.btq_idx,
 
+`ifdef DEBUG
+        reso    : reso,
+`endif
         clmsk   : i_vld ? i_reg.b1hot : '0,
         flush           : i_vld & mispred,
         flush_ghr_base  : btq_in.ghr_base,
@@ -270,9 +286,6 @@ module bru_ex(
 
 
     always_comb begin
-        logic pred;
-        logic take;
-        logic corr_tgt;
         WADDR npc;
         WADDR tgt;
 
