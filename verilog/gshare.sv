@@ -97,40 +97,33 @@ module gshare (
     output  logic [NUM_BR_SLOTS-1:0] o_pred
 );
     localparam PHT_SZ = 1 << FH_LEN;
-`ifdef DEBUG
-    logic [PHT_SZ-1:0][1:0] touched;
-`endif
     // logic [1:0] pht [PHT_SZ-1:0]; // ram inference?
-    logic [PHT_SZ-1:0][3:0] pht;
-    logic [3:0] rrec;
-    logic [3:0] urec; // read, update records
+    SC_2BIT [PHT_SZ-1:0][1:0] pht;
+    SC_2BIT [1:0] rrec, urec; // read, update records
 
-    // assign i_hash = i_ghr ^ i_qry[GHR_LEN-1:0];
     assign rrec = pht[i_hash];
-    assign o_pred[0] = query_sc(rrec[1:0]);
-    assign o_pred[1] = query_sc(rrec[3:2]);
+    assign o_pred[0] = query_sc(rrec[0]);
+    assign o_pred[1] = query_sc(rrec[1]);
 
     assign urec = pht[i_uhash];
-
     always_ff @(posedge clock) begin
-        if (reset) begin
-`ifdef DEBUG
-            touched <= '0;
-`endif
+        if (reset)
             for (int i = 0; i < PHT_SZ; ++i)
                 pht[i] <= {WT, WT};
-        end else if (i_uen) begin
-`ifdef DEBUG
-            touched[i_uhash][i_uslot_idx] <= '1;
-`endif
-            if (i_uslot_idx)
-                pht[i_uhash][3:2] <= update_sc(urec[3:2], i_utake);
-            else
-                pht[i_uhash][1:0] <= update_sc(urec[1:0], i_utake);
-        end
+        else if (i_uen)
+            pht[i_uhash][i_uslot_idx] <= update_sc(urec[i_uslot_idx], i_utake);
     end
 
 `ifdef DEBUG
+    logic [PHT_SZ-1:0][1:0] touched;
+
+    always_ff @(posedge clock) begin
+        if (reset)
+            touched <= '0;
+        else if (i_uen)
+            touched[i_uhash][i_uslot_idx] <= '1;
+    end
+
     task print_gshare;
         $display(">> gshare");
         if (i_uen)

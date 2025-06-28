@@ -292,7 +292,7 @@ typedef enum logic [1:0] {
     WN = 2'b01,
     WT = 2'b10,
     ST = 2'b11
-} SC_STATE;
+} SC_2BIT;
 
 function automatic logic [1:0] update_sc(
     input logic unsigned [1:0] sc,

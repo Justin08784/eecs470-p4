@@ -604,11 +604,11 @@ module testbench;
         if (!print_en)
             return;
 
-        $display("  | >> CYCLE: %3d (t: %3d)", clock_count-1, $time);
+        // $display("  | >> CYCLE: %3d (t: %3d)", clock_count-1, $time);
         // print_btb();
-        print_btq();
+        // print_btq();
         // print_fetch();
-        verisimpleV.bpu0.uftb0.print_uftb;
+        // verisimpleV.bpu0.uftb0.print_uftb;
 
         // verisimpleV.fetch0.bpu0.print_udat;
         // verisimpleV.fetch0.bpu0.gshare0.print_gshare;
@@ -626,7 +626,7 @@ module testbench;
         // print_execute();
         // print_dcache();
         // print_retire();
-        $display("  | << CYCLE: %3d (t: %3d)", clock_count-1, $time);
+        // $display("  | << CYCLE: %3d (t: %3d)", clock_count-1, $time);
 
         // $display("---- rob_debug contents ----");
         // foreach (rob_debug[idx]) begin
