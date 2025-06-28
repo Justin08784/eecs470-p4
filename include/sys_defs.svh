@@ -363,33 +363,6 @@ typedef struct packed {
 } FTB_UPD_PKT;
 
 typedef struct packed {
-    // FTB_UPD_PKT fields
-    WADDR       base;
-    logic [3:0] fb_off; // pc = base + fb_off
-    logic       take;
-    WADDR       tgt;
-
-    logic       always_take; // i.e. a cond branch that is always taken?
-    FTB_MD1     md;
-
-    // predictor-specific fields
-    logic       en_dir_update;  // update direction predictors?
-    logic       slot_idx;
-    GHR_IDX     ghr_base;
-    // logic [GHR_LEN-1:0] hash;   // gshare hash
-} BPU_UPD_PKT;
-
-
-// ================
-// Owner: Fetch
-// ================
-// Packets: fetch
-typedef struct packed {
-    logic [N-1:0][`IDX_SIZE(RAS_SZ)-1:0] top;
-    logic [N-1:0][`CNT_SIZE(RAS_SZ)-1:0] used;
-} RAS_SNAP;
-
-typedef struct packed {
 `ifdef PC_GEN_TEST_MODE
     int id;
 `endif
@@ -415,6 +388,41 @@ typedef struct packed {
     FTB_MD1     md;         // ft ? <IGNORE>: " of pred-tkaen branch
 } FTQ_ENTRY;
 
+typedef struct packed {
+    // FTB_UPD_PKT fields
+    WADDR       base;
+    logic [3:0] fb_off; // pc = base + fb_off
+    logic       take;
+    WADDR       tgt;
+
+    logic       always_take; // i.e. a cond branch that is always taken?
+    FTB_MD1     md;
+
+    // predictor-specific fields
+    logic       en_dir_update;  // update direction predictors?
+    logic       slot_idx;
+    GHR_IDX     ghr_base;
+    // logic [GHR_LEN-1:0] hash;   // gshare hash
+} BPU_UPD_PKT;
+
+// I/O: BPU
+typedef struct packed {
+    `CNT_TYPE(2)    vld_scnt;
+    FTQ_ENTRY[1:0]  dat;
+} bpu2fetch;
+
+typedef struct packed {
+    logic   urdy;   // ready to receive update?
+} bpu2btq;
+
+// ================
+// Owner: Fetch
+// ================
+// Packets: fetch
+typedef struct packed {
+    logic [N-1:0][`IDX_SIZE(RAS_SZ)-1:0] top;
+    logic [N-1:0][`CNT_SIZE(RAS_SZ)-1:0] used;
+} RAS_SNAP;
 
 typedef struct packed {
     // struct guard
@@ -436,6 +444,10 @@ typedef struct packed {
 } IF_ID_PKT;
 
 // I/O: fetch
+typedef struct packed {
+    `CNT_TYPE(2)    ren_cnt;
+} fetch2bpu;
+
 typedef struct packed {
     DWADDR              dw;
     logic   [1:0][3:0]  off;
@@ -478,12 +490,14 @@ typedef struct packed {
     IF_ID_PKT   [N-1:0] dat;
 } fetch2decode;
 
+// ================
+// Owner: Branch target queue (BTQ)
+// ================
+// Packets: BTQ
+// I/O: BTQ
 typedef struct packed {
     `CNT_TYPE(N)    rdy_scnt;
     BTQ_IDX [N-1:0] btq_idxs_n;
-
-    logic       bpu_uen;
-    BPU_UPD_PKT bpu_udat;
 } btq2fetch;
 
 typedef struct packed {
@@ -493,6 +507,11 @@ typedef struct packed {
     logic [NUM_FU_BRU-1:0][3:0] fb_off;
     GHR_IDX [NUM_FU_BRU-1:0]ghr_base;
 } btq2execute;
+
+typedef struct packed {
+    logic       uen;
+    BPU_UPD_PKT udat;
+} btq2bpu;
 
 // ================
 // Owner: Decode

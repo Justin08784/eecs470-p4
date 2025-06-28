@@ -678,9 +678,8 @@ module dcf (
         fb_base–– instead flush_PC is more likely to be a nonzero offset INO the FB.
         */
 
-    input   `CNT_TYPE(2)    i_vld_scnt,
-    input   FTQ_ENTRY[1:0]  i_dat,
-    output  `CNT_TYPE(2)    o_ren_cnt,
+    input   bpu2fetch   bpu_in,
+    output  fetch2bpu   bpu_out,
 
     input   decode2fetch d_in,
     output  fetch2decode d_out,
@@ -713,9 +712,9 @@ module dcf (
         .flush_fb_base      (cbru_in.flush_fb_base),
         .flush_fb_off       (cbru_in.flush_fb_off),
 
-        .ftq_in_vld_scnt    (i_vld_scnt),
-        .ftq_in_dat         (i_dat),
-        .ftq_out_ren_cnt    (o_ren_cnt),
+        .ftq_in_vld_scnt    (bpu_in.vld_scnt),
+        .ftq_in_dat         (bpu_in.dat),
+        .ftq_out_ren_cnt    (bpu_out.ren_cnt),
 
         .ixq_in_rdy_scnt    (ixq2pc_gen_rdy_scnt),
         .ixq_out_wen_cnt    (pc_gen2ixq_wen_cnt),
@@ -893,21 +892,4 @@ module dcf (
         end
 
     end
-
-`ifdef FORMAL
-    /* Since the FTQ_ENTRY does not store the current base (it only stores base_n),
-    it is *vital* that upon reset, flush, or–– in the future–– steer, the BPU and
-    pc_gen are both reset to same fb base AND in-fb offset. */
-
-    property bpu_pcgen_converge_after_redirect;
-        @(posedge clock)
-            disable iff (reset)
-            flush |=> // TODO: add steer too
-                (bpu0.cur.base  == pc_gen0.cur.base) &&
-                (bpu0.cur.off   == pc_gen0.cur.off);
-    endproperty
-
-    Bpu_Pcgen_Converge_After_Redirect: assert property(bpu_pcgen_converge_after_redirect)
-        else $fatal;
-`endif
 endmodule

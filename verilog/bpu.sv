@@ -32,15 +32,20 @@ module bpu (
     input   reset,
     input   execute2complete_bru cbru_in,
 
-    input   logic       i_uen,
-    input   BPU_UPD_PKT i_udat,
+    input   btq2bpu     btq_in,
+    output  bpu2btq     btq_out,
 
-    output  `CNT_TYPE(2)    o_vld_scnt,
-    output  FTQ_ENTRY[1:0]  o_dat,
-    input   `CNT_TYPE(2)    i_ren_cnt
+    input   fetch2bpu   f_in,
+    output  bpu2fetch   f_out
 );
     logic flush;
     assign flush = cbru_in.flush;
+
+    logic       i_uen;
+    BPU_UPD_PKT i_udat;
+    assign i_uen = btq_in.uen;
+    assign i_udat= btq_in.udat;
+    assign btq_out.urdy = !flush;
 
     logic step;
     struct packed {
@@ -351,9 +356,9 @@ module bpu (
         .wen        (ftq_skid_2_ftq.wen),
         .wdat       (ftq_skid_2_ftq.wdat),
 
-        .vld_scnt   (o_vld_scnt),
-        .rdat       (o_dat),
-        .ren_cnt    (i_ren_cnt)
+        .vld_scnt   (f_out.vld_scnt),
+        .rdat       (f_out.dat),
+        .ren_cnt    (f_in.ren_cnt)
     );
 
     always_ff @(posedge clock) begin

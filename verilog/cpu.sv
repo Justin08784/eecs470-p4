@@ -53,49 +53,48 @@ module cpu (
 
 
     /* >> ==== Branch predictor unit (BPU) ==== >> */
-    btq2fetch       btq_2_f;
-
-    `CNT_TYPE(2)    bpu2fetch_vld_scnt;
-    FTQ_ENTRY [1:0] bpu2fetch_dat;
-    `CNT_TYPE(2)    fetch2bpu_ren_cnt;
+    bpu2fetch   bpu_2_f;
+    fetch2bpu   f_2_bpu;
+    bpu2btq     bpu_2_btq;
+    btq2bpu     btq_2_bpu;
 
     bpu bpu0 (
         .clock,
         .reset,
         .cbru_in    (ex_2_cbru),
 
-        .i_uen      (btq_2_f.bpu_uen),
-        .i_udat     (btq_2_f.bpu_udat),
+        .btq_in     (btq_2_bpu),
+        .btq_out    (bpu_2_btq),
 
-        .o_vld_scnt (bpu2fetch_vld_scnt),
-        .o_dat      (bpu2fetch_dat),
-        .i_ren_cnt  (fetch2bpu_ren_cnt)
+        .f_out      (bpu_2_f),
+        .f_in       (f_2_bpu)
     );
+
 
     /* >> ==== Fetch ==== >> */
     fetch2decode f_2_decode;
     decode2fetch decode_2_f;
-    fetch2btq    f_2_btq;
+    fetch2btq   f_2_btq;
+    btq2fetch   btq_2_f;
     rename2snap_bus rnme_2_snap;
 
     dcf fetch0 (
         .clock,
         .reset,
-        .cbru_in(ex_2_cbru),
+        .cbru_in    (ex_2_cbru),
 
-        .i_vld_scnt (bpu2fetch_vld_scnt),
-        .i_dat      (bpu2fetch_dat),
-        .o_ren_cnt  (fetch2bpu_ren_cnt),
+        .bpu_in     (bpu_2_f),
+        .bpu_out    (f_2_bpu),
 
-        .d_in   (decode_2_f),
-        .d_out  (f_2_decode),
-        .btq_in (btq_2_f),
-        .btq_out(f_2_btq),
+        .d_in       (decode_2_f),
+        .d_out      (f_2_decode),
+        .btq_in     (btq_2_f),
+        .btq_out    (f_2_btq),
 
-        .snap_in(rnme_2_snap),
+        .snap_in    (rnme_2_snap),
 
-        .mem_out(f2mem),
-        .mem_in (mem2f)
+        .mem_out    (f2mem),
+        .mem_in     (mem2f)
     );
 
 
@@ -168,8 +167,8 @@ module cpu (
 
 
     /* >> ==== Retire ==== >> */
-    rob2retire rob_2_retire;
-    RETIRE_PKT    retire_exec;
+    rob2retire  rob_2_retire;
+    RETIRE_PKT  retire_exec;
 
     retire retire0 (
         .rob_in (rob_2_retire),
@@ -193,7 +192,9 @@ module cpu (
         .ex_out (btq_2_ex),
 
         .f_in   (f_2_btq),
-        .f_out  (btq_2_f)
+        .f_out  (btq_2_f),
+        .bpu_in (bpu_2_btq),
+        .bpu_out(btq_2_bpu)
     );
 
     /* >> ==== Reservation station (RS) ==== >> */
@@ -347,6 +348,21 @@ module cpu (
 
 `ifdef FORMAL
     /* >> ==== Multi-module formal ==== >> */
+
+    property bpu_pcgen_converge_after_redirect;
+        /* Since the FTQ_ENTRY does not store the current base (it only stores base_n),
+        it is *vital* that upon reset, flush, or–– in the future–– steer, the BPU and
+        pc_gen are both reset to same fb base AND in-fb offset. */
+        @(posedge clock)
+            disable iff (reset)
+            flush |=> // TODO: add steer too
+                (bpu0.cur.base  == fetch0.pc_gen0.cur.base) &&
+                (bpu0.cur.off   == fetch0.pc_gen0.cur.off);
+    endproperty
+
+    Bpu_Pcgen_Converge_After_Redirect: assert property(bpu_pcgen_converge_after_redirect)
+        else $fatal;
+
     begin
         GHR_IDX [N-1:0] ret_ghr_base;
         for (genvar i = 0; i < N; ++i)

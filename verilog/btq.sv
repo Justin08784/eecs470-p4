@@ -50,7 +50,11 @@ module btq #(
 
     // fetch
     input  fetch2btq    f_in,
-    output btq2fetch    f_out
+    output btq2fetch    f_out,
+
+    // bpu
+    input   bpu2btq     bpu_in,
+    output  btq2bpu     bpu_out
 );
     logic flush;
     BMASK clmsk;
@@ -224,7 +228,7 @@ module btq #(
             puq_enq_flt[nret_prefix_cnt[i]] = puq_enq_raw[i];
 
         // handle fetch (outs)
-        f_out.bpu_uen   = !puq_empty & !flush; // FIXME: !flush should not be hardcoded here. It should be packaged as part of bpu_urdy_scnt broadcast from bpu
+        bpu_out.uen   = !puq_empty & bpu_in.urdy;
             /* GHR has only 1 barrel shift port (rd_ghist), and flush takes
             precedence over retire-time BPU updates */
         f_out.btq_idxs_n= f_idxs_n;
@@ -262,8 +266,8 @@ module btq #(
 
         .wr_en_cnt  (nret_prefix_cnt[rd_en_cnt]),
         .wr_data    (puq_enq_flt),
-        .rd_en_cnt  (f_out.bpu_uen),
-        .rd_data    (f_out.bpu_udat),
+        .rd_en_cnt  (bpu_out.uen),
+        .rd_data    (bpu_out.udat),
         .free_scnt  (puq_rdy_scnt),
         .used_scnt  (),
         .empty      (puq_empty)
