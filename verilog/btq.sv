@@ -118,27 +118,9 @@ module btq #(
         .wdat   (snap_in.btq_tail)
     );
 
-    logic [NUM_RPORTS-1:0] nret;
-    logic [NUM_RPORTS:0][`CNT_SIZE(NUM_RPORTS)-1:0] nret_prefix_cnt;
-    generate
-    for (genvar i = 0; i < NUM_RPORTS; ++i) begin
-        assign nret[i] = !state[r_idxs_n[i]].md.ret; // nret = not a return instruction
-    end
-    endgenerate
-
-    compactor #(
-        .REQW(NUM_RPORTS),
-        .GNTW(NUM_RPORTS)
-    ) comp_nret (
-        .req        (nret),
-        .prefix_cnt (nret_prefix_cnt)
-    );
-
-
     logic puq_empty;
     `CNT_TYPE(NUM_RPORTS) puq_rdy_scnt;
-    BPU_UPD_PKT [NUM_RPORTS-1:0]puq_enq_raw,
-                                puq_enq_flt; // ret's filtered out (FIXME: probably dont want to filter out ret's to FTB)
+    BPU_UPD_PKT [NUM_RPORTS-1:0]puq_wdat;
 
     // btq retire window
     BTQ_ENTRY   [NUM_RPORTS-1:0] rdat;
@@ -176,7 +158,7 @@ module btq #(
                 cur.reso.pred                   ? !cur.reso.corr_tgt : 0;
 `endif
 
-            puq_enq_raw[i] = '{
+            puq_wdat[i] = '{
                 base    : cur.PC - cur.off,
                 fb_off  : cur.off,
                 take    : cur.take,
@@ -218,14 +200,9 @@ module btq #(
                         gshare row; the BPU never looks at that row, so slot-1's
                         counter is trained but never read -> accuracy collapses.
                      */
-                // hash    : cur.hash
             };
 
         end
-
-        puq_enq_flt = '0;
-        for (int i = 0; i < NUM_RPORTS; ++i)
-            puq_enq_flt[nret_prefix_cnt[i]] = puq_enq_raw[i];
 
         // handle fetch (outs)
         bpu_out.uen   = !puq_empty & bpu_in.urdy;
@@ -264,8 +241,8 @@ module btq #(
         .wr_bmask   ('0),
         // << unused inputs
 
-        .wr_en_cnt  (nret_prefix_cnt[rd_en_cnt]),
-        .wr_data    (puq_enq_flt),
+        .wr_en_cnt  (rd_en_cnt),
+        .wr_data    (puq_wdat),
         .rd_en_cnt  (bpu_out.uen),
         .rd_data    (bpu_out.udat),
         .free_scnt  (puq_rdy_scnt),

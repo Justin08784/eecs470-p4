@@ -396,8 +396,8 @@ module cpu (
     always_ff @(posedge clock) begin
         if (reset)
             true_ghr <= '0;
-        else if (btq_2_f.bpu_uen)
-            true_ghr <= (true_ghr << 1) | btq_2_f.bpu_udat.take;
+        else if (btq_2_bpu.uen)
+            true_ghr <= (true_ghr << 1) | btq_2_bpu.udat.take;
     end
 `endif
 

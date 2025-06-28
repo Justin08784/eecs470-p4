@@ -607,14 +607,14 @@ module testbench;
         $display("  | >> CYCLE: %3d (t: %3d)", clock_count-1, $time);
         // print_btb();
         print_btq();
+        // print_fetch();
+        verisimpleV.bpu0.uftb0.print_uftb;
 
         // verisimpleV.fetch0.bpu0.print_udat;
         // verisimpleV.fetch0.bpu0.gshare0.print_gshare;
-        // verisimpleV.fetch0.bpu0.uftb0.print_uftb;
         // $display("decode_en_cnt: %d", verisimpleV.decode0.f_in.wen_cnt);
         // $display("true_ghr: %b", verisimpleV.true_ghr);
 
-        // print_fetch();
         // print_decode();
         // print_fl();
         // print_rob();
