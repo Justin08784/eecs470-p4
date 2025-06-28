@@ -1,4 +1,4 @@
-    li x1, 100
+    li x1, 50
 loop1:
     li x2, 8
 loop2:

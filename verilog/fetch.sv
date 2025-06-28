@@ -942,8 +942,8 @@ module dcf (
         @(posedge clock)
             disable iff (reset)
             flush |=> // TODO: add steer too
-                (bpu0.pc_reg== pc_gen0.cur.base) &&
-                (bpu0.off   == pc_gen0.cur.off);
+                (bpu0.cur.base  == pc_gen0.cur.base) &&
+                (bpu0.cur.off   == pc_gen0.cur.off);
     endproperty
 
     Bpu_Pcgen_Converge_After_Redirect: assert property(bpu_pcgen_converge_after_redirect)

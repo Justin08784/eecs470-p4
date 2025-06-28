@@ -95,12 +95,7 @@ expensive "rslv" maintenance logic. Need assertions to check this during runtime
 */
 module ghr #(
     // parameter DEPTH     = 512, // must be geq than 2*GHR_LEN and a power of 2
-    // parameter GHR_LEN   = 256,
-    // parameter DEPTH     = 256,
-    // parameter GHR_LEN   = 8 * $bits(WADDR),
-
-    // parameter DEPTH     = 128,
-    // parameter GHR_LEN   = 40,
+    // parameter GHR_LEN   = 384,
     parameter DEPTH     = 128,
     parameter GHR_LEN   = 80,
 

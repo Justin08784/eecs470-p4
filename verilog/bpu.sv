@@ -23,8 +23,11 @@ module bpu (
     assign flush = cbru_in.flush;
 
     logic step;
-    logic [3:0] off; // in-FB offset
-    WADDR pc_reg, pc_reg_n; // current fb/ftb base
+    struct packed {
+        logic[3:0]  off;    // in-FB offset
+        WADDR       base;   // current FB/FTB base
+    } cur, cur_n;
+    assign cur_n.off = '0;
 
     struct packed {
         // fetch query
@@ -52,7 +55,7 @@ module bpu (
         logic [GHR_LEN-1:0] hash;
     } gshare_io;
 
-    assign uftb_io.i_qry = pc_reg;
+    assign uftb_io.i_qry = cur.base;
     assign uftb_io.i_uen = i_uen;
     assign uftb_io.i_udat= '{
         base        : i_udat.base,
@@ -111,8 +114,8 @@ module bpu (
         // cmp4(off, e.br_slot[1].off, eq1, lt1);
         // leq0 = eq0 || lt0;
         // leq1 = eq1 || lt1;
-        leq0 = off <= e.br_slot[0].off;
-        leq1 = off <= e.br_slot[1].off;
+        leq0 = cur.off <= e.br_slot[0].off;
+        leq1 = cur.off <= e.br_slot[1].off;
         pred[0] =
             !e.br_slot[0].vld ? 0 :
             leq0 && gshare_io.pred[0];
@@ -144,7 +147,7 @@ module bpu (
             When the current fb off is BEYOND the 1st branch slot, then
             the first branch we can shift into the GHR is the 2nd branch slot. */
 
-        pc_flt = pc_reg + `UCAST_LEN(
+        pc_flt = cur.base + `UCAST_LEN(
             (e.end_off == 4'd15)
                 ? 16
                 : e.end_off + `UCAST_FIT(1),
@@ -152,12 +155,12 @@ module bpu (
         );
 
         pc_jmp = slot.tgt;
-        pc_reg_n =
-            !uftb_io.o_vld ? pc_reg + `UCAST_FIT(16) :
+        cur_n.base =
+            !uftb_io.o_vld ? cur.base + `UCAST_FIT(16) :
             pred_any ? pc_jmp : pc_flt;
 
         buf_io.i_dat = '{
-            base_n      : pc_reg_n,
+            base_n      : cur_n.base,
             // hash        : gshare_io.hash,
 
             ft          : !pred_any,
@@ -260,24 +263,11 @@ module bpu (
         .i_udat,
 
         // .i_hash (fh),
-        .i_hash (fh ^ pc_reg[FH_LEN-1:0]),
+        .i_hash (fh ^ cur.base[FH_LEN-1:0]),
         .o_pred (gshare_io.pred)
 
     );
 
-
-    task automatic print_udat;
-        $display("base: %d, pred_fh: %b, pred: %b, wpred: %b", pc_reg, fh, gshare_io.pred, pred);
-        // if (i_uen)
-        //     $display("base: %d, off: %d, pc: %2d, take: %b (hist: %b) edu: %b",
-        //         i_udat.base,
-        //         i_udat.fb_off,
-        //         i_udat.base + i_udat.fb_off,
-        //         i_udat.take,
-        //         ghr_io.rd_ghist,
-        //         i_udat.en_dir_update
-        //     );
-    endtask
 
     struct packed {
         logic i_rdy;
@@ -308,25 +298,22 @@ module bpu (
     assign o_ftq_en = o_buf_ftq_vld && i_ftq_rdy;
 
     always_ff @(posedge clock) begin
-        if (reset) begin
-            pc_reg <= '0;
-            off    <= '0;
-        end else if (flush) begin
-            pc_reg <= cbru_in.flush_fb_base;
-            off    <= cbru_in.flush_fb_off;
-        end else if (step) begin
-            pc_reg <= pc_reg_n;
-            off    <= '0;
-        end
-        // $display("ghr_rdy_scnt: %d", ghr_io.rdy_scnt);
-        // ghr0.print_ghr;
+        if (reset)
+            cur <= '0;
+        else if (flush)
+            cur <= '{
+                base: cbru_in.flush_fb_base,
+                off : cbru_in.flush_fb_off
+            };
+        else if (step)
+            cur <= cur_n;
     end
 
 `ifdef DEBUG
     task print_bpu;
         $display(">> bpu");
-        $display("(pc_reg: %d, off: %0d, pred: [%b, %b]), step: %b, buf_rdy: %b, ftq_rdy: %b",
-            pc_reg,
+        $display("(cur.base: %d, off: %0d, pred: [%b, %b]), step: %b, buf_rdy: %b, ftq_rdy: %b",
+            cur.base,
             off,
             pred[0],
             pred[1],
@@ -337,6 +324,20 @@ module bpu (
 
         $display("<< bpu");
     endtask
+
+    task automatic print_udat;
+        $display("base: %d, pred_fh: %b, pred: %b, wpred: %b", cur.base, fh, gshare_io.pred, pred);
+        // if (i_uen)
+        //     $display("base: %d, off: %d, pc: %2d, take: %b (hist: %b) edu: %b",
+        //         i_udat.base,
+        //         i_udat.fb_off,
+        //         i_udat.base + i_udat.fb_off,
+        //         i_udat.take,
+        //         ghr_io.rd_ghist,
+        //         i_udat.en_dir_update
+        //     );
+    endtask
+
 `endif
 
 endmodule
