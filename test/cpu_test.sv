@@ -572,8 +572,8 @@ module testbench;
         // verisimpleV.fetch0.print_fetch();
         // verisimpleV.fetch0.ftq0.print_ftq();
         // verisimpleV.fetch0.align0.print_align();
-        verisimpleV.fetch0.bpu0.ghr0.print_ghr;
-        // verisimpleV.fetch0.bpu0.gshare0.print_gshare;
+        verisimpleV.bpu0.ghr0.print_ghr;
+        // verisimpleV.bpu0.gshare0.print_gshare;
 
     endtask
 

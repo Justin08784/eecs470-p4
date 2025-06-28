@@ -34,6 +34,8 @@ module cpu (
     output COMMIT_PKT commit
 );
     /* Global controls*/
+    execute2complete_bru ex_2_cbru;
+
     logic flush;
     BMASK clmsk;
     assign flush = ex_2_cbru.flush;
@@ -49,18 +51,41 @@ module cpu (
     //     dbg_dcache = '0;
     // end
 
+
+    /* >> ==== Branch predictor unit (BPU) ==== >> */
+    btq2fetch       btq_2_f;
+
+    `CNT_TYPE(2)    bpu2fetch_vld_scnt;
+    FTQ_ENTRY [1:0] bpu2fetch_dat;
+    `CNT_TYPE(2)    fetch2bpu_ren_cnt;
+
+    bpu bpu0 (
+        .clock,
+        .reset,
+        .cbru_in    (ex_2_cbru),
+
+        .i_uen      (btq_2_f.bpu_uen),
+        .i_udat     (btq_2_f.bpu_udat),
+
+        .o_vld_scnt (bpu2fetch_vld_scnt),
+        .o_dat      (bpu2fetch_dat),
+        .i_ren_cnt  (fetch2bpu_ren_cnt)
+    );
+
     /* >> ==== Fetch ==== >> */
     fetch2decode f_2_decode;
     decode2fetch decode_2_f;
-    btq2fetch    btq_2_f;
     fetch2btq    f_2_btq;
     rename2snap_bus rnme_2_snap;
-    execute2complete_bru ex_2_cbru;
 
     dcf fetch0 (
         .clock,
         .reset,
         .cbru_in(ex_2_cbru),
+
+        .i_vld_scnt (bpu2fetch_vld_scnt),
+        .i_dat      (bpu2fetch_dat),
+        .o_ren_cnt  (fetch2bpu_ren_cnt),
 
         .d_in   (decode_2_f),
         .d_out  (f_2_decode),
@@ -170,17 +195,6 @@ module cpu (
         .f_in   (f_2_btq),
         .f_out  (btq_2_f)
     );
-
-`ifdef DEBUG
-    logic [GHR_BUF_SZ-1:0] true_ghr;
-    always_ff @(posedge clock) begin
-        if (reset)
-            true_ghr <= '0;
-        else if (btq_2_f.bpu_uen)
-            true_ghr <= (true_ghr << 1) | btq_2_f.bpu_udat.take;
-    end
-`endif
-
 
     /* >> ==== Reservation station (RS) ==== >> */
     execute2rs      ex_2_rs; 
@@ -342,8 +356,8 @@ module cpu (
             .clock,
             .reset,
 
-            .base   (fetch0.bpu0.ghr0.base),
-            .hist   (fetch0.bpu0.ghr0.hist),
+            .base   (bpu0.ghr0.base),
+            .hist   (bpu0.ghr0.hist),
 
             .flush,
             .flush_ghr_base (ex_2_cbru.flush_ghr_base),
@@ -351,13 +365,23 @@ module cpu (
             .retire_en_cnt  (btq0.rd_en_cnt),
             .retire_ghr_base(ret_ghr_base),
 
-            .wshf_in_en_cnt (fetch0.bpu0.ghr0.wen_cnt),
-            .wshf_in        (fetch0.bpu0.ghr0.wshf_in),
+            .wshf_in_en_cnt (bpu0.ghr0.wen_cnt),
+            .wshf_in        (bpu0.ghr0.wshf_in),
 
-            .ubpu_ren       (fetch0.bpu0.upd_s2_n.uen_gshare),
-            .ubpu_ghr_base  (fetch0.bpu0.i_udat.ghr_base)
+            .ubpu_ren       (bpu0.upd_s2_n.uen_gshare),
+            .ubpu_ghr_base  (bpu0.i_udat.ghr_base)
         );
 
+    end
+`endif
+
+`ifdef DEBUG
+    logic [GHR_BUF_SZ-1:0] true_ghr;
+    always_ff @(posedge clock) begin
+        if (reset)
+            true_ghr <= '0;
+        else if (btq_2_f.bpu_uen)
+            true_ghr <= (true_ghr << 1) | btq_2_f.bpu_udat.take;
     end
 `endif
 

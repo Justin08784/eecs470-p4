@@ -35,9 +35,9 @@ module bpu (
     input   logic       i_uen,
     input   BPU_UPD_PKT i_udat,
 
-    input   logic       i_ftq_rdy,
-    output  logic       o_ftq_en,
-    output  FTQ_ENTRY   o_ftq_dat
+    output  `CNT_TYPE(2)    o_vld_scnt,
+    output  FTQ_ENTRY[1:0]  o_dat,
+    input   `CNT_TYPE(2)    i_ren_cnt
 );
     logic flush;
     assign flush = cbru_in.flush;
@@ -74,6 +74,15 @@ module bpu (
         logic [NUM_BR_SLOTS-1:0] pred;
         logic [GHR_LEN-1:0] hash;
     } gshare_io;
+
+    struct packed {
+        logic       wen;
+        FTQ_ENTRY   wdat;
+    } pred_2_ftq_skid;
+
+    struct packed {
+        logic   rdy;
+    } ftq_skid_2_pred;
 
     assign uftb_io.i_qry = cur.base;
     assign uftb_io.i_uen = i_uen;
@@ -155,7 +164,8 @@ module bpu (
         ghr_wvld_cnt = $countones(in_ghr);
 
         slot = e.br_slot[pred_idx];
-        step = buf_io.i_rdy;
+        step = ftq_skid_2_pred.rdy;
+        pred_2_ftq_skid.wen = step;
 
 
         if (!step || !uftb_io.o_vld)
@@ -179,7 +189,7 @@ module bpu (
             !uftb_io.o_vld ? cur.base + `UCAST_FIT(16) :
             pred_any ? pc_jmp : pc_flt;
 
-        buf_io.i_dat = '{
+        pred_2_ftq_skid.wdat = '{
             base_n      : cur_n.base,
             // hash        : gshare_io.hash,
 
@@ -198,7 +208,7 @@ module bpu (
         };
 
         for (int i = 0; i < NUM_BR_SLOTS; ++i) begin
-            buf_io.i_dat.slot[i] = '{
+            pred_2_ftq_skid.wdat.slot[i] = '{
                 vld : e.br_slot[i].vld,
                 off : e.br_slot[i].off
             };
@@ -302,34 +312,49 @@ module bpu (
 
     );
 
-
     struct packed {
-        logic i_rdy;
-        FTQ_ENTRY i_dat;
-    } buf_io;
+        logic       wvld;
+        logic       wen;
+        FTQ_ENTRY   wdat;
+    } ftq_skid_2_ftq;
+    struct packed {
+        logic       rdy;
+    } ftq_2_ftq_skid;
+    assign ftq_skid_2_ftq.wen = ftq_skid_2_ftq.wvld & ftq_2_ftq_skid.rdy;
 
-    logic o_buf_ftq_vld;
     ppln_skid #(
         .FLUSH_MODE (SKID_FLUSH_RESET),
         .WIDTH      ($bits(FTQ_ENTRY))
-    ) buf_ftq (
+    ) ftq_skid (
         .clock,
         .reset,
         .flush,
         .clmsk  ('0), // unused
 
-        .i_vld (step), // FIXME: should this be step without the buf_io.i_rdy component?
-        .i_rdy (buf_io.i_rdy),
+        .i_vld (pred_2_ftq_skid.wen),
+        .i_rdy (ftq_skid_2_pred.rdy),
         .i_msk ('0),
-        .i_dat (buf_io.i_dat),
+        .i_dat (pred_2_ftq_skid.wdat),
 
-        .o_vld (o_buf_ftq_vld),
-        .o_rdy (i_ftq_rdy),
+        .o_vld (ftq_skid_2_ftq.wvld),
+        .o_rdy (ftq_2_ftq_skid.rdy),
         .o_msk (),
-        .o_dat (o_ftq_dat)
+        .o_dat (ftq_skid_2_ftq.wdat)
     );
 
-    assign o_ftq_en = o_buf_ftq_vld && i_ftq_rdy;
+    ftq ftq0 (
+        .clock,
+        .reset,
+        .flush,
+
+        .rdy        (ftq_2_ftq_skid.rdy),
+        .wen        (ftq_skid_2_ftq.wen),
+        .wdat       (ftq_skid_2_ftq.wdat),
+
+        .vld_scnt   (o_vld_scnt),
+        .rdat       (o_dat),
+        .ren_cnt    (i_ren_cnt)
+    );
 
     always_ff @(posedge clock) begin
         if (reset)
@@ -351,14 +376,14 @@ module bpu (
 `ifdef DEBUG
     task print_bpu;
         $display(">> bpu");
-        $display("(cur.base: %d, off: %0d, pred: [%b, %b]), step: %b, buf_rdy: %b, ftq_rdy: %b",
+        $display("(cur.base: %d, off: %0d, pred: [%b, %b]), step: %b, ftq_skid: %b, ftq: %b",
             cur.base,
             cur.off,
             pred[0],
             pred[1],
             step,
-            buf_io.i_rdy,
-            i_ftq_rdy
+            ftq_skid_2_pred.rdy,
+            ftq_2_ftq_skid.rdy
         );
 
         $display("<< bpu");

@@ -678,6 +678,10 @@ module dcf (
         fb_base–– instead flush_PC is more likely to be a nonzero offset INO the FB.
         */
 
+    input   `CNT_TYPE(2)    i_vld_scnt,
+    input   FTQ_ENTRY[1:0]  i_dat,
+    output  `CNT_TYPE(2)    o_ren_cnt,
+
     input   decode2fetch d_in,
     output  fetch2decode d_out,
 
@@ -692,49 +696,6 @@ module dcf (
 );
     logic flush;
     assign flush = cbru_in.flush;
-
-
-    // bpu <-> ftq plumbing
-    struct packed {
-        logic       en;
-        FTQ_ENTRY   dat;
-    } bpu2ftq;
-    struct packed {
-        logic       rdy;
-    } ftq2bpu;
-
-    bpu bpu0 (
-        .clock,
-        .reset,
-        .cbru_in,
-
-        .i_uen      (btq_in.bpu_uen),
-        .i_udat     (btq_in.bpu_udat),
-
-        .i_ftq_rdy  (ftq2bpu.rdy),
-        .o_ftq_en   (bpu2ftq.en),
-        .o_ftq_dat  (bpu2ftq.dat)
-    );
-
-
-    // ftq <-> pc_gen plumbing
-    FTQ_ENTRY [1:0] ftq2pc_gen_dat;
-    `CNT_TYPE(2)    ftq2pc_gen_vld_scnt;
-    `CNT_TYPE(2)    pc_gen2ftq_ren_cnt;
-
-    ftq ftq0 (
-        .clock,
-        .reset,
-        .flush,
-
-        .rdy        (ftq2bpu.rdy),
-        .wen        (bpu2ftq.en),
-        .wdat       (bpu2ftq.dat),
-
-        .vld_scnt   (ftq2pc_gen_vld_scnt),
-        .rdat       (ftq2pc_gen_dat),
-        .ren_cnt    (pc_gen2ftq_ren_cnt)
-    );
 
     pc_gen2ixq [1:0]pc_gen2ixq_dat;
     `CNT_TYPE(2)    pc_gen2ixq_wen_cnt;
@@ -752,9 +713,9 @@ module dcf (
         .flush_fb_base      (cbru_in.flush_fb_base),
         .flush_fb_off       (cbru_in.flush_fb_off),
 
-        .ftq_in_vld_scnt    (ftq2pc_gen_vld_scnt),
-        .ftq_in_dat         (ftq2pc_gen_dat),
-        .ftq_out_ren_cnt    (pc_gen2ftq_ren_cnt),
+        .ftq_in_vld_scnt    (i_vld_scnt),
+        .ftq_in_dat         (i_dat),
+        .ftq_out_ren_cnt    (o_ren_cnt),
 
         .ixq_in_rdy_scnt    (ixq2pc_gen_rdy_scnt),
         .ixq_out_wen_cnt    (pc_gen2ixq_wen_cnt),
