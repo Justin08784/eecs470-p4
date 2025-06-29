@@ -17,18 +17,18 @@ module pred_s1 (
     input   clock,
     input   reset,
 
-    input   logic   i_uen,
+    input   logic       i_uen,
     input   BPU_UPD_PKT i_udat,
 
-    input   FB_POS  i_pos,
+    input   FB_POS      i_pos,
+    output  FB_POS      o_pos_n,
 
-    output  s1_to_ghr  ghr_out,
-    input   ghr_to_s1  ghr_in,
+    input   ghr_to_s1   i_ghr,
+    output  s1_to_ghr   o_ghr,
 
-    output  FB_POS  o_pos,
-    input   logic   o_rdy,
-    output  logic   o_wen,
-    output  FTQ_ENTRY   o_dat
+    input   logic       i_s2_rdy,
+    output  logic       o_s2_wen,
+    output  FTQ_ENTRY   o_s2_dat
 );
     logic       hit;
     FTB_ENTRY   row;
@@ -76,10 +76,10 @@ module pred_s1 (
     assign in_ghr[1] = row.br_slot[1].vld & in_win[1] & ~(pred_any & ~pred_idx);
 
     assign slot = row.br_slot[pred_idx];
-    assign o_wen= o_rdy;
+    assign o_s2_wen = i_s2_rdy; // FIXME
 
-    assign ghr_out.wen_cnt = (o_wen & hit) ? $countones(in_ghr) : 0;
-    assign ghr_out.wshf_in = pred >> ~in_win[0];
+    assign o_ghr.wen_cnt = (o_s2_wen & hit) ? $countones(in_ghr) : 0;
+    assign o_ghr.wshf_in = pred >> ~in_win[0];
 
     WADDR pc_ft, pc_jmp;
     assign pc_ft = i_pos.base + `UCAST_LEN(
@@ -89,7 +89,7 @@ module pred_s1 (
         16
     );
     assign pc_jmp = slot.tgt;
-    assign o_pos = '{
+    assign o_pos_n = '{
         base :
             !hit    ? i_pos.base + `UCAST_FIT(16) :
             pred_any? pc_jmp : pc_ft,
@@ -105,8 +105,8 @@ module pred_s1 (
         jalr : 0
     };
     always_comb begin
-        o_dat = '{
-            base_n      : o_pos.base,
+        o_s2_dat = '{
+            base_n      : o_pos_n.base,
 
             ft          : ~pred_any,
             pred_idx    : pred_idx,
@@ -117,13 +117,13 @@ module pred_s1 (
             
             slot        : '0, // filled below
             in_ghr      : in_ghr,
-            ghr_base_n1 : ghr_in.base_n1,
+            ghr_base_n1 : i_ghr.base_n1,
             always_take : slot.always_take,
             md          : (pred_idx == 0) ? COND_MD : row.md1
         };
 
         for (int i = 0; i < NUM_BR_SLOTS; ++i) begin
-            o_dat.slot[i] = '{
+            o_s2_dat.slot[i] = '{
                 vld : row.br_slot[i].vld,
                 off : row.br_slot[i].off
             };
@@ -149,6 +149,7 @@ module bpu (
     input   fetch2bpu   f_in,
     output  bpu2fetch   f_out
 );
+    // convenience signals
     logic flush;
     assign flush = cbru_in.flush;
 
@@ -158,9 +159,10 @@ module bpu (
     assign i_udat= btq_in.udat;
     assign btq_out.urdy = !flush;
 
-    logic   step;
-    FB_POS  cur, cur_s1n;
+    // state and succs
+    FB_POS  pos, pos_s1_n;
 
+    // i/o's
     s1_to_ghr s1_2_ghr; 
     ghr_to_s1 ghr_2_s1;
 
@@ -180,14 +182,15 @@ module bpu (
         .i_uen,
         .i_udat,
 
-        .i_pos  (cur),
-        .ghr_out(s1_2_ghr),
-        .ghr_in (ghr_2_s1),
+        .i_pos  (pos),
+        .o_pos_n(pos_s1_n),
 
-        .o_pos  (cur_s1n),
-        .o_rdy  (ftq_skid_2_pred.rdy),
-        .o_wen  (pred_2_ftq_skid.wen),
-        .o_dat  (pred_2_ftq_skid.wdat)
+        .i_ghr  (ghr_2_s1),
+        .o_ghr  (s1_2_ghr),
+
+        .i_s2_rdy   (ftq_skid_2_pred.rdy),
+        .o_s2_wen   (pred_2_ftq_skid.wen),
+        .o_s2_dat   (pred_2_ftq_skid.wdat)
     );
 
     // struct packed {
@@ -499,16 +502,16 @@ module bpu (
 
     always_ff @(posedge clock) begin
         if (reset)
-            cur <= '0;
+            pos <= '0;
         else if (flush)
-            cur <= '{
+            pos <= '{
                 base: cbru_in.flush_fb_base,
                 off : cbru_in.flush_fb_off
             };
         // else if (step)
         //     cur <= cur_n;
         else if (pred_2_ftq_skid.wen)
-            cur <= cur_s1n;
+            pos <= pos_s1_n;
 
         // if (reset)
         //     upd_s2  <= '0;

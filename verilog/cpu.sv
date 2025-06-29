@@ -356,8 +356,8 @@ module cpu (
         @(posedge clock)
             disable iff (reset)
             flush |=> // TODO: add steer too
-                (bpu0.cur.base  == fetch0.pc_gen0.cur.base) &&
-                (bpu0.cur.off   == fetch0.pc_gen0.cur.off);
+                (bpu0.pos.base  == fetch0.pc_gen0.cur.base) &&
+                (bpu0.pos.off   == fetch0.pc_gen0.cur.off);
     endproperty
 
     Bpu_Pcgen_Converge_After_Redirect: assert property(bpu_pcgen_converge_after_redirect)
