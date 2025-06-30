@@ -134,8 +134,8 @@ module pred_s1 (
         if (reset | flush | s2_steer) begin
             o_s2_vld <= 0;
             o_s2_dat <= '0;
-        end else if (s1_step) begin
-            o_s2_vld <= 1;
+        end else begin
+            o_s2_vld <= s1_step;
             o_s2_dat <= o_s2_dat_n;
         end
     end
@@ -230,8 +230,9 @@ module pred_s2 (
     assign s2_steer = (i_s1_vld & o_s1_rdy) & (pred != i_s1_dat.pred_uftb);
     assign o_ghr.s2_steer_wen[0]= |in_ghr;
     assign o_ghr.s2_steer_wen[1]= &in_ghr;
-    assign o_ghr.s2_steer_take  = pred >> ~in_win[0];
-    assign o_ghr.s2_steer_idx   = i_s1_dat.ghr_base_n1;
+    assign o_ghr.s2_steer_take  = pred >> ~in_ghr[0];
+    assign o_ghr.s2_steer_idx   = i_s1_dat.ghr_base_n1 - (in_ghr[0] & in_ghr[1]);
+        /* FIXME: this "-" term needs explanation */
 
 
     FTB_BR_SLOT slot;
@@ -302,13 +303,15 @@ module pred_s2 (
 
 
     always_ff @(posedge clock) begin
-        if (reset) begin
+        if (reset | flush | s2_steer)
             raw_pred<= '0;
-            upd_s2  <= '0;
-        end else begin
+        else
             raw_pred<= raw_pred_n;
+
+        if (reset)
+            upd_s2  <= '0;
+        else
             upd_s2  <= upd_s2_n;
-        end
     end
 
 
@@ -340,11 +343,11 @@ module bpu (
     BPU_UPD_PKT i_udat;
     assign i_uen = btq_in.uen;
     assign i_udat= btq_in.udat;
-    assign btq_out.urdy = !flush;
 
     // controls
     logic s1_step;
     logic s2_steer;
+    assign btq_out.urdy = ~(flush | s2_steer);
 
     // state and succs
     FB_POS  pos, pos_s1_n, pos_s2_n;
@@ -515,35 +518,35 @@ module bpu (
     // end
 
 
-`ifdef DEBUG
-    task print_bpu;
-        $display(">> bpu");
-        $display("(cur.base: %d, off: %0d, pred: [%b, %b]), step: %b, ftq_skid: %b, ftq: %b",
-            cur.base,
-            cur.off,
-            pred[0],
-            pred[1],
-            step,
-            ftq_skid_2_pred.rdy,
-            ftq_2_ftq_skid.rdy
-        );
+// `ifdef DEBUG
+//     task print_bpu;
+//         $display(">> bpu");
+//         $display("(cur.base: %d, off: %0d, pred: [%b, %b]), step: %b, ftq_skid: %b, ftq: %b",
+//             cur.base,
+//             cur.off,
+//             pred[0],
+//             pred[1],
+//             step,
+//             ftq_skid_2_pred.rdy,
+//             ftq_2_ftq_skid.rdy
+//         );
 
-        $display("<< bpu");
-    endtask
+//         $display("<< bpu");
+//     endtask
 
-    task automatic print_udat;
-        $display("base: %d, pred_fh: %b, pred: %b, wpred: %b", cur.base, fh, gshare_io.pred, pred);
-        // if (i_uen)
-        //     $display("base: %d, off: %d, pc: %2d, take: %b (hist: %b) edu: %b",
-        //         i_udat.base,
-        //         i_udat.fb_off,
-        //         i_udat.base + i_udat.fb_off,
-        //         i_udat.take,
-        //         ghr_io.rd_ghist,
-        //         i_udat.en_dir_update
-        //     );
-    endtask
+//     task automatic print_udat;
+//         $display("base: %d, pred_fh: %b, pred: %b, wpred: %b", cur.base, fh, gshare_io.pred, pred);
+//         // if (i_uen)
+//         //     $display("base: %d, off: %d, pc: %2d, take: %b (hist: %b) edu: %b",
+//         //         i_udat.base,
+//         //         i_udat.fb_off,
+//         //         i_udat.base + i_udat.fb_off,
+//         //         i_udat.take,
+//         //         ghr_io.rd_ghist,
+//         //         i_udat.en_dir_update
+//         //     );
+//     endtask
 
-`endif
+// `endif
 
 endmodule
