@@ -13,9 +13,24 @@ typedef struct packed {
     GHR_IDX base_n1;
 } ghr_to_s1;
 
+typedef struct packed {
+    logic [1:0] in_win;
+    logic [1:0] in_ghr;
+
+    logic [1:0] pred_uftb; // bimodal sc bits
+    logic       hit_uftb;
+    GHR_IDX     ghr_base_n1;
+
+    WADDR       pc_ft;
+
+    FTB_ENTRY   fb;
+} S1_S2_PKT;
+
 module pred_s1 (
     input   clock,
     input   reset,
+    input   flush,
+    input   s2_steer,
 
     input   logic       i_uen,
     input   BPU_UPD_PKT i_udat,
@@ -26,13 +41,15 @@ module pred_s1 (
     input   ghr_to_s1   i_ghr,
     output  s1_to_ghr   o_ghr,
 
+    output  logic       s1_step,
     input   logic       i_s2_rdy,
-    output  logic       o_s2_wen,
-    output  FTQ_ENTRY   o_s2_dat
+    output  logic       o_s2_vld,
+    output  S1_S2_PKT   o_s2_dat
 );
+    assign s1_step = ~o_s2_vld | i_s2_rdy; // FIXME
+
     logic       hit;
     FTB_ENTRY   row;
-    FTB_BR_SLOT slot;
     FTB_UPD_PKT uftb_udat;
     assign uftb_udat = '{
         base    : i_udat.base,
@@ -58,6 +75,7 @@ module pred_s1 (
         .i_udat (uftb_udat)
     );
 
+
     logic [1:0] in_win;
     assign in_win[0] = i_pos.off <= row.br_slot[0].off;
     assign in_win[1] = i_pos.off <= row.br_slot[1].off;
@@ -75,12 +93,14 @@ module pred_s1 (
     assign in_ghr[0] = row.br_slot[0].vld & in_win[0];
     assign in_ghr[1] = row.br_slot[1].vld & in_win[1] & ~(pred_any & ~pred_idx);
 
+    assign o_ghr = '{
+        wen_cnt : (s1_step & hit) ? $countones(in_ghr) : 0,
+        wshf_in : pred >> ~in_win[0]
+    };
+
+
+    FTB_BR_SLOT slot;
     assign slot = row.br_slot[pred_idx];
-    assign o_s2_wen = i_s2_rdy; // FIXME
-
-    assign o_ghr.wen_cnt = (o_s2_wen & hit) ? $countones(in_ghr) : 0;
-    assign o_ghr.wshf_in = pred >> ~in_win[0];
-
     WADDR pc_ft, pc_jmp;
     assign pc_ft = i_pos.base + `UCAST_LEN(
         (row.end_off == 4'd15)
@@ -98,6 +118,132 @@ module pred_s1 (
     };
 
 
+    S1_S2_PKT o_s2_dat_n;
+    assign o_s2_dat_n = '{
+        in_win      : in_win,
+        in_ghr      : in_ghr,
+        pred_uftb   : pred,
+        hit_uftb    : hit,
+        ghr_base_n1 : i_ghr.base_n1,
+        pc_ft       : pc_ft,
+
+        fb          : row 
+    };
+
+    always_ff @(posedge clock) begin
+        if (reset | flush) begin
+            o_s2_vld <= 0;
+            o_s2_dat <= '0;
+        end else if (s1_step) begin
+            o_s2_vld <= 1;
+            o_s2_dat <= o_s2_dat_n;
+        end
+    end
+
+endmodule;
+
+
+typedef struct packed {
+    logic [NUM_BR_SLOTS-1:0]wshf_in;
+} s2_to_ghr;
+
+typedef struct packed {
+    logic[FH_LEN-1:0] fh, rd_fh;
+} fhr_to_s2;
+
+
+module pred_s2 (
+    input   clock,
+    input   reset,
+    input   flush,
+    output  logic       s2_steer,
+
+    input   logic       i_uen,
+    input   BPU_UPD_PKT i_udat,
+
+    input   FB_POS      i_pos,
+    output  FB_POS      o_pos_n,
+
+    input   fhr_to_s2   i_fhr,
+    output  s2_to_ghr   o_ghr,
+
+    output  logic       o_s1_rdy,
+    input   logic       i_s1_vld,
+    input   S1_S2_PKT   i_s1_dat,
+
+    input   logic       i_s3_rdy,
+    output  logic       o_s3_vld,
+    output  FTQ_ENTRY   o_s3_dat
+);
+    struct packed {
+        logic   take;
+        logic   slot_idx;
+
+        logic   uen_gshare;
+        logic   [FH_LEN-1:0] hash_gshare;
+    } upd_s2, upd_s2_n;
+    assign upd_s2_n = '{
+        take        : i_udat.take,
+        slot_idx    : i_udat.slot_idx,
+        uen_gshare  : i_uen && i_udat.en_dir_update && i_udat.md.cond, // train only on conditional branches!
+        hash_gshare : i_fhr.rd_fh ^ i_udat.base[FH_LEN-1:0]
+    };
+
+    logic [1:0] raw_pred, raw_pred_n;
+
+    logic [1:0] in_win;
+    logic [1:0] in_ghr;
+    logic       hit;
+    FTB_ENTRY   row;
+    assign in_win = i_s1_dat.in_win;
+    assign in_ghr = i_s1_dat.in_ghr;
+    assign hit = i_s1_dat.hit_uftb;
+    assign row = i_s1_dat.fb;
+
+    gshare gshare0 (
+        .clock,
+        .reset,
+
+        .i_uen      (upd_s2.uen_gshare),
+        .i_utake    (upd_s2.take),
+        .i_uslot_idx(upd_s2.slot_idx),
+        .i_uhash    (upd_s2.hash_gshare),
+
+        .i_hash     (i_fhr.fh ^ i_pos.base[FH_LEN-1:0]),
+        .o_pred     (raw_pred_n)
+
+    );
+
+    logic [1:0] pred;
+    logic pred_any, pred_idx;
+    assign pred[0] = (hit & row.br_slot[0].vld & in_win[0])
+        &  raw_pred[0];
+    assign pred[1] = (hit & row.br_slot[1].vld & in_win[1])
+        & (raw_pred[1] | ~row.md1.cond);
+    assign pred_any = |pred;
+    assign pred_idx = ~pred[0] & pred[1];
+
+    assign s2_steer = (i_s1_vld & o_s1_rdy) & (pred != i_s1_dat.pred_uftb);
+    assign o_ghr = '{
+        // wen_cnt : (step & hit) ? $countones(in_ghr) : 0,
+        wshf_in : pred >> ~in_win[0]
+    };
+
+
+    FTB_BR_SLOT slot;
+    assign slot = row.br_slot[pred_idx];
+    WADDR pc_ft, pc_jmp;
+    assign pc_ft = i_s1_dat.pc_ft;
+    assign pc_jmp = slot.tgt;
+    assign o_pos_n = '{
+        base :
+            !hit    ? i_pos.base + `UCAST_FIT(16) :
+            pred_any? pc_jmp : pc_ft,
+
+        off : '0
+    };
+
+    FTQ_ENTRY skid_wdat;
     localparam FTB_MD1 COND_MD = '{
         cond : 1,
         call : 0,
@@ -105,7 +251,7 @@ module pred_s1 (
         jalr : 0
     };
     always_comb begin
-        o_s2_dat = '{
+        skid_wdat = '{
             base_n      : o_pos_n.base,
 
             ft          : ~pred_any,
@@ -117,18 +263,51 @@ module pred_s1 (
             
             slot        : '0, // filled below
             in_ghr      : in_ghr,
-            ghr_base_n1 : i_ghr.base_n1,
+            ghr_base_n1 : i_s1_dat.ghr_base_n1,
             always_take : slot.always_take,
             md          : (pred_idx == 0) ? COND_MD : row.md1
         };
 
         for (int i = 0; i < NUM_BR_SLOTS; ++i) begin
-            o_s2_dat.slot[i] = '{
+            skid_wdat.slot[i] = '{
                 vld : row.br_slot[i].vld,
                 off : row.br_slot[i].off
             };
         end
     end
+
+    ppln_skid #(
+        .FLUSH_MODE (SKID_FLUSH_RESET),
+        .WIDTH      ($bits(FTQ_ENTRY))
+    ) ftq_skid (
+        .clock,
+        .reset,
+        .flush,
+        .clmsk  ('0), // unused
+
+        .i_vld (i_s1_vld),
+        .i_rdy (o_s1_rdy),
+        .i_msk ('0),
+        .i_dat (skid_wdat),
+
+        .o_vld (o_s3_vld),
+        .o_rdy (i_s3_rdy),
+        .o_msk (),
+        .o_dat (o_s3_dat)
+    );
+
+
+    always_ff @(posedge clock) begin
+        if (reset) begin
+            raw_pred<= '0;
+            upd_s2  <= '0;
+        end else begin
+            raw_pred<= raw_pred_n;
+            upd_s2  <= upd_s2_n;
+        end
+    end
+
+
 endmodule;
 
 /* Branch predictor unit (BPU):
@@ -159,242 +338,113 @@ module bpu (
     assign i_udat= btq_in.udat;
     assign btq_out.urdy = !flush;
 
+    // controls
+    logic s1_step;
+    logic s2_steer;
+
     // state and succs
-    FB_POS  pos, pos_s1_n;
+    FB_POS  pos, pos_s1_n, pos_s2_n;
+
+
 
     // i/o's
     s1_to_ghr s1_2_ghr; 
     ghr_to_s1 ghr_2_s1;
 
     struct packed {
-        logic       wen;
-        FTQ_ENTRY   wdat;
-    } pred_2_ftq_skid;
+        logic       vld;
+        S1_S2_PKT   dat;
+    } s1_2_s2;
 
     struct packed {
-        logic   rdy;
-    } ftq_skid_2_pred;
+        logic rdy;
+    } s2_2_s1;
 
     pred_s1 s1 (
         .clock,
         .reset,
+        .flush,
+        .s1_step,
+        .s2_steer,
 
         .i_uen,
         .i_udat,
 
-        .i_pos  (pos),
-        .o_pos_n(pos_s1_n),
+        .i_pos      (pos),
+        .o_pos_n    (pos_s1_n),
 
-        .i_ghr  (ghr_2_s1),
-        .o_ghr  (s1_2_ghr),
+        .i_ghr      (ghr_2_s1),
+        .o_ghr      (s1_2_ghr),
 
-        .i_s2_rdy   (ftq_skid_2_pred.rdy),
-        .o_s2_wen   (pred_2_ftq_skid.wen),
-        .o_s2_dat   (pred_2_ftq_skid.wdat)
+        .i_s2_rdy   (s2_2_s1.rdy),
+        .o_s2_vld   (s1_2_s2.vld),
+        .o_s2_dat   (s1_2_s2.dat)
     );
 
-    // struct packed {
-    //     // fetch query
-    //     WADDR       i_qry;
 
-    //     logic       o_vld;
-    //     FTB_ENTRY   o_tgt;
+    // i/o's
+    s2_to_ghr s2_2_ghr; 
+    fhr_to_s2 fhr_2_s2;
 
-    //     // puq updates
-    //     logic       i_uen;
-    //     FTB_UPD_PKT i_udat;
-    // } uftb_io;
+    struct packed {
+        logic vld;
+        logic wen;
+        FTQ_ENTRY dat;
+    } pred_2_ftq;
+    struct packed {
+        logic rdy;
+    } ftq_2_pred;
+    assign pred_2_ftq.wen = pred_2_ftq.vld & ftq_2_pred.rdy;
 
-    // struct packed {
-    //     // fetch
-    //     `CNT_TYPE(NUM_BR_SLOTS) wen_cnt;
-    //     logic [NUM_BR_SLOTS-1:0]wpred, wshf_out;
+    pred_s2 s2 (
+        .clock,
+        .reset,
+        .flush,
+        .s2_steer,
 
-    //     GHR_IDX base_n1;
-    //     logic [GHR_LEN-1:0] rd_ghist;
-    // } ghr_io;
+        .i_uen,
+        .i_udat,
 
-    // struct packed {
-    //     logic [NUM_BR_SLOTS-1:0] pred;
-    //     logic [GHR_LEN-1:0] hash;
-    // } gshare_io;
+        .i_pos      (pos),
+        .o_pos_n    (pos_s2_n),
 
-    // struct packed {
-    //     logic       wen;
-    //     FTQ_ENTRY   wdat;
-    // } pred_2_ftq_skid;
+        .i_fhr      (fhr_2_s2),
+        .o_ghr      (s2_2_ghr),
 
-    // struct packed {
-    //     logic   rdy;
-    // } ftq_skid_2_pred;
+        .o_s1_rdy   (s2_2_s1.rdy),
+        .i_s1_vld   (s1_2_s2.vld),
+        .i_s1_dat   (s1_2_s2.dat),
 
-    // assign uftb_io.i_qry = cur.base;
-    // assign uftb_io.i_uen = i_uen;
-    // assign uftb_io.i_udat= '{
-    //     base        : i_udat.base,
-    //     fb_off      : i_udat.fb_off,
-    //     take        : i_udat.take,
-    //     tgt         : i_udat.tgt,
+        .i_s3_rdy   (ftq_2_pred.rdy),
+        .o_s3_vld   (pred_2_ftq.vld),
+        .o_s3_dat   (pred_2_ftq.dat)
+    );
 
-    //     md          : i_udat.md
-    // };
+    struct packed {
+        logic [GHR_LEN-1:0] rd_ghist;
+        logic [1:0] wshf_out;
+    } ghr2fhr;
 
-    // uftb #(
-    //     .NUM_LINES(16)
-    // ) uftb0 (
-    //     .clock,
-    //     .reset,
+    fhr #(
+        .GHR_LEN    (GHR_LEN),
+        .FH_LEN     (FH_LEN),
 
-    //     .i_qry  (uftb_io.i_qry),
+        .WPORTS     (NUM_BR_SLOTS)
+    ) fhr0 (
+        .clock,
+        .reset,
 
-    //     .o_vld  (uftb_io.o_vld),
-    //     .o_tgt  (uftb_io.o_tgt),
+        .flush,
 
-    //     .i_uen  (uftb_io.i_uen),
-    //     .i_udat (uftb_io.i_udat)
-    // );
+        .qry_ghist  (ghr2fhr.rd_ghist),
+        .rd_fh      (fhr_2_s2.rd_fh),
 
-    // logic [NUM_BR_SLOTS-1:0] pred;
-    // logic pred_any;
-    // `IDX_TYPE(NUM_BR_SLOTS) pred_idx;
-    // ffs #(
-    //     .VECW(NUM_BR_SLOTS)
-    // ) ff_take (
-    //     .i_vec(pred),
-    //     .o_vld(pred_any),
-    //     .o_idx(pred_idx)
-    // );
+        .wen_cnt    (s1_2_ghr.wen_cnt),
+        .wshf_in    (s1_2_ghr.wshf_in),
+        .wshf_out   (ghr2fhr.wshf_out),
 
-    // logic [NUM_BR_SLOTS-1:0] in_ghr;
-    // always_comb begin
-    //     FTB_ENTRY e;
-    //     FTB_BR_SLOT slot;
-    //     WADDR pc_flt, pc_jmp;
-    //     logic leq0, leq1;
-    //     `CNT_TYPE(NUM_BR_SLOTS) ghr_wvld_cnt;
-
-    //     const FTB_MD1 COND_MD = '{
-    //         cond : 1,
-    //         call : 0,
-    //         ret  : 0,
-    //         jalr : 0
-    //     };
-
-    //     e = uftb_io.o_tgt;
-
-    //     // ignore branches before the current FB-offset
-    //     // cmp4(off, e.br_slot[0].off, eq0, lt0);
-    //     // cmp4(off, e.br_slot[1].off, eq1, lt1);
-    //     // leq0 = eq0 || lt0;
-    //     // leq1 = eq1 || lt1;
-    //     leq0 = cur.off <= e.br_slot[0].off;
-    //     leq1 = cur.off <= e.br_slot[1].off;
-    //     pred[0] =
-    //         !e.br_slot[0].vld ? 0 :
-    //         leq0 && gshare_io.pred[0];
-    //         // leq0 && query_sc(e.br_slot[0].sc);
-    //     pred[1] =
-    //         !e.br_slot[1].vld ? 0 :
-    //         leq1 && (!e.md1.cond || gshare_io.pred[1]);
-    //         // leq1 && (!e.md1.cond || query_sc(e.br_slot[1].sc));
-    //     if (!uftb_io.o_vld)
-    //         pred = '0;
-
-    //     in_ghr[0] =
-    //         (!e.br_slot[0].vld || !leq0) ? 0 : 1;
-    //     in_ghr[1] =
-    //         (!e.br_slot[1].vld || !leq1) ? 0 :
-    //         ~(pred_any & ~pred_idx);
-    //     ghr_wvld_cnt = $countones(in_ghr);
-
-    //     slot = e.br_slot[pred_idx];
-    //     step = ftq_skid_2_pred.rdy;
-    //     pred_2_ftq_skid.wen = step;
-
-
-    //     if (!step || !uftb_io.o_vld)
-    //         ghr_io.wen_cnt = 0;
-    //     else
-    //         ghr_io.wen_cnt = ghr_wvld_cnt;
-    //     ghr_io.wpred = pred >> !leq0; // !leq0 is in_ghr[0] without the validity check
-    //         /* FIXME: extremely hacky
-    //         When the current fb off is BEYOND the 1st branch slot, then
-    //         the first branch we can shift into the GHR is the 2nd branch slot. */
-
-    //     pc_flt = cur.base + `UCAST_LEN(
-    //         (e.end_off == 4'd15)
-    //             ? 16
-    //             : e.end_off + `UCAST_FIT(1),
-    //         16
-    //     );
-
-    //     pc_jmp = slot.tgt;
-    //     cur_n.base =
-    //         !uftb_io.o_vld ? cur.base + `UCAST_FIT(16) :
-    //         pred_any ? pc_jmp : pc_flt;
-
-    //     pred_2_ftq_skid.wdat = '{
-    //         base_n      : cur_n.base,
-    //         // hash        : gshare_io.hash,
-
-    //         ft          : !pred_any,
-    //         pred_idx    : pred_idx,
-    //         off         : 
-    //             !uftb_io.o_vld ? 15 :
-    //             pred_any ? slot.off : e.end_off,
-    //         hit         : uftb_io.o_vld,
-            
-    //         slot        : '0, // filled below
-    //         in_ghr      : in_ghr,
-    //         ghr_base_n1 : ghr_io.base_n1,
-    //         always_take : slot.always_take,
-    //         md          : (pred_idx == 0) ? COND_MD : e.md1
-    //     };
-
-    //     for (int i = 0; i < NUM_BR_SLOTS; ++i) begin
-    //         pred_2_ftq_skid.wdat.slot[i] = '{
-    //             vld : e.br_slot[i].vld,
-    //             off : e.br_slot[i].off
-    //         };
-    //     end
-    // end
-
-    /*
-    FIXME:
-    - GHR temporarily commented out because none of our predictors rely on it yet
-    - Q: How to pass ghr_base forward to FTQ? A:
-    Each FTB_ENTRY / fetch block has 2 branch slots, so the FTQ_ENTRY will
-    need to store at most 2 ghr_base's.
-        A. Store only the initial ghr_base and compute the 2nd ghr_base on the fly
-        (need to ensure it is equal the ghr_base fed into the GHR).
-        B. Simply store both ghr_base's.
-    
-    Remember, any branch in the fetch block which do not occupy a branch slot is
-    assumed "never taken" and do not require a branch slot, thus nor a ghr_base.
-    They will only ever start receiving their own ghr_base if they are ever taken
-    and added to a branch_slot.
-    */
-    // logic [FH_LEN-1:0] fh, rd_fh;
-    // fhr #(
-    //     .GHR_LEN    (GHR_LEN),
-    //     .FH_LEN     (FH_LEN),
-
-    //     .WPORTS     (NUM_BR_SLOTS)
-    // ) fhr0 (
-    //     .clock,
-    //     .reset,
-
-    //     .flush,
-
-    //     .qry_ghist  (ghr_io.rd_ghist),
-    //     .rd_fh,
-
-    //     .wen_cnt    (ghr_io.wen_cnt),
-    //     .wshf_in    (ghr_io.wpred),
-    //     .wshf_out   (ghr_io.wshf_out),
-
-    //     .fh
-    // );
+        .fh         (fhr_2_s2.fh)
+    );
 
     ghr #(
         .DEPTH      (GHR_BUF_SZ),
@@ -411,79 +461,11 @@ module bpu (
 
         .wen_cnt    (s1_2_ghr.wen_cnt),
         .wshf_in    (s1_2_ghr.wshf_in),
-        // .wshf_out   (ghr_io.wshf_out),
-        .base_n1    (ghr_2_s1.base_n1)
+        .wshf_out   (ghr2fhr.wshf_out),
+        .base_n1    (ghr_2_s1.base_n1),
 
-        // .ridx       (i_udat.ghr_base),
-            /* FIXME: hacky fix. We want the history LEADING UP TO the branch––
-            should not include the branch itself!! */
-        // .rd_ghist   (ghr_io.rd_ghist)
-    );
-
-    // struct packed {
-    //     logic   take;
-    //     logic   slot_idx;
-
-    //     logic   uen_gshare;
-    //     logic   [FH_LEN-1:0] hash_gshare;
-    // } upd_s2, upd_s2_n;
-    // assign upd_s2_n = '{
-    //     take        : i_udat.take,
-    //     slot_idx    : i_udat.slot_idx,
-    //     uen_gshare  : i_uen && i_udat.en_dir_update && i_udat.md.cond, // train only on conditional branches!
-    //     hash_gshare : rd_fh ^ i_udat.base[FH_LEN-1:0]
-    // };
-
-    // always_ff @(posedge clock) begin
-    //     if (!reset)
-    //         assert (fhr0.fh == fhr0.compute_fh(ghr0.ghist)) else $fatal;
-    // end
-
-    // WADDR tmp;
-    // assign tmp = i_udat.base - i_udat.fb_off;
-    // gshare gshare0 (
-    //     .clock,
-    //     .reset,
-
-    //     .i_uen      (upd_s2.uen_gshare),
-    //     .i_utake    (upd_s2.take),
-    //     .i_uslot_idx(upd_s2.slot_idx),
-    //     .i_uhash    (upd_s2.hash_gshare),
-
-    //     // .i_hash (fh),
-    //     .i_hash (fh ^ cur.base[FH_LEN-1:0]),
-    //     .o_pred (gshare_io.pred)
-
-    // );
-
-    struct packed {
-        logic       wvld;
-        logic       wen;
-        FTQ_ENTRY   wdat;
-    } ftq_skid_2_ftq;
-    struct packed {
-        logic       rdy;
-    } ftq_2_ftq_skid;
-    assign ftq_skid_2_ftq.wen = ftq_skid_2_ftq.wvld & ftq_2_ftq_skid.rdy;
-
-    ppln_skid #(
-        .FLUSH_MODE (SKID_FLUSH_RESET),
-        .WIDTH      ($bits(FTQ_ENTRY))
-    ) ftq_skid (
-        .clock,
-        .reset,
-        .flush,
-        .clmsk  ('0), // unused
-
-        .i_vld (pred_2_ftq_skid.wen),
-        .i_rdy (ftq_skid_2_pred.rdy),
-        .i_msk ('0),
-        .i_dat (pred_2_ftq_skid.wdat),
-
-        .o_vld (ftq_skid_2_ftq.wvld),
-        .o_rdy (ftq_2_ftq_skid.rdy),
-        .o_msk (),
-        .o_dat (ftq_skid_2_ftq.wdat)
+        .ridx       (i_udat.ghr_base),
+        .rd_ghist   (ghr2fhr.rd_ghist)
     );
 
     ftq ftq0 (
@@ -491,9 +473,9 @@ module bpu (
         .reset,
         .flush,
 
-        .rdy        (ftq_2_ftq_skid.rdy),
-        .wen        (ftq_skid_2_ftq.wen),
-        .wdat       (ftq_skid_2_ftq.wdat),
+        .rdy        (ftq_2_pred.rdy),
+        .wen        (pred_2_ftq.wen),
+        .wdat       (pred_2_ftq.dat),
 
         .vld_scnt   (f_out.vld_scnt),
         .rdat       (f_out.dat),
@@ -508,16 +490,19 @@ module bpu (
                 base: cbru_in.flush_fb_base,
                 off : cbru_in.flush_fb_off
             };
-        // else if (step)
-        //     cur <= cur_n;
-        else if (pred_2_ftq_skid.wen)
-            pos <= pos_s1_n;
-
-        // if (reset)
-        //     upd_s2  <= '0;
-        // else
-        //     upd_s2  <= upd_s2_n;
+        else begin
+            if (s2_steer)
+                pos <= pos_s2_n;
+            else if (s1_step)
+                pos <= pos_s1_n;
+        end
     end
+
+    // always_ff @(posedge clock) begin
+    //     if (!reset)
+    //         assert (fhr0.fh == fhr0.compute_fh(ghr0.ghist)) else $fatal;
+    // end
+
 
 `ifdef DEBUG
     task print_bpu;

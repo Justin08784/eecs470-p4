@@ -212,7 +212,13 @@ build/align.simv: $(ALIGN_FILES)
 build/align.cov: $(ALIGN_FILES)
 synth/align.vg: $(ALIGN_FILES)
 
-BPU_FILES = include/sys_defs.svh verilog/uftb.sv verilog/skid_buffer.sv verilog/ghr.sv
+BPU_FILES = include/sys_defs.svh \
+	verilog/uftb.sv \
+	verilog/skid_buffer.sv \
+	verilog/ghr.sv \
+	verilog/gshare.sv \
+	verilog/ring_ctr.sv \
+	verilog/ftq.sv
 build/bpu.simv: $(BPU_FILES)
 build/bpu.cov: $(BPU_FILES)
 synth/bpu.vg: $(BPU_FILES)
