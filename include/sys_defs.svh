@@ -31,8 +31,8 @@
 // `define SYNTH // synth only constructions // FIXME: how can we implement this in Makefile?
 
 `ifndef SYNTH
-// `define DEBUG
-// `define CYCLE_PRINT // clock cycle print
+`define DEBUG
+`define CYCLE_PRINT // clock cycle print
 // `define PC_GEN_TEST_MODE
 `define FORMAL
 `endif
@@ -80,8 +80,10 @@ parameter MAX_FB_SPAN   = 16; // maximum span of a fetch block (in words/insns)
 
 parameter BRANCH_PRED_SZ= 'x; // FIXME
 parameter GHR_BUF_SZ    = 128;
-parameter GHR_LEN       = 90;
-parameter FH_LEN        = 10;
+// parameter GHR_LEN       = 90;
+// parameter FH_LEN        = 10;
+parameter GHR_LEN       = 6;
+parameter FH_LEN        = 6;
 parameter RAS_SZ        = 16;
 parameter FTQ_SZ        = 32;
 

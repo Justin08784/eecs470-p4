@@ -21,7 +21,7 @@ typedef struct packed {
     logic       hit_uftb;
     GHR_IDX     ghr_base_n1;
 
-    WADDR       pc_ft;
+    WADDR       base;
 
     FTB_ENTRY   fb;
 } S1_S2_PKT;
@@ -46,7 +46,7 @@ module pred_s1 (
     output  logic       o_s2_vld,
     output  S1_S2_PKT   o_s2_dat
 );
-    assign s1_step = ~o_s2_vld | i_s2_rdy; // FIXME
+    assign s1_step = (~o_s2_vld | i_s2_rdy) & ~(flush | s2_steer); // FIXME
 
     logic       hit;
     FTB_ENTRY   row;
@@ -125,7 +125,7 @@ module pred_s1 (
         pred_uftb   : pred,
         hit_uftb    : hit,
         ghr_base_n1 : i_ghr.base_n1,
-        pc_ft       : pc_ft,
+        base        : i_pos.base,
 
         fb          : row 
     };
@@ -188,7 +188,8 @@ module pred_s2 (
         take        : i_udat.take,
         slot_idx    : i_udat.slot_idx,
         uen_gshare  : i_uen && i_udat.en_dir_update && i_udat.md.cond, // train only on conditional branches!
-        hash_gshare : i_fhr.rd_fh ^ i_udat.base[FH_LEN-1:0]
+        // hash_gshare : i_fhr.rd_fh ^ i_udat.base[FH_LEN-1:0]
+        hash_gshare : i_fhr.rd_fh
     };
 
     logic [1:0] raw_pred, raw_pred_n;
@@ -209,7 +210,8 @@ module pred_s2 (
         .i_uslot_idx(upd_s2.slot_idx),
         .i_uhash    (upd_s2.hash_gshare),
 
-        .i_hash     (i_fhr.fh ^ i_pos.base[FH_LEN-1:0]),
+        // .i_hash     (i_fhr.fh ^ i_pos.base[FH_LEN-1:0]),
+        .i_hash     (i_fhr.fh),
         .o_pred     (raw_pred_n)
 
     );
@@ -220,6 +222,8 @@ module pred_s2 (
         &  raw_pred[0];
     assign pred[1] = (hit & row.br_slot[1].vld & in_win[1])
         & (raw_pred[1] | ~row.md1.cond);
+    // assign pred = i_s1_dat.pred_uftb;
+    // assign pred = '1;
     assign pred_any = |pred;
     assign pred_idx = ~pred[0] & pred[1];
 
@@ -238,11 +242,16 @@ module pred_s2 (
     FTB_BR_SLOT slot;
     assign slot = row.br_slot[pred_idx];
     WADDR pc_ft, pc_jmp;
-    assign pc_ft = i_s1_dat.pc_ft;
+    assign pc_ft = i_s1_dat.base + `UCAST_LEN(
+        (row.end_off == 4'd15)
+            ? 16
+            : row.end_off + `UCAST_FIT(1),
+        16
+    );
     assign pc_jmp = slot.tgt;
     assign o_pos_n = '{
         base :
-            !hit    ? i_pos.base + `UCAST_FIT(16) :
+            !hit    ? i_s1_dat.base + `UCAST_FIT(16) :
             pred_any? pc_jmp : pc_ft,
 
         off : '0
@@ -303,7 +312,8 @@ module pred_s2 (
 
 
     always_ff @(posedge clock) begin
-        if (reset | flush | s2_steer)
+        // if (reset | flush | s2_steer)
+        if (reset)
             raw_pred<= '0;
         else
             raw_pred<= raw_pred_n;
@@ -518,35 +528,64 @@ module bpu (
     // end
 
 
-// `ifdef DEBUG
-//     task print_bpu;
-//         $display(">> bpu");
-//         $display("(cur.base: %d, off: %0d, pred: [%b, %b]), step: %b, ftq_skid: %b, ftq: %b",
-//             cur.base,
-//             cur.off,
-//             pred[0],
-//             pred[1],
-//             step,
-//             ftq_skid_2_pred.rdy,
-//             ftq_2_ftq_skid.rdy
-//         );
+`ifdef DEBUG
+    task print_bpu;
+        $display(">> bpu");
+        $display("pos: base: %d, off: %d (flush: %b, steer: %b, step: %b), (flush_fb_base: %d, flush_fb_off: %d)",
+            pos.base,
+            pos.off,
+            flush,
+            s2_steer,
+            s1_step,
+            cbru_in.flush_fb_base,
+            cbru_in.flush_fb_off
+        );
 
-//         $display("<< bpu");
-//     endtask
+        $display("o_s2_dat: vld: %b, hit: %b, base: %d", s1.o_s2_vld, s1.o_s2_dat.hit_uftb, s1.o_s2_dat.base);
+        $display("[ {vld: %b, tgt: %d, off = %2d, always_take: %b},",
+            s1.o_s2_dat.fb.br_slot[0].vld,
+            s1.o_s2_dat.fb.br_slot[0].tgt,
+            s1.o_s2_dat.fb.br_slot[0].off,
+            s1.o_s2_dat.fb.br_slot[0].always_take
+        );
 
-//     task automatic print_udat;
-//         $display("base: %d, pred_fh: %b, pred: %b, wpred: %b", cur.base, fh, gshare_io.pred, pred);
-//         // if (i_uen)
-//         //     $display("base: %d, off: %d, pc: %2d, take: %b (hist: %b) edu: %b",
-//         //         i_udat.base,
-//         //         i_udat.fb_off,
-//         //         i_udat.base + i_udat.fb_off,
-//         //         i_udat.take,
-//         //         ghr_io.rd_ghist,
-//         //         i_udat.en_dir_update
-//         //     );
-//     endtask
+        $display("  {vld: %b, tgt: %d, off = %2d, always_take: %b, ccrj: %b%b%b%b}]",
+            s1.o_s2_dat.fb.br_slot[1].vld,
+            s1.o_s2_dat.fb.br_slot[1].tgt,
+            s1.o_s2_dat.fb.br_slot[1].off,
+            s1.o_s2_dat.fb.br_slot[1].always_take,
+            s1.o_s2_dat.fb.md1.cond,
+            s1.o_s2_dat.fb.md1.call,
+            s1.o_s2_dat.fb.md1.ret,
+            s1.o_s2_dat.fb.md1.jalr
+        );
 
-// `endif
+        // $display("(cur.base: %d, off: %0d, pred: [%b, %b]), step: %b, ftq_skid: %b, ftq: %b",
+        //     cur.base,
+        //     cur.off,
+        //     pred[0],
+        //     pred[1],
+        //     step,
+        //     ftq_skid_2_pred.rdy,
+        //     ftq_2_ftq_skid.rdy
+        // );
+
+        $display("<< bpu");
+    endtask
+
+    task automatic print_udat;
+        // $display("base: %d, pred_fh: %b, pred: %b, wpred: %b", cur.base, fh, gshare_io.pred, pred);
+        // if (i_uen)
+        //     $display("base: %d, off: %d, pc: %2d, take: %b (hist: %b) edu: %b",
+        //         i_udat.base,
+        //         i_udat.fb_off,
+        //         i_udat.base + i_udat.fb_off,
+        //         i_udat.take,
+        //         ghr_io.rd_ghist,
+        //         i_udat.en_dir_update
+        //     );
+    endtask
+
+`endif
 
 endmodule

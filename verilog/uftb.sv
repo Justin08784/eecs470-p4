@@ -465,6 +465,7 @@ module uftb #(
         logic   en;
 
         logic   hit;
+        logic   hit_hdr;
         logic   hit_s1;
             /* Predecessor is valid and has matching tag.
             (When we reach s2, must bypass FTB_ENTRY from predecessor IFF it writes) */
@@ -491,7 +492,7 @@ module uftb #(
         msk_way = s1.way;
             // ^ protect our predecessor's way from LRU selection so we don't clobber it
         loc_s1  = '{
-            hit : s1.en && (tag == get_tag(s1.udat.base)),
+            hit : s1.en & (tag == get_tag(s1.udat.base)),
             way : s1.way
         };
 
@@ -499,7 +500,7 @@ module uftb #(
         loc_hdr = locate(hdr, tag);
 
         // mux loc, giving priority to s1 (bypass)
-        loc.hit = loc_s1.hit || loc_hdr.hit;
+        loc.hit = loc_s1.hit | loc_hdr.hit;
         loc.way = '0;
         if (loc_s1.hit)
             loc.way = loc_s1.way;
@@ -510,6 +511,7 @@ module uftb #(
             en  : i_uen,
 
             hit : loc.hit,
+            hit_hdr : loc_hdr.hit,
             hit_s1  : loc_s1.hit,
             way : loc.hit ? loc.way : lru_way,
 
@@ -550,7 +552,7 @@ module uftb #(
             X on cycles because hit_slot, spill were not being initialized on
             cycles, which is only possible if update_fb is conditinally executed.)
             */
-        wfb     = s1.hit ? upd_fb : new_fb;
+        wfb     = ((s2.wen & s1.hit_s1) | s1.hit_hdr) ? upd_fb : new_fb;
 `ifdef FORMAL
         hit_slot_spill_mex = !s1.en || !(hit_slot && spill);
 `endif
@@ -664,6 +666,101 @@ module uftb #(
 `ifdef DEBUG
     task automatic print_uftb();
         $display(">> uftb >>");
+        $display("i_uen: %b, {base: %d, fb_off: %d, take: %b, tgt: %d}",
+            i_uen,
+            i_udat.base,
+            i_udat.fb_off,
+            i_udat.take,
+            i_udat.tgt
+        );
+
+        $display("s1_n: {en: %b, hit: %b, hit_s1: %b, way: %d} e:{}",
+            s1_n.en,
+            s1_n.hit,
+            s1_n.hit_s1,
+            s1_n.way);
+        $display("[ {vld: %b, tgt: %d, off = %2d, always_take: %b},",
+            s1_n.e.br_slot[0].vld,
+            s1_n.e.br_slot[0].tgt,
+            s1_n.e.br_slot[0].off,
+            s1_n.e.br_slot[0].always_take
+        );
+
+        $display("  {vld: %b, tgt: %d, off = %2d, always_take: %b, ccrj: %b%b%b%b}]",
+            s1_n.e.br_slot[1].vld,
+            s1_n.e.br_slot[1].tgt,
+            s1_n.e.br_slot[1].off,
+            s1_n.e.br_slot[1].always_take,
+            s1_n.e.md1.cond,
+            s1_n.e.md1.call,
+            s1_n.e.md1.ret,
+            s1_n.e.md1.jalr
+        );
+
+        $display("s1: {en: %b, hit: %b, hit_s1: %b, way: %d} e:{}",
+            s1.en,
+            s1.hit,
+            s1.hit_s1,
+            s1.way);
+        $display("[ {vld: %b, tgt: %d, off = %2d, always_take: %b},",
+            s1.e.br_slot[0].vld,
+            s1.e.br_slot[0].tgt,
+            s1.e.br_slot[0].off,
+            s1.e.br_slot[0].always_take
+        );
+
+        $display("  {vld: %b, tgt: %d, off = %2d, always_take: %b, ccrj: %b%b%b%b}]",
+            s1.e.br_slot[1].vld,
+            s1.e.br_slot[1].tgt,
+            s1.e.br_slot[1].off,
+            s1.e.br_slot[1].always_take,
+            s1.e.md1.cond,
+            s1.e.md1.call,
+            s1.e.md1.ret,
+            s1.e.md1.jalr
+        );
+
+        $display("s2_n: {wen: %b, e:{}",
+            s2_n.wen);
+
+        $display("[ {vld: %b, tgt: %d, off = %2d, always_take: %b},",
+            s2_n.e.br_slot[0].vld,
+            s2_n.e.br_slot[0].tgt,
+            s2_n.e.br_slot[0].off,
+            s2_n.e.br_slot[0].always_take
+        );
+
+        $display("  {vld: %b, tgt: %d, off = %2d, always_take: %b, ccrj: %b%b%b%b}]",
+            s2_n.e.br_slot[1].vld,
+            s2_n.e.br_slot[1].tgt,
+            s2_n.e.br_slot[1].off,
+            s2_n.e.br_slot[1].always_take,
+            s2_n.e.md1.cond,
+            s2_n.e.md1.call,
+            s2_n.e.md1.ret,
+            s2_n.e.md1.jalr
+        );
+
+        $display("s2: {wen: %b, e:{}",
+            s2.wen);
+
+        $display("[ {vld: %b, tgt: %d, off = %2d, always_take: %b},",
+            s2.e.br_slot[0].vld,
+            s2.e.br_slot[0].tgt,
+            s2.e.br_slot[0].off,
+            s2.e.br_slot[0].always_take
+        );
+
+        $display("  {vld: %b, tgt: %d, off = %2d, always_take: %b, ccrj: %b%b%b%b}]",
+            s2.e.br_slot[1].vld,
+            s2.e.br_slot[1].tgt,
+            s2.e.br_slot[1].off,
+            s2.e.br_slot[1].always_take,
+            s2.e.md1.cond,
+            s2.e.md1.call,
+            s2.e.md1.ret,
+            s2.e.md1.jalr
+        );
 
         for (int w = 0; w < NUM_LINES; ++w)
             // $display("age[%d]: %b", w, lru_man0.ot_masked[w]);

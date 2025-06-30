@@ -114,47 +114,47 @@ module gshare (
             pht[i_uhash][i_uslot_idx] <= update_sc(urec[i_uslot_idx], i_utake);
     end
 
-`ifdef DEBUG
-    logic [PHT_SZ-1:0][1:0] touched;
+// `ifdef DEBUG
+//     logic [PHT_SZ-1:0][1:0] touched;
 
-    always_ff @(posedge clock) begin
-        if (reset)
-            touched <= '0;
-        else if (i_uen)
-            touched[i_uhash][i_uslot_idx] <= '1;
-    end
+//     always_ff @(posedge clock) begin
+//         if (reset)
+//             touched <= '0;
+//         else if (i_uen)
+//             touched[i_uhash][i_uslot_idx] <= '1;
+//     end
 
-    task print_gshare;
-        $display(">> gshare");
-        if (i_uen)
-            $display("i_uhash: %b, take: %b, slot_idx: %b, urec: [%b, %b]",
-                i_uhash,
-                i_utake,
-                i_uslot_idx,
-                urec[1:0],
-                urec[3:2]
-            );
-        else
-            $display("N/A!");
+//     task print_gshare;
+//         $display(">> gshare");
+//         if (i_uen)
+//             $display("i_uhash: %b, take: %b, slot_idx: %b, urec: [%b, %b]",
+//                 i_uhash,
+//                 i_utake,
+//                 i_uslot_idx,
+//                 urec[1:0],
+//                 urec[3:2]
+//             );
+//         else
+//             $display("N/A!");
 
-        for (int i = 0; i < PHT_SZ; ++i) begin
-            if (|touched[i])
-                $display("pht[%6b]: (%b, %b)",
-                    i,
-                    touched[i][0] ? pht[i][1:0] : 2'bxx,
-                    touched[i][1] ? pht[i][3:2] : 2'bxx
-                );
-        end
-    //     $display("i_ghr: %b, i_qry: %x, i_hash: %b, o_pred: [%b, %b]",
-    //         i_ghr,
-    //         i_qry,
-    //         i_hash,
-    //         o_pred[0],
-    //         o_pred[1]
-    //     );
-        $display("upd: {en: %b, take: %b, i_uhash: %b, slot_idx: %b}", i_uen, i_utake, i_uhash, i_uslot_idx);
-        $display("<< gshare");
-    endtask
-`endif
+//         for (int i = 0; i < PHT_SZ; ++i) begin
+//             if (|touched[i])
+//                 $display("pht[%6b]: (%b, %b)",
+//                     i,
+//                     touched[i][0] ? pht[i][1:0] : 2'bxx,
+//                     touched[i][1] ? pht[i][3:2] : 2'bxx
+//                 );
+//         end
+//     //     $display("i_ghr: %b, i_qry: %x, i_hash: %b, o_pred: [%b, %b]",
+//     //         i_ghr,
+//     //         i_qry,
+//     //         i_hash,
+//     //         o_pred[0],
+//     //         o_pred[1]
+//     //     );
+//         $display("upd: {en: %b, take: %b, i_uhash: %b, slot_idx: %b}", i_uen, i_utake, i_uhash, i_uslot_idx);
+//         $display("<< gshare");
+//     endtask
+// `endif
 
 endmodule

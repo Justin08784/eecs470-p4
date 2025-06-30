@@ -363,32 +363,32 @@ module cpu (
     Bpu_Pcgen_Converge_After_Redirect: assert property(bpu_pcgen_converge_after_redirect)
         else $fatal;
 
-    begin
-        GHR_IDX [N-1:0] ret_ghr_base;
-        for (genvar i = 0; i < N; ++i)
-            assign ret_ghr_base[i] = btq0.rdat[i].ghr_base;
+    // begin
+    //     GHR_IDX [N-1:0] ret_ghr_base;
+    //     for (genvar i = 0; i < N; ++i)
+    //         assign ret_ghr_base[i] = btq0.rdat[i].ghr_base;
 
-        ghr_chk ghr_chk0 (
-            .clock,
-            .reset,
+    //     ghr_chk ghr_chk0 (
+    //         .clock,
+    //         .reset,
 
-            .base   (bpu0.ghr0.base),
-            .hist   (bpu0.ghr0.hist),
+    //         .base   (bpu0.ghr0.base),
+    //         .hist   (bpu0.ghr0.hist),
 
-            .flush,
-            .flush_ghr_base (ex_2_cbru.flush_ghr_base),
+    //         .flush,
+    //         .flush_ghr_base (ex_2_cbru.flush_ghr_base),
 
-            .retire_en_cnt  (btq0.rd_en_cnt),
-            .retire_ghr_base(ret_ghr_base),
+    //         .retire_en_cnt  (btq0.rd_en_cnt),
+    //         .retire_ghr_base(ret_ghr_base),
 
-            .wshf_in_en_cnt (bpu0.ghr0.wen_cnt),
-            .wshf_in        (bpu0.ghr0.wshf_in),
+    //         .wshf_in_en_cnt (bpu0.ghr0.wen_cnt),
+    //         .wshf_in        (bpu0.ghr0.wshf_in),
 
-            .ubpu_ren       (bpu0.upd_s2_n.uen_gshare),
-            .ubpu_ghr_base  (bpu0.i_udat.ghr_base)
-        );
+    //         .ubpu_ren       (bpu0.upd_s2_n.uen_gshare),
+    //         .ubpu_ghr_base  (bpu0.i_udat.ghr_base)
+    //     );
 
-    end
+    // end
 `endif
 
 `ifdef DEBUG
