@@ -164,7 +164,7 @@ module ghr #(
     // ghist slice: mux redir and retire read
     always_comb begin
         rd_ghist = {hist, hist} >> (redir ? redir_idx : ridx);
-        if (redir) begin
+        if (redir & redir_wen[0]) begin
             rd_ghist[0] &= 0;
 
             if (redir_wen[1]) begin
@@ -172,7 +172,7 @@ module ghr #(
 
                 rd_ghist[1] |= redir_take[0];
                 rd_ghist[0] |= redir_take[1];
-            end else // assert redir_wen[0]
+            end else
                 rd_ghist[0] |= redir_take[0];
         end
     end

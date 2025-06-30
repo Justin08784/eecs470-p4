@@ -131,7 +131,7 @@ module pred_s1 (
     };
 
     always_ff @(posedge clock) begin
-        if (reset | flush) begin
+        if (reset | flush | s2_steer) begin
             o_s2_vld <= 0;
             o_s2_dat <= '0;
         end else if (s1_step) begin
@@ -144,7 +144,9 @@ endmodule;
 
 
 typedef struct packed {
-    logic [NUM_BR_SLOTS-1:0]wshf_in;
+    logic [NUM_BR_SLOTS-1:0] s2_steer_wen;
+    logic [NUM_BR_SLOTS-1:0] s2_steer_take;
+    GHR_IDX s2_steer_idx;
 } s2_to_ghr;
 
 typedef struct packed {
@@ -192,11 +194,9 @@ module pred_s2 (
     logic [1:0] raw_pred, raw_pred_n;
 
     logic [1:0] in_win;
-    logic [1:0] in_ghr;
     logic       hit;
     FTB_ENTRY   row;
     assign in_win = i_s1_dat.in_win;
-    assign in_ghr = i_s1_dat.in_ghr;
     assign hit = i_s1_dat.hit_uftb;
     assign row = i_s1_dat.fb;
 
@@ -223,11 +223,15 @@ module pred_s2 (
     assign pred_any = |pred;
     assign pred_idx = ~pred[0] & pred[1];
 
+    logic [1:0] in_ghr;
+    assign in_ghr[0] = row.br_slot[0].vld & in_win[0];
+    assign in_ghr[1] = row.br_slot[1].vld & in_win[1] & ~(pred_any & ~pred_idx);
+
     assign s2_steer = (i_s1_vld & o_s1_rdy) & (pred != i_s1_dat.pred_uftb);
-    assign o_ghr = '{
-        // wen_cnt : (step & hit) ? $countones(in_ghr) : 0,
-        wshf_in : pred >> ~in_win[0]
-    };
+    assign o_ghr.s2_steer_wen[0]= |in_ghr;
+    assign o_ghr.s2_steer_wen[1]= &in_ghr;
+    assign o_ghr.s2_steer_take  = pred >> ~in_win[0];
+    assign o_ghr.s2_steer_idx   = i_s1_dat.ghr_base_n1;
 
 
     FTB_BR_SLOT slot;
@@ -434,7 +438,7 @@ module bpu (
         .clock,
         .reset,
 
-        .flush,
+        .redir      (flush | s2_steer),
 
         .qry_ghist  (ghr2fhr.rd_ghist),
         .rd_fh      (fhr_2_s2.rd_fh),
@@ -446,6 +450,12 @@ module bpu (
         .fh         (fhr_2_s2.fh)
     );
 
+    logic [NUM_BR_SLOTS-1:0] flush_wen;
+    logic [NUM_BR_SLOTS-1:0] flush_take;
+    assign flush_wen[0] = flush;
+    assign flush_wen[1] = 0;
+    assign flush_take[0] = cbru_in.take;
+    assign flush_take[1] = 0;
     ghr #(
         .DEPTH      (GHR_BUF_SZ),
         .GHR_LEN    (GHR_LEN),
@@ -455,9 +465,10 @@ module bpu (
         .clock,
         .reset,
 
-        .flush,
-        .flush_take (cbru_in.take),
-        .flush_idx  (cbru_in.flush_ghr_base),
+        .redir      (flush | s2_steer),
+        .redir_wen  (flush ? flush_wen  : s2_2_ghr.s2_steer_wen),
+        .redir_take (flush ? flush_take : s2_2_ghr.s2_steer_take),
+        .redir_idx  (flush ? cbru_in.flush_ghr_base : s2_2_ghr.s2_steer_idx),
 
         .wen_cnt    (s1_2_ghr.wen_cnt),
         .wshf_in    (s1_2_ghr.wshf_in),
@@ -485,13 +496,13 @@ module bpu (
     always_ff @(posedge clock) begin
         if (reset)
             pos <= '0;
-        else if (flush)
-            pos <= '{
-                base: cbru_in.flush_fb_base,
-                off : cbru_in.flush_fb_off
-            };
         else begin
-            if (s2_steer)
+            if (flush)
+                pos <= '{
+                    base: cbru_in.flush_fb_base,
+                    off : cbru_in.flush_fb_off
+                };
+            else if (s2_steer)
                 pos <= pos_s2_n;
             else if (s1_step)
                 pos <= pos_s1_n;
