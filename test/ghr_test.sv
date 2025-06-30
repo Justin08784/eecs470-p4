@@ -50,9 +50,10 @@ module ghr_test;
         .clock,
         .reset,
 
-        .flush,
-        .flush_take,
-        .flush_idx,
+        .redir      (flush),
+        .redir_wen  ({1'b0, flush}),
+        .redir_take ({1'b0, flush_take}),
+        .redir_idx  (flush_idx),
 
         .wen_cnt,
         .wshf_in,
@@ -72,8 +73,8 @@ module ghr_test;
         .clock,
         .reset,
 
-        .flush,
-        .qry_ghist    (rd_ghist),
+        .redir      (flush),
+        .qry_ghist  (rd_ghist),
 
         .wen_cnt,
         .wshf_in,

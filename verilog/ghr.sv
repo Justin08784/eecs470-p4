@@ -10,8 +10,8 @@ module fhr #(
     input   clock,
     input   reset,
 
-    // misprediction flush
-    input   flush,
+    // redirection
+    input   redir,
 
     input   logic [GHR_LEN-1:0] qry_ghist,
     output  logic [FH_LEN-1:0]  rd_fh,
@@ -22,7 +22,7 @@ module fhr #(
     input   logic [WPORTS-1:0]  wshf_out,
     output  logic [FH_LEN-1:0]  fh
 );
-    logic [FH_LEN-1:0] fh_flush;
+    logic [FH_LEN-1:0] fh_redir;
     logic [WPORTS:0][FH_LEN-1:0] fh_n;
     localparam last = (GHR_LEN-1) % FH_LEN;
 
@@ -53,8 +53,8 @@ module fhr #(
     endfunction
 
     localparam logic [FH_LEN-1:0] fh_rst = compute_fh('0);
-    assign fh_flush = compute_fh(qry_ghist);
-    assign rd_fh = fh_flush;
+    assign rd_fh = compute_fh(qry_ghist);
+    assign fh_redir = rd_fh;
 
     function automatic logic [FH_LEN-1:0] update_fh (
         input logic [FH_LEN-1:0] pre,
@@ -83,7 +83,7 @@ module fhr #(
         if (reset)
             fh <= fh_rst;
         else
-            fh <= flush ? fh_flush : fh_n[wen_cnt];
+            fh <= redir ? fh_redir : fh_n[wen_cnt];
     end
 
 endmodule
@@ -101,10 +101,11 @@ module ghr #(
     input   clock,
     input   reset,
 
-    // misprediction flush
-    input           flush,
-    input   logic   flush_take,
-    input   PTR     flush_idx, // base BEFORE shifting in current branch's pred
+    // redirection
+    input   redir,  // flush | steer_s{2, 3}
+    input   logic [WPORTS-1:0]  redir_wen,
+    input   logic [WPORTS-1:0]  redir_take,
+    input   PTR                 redir_idx,
 
     // fetch
     input   `CNT_TYPE(WPORTS)   wen_cnt,
@@ -115,8 +116,7 @@ module ghr #(
     // retire
     input   PTR     ridx,
 
-    // ghist slice (flush and retire use the same rotator; flush takes precedence)
-    // FIXME: must stall retire during flush
+    // ghist slice (NOTE: redirection and retire use the same rotator; redirection gets priority)
     output  logic [GHR_LEN-1:0] rd_ghist
 );
     initial begin
@@ -128,6 +128,9 @@ module ghr #(
 
         assert ((DEPTH != 0) && ((DEPTH & (DEPTH - 1)) == 0))
             else $fatal("GHR DEPTH must be a power of 2");
+
+        assert (WPORTS == 2)
+            else $fatal("ghr: impl is hardcoded to WPORTS=2, but was given WPORTS=%0d", WPORTS);
     end
 
     VEC hist; // {0=ntake, 1=take}
@@ -142,27 +145,35 @@ module ghr #(
     assign base_n1 = base_n[1];
     endgenerate
 
-    // write ports: mux flush and fetch writes
+    // write ports: mux redir and fetch writes
     logic   [WPORTS-1:0] wen, wval;
-    PTR     [WPORTS-1:0] widx;
+    PTR     [WPORTS-1:0] redir_widx, widx;
     generate
-    assign wen[0]   = flush | (wen_cnt != 0);
-    assign widx[0]  = flush ? flush_idx : base_n[1];
-    assign wval[0]  = flush ? flush_take: wshf_in[0];
-    for (genvar i = 1; i < WPORTS; ++i) begin
-        assign wen [i] = i < wen_cnt;
-        assign widx[i] = base_n[i+1];
-        assign wval[i] = wshf_in[i];
+    assign wen[0] = redir ? redir_wen[0] : wen_cnt != 0;
+    assign wen[1] = redir ? redir_wen[1] : wen_cnt[1];
+
+    assign redir_widx[0] = redir_wen[1] ? redir_idx + 1'b1 : redir_idx;
+    assign redir_widx[1] = redir_idx;
+
+    for (genvar i = 0; i < WPORTS; ++i) begin
+        assign widx[i] = redir ? redir_widx[i] : base_n[i+1];
+        assign wval[i] = redir ? redir_take[i] : wshf_in[i];
     end
     endgenerate
 
-    // ghist slice: mux flush and retire read
+    // ghist slice: mux redir and retire read
     always_comb begin
-        rd_ghist = {hist, hist} >> (flush ? flush_idx : ridx);
-        if (flush) begin
+        rd_ghist = {hist, hist} >> (redir ? redir_idx : ridx);
+        if (redir) begin
             rd_ghist[0] &= 0;
-            // rd_ghist &= ~(1'b1);
-            rd_ghist[0] |= flush_take;
+
+            if (redir_wen[1]) begin
+                rd_ghist[1] &= 0;
+
+                rd_ghist[1] |= redir_take[0];
+                rd_ghist[0] |= redir_take[1];
+            end else // assert redir_wen[0]
+                rd_ghist[0] |= redir_take[0];
         end
     end
 
@@ -192,10 +203,10 @@ module ghr #(
                     continue;
                 hist[widx[i]] <= wval[i];
             end
-            base    <= flush
-                ? flush_idx
+            base    <= redir
+                ? redir_idx
                 : base_n[wen_cnt];
-            ghist   <= flush
+            ghist   <= redir
                 ? rd_ghist
                 : ghist_win[WPORTS +: GHR_LEN];
 
@@ -209,17 +220,17 @@ module ghr #(
 //         // runtime assertions
 //         if (!reset) begin
 //             logic [WPORTS-1:0] en_pred;
-//             assert(!flush || !rslv[cidx[0]]) else
-//                 $fatal("ghr: flush base %2d is already resolved", cidx[0]);
-//             // assert(!flush || hist[flush_base] != flush_take) else
-//             //     $fatal("ghr: flush take %b matches existing history", flush_take);
+//             assert(!redir || !rslv[cidx[0]]) else
+//                 $fatal("ghr: redir base %2d is already resolved", cidx[0]);
+//             // assert(!redir || hist[redir_base] != redir_take) else
+//             //     $fatal("ghr: redir take %b matches existing history", redir_take);
 //             /* Reason for disabling this asssertion:
-//             We must still perform flush even if the flush_take matches the hist record
+//             We must still perform redir even if the redir_take matches the hist record
 //             (Q: How can this happen? A: target mismatch).
 
 //             If we do not, we will fail to mark-resolve the dependent branches on the
 //             mispredicted path and the ghr will stall forever. (This is also why we
-//             cannot move to a simple "invert" hist value iff flush.)
+//             cannot move to a simple "invert" hist value iff redir.)
 //             */
 
 //             for (int i = 0; i < CPORTS; ++i) begin
@@ -243,15 +254,15 @@ module ghr #(
 `ifdef DEBUG
     task print_ghr;
         $display(">> ghr >>");
-        $display("  %3d | fetch: {en_cnt: %1d, pred: [%b, %b]}, flush: {%b, base: %2d, take: %b}",
+        $display("  %3d | fetch: {en_cnt: %1d, pred: [%b, %b]}, redir: {%b, base: %2d, take: %b}",
             $time,
             wen_cnt,
             wshf_in[0],
             wshf_in[1],
 
-            flush,
-            flush_idx,
-            flush_take
+            redir,
+            redir_idx,
+            redir_take
         );
 
         $display("ghist: %b. hist: %b", ghist, hist);
