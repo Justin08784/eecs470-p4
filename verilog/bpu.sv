@@ -14,6 +14,9 @@ typedef struct packed {
 } ghr_to_s1;
 
 typedef struct packed {
+`ifdef DEBUG
+    logic [31:0] id;
+`endif
     logic [1:0] in_win;
     logic [1:0] in_ghr;
 
@@ -118,8 +121,21 @@ module pred_s1 (
     };
 
 
+`ifdef DEBUG
+    int id;
+    always_ff @(posedge clock) begin
+        if (reset)
+            id <= 0;
+        else
+            id <= id + 1;
+    end
+`endif
+
     S1_S2_PKT o_s2_dat_n;
     assign o_s2_dat_n = '{
+`ifdef DEBUG
+        id          : id,
+`endif
         in_win      : in_win,
         in_ghr      : in_ghr,
         pred_uftb   : pred,
@@ -257,7 +273,25 @@ module pred_s2 (
         off : '0
     };
 
-    FTQ_ENTRY skid_wdat;
+    logic ftq_vld, ftq_vld_n;
+    FTQ_ENTRY ftq_wdat, ftq_wdat_n;
+
+    assign o_s1_rdy = ~ftq_vld | i_s3_rdy;
+    assign o_s3_vld = ftq_vld;
+    assign o_s3_dat = ftq_wdat;
+
+    always_ff @(posedge clock) begin
+        if (reset | flush) begin
+            ftq_vld     <= '0;
+            ftq_wdat    <= '0;
+
+        end else if (o_s1_rdy) begin // <<< THIS WAS THE BACKPRESSURE BUG FIX
+            ftq_vld     <= i_s1_vld;
+            ftq_wdat    <= ftq_wdat_n;
+
+        end
+    end
+
     localparam FTB_MD1 COND_MD = '{
         cond : 1,
         call : 0,
@@ -265,7 +299,10 @@ module pred_s2 (
         jalr : 0
     };
     always_comb begin
-        skid_wdat = '{
+        ftq_wdat_n = '{
+`ifdef DEBUG
+            id          : i_s1_dat.id,
+`endif
             base_n      : o_pos_n.base,
 
             ft          : ~pred_any,
@@ -283,32 +320,32 @@ module pred_s2 (
         };
 
         for (int i = 0; i < NUM_BR_SLOTS; ++i) begin
-            skid_wdat.slot[i] = '{
+            ftq_wdat_n.slot[i] = '{
                 vld : row.br_slot[i].vld,
                 off : row.br_slot[i].off
             };
         end
     end
 
-    ppln_skid #(
-        .FLUSH_MODE (SKID_FLUSH_RESET),
-        .WIDTH      ($bits(FTQ_ENTRY))
-    ) ftq_skid (
-        .clock,
-        .reset,
-        .flush,
-        .clmsk  ('0), // unused
+    // ppln_skid #(
+    //     .FLUSH_MODE (SKID_FLUSH_RESET),
+    //     .WIDTH      ($bits(FTQ_ENTRY))
+    // ) ftq_skid (
+    //     .clock,
+    //     .reset,
+    //     .flush,
+    //     .clmsk  ('0), // unused
 
-        .i_vld (i_s1_vld),
-        .i_rdy (o_s1_rdy),
-        .i_msk ('0),
-        .i_dat (skid_wdat),
+    //     .i_vld (ftq_vld),
+    //     .i_rdy (ftq_rdy),
+    //     .i_msk ('0),
+    //     .i_dat (ftq_wdat),
 
-        .o_vld (o_s3_vld),
-        .o_rdy (i_s3_rdy),
-        .o_msk (),
-        .o_dat (o_s3_dat)
-    );
+    //     .o_vld (o_s3_vld),
+    //     .o_rdy (i_s3_rdy),
+    //     .o_msk (),
+    //     .o_dat (o_s3_dat)
+    // );
 
 
     always_ff @(posedge clock) begin
@@ -541,7 +578,16 @@ module bpu (
             cbru_in.flush_fb_off
         );
 
-        $display("o_s2_dat: vld: %b, hit: %b, base: %d", s1.o_s2_vld, s1.o_s2_dat.hit_uftb, s1.o_s2_dat.base);
+        $display("s2 pred: %b", s2.pred);
+        $display("o_s2_dat: vld: %b, id: %4d, {in_win: %b, in_ghr: %b, pred: %b, hit: %b, base: %d}",
+            s1.o_s2_vld,
+            s1.o_s2_dat.id,
+            s1.o_s2_dat.in_win,
+            s1.o_s2_dat.in_ghr,
+            s1.o_s2_dat.pred_uftb,
+            s1.o_s2_dat.hit_uftb,
+            s1.o_s2_dat.base
+        );
         $display("[ {vld: %b, tgt: %d, off = %2d, always_take: %b},",
             s1.o_s2_dat.fb.br_slot[0].vld,
             s1.o_s2_dat.fb.br_slot[0].tgt,
@@ -558,6 +604,21 @@ module bpu (
             s1.o_s2_dat.fb.md1.call,
             s1.o_s2_dat.fb.md1.ret,
             s1.o_s2_dat.fb.md1.jalr
+        );
+
+        $display("o_s3_dat: vld: %b, id: %4d {base_n: %d, ft: %b, pred_idx: %b, off: %d, hit: %b, slot: %b, in_ghr: %b, ghr_base_n1: %d, always_take: %b, md: %b}",
+            s2.o_s3_vld,
+            s2.o_s3_dat.id,
+            s2.o_s3_dat.base_n,
+            s2.o_s3_dat.ft,
+            s2.o_s3_dat.pred_idx,
+            s2.o_s3_dat.off,
+            s2.o_s3_dat.hit,
+            s2.o_s3_dat.slot,
+            s2.o_s3_dat.in_ghr,
+            s2.o_s3_dat.ghr_base_n1,
+            s2.o_s3_dat.always_take,
+            s2.o_s3_dat.md
         );
 
         // $display("(cur.base: %d, off: %0d, pred: [%b, %b]), step: %b, ftq_skid: %b, ftq: %b",
