@@ -46,7 +46,8 @@ module pred_s1 (
     output  logic       o_s2_vld,
     output  S1_S2_PKT   o_s2_dat
 );
-    assign s1_step = (~o_s2_vld | i_s2_rdy) & ~(flush | s2_steer); // FIXME
+    assign s1_step = ~o_s2_vld | i_s2_rdy;
+        /* functionally equivalent to s1_rdy */
 
     logic       hit;
     FTB_ENTRY   row;
@@ -134,8 +135,8 @@ module pred_s1 (
         if (reset | flush | s2_steer) begin
             o_s2_vld <= 0;
             o_s2_dat <= '0;
-        end else begin
-            o_s2_vld <= s1_step;
+        end else if (s1_step) begin
+            o_s2_vld <= 1;
             o_s2_dat <= o_s2_dat_n;
         end
     end
