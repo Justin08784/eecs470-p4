@@ -189,7 +189,7 @@ module pred_s2 (
         take        : i_udat.take,
         slot_idx    : i_udat.slot_idx,
         uen_gshare  : i_uen && i_udat.en_dir_update && i_udat.md.cond, // train only on conditional branches!
-        // hash_gshare : i_fhr.rd_fh ^ i_udat.base[FH_LEN-1:0]
+        // hash_gshare : i_fhr.rd_fh ^ i_udat.base[FH_LEN-1:0] // FIXME: reenable
         hash_gshare : i_fhr.rd_fh
     };
 
@@ -211,7 +211,7 @@ module pred_s2 (
         .i_uslot_idx(upd_s2.slot_idx),
         .i_uhash    (upd_s2.hash_gshare),
 
-        // .i_hash     (i_fhr.fh ^ i_pos.base[FH_LEN-1:0]),
+        // .i_hash     (i_fhr.fh ^ i_pos.base[FH_LEN-1:0]), // FIXME: reenable
         .i_hash     (i_fhr.fh),
         .o_pred     (raw_pred_n)
 
@@ -258,33 +258,16 @@ module pred_s2 (
         off : '0
     };
 
-    logic ftq_vld, ftq_vld_n;
-    FTQ_ENTRY ftq_wdat, ftq_wdat_n;
-
-    assign o_s1_rdy = ~ftq_vld | i_s3_rdy;
-    assign o_s3_vld = ftq_vld;
-    assign o_s3_dat = ftq_wdat;
-
-    always_ff @(posedge clock) begin
-        if (reset | flush) begin
-            ftq_vld     <= '0;
-            ftq_wdat    <= '0;
-
-        end else if (o_s1_rdy) begin // <<< THIS WAS THE BACKPRESSURE BUG FIX
-            ftq_vld     <= i_s1_vld;
-            ftq_wdat    <= ftq_wdat_n;
-
-        end
-    end
-
     localparam FTB_MD1 COND_MD = '{
         cond : 1,
         call : 0,
         ret  : 0,
         jalr : 0
     };
+
+    FTQ_ENTRY buf_wdat;
     always_comb begin
-        ftq_wdat_n = '{
+        buf_wdat = '{
             base_n      : o_pos_n.base,
 
             ft          : ~pred_any,
@@ -302,47 +285,43 @@ module pred_s2 (
         };
 
         for (int i = 0; i < NUM_BR_SLOTS; ++i) begin
-            ftq_wdat_n.slot[i] = '{
+            buf_wdat.slot[i] = '{
                 vld : row.br_slot[i].vld,
                 off : row.br_slot[i].off
             };
         end
     end
 
-    // ppln_skid #(
-    //     .FLUSH_MODE (SKID_FLUSH_RESET),
-    //     .WIDTH      ($bits(FTQ_ENTRY))
-    // ) ftq_skid (
-    //     .clock,
-    //     .reset,
-    //     .flush,
-    //     .clmsk  ('0), // unused
+    ppln_skid #(
+        .FLUSH_MODE (SKID_FLUSH_RESET),
+        .WIDTH      ($bits(FTQ_ENTRY))
+    ) ftq_skid (
+        .clock,
+        .reset,
+        .flush,
+        .clmsk  ('0), // unused
 
-    //     .i_vld (ftq_vld),
-    //     .i_rdy (ftq_rdy),
-    //     .i_msk ('0),
-    //     .i_dat (ftq_wdat),
+        .i_vld (i_s1_vld),
+        .i_rdy (o_s1_rdy),
+        .i_msk ('0),
+        .i_dat (buf_wdat),
 
-    //     .o_vld (o_s3_vld),
-    //     .o_rdy (i_s3_rdy),
-    //     .o_msk (),
-    //     .o_dat (o_s3_dat)
-    // );
+        .o_vld (o_s3_vld),
+        .o_rdy (i_s3_rdy),
+        .o_msk (),
+        .o_dat (o_s3_dat)
+    );
 
 
     always_ff @(posedge clock) begin
-        // if (reset | flush | s2_steer)
-        if (reset)
+        if (reset) begin
             raw_pred<= '0;
-        else
-            raw_pred<= raw_pred_n;
-
-        if (reset)
             upd_s2  <= '0;
-        else
+        end else begin
+            raw_pred<= raw_pred_n;
             upd_s2  <= upd_s2_n;
+        end
     end
-
 
 endmodule;
 

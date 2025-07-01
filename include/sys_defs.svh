@@ -82,8 +82,10 @@ parameter BRANCH_PRED_SZ= 'x; // FIXME
 parameter GHR_BUF_SZ    = 128;
 // parameter GHR_LEN       = 90;
 // parameter FH_LEN        = 10;
-parameter GHR_LEN       = 6;
-parameter FH_LEN        = 6;
+parameter GHR_LEN       = 10;
+parameter FH_LEN        = 10;
+// parameter GHR_LEN       = 6;
+// parameter FH_LEN        = 6;
 parameter RAS_SZ        = 16;
 parameter FTQ_SZ        = 32;
 
