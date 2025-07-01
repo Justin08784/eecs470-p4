@@ -14,9 +14,6 @@ typedef struct packed {
 } ghr_to_s1;
 
 typedef struct packed {
-`ifdef DEBUG
-    logic [31:0] id;
-`endif
     logic [1:0] in_win;
     logic [1:0] in_ghr;
 
@@ -121,21 +118,8 @@ module pred_s1 (
     };
 
 
-`ifdef DEBUG
-    int id;
-    always_ff @(posedge clock) begin
-        if (reset)
-            id <= 0;
-        else
-            id <= id + 1;
-    end
-`endif
-
     S1_S2_PKT o_s2_dat_n;
     assign o_s2_dat_n = '{
-`ifdef DEBUG
-        id          : id,
-`endif
         in_win      : in_win,
         in_ghr      : in_ghr,
         pred_uftb   : pred,
@@ -300,9 +284,6 @@ module pred_s2 (
     };
     always_comb begin
         ftq_wdat_n = '{
-`ifdef DEBUG
-            id          : i_s1_dat.id,
-`endif
             base_n      : o_pos_n.base,
 
             ft          : ~pred_any,
@@ -579,9 +560,8 @@ module bpu (
         );
 
         $display("s2 pred: %b", s2.pred);
-        $display("o_s2_dat: vld: %b, id: %4d, {in_win: %b, in_ghr: %b, pred: %b, hit: %b, base: %d}",
+        $display("o_s2_dat: vld: %b, {in_win: %b, in_ghr: %b, pred: %b, hit: %b, base: %d}",
             s1.o_s2_vld,
-            s1.o_s2_dat.id,
             s1.o_s2_dat.in_win,
             s1.o_s2_dat.in_ghr,
             s1.o_s2_dat.pred_uftb,
@@ -606,9 +586,8 @@ module bpu (
             s1.o_s2_dat.fb.md1.jalr
         );
 
-        $display("o_s3_dat: vld: %b, id: %4d {base_n: %d, ft: %b, pred_idx: %b, off: %d, hit: %b, slot: %b, in_ghr: %b, ghr_base_n1: %d, always_take: %b, md: %b}",
+        $display("o_s3_dat: vld: %b, {base_n: %d, ft: %b, pred_idx: %b, off: %d, hit: %b, slot: %b, in_ghr: %b, ghr_base_n1: %d, always_take: %b, md: %b}",
             s2.o_s3_vld,
-            s2.o_s3_dat.id,
             s2.o_s3_dat.base_n,
             s2.o_s3_dat.ft,
             s2.o_s3_dat.pred_idx,

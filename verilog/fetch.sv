@@ -152,13 +152,15 @@ module irq #(
             wr_idxs_n[1],
             wr_idxs_n[2]
         );
-        for (int i = 0; i < IRQ_SZ; ++i)
-            $display("irq[%d]: cpl: %b, dw: %d, off: [%d, %d], fmsk: %b, is_end: %b, blk: [%x, %x], md: [%b, %b]",
+        for (int i = 0; i < IRQ_SZ; ++i) begin
+            $display("irq[%d]: cpl: %b, dw: %d, off: [%d, %d], pc: (%d, %d), fmsk: %b, is_end: %b, blk: [%x, %x], md: [%b, %b]",
                 i,
                 cpl[i],
                 state[i].dw,
                 state[i].off[0],
                 state[i].off[1],
+                {state[i].dw, 1'b0},
+                {state[i].dw, 1'b1},
                 state[i].fmsk,
                 state[i].is_end,
                 state[i].blk.word_level[0],
@@ -166,6 +168,7 @@ module irq #(
                 state[i].md[0],
                 state[i].md[1]
             );
+        end
     endtask
 `endif
 

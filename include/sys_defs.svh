@@ -31,8 +31,8 @@
 // `define SYNTH // synth only constructions // FIXME: how can we implement this in Makefile?
 
 `ifndef SYNTH
-`define DEBUG
-`define CYCLE_PRINT // clock cycle print
+// `define DEBUG
+// `define CYCLE_PRINT // clock cycle print
 // `define PC_GEN_TEST_MODE
 `define FORMAL
 `endif

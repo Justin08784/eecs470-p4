@@ -20,3 +20,7 @@ loop3:
     nop
     bnez x1, loop1  # 17
 wfi
+
+# This test case is quite pathological because branch at pc 7 appears to uftb
+# as an update only on cycles when it is not taken, so it never seems to enter
+# the uftb?
