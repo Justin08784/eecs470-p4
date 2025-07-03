@@ -17,7 +17,9 @@ typedef struct packed {
     logic [1:0] in_win;
     logic [1:0] in_ghr;
 
-    logic [1:0] pred_uftb; // bimodal sc bits
+    // logic [1:0] pred_uftb; // bimodal sc bits
+    logic       pred_any;
+    logic       pred_idx;
     logic       hit_uftb;
     GHR_IDX     ghr_base_n1;
 
@@ -123,7 +125,9 @@ module pred_s1 (
     assign o_s2_dat_n = '{
         in_win      : in_win,
         in_ghr      : in_ghr,
-        pred_uftb   : pred,
+        // pred_uftb   : pred,
+        pred_any    : pred_any,
+        pred_idx    : pred_idx,
         hit_uftb    : hit,
         ghr_base_n1 : i_ghr.base_n1,
         base        : i_pos.base,
@@ -232,7 +236,10 @@ module pred_s2 (
     assign in_ghr[0] = row.br_slot[0].vld & in_win[0];
     assign in_ghr[1] = row.br_slot[1].vld & in_win[1] & ~(pred_any & ~pred_idx);
 
-    assign s2_steer = (i_s1_vld & o_s1_rdy) & (pred != i_s1_dat.pred_uftb);
+    assign s2_steer = (i_s1_vld & o_s1_rdy) & (
+        {i_s1_dat.pred_any, i_s1_dat.pred_idx} != {pred_any, pred_idx}
+    ); // == override s1?
+
     assign o_ghr.s2_steer_wen[0]= |in_ghr;
     assign o_ghr.s2_steer_wen[1]= &in_ghr;
     assign o_ghr.s2_steer_take  = pred >> ~in_ghr[0];
