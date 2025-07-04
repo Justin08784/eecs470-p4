@@ -99,7 +99,7 @@
 export CLOCK_PERIOD = 30.0
 
 # the Verilog Compiler command and arguments
-VCS =  vcs -sverilog -xprop=tmerge +vc +vcs+initreg+random -Mupdate -Mdir=build/csrc -line -full64 -kdb -lca -nc \
+VCS =  vcs -sverilog -xprop=tmerge +vc -Mupdate -Mdir=build/csrc -line -full64 -kdb -lca -nc \
       -debug_access+all+reverse $(VCS_BAD_WARNINGS) +define+CLOCK_PERIOD=$(CLOCK_PERIOD) +incdir+include/
 # a SYNTH define is added when compiling for synthesis that can be used in testbenches
 RAND_SEED = 1729

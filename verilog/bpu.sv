@@ -125,7 +125,6 @@ module pred_s1 (
     assign o_s2_dat_n = '{
         in_win      : in_win,
         in_ghr      : in_ghr,
-        // pred_uftb   : pred,
         pred_any    : pred_any,
         pred_idx    : pred_idx,
         hit_uftb    : hit,
@@ -227,8 +226,6 @@ module pred_s2 (
         &  raw_pred[0];
     assign pred[1] = (hit & row.br_slot[1].vld & in_win[1])
         & (raw_pred[1] | ~row.md1.cond);
-    // assign pred = i_s1_dat.pred_uftb;
-    // assign pred = '1;
     assign pred_any = |pred;
     assign pred_idx = ~pred[0] & pred[1];
 
@@ -547,11 +544,12 @@ module bpu (
         );
 
         $display("s2 pred: %b", s2.pred);
-        $display("o_s2_dat: vld: %b, {in_win: %b, in_ghr: %b, pred: %b, hit: %b, base: %d}",
+        $display("o_s2_dat: vld: %b, {in_win: %b, in_ghr: %b, pred: (any: %b, idx: %b), hit: %b, base: %d}",
             s1.o_s2_vld,
             s1.o_s2_dat.in_win,
             s1.o_s2_dat.in_ghr,
-            s1.o_s2_dat.pred_uftb,
+            s1.o_s2_dat.pred_any,
+            s1.o_s2_dat.pred_idx,
             s1.o_s2_dat.hit_uftb,
             s1.o_s2_dat.base
         );
