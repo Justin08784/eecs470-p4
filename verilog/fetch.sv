@@ -882,11 +882,9 @@ module dcf (
     );
 
     always_ff @(posedge clock) begin
-        if (reset || flush) begin
-            iqq.vld <= '0;
-            idat.vld<= '0;
-            // iqq     <= '0;
-            // idat    <= '0;
+        if (reset | flush) begin
+            iqq     <= '0;
+            idat    <= '0;
 
         end else begin
             iqq     <= iqq_n;

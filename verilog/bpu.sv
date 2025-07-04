@@ -80,24 +80,24 @@ module pred_s1 (
 
 
     logic [1:0] in_win;
-    assign in_win[0] = i_pos.off <= row.br_slot[0].off;
-    assign in_win[1] = i_pos.off <= row.br_slot[1].off;
+    assign in_win[0] = hit & (i_pos.off <= row.br_slot[0].off);
+    assign in_win[1] = hit & (i_pos.off <= row.br_slot[1].off);
 
     logic [1:0] pred;
     logic pred_any, pred_idx;
-    assign pred[0] = (hit & row.br_slot[0].vld & in_win[0])
+    assign pred[0] = hit & row.br_slot[0].vld & in_win[0]
         &  query_sc(row.br_slot[0].sc);
-    assign pred[1] = (hit & row.br_slot[1].vld & in_win[1])
+    assign pred[1] = hit & row.br_slot[1].vld & in_win[1]
         & (query_sc(row.br_slot[1].sc) | ~row.md1.cond);
     assign pred_any = |pred;
     assign pred_idx = ~pred[0] & pred[1];
 
     logic [1:0] in_ghr;
-    assign in_ghr[0] = row.br_slot[0].vld & in_win[0];
-    assign in_ghr[1] = row.br_slot[1].vld & in_win[1] & ~(pred_any & ~pred_idx);
+    assign in_ghr[0] = hit & row.br_slot[0].vld & in_win[0];
+    assign in_ghr[1] = hit & row.br_slot[1].vld & in_win[1] & ~(pred_any & ~pred_idx);
 
     assign o_ghr = '{
-        wen_cnt : (s1_step & hit) ? $countones(in_ghr) : 0,
+        wen_cnt : s1_step ? $countones(in_ghr) : 0,
         wshf_in : pred >> ~in_win[0]
     };
 
@@ -131,17 +131,16 @@ module pred_s1 (
         ghr_base_n1 : i_ghr.base_n1,
         base        : i_pos.base,
 
-        fb          : row 
+        fb          : hit ? row : '0
     };
 
     always_ff @(posedge clock) begin
-        if (reset | flush | s2_steer) begin
+        if (reset | flush | s2_steer)
             o_s2_vld <= 0;
-            o_s2_dat <= '0;
-        end else if (s1_step) begin
+        else if (s1_step)
             o_s2_vld <= 1;
-            o_s2_dat <= o_s2_dat_n;
-        end
+
+        o_s2_dat <= o_s2_dat_n;
     end
 
 endmodule;
