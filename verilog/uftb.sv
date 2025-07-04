@@ -4,6 +4,7 @@
 module lru_man #(
     parameter SETW=16
 ) (
+    input   logic [SETW-1:0] vld,
     input   logic [SETW-1:0][SETW-1:0] age,
     input   `IDX_TYPE(SETW) acc_way,   
     input   logic msk_en,
@@ -20,16 +21,19 @@ age[i][j]
     1) is valid iff i < j
     2) if valid, means way i is "older" than way j */
 
-    logic [SETW-1:0][SETW-1:0] nage;
+    logic [SETW-1:0][SETW-1:0] vage, nvage; // valid age, ~(valid age)
     logic [SETW-1:0][SETW-1:0] ot, ot_masked;
     logic [SETW-1:0] lruv;
     generate
-    assign nage = ~age;
+    for (genvar i = 0; i < SETW; ++i)
+        assign vage[i] = vld[i] ? age[i] : '1; // if entry not valid, treat as "oldest" (all 1s)
+
+    assign nvage = ~vage;
     for (genvar i = 0; i < SETW; ++i) begin
         for (genvar j = 0; j < SETW; ++j) begin
             assign ot[i][j] =
-                i <  j ?  age[i][j] :
-                i >  j ? nage[j][i] :
+                i <  j ? vage[i][j] :
+                i >  j ? nvage[j][i] :
                 1;
         end
     end
@@ -438,7 +442,9 @@ module uftb #(
     lru_man #(
         .SETW(NUM_LINES)
     ) lru_man0 (
+        .vld(hdr.vld),
         .age(hdr.age),
+
         .acc_way,
         .lru_way,
 
