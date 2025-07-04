@@ -1,3 +1,5 @@
+# CPU Architecture
+![architecture](img/arch.png)
 
 # Personal Notes
 ## Multiplexed SSH connection for convenience
