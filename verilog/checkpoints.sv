@@ -118,7 +118,8 @@ module branch_manager (
 
 `ifdef FORMAL
     always_ff @(posedge clock) begin
-        assert ($onehot0({reset,clmsk})) else $fatal("clmsk not one-hot");
+        if (!reset)
+            assert ($onehot0(clmsk)) else $fatal("clmsk not one-hot");
     end
 `endif
 

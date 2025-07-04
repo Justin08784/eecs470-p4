@@ -107,11 +107,29 @@ module gshare (
 
     assign urec = pht[i_uhash];
     always_ff @(posedge clock) begin
+`ifndef SYNTH
+        /*
+        1. Unlike TAGE, gshare is non-tagged and does not have entry valid bits.
+        2. Unlike the PRF, gshare does not enforce "write-before-read" semantics.
+        -> 1+2 means that X's can propagate from uninitialized gshare and blow up simulation
+
+        Conversely, we do not want a high-fanout reset tree just to zero the gshare table
+        (which will worsen timing during synthesis), since gshare is non-architectural
+        (i.e. need not be initialized to any particular value).
+        
+        Thus we compromise via the following power-on policy:
+
+        !SYNTH: reset fills with WT/WT
+         SYNTH: rely on +initreg+ to non-X random-fill */
         if (reset)
             for (int i = 0; i < PHT_SZ; ++i)
                 pht[i] <= {WT, WT};
-        else if (i_uen)
-            pht[i_uhash][i_uslot_idx] <= update_sc(urec[i_uslot_idx], i_utake);
+        else
+`endif
+        begin    
+            if (i_uen)
+                pht[i_uhash][i_uslot_idx] <= update_sc(urec[i_uslot_idx], i_utake);
+        end
     end
 
 // `ifdef DEBUG

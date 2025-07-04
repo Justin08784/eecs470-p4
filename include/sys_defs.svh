@@ -291,12 +291,15 @@ typedef enum logic [1:0] {
 // ================
 // Owner: BPU (branch prediction unit)
 // ================
+typedef logic [1:0] SC_2BIT;
+    /*  - ^ formerly "enum logic [1:0]"
+        - redefined because +vcs+initreg+random can only initialize logic types */
 typedef enum logic [1:0] {
     SN = 2'b00,
     WN = 2'b01,
     WT = 2'b10,
     ST = 2'b11
-} SC_2BIT;
+} SC_2BIT_VALS;
 
 function automatic logic [1:0] update_sc(
     input logic unsigned [1:0] sc,

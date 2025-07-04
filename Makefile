@@ -99,9 +99,10 @@
 export CLOCK_PERIOD = 30.0
 
 # the Verilog Compiler command and arguments
-VCS =  vcs -sverilog -xprop=tmerge +vc -Mupdate -Mdir=build/csrc -line -full64 -kdb -lca -nc \
+VCS =  vcs -sverilog -xprop=tmerge +vc +vcs+initreg+random -Mupdate -Mdir=build/csrc -line -full64 -kdb -lca -nc \
       -debug_access+all+reverse $(VCS_BAD_WARNINGS) +define+CLOCK_PERIOD=$(CLOCK_PERIOD) +incdir+include/
 # a SYNTH define is added when compiling for synthesis that can be used in testbenches
+RAND_SEED = 1729
 
 RUN_VERDI = -gui=verdi -verdi_opts "-ultra"
 
@@ -194,6 +195,7 @@ MODULES = cpu \
 	bpu \
 	fetch \
 	fifo \
+	foo \
 	ftq \
 	ghr \
 	gshare \
@@ -349,7 +351,15 @@ syn_simv: build/cpu.syn.simv ;
 # using this syntax avoids overlapping with the 'make <my_program>.out' targets
 $(MODULES:%=build/%.out) $(MODULES:%=build/%.syn.out): build/%.out: build/%.simv
 	@$(call PRINT_COLOR, 5, running $<)
-	cd build && ./$(<F) | tee $(@F)
+	cd build && ./$(<F) +vcs+initreg+$(RAND_SEED) | tee $(@F)
+# NOTE X1: +vcs+initreg+$(RAND_SEED) is a runtime option that randomly initializes
+# the values of all registers according to the seed. Alternative options:
+#    "Please use +vcs+initreg+random at compile time and choose either 0|1|random|<seed>
+#    at runtime using +vcs+initreg."
+# 
+# This runtime option only has any effect when the code has been compiled with
+# the option +vcs+initreg+random (it is currently only used for <module>.syn.simv <synthesis>).
+# If the +vcs+initreg+random option is not set, then all registers are initialized to "x" as normal.
 
 # Connect 'make build/mod.out' to 'make mod.out'
 $(MODULES:%=./%.out) $(MODULES:%=./%.syn.out): ./%.out: build/%.out
@@ -395,8 +405,9 @@ slack:
 # The synthesis executable runs your testbench on the synthesized versions of your modules
 $(MODULES:%=build/%.syn.simv): build/%.syn.simv: test/%_test.sv synth/%.vg | build
 	@$(call PRINT_COLOR, 5, compiling the synthesis executable $@)
-	$(VCS) +define+SYNTH $(filter-out $(ALL_HEADERS),$^) $(LIB) -o $@
+	$(VCS) +vcs+initreg+random +define+SYNTH $(filter-out $(ALL_HEADERS),$^) $(LIB) -o $@
 	@$(call PRINT_COLOR, 6, finished compiling $@)
+# Unlike *.simv, *.syn.simv sets compile option +vcs+initreg+random to avoid x's.
 
 ##############################
 # ---- Coverage targets ---- #
@@ -579,9 +590,10 @@ dump_all: $(DUMP_PROGRAMS:=.dump_x) $(DUMP_PROGRAMS:=.dump_abi)
 # run a program and produce output files
 output/%.out: programs/mem/%.mem build/cpu.simv | output
 	@$(call PRINT_COLOR, 5, running simv on $<)
-	./build/cpu.simv +MEMORY=$< +OUTPUT=output/$* > output/$*.log
+	./build/cpu.simv +vcs+initreg+$(RAND_SEED) +MEMORY=$< +OUTPUT=output/$* > output/$*.log
 	@$(call PRINT_COLOR, 6, finished running simv on $<)
 	@$(call PRINT_COLOR, 2, output is in output/$*.{out cpi wb log})
+# Re: +vcs+initreg+$(RAND_SEED), see Note X1
 # NOTE: this uses a 'static pattern rule' to match a list of known targets to a pattern
 # and then generates the correct rule based on the pattern, where % and $* match
 # so for the target 'output/sampler.out' the % matches 'sampler' and depends on programs/sampler.mem
@@ -593,9 +605,10 @@ output/%.out: programs/mem/%.mem build/cpu.simv | output
 output/%.syn.out: programs/mem/%.mem build/cpu.syn.simv | output
 	@$(call PRINT_COLOR, 5, running syn_simv on $<)
 	@$(call PRINT_COLOR, 3, this might take a while...)
-	./build/cpu.syn.simv +MEMORY=$< +OUTPUT=output/$*.syn > output/$*.syn.log
+	./build/cpu.syn.simv +vcs+initreg+$(RAND_SEED) +MEMORY=$< +OUTPUT=output/$*.syn > output/$*.syn.log
 	@$(call PRINT_COLOR, 6, finished running syn_simv on $<)
 	@$(call PRINT_COLOR, 2, output is in output/$*.syn.{out cpi wb})
+# Re: +vcs+initreg+$(RAND_SEED), see Note X1
 
 # Allow us to type 'make <my_program>.out' instead of 'make output/<my_program>.out'
 ./%.out: output/%.out ;
