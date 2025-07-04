@@ -473,8 +473,6 @@ module uftb #(
         logic   en;
     } s1_ctl, s1_ctl_n;
     struct packed {
-
-        logic   hit;
         logic   hit_hdr;
         logic   hit_s1;
             /* Predecessor is valid and has matching tag.
@@ -486,6 +484,7 @@ module uftb #(
         FTB_ENTRY e;
         FTB_UPD_PKT udat;
     } s1, s1_n;
+
     struct packed {
         logic   wen; // did predecessor write at all?
     } s2_ctl, s2_ctl_n;
@@ -496,7 +495,7 @@ module uftb #(
     // s1
     always_comb begin
         TAG tag;
-        LOC loc_s1, loc_hdr, loc;
+        LOC loc_s1, loc_hdr;
 
         tag = get_tag(i_udat.base);
         // query s1 reg
@@ -511,23 +510,18 @@ module uftb #(
         // query header
         loc_hdr = locate(hdr, tag);
 
-        // mux loc, giving priority to s1 (bypass)
-        loc.hit = loc_s1.hit | loc_hdr.hit;
-        loc.way = '0;
-        if (loc_s1.hit)
-            loc.way = loc_s1.way;
-        else
-            loc.way = loc_hdr.way;
-
         s1_ctl_n= '{en  : i_uen};
         s1_n    = '{
-            hit : loc.hit,
             hit_hdr : loc_hdr.hit,
             hit_s1  : loc_s1.hit,
-            way : loc.hit ? loc.way : lru_way,
+            way     :
+                loc_s1.hit  ? loc_s1.way :
+                loc_hdr.hit ? loc_hdr.way:
+                lru_way,
+                    // mux loc, giving priority to s1 (bypass)
 
-            e   : tgt[loc_hdr.way],
-            udat: i_udat
+            e       : tgt[loc_hdr.way],
+            udat    : i_udat
         };
     end
 
@@ -660,13 +654,12 @@ module uftb #(
     // runtime assertions
     always_ff @(posedge clock) begin
         if (!reset) begin
-            assert(hit_slot_spill_mex) else $fatal("hit_slot and spill are both high: %b. en: %b, hit: %b, way: %b, e: %b, udat: %b",
-            hit_slot_spill_mex,
-            s1_ctl.en,
-            s1.hit,
-            s1.way,
-            s1.e,
-            s1.udat
+            assert(hit_slot_spill_mex) else $fatal("hit_slot and spill are both high: %b. en: %b, way: %b, e: %b, udat: %b",
+                hit_slot_spill_mex,
+                s1_ctl.en,
+                s1.way,
+                s1.e,
+                s1.udat
             );
         end
     end
