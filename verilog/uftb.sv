@@ -208,28 +208,33 @@ module uftb #(
     typedef struct packed {
         logic   hit;
         WAY     way;
+        FTB_ENTRY e;
     } LOC;
     function automatic LOC locate(
-        input HEADER    hdr,
-        input TAG       tag
+        input TAG   tag
     );
         logic   [NUM_LINES-1:0] hitv;
         logic   hit;
         WAY     way;
+        FTB_ENTRY e;
 
         for (int w = 0; w < NUM_LINES; ++w)
             hitv[w] = hdr.vld[w] && (tag == hdr.tag[w]);
 
         hit = |hitv;
         way = 0;
+        e   = '0;
         for (int w = 0; w < NUM_LINES; ++w) begin
-            if (hitv[w])
+            if (hitv[w]) begin
                 way = w;
+                e   = tgt[w];
+            end
         end
 
         return '{
             hit : hit,
-            way : way
+            way : way,
+            e   : e
         };
     endfunction
 
@@ -457,13 +462,11 @@ module uftb #(
     // fetch
     always_comb begin
         LOC loc;
-        TAG tag;
 
-        tag = get_tag(i_qry);
-        loc = locate(hdr, tag);
+        loc = locate(get_tag(i_qry));
 
         o_vld = loc.hit;
-        o_tgt = tgt[loc.way];
+        o_tgt = loc.e;
     end
 
     // retire
@@ -489,20 +492,22 @@ module uftb #(
     // s1
     always_comb begin
         TAG tag;
-        LOC loc_s1, loc_hdr;
+        struct packed {
+            logic   hit;
+            WAY     way;
+        } loc_s1;
+        LOC loc_hdr;
 
         tag = get_tag(i_udat.base);
         // query s1 reg
         msk_en  = s1.en;
         msk_way = s1.way;
             // ^ protect our predecessor's way from LRU selection so we don't clobber it
-        loc_s1  = '{
-            hit : s1.en & (tag == get_tag(s1.udat.base)),
-            way : s1.way
-        };
+        loc_s1.hit = s1.en & (tag == get_tag(s1.udat.base));
+        loc_s1.way = s1.way;
 
         // query header
-        loc_hdr = locate(hdr, tag);
+        loc_hdr = locate(tag);
 
         s1_n    = '{
             en      : i_uen,
@@ -514,7 +519,7 @@ module uftb #(
                 lru_way,
                     // mux loc, giving priority to s1 (bypass)
 
-            e       : tgt[loc_hdr.way],
+            e       : loc_hdr.e,
             udat    : i_udat
         };
     end
