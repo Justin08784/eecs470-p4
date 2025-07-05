@@ -26,12 +26,9 @@ module general_snaps #(
 
     always_ff @(posedge clock) begin
         for (int n = 0; n < N; ++n) begin
-            if (!wen[n])
-                continue;
             for (int i = 0; i < BMASK_LEN; ++i) begin
-                if (!wmsk[n][i])
-                    continue;
-                snaps[i] <= wdat[n];
+                if (wen[n] & wmsk[n][i])
+                    snaps[i] <= wdat[n];
             end
         end
     end

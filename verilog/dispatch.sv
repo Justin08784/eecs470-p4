@@ -55,16 +55,9 @@ module dispatch #(parameter
         .prefix_cnt (free_prefix_cnt),
         .gnt_cnt    (free_lim_cnt)
     );
+    for (genvar n = 0; n < N; ++n)
+        assign has_dst[n] = d_in.dat[n].has_dst;
 
-    always_comb begin
-        foreach (has_dst[n])
-            has_dst[n] = d_in.dat[n].has_dst;
-    end
-
-    `CNT_TYPE(N) rename_vld_scnt;
-    `CNT_TYPE(N) rename_rdy_scnt;
-    `CNT_TYPE(N) rename_en_cnt;
-    logic [N-1:0]      rename_en;
 
     logic [N-1:0] rnme_is_brch;
     logic [N:0][`CNT_SIZE(N)-1:0] rnme_snap_prefix_cnt;
@@ -78,96 +71,86 @@ module dispatch #(parameter
         .prefix_cnt (rnme_snap_prefix_cnt),
         .gnt_cnt    (rnme_snap_lim_cnt)
     );
+    for (genvar n = 0; n < N; ++n)
+        assign rnme_is_brch[n] = d_in.dat[n].fu_idx == FU_BRU;
 
-    always_comb begin
-        foreach (rnme_is_brch[n])
-            rnme_is_brch[n] = d_in.dat[n].fu_idx == FU_BRU;
 
-        rename_en_cnt = d_in.vld_scnt;
-        rename_en_cnt = `MIN(free_lim_cnt, rename_en_cnt);
-        rename_en_cnt = `MIN(rename_rdy_scnt, rename_en_cnt);
-        rename_en_cnt = `MIN(rnme_snap_lim_cnt, rename_en_cnt);
+    `CNT_TYPE(N) rename_vld_scnt;
+    `CNT_TYPE(N) rename_rdy_scnt;
+    `CNT_TYPE(N) rename_en_cnt;
+    assign rename_en_cnt = `MIN(
+        `MIN(d_in.vld_scnt,     free_lim_cnt),
+        `MIN(rename_rdy_scnt,   rnme_snap_lim_cnt)
+    );
+    assign d_out.ren_cnt       = rename_en_cnt;
+    assign free_out.ren_cnt    = free_prefix_cnt[rename_en_cnt];
+    assign bman_out.snap_en_cnt= rnme_snap_prefix_cnt[rename_en_cnt];
 
-        d_out.ren_cnt       = rename_en_cnt;
-        free_out.ren_cnt    = free_prefix_cnt[rename_en_cnt];
-        bman_out.snap_en_cnt= rnme_snap_prefix_cnt[rename_en_cnt];
-    end
 
     // handle map table output 
-    always_comb begin
-        map_out = '0;
-        map_out.en_cnt  = rename_en_cnt;
-
-        for (int i = 0; i < N; i++) begin
-            //handling dest register
-            map_out.ts[i]       = has_dst[i] ? free_in.ts[free_prefix_cnt[i]] : '0;
-            map_out.dsts[i]     = d_in.dat[i].has_dst
-                ? d_in.dat[i].inst.r.rd
-                : `ZERO_REG;
-            //handling src tags
-            map_out.src1s[i]    = d_in.dat[i].inst.r.rs1;
-            map_out.src2s[i]    = d_in.dat[i].inst.r.rs2;
-        end
+    assign map_out.en_cnt = rename_en_cnt;
+    for (genvar i = 0; i < N; i++) begin
+        //handling dest register
+        assign map_out.ts[i]    = has_dst[i]
+            ? free_in.ts[free_prefix_cnt[i]]
+            : '0;
+        assign map_out.dsts[i]  = d_in.dat[i].has_dst
+            ? d_in.dat[i].inst.r.rd
+            : `ZERO_REG;
+        //handling src tags
+        assign map_out.src1s[i] = d_in.dat[i].inst.r.rs1;
+        assign map_out.src2s[i] = d_in.dat[i].inst.r.rs2;
     end
 
     RENAME_COMMIT_PKT [N-1:0] rename2commit;
     BMASK             [N-1:0] rename2commit_bmask;
-    always_comb begin
-        rename2commit = '0;
-        for (int i = 0; i < N; ++i) begin
-            rename2commit[i] = '{
+    for (genvar i = 0; i < N; ++i) begin
+        assign rename2commit[i] = '{
 `ifdef DEBUG
-                id          : d_in.dat[i].id,
+            id          : d_in.dat[i].id,
 `endif
-                PC          : d_in.dat[i].PC,
-                inst        : d_in.dat[i].inst,
-                fu_idx      : d_in.dat[i].fu_idx,
+            PC          : d_in.dat[i].PC,
+            inst        : d_in.dat[i].inst,
+            fu_idx      : d_in.dat[i].fu_idx,
 
-                alu_func    : d_in.dat[i].alu_func,
-                opa_select  : d_in.dat[i].opa_select,
-                opb_select  : d_in.dat[i].opb_select,
+            alu_func    : d_in.dat[i].alu_func,
+            opa_select  : d_in.dat[i].opa_select,
+            opb_select  : d_in.dat[i].opb_select,
 
-                has_dst     : d_in.dat[i].has_dst,
-                cond_branch : d_in.dat[i].cond_branch,
-                halt        : d_in.dat[i].halt,
-                illegal     : d_in.dat[i].illegal,
-                csr_op      : d_in.dat[i].csr_op,
-                btq_idx     : d_in.dat[i].btq_idx,
+            has_dst     : d_in.dat[i].has_dst,
+            cond_branch : d_in.dat[i].cond_branch,
+            halt        : d_in.dat[i].halt,
+            illegal     : d_in.dat[i].illegal,
+            csr_op      : d_in.dat[i].csr_op,
+            btq_idx     : d_in.dat[i].btq_idx,
 
-                // alloc
-                t           : '0,
-                // rename
-                b1hot       : '0,
-                t_old       : '0,
-                t1          : '0,
-                t2          : '0
-            };
+            // alloc
+            t           : map_out.ts[i],
+            // rename
+            b1hot       : bman_in.b1hot_n[rnme_snap_prefix_cnt[i]],
+            t_old       : map_in.ts_old[i],
+            t1          : map_in.t1s[i],
+            t2          : map_in.t2s[i]
+        };
 
-            rename2commit[i].t       = map_out.ts[i];
-            rename2commit[i].t_old   = map_in.ts_old[i];
-            rename2commit[i].t1      = map_in.t1s[i];
-            rename2commit[i].t2      = map_in.t2s[i];
+        assign rename2commit_bmask[i] = bman_in.bmask_n[rnme_snap_prefix_cnt[i]];
+    end
 
-            rename2commit[i].b1hot = bman_in.b1hot_n[rnme_snap_prefix_cnt[i]];
-            rename2commit_bmask[i] = bman_in.bmask_n[rnme_snap_prefix_cnt[i]];
-        end
+    for (genvar i = 0; i < N; ++i) begin
+        `CNT_TYPE(BTQ_SZ) btq_carry;
+        assign btq_carry = d_in.dat[i].btq_idx + `UCAST_FIT(1);
 
-        for (int i = 0; i < N; ++i) begin
-            `CNT_TYPE(BTQ_SZ) btq_carry;
+        assign rnme_snap_out.snap_en[i] = rnme_is_brch[i] && (i < rename_en_cnt);
+        assign rnme_snap_out.b1hot_n[i] = bman_in.b1hot_n[rnme_snap_prefix_cnt[i]]; // only valid if snap_en
+        assign rnme_snap_out.fl_head[i] = free_in.fl_heads_n[free_prefix_cnt[i] + has_dst[i]];
+            // Q: Why "+ has_dst[i]"? A: Remember, we want to snapshot the free_list
+            // head immediately AFTER the branch. The next free_list head is incremented IFF we consume a preg.
 
-            rnme_snap_out.snap_en[i] = rnme_is_brch[i] && (i < rename_en_cnt);
-            rnme_snap_out.b1hot_n[i] = bman_in.b1hot_n[rnme_snap_prefix_cnt[i]]; // only valid if snap_en
-            rnme_snap_out.fl_head[i] = free_in.fl_heads_n[free_prefix_cnt[i] + has_dst[i]];
-                // Q: Why "+ has_dst[i]"? A: Remember, we want to snapshot the free_list
-                // head immediately AFTER the branch. The next free_list head is incremented IFF we consume a preg.
-
-            btq_carry = d_in.dat[i].btq_idx + `UCAST_FIT(1);
-            rnme_snap_out.btq_tail[i]= btq_carry >= `UCAST_FIT(BTQ_SZ) ? 0 : btq_carry;
-            rnme_snap_out.ras_snap[i]= d_in.dat[i].ras_snap;
+        assign rnme_snap_out.btq_tail[i]= btq_carry >= `UCAST_FIT(BTQ_SZ) ? 0 : btq_carry;
+        assign rnme_snap_out.ras_snap[i]= d_in.dat[i].ras_snap;
 `ifdef DEBUG
-            rnme_snap_out.btq_idx[i] = d_in.dat[i].btq_idx;
+        assign rnme_snap_out.btq_idx[i] = d_in.dat[i].btq_idx;
 `endif
-        end
     end
 
     /*
