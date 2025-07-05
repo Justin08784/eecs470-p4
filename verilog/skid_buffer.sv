@@ -31,16 +31,17 @@ module flop #(
     end
 
     always_ff @(posedge clock) begin
-        if (reset) begin
-            vld <= 0;
-            msk <= '0;
-            dat <= '0;
-        end else if (flush && (FLUSH_MODE == SKID_FLUSH_RESET)) begin
+        if (flush && (FLUSH_MODE == SKID_FLUSH_RESET)) begin
             vld <= 0;
         end else begin
             vld <= i_vld;
             msk <= i_msk;
             dat <= i_dat;
+        end
+
+        if (reset) begin
+            vld <= 0;
+            msk <= '0;
         end
     end
 
@@ -92,12 +93,7 @@ module skid #(
     assign o_dat = dat;
 
     always_ff @(posedge clock) begin
-        if (reset) begin
-            vld <= 1'b0;
-            msk <= '0;
-            dat <= '0;
-
-        end else if (flush && (FLUSH_MODE == SKID_FLUSH_RESET)) begin
+        if (flush && (FLUSH_MODE == SKID_FLUSH_RESET)) begin
             vld <= 0;
 
         // ---- normal acceptance path ----
@@ -109,12 +105,18 @@ module skid #(
         // ---- hold / snoop path ----
         end else begin
 `ifdef FORMAL
-            assert (vld && !o_rdy && !kill) else $fatal("skid: snoop: unexpected");
+            if (!reset)
+                assert (vld && !o_rdy && !kill) else $fatal("skid: snoop: unexpected");
 `endif
             msk <= msk & ~clmsk;
             if (ENABLE_SNOOP)
                 dat <= i_snoop;
 
+        end
+
+        if (reset) begin
+            vld <= 1'b0;
+            msk <= '0;
         end
     end
 
@@ -173,14 +175,7 @@ module ppln_skid #(
     assign o_dat = dat;
 
     always_ff @(posedge clock) begin
-        if (reset) begin
-            s   <= PIPE;
-            vld <= 0; 
-            rdy <= 1;
-
-            dat <= '0; dat_msk <= '0;
-            tmp <= '0; tmp_msk <= '0;
-        end else if (flush && (FLUSH_MODE == SKID_FLUSH_RESET)) begin
+        if (flush && (FLUSH_MODE == SKID_FLUSH_RESET)) begin
             s   <= PIPE;
             vld <= 0; 
             rdy <= 1;
@@ -229,5 +224,16 @@ module ppln_skid #(
             end
             endcase
         end
+
+
+        if (reset) begin
+            s   <= PIPE;
+            vld <= 0; 
+            rdy <= 1;
+
+            dat_msk <= '0;
+            tmp_msk <= '0;
+        end
+
     end
 endmodule

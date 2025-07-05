@@ -510,19 +510,18 @@ module bpu (
     );
 
     always_ff @(posedge clock) begin
+        if (flush)
+            pos <= '{
+                base: cbru_in.flush_fb_base,
+                off : cbru_in.flush_fb_off
+            };
+        else if (s2_steer)
+            pos <= pos_s2_n;
+        else if (s1_step)
+            pos <= pos_s1_n;
+
         if (reset)
             pos <= '0;
-        else begin
-            if (flush)
-                pos <= '{
-                    base: cbru_in.flush_fb_base,
-                    off : cbru_in.flush_fb_off
-                };
-            else if (s2_steer)
-                pos <= pos_s2_n;
-            else if (s1_step)
-                pos <= pos_s1_n;
-        end
     end
 
     // always_ff @(posedge clock) begin
