@@ -1,6 +1,7 @@
 TESTS=(
     # no mem ops
     branchy_nested
+    branchy_nested2
     branchy
     branchzero
     btest1-nomem

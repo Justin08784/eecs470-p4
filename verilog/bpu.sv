@@ -135,12 +135,15 @@ module pred_s1 (
     };
 
     always_ff @(posedge clock) begin
-        if (reset | flush | s2_steer)
+        if (flush | s2_steer)
             o_s2_vld <= 0;
-        else if (s1_step)
+        else if (s1_step) begin
             o_s2_vld <= 1;
+            o_s2_dat <= o_s2_dat_n;
+        end
 
-        o_s2_dat <= o_s2_dat_n;
+        if (reset)
+            o_s2_vld <= 0;
     end
 
 endmodule;
@@ -558,7 +561,7 @@ module bpu (
             s1.o_s2_dat.fb.br_slot[0].always_take
         );
 
-        $display("  {vld: %b, tgt: %d, off = %2d, always_take: %b, ccrj: %b%b%b%b}]",
+        $display("  {vld: %b, tgt: %d, off = %2d, always_take: %b, ccrj: %b%b%b%b}]\n",
             s1.o_s2_dat.fb.br_slot[1].vld,
             s1.o_s2_dat.fb.br_slot[1].tgt,
             s1.o_s2_dat.fb.br_slot[1].off,
@@ -569,19 +572,26 @@ module bpu (
             s1.o_s2_dat.fb.md1.jalr
         );
 
-        $display("o_s3_dat: vld: %b, {base_n: %d, ft: %b, pred_idx: %b, off: %d, hit: %b, slot: %b, in_ghr: %b, ghr_base_n1: %d, always_take: %b, md: %b}",
-            s2.o_s3_vld,
-            s2.o_s3_dat.base_n,
-            s2.o_s3_dat.ft,
-            s2.o_s3_dat.pred_idx,
-            s2.o_s3_dat.off,
-            s2.o_s3_dat.hit,
-            s2.o_s3_dat.slot,
-            s2.o_s3_dat.in_ghr,
-            s2.o_s3_dat.ghr_base_n1,
-            s2.o_s3_dat.always_take,
-            s2.o_s3_dat.md
+        $display("o_s3_dat: vld: %b, {base: %d, off: %d, base_n: %d}",
+            s2.i_s1_vld,
+            s2.i_s1_dat.base,
+            s2.buf_wdat.off,
+            s2.buf_wdat.base_n
         );
+
+        // $display("o_s3_dat: vld: %b, {base_n: %d, ft: %b, pred_idx: %b, off: %d, hit: %b, slot: %b, in_ghr: %b, ghr_base_n1: %d, always_take: %b, md: %b}",
+        //     s2.o_s3_vld,
+        //     s2.o_s3_dat.base_n,
+        //     s2.o_s3_dat.ft,
+        //     s2.o_s3_dat.pred_idx,
+        //     s2.o_s3_dat.off,
+        //     s2.o_s3_dat.hit,
+        //     s2.o_s3_dat.slot,
+        //     s2.o_s3_dat.in_ghr,
+        //     s2.o_s3_dat.ghr_base_n1,
+        //     s2.o_s3_dat.always_take,
+        //     s2.o_s3_dat.md
+        // );
 
         // $display("(cur.base: %d, off: %0d, pred: [%b, %b]), step: %b, ftq_skid: %b, ftq: %b",
         //     cur.base,

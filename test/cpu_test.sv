@@ -32,13 +32,14 @@ import "DPI-C" function string decode_inst(int inst);
 
 
 parameter int TB_MAX_CYCLES = 50000000;
-// parameter int TB_MAX_CYCLES = 200;
+// parameter int TB_MAX_CYCLES = 400;
 // parameter int TB_MAX_CYCLES = 1000;
 // parameter int TB_MAX_CYCLES = 160100;
 
 
 // Debug cycle limits, both inclusive
 localparam int DBG_CYCLE_MIN = 300;
+// localparam int DBG_CYCLE_MIN = 250;
 // localparam int DBG_CYCLE_MAX = TB_MAX_CYCLES;
 localparam int DBG_CYCLE_MAX = 500;
 
@@ -609,7 +610,8 @@ module testbench;
         // $display("  | >> CYCLE: %3d (t: %3d)", clock_count-1, $time);
         // print_btb();
         // print_btq();
-        // verisimpleV.bpu0.print_bpu;
+        verisimpleV.bpu0.print_bpu;
+        verisimpleV.bpu0.ftq0.print_ftq();
         // verisimpleV.bpu0.s1.uftb0.print_uftb;
         // print_fetch();
 
