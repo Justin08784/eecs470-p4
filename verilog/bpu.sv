@@ -182,16 +182,14 @@ module pred_s2 (
 );
     struct packed {
         logic   uen_gshare;
-    } upd_s2_ctl, upd_s2_ctl_n;
-    struct packed {
         logic   take;
         logic   slot_idx;
 
         logic   [FH_LEN-1:0] hash_gshare;
     } upd_s2, upd_s2_n;
-    assign upd_s2_ctl_n.uen_gshare = i_uen && i_udat.en_dir_update && i_udat.md.cond;
-        // ^^ train only on conditional branches!
     assign upd_s2_n = '{
+        uen_gshare  : i_uen && i_udat.en_dir_update && i_udat.md.cond,
+            // ^^ train only on conditional branches!
         take        : i_udat.take,
         slot_idx    : i_udat.slot_idx,
         // hash_gshare : i_fhr.rd_fh ^ i_udat.base[FH_LEN-1:0] // FIXME: reenable
@@ -211,7 +209,7 @@ module pred_s2 (
         .clock,
         .reset,
 
-        .i_uen      (upd_s2_ctl.uen_gshare),
+        .i_uen      (upd_s2.uen_gshare),
         .i_utake    (upd_s2.take),
         .i_uslot_idx(upd_s2.slot_idx),
         .i_uhash    (upd_s2.hash_gshare),
@@ -320,13 +318,11 @@ module pred_s2 (
 
 
     always_ff @(posedge clock) begin
-        if (reset)
-            upd_s2_ctl <= '{uen_gshare : 0};
-        else
-            upd_s2_ctl <= upd_s2_ctl_n;
-
         raw_pred<= raw_pred_n;
         upd_s2  <= upd_s2_n;
+
+        if (reset)
+            upd_s2.uen_gshare <= 0;
     end
 
 endmodule;

@@ -191,6 +191,7 @@ module uftb #(
     endfunction
 
     typedef struct packed {
+        logic   [NUM_LINES-1:0] vld;
         logic   [NUM_LINES-1:0] dirty; // TODO: unused. use when doing multi-level FTB
         TAG     [NUM_LINES-1:0] tag;
         AGE     age;
@@ -201,9 +202,6 @@ module uftb #(
             2. We can save bits in the LRU age matrix by storing the upper-triangle
             bits (top right above diagonal). */
     } HEADER;
-    struct packed {
-        logic   [NUM_LINES-1:0] vld;
-    } hdr_ctl, hdr_ctl_n;
     HEADER hdr, hdr_n;
     FTB_ENTRY [NUM_LINES-1:0] tgt, tgt_n;
 
@@ -220,7 +218,7 @@ module uftb #(
         WAY     way;
 
         for (int w = 0; w < NUM_LINES; ++w)
-            hitv[w] = hdr_ctl.vld[w] && (tag == hdr.tag[w]);
+            hitv[w] = hdr.vld[w] && (tag == hdr.tag[w]);
 
         hit = |hitv;
         way = 0;
@@ -444,7 +442,7 @@ module uftb #(
     lru_man #(
         .SETW(NUM_LINES)
     ) lru_man0 (
-        .vld(hdr_ctl.vld),
+        .vld(hdr.vld),
         .age(hdr.age),
 
         .acc_way,
@@ -471,8 +469,6 @@ module uftb #(
     // retire
     struct packed {
         logic   en;
-    } s1_ctl, s1_ctl_n;
-    struct packed {
         logic   hit_hdr;
         logic   hit_s1;
             /* Predecessor is valid and has matching tag.
@@ -487,8 +483,6 @@ module uftb #(
 
     struct packed {
         logic   wen; // did predecessor write at all?
-    } s2_ctl, s2_ctl_n;
-    struct packed {
         FTB_ENTRY e;
     } s2, s2_n;
 
@@ -499,19 +493,19 @@ module uftb #(
 
         tag = get_tag(i_udat.base);
         // query s1 reg
-        msk_en  = s1_ctl.en;
+        msk_en  = s1.en;
         msk_way = s1.way;
             // ^ protect our predecessor's way from LRU selection so we don't clobber it
         loc_s1  = '{
-            hit : s1_ctl.en & (tag == get_tag(s1.udat.base)),
+            hit : s1.en & (tag == get_tag(s1.udat.base)),
             way : s1.way
         };
 
         // query header
         loc_hdr = locate(hdr, tag);
 
-        s1_ctl_n= '{en  : i_uen};
         s1_n    = '{
+            en      : i_uen,
             hit_hdr : loc_hdr.hit,
             hit_s1  : loc_s1.hit,
             way     :
@@ -542,7 +536,7 @@ module uftb #(
 
         acc_way = s1.way;
         // e       = s1.e;
-        e       = (s2_ctl.wen & s1.hit_s1) ? s2.e : s1.e;
+        e       = (s2.wen & s1.hit_s1) ? s2.e : s1.e;
             // bypass iff matching tag AND pred wrote
             // (if pred did not write, committed state is latest)
         upd_fb  = update_fb(hit_slot, spill, e, s1.udat);
@@ -558,7 +552,7 @@ module uftb #(
             X on cycles because hit_slot, spill were not being initialized on
             cycles, which is only possible if update_fb is conditinally executed.)
             */
-        augment = (s2_ctl.wen & s1.hit_s1) | s1.hit_hdr;
+        augment = (s2.wen & s1.hit_s1) | s1.hit_hdr;
         wfb     = augment ? upd_fb : new_fb;
 `ifdef FORMAL
         hit_slot_spill_mex =
@@ -575,19 +569,20 @@ module uftb #(
         insert   =  augment &   ~hit_slot   & s1.udat.take  & ~spill;
         update   =  augment &   hit_slot; // not taken branches can still update owned slots
 
-        wen     = s1_ctl.en && (alloc || insert || update);
+        wen     = s1.en && (alloc || insert || update);
         // old: allocate-always policy
         // wen = s1.en && (!s1.hit || !spill);
 
-        hdr_ctl_n = hdr_ctl;
         hdr_n = hdr;
         tgt_n = tgt;
 
-        s2_ctl_n= '{wen : wen};
-        s2_n    = '{e   : wfb};
+        s2_n    = '{
+            wen : wen,
+            e   : wfb
+        };
 
         if (wen) begin
-            hdr_ctl_n.vld[s1.way] = 1;
+            hdr_n.vld[s1.way] = 1;
             hdr_n.dirty[s1.way] = 1;
             hdr_n.tag[s1.way]   = get_tag(s1.udat.base);
             hdr_n.age           = age_n;
@@ -633,20 +628,17 @@ module uftb #(
     // end
 
     always_ff @(posedge clock) begin
-        if (reset) begin
-            hdr_ctl <= '{vld: '0};
-            s1_ctl  <= '{en : 0};
-            s2_ctl  <= '{wen: 0};
-        end else begin
-            hdr_ctl <= hdr_ctl_n;
-            s1_ctl  <= s1_ctl_n;
-            s2_ctl  <= s2_ctl_n;
-        end
-
-        s1  <= s1_n;
-        s2  <= s2_n;
         hdr <= hdr_n;
         tgt <= tgt_n;
+        s1  <= s1_n;
+        s2  <= s2_n;
+
+        if (reset) begin
+            // selective override reset-initialization
+            hdr.vld <= '0;
+            s1.en   <= 0;
+            s2.wen  <= 0;
+        end
     end
 
 
@@ -656,7 +648,7 @@ module uftb #(
         if (!reset) begin
             assert(hit_slot_spill_mex) else $fatal("hit_slot and spill are both high: %b. en: %b, way: %b, e: %b, udat: %b",
                 hit_slot_spill_mex,
-                s1_ctl.en,
+                s1.en,
                 s1.way,
                 s1.e,
                 s1.udat
@@ -671,7 +663,7 @@ module uftb #(
         $display(">> uftb >>");
         // if (!reset) begin
         //     $display("s1: {en %b, hit: (%b, hdr: %b, s1: %b), way: %d} %b",
-        //         s1_ctl.en,
+        //         s1.en,
         //         s1.hit,
         //         s1.hit_hdr,
         //         s1.hit_s1,
@@ -686,7 +678,7 @@ module uftb #(
         //     );
 
         //     $display("s2:{wen: %b} %b\n",
-        //         s2_ctl.wen,
+        //         s2.wen,
         //         s2.e
         //     );
         // end
@@ -699,7 +691,7 @@ module uftb #(
         );
 
         $display("s1_n: {en: %b, hit: %b, hit_s1: %b, way: %d} e:{}",
-            s1_ctl_n.en,
+            s1_n.en,
             s1_n.hit,
             s1_n.hit_s1,
             s1_n.way);
@@ -722,7 +714,7 @@ module uftb #(
         );
 
         $display("s1: {en: %b, hit: %b, hit_s1: %b, way: %d} e:{}",
-            s1_ctl.en,
+            s1.en,
             s1.hit,
             s1.hit_s1,
             s1.way);
@@ -745,7 +737,7 @@ module uftb #(
         );
 
         $display("s2_n: {wen: %b, e:{}",
-            s2_ctl_n.wen
+            s2_n.wen
         );
 
         $display("[ {vld: %b, tgt: %d, off = %2d, always_take: %b},",
@@ -767,7 +759,7 @@ module uftb #(
         );
 
         $display("s2: {wen: %b, e:{}",
-            s2_ctl.wen);
+            s2.wen);
 
         $display("[ {vld: %b, tgt: %d, off = %2d, always_take: %b},",
             s2.e.br_slot[0].vld,
@@ -795,7 +787,7 @@ module uftb #(
             FTB_ENTRY fb;
             WADDR base;
 
-            if (!hdr_ctl.vld[w]) begin
+            if (!hdr.vld[w]) begin
                 $display("uftb[%1d]:", w);
                 // $display("uftb[%1d]:\n\n", w);
                 continue;
