@@ -695,11 +695,12 @@ module uftb #(
             i_udat.tgt
         );
 
-        $display("s1_n: {en: %b, hit: %b, hit_s1: %b, way: %d} e:{}",
+        $display("s1_n: {en: %b, hit_s1: %b, hit_hdr: %b, way: %d} e:{}",
             s1_n.en,
-            s1_n.hit,
             s1_n.hit_s1,
-            s1_n.way);
+            s1_n.hit_hdr,
+            s1_n.way
+        );
         $display("[ {vld: %b, tgt: %d, off = %2d, always_take: %b},",
             s1_n.e.br_slot[0].vld,
             s1_n.e.br_slot[0].tgt,
@@ -718,11 +719,12 @@ module uftb #(
             s1_n.e.md1.jalr
         );
 
-        $display("s1: {en: %b, hit: %b, hit_s1: %b, way: %d} e:{}",
+        $display("s1: {en: %b, hit_s1: %b, hit_hdr: %b, way: %d} e:{}",
             s1.en,
-            s1.hit,
             s1.hit_s1,
-            s1.way);
+            s1.hit_hdr,
+            s1.way
+        );
         $display("[ {vld: %b, tgt: %d, off = %2d, always_take: %b},",
             s1.e.br_slot[0].vld,
             s1.e.br_slot[0].tgt,
