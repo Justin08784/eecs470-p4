@@ -660,6 +660,7 @@ typedef struct packed {
     BTQ_IDX [N-1:0] btq_tail;
     logic [N-1:0][`IDX_SIZE(ROB_SZ)-1:0] fl_head;
     RAS_SNAP [N-1:0] ras_snap;
+    PHYS_REG_IDX [N-1:0][NUM_ARCH_REG-1:0] mts;
     // mt checkpoints are handled locally
 } rename2snap_bus;
 
@@ -990,6 +991,7 @@ typedef struct packed {
     PHYS_REG_IDX [N-1:0] t1s;
     PHYS_REG_IDX [N-1:0] t2s;
     PHYS_REG_IDX [N-1:0] ts_old;
+    PHYS_REG_IDX [N-1:0][NUM_ARCH_REG-1:0] mts;
 } map_table2dispatch;
 
 typedef struct packed {

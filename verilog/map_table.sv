@@ -61,6 +61,10 @@ module map_table #(parameter
                 entries_n[i + 1][d_in.dsts[i]] = d_in.ts[i];
             end
         end
+
+        d_out.mts = entries_n[N:1];
+            // Remember, we want to snapshot the map_table state immediately AFTER the branch.
+            // entries_n[i+1] is the state after rename of insn i.
     end
 
     /*
@@ -86,9 +90,7 @@ module map_table #(parameter
 
         .wen    (snap_in.snap_en),
         .wmsk   (snap_in.b1hot_n),
-        .wdat   (entries_n[N:1])
-            // Q: Why "+ has_dst[i]"? A: Remember, we want to snapshot the map_table state
-            // immediately AFTER the branch. For entries_n[i+1] is the state after rename of insn i.
+        .wdat   (snap_in.mts)
     );
 
     always_ff @(posedge clock) begin

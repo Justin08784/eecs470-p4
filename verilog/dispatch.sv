@@ -38,8 +38,25 @@ module dispatch #(parameter
     input   map_table2dispatch map_in,
     output  dispatch2map_table map_out
 );
-
     logic [PHYS_REG_SZ_R10K-1:0] cpl_lst;
+    rename2snap_bus rnme_snap_out_n;
+    comm2snap_bus   comm_snap_out_n;
+
+    always_ff @(posedge clock) begin
+        /* Flopped snapshot bus for improved fanout/timing. NOTE: bman_out is NOT flopped
+        to ensure that the bmask_reg remains consistent and that we avoid double-allocating b1hots. */
+
+        rnme_snap_out <= rnme_snap_out_n;
+        comm_snap_out <= comm_snap_out_n;
+
+        if (reset) begin
+            rnme_snap_out.snap_en <= '0;
+            comm_snap_out.snap_en <= '0;
+        end
+
+        /* To reduce reset fanout, only the signals which require reset-initalization
+        are selectively overriden to constants in ^this^ reset-gated if-block. */
+    end
 
     /* >> ==== 1. Rename stage ==== >> */
     // Gate by availability
@@ -136,20 +153,21 @@ module dispatch #(parameter
         assign rename2commit_bmask[i] = bman_in.bmask_n[rnme_snap_prefix_cnt[i]];
     end
 
+    assign rnme_snap_out_n.mts = map_in.mts;
     for (genvar i = 0; i < N; ++i) begin
         `CNT_TYPE(BTQ_SZ) btq_carry;
         assign btq_carry = d_in.dat[i].btq_idx + `UCAST_FIT(1);
 
-        assign rnme_snap_out.snap_en[i] = rnme_is_brch[i] && (i < rename_en_cnt);
-        assign rnme_snap_out.b1hot_n[i] = bman_in.b1hot_n[rnme_snap_prefix_cnt[i]]; // only valid if snap_en
-        assign rnme_snap_out.fl_head[i] = free_in.fl_heads_n[free_prefix_cnt[i] + has_dst[i]];
+        assign rnme_snap_out_n.snap_en[i] = rnme_is_brch[i] && (i < rename_en_cnt);
+        assign rnme_snap_out_n.b1hot_n[i] = bman_in.b1hot_n[rnme_snap_prefix_cnt[i]]; // only valid if snap_en
+        assign rnme_snap_out_n.fl_head[i] = free_in.fl_heads_n[free_prefix_cnt[i] + has_dst[i]];
             // Q: Why "+ has_dst[i]"? A: Remember, we want to snapshot the free_list
             // head immediately AFTER the branch. The next free_list head is incremented IFF we consume a preg.
 
-        assign rnme_snap_out.btq_tail[i]= btq_carry >= `UCAST_FIT(BTQ_SZ) ? 0 : btq_carry;
-        assign rnme_snap_out.ras_snap[i]= d_in.dat[i].ras_snap;
+        assign rnme_snap_out_n.btq_tail[i]= btq_carry >= `UCAST_FIT(BTQ_SZ) ? 0 : btq_carry;
+        assign rnme_snap_out_n.ras_snap[i]= d_in.dat[i].ras_snap;
 `ifdef DEBUG
-        assign rnme_snap_out.btq_idx[i] = d_in.dat[i].btq_idx;
+        assign rnme_snap_out_n.btq_idx[i] = d_in.dat[i].btq_idx;
 `endif
     end
 
@@ -272,9 +290,9 @@ module dispatch #(parameter
             rs_out.dat[i].t1_rdy |= cpl_lst[commit_in[i].t1];
             rs_out.dat[i].t2_rdy |= cpl_lst[commit_in[i].t2];
 
-            comm_snap_out.snap_en[i]= comm_is_brch[i] && (i < commit_en_cnt);
-            comm_snap_out.b1hot_n[i]= commit_in[i].b1hot; // only valid if snap_en
-            comm_snap_out.rob_tail[i]=rob_in.rob_idxs_n[i + 1];
+            comm_snap_out_n.snap_en[i]= comm_is_brch[i] && (i < commit_en_cnt);
+            comm_snap_out_n.b1hot_n[i]= commit_in[i].b1hot; // only valid if snap_en
+            comm_snap_out_n.rob_tail[i]=rob_in.rob_idxs_n[i + 1];
                 /* Q: Why +1?
                 A: Checkpoint the tail AFTER us. The mispredicted branch still retires.
                 */
@@ -329,7 +347,7 @@ module dispatch #(parameter
         );
         $display("bman_in.snap_rdy_scnt: %1d", bman_in.snap_rdy_scnt);
         $display("bman_out.snap_en_cnt: %1d", bman_out.snap_en_cnt);
-        $display("rnme_snap_out.snap_en: %b", rnme_snap_out.snap_en);
+        $display("rnme_snap_out_n.snap_en: %b", rnme_snap_out_n.snap_en);
         $display("rob_in.rdy_scnt: %d",  rob_in.rdy_scnt);
         $display("d_in.vld_scnt: %d",  d_in.vld_scnt);
         $display("free_in.vld_scnt: %d [%d, %d]",  free_in.vld_scnt, free_in.ts[0], free_in.ts[1]);
@@ -345,12 +363,12 @@ module dispatch #(parameter
         end
 
         for (int i = 0; i < N; ++i) begin
-            $display("rnme_snap_out[%2d]: en: %b, b1hot_n: %b, fl_head: %2d, btq_tail: %2d",
+            $display("rnme_snap_out_n[%2d]: en: %b, b1hot_n: %b, fl_head: %2d, btq_tail: %2d",
                 i,
-                rnme_snap_out.snap_en[i],
-                rnme_snap_out.b1hot_n[i],
-                rnme_snap_out.fl_head[i],
-                rnme_snap_out.btq_tail[i]
+                rnme_snap_out_n.snap_en[i],
+                rnme_snap_out_n.b1hot_n[i],
+                rnme_snap_out_n.fl_head[i],
+                rnme_snap_out_n.btq_tail[i]
             );
         end
         $display("  %3d | << Dispatch <<", $time);
