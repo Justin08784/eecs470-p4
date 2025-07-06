@@ -139,23 +139,6 @@ function automatic cmp4(
 
     eq = eq_hi & eq_lo;
     lt = lt_hi | (eq_hi & lt_lo);
-
-
-    // logic [3:0] lt1, eq1;
-    // logic [1:0] lt2, eq2;
-
-    // for (int i = 0; i < 4; ++i) begin
-    //     lt1[i] = !a[i] && b[i];
-    //     eq1[i] =  a[i] == b[i];
-    // end
-
-    // lt2[0] = lt1[1] || (eq1[1] ? lt1[0] : 0);
-    // lt2[1] = lt1[3] || (eq1[3] ? lt1[2] : 0);
-    // eq2[0] = eq1[0] && eq1[1];
-    // eq2[1] = eq1[2] && eq1[3];
-
-    // eq = eq2[0] && eq2[1];
-    // lt = lt2[1] || (eq2[1] ? lt2[0] : 0);
 endfunction
 
 module uftb #(
@@ -181,16 +164,16 @@ module uftb #(
 
         Increasing will result in more aliases, but acceptable for
         BTB since they are speculative. Can be worth to save area and logic. */
-    localparam TAG_BITS = $bits(WADDR) - TAG_SKIMP;
-    typedef logic [TAG_BITS-1:0]TAG;
+    localparam TAG_SZ = $bits(WADDR) - TAG_SKIMP;
+    typedef logic [TAG_SZ-1:0]  TAG;
     typedef `IDX_TYPE(NUM_LINES)WAY;
     typedef logic [NUM_LINES-1:0][NUM_LINES-1:0]AGE;
 
     function automatic TAG get_tag(input WADDR waddr);
-        return waddr[TAG_BITS-1:0];
+        return waddr[TAG_SZ-1:0];
     endfunction
 
-    typedef struct packed {
+    struct packed {
         logic   [NUM_LINES-1:0] vld;
         logic   [NUM_LINES-1:0] dirty; // TODO: unused. use when doing multi-level FTB
         TAG     [NUM_LINES-1:0] tag;
@@ -201,42 +184,42 @@ module uftb #(
             parameter, keeping LRU for assoc < 8. 
             2. We can save bits in the LRU age matrix by storing the upper-triangle
             bits (top right above diagonal). */
-    } HEADER;
-    HEADER hdr, hdr_n;
+    } hdr, hdr_n;
     FTB_ENTRY [NUM_LINES-1:0] tgt, tgt_n;
 
-    typedef struct packed {
+    // instantiate our readports
+    enum logic [1:0] {
+        RD_FET,
+        RD_UPD,
+        NUM_RD
+    } RD_PORT_TAG;
+    struct packed {
+        TAG     tag;
+
         logic   hit;
         WAY     way;
         FTB_ENTRY e;
-    } LOC;
-    function automatic LOC locate(
-        input TAG   tag
-    );
-        logic   [NUM_LINES-1:0] hitv;
-        logic   hit;
-        WAY     way;
-        FTB_ENTRY e;
+    } [NUM_RD-1:0] rd;
 
-        for (int w = 0; w < NUM_LINES; ++w)
-            hitv[w] = hdr.vld[w] && (tag == hdr.tag[w]);
+    generate
+    for (genvar i = 0; i < NUM_RD; ++i) begin
+        logic [NUM_LINES-1:0] hitv;
 
-        hit = |hitv;
-        way = 0;
-        e   = '0;
-        for (int w = 0; w < NUM_LINES; ++w) begin
-            if (hitv[w]) begin
-                way = w;
-                e   = tgt[w];
+        for (genvar w = 0; w < NUM_LINES; ++w)
+            assign hitv[w] = hdr.vld[w] & (rd[i].tag == hdr.tag[w]);
+
+        assign rd[i].hit = |hitv;
+
+        always_comb begin
+            for (int w = 0; w < NUM_LINES; ++w) begin
+                if (hitv[w]) begin
+                    rd[i].way   = w;
+                    rd[i].e     = tgt[w];
+                end
             end
         end
-
-        return '{
-            hit : hit,
-            way : way,
-            e   : e
-        };
-    endfunction
+    end
+    endgenerate
 
     function automatic FTB_ENTRY wr_br0(
         input FTB_ENTRY     dst,
@@ -460,14 +443,9 @@ module uftb #(
     );
 
     // fetch
-    always_comb begin
-        LOC loc;
-
-        loc = locate(get_tag(i_qry));
-
-        o_vld = loc.hit;
-        o_tgt = loc.e;
-    end
+    assign rd[RD_FET].tag = get_tag(i_qry);
+    assign o_vld = rd[RD_FET].hit;
+    assign o_tgt = rd[RD_FET].e;
 
     // retire
     struct packed {
@@ -490,39 +468,50 @@ module uftb #(
     } s2, s2_n;
 
     // s1
-    always_comb begin
-        TAG tag;
-        struct packed {
-            logic   hit;
-            WAY     way;
-        } loc_s1;
-        LOC loc_hdr;
+    generate
+    TAG s1_n_tag;
+    struct packed {
+        logic   hit;
+        WAY     way;
+    } loc_s1;
+    struct packed {
+        logic   hit;
+        WAY     way;
+        FTB_ENTRY e;
+    } loc_hdr;
 
-        tag = get_tag(i_udat.base);
-        // query s1 reg
-        msk_en  = s1.en;
-        msk_way = s1.way;
-            // ^ protect our predecessor's way from LRU selection so we don't clobber it
-        loc_s1.hit = s1.en & (tag == get_tag(s1.udat.base));
-        loc_s1.way = s1.way;
+    assign s1_n_tag = get_tag(i_udat.base);
+    assign rd[RD_UPD].tag = get_tag(s1_n_tag);
+    assign loc_hdr = '{
+        hit : rd[RD_UPD].hit,
+        way : rd[RD_UPD].way,
+        e   : rd[RD_UPD].e
+    };
 
-        // query header
-        loc_hdr = locate(tag);
+    // query s1 reg
+    assign msk_en  = s1.en;
+    assign msk_way = s1.way;
+        // ^ protect our predecessor's way from LRU selection so we don't clobber it
+    assign loc_s1 = '{
+        hit : s1.en & (s1_n_tag == get_tag(s1.udat.base)),
+        way : s1.way
+    };
 
-        s1_n    = '{
-            en      : i_uen,
-            hit_hdr : loc_hdr.hit,
-            hit_s1  : loc_s1.hit,
-            way     :
-                loc_s1.hit  ? loc_s1.way :
-                loc_hdr.hit ? loc_hdr.way:
-                lru_way,
-                    // mux loc, giving priority to s1 (bypass)
+    // query header
+    assign s1_n = '{
+        en      : i_uen,
+        hit_hdr : loc_hdr.hit,
+        hit_s1  : loc_s1.hit,
+        way     :
+            loc_s1.hit  ? loc_s1.way :
+            loc_hdr.hit ? loc_hdr.way:
+            lru_way,
+                // mux loc, giving priority to s1 (bypass)
 
-            e       : loc_hdr.e,
-            udat    : i_udat
-        };
-    end
+        e       : loc_hdr.e,
+        udat    : i_udat
+    };
+    endgenerate
 
     // s2
 `ifdef FORMAL
@@ -574,7 +563,7 @@ module uftb #(
         insert   =  augment &   ~hit_slot   & s1.udat.take  & ~spill;
         update   =  augment &   hit_slot; // not taken branches can still update owned slots
 
-        wen     = s1.en && (alloc || insert || update);
+        wen     = s1.en & (alloc | insert | update);
         // old: allocate-always policy
         // wen = s1.en && (!s1.hit || !spill);
 
@@ -587,50 +576,18 @@ module uftb #(
         };
 
         if (wen) begin
-            hdr_n.vld[s1.way] = 1;
-            hdr_n.dirty[s1.way] = 1;
-            hdr_n.tag[s1.way]   = get_tag(s1.udat.base);
+            hdr_n.vld   [s1.way]= 1;
+            hdr_n.dirty [s1.way]= 1;
+            hdr_n.tag   [s1.way]= get_tag(s1.udat.base);
             hdr_n.age           = age_n;
                 /* TODO: since every branch queries the FTB (but not every branch
                 generates an FTB update) we need an LRU update for reads as well,
                 not just writes. */
 
-            tgt_n[s1.way]       = wfb;
+            tgt_n       [s1.way]= wfb;
         end
 
     end
-
-    // single stage update
-    // always_comb begin
-    //     LOC loc;
-    //     WAY way;
-    //     logic spill;
-    //     FTB_ENTRY wfb; // FTB entry with updates
-    //     logic wen;
-
-    //     loc = locate(hdr, i_udat.base);
-    //     way = loc.hit ? loc.way : lru_way;
-    //     acc_way = way;
-    //     wfb = loc.hit
-    //         ? update_fb(spill, tgt[loc.way], i_udat)
-    //         : create_fb(i_udat);
-    //     wen = i_uen && (!loc.hit || !spill);
-
-    //     hdr_n = hdr;
-    //     tgt_n = tgt;
-
-    //     if (wen) begin
-    //         hdr_n.vld[way]  = 1;
-    //         hdr_n.dirty[way]= 1;
-    //         hdr_n.tag[way]  = loc.tag;
-    //         hdr_n.age       = age_n;
-    //             /* TODO: since every branch queries the FTB (but not every branch
-    //             generates an FTB update) we need an LRU update for reads as well,
-    //             not just writes. */
-
-    //         tgt_n[way]      = wfb;
-    //     end
-    // end
 
     always_ff @(posedge clock) begin
         hdr <= hdr_n;
