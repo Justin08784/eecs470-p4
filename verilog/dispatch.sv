@@ -319,18 +319,17 @@ module dispatch #(parameter
     end
 
     always_ff @(posedge clock) begin
-        if (reset) begin
-            cpl_lst <= '1;
-        end else begin
-            for (int i = 0; i < map_out.en_cnt; ++i) begin
-                if (map_out.dsts[i] != `ZERO_REG)
-                    cpl_lst[map_out.ts[i]] <= 0;
-            end
-            for (int c = 0; c < N; ++c) begin
-                if (ctag_in.en[c])
-                    cpl_lst[ctag_in.ts[c]] <= 1;
-            end
+        for (int i = 0; i < map_out.en_cnt; ++i) begin
+            if (map_out.dsts[i] != `ZERO_REG)
+                cpl_lst[map_out.ts[i]] <= 0;
         end
+        for (int c = 0; c < N; ++c) begin
+            if (ctag_in.en[c])
+                cpl_lst[ctag_in.ts[c]] <= 1;
+        end
+
+        if (reset)
+            cpl_lst <= '1;
     end
 
 

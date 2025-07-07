@@ -517,17 +517,7 @@ module pc_gen #(
     assign  blkv = aft_blk  [iss_idx];
 
     always_ff @(posedge clock) begin
-        if (reset)
-`ifndef PC_GEN_TEST_MODE
-            cur <= '{
-                off : off_rst,
-                base: base_rst,
-                inbuf:inbuf_rst
-            };
-`else
-            cur <= reset_val;
-`endif
-        else if (flush)
+        if (flush)
             cur <= '{
                 off  : flush_fb_off,
                 base : flush_fb_base,
@@ -550,6 +540,17 @@ module pc_gen #(
                     cur.inbuf   <= !(|(ctl.req_rr_buf_actual[iss_idx] & ~(can_buf_write & ctl.rdy_res.rr_buf)));
         end
 
+
+        if (reset)
+`ifndef PC_GEN_TEST_MODE
+            cur <= '{
+                off : off_rst,
+                base: base_rst,
+                inbuf:inbuf_rst
+            };
+`else
+            cur <= reset_val;
+`endif
     end
 
 

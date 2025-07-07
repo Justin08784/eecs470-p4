@@ -96,7 +96,7 @@
 # there should be no need to change anything for project 3
 
 # this is a global clock period variable used in the tcl script and referenced in testbenches
-export CLOCK_PERIOD = 30.0
+export CLOCK_PERIOD = 5.0
 
 # the Verilog Compiler command and arguments
 VCS =  vcs -sverilog -xprop=tmerge +vc -Mupdate -Mdir=build/csrc -line -full64 -kdb -lca -nc \
@@ -225,6 +225,15 @@ BPU_FILES = include/sys_defs.svh \
 build/bpu.simv: $(BPU_FILES)
 build/bpu.cov: $(BPU_FILES)
 synth/bpu.vg: $(BPU_FILES)
+
+EXECUTE_FILES = include/sys_defs.svh \
+	include/execute.svh \
+	verilog/psel_gen.sv \
+	verilog/mult.sv \
+	verilog/skid_buffer.sv
+build/execute.simv: $(EXECUTE_FILES)
+build/execute.cov: $(EXECUTE_FILES)
+synth/execute.vg: $(EXECUTE_FILES)
 
 FETCH_FILES = include/sys_defs.svh \
 	verilog/uftb.sv \

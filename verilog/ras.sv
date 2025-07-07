@@ -81,16 +81,14 @@ module ras #(
     end
 
     always_ff @(posedge clock) begin
+        used <= used_n;
+        top  <= top_n;
+        if (wen & ~flush)
+            state[top] <= wtgt;
+
         if (reset) begin
             used <= '0;
             top  <= '0;
-            for (int i = 0; i < DEPTH; ++i)
-                state[i] <= '0;
-        end else begin
-            used <= used_n;
-            top  <= top_n;
-            if (wen && !flush)
-                state[top] <= wtgt;
         end
     end
 

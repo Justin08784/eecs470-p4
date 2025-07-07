@@ -80,10 +80,10 @@ module fhr #(
     endgenerate
 
     always_ff @(posedge clock) begin
+        fh <= redir ? fh_redir : fh_n[wen_cnt];
+
         if (reset)
             fh <= fh_rst;
-        else
-            fh <= redir ? fh_redir : fh_n[wen_cnt];
     end
 
 endmodule
@@ -194,83 +194,82 @@ module ghr #(
     endgenerate
 
     always_ff @(posedge clock) begin
+        /* NOTE: hist latches in the wshf_in bits 1 cycle after the bits are presented
+        (vs. ghist, which latches same cycle). Hence, hist lags behind ghist by 1 cycle.
+        hist is written 1 cycle after ghist to move s1 uftb lookup off critical path;
+        unlike wshf_in->ghist, which touches 2 fixed bit positions, wshf_in->hist
+        performs two random writes into the full ghr buffer.
+
+        Why this doesn't break correctness:
+        Case 1: redir (flush or steer2/3) low
+        Next cycle, all predictor stages will read ghist, which is up-to-date,
+        and no one will consume hist.
+
+        Case 2: redir high
+        fhr and ghist must be reconstructed from hist, so the GHR_LEN subsegment of
+        hist to which we will rollback must be up-to-date **this very cycle**.
+
+        Consider the configuration:
+        s1:fb3 -> s2:fb2 -> s3:fb1 -> ftq:fb0
+        (<stage>:<occupant>)
+
+        Subcase 2A: wshf_in belonging to the redirecting FB...
+        ...are patched into ghist same cycle (redir_take bypass).
+
+        Subcase 2B: " to FBs *younger* than the redirecting FB
+        A redirect can only ever jump to an earlier index in the history (but,
+        given a large enough GHR_BUF_SZ size, not so early that it wraps around
+        the buffer to reach the wshf_in bit positions), so that the wshf_in bits
+        belonging to any younger insns will NOT be in the rollback GHR_LEN window
+        (they will be on the mispredicted path).
+
+        e.g. if fb2 causes an s2_steer, then fb3 can be ignored.
+
+        Subcase 2C: " to FBs *older* than the redirecting FB
+        The most restrictive timing constraint is ensuring that fb1's wshf_in are
+        reflected in hist when fb2 raises s2_steer:
+        - 1 cycle separation between "redirecting fb (fb2)" and "fb demanding hist consistency (fb1)"
+        (e.g. compared to 2-cycles between fb2 and fb0)
+        - 2 cycles since "fb demanding hist consistency" presented its wshf_in bits to ghr
+        (e.g. 3 cycles for s3_steer, and many more cycles for flush)
+
+        cycle 0
+        s1:fb1 -> s2:    -> s3:    -> ftq:
+        fb1 presents bits to ghr, latched into ghist end-of-cycle
+
+        cycle 1
+        s1:fb2 -> s2:fb1 -> s3:    -> ftq:
+        fb1 bits latched into hist end-of-cycle
+
+        cycle 2
+        s1:fb3 -> s2:fb2 -> s3:fb1 -> ftq:
+        fb2 raises steer
+
+        As you can see, older blocks will have shifted in their bits at
+        least 1 cycle earlier.
+
+        (FIXME: need to check these formally)
+        */
+        w       <= w_n;
+        for (int i = 0; i < WPORTS; ++i) begin
+            if (~w.en[i])
+                continue;
+            hist[w.idx[i]] <= w.val[i];
+        end
+        base    <= redir
+            ? redir_idx
+            : base_n[wen_cnt];
+        ghist   <= redir
+            ? rd_ghist
+            : ghist_win[WPORTS +: GHR_LEN];
+
+
         if (reset) begin
             hist    <= '0;
                 // hist <= 'hACE1; // heuristic seed to avoid cold start
             base    <= '0;
             ghist   <= '0;
-            w       <= '0;
-
-        end else begin
-            w       <= w_n;
-                /* NOTE: hist latches in the wshf_in bits 1 cycle after the bits are presented
-                (vs. ghist, which latches same cycle). Hence, hist lags behind ghist by 1 cycle.
-                hist is written 1 cycle after ghist to move s1 uftb lookup off critical path;
-                unlike wshf_in->ghist, which touches 2 fixed bit positions, wshf_in->hist
-                performs two random writes into the full ghr buffer.
-
-                Why this doesn't break correctness:
-                Case 1: redir (flush or steer2/3) low
-                Next cycle, all predictor stages will read ghist, which is up-to-date,
-                and no one will consume hist.
-
-                Case 2: redir high
-                fhr and ghist must be reconstructed from hist, so the GHR_LEN subsegment of
-                hist to which we will rollback must be up-to-date **this very cycle**.
-
-                Consider the configuration:
-                s1:fb3 -> s2:fb2 -> s3:fb1 -> ftq:fb0
-                (<stage>:<occupant>)
-
-                Subcase 2A: wshf_in belonging to the redirecting FB...
-                ...are patched into ghist same cycle (redir_take bypass).
-
-                Subcase 2B: " to FBs *younger* than the redirecting FB
-                A redirect can only ever jump to an earlier index in the history (but,
-                given a large enough GHR_BUF_SZ size, not so early that it wraps around
-                the buffer to reach the wshf_in bit positions), so that the wshf_in bits
-                belonging to any younger insns will NOT be in the rollback GHR_LEN window
-                (they will be on the mispredicted path).
-
-                e.g. if fb2 causes an s2_steer, then fb3 can be ignored.
-
-                Subcase 2C: " to FBs *older* than the redirecting FB
-                The most restrictive timing constraint is ensuring that fb1's wshf_in are
-                reflected in hist when fb2 raises s2_steer:
-                - 1 cycle separation between "redirecting fb (fb2)" and "fb demanding hist consistency (fb1)"
-                (e.g. compared to 2-cycles between fb2 and fb0)
-                - 2 cycles since "fb demanding hist consistency" presented its wshf_in bits to ghr
-                (e.g. 3 cycles for s3_steer, and many more cycles for flush)
-
-                cycle 0
-                s1:fb1 -> s2:    -> s3:    -> ftq:
-                fb1 presents bits to ghr, latched into ghist end-of-cycle
-
-                cycle 1
-                s1:fb2 -> s2:fb1 -> s3:    -> ftq:
-                fb1 bits latched into hist end-of-cycle
-
-                cycle 2
-                s1:fb3 -> s2:fb2 -> s3:fb1 -> ftq:
-                fb2 raises steer
-
-                As you can see, older blocks will have shifted in their bits at
-                least 1 cycle earlier.
-
-                (FIXME: need to check these formally)
-                */
-            for (int i = 0; i < WPORTS; ++i) begin
-                if (~w.en[i])
-                    continue;
-                hist[w.idx[i]] <= w.val[i];
-            end
-            base    <= redir
-                ? redir_idx
-                : base_n[wen_cnt];
-            ghist   <= redir
-                ? rd_ghist
-                : ghist_win[WPORTS +: GHR_LEN];
-
+            w.en    <= '0;
         end
 
     end

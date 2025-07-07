@@ -145,13 +145,13 @@ module free_list #(parameter
 
     // flop returning free pregs for better timing
     always_ff @(posedge clock) begin
+        r_in <= '{
+            en_cnt  : r_in_n.en_cnt,
+            t_old   : r_in_n.t_old
+        };
+
         if (reset)
-            r_in <= '0;
-        else
-            r_in <= '{
-                en_cnt  : r_in_n.en_cnt,
-                t_old   : r_in_n.t_old
-            };
+            r_in.en_cnt <= '0;
     end
 
 

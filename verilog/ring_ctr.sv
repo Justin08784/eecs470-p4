@@ -114,12 +114,7 @@ module ring_ctr #(
     endgenerate
 
     always_ff @(posedge clock) begin
-        if (reset) begin
-            used <= RESET_STATE.used;
-            rd_win <= rd_win_res;
-            wr_win <= wr_win_res;
-
-        end else if (flush) begin
+        if (flush) begin
             unique case (FLUSH_MODE)
             FIFO_FLUSH_SNAP_HEAD: begin
                 // used <= used + distance(flush_snap, head) + wr_en_cnt;
@@ -151,6 +146,13 @@ module ring_ctr #(
             rd_win <= rd_full[rd_en_cnt +: RPORTS+1];
             wr_win <= wr_full[wr_en_cnt +: WPORTS+1];
         end
+
+        if (reset) begin
+            used <= RESET_STATE.used;
+            rd_win <= rd_win_res;
+            wr_win <= wr_win_res;
+        end
+
     end
 
 endmodule

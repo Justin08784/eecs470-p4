@@ -94,11 +94,7 @@ module map_table #(parameter
     );
 
     always_ff @(posedge clock) begin
-        if (reset) begin
-            entries[`ZERO_REG] <= '0;
-            for (int r = 1; r < NUM_ARCH_REG; ++r)
-                entries[r] <= r;
-        end else if (flush) begin
+        if (flush) begin
             for (int r = 1; r < NUM_ARCH_REG; ++r)
                 entries[r] <= snap[r];
         end else begin
@@ -107,6 +103,12 @@ module map_table #(parameter
             if (entries[`ZERO_REG] != '0)
                 $error("ERROR: entries[0] was modified! Got: {t:%0d}", entries[`ZERO_REG]);
 `endif
+        end
+
+        if (reset) begin
+            entries[`ZERO_REG] <= '0;
+            for (int r = 1; r < NUM_ARCH_REG; ++r)
+                entries[r] <= r;
         end
 
     end

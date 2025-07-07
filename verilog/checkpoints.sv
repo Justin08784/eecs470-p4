@@ -82,11 +82,7 @@ module branch_manager (
         // dep_table[i][j] := branch w/ b1hot j is dependent on branch w/ b1hot i
 
     always_ff @(posedge clock) begin
-        if (reset) begin
-            bmask_reg <= '0;
-            dep_table <= '0;
-
-        end else if (flush) begin
+        if (flush) begin
             foreach (clmsk[i]) begin
                 if (!clmsk[i])
                     continue;
@@ -109,6 +105,11 @@ module branch_manager (
                 dep_table[i] <= cum_b1hot_n[dis_in.snap_en_cnt] & ~cum_b1hot_n[n+1];
                     // "all new dispatching branches" MINUS "branches older than or equal to i"
             end
+        end
+
+        if (reset) begin
+            bmask_reg <= '0;
+            dep_table <= '0;
         end
     end
 
