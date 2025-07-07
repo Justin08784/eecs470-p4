@@ -197,6 +197,7 @@ MODULES = cpu \
 	fifo \
 	foo \
 	ftq \
+	execute \
 	ghr \
 	gshare \
 	mult \

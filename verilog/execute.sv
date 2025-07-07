@@ -334,6 +334,7 @@ module bru_ex(
 
 endmodule
 
+// module execute (
 module stage_ex_p4 (
     input   clock,
     input   reset,
@@ -933,61 +934,92 @@ module stage_ex_p4 (
     // Data broadcast is the final stage of the execute pipeline.
     execute2complete_tag ctag_out_n;
     execute2complete_dat cdat_out_n;
-    always_comb begin
-        rs_out = '{
-            fu_cdb_gnt_alu  : cdb_gnt.alu,
-            fu_cdb_gnt_bru  : cdb_gnt.bru,
+    assign rs_out = '{
+        fu_cdb_gnt_alu  : cdb_gnt.alu,
+        fu_cdb_gnt_bru  : cdb_gnt.bru,
 
-            fu_rdy_alu      : iss.i_rdy.alu,
-            fu_rdy_mul      : iss.i_rdy.mul,
-            fu_rdy_lod      : iss.i_rdy.lod,
-            fu_rdy_str      : iss.i_rdy.str,
-            fu_rdy_bru      : iss.i_rdy.bru
-        };
+        fu_rdy_alu      : iss.i_rdy.alu,
+        fu_rdy_mul      : iss.i_rdy.mul,
+        fu_rdy_lod      : iss.i_rdy.lod,
+        fu_rdy_str      : iss.i_rdy.str,
+        fu_rdy_bru      : iss.i_rdy.bru
+    };
 
-        foreach (rs_in.fu_dat_alu[i])
-            ctag_ts.alu[i] = rs_in.fu_dat_alu[i].t;
-        foreach (rs_in.fu_dat_bru[i])
-            ctag_ts.bru[i] = rs_in.fu_dat_bru[i].t;
-        ctag_ts_flat = ctag_ts;
+    assign ctag_ts_flat = ctag_ts;
+    for (genvar i = 0; i < NUM_FU_ALU; ++i)
+        assign ctag_ts.alu[i] = rs_in.fu_dat_alu[i].t;
+    for (genvar i = 0; i < NUM_FU_BRU; ++i)
+        assign ctag_ts.bru[i] = rs_in.fu_dat_bru[i].t;
+    
+    logic [NUM_FU_TOTAL-1:0] cands_flat_vldv;
+    for (genvar f = 0; f < NUM_FU_TOTAL; ++f)
+        assign cands_flat_vldv[f] = cands_flat[f].vld;
 
-        ctag_out_n = '0;
-        cdat_out_n = '0;
-        foreach(cdb2fu_gbus_shr[_, c, f]) begin
-            if (cdb2fu_gbus[c][f]) begin
-                ctag_out_n.en[c]  |= 1;
-                ctag_out_n.ts[c]  |= ctag_ts_flat[f];
-            end
+    logic [N-1:0][NUM_FU_TOTAL-1:0] cdb2fu_tag_sel, cdb2fu_dat_sel;
+    assign cdb2fu_tag_sel = cdb2fu_gbus;
+    for (genvar c = 0; c < N; ++c) begin
+        assign cdb2fu_dat_sel[c] = cdb2fu_gbus_shr[1][c] & cands_flat_vldv;
 
-            if (cdb2fu_gbus_shr[1][c][f]) begin
-                cdat_out_n.en[c]        |= cands_flat[f].vld;
-                cdat_out_n.ts[c]        |= cands_flat[f].t;
-                cdat_out_n.rob_idxs[c]  |= cands_flat[f].rob_idx;
-                cdat_out_n.data[c]      |= cands_flat[f].data;
+        assign ctag_out_n.en[c] = |cdb2fu_gbus[c];
+        assign cdat_out_n.en[c] = |cdb2fu_dat_sel[c];
+
+        // cdb2fu assign V2:
+        /* NOTE: This V2 assign follows the same principles as ffs or the tag-locate
+        block in uFTB: repeatedly override whenever the bit in the select
+        vector is high (instead of explicitly OR-ing them all together as in V1). 
+        
+        I believe V2 synthesizes to a mux, while V1 is a wide OR. In any case
+        the critical path of V2 is much improved. */
+        always_comb begin
+            for (int f = 0; f < NUM_FU_TOTAL; ++f) begin
+                if (cdb2fu_tag_sel[c][f])
+                    ctag_out_n.ts[c]        = ctag_ts_flat[f];
+
+                if (cdb2fu_dat_sel[c][f]) begin
+                    cdat_out_n.ts[c]        = cands_flat[f].t;
+                    cdat_out_n.rob_idxs[c]  = cands_flat[f].rob_idx;
+                    cdat_out_n.data[c]      = cands_flat[f].data;
+                end
             end
         end
+
+        // cdb2fu assign V1:
+        // foreach(cdb2fu_gbus_shr[_, c, f]) begin
+        //     if (cdb2fu_gbus[c][f]) begin
+        //         ctag_out_n.en[c]  |= 1;
+        //         ctag_out_n.ts[c]  |= ctag_ts_flat[f];
+        //     end
+
+        //     if (cdb2fu_gbus_shr[1][c][f]) begin
+        //         cdat_out_n.en[c]        |= cands_flat[f].vld;
+        //         cdat_out_n.ts[c]        |= cands_flat[f].t;
+        //         cdat_out_n.rob_idxs[c]  |= cands_flat[f].rob_idx;
+        //         cdat_out_n.data[c]      |= cands_flat[f].data;
+        //     end
+        // end
     end
 
     always_ff @(posedge clock) begin
+        cdb2fu_gbus_shr[0]  <= cdb2fu_gbus;
+        cdb_gnt_shr[0]      <= cdb_gnt;
+        for (int unsigned i = 0; i < 1; ++i) begin
+            cdb2fu_gbus_shr[i+1] <= cdb2fu_gbus_shr[i];
+            cdb_gnt_shr[i+1]     <= cdb_gnt_shr[i];
+        end
+        ctag_out <= ctag_out_n;
+        cdat_out <= cdat_out_n;
+        cbru_out <= cbru_out_n;
+        btq_out  <= btq_out_n;
+
         if (reset) begin
             cdb2fu_gbus_shr <= '0;
             cdb_gnt_shr     <= '0;
-            ctag_out        <= '0;
-            cdat_out        <= '0;
-            cbru_out        <= '0;
-            btq_out         <= '0;
-        end else begin
-            cdb2fu_gbus_shr[0]  <= cdb2fu_gbus;
-            cdb_gnt_shr[0]      <= cdb_gnt;
-            for (int unsigned i = 0; i < 1; ++i) begin
-                cdb2fu_gbus_shr[i+1] <= cdb2fu_gbus_shr[i];
-                cdb_gnt_shr[i+1]     <= cdb_gnt_shr[i];
-            end
-            ctag_out <= ctag_out_n;
-            cdat_out <= cdat_out_n;
-            cbru_out <= cbru_out_n;
-            btq_out  <= btq_out_n;
+            ctag_out.en     <= '0;
+            cdat_out.en     <= '0;
 
+            cbru_out.en     <= '0;
+            cbru_out.clmsk  <= '0;
+            cbru_out.flush  <= 0;
         end
     end
 
