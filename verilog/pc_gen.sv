@@ -558,7 +558,10 @@ module pc_gen #(
     always_ff @(posedge clock) begin
         if (!reset) begin
             for (int e = 0; e < NUM_FTQ; ++e)
-                assert(!(|is_end_flat[e]) | $onehot(is_end_flat[e])) else $fatal;
+                assert(~(e < ftq_in_vld_scnt)
+                    | !(|is_end_flat[e])
+                    | $onehot(is_end_flat[e]))
+                else $fatal;
 
             if (iss_any) begin
                 // adv_blk is high IFF we do not advance 2 bases
