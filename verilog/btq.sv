@@ -128,7 +128,7 @@ module btq #(
     generate
     for (genvar i = 0; i < NUM_RPORTS; ++i) begin
         assign rdat[i] = state[r_idxs_n[i]];
-        assign rcpl[i] = rdat[i].rslv;
+        assign rcpl[i] = (i < btq_vld_scnt) & rdat[i].rslv;
     end
     endgenerate
 
@@ -143,7 +143,7 @@ module btq #(
     );
 
     assign rd_en_cnt = `MIN(
-        `MIN(btq_vld_scnt, puq_rdy_scnt),
+        puq_rdy_scnt,
         ncpl_any ? ncpl_idx : `UCAST_FIT(NUM_RPORTS)
     );
 
@@ -251,69 +251,66 @@ module btq #(
     );
 
     always_ff @(posedge clock) begin
-        if (reset) begin
-            state   <= '0;
-        end else begin
-            if (f_in.wen_cnt > free)
-                $error("BTQ overflow!");
-            if (rd_en_cnt > used)
-                $error("BTQ underflow!");
+        if (f_in.wen_cnt > free)
+            $error("BTQ overflow!");
+        if (rd_en_cnt > used)
+            $error("BTQ underflow!");
 
-            // handle complete (ins)
-            for (int i = 0, int idx = 0; i < NUM_CPORTS; ++i) begin
-                idx = cbru_in.btq_idx[i];
-                if (!cbru_in.en[i])
-                    continue;
+        // handle complete (ins)
+        for (int i = 0, int idx = 0; i < NUM_CPORTS; ++i) begin
+            idx = cbru_in.btq_idx[i];
+            if (!cbru_in.en[i])
+                continue;
 
-                state[idx].rslv <= 1;
-                state[idx].tgt  <= cbru_in.tgt[i];
-                state[idx].take <= cbru_in.take[i];
+            state[idx].rslv <= 1;
+            state[idx].tgt  <= cbru_in.tgt[i];
+            state[idx].take <= cbru_in.take[i];
 `ifdef DEBUG
-                state[idx].b1hot<= '0;
-                state[idx].reso <= cbru_in.reso[i];
+            state[idx].b1hot<= '0;
+            state[idx].reso <= cbru_in.reso[i];
 `endif
-            end
-
-`ifdef DEBUG
-            // mark alloc'd b1hot (debug only)
-            for (int i = 0; i < N; ++i) begin
-                if (!snap_in.snap_en[i])
-                    continue;
-                state[snap_in.btq_idx[i]].b1hot <= snap_in.b1hot_n[i];
-            end
-`endif
-
-            // handle fetch (ins)
-            for (int i = 0, int idx = 0; i < NUM_FPORTS; ++i) begin
-                idx = f_idxs_n[i];
-                if (i >= f_in.wen_cnt)
-                    continue;
-
-                state[idx] <= '{
-`ifdef DEBUG
-                    b1hot   : '0,
-                    reso    : '0,
-`endif
-                    PC      : f_in.PC[i],
-                    is_tail : f_in.is_tail[i],
-                    off     : f_in.off[i],
-
-                    rslv    : 0,
-                    take    : f_in.pred[i],
-                    tgt     : f_in.pred_tgt[i],
-
-                    always_take : f_in.always_take[i],
-                    md      : f_in.md[i],
-
-                    hit     : f_in.hit[i],
-                    hit_slot: f_in.hit_slot[i],
-                    slot_idx: f_in.slot_idx[i],
-                    in_ghr  : f_in.in_ghr[i],
-                    // hash    : f_in.hash[i],
-                    ghr_base: f_in.ghr_base[i]
-                };
-            end
         end
+
+`ifdef DEBUG
+        // mark alloc'd b1hot (debug only)
+        for (int i = 0; i < N; ++i) begin
+            if (!snap_in.snap_en[i])
+                continue;
+            state[snap_in.btq_idx[i]].b1hot <= snap_in.b1hot_n[i];
+        end
+`endif
+
+        // handle fetch (ins)
+        for (int i = 0, int idx = 0; i < NUM_FPORTS; ++i) begin
+            idx = f_idxs_n[i];
+            if (i >= f_in.wen_cnt)
+                continue;
+
+            state[idx] <= '{
+`ifdef DEBUG
+                b1hot   : '0,
+                reso    : '0,
+`endif
+                PC      : f_in.PC[i],
+                is_tail : f_in.is_tail[i],
+                off     : f_in.off[i],
+
+                rslv    : 0,
+                take    : f_in.pred[i],
+                tgt     : f_in.pred_tgt[i],
+
+                always_take : f_in.always_take[i],
+                md      : f_in.md[i],
+
+                hit     : f_in.hit[i],
+                hit_slot: f_in.hit_slot[i],
+                slot_idx: f_in.slot_idx[i],
+                in_ghr  : f_in.in_ghr[i],
+                // hash    : f_in.hash[i],
+                ghr_base: f_in.ghr_base[i]
+            };
+        end
+
     end
 
 

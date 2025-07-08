@@ -86,7 +86,7 @@ module irq #(
     `IDX_TYPE(2)rwin_ncpl_idx;
     generate
     for (genvar i = 0; i < 2; ++i) begin
-        assign rwin_cpl[i]  = cpl[rd_idxs_n[i]];
+        assign rwin_cpl[i]  = (i < used_scnt) & cpl[rd_idxs_n[i]];
         assign rdat[i]      = state[rd_idxs_n[i]];
     end
     endgenerate
@@ -100,17 +100,11 @@ module irq #(
 
     assign rdy_scnt = free_scnt;
 
-    assign vld_scnt = `MIN(
-        used_scnt,
-        rwin_ncpl_any ? rwin_ncpl_idx : 2
-    );
+    assign vld_scnt = rwin_ncpl_any ? rwin_ncpl_idx : 2;
 
     always_ff @(posedge clock) begin
-        if (reset) begin
-            state   <= '0;
-            cpl     <= '1;
-        end else if (flush) begin
-            cpl     <= '1;
+        if (flush) begin
+            cpl <= '1;
 
         end else begin
             for (int i = 0; i < 2; ++i) begin
@@ -278,10 +272,12 @@ module align (
 
     generate
     assign shl = '{
-        blk : {~raw.fmsk[2], ~raw.fmsk[0]},
-        mid : |(~raw.fmsk[1:0])
+        blk : {raw.irq_vld[1] & ~raw.fmsk[2], raw.irq_vld[0] & ~raw.fmsk[0]},
+        mid : raw.irq_vld[0] & |(~raw.fmsk[1:0])
             /* since each cache line contains at least 1 valid word,
-            the cross (mid) shift is at most 1 */
+            the cross (mid) shift is at most 1 
+            
+            The irq_vld mask guards access to potentially garbage values. */
     };
 
     for (genvar b = 0; b < NUM_DW; ++b) begin : block_align
@@ -583,6 +579,12 @@ module align (
     Uftb_No_False_Positive: assert property(p_uftb_no_false_positive)
         else error_uftb_no_false_positive();
 `endif
+
+// always_ff @(posedge clock) begin
+//     if (!reset) begin
+//         $display("ctl.req, gnt, rng: %b %b %b", ctl.req, ctl.gnt, ctl.rng);
+//     end
+// end
 
 
 `ifdef DEBUG

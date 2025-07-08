@@ -109,39 +109,36 @@ module rob #(
     end
 
     always_ff @(posedge clock) begin
-        if (reset) begin
-            state   <= '0;
-        end else begin
 `ifndef SYNTH
-            if (d_in.wen_cnt > free + r_out.vld_scnt)
-                $error("ROB overflow!");
-            if (r_out.vld_scnt > used + d_in.wen_cnt)
-                $error("ROB underflow!");
+        if (d_in.wen_cnt > free + r_out.vld_scnt)
+            $error("ROB overflow!");
+        if (r_out.vld_scnt > used + d_in.wen_cnt)
+            $error("ROB underflow!");
 `endif
-            // handle complete (ins)
-            for (int unsigned i = 0, int cur_idx = 0; i < NUM_CPORTS; ++i) begin
-                cur_idx = cdat_in.rob_idxs[i];
+        // handle complete (ins)
+        for (int unsigned i = 0, int cur_idx = 0; i < NUM_CPORTS; ++i) begin
+            cur_idx = cdat_in.rob_idxs[i];
 
-                if (cdat_in.en[i])
-                    state[cur_idx].cpl <= 1;
-            end
-
-            // handle dispatch (ins)
-            for (int unsigned i = 0, int cur_idx = 0; i < NUM_DPORTS; ++i) begin
-                if (i >= d_in.wen_cnt)
-                    continue;
-                cur_idx = comm_idxs_n[i];
-                state[cur_idx] <= '{
-                    cpl     : 0,
-                    fu_idx  : d_in.fu_idx[i],
-                    tag     : d_in.tag[i],
-                    t_old   : d_in.t_old[i],
-                    dst     : d_in.dst[i],
-                    halt    : d_in.halt[i],
-                    illegal : d_in.illegal[i]
-                };
-            end
+            if (cdat_in.en[i])
+                state[cur_idx].cpl <= 1;
         end
+
+        // handle dispatch (ins)
+        for (int unsigned i = 0, int cur_idx = 0; i < NUM_DPORTS; ++i) begin
+            if (i >= d_in.wen_cnt)
+                continue;
+            cur_idx = comm_idxs_n[i];
+            state[cur_idx] <= '{
+                cpl     : 0,
+                fu_idx  : d_in.fu_idx[i],
+                tag     : d_in.tag[i],
+                t_old   : d_in.t_old[i],
+                dst     : d_in.dst[i],
+                halt    : d_in.halt[i],
+                illegal : d_in.illegal[i]
+            };
+        end
+
     end
     
 
