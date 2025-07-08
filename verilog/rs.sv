@@ -101,18 +101,22 @@ module rs_part #(
     logic [N-1:0][PART_SZ-1:0] to_t2_rdy_per_cpl;
     logic [PART_SZ-1:0] to_t1_rdy;
     logic [PART_SZ-1:0] to_t2_rdy;
-    always_comb begin
-        to_t1_rdy_per_cpl = '0;
-        to_t2_rdy_per_cpl = '0;
-        foreach(to_t1_rdy_per_cpl[n, rs]) begin
-            if (!ctag_in.en[n])
-                continue;
-            to_t1_rdy_per_cpl[n][rs] = entries[rs].dat.t1 == ctag_in.ts[n]
-                && ctag_in.ts[n] != '0;
-            to_t2_rdy_per_cpl[n][rs] = entries[rs].dat.t2 == ctag_in.ts[n]
-                && ctag_in.ts[n] != '0;
-        end
+    for (genvar n = 0; n < N; ++n) begin
+        for (genvar rs = 0; rs < PART_SZ; ++rs) begin
+            assign to_t1_rdy_per_cpl[n][rs] =
+                ctag_in.en[n]
+                & entries[rs].dat.t1 == ctag_in.ts[n]
+                & ctag_in.ts[n] != '0;
 
+            assign to_t2_rdy_per_cpl[n][rs] =
+                ctag_in.en[n]
+                & entries[rs].dat.t2 == ctag_in.ts[n]
+                & ctag_in.ts[n] != '0;
+
+        end
+    end
+
+    always_comb begin
         to_t1_rdy = '0;
         to_t2_rdy = '0;
         foreach(to_t1_rdy_per_cpl[n, rs]) begin
@@ -123,23 +127,18 @@ module rs_part #(
 
     // SECTION: kill terms
     logic [PART_SZ-1:0] kill;
-    always_comb begin
-        for (int rs = 0; rs < PART_SZ; ++rs)
-            kill[rs]  = flush && |(entries[rs].dat.bmask & clmsk);
-    end
+    for (genvar rs = 0; rs < PART_SZ; ++rs)
+        assign kill[rs] = flush & |(entries[rs].dat.bmask & clmsk);
 
     // SECTION: Issue 
     // operand readiness
     logic [PART_SZ-1:0] can_issue;
-    always_comb begin
-        can_issue = '0;
-        for (int rs = 0; rs < PART_SZ; ++rs) begin
-            can_issue[rs] = busy_vec[rs]
-                && !kill[rs]
-                && !entries[rs].issd // ms1 test: remove "!" from entries[rs].issd (caught)
-                && (entries[rs].dat.t1_rdy || to_t1_rdy[rs]) // [ADDRESSED] ms1 test: remove "|| to_t1_rdy[rs]" (not caught) 
-                && (entries[rs].dat.t2_rdy || to_t2_rdy[rs]);
-        end
+    for (genvar rs = 0; rs < PART_SZ; ++rs) begin
+        assign can_issue[rs] = busy_vec[rs]
+            & ~kill[rs]
+            & ~entries[rs].issd // ms1 test: remove "!" from entries[rs].issd (caught)
+            & (entries[rs].dat.t1_rdy | to_t1_rdy[rs]) // [ADDRESSED] ms1 test: remove "|| to_t1_rdy[rs]" (not caught) 
+            & (entries[rs].dat.t2_rdy | to_t2_rdy[rs]);
     end
 
     // select issue lines
@@ -166,18 +165,29 @@ module rs_part #(
     function automatic BYPASS_TAG get_bytag (
         input int rs
     );
-        BYPASS_TAG tag = '0;
+        logic by1, by2;
+        logic [`IDX_SIZE(N)-1:0] ci1, ci2;
+
+        by1 = 0;
+        by2 = 0;
+        ci1 = '0;
+        ci2 = '0;
         for (int n = 0; n < N; ++n) begin
-            if (to_t1_rdy_per_cpl[n][rs]) begin
-                tag.bypass1     |= 1; // TODO: What about zero reg? A matching zero reg should not count as a valid wakeup!
-                tag.cdb_idx1    |= n; // This should be okay. Two insns cannot have the same destination tag! There is a $fatal check for this in execute.sv
-            end
-            if (to_t2_rdy_per_cpl[n][rs]) begin
-                tag.bypass2     |= 1;
-                tag.cdb_idx2    |= n;
-            end
+            by1 |= to_t1_rdy_per_cpl[n][rs];
+            by2 |= to_t2_rdy_per_cpl[n][rs];
+
+            if (to_t1_rdy_per_cpl[n][rs])
+                ci1 = n; // This should be okay. Two insns cannot have the same destination tag! There is a $fatal check for this in execute.sv
+            if (to_t2_rdy_per_cpl[n][rs])
+                ci2 = n;
         end
-        return tag;
+
+        return '{
+            bypass1 : by1,
+            bypass2 : by2,
+            cdb_idx1: ci1,
+            cdb_idx2: ci2
+        };
     endfunction
 
     // assign FUs to issuables
@@ -213,9 +223,9 @@ module rs_part #(
         ex_out_bytag    = '0;
         foreach (fu2issuer[fu, rs]) begin
             if (fu2issuer[fu][rs]) begin // [MISSING] ms1 test: Remove "!" from if condition (not caught)
-                ex_out_fu_dat[fu] |= entries[rs].dat;
+                ex_out_fu_dat[fu] = entries[rs].dat;
                 ex_out_fu_dat[fu].bmask &= ~clmsk;
-                ex_out_bytag[fu]  |= get_bytag(rs);
+                ex_out_bytag[fu]  = get_bytag(rs);
             end
         end
     end
@@ -238,50 +248,49 @@ module rs_part #(
     );
 
     logic [N-1:0][PART_SZ-1:0] d2entry;
-    always_comb begin
-        d2entry = '0;
-        foreach (d2entry[i]) begin
-            if (d_in_en[i]) begin
-                d2entry[i] |= gbus_free[i];
-            end
-        end
-
-        foreach (gbus_free[n])
-            d_out_rdy_sbus[n] = |gbus_free[n];
+    for (genvar n = 0; n < N; ++n) begin
+        assign d_out_rdy_sbus[n] = |gbus_free[n];
+        assign d2entry[n] = d_in_en[n] ? gbus_free[n] : '0;
     end
 
 
     always_ff @(posedge clock) begin
-        if (reset) begin
-            entries  <= '0;
-        end else begin
-            // SECTION: Compute next state
-            for (int rs = 0; rs < PART_SZ; ++rs) begin
-                entries[rs].dat.t1_rdy <= entries[rs].dat.t1_rdy | to_t1_rdy[rs];
-                entries[rs].dat.t2_rdy <= entries[rs].dat.t2_rdy | to_t2_rdy[rs]; // [ADDRESSED] ms1 test: change |= to = (not caught)
-                entries[rs].dat.bmask  <= entries[rs].dat.bmask & ~clmsk; // any resolved (pred/mispred) clear its b1hot
+        // SECTION: Compute next state
+        for (int rs = 0; rs < PART_SZ; ++rs) begin
+            entries[rs].dat.t1_rdy <= entries[rs].dat.t1_rdy | to_t1_rdy[rs];
+            entries[rs].dat.t2_rdy <= entries[rs].dat.t2_rdy | to_t2_rdy[rs]; // [ADDRESSED] ms1 test: change |= to = (not caught)
+            entries[rs].dat.bmask  <= entries[rs].dat.bmask & ~clmsk; // any resolved (pred/mispred) clear its b1hot
 
-                // issuing
-                if (to_issue[rs])
-                    entries[rs].issd <= 1;
+            // issuing
+            if (to_issue[rs])
+                entries[rs].issd <= 1;
 
-                // going to EX or flush kill; clear entry
-                if (entries[rs].issd || kill[rs])
-                    entries[rs].busy <= 0; // only clear busy bit
+            // going to EX or flush kill; clear entry
+            if (entries[rs].issd || kill[rs])
+                entries[rs].busy <= 0; // only clear busy bit
 
-                if (!flush) begin // frontend is killed unconditionally; disable ALL dispatches during flush
-                    for (int n = 0; n < N; ++n) begin
-                        if (!d2entry[n][rs])
-                            continue;
-                        entries[rs].busy    <= 1;
-                        entries[rs].issd    <= 0;
-                        entries[rs].dat     <= d_in_dat[n];
-                    end
+            if (!flush) begin // frontend is killed unconditionally; disable ALL dispatches during flush
+                for (int n = 0; n < N; ++n) begin
+                    if (!d2entry[n][rs])
+                        continue;
+                    entries[rs].busy    <= 1;
+                    entries[rs].issd    <= 0;
+                    entries[rs].dat     <= d_in_dat[n];
                 end
             end
-
         end
+
+        if (reset) begin
+            for (int rs = 0; rs < PART_SZ; ++rs) begin
+                entries[rs].busy <= 0;
+                entries[rs].issd <= 0;
+                entries[rs].dat.bmask<= '0;
+
+            end
+        end
+
     end
+
 endmodule;
 
 
@@ -489,13 +498,13 @@ module rs #(parameter
     );
 
     // default rdy_sbus for partitions not yet defined
-    assign d_out.rdy_sbus[FU_LOD]  = '0;
+    assign d_out.rdy_sbus[FU_LOD] = '0;
     assign d_out.rdy_sbus[FU_STR] = '0;
 
-    assign ex_out.fu_en_lod    = '0;
-    assign ex_out.fu_en_str     = '0;
-    assign ex_out.fu_dat_lod   = '0;
-    assign ex_out.fu_dat_str    = '0;
+    assign ex_out.fu_en_lod = '0;
+    assign ex_out.fu_en_str = '0;
+    assign ex_out.fu_dat_lod= '0;
+    assign ex_out.fu_dat_str= '0;
 
 `ifdef DEBUG
     task automatic print_rs_alu(input RS_ALU_ENTRY [RS_ALU_SZ-1:0] entries);

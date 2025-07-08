@@ -63,13 +63,8 @@ module ftq #(
     endgenerate
 
     always_ff @(posedge clock) begin
-        if (flush)
-            state <= '0;
-        else if (wen)
+        if (wen)
             state[tail] <= wdat;
-
-        if (reset)
-            state <= '0;
     end
 
 
