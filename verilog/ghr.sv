@@ -111,7 +111,7 @@ module ghr #(
     input   logic [WPORTS-1:0]  wen,
     input   logic [WPORTS-1:0]  wshf_in,
     output  logic [WPORTS-1:0]  wshf_out,
-    output  PTR     base_n1,
+    output  PTR     base_n1, // ghr index of the next shifted-in branch
 
     // retire
     input   PTR     ridx,
@@ -153,8 +153,8 @@ module ghr #(
     PTR [WPORTS-1:0] redir_widx;
 
     generate
-    assign redir_widx[0] = redir_wen[1] ? redir_idx + 1'b1 : redir_idx;
-    assign redir_widx[1] = redir_idx;
+    assign redir_widx[0] = redir_idx;
+    assign redir_widx[1] = redir_idx - 1'b1;
 
     assign w_n.en = redir ? redir_wen : wen;
     for (genvar i = 0; i < WPORTS; ++i) begin

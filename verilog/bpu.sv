@@ -231,13 +231,10 @@ module pred_s2 (
     assign in_ghr[1]= row.br_slot[1].vld & in_win[1] & ~(pred_any & ~pred_idx);
 
     assign s2_steer = i_s1_vld & o_s1_rdy & hit & ({i_s1_dat.pred_any, i_s1_dat.pred_idx} != {pred_any, pred_idx}); // == override s1?
-
     assign o_ghr.s2_steer_wen[0]= |in_ghr;
     assign o_ghr.s2_steer_wen[1]= &in_ghr;
-    assign o_ghr.s2_steer_take  = pred >> ~in_ghr[0];
-    assign o_ghr.s2_steer_idx   = i_s1_dat.ghr_base_n1 - (in_ghr[0] & in_ghr[1]);
-        /* FIXME: this "-" term needs explanation */
-
+    assign o_ghr.s2_steer_take  = pred >> ~in_win[0];
+    assign o_ghr.s2_steer_idx   = i_s1_dat.ghr_base_n1;
 
     FTB_BR_SLOT slot;
     assign slot = row.br_slot[pred_idx];
