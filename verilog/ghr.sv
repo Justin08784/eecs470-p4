@@ -17,7 +17,7 @@ module fhr #(
     output  logic [FH_LEN-1:0]  rd_fh,
 
     // fetch
-    input   `CNT_TYPE(WPORTS)   wen_cnt,
+    input   logic [WPORTS-1:0]  wen,
     input   logic [WPORTS-1:0]  wshf_in,
     input   logic [WPORTS-1:0]  wshf_out,
     output  logic [FH_LEN-1:0]  fh
@@ -80,7 +80,7 @@ module fhr #(
     endgenerate
 
     always_ff @(posedge clock) begin
-        fh <= redir ? fh_redir : fh_n[wen_cnt];
+        fh <= redir ? fh_redir : fh_n[$countones(wen)];
 
         if (reset)
             fh <= fh_rst;
@@ -108,7 +108,7 @@ module ghr #(
     input   PTR                 redir_idx,
 
     // fetch
-    input   `CNT_TYPE(WPORTS)   wen_cnt,
+    input   logic [WPORTS-1:0]  wen,
     input   logic [WPORTS-1:0]  wshf_in,
     output  logic [WPORTS-1:0]  wshf_out,
     output  PTR     base_n1,
@@ -153,12 +153,10 @@ module ghr #(
     PTR [WPORTS-1:0] redir_widx;
 
     generate
-    assign w_n.en[0] = redir ? redir_wen[0] : wen_cnt != 0;
-    assign w_n.en[1] = redir ? redir_wen[1] : wen_cnt[1];
-
     assign redir_widx[0] = redir_wen[1] ? redir_idx + 1'b1 : redir_idx;
     assign redir_widx[1] = redir_idx;
 
+    assign w_n.en = redir ? redir_wen : wen;
     for (genvar i = 0; i < WPORTS; ++i) begin
         assign w_n.idx[i] = redir ? redir_widx[i] : base_n[i+1];
         assign w_n.val[i] = redir ? redir_take[i] : wshf_in[i];
@@ -180,6 +178,9 @@ module ghr #(
                 rd_ghist[0] |= redir_take[0];
         end
     end
+
+    `CNT_TYPE(WPORTS) wen_cnt;
+    assign wen_cnt = $countones(wen);
 
     generate
     for (genvar i = 0; i < WPORTS; ++i)
@@ -256,12 +257,8 @@ module ghr #(
                 continue;
             hist[w.idx[i]] <= w.val[i];
         end
-        base    <= redir
-            ? redir_idx
-            : base_n[wen_cnt];
-        ghist   <= redir
-            ? rd_ghist
-            : ghist_win[WPORTS +: GHR_LEN];
+        base    <= redir ? redir_idx: base_n[wen_cnt];
+        ghist   <= redir ? rd_ghist : ghist_win[WPORTS +: GHR_LEN];
 
 
         if (reset) begin

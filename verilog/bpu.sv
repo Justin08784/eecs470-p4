@@ -5,13 +5,13 @@ typedef struct packed {
 } FB_POS;
 
 typedef struct packed {
-    `CNT_TYPE(NUM_BR_SLOTS) wen_cnt;
+    logic [NUM_BR_SLOTS-1:0]wen;
     logic [NUM_BR_SLOTS-1:0]wshf_in;
-} s1_to_ghr;
+} s12ghr; // s1 to ghr
 
 typedef struct packed {
     GHR_IDX base_n1;
-} ghr_to_s1;
+} ghr2s1;
 
 typedef struct packed {
     logic [1:0] in_win;
@@ -40,8 +40,8 @@ module pred_s1 (
     input   FB_POS      i_pos,
     output  FB_POS      o_pos_n,
 
-    input   ghr_to_s1   i_ghr,
-    output  s1_to_ghr   o_ghr,
+    input   ghr2s1      i_ghr,
+    output  s12ghr      o_ghr,
 
     output  logic       s1_step,
     input   logic       i_s2_rdy,
@@ -80,24 +80,22 @@ module pred_s1 (
 
 
     logic [1:0] in_win;
-    assign in_win[0] = hit & (i_pos.off <= row.br_slot[0].off);
-    assign in_win[1] = hit & (i_pos.off <= row.br_slot[1].off);
+    assign in_win[0]= i_pos.off <= row.br_slot[0].off;
+    assign in_win[1]= i_pos.off <= row.br_slot[1].off;
 
     logic [1:0] pred;
     logic pred_any, pred_idx;
-    assign pred[0] = hit & row.br_slot[0].vld & in_win[0]
-        &  query_sc(row.br_slot[0].sc);
-    assign pred[1] = hit & row.br_slot[1].vld & in_win[1]
-        & (query_sc(row.br_slot[1].sc) | ~row.md1.cond);
+    assign pred[0]  = row.br_slot[0].vld & in_win[0] &  query_sc(row.br_slot[0].sc);
+    assign pred[1]  = row.br_slot[1].vld & in_win[1] & (query_sc(row.br_slot[1].sc) | ~row.md1.cond);
     assign pred_any = |pred;
     assign pred_idx = ~pred[0] & pred[1];
 
     logic [1:0] in_ghr;
-    assign in_ghr[0] = hit & row.br_slot[0].vld & in_win[0];
-    assign in_ghr[1] = hit & row.br_slot[1].vld & in_win[1] & ~(pred_any & ~pred_idx);
+    assign in_ghr[0]= row.br_slot[0].vld & in_win[0];
+    assign in_ghr[1]= row.br_slot[1].vld & in_win[1] & ~(pred_any & ~pred_idx);
 
     assign o_ghr = '{
-        wen_cnt : s1_step ? $countones(in_ghr) : 0,
+        wen     : {2{s1_step & hit}} & in_ghr,
         wshf_in : pred >> ~in_win[0]
     };
 
@@ -113,10 +111,8 @@ module pred_s1 (
     );
     assign pc_jmp = slot.tgt;
     assign o_pos_n = '{
-        base :
-            !hit    ? i_pos.base + `UCAST_FIT(16) :
-            pred_any? pc_jmp : pc_ft,
-
+        base:   !hit    ? i_pos.base + `UCAST_FIT(16) :
+                pred_any? pc_jmp : pc_ft,
         off : '0
     };
 
@@ -153,11 +149,11 @@ typedef struct packed {
     logic [NUM_BR_SLOTS-1:0] s2_steer_wen;
     logic [NUM_BR_SLOTS-1:0] s2_steer_take;
     GHR_IDX s2_steer_idx;
-} s2_to_ghr;
+} s22ghr; // s2 to ghr
 
 typedef struct packed {
     logic[FH_LEN-1:0] fh, rd_fh;
-} fhr_to_s2;
+} fhr2s2;
 
 
 module pred_s2 (
@@ -172,8 +168,8 @@ module pred_s2 (
     input   FB_POS      i_pos,
     output  FB_POS      o_pos_n,
 
-    input   fhr_to_s2   i_fhr,
-    output  s2_to_ghr   o_ghr,
+    input   fhr2s2      i_fhr,
+    output  s22ghr      o_ghr,
 
     output  logic       o_s1_rdy,
     input   logic       i_s1_vld,
@@ -204,9 +200,9 @@ module pred_s2 (
     logic [1:0] in_win;
     logic       hit;
     FTB_ENTRY   row;
-    assign in_win = i_s1_dat.in_win;
-    assign hit = i_s1_dat.hit_uftb;
-    assign row = i_s1_dat.fb;
+    assign in_win   = i_s1_dat.in_win;
+    assign hit      = i_s1_dat.hit_uftb;
+    assign row      = i_s1_dat.fb;
 
     gshare gshare0 (
         .clock,
@@ -225,20 +221,16 @@ module pred_s2 (
 
     logic [1:0] pred;
     logic pred_any, pred_idx;
-    assign pred[0] = (hit & row.br_slot[0].vld & in_win[0])
-        &  raw_pred[0];
-    assign pred[1] = (hit & row.br_slot[1].vld & in_win[1])
-        & (raw_pred[1] | ~row.md1.cond);
+    assign pred[0]  = row.br_slot[0].vld & in_win[0] &  raw_pred[0];
+    assign pred[1]  = row.br_slot[1].vld & in_win[1] & (raw_pred[1] | ~row.md1.cond);
     assign pred_any = |pred;
     assign pred_idx = ~pred[0] & pred[1];
 
     logic [1:0] in_ghr;
-    assign in_ghr[0] = row.br_slot[0].vld & in_win[0];
-    assign in_ghr[1] = row.br_slot[1].vld & in_win[1] & ~(pred_any & ~pred_idx);
+    assign in_ghr[0]= row.br_slot[0].vld & in_win[0];
+    assign in_ghr[1]= row.br_slot[1].vld & in_win[1] & ~(pred_any & ~pred_idx);
 
-    assign s2_steer = (i_s1_vld & o_s1_rdy) & (
-        {i_s1_dat.pred_any, i_s1_dat.pred_idx} != {pred_any, pred_idx}
-    ); // == override s1?
+    assign s2_steer = i_s1_vld & o_s1_rdy & hit & ({i_s1_dat.pred_any, i_s1_dat.pred_idx} != {pred_any, pred_idx}); // == override s1?
 
     assign o_ghr.s2_steer_wen[0]= |in_ghr;
     assign o_ghr.s2_steer_wen[1]= &in_ghr;
@@ -258,10 +250,8 @@ module pred_s2 (
     );
     assign pc_jmp = slot.tgt;
     assign o_pos_n = '{
-        base :
-            !hit    ? i_s1_dat.base + `UCAST_FIT(16) :
-            pred_any? pc_jmp : pc_ft,
-
+        base:   !hit    ? i_s1_dat.base + `UCAST_FIT(16) :
+                pred_any? pc_jmp : pc_ft,
         off : '0
     };
 
@@ -279,9 +269,8 @@ module pred_s2 (
 
             ft          : ~pred_any,
             pred_idx    : pred_idx,
-            off         : 
-                ~hit    ? 15 :
-                pred_any? slot.off : row.end_off,
+            off         :   ~hit    ? 15 :
+                            pred_any? slot.off : row.end_off,
             hit         : hit,
             
             slot        : '0, // filled below
@@ -368,8 +357,8 @@ module bpu (
 
 
     // i/o's
-    s1_to_ghr s1_2_ghr; 
-    ghr_to_s1 ghr_2_s1;
+    s12ghr s1_2_ghr; 
+    ghr2s1 ghr_2_s1;
 
     struct packed {
         logic       vld;
@@ -403,8 +392,8 @@ module bpu (
 
 
     // i/o's
-    s2_to_ghr s2_2_ghr; 
-    fhr_to_s2 fhr_2_s2;
+    s22ghr s2_2_ghr; 
+    fhr2s2 fhr_2_s2;
 
     struct packed {
         logic vld;
@@ -443,7 +432,7 @@ module bpu (
     struct packed {
         logic [GHR_LEN-1:0] rd_ghist;
         logic [1:0] wshf_out;
-    } ghr2fhr;
+    } ghr_2_fhr;
 
     fhr #(
         .GHR_LEN    (GHR_LEN),
@@ -456,22 +445,16 @@ module bpu (
 
         .redir      (flush | s2_steer),
 
-        .qry_ghist  (ghr2fhr.rd_ghist),
+        .qry_ghist  (ghr_2_fhr.rd_ghist),
         .rd_fh      (fhr_2_s2.rd_fh),
 
-        .wen_cnt    (s1_2_ghr.wen_cnt),
+        .wen        (s1_2_ghr.wen),
         .wshf_in    (s1_2_ghr.wshf_in),
-        .wshf_out   (ghr2fhr.wshf_out),
+        .wshf_out   (ghr_2_fhr.wshf_out),
 
         .fh         (fhr_2_s2.fh)
     );
 
-    logic [NUM_BR_SLOTS-1:0] flush_wen;
-    logic [NUM_BR_SLOTS-1:0] flush_take;
-    assign flush_wen[0] = flush;
-    assign flush_wen[1] = 0;
-    assign flush_take[0] = cbru_in.take;
-    assign flush_take[1] = 0;
     ghr #(
         .DEPTH      (GHR_BUF_SZ),
         .GHR_LEN    (GHR_LEN),
@@ -482,17 +465,17 @@ module bpu (
         .reset,
 
         .redir      (flush | s2_steer),
-        .redir_wen  (flush ? flush_wen  : s2_2_ghr.s2_steer_wen),
-        .redir_take (flush ? flush_take : s2_2_ghr.s2_steer_take),
+        .redir_wen  (flush ? {1'b0, flush}          : s2_2_ghr.s2_steer_wen),
+        .redir_take (flush ? {1'b0, cbru_in.take}   : s2_2_ghr.s2_steer_take),
         .redir_idx  (flush ? cbru_in.flush_ghr_base : s2_2_ghr.s2_steer_idx),
 
-        .wen_cnt    (s1_2_ghr.wen_cnt),
+        .wen        (s1_2_ghr.wen),
         .wshf_in    (s1_2_ghr.wshf_in),
-        .wshf_out   (ghr2fhr.wshf_out),
+        .wshf_out   (ghr_2_fhr.wshf_out),
         .base_n1    (ghr_2_s1.base_n1),
 
         .ridx       (i_udat.ghr_base),
-        .rd_ghist   (ghr2fhr.rd_ghist)
+        .rd_ghist   (ghr_2_fhr.rd_ghist)
     );
 
     ftq ftq0 (

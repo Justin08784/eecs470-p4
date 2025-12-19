@@ -50,12 +50,12 @@ module irq #(
     input   `CNT_TYPE(2)    ren_cnt,
     output  ICACHE_RESPONSE [1:0]   rdat
 );
-    PTR [2:0] rd_idxs_n;
+    PTR [2:0]   rd_idxs_n;
+    `CNT_TYPE(2)used_scnt;
+    `CNT_TYPE(2)free_scnt;
 
-    logic [DEPTH-1:0] cpl;
+    logic [DEPTH-1:0]           cpl;
     ICACHE_RESPONSE [DEPTH-1:0] state;
-
-    `CNT_TYPE(2) used_scnt, free_scnt;
 
     ring_ctr #(
         .DEPTH(DEPTH),
