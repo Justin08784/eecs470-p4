@@ -307,6 +307,7 @@ CPU_SOURCES = verilog/cpu.sv \
 			verilog/btq.sv \
 			verilog/checkpoints.sv \
 			verilog/compactor.sv \
+			verilog/dcache_block_direct.sv \
 			verilog/decode.sv \
 			verilog/dispatch.sv \
 			verilog/execute.sv \
@@ -318,6 +319,7 @@ CPU_SOURCES = verilog/cpu.sv \
 			verilog/ghr.sv \
 			verilog/ghr_chk.sv \
 			verilog/gshare.sv \
+			verilog/lod_ex.sv \
 			verilog/map_table.sv \
 			verilog/memDP.sv \
 			verilog/mult.sv \

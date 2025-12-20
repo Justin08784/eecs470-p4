@@ -26,6 +26,11 @@ typedef struct packed {
 typedef struct packed {
     logic busy;
     logic issd;
+    RS_LOAD_PAYLOAD dat;
+} RS_LOAD_ENTRY;
+typedef struct packed {
+    logic busy;
+    logic issd;
     RS_BRU_PAYLOAD dat;
 } RS_BRU_ENTRY;
 
@@ -384,6 +389,28 @@ module rs #(parameter
         end
     end
 
+    RS_LOAD_PAYLOAD [N-1:0] tmp_dat_lod;
+    always_comb begin
+        foreach (d_in.dat[i]) begin
+            tmp_dat_lod[i] = '{
+`ifdef DEBUG
+                id          : d_in.dat[i].id,
+                PC          : d_in.dat[i].PC,
+                inst        : d_in.dat[i].inst,
+`endif
+                bmask       : d_in.dat[i].bmask,
+
+                imm         : d_in.dat[i].inst.i.imm,
+                funct3      : d_in.dat[i].inst.i.funct3,
+
+                t           : d_in.dat[i].t,
+                t1          : d_in.dat[i].t1,
+                t1_rdy      : d_in.dat[i].t1_rdy,
+                rob_idx     : d_in.dat[i].rob_idx
+            };
+        end
+    end
+
     RS_BRU_PAYLOAD [N-1:0] tmp_dat_bru;
     always_comb begin
         foreach (d_in.dat[i]) begin
@@ -469,6 +496,31 @@ module rs #(parameter
         .ctag_in(ctag_in)
     );
 
+    rs_part_load #(
+        .FU         (FU_LOD),
+        .PAYLOAD    (RS_LOAD_PAYLOAD),
+        .ENTRY      (RS_LOAD_ENTRY),
+        .PART_SZ    (RS_LOD_SZ),
+        .NUM_FU     (NUM_FU_LOD),
+        .ISS_CDB_ARB(`FALSE)
+    ) rs_lod (
+        .clock              (clock),
+        .reset              (reset),
+        .flush              (flush),
+        .clmsk              (clmsk),
+
+        .d_in_en            (d_in.en[FU_LOD]),
+        .d_in_dat           (tmp_dat_lod),
+        .d_out_rdy_sbus     (d_out.rdy_sbus[FU_LOD]),
+
+        .ex_in_fu_rdy       (ex_in.fu_rdy_lod),
+
+        .ex_out_fu_en       (ex_out.fu_en_lod),
+        .ex_out_fu_dat      (ex_out.fu_dat_lod),
+
+        .ctag_in            (ctag_in)
+    );
+
     rs_part #(
         .FU         (FU_BRU),
         .PAYLOAD    (RS_BRU_PAYLOAD),
@@ -498,12 +550,9 @@ module rs #(parameter
     );
 
     // default rdy_sbus for partitions not yet defined
-    assign d_out.rdy_sbus[FU_LOD] = '0;
     assign d_out.rdy_sbus[FU_STR] = '0;
 
-    assign ex_out.fu_en_lod = '0;
     assign ex_out.fu_en_str = '0;
-    assign ex_out.fu_dat_lod= '0;
     assign ex_out.fu_dat_str= '0;
 
 `ifdef DEBUG
@@ -600,3 +649,206 @@ module rs #(parameter
     endtask
 `endif
 endmodule
+
+module rs_part_load #(
+    type PAYLOAD=RS_LOAD_PAYLOAD,
+    type ENTRY  =RS_LOAD_ENTRY,
+    parameter   FU=FU_ALU,
+    parameter   N=N,
+    parameter   PART_SZ=1,
+    parameter   NUM_FU=1,
+    parameter   ISS_CDB_ARB=`FALSE
+) (
+    input clock,
+    input reset,
+    input flush,
+    input  BMASK    clmsk,
+
+    // dispatch
+    input  logic    [N-1:0]     d_in_en,
+    input  PAYLOAD  [N-1:0]     d_in_dat,
+
+    output logic    [N-1:0]     d_out_rdy_sbus,
+
+    // issue
+    input  logic   [NUM_FU-1:0] ex_in_fu_rdy,
+
+    // logic   [NUM_FU-1:0]    cdb_gnt;
+    input  logic   [NUM_FU-1:0] ex_in_fu_cdb_gnt, // 1-cycle insns need to win CDB arb. to issue
+
+    /* Selected for issue */
+    // logic   [NUM_FU-1:0]    iss_en;
+    // ENTRY   [NUM_FU-1:0]    iss_dat;
+    output logic   [NUM_FU-1:0] ex_out_fu_en,
+    output PAYLOAD [NUM_FU-1:0] ex_out_fu_dat,
+    output BYPASS_TAG [NUM_FU-1:0] ex_out_bytag,
+    /*
+    * NOTE: causally, fu_rdy -> iss_vld -> cdb_gnt -> iss_en, iss_dat
+    * */
+
+    // complete (CDB)
+    input execute2complete_tag  ctag_in
+);
+    /*
+    Flush contract:
+    - Reject all dispatches
+    - Issue non-killed ready entries
+    */
+    ENTRY [PART_SZ-1:0] entries; // ms1 test: remove one RS entry (caught)
+
+    logic [PART_SZ-1:0] busy_vec;
+    logic [PART_SZ-1:0] issd_vec;
+    logic [PART_SZ-1:0] t1_rdy_vec;
+    generate
+    for (genvar i = 0; i < PART_SZ; i++) begin : gen_vecs // ms1 test: make loop count PART_SZ-1 instead of PART_SZ (caught)
+        assign busy_vec[i] = entries[i].busy; // ms1 test: make busy_vec sequential instead of combinational (caught)
+        assign issd_vec[i] = entries[i].issd;
+        assign t1_rdy_vec[i] = entries[i].dat.t1_rdy;
+    end
+    endgenerate
+
+    // SECTION: cdb completion
+    logic [N-1:0][PART_SZ-1:0] to_t1_rdy_per_cpl;
+    logic [PART_SZ-1:0] to_t1_rdy;
+    for (genvar n = 0; n < N; ++n) begin
+        for (genvar rs = 0; rs < PART_SZ; ++rs) begin
+            assign to_t1_rdy_per_cpl[n][rs] =
+                ctag_in.en[n]
+                & entries[rs].dat.t1 == ctag_in.ts[n]
+                & ctag_in.ts[n] != '0;
+
+        end
+    end
+
+    always_comb begin
+        to_t1_rdy = '0;
+        foreach(to_t1_rdy_per_cpl[n, rs]) begin
+            to_t1_rdy[rs] |= to_t1_rdy_per_cpl[n][rs];
+        end
+    end
+
+    // SECTION: kill terms
+    logic [PART_SZ-1:0] kill;
+    for (genvar rs = 0; rs < PART_SZ; ++rs)
+        assign kill[rs] = flush & |(entries[rs].dat.bmask & clmsk);
+
+    // SECTION: Issue 
+    // operand readiness
+    logic [PART_SZ-1:0] can_issue;
+    for (genvar rs = 0; rs < PART_SZ; ++rs) begin
+        assign can_issue[rs] = busy_vec[rs]
+            & ~kill[rs]
+            & ~entries[rs].issd // ms1 test: remove "!" from entries[rs].issd (caught)
+            & (entries[rs].dat.t1_rdy | to_t1_rdy[rs]);// [ADDRESSED] ms1 test: remove "|| to_t1_rdy[rs]" (not caught) 
+    end
+
+    // select issue lines
+    logic [NUM_FU-1:0][PART_SZ-1:0] gbus_can_issue;
+    psel_gen #(
+        .WIDTH  (PART_SZ),
+        .REQS   (NUM_FU)
+    ) sel_iss (
+        .req    (can_issue),
+        .gnt_bus(gbus_can_issue)
+    );
+
+    // select available FUs
+    logic [NUM_FU-1:0][NUM_FU-1:0]  gbus_fu_rdy;
+    psel_gen #(
+        .WIDTH  (NUM_FU),
+        .REQS   (NUM_FU)
+    ) sel_rdy_alu (
+        .req    (ex_in_fu_rdy),
+        .gnt_bus(gbus_fu_rdy)
+    );
+
+    // assign FUs to issuables
+    logic [PART_SZ-1:0] to_issue;
+    logic [NUM_FU-1:0][PART_SZ-1:0] fu2issuer;
+
+    always_comb begin
+        to_issue    = '0;
+        fu2issuer   = '0;
+        ex_out_fu_en    = '0;
+
+        foreach (gbus_fu_rdy[i, j]) begin
+            if (gbus_fu_rdy[i][j]) begin
+                fu2issuer[j]    |= gbus_can_issue[i];
+
+                ex_out_fu_en[j] = |gbus_can_issue[i];
+                to_issue        |= gbus_can_issue[i];
+            end
+        end
+    end
+
+    always_comb begin
+        ex_out_fu_dat   = '0;
+        foreach (fu2issuer[fu, rs]) begin
+            if (fu2issuer[fu][rs]) begin // [MISSING] ms1 test: Remove "!" from if condition (not caught)
+                ex_out_fu_dat[fu] = entries[rs].dat;
+                ex_out_fu_dat[fu].bmask &= ~clmsk;
+            end
+        end
+    end
+
+    // SECTION: Dispatch
+    // compute free entries
+    logic [PART_SZ-1:0] free_entries;
+    assign free_entries = 
+        ~busy_vec
+        | issd_vec; // an issued insn will go to EX and free its entry
+
+    // select free entries
+    logic [N-1:0][PART_SZ-1:0] gbus_free;
+    psel_gen #(
+        .WIDTH(PART_SZ),
+        .REQS(N)
+    ) sel_free_entries (
+        .req    (free_entries),
+        .gnt_bus(gbus_free)
+    );
+
+    logic [N-1:0][PART_SZ-1:0] d2entry;
+    for (genvar n = 0; n < N; ++n) begin
+        assign d_out_rdy_sbus[n] = |gbus_free[n];
+        assign d2entry[n] = d_in_en[n] ? gbus_free[n] : '0;
+    end
+
+
+    always_ff @(posedge clock) begin
+        // SECTION: Compute next state
+        for (int rs = 0; rs < PART_SZ; ++rs) begin
+            entries[rs].dat.t1_rdy <= entries[rs].dat.t1_rdy | to_t1_rdy[rs];
+            entries[rs].dat.bmask  <= entries[rs].dat.bmask & ~clmsk; // any resolved (pred/mispred) clear its b1hot
+
+            // issuing
+            if (to_issue[rs])
+                entries[rs].issd <= 1;
+
+            // going to EX or flush kill; clear entry
+            if (entries[rs].issd || kill[rs])
+                entries[rs].busy <= 0; // only clear busy bit
+
+            if (!flush) begin // frontend is killed unconditionally; disable ALL dispatches during flush
+                for (int n = 0; n < N; ++n) begin
+                    if (!d2entry[n][rs])
+                        continue;
+                    entries[rs].busy    <= 1;
+                    entries[rs].issd    <= 0;
+                    entries[rs].dat     <= d_in_dat[n];
+                end
+            end
+        end
+
+        if (reset) begin
+            for (int rs = 0; rs < PART_SZ; ++rs) begin
+                entries[rs].busy <= 0;
+                entries[rs].issd <= 0;
+                entries[rs].dat.bmask<= '0;
+
+            end
+        end
+
+    end
+
+endmodule;

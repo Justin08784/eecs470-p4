@@ -67,6 +67,8 @@ EXTS=(
     out
 )
 
+rm -rf build
+
 # Build all tests
 make ${TESTS[@]/%/.out}
 

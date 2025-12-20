@@ -8,7 +8,7 @@
 /////////////////////////////////////////////////////////////////////////
 
 `include "sys_defs.svh"
-// `include "dcache_block_direct.svh"
+`include "dcache_block_direct.svh"
 `include "execute.svh"
 `include "ISA.svh"
 
@@ -138,37 +138,37 @@ module testbench;
     ADDR [N-1:0] PC_reg;
     EXCEPTION_CODE error_status = NO_ERROR;
 
-    // DBG_dcache      dbg_dcache;
+    DBG_dcache      dbg_dcache;
 
-    assign proc2mem_command = '0;
-    assign proc2mem_addr    = '0;
-    assign proc2mem_data    = '0;
-    assign proc2mem_size    = '0;
+    // assign proc2mem_command = '0;
+    // assign proc2mem_addr    = '0;
+    // assign proc2mem_data    = '0;
+    // assign proc2mem_size    = '0;
     // assign dbg_dcache       = '0;
 
     // Instantiate the Pipeline
     cpu verisimpleV (
         // Inputs
-        .clock (clock),
-        .reset (reset),
+        .clock  (clock),
+        .reset  (reset),
 
         .f2mem  (f2mem),
         .mem2f  (mem2f),
 
 // >> TODO: memory stubbed
-//         .mem2proc_transaction_tag (mem2proc_transaction_tag),
-//         .mem2proc_data            (mem2proc_data),
-//         .mem2proc_data_tag        (mem2proc_data_tag),
+        .mem2proc_transaction_tag   (mem2proc_transaction_tag),
+        .mem2proc_data              (mem2proc_data),
+        .mem2proc_data_tag          (mem2proc_data_tag),
 
-//         // Outputs
-//         .proc2mem_command (proc2mem_command),
-//         .proc2mem_addr    (proc2mem_addr),
-//         .proc2mem_data    (proc2mem_data),
-// `ifndef CACHE_MODE
-//         .proc2mem_size    (proc2mem_size),
-// `endif
+        // Outputs
+        .proc2mem_command           (proc2mem_command),
+        .proc2mem_addr              (proc2mem_addr),
+        .proc2mem_data              (proc2mem_data),
+`ifndef CACHE_MODE
+        .proc2mem_size              (proc2mem_size),
+`endif
 
-//         .dbg_dcache     (dbg_dcache),
+        .dbg_dcache                 (dbg_dcache),
 // << TODO: memory stubbed
 
         .commit(commit)
@@ -558,7 +558,7 @@ module testbench;
     endtask
 
     task print_dcache;
-        // verisimpleV.dcache0.print_dcache();
+        verisimpleV.dcache.print_dcache();
     endtask
 
     task print_execute();
@@ -610,13 +610,13 @@ module testbench;
         // $display("  | >> CYCLE: %3d (t: %3d)", clock_count-1, $time);
         // print_btb();
         // print_btq();
-        verisimpleV.bpu0.print_bpu;
-        verisimpleV.bpu0.ftq0.print_ftq();
+        // verisimpleV.bpu0.print_bpu;
+        // verisimpleV.bpu0.ftq0.print_ftq();
         // verisimpleV.bpu0.s1.uftb0.print_uftb;
         // print_fetch();
 
         // verisimpleV.fetch0.bpu0.print_udat;
-        // verisimpleV.fetch0.bpu0.gshare0.print_gshare;
+        // verisimpleV.bpu0.s2.gshare0.print_gshare;
         // $display("decode_en_cnt: %d", verisimpleV.decode0.f_in.wen_cnt);
         // $display("true_ghr: %b", verisimpleV.true_ghr);
 
@@ -629,7 +629,7 @@ module testbench;
         // print_bman();
         // print_dispatch();
         // print_execute();
-        // print_dcache();
+        print_dcache();
         // print_retire();
         // $display("  | << CYCLE: %3d (t: %3d)", clock_count-1, $time);
 

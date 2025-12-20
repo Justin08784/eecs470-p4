@@ -344,8 +344,8 @@ module stage_ex_p4 (
     input   rs2execute rs_in,
     output  execute2rs rs_out,
 
-    // input   dcache2ld   dcache_in,
-    // output  ld2dcache   dcache_out,
+    input   dcache2ld   dcache_in,
+    output  ld2dcache   dcache_out,
 
     input   prf2execute prf_in,
     output  execute2prf prf_out,
@@ -474,19 +474,25 @@ module stage_ex_p4 (
         end
 
         for (genvar i = 0; i < NUM_FU_LOD; ++i) begin : gen_lod_sbufs
+            INST tmp_inst;
+            always_comb begin
+                tmp_inst        = '0;
+                tmp_inst.i.imm  = rs_in.fu_dat_lod[i].imm;
+            end
+
             assign iss.i_dat.lod[i] = '{
-                t       : rs_in.fu_dat_lod[i].t,
-                t1      : rs_in.fu_dat_lod[i].t1,
-                opb     : `RV32_signext_Iimm(rs_in.fu_dat_lod[i].inst),
+                t           : rs_in.fu_dat_lod[i].t,
+                t1          : rs_in.fu_dat_lod[i].t1,
+                opb         : `RV32_signext_Iimm(tmp_inst),
 
                 // >> FIXME
-                sq_idx  : '0,
-                lq_idx  : '0,
+                sq_idx      : '0,
+                lq_idx      : '0,
                 // << FIXME
 
-                rob_idx : rs_in.fu_dat_lod[i].rob_idx,
-                mem_size: MEM_SIZE'(rs_in.fu_dat_lod[i].inst.r.funct3[1:0]),
-                rd_unsigned : rs_in.fu_dat_lod[i].inst.r.funct3[2]
+                rob_idx     : rs_in.fu_dat_lod[i].rob_idx,
+                mem_size    : MEM_SIZE'(rs_in.fu_dat_lod[i].funct3[1:0]),
+                rd_unsigned : rs_in.fu_dat_lod[i].funct3[2]
             };
 
             ppln_skid #(
@@ -874,7 +880,6 @@ module stage_ex_p4 (
     assign cdb_req.alu = rs_in.fu_vld_alu;
     // cdb_req.mul set by mul_ex
     // cdb_req.lod set by lod_ex
-    assign cdb_req.lod = '0; // FIXME
     assign cdb_req.str = '0;
     assign cdb_req.bru = rs_in.fu_vld_bru;
     `BY_FU(logic) cdb_gnt;
@@ -917,6 +922,30 @@ module stage_ex_p4 (
         .cdb_gnt(cdb_gnt.mul),
 
         .o_cands(cands.mul)
+    );
+
+    lod_ex lod_ex0 (
+`ifdef DEBUG
+        .print_en   (1'b1),
+`endif
+        .clock      (clock),
+        .reset      (reset),
+        .flush      (flush),
+        .clmsk      (clmsk),
+
+        .i_vld      (regs.o_vld.lod),
+        .i_rdy      (ex.i_rdy.lod),
+        .i_regs     (regs.o_dat.lod),
+        .i_bmask    (regs.o_msk.lod),
+
+        .dcache_in  (dcache_in),
+        .dcache_out (dcache_out),
+
+        .cdb_req    (cdb_req.lod),
+        .ctag_ts    (ctag_ts.lod),
+        .cdb_gnt    (cdb_gnt.lod),
+
+        .o_cands    (cands.lod)
     );
 
     execute2complete_bru cbru_out_n;

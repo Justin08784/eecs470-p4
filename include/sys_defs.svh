@@ -799,8 +799,15 @@ typedef struct packed {
     WADDR           PC;
     INST            inst;
 `endif
-    /* FIXME: stubbed */
-    logic _dummy;
+    BMASK           bmask;
+
+    logic [11:0]    imm;
+    logic [2:0]     funct3;
+
+    PHYS_REG_IDX    t;
+    PHYS_REG_IDX    t1;
+    logic           t1_rdy;
+    ROB_IDX         rob_idx;
 } RS_LOAD_PAYLOAD;
 
 typedef struct packed {
@@ -860,7 +867,7 @@ typedef struct packed {
     RS_ALU_PAYLOAD [NUM_FU_ALU-1:0] fu_dat_alu;
     RS_MUL_PAYLOAD [NUM_FU_MUL-1:0] fu_dat_mul;
     RS_ALU_PAYLOAD [NUM_FU_STR-1:0] fu_dat_str;
-    RS_ALU_PAYLOAD [NUM_FU_LOD-1:0] fu_dat_lod;
+    RS_LOAD_PAYLOAD[NUM_FU_LOD-1:0] fu_dat_lod;
     RS_BRU_PAYLOAD [NUM_FU_BRU-1:0] fu_dat_bru;
 
     BYPASS_TAG [NUM_FU_ALU-1:0] bytag_alu;

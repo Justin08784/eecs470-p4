@@ -1,5 +1,5 @@
 `include "sys_defs.svh"
-// `include "dcache_block_direct.svh"
+`include "dcache_block_direct.svh"
 
 module cpu (
     input  clock,
@@ -9,27 +9,27 @@ module cpu (
     input  mem2fetch mem2f,
 
 // >> TODO: memory stubbed
-//     input  MEM_TAG      mem2proc_transaction_tag, // Memory tag for current transaction
-//     input  MEM_BLOCK    mem2proc_data,            // Data coming back from memory
-//         /*
-//         Q: Why 2 mem blocks when each mem block supplies a double word
-//         i.e. 8 bytes i.e. 2 insns? Isn't this enough to support 2-size fetch?
-//         A (Justin): No, it is not; fetch at a double-word misaligned PC will
-//         straddle double word block boundaries.
+    input  MEM_TAG      mem2proc_transaction_tag, // Memory tag for current transaction
+    input  MEM_BLOCK    mem2proc_data,            // Data coming back from memory
+        /*
+        Q: Why 2 mem blocks when each mem block supplies a double word
+        i.e. 8 bytes i.e. 2 insns? Isn't this enough to support 2-size fetch?
+        A (Justin): No, it is not; fetch at a double-word misaligned PC will
+        straddle double word block boundaries.
 
-//         An address is "double word-aligned" iff its lowest 3 bits are 000.
-//         If PC_reg = 3'b100, the first instruction (PC) is in the *second half* of
-//         mem2proc_data[0], but the next instruction (PC + 4) is in the *first half*
-//         of mem2proc_data[1]. One memory block isn't enough to cover both.
-//         */
-//     input  MEM_TAG      mem2proc_data_tag,        // Tag for which transaction data is for
+        An address is "double word-aligned" iff its lowest 3 bits are 000.
+        If PC_reg = 3'b100, the first instruction (PC) is in the *second half* of
+        mem2proc_data[0], but the next instruction (PC + 4) is in the *first half*
+        of mem2proc_data[1]. One memory block isn't enough to cover both.
+        */
+    input  MEM_TAG      mem2proc_data_tag,        // Tag for which transaction data is for
 
-//     output MEM_COMMAND  proc2mem_command, // Command sent to memory
-//     output ADDR         proc2mem_addr,    // Address sent to memory
-//     output MEM_BLOCK    proc2mem_data,    // Data sent to memory
-//     output MEM_SIZE     proc2mem_size,    // Data size sent to memory
+    output MEM_COMMAND  proc2mem_command, // Command sent to memory
+    output ADDR         proc2mem_addr,    // Address sent to memory
+    output MEM_BLOCK    proc2mem_data,    // Data sent to memory
+    output MEM_SIZE     proc2mem_size,    // Data size sent to memory
 
-//     output DBG_dcache   dbg_dcache,
+    output DBG_dcache   dbg_dcache,
 // << TODO: memory stubbed
     output COMMIT_PKT commit
 );
@@ -51,6 +51,32 @@ module cpu (
     //     dbg_dcache = '0;
     // end
 
+    ld2dcache   ld_2_dcache;
+    dcache2ld   dcache_2_ld;
+    sq2dcache   sq_2_dcache;
+    dcache2sq   dcache_2_sq;
+    assign sq_2_dcache = '0; // FIXME: store queue stubbed
+    dcache_block dcache (
+        .dbg                    (dbg_dcache),
+
+        .clock                  (clock),
+        .reset                  (reset),
+        .flush                  (flush),
+
+        .mem_in_transaction_tag (mem2proc_transaction_tag),
+        .mem_in_data            (mem2proc_data),
+        .mem_in_data_tag        (mem2proc_data_tag),
+
+        .mem_out_command        (proc2mem_command),
+        .mem_out_addr           (proc2mem_addr),
+        .mem_out_data           (proc2mem_data),
+
+        .ld_in                  (ld_2_dcache),
+        .ld_out                 (dcache_2_ld),
+
+        .sq_in                  (sq_2_dcache),
+        .sq_out                 (dcache_2_sq)
+    );
 
     /* >> ==== Branch predictor unit (BPU) ==== >> */
     bpu2fetch   bpu_2_f;
@@ -244,6 +270,9 @@ module cpu (
 
         .rs_in      (rs_2_ex),
         .rs_out     (ex_2_rs),
+
+        .dcache_in  (dcache_2_ld),
+        .dcache_out (ld_2_dcache),
 
         .prf_in     (prf_2_ex),
         .prf_out    (ex_2_prf),
