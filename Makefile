@@ -110,7 +110,8 @@ RUN_VERDI = -gui=verdi -verdi_opts "-ultra"
 VCS_BAD_WARNINGS = +warn=noTFIPC +warn=noDEBUG_DEP +warn=noENUMASSIGN +warn=noLCA_FEATURES_ENABLED
 
 # a reference library of standard structural cells that we link against when synthesizing
-LIB = /afs/umich.edu/class/eecs470/lib/verilog/lec25dscc25.v
+# LIB = /afs/umich.edu/class/eecs470/lib/verilog/lec25dscc25.v
+LIB = /usr/caen/misc/class/eecs470/lib/verilog/lec25dscc25.v
 
 # the EECS 470 synthesis script
 TCL_SCRIPT = synth/470synth.tcl
