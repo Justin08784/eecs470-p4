@@ -155,6 +155,8 @@ module ghr #(
     generate
     assign redir_widx[0] = redir_idx;
     assign redir_widx[1] = redir_idx - 1'b1;
+    PTR     redir_base_n;
+    assign  redir_base_n = redir_idx - redir_wen[1];
 
     assign w_n.en = redir ? redir_wen : wen;
     for (genvar i = 0; i < WPORTS; ++i) begin
@@ -165,7 +167,7 @@ module ghr #(
 
     // ghist slice: mux redir and retire read
     always_comb begin
-        rd_ghist = {hist, hist} >> (redir ? redir_idx : ridx);
+        rd_ghist = {hist, hist} >> (redir ? redir_base_n : ridx);
         if (redir & redir_wen[0]) begin
             rd_ghist[0] &= 0;
 
@@ -257,7 +259,7 @@ module ghr #(
                 continue;
             hist[w.idx[i]] <= w.val[i];
         end
-        base    <= redir ? redir_idx: base_n[wen_cnt];
+        base    <= redir ? redir_base_n : base_n[wen_cnt];
         ghist   <= redir ? rd_ghist : ghist_win[WPORTS +: GHR_LEN];
 
 
