@@ -488,14 +488,15 @@ module dcache_block (
 
     REQR     gnt_reqr;
     always_comb begin
-        gnt_reqr = '0;
+        gnt_reqr= '0;
+        gnt     = '0;
         for (int reqr = 0; reqr < NUM_REQR; ++reqr) begin
-            if (req[reqr])
+            if (req[reqr]) begin
                 gnt_reqr = reqr;
+                gnt[reqr]= 1'b1;
+            end
         end
     end
-    for (genvar reqr = 0; reqr < NUM_REQR; ++reqr)
-        assign gnt[reqr] = reqr == gnt_reqr;
 
     always_comb begin
         rway    = '0;
