@@ -165,20 +165,23 @@ module lod_ex(
     end
 
     /* Lbuf -> CDB shr */
-    logic [LBUF_SZ-1:0] lbuf2cdb_gnt;
+    logic [LBUF_SZ-1:0] lbuf2cdb_arb_req; // request to request for cdb slot
+    logic [LBUF_SZ-1:0] lbuf2cdb_arb_gnt; // grant   to request for cdb slot
+    // cdb_gnt = did the chosen lbuf requestor actually get a cdb slot
+    assign lbuf2cdb_arb_req = lbuf_vld & ~lbuf_kill;
     psel_gen #(
         .WIDTH  (LBUF_SZ),
         .REQS   (1)
-    ) arb_out (
-        .req    (lbuf_vld & ~lbuf_kill),
-        .gnt    (lbuf2cdb_gnt)
+    ) cdb_arb_sel (
+        .req    (lbuf2cdb_arb_req),
+        .gnt    (lbuf2cdb_arb_gnt)
     );
 
-    assign cdb_req = |(lbuf_vld & ~lbuf_kill);
+    assign cdb_req[0] = |lbuf2cdb_arb_req;
     always_comb begin
         ctag_ts = '0;
         for (int i = 0; i < LBUF_SZ; ++i) begin
-            if (lbuf2cdb_gnt[i])
+            if (lbuf2cdb_arb_gnt[i])
                 ctag_ts[0] = lbuf[i].t;
         end
     end
@@ -284,7 +287,7 @@ module lod_ex(
         end
 
         for (int i = 0; i < LBUF_SZ; ++i) begin
-            if (lbuf2cdb_gnt[i] | lbuf_kill[i])
+            if ((lbuf2cdb_arb_gnt[i] & cdb_gnt[0]) | lbuf_kill[i])
                 lbuf_hdr_n[i].vld = 1'b0;
         end
 
@@ -293,11 +296,10 @@ module lod_ex(
     logic       lbuf2cands0_vld;
     BMASK       lbuf2cands0_msk;
     CPL_CAND    lbuf2cands0_dat;
-    assign lbuf2cands0_vld = |lbuf2cdb_gnt & cdb_gnt;
+    assign lbuf2cands0_vld = |lbuf2cdb_arb_gnt & cdb_gnt;
     always_comb begin
         lbuf2cands0_msk     = '0;
         lbuf2cands0_dat     = '0;
-        // lbuf2cands0_dat.vld = |lbuf2cdb_gnt & cdb_gnt; // NOTE: ignored
 
         for (int i = 0; i < LBUF_SZ; ++i) begin
             LOAD_BUFFER_ENTRY   tmp;
@@ -319,7 +321,7 @@ module lod_ex(
             default: blk.word_level = tmp.raw.word_level;
             endcase
 
-            if (lbuf2cdb_gnt[i] && cdb_gnt) begin
+            if (lbuf2cdb_arb_gnt[i] && cdb_gnt) begin
                 lbuf2cands0_dat.t       = tmp.t;
                 lbuf2cands0_dat.rob_idx = tmp.rob_idx;
                 lbuf2cands0_dat.data    = blk;
@@ -394,10 +396,10 @@ module lod_ex(
         if (!reset && print_en) begin
             $display("\n[%0t] <<< lod_ex DEBUG >>>", $time);
             $display("  flush: %b", flush);
-            $display("  bay_gnt  = %b | i_vld = %b | i_rdy = %b", bay_gnt, i_vld, i_rdy);
+            $display("  i_vld = %b | i_rdy = %b", i_vld, i_rdy);
             $display("  dispatch_en_bay  = %b", dispatch_en_bay2buf);
             $display("  cdb_req = %b | cdb_gnt = %b", cdb_req, cdb_gnt);
-            $display("  lbuf2cdb_gnt= %b", lbuf2cdb_gnt);
+            $display("  lbuf2cdb_arb_gnt= %b", lbuf2cdb_arb_gnt);
             $display("  ctag_ts     = %2d", ctag_ts);
 
             $display("  -- BAY STATE --");
@@ -419,15 +421,9 @@ module lod_ex(
                 );
             end
 
-            $display("dcache_out: qry_req: %b, bay_need: %b, prv_qry=%1d, qry=%1d",
-                qry_req,
+            $display("dcache_out: bay[0].addr=0x%h, bay_need: %b, {vld=%b, addr=%x}",
+                bay[0].addr,
                 bay_need,
-                prv_qry,
-                qry
-            );
-
-            $display("dcache_out: qry=%1d {vld=%b, addr=%x}",
-                qry,
                 dcache_out.vld,
                 dcache_out.addr
             );
@@ -469,6 +465,7 @@ module lod_ex(
                     lbuf[i].raw
                 );
             end
+            $display("lbuf_vld: %b, lbuf_kill: %b, lbuf2cdb_arb_gnt: %b", lbuf_vld, lbuf_kill, lbuf2cdb_arb_gnt);
 
             $display("  -- COMPLETION (CDB OUT) --");
             $display("t=%2d, rob_idx=%2d, data=%x",
@@ -678,8 +675,8 @@ module lod_ex(
     //             bays.st_frwd_byte_mask[i] <= next_st_frwd_byte_mask[i];
     //         end
 
-    //         foreach (lbuf2cdb_gnt[i]) begin
-    //             if (!(lbuf2cdb_gnt[i] && cdb_gnt))
+    //         foreach (lbuf2cdb_arb_gnt[i]) begin
+    //             if (!(lbuf2cdb_arb_gnt[i] && cdb_gnt))
     //                 continue;
     //             bays.vld     [i] <= 0;
     //             bays.got     [i] <= 0;
