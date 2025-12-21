@@ -169,7 +169,6 @@ function automatic CACHE_LOC cache_locate(
         if (hdr.vld[sid][w] && (tag == hdr.tag[sid][w])) begin
             hit = 1;
             way = w;
-            break;
         end
     end
 

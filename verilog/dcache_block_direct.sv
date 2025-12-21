@@ -365,12 +365,9 @@ module refill_engine (
                 mem_out_command = mshr.wr_mem ? MEM_STORE : MEM_LOAD;
             end
 
-            if          (mshr.wr_mem  && mem_in_transaction_tag != 0) begin
+            if (mem_in_transaction_tag != 0) begin
                 mshr_n.miss_tag = mem_in_transaction_tag;
-                mshr_n.status   = S_IDLE;
-            end else if (!mshr.wr_mem && mem_in_transaction_tag != 0) begin
-                mshr_n.miss_tag = mem_in_transaction_tag;
-                mshr_n.status   = S_WAIT;
+                mshr_n.status   = mshr.wr_mem ? S_IDLE : S_WAIT;
             end
         end
 

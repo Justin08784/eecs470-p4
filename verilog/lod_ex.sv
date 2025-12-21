@@ -50,7 +50,6 @@ module lod_ex(
     /* BACKEND */
     output CPL_CAND                     o_cands
 );
-    localparam BAY_SZ   = 4;
     localparam LBUF_SZ  = 4;
 
     typedef struct packed {
@@ -74,13 +73,13 @@ module lod_ex(
     struct packed {
         logic   vld;
         BMASK   msk;
-    } [BAY_SZ-1:0] bay_hdr, bay_hdr_n;
-    QUERY_BAY_ENTRY [BAY_SZ-1:0] bay, bay_n;
-    logic           [BAY_SZ-1:0] bay_vld;
-    logic           [BAY_SZ-1:0] bay_need;
-    logic           [BAY_SZ-1:0] bay_kill;
+    } [NUM_FU_LOD-1:0] bay_hdr, bay_hdr_n;
+    QUERY_BAY_ENTRY [NUM_FU_LOD-1:0] bay, bay_n;
+    logic           [NUM_FU_LOD-1:0] bay_vld;
+    logic           [NUM_FU_LOD-1:0] bay_need;
+    logic           [NUM_FU_LOD-1:0] bay_kill;
 
-    for (genvar i = 0; i < BAY_SZ; ++i) begin
+    for (genvar i = 0; i < NUM_FU_LOD; ++i) begin
         assign bay_vld[i]   = bay_hdr[i].vld;
         assign bay_need[i]  = |(bay[i].need_byte_mask);
         assign bay_kill[i]  = flush & |(bay_hdr[i].msk & clmsk);
@@ -111,45 +110,38 @@ module lod_ex(
     end
 
     /* In -> Bay */
-    logic [BAY_SZ-1:0] bay_gnt;
-    psel_gen #(
-        .WIDTH(BAY_SZ),
-        .REQS(1)
-    ) arb_in (
-        .req    (~bay_vld | bay_kill),
-        .gnt    (bay_gnt)
-    );
-
     typedef union packed {
         logic [3:0]      byte_level;
         logic [1:0][1:0] half_level;
     } DATA_BYTE_MASK;
 
-    ADDR            i_addr;
-    DATA_BYTE_MASK  i_byte_mask;
+    ADDR            [NUM_FU_LOD-1:0] i_addr;
+    DATA_BYTE_MASK  [NUM_FU_LOD-1:0] i_byte_mask;
 
-    assign i_rdy    = |bay_gnt;
-    assign i_addr   = i_regs[0].rs1 + i_regs[0].dat.opb; // load address computation
-    always_comb begin
-        i_byte_mask = '0;
-        case (i_regs[0].dat.mem_size)
-        BYTE: i_byte_mask[i_addr[1:0]]  = '1;
-        HALF: i_byte_mask[i_addr[1]]    = '1;
-        WORD: i_byte_mask               = '1;
-        endcase
+    assign i_rdy    = ~bay_vld | bay_kill;
+    for (genvar i = 0; i < NUM_FU_LOD; ++i) begin
+        assign i_addr[i] = i_regs[i].rs1 + i_regs[i].dat.opb; // load address computation
+        always_comb begin
+            i_byte_mask[i] = '0;
+            case (i_regs[i].dat.mem_size)
+            BYTE: i_byte_mask[i][i_addr[i][1:0]]= '1;
+            HALF: i_byte_mask[i][i_addr[i][1]]  = '1;
+            WORD: i_byte_mask[i]                = '1;
+            endcase
+        end
     end
 
     /* Bay -> Lbuf ("dispatch") */
     // FIXME: Change lbuf to a compressible ring buffer to avoid crossbar
-    logic [BAY_SZ-1:0]  dispatch_vld_req, dispatch_vld_gnt;
+    logic [NUM_FU_LOD-1:0]  dispatch_vld_req, dispatch_vld_gnt;
     logic [LBUF_SZ-1:0] dispatch_rdy_req, dispatch_rdy_gnt;
     logic dispatch_en;
-    logic [BAY_SZ-1:0][LBUF_SZ-1:0] dispatch_en_bay2buf;
+    logic [NUM_FU_LOD-1:0][LBUF_SZ-1:0] dispatch_en_bay2buf;
 
     assign dispatch_vld_req = (bay_vld & ~bay_kill) & ~bay_need;
     assign dispatch_rdy_req = ~lbuf_vld | lbuf_kill; // TODO: also reflect same-cycle frees due to "to-issue" (i.e. got CDB reservation)
     psel_gen #(
-        .WIDTH  (BAY_SZ),
+        .WIDTH  (NUM_FU_LOD),
         .REQS   (1)
     ) dispatch_vld_sel (
         .req    (dispatch_vld_req),
@@ -165,7 +157,7 @@ module lod_ex(
     );
 
     assign dispatch_en = |dispatch_vld_gnt && |dispatch_rdy_gnt;
-    for (genvar i = 0; i < BAY_SZ; ++i) begin
+    for (genvar i = 0; i < NUM_FU_LOD; ++i) begin
         for (genvar j = 0; j < LBUF_SZ; ++j) begin
             assign dispatch_en_bay2buf[i][j] = dispatch_vld_gnt[i] & dispatch_rdy_gnt[j];
         end
@@ -191,36 +183,11 @@ module lod_ex(
     end
 
 
-    /* Dcache query selection */
-    logic [BAY_SZ-1:0] qry_req, qry_gnt;
-    `IDX_TYPE(BAY_SZ) prv_qry, nex_qry, qry;
-
-    assign qry_req = (bay_vld & ~bay_kill) & bay_need;
-    psel_gen #(
-        .WIDTH  (BAY_SZ),
-        .REQS   (1)
-    ) qry_sel (
-        .req    (qry_req),
-        .gnt    (qry_gnt)
-    );
-
-    always_comb begin
-        nex_qry = 0;
-        foreach (qry_gnt[i]) begin
-            if (qry_gnt[i])
-                nex_qry = i;
-        end
-    end
-    assign qry = qry_req[prv_qry] ? prv_qry : nex_qry;
-
     /* Query + forward handling */
-    QUERY_BAY_ENTRY qry_entry;
-
     // only let the query ask dcache... *1*
-    assign qry_entry    = bay[qry];
     assign dcache_out   = '{
-        vld     : qry_req[qry],
-        addr    : qry_entry.addr
+        vld     : bay_vld[0] & ~bay_kill[0] & bay_need[0],
+        addr    : bay[0].addr
     };
 
     always_comb begin
@@ -238,11 +205,11 @@ module lod_ex(
         bay_n       = bay;
         // merge dcache result
         if (dcache_in.status == LD_SUCC) begin
-            bay_n[qry].need_byte_mask &= '0;
-            bay_n[qry].raw            = dcache_in.dat.word_level[qry_entry.addr[2]];
+            bay_n[0].need_byte_mask &= '0;
+            bay_n[0].raw            = dcache_in.dat.word_level[bay[0].addr[2]];
         end
 
-        for (int i = 0; i < BAY_SZ; ++i) begin
+        for (int i = 0; i < NUM_FU_LOD; ++i) begin
             // if (qry_req[i]) begin
             //     // merge store forwards
 
@@ -255,26 +222,24 @@ module lod_ex(
             //     continue;
             // end
 
-            if (bay_gnt[i] && i_vld) begin
+            if (i_vld[i] & i_rdy[i]) begin
                 // i_regs->bay logic
                 bay_hdr_n[i] = '{
                     vld : 1'b1,
-                    msk : i_bmask[0]
+                    msk : i_bmask[i]
                 };
 
                 bay_n[i] = '{
-                    t               : i_regs[0].dat.t,
-                    rob_idx         : i_regs[0].dat.rob_idx,
-                    rd_unsigned     : i_regs[0].dat.rd_unsigned,
-                    addr            : i_addr,
-                    mem_size        : i_regs[0].dat.mem_size,
+                    t               : i_regs[i].dat.t,
+                    rob_idx         : i_regs[i].dat.rob_idx,
+                    rd_unsigned     : i_regs[i].dat.rd_unsigned,
+                    addr            : i_addr[i],
+                    mem_size        : i_regs[i].dat.mem_size,
                     raw             : '0,
                     // sq_idx          : i_regs[0].dat.sq_idx,
-                    need_byte_mask  : i_byte_mask
+                    need_byte_mask  : i_byte_mask[i]
                 };
-            end
-
-            if (|dispatch_en_bay2buf[i] | bay_kill[i]) begin
+            end else if (|dispatch_en_bay2buf[i] | bay_kill[i]) begin
                 // bay->lbuf logic
                 bay_hdr_n[i].vld = 1'b0;
             end
@@ -412,14 +377,12 @@ module lod_ex(
     };
 
     always_ff @(posedge clock) begin
-        prv_qry     <= (bay_vld[qry] & ~bay_kill[qry]) & bay_need[qry] ? qry : prv_qry;
         bay_hdr     <= bay_hdr_n;
         bay         <= bay_n;
         lbuf_hdr    <= lbuf_hdr_n;
         lbuf        <= lbuf_n;
 
         if (reset) begin
-            prv_qry <= '0;
             bay_hdr <= '0;
             lbuf_hdr<= '0;
         end
@@ -437,7 +400,7 @@ module lod_ex(
             $display("  ctag_ts     = %2d", ctag_ts);
 
             $display("  -- BAY STATE --");
-            for (int i = 0; i < BAY_SZ; ++i) begin
+            for (int i = 0; i < NUM_FU_LOD; ++i) begin
                 if (!bay_hdr[i].vld) begin
                     $display("bay[%2d]: ", i);
                     continue;
@@ -473,7 +436,7 @@ module lod_ex(
                 dcache_in.dat,
             );
 
-            // for (int i = 0; i < BAY_SZ; ++i) begin
+            // for (int i = 0; i < NUM_FU_LOD; ++i) begin
             //     $display("sq_in[%1d]: qry_req=%b, byte_en=%b, raw=%x",
             //         i,
             //         qry_req[i],
@@ -483,7 +446,7 @@ module lod_ex(
             // end
 
 
-            for (int i = 0; i < BAY_SZ; ++i)
+            for (int i = 0; i < NUM_FU_LOD; ++i)
                 $display("dispatch_en_bay2buf[%1d]: %b", i, dispatch_en_bay2buf[i]);
             $display("dispatch_vld_req: %b", dispatch_vld_req);
             $display("dispatch_rdy_req: %b", dispatch_vld_req);

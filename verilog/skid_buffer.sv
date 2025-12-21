@@ -128,12 +128,19 @@ module ppln_skid #(
         SKID
     },
     parameter int FLUSH_MODE=SKID_FLUSH_MASK,
-    parameter int unsigned WIDTH
+    parameter int unsigned WIDTH,
+    parameter logic ENABLE_SNOOP = `FALSE
 ) (
     input   clock, 
     input   reset,
     input   flush,
     BMASK   clmsk, // kill mask iff flush high
+
+    // >> snoop only
+    input   logic   [WIDTH-1:0] i_snoop_tmp,
+    input   logic   [WIDTH-1:0] i_snoop_dat,
+    output  logic   [WIDTH-1:0] o_tmp, // intermediate buffer
+    // << snoop only
 
     input   logic   i_vld, // MUST incorporate current cycle flush kill status
     output  logic   i_rdy,
@@ -170,6 +177,7 @@ module ppln_skid #(
     end
 
     assign i_rdy = rdy;
+    assign o_tmp = ENABLE_SNOOP ? tmp : 'x;
     assign o_vld = vld && !dat_kill;
     assign o_msk = dat_msk & ~clmsk;
     assign o_dat = dat;
@@ -197,6 +205,7 @@ module ppln_skid #(
                     end
 
                     dat_msk <= dat_msk & ~clmsk;
+                    dat     <= ENABLE_SNOOP ? i_snoop_dat : dat;
 
                     tmp     <= i_dat;
                     tmp_msk <= i_msk;
@@ -209,7 +218,7 @@ module ppln_skid #(
                     rdy     <= 1;
 
                     vld     <= !tmp_kill;
-                    dat     <= tmp;
+                    dat     <= ENABLE_SNOOP ? i_snoop_tmp : tmp;
                     dat_msk <= tmp_msk & ~clmsk;
                 end else begin
                     if (tmp_kill) begin
@@ -220,6 +229,8 @@ module ppln_skid #(
 
                     dat_msk <= dat_msk & ~clmsk;
                     tmp_msk <= tmp_msk & ~clmsk;
+                    dat     <= ENABLE_SNOOP ? i_snoop_dat : dat;
+                    tmp     <= ENABLE_SNOOP ? i_snoop_tmp : tmp;
                 end
             end
             endcase

@@ -784,8 +784,8 @@ module stage_ex_p4 (
         end
 
         for (genvar i = 0; i < NUM_FU_LOD; ++i) begin : gen_lod_rbufs
-            LOD_REGS raw;
-            skid #(
+            LOD_REGS raw_tmp, raw_dat;
+            ppln_skid #(
                 .ENABLE_SNOOP(`TRUE),
                 .WIDTH($bits(LOD_REGS))
             ) rbuf_lod (
@@ -794,7 +794,9 @@ module stage_ex_p4 (
                 .flush (flush),
                 .clmsk,
 
-                .i_snoop(regs.o_dat.lod[i]),
+                .i_snoop_tmp(lod_snoop(raw_tmp, cdat_out)),
+                .i_snoop_dat(regs.o_dat.lod[i]),
+                .o_tmp      (raw_tmp),
 
                 .i_vld (iss.o_vld.lod[i]),
                 .i_rdy (regs.i_rdy.lod[i]),
@@ -804,9 +806,9 @@ module stage_ex_p4 (
                 .o_vld (regs.o_vld.lod[i]),
                 .o_rdy (ex.i_rdy.lod[i]),
                 .o_msk (regs.o_msk.lod[i]),
-                .o_dat (raw)
+                .o_dat (raw_dat)
             );
-            assign regs.o_dat.lod[i] = lod_snoop(raw, cdat_out);
+            assign regs.o_dat.lod[i] = lod_snoop(raw_dat, cdat_out);
         end
 
         for (genvar i = 0; i < NUM_FU_STR; ++i) begin : gen_str_rbufs
