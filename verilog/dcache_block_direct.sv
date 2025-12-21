@@ -349,7 +349,7 @@ module refill_engine (
                 mshr_n = '{
                     status   : S_NTAG,
                     wr_mem   : snd_in.wr_mem,
-                    miss_tag : '0,
+                    mem_tag  : '0,
                     addr     : snd_in.addr,
                     mem_data : snd_in.mem_data,
                     mem_size : snd_in.mem_size
@@ -359,21 +359,21 @@ module refill_engine (
         end
 
         S_NTAG: begin
-            if (mshr.miss_tag == 0) begin
+            if (mshr.mem_tag == 0) begin
                 mem_out_addr    = dw_align(mshr.addr);
                 mem_out_data    = mshr.mem_data;
                 mem_out_command = mshr.wr_mem ? MEM_STORE : MEM_LOAD;
             end
 
             if (mem_in_transaction_tag != 0) begin
-                mshr_n.miss_tag = mem_in_transaction_tag;
+                mshr_n.mem_tag  = mem_in_transaction_tag;
                 mshr_n.status   = mshr.wr_mem ? S_IDLE : S_WAIT;
             end
         end
 
         S_WAIT: begin
             if (mem_in_data_tag != 0
-            &&  mem_in_data_tag == mshr.miss_tag) begin
+            &&  mem_in_data_tag == mshr.mem_tag) begin
                 mshr_n.status   = S_FILL;
                 mshr_n.mem_data = mem_in_data;
             end
@@ -385,7 +385,7 @@ module refill_engine (
                 mshr_n = '{
                     status   : S_NTAG,
                     wr_mem   : snd_in.wr_mem,
-                    miss_tag : '0,
+                    mem_tag  : '0,
                     addr     : snd_in.addr,
                     mem_data : snd_in.mem_data,
                     mem_size : snd_in.mem_size
@@ -404,9 +404,9 @@ module refill_engine (
     always_ff @(posedge clock) begin
         if (reset) begin
             mshr <= '0;
-        end else if (flush && !mshr.wr_mem && mshr.miss_tag == 0) begin
+        end else if (flush && !mshr.wr_mem && mshr.mem_tag == 0) begin
             /* FIXME: This seems rather hacky. During flush, clear a load request if it
-            has not allocated miss_tag. This prevents the potentially spurious
+            has not allocated mem_tag. This prevents the potentially spurious
             requests of ooo loads (e.g. oob addresses) from persisting in the dcache--
             dcache would get stuck requesting the bad address continuously. */
             mshr <= '0;
@@ -667,10 +667,10 @@ module dcache_block (
 
         $display("");
         $display("mshr: {");
-        $display("  status: %s\n  wr_mem: %b\n  miss_tag: %2d\n  addr: 0x%x\n  mem_data: 0x%x\n  mem_size: %s",
+        $display("  status: %s\n  wr_mem: %b\n  mem_tag: %2d\n  addr: 0x%x\n  mem_data: 0x%x\n  mem_size: %s",
             dbg_mshr_status(mshr.status),
             mshr.wr_mem,
-            mshr.miss_tag,
+            mshr.mem_tag,
             mshr.addr,
             mshr.mem_data,
             dbg_mem_size(mshr.mem_size)
@@ -678,6 +678,8 @@ module dcache_block (
         $display("}");
 
         $display("");
+        $display("gnt: %b", gnt);
+        $display("dirty: %b\n", hdr.dirty);
         for (int s = 0; s < NUM_SETS; ++s) begin
             $display("set[%2d]:", s);
             for (int w = 0; w < ASSOC; ++w) begin
@@ -685,9 +687,8 @@ module dcache_block (
                     $display("  blk[%1d]: ", w);
                     continue;
                 end
-                $display("  blk[%1d]: {vld: %b, dirty: %b, tag: 0x%x} data: %x, (addr: 0x%x)",
+                $display("  blk[%1d]: {dirty: %b, tag: 0x%x} data: %x, (addr: 0x%x)",
                     w,
-                    hdr.vld     [s][w],
                     hdr.dirty   [s][w],
                     hdr.tag     [s][w],
                     dbg_memDP   [s][w],
