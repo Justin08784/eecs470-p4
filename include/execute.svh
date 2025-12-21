@@ -4,10 +4,9 @@
 `include "sys_defs.svh"
 
 typedef struct packed {
-    logic vld;
-    PHYS_REG_IDX t;
-    ROB_IDX rob_idx;
-    DATA data;
+    PHYS_REG_IDX    t;
+    ROB_IDX         rob_idx;
+    DATA            data;
 } CPL_CAND;
 
 /* Slices (or "views") of ID_RENAME_PKT needed for each FU type */

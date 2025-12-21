@@ -69,9 +69,11 @@ module alu_ex(
         // insn metadata/operands
 
     /* BACKEND */
+    output logic    [NUM_FU_ALU-1:0]    o_cands_vld,
     output CPL_CAND [NUM_FU_ALU-1:0]    o_cands
 );
     // execute
+    assign o_cands_vld = i_vld;
     generate
         DATA        [NUM_FU_ALU-1:0] tmp_res;
         for (genvar i = 0; i < NUM_FU_ALU; ++i) begin : gen_alus
@@ -86,7 +88,6 @@ module alu_ex(
             );
 
             assign o_cands[i] = '{
-                vld     : i_vld[i],
                 t       : i_regs[i].t,
                 rob_idx : i_regs[i].rob_idx,
                 data    : tmp_res[i]
@@ -116,12 +117,12 @@ module mul_ex(
     input  logic [NUM_FU_MUL-1:0]     cdb_gnt,
 
     /* BACKEND */
+    output logic    [NUM_FU_MUL-1:0]  o_cands_vld,
     output CPL_CAND [NUM_FU_MUL-1:0]  o_cands
 );
     // execute
     generate
         DATA        [NUM_FU_MUL-1:0] tmp_res;
-        logic       [NUM_FU_MUL-1:0] tmp_vld;
         PHYS_REG_IDX[NUM_FU_MUL-1:0] tmp_t;
         ROB_IDX     [NUM_FU_MUL-1:0] tmp_rob_idx;
 
@@ -148,14 +149,13 @@ module mul_ex(
                 .cdb_gnt(cdb_gnt[i]),
 
                 // Output (directly to cdat_out)
-                .o_vld  (tmp_vld[i]),
+                .o_vld  (o_cands_vld[i]),
                 .o_t    (tmp_t[i]),
                 .o_rob_idx(tmp_rob_idx[i]),
                 .result (tmp_res[i])
             );
 
             assign o_cands[i] = '{
-                vld     : tmp_vld[i],
                 t       : tmp_t[i],
                 rob_idx : tmp_rob_idx[i],
                 data    : tmp_res[i]
@@ -200,6 +200,7 @@ module bru_ex(
 
     /* BACKEND */
     output execute2complete_bru cbru_out,
+    output logic                o_cand_vld,
     output CPL_CAND             o_cand
 );
     initial begin
@@ -243,8 +244,8 @@ module bru_ex(
 
     assign tmp_take = !i_reg.cond_branch || cond_take;
 
+    assign o_cand_vld = i_vld;
     assign o_cand = '{
-        vld     : i_vld,
         t       : i_reg.t,
         rob_idx : i_reg.rob_idx,
         data    : tmp_take ? npc_addr : tmp_res
@@ -866,10 +867,14 @@ module stage_ex_p4 (
     // If 1-cycle operation (e.g. ALU), this is before issue staging.
     // Else if a longer-latency insn, this is in the middle of execution.
 
-    `BY_FU(CPL_CAND) cands;
-    assign cands.str = '0; // alu, mul, lod set by respective *_ex's
+    `BY_FU(logic)   cands_vld;
+    `BY_FU(CPL_CAND)cands;
+    logic [NUM_FU_TOTAL-1:0]    cands_flat_vldv;
     CPL_CAND [NUM_FU_TOTAL-1:0] cands_flat;
-    assign cands_flat = cands;
+    assign cands_vld.str    = '0;
+    assign cands.str        = '0; // alu, mul, lod set by respective *_ex's
+    assign cands_flat_vldv  = cands_vld;
+    assign cands_flat       = cands;
 
     /*
     Complete grant bus shift register
@@ -899,10 +904,11 @@ module stage_ex_p4 (
     // Includes operand decode/CDB bypass just before 1st cycle of execution.
 
     alu_ex alu_ex0 (
-        .i_vld  (regs.o_vld.alu),
-        .i_regs (regs.o_dat.alu),
+        .i_vld      (regs.o_vld.alu),
+        .i_regs     (regs.o_dat.alu),
 
-        .o_cands(cands.alu)
+        .o_cands_vld(cands_vld.alu),
+        .o_cands    (cands.alu)
     );
 
     `BY_FU(PHYS_REG_IDX) ctag_ts; // FIXME: do we need selective flush this?
@@ -914,16 +920,17 @@ module stage_ex_p4 (
         .flush,
         .clmsk,
 
-        .i_vld  (regs.o_vld.mul),
-        .i_bmask(regs.o_msk.mul),
-        .i_regs (regs.o_dat.mul),
-        .i_rdy  (ex.i_rdy.mul),
+        .i_vld      (regs.o_vld.mul),
+        .i_bmask    (regs.o_msk.mul),
+        .i_regs     (regs.o_dat.mul),
+        .i_rdy      (ex.i_rdy.mul),
 
-        .cdb_req(cdb_req.mul),
-        .ctag_ts(ctag_ts.mul),
-        .cdb_gnt(cdb_gnt.mul),
+        .cdb_req    (cdb_req.mul),
+        .ctag_ts    (ctag_ts.mul),
+        .cdb_gnt    (cdb_gnt.mul),
 
-        .o_cands(cands.mul)
+        .o_cands_vld(cands_vld.mul),
+        .o_cands    (cands.mul)
     );
 
     lod_ex lod_ex0 (
@@ -947,17 +954,19 @@ module stage_ex_p4 (
         .ctag_ts    (ctag_ts.lod),
         .cdb_gnt    (cdb_gnt.lod),
 
+        .o_cands_vld(cands_vld.lod),
         .o_cands    (cands.lod)
     );
 
     execute2complete_bru cbru_out_n;
     bru_ex bru_ex0 (
-        .i_vld  (regs.o_vld.bru),
-        .i_reg  (regs.o_dat.bru),
-        .btq_in (btq_in),
+        .i_vld      (regs.o_vld.bru),
+        .i_reg      (regs.o_dat.bru),
+        .btq_in     (btq_in),
 
         .cbru_out   (cbru_out_n),
-        .o_cand (cands.bru)
+        .o_cand_vld (cands_vld.bru),
+        .o_cand     (cands.bru)
     );
 
     /* >> ======== STAGE 4/?: CDB data/tag broadcast ======== >> */
@@ -981,10 +990,6 @@ module stage_ex_p4 (
         assign ctag_ts.alu[i] = rs_in.fu_dat_alu[i].t;
     for (genvar i = 0; i < NUM_FU_BRU; ++i)
         assign ctag_ts.bru[i] = rs_in.fu_dat_bru[i].t;
-    
-    logic [NUM_FU_TOTAL-1:0] cands_flat_vldv;
-    for (genvar f = 0; f < NUM_FU_TOTAL; ++f)
-        assign cands_flat_vldv[f] = cands_flat[f].vld;
 
     logic [N-1:0][NUM_FU_TOTAL-1:0] cdb2fu_tag_sel, cdb2fu_dat_sel;
     assign cdb2fu_tag_sel = cdb2fu_gbus;

@@ -48,6 +48,7 @@ module lod_ex(
     input  logic [NUM_FU_LOD-1:0]       cdb_gnt,
 
     /* BACKEND */
+    output logic                        o_cands_vld,
     output CPL_CAND                     o_cands
 );
     localparam LBUF_SZ  = 4;
@@ -369,8 +370,8 @@ module lod_ex(
         .o_dat  (cands1_dat)
     );
 
+    assign o_cands_vld = cands1_vld;
     assign o_cands = '{
-        vld     : cands1_vld,
         t       : cands1_dat.t,
         rob_idx : cands1_dat.rob_idx,
         data    : cands1_dat.data
