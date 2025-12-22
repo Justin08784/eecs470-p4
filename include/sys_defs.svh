@@ -118,7 +118,7 @@ parameter NUM_FU_STR    = 1;
 parameter NUM_FU_BRU    = 1;
 parameter NUM_FU_TOTAL  = NUM_FU_ALU + NUM_FU_MUL + NUM_FU_LOD + NUM_FU_STR + NUM_FU_BRU;
     // per-FU config
-parameter LD_BAY_SZ     = 2; // number of load bays in load FU
+parameter LBUF_SZ       = 4;
 parameter MUL_STAGES    = 16;// number of mult stages (2, 4) (you likely don't need 8)
     // Justin: funny enough we need at least 8 or else multiply is on critical path
 
@@ -145,6 +145,8 @@ typedef `IDX_TYPE(BTQ_SZ) BTQ_IDX;
 typedef `IDX_TYPE(ROB_SZ) ROB_IDX;
 typedef `IDX_TYPE(LSQ_SZ) LSQ_IDX;
 typedef `IDX_TYPE(GHR_BUF_SZ) GHR_IDX;
+
+typedef `IDX_TYPE(LBUF_SZ) LBUF_IDX;
 
 // superscalar-width convenience types
 typedef `CNT_TYPE(N) N_CNT;

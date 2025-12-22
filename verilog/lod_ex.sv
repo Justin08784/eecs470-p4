@@ -127,15 +127,14 @@ module lod_ex(
 
     /* Bay -> Lbuf ("dispatch") */
     // FIXME: Change lbuf to a compressible ring buffer to avoid crossbar
-    logic dispatch_vld;
+    logic dcache_hit;
     logic [LBUF_SZ-1:0] dispatch_rdy_req, dispatch_rdy_gnt;
-    logic dispatch_en_any;
-    logic [LBUF_SZ-1:0] dispatch_en;
+    LBUF_IDX dispatch_rdy_idx;
+    logic dispatch_en;
+    logic [LBUF_SZ-1:0] dispatch_lbuf_en;
 
-    assign dispatch_vld     = (bay_vld & ~bay_kill) & ~bay_need;
-    assign dispatch_rdy_req = ~lbuf_vld | lbuf_kill; // TODO: also reflect same-cycle frees due to "to-issue" (i.e. got CDB reservation)
-    assign dispatch_en_any  = dispatch_vld & |dispatch_rdy_req;
-    assign dispatch_en      = {LBUF_SZ{dispatch_vld}} & dispatch_rdy_gnt;
+    assign dcache_hit = (dcache_in.status == LD_SUCC);  // TODO: Can change in the future, where an MSHR-allocate on a miss shall still be considered "success".
+    assign dispatch_rdy_req = ~(lbuf_vld & ~lbuf_kill); // TODO: also reflect same-cycle frees due to "to-issue" (i.e. got CDB reservation)
     psel_gen #(
         .WIDTH  (LBUF_SZ),
         .REQS   (1)
@@ -143,6 +142,18 @@ module lod_ex(
         .req    (dispatch_rdy_req),
         .gnt_bus(dispatch_rdy_gnt)
     );
+    always_comb begin
+        dispatch_rdy_idx    = '0;
+        for (int i = 0; i < LBUF_SZ; ++i) begin
+            if (dispatch_rdy_gnt[i])
+                dispatch_rdy_idx = i;
+        end
+    end
+    assign dispatch_en      =
+        (bay_vld & ~bay_kill)
+    &   (~bay_need | dcache_hit)
+    &   |dispatch_rdy_req;
+    assign dispatch_lbuf_en = {LBUF_SZ{(bay_vld & ~bay_kill) & (~bay_need | dcache_hit)}} & dispatch_rdy_gnt;
 
     /* Lbuf -> CDB shr */
     logic [LBUF_SZ-1:0] lbuf2cdb_arb_req; // request to request for cdb slot
@@ -170,8 +181,11 @@ module lod_ex(
     /* Query + forward handling */
     // only let the query ask dcache... *1*
     assign dcache_out = '{
-        vld : bay_vld & ~bay_kill & bay_need,
-        addr: bay.addr
+        vld         : (bay_vld & ~bay_kill) & bay_need,
+        lbuf_idx    : dispatch_rdy_idx,
+        addr        : bay.addr,
+
+        dispatch_rdy: |dispatch_rdy_req
     };
 
     always_comb begin
@@ -188,10 +202,10 @@ module lod_ex(
         bay_hdr_n   = bay_hdr;
         bay_n       = bay;
         // merge dcache result
-        if (dcache_in.status == LD_SUCC) begin
-            bay_n.need_byte_mask&= '0;
-            bay_n.raw           = dcache_in.dat.word_level[bay.addr[2]];
-        end
+        // if (dcache_in.status == LD_SUCC) begin
+        //     bay_n.need_byte_mask&= '0;
+        //     bay_n.raw           = dcache_in.dat.word_level[bay.addr[2]];
+        // end
 
         // if (qry_req[i]) begin
         //     // merge store forwards
@@ -222,7 +236,7 @@ module lod_ex(
                 // sq_idx          : i_regs[0].dat.sq_idx,
                 need_byte_mask  : i_byte_mask
             };
-        end else if (dispatch_en_any | bay_kill) begin
+        end else if (dispatch_en | bay_kill) begin
             // bay->lbuf logic
             bay_hdr_n.vld = 1'b0;
         end
@@ -233,8 +247,11 @@ module lod_ex(
         lbuf_hdr_n  = lbuf_hdr;
         lbuf_n      = lbuf;
 
+        if (dcache_in.ldb.en)
+            lbuf_n[dcache_in.ldb.lbuf_idx].raw = dcache_in.ldb.dat;
+
         for (int i = 0; i < LBUF_SZ; ++i) begin
-            if (dispatch_en[i]) begin
+            if (dispatch_lbuf_en[i]) begin
                 logic [1:0] iw_off;
 
                 iw_off = 0;
@@ -371,7 +388,7 @@ module lod_ex(
             $display("\n[%0t] <<< lod_ex DEBUG >>>", $time);
             $display("  flush: %b", flush);
             $display("  i_vld = %b | i_rdy = %b", i_vld, i_rdy);
-            $display("  dispatch_en_bay  = %b", dispatch_en_bay2buf);
+            $display("  dispatch_lbuf_en   = %b", dispatch_lbuf_en);
             $display("  cdb_req = %b | cdb_gnt = %b", cdb_req, cdb_gnt);
             $display("  lbuf2cdb_arb_gnt= %b", lbuf2cdb_arb_gnt);
             $display("  ctag_ts     = %2d", ctag_ts);
@@ -408,16 +425,17 @@ module lod_ex(
                     bay.raw
                 );
 
-            $display("dcache_out: bay.addr=0x%h, bay_need: %b, {vld=%b, addr=%x}",
-                bay.addr,
-                bay_need,
+            $display("dcache_out: vld: %b, lbuf_idx: %1d, addr: 0x%x, dispatch_rdy: %b",
                 dcache_out.vld,
-                dcache_out.addr
+                dcache_out.lbuf_idx,
+                dcache_out.addr,
+                dcache_out.dispatch_rdy
             );
-
-            $display("dcache_in : {status=%1d, dat=%x}",
-                dcache_in.status,
-                dcache_in.dat,
+            $display("dcache_in : status: %s, ldb: {en: %b, lbuf_idx: %1d, dat: 0x%x}",
+                dbg_ld_status(dcache_in.status),
+                dcache_in.ldb.en,
+                dcache_in.ldb.lbuf_idx,
+                dcache_in.ldb.dat
             );
 
             // for (int i = 0; i < NUM_FU_LOD; ++i) begin
@@ -430,10 +448,11 @@ module lod_ex(
             // end
 
 
-            for (int i = 0; i < NUM_FU_LOD; ++i)
-                $display("dispatch_en_bay2buf[%1d]: %b", i, dispatch_en_bay2buf[i]);
-            $display("dispatch_vld_req: %b", dispatch_vld_req);
-            $display("dispatch_rdy_req: %b", dispatch_vld_req);
+            // for (int i = 0; i < NUM_FU_LOD; ++i)
+            //     $display("dispatch_lbuf_en_bay2buf[%1d]: %b", i, dispatch_lbuf_en_bay2buf[i]);
+            $display("dispatch_lbuf_en: %b", dispatch_lbuf_en);
+            $display("dispatch_rdy_req: %b", dispatch_rdy_req);
+            $display("dispatch_rdy_gnt: %b", dispatch_rdy_gnt);
 
             $display("  -- LBUF STATE --");
             for (int i = 0; i < LBUF_SZ; ++i) begin

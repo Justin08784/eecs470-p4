@@ -186,6 +186,9 @@ module fill_handler (
 endmodule;
 
 module load_handler (
+    input  logic        clock,
+    input  logic        reset,
+
     // Load (w/ load FU)
     input  ld2dcache    ld_in,
     output dcache2ld    ld_out,
@@ -236,11 +239,23 @@ module load_handler (
         endcase
     end
 
+    LDB ldb, ldb_n;
+    assign ldb_n = '{
+        en      : gnt && op == OP_LOAD_HIT && ld_in.dispatch_rdy,
+        lbuf_idx: ld_in.lbuf_idx,
+        dat     : r_rcv.dat.word_level[ld_in.addr[2]]
+    };
+    always_ff @(posedge clock) begin
+        ldb <= ldb_n;
+        if (reset)
+            ldb.en <= 1'b0;
+    end
+
     assign ld_out = '{
-        tag     : '0,
-        dat     : r_rcv.dat, // FIXME: load FU will need to do the byte manip on the load!
+        // tag     : '0,
+        // dat     : r_rcv.dat, // FIXME: load FU will need to do the byte manip on the load!
         status  : (gnt && op == OP_LOAD_HIT) ? LD_SUCC : LD_FAIL,
-        ldb     : '0
+        ldb     : ldb
     };
 
 endmodule;
@@ -592,6 +607,9 @@ module dcache_block (
     );
 
     load_handler dec_load0 (
+        .clock      (clock),
+        .reset      (reset),
+
         .ld_in      (ld_in),
         .ld_out     (ld_out),
         .hdr        (hdr),
@@ -647,12 +665,17 @@ module dcache_block (
             mem_out_data
         );
 
-        $display("ld_in: vld: %b, addr: 0x%x", ld_in.vld, ld_in.addr);
-        $display("ld_ot: status: %s, tag: %2d, dat: 0x%x, ldb: %x",
+        $display("ld_in: vld: %b, lbuf_idx: %1d, addr: 0x%x, dispatch_rdy: %b",
+            ld_in.vld,
+            ld_in.lbuf_idx,
+            ld_in.addr,
+            ld_in.dispatch_rdy
+        );
+        $display("ld_ot: status: %s, ldb: {en: %b, lbuf_idx: %1d, dat: 0x%x}",
             dbg_ld_status(ld_out.status),
-            ld_out.tag,
-            ld_out.dat,
-            ld_out.ldb
+            ld_out.ldb.en,
+            ld_out.ldb.lbuf_idx,
+            ld_out.ldb.dat
         );
 
         $display("sq_in: vld: %b, addr: 0x%x, size: %s, dat: %1d",
