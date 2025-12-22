@@ -129,10 +129,12 @@ module lod_ex(
     // FIXME: Change lbuf to a compressible ring buffer to avoid crossbar
     logic dispatch_vld;
     logic [LBUF_SZ-1:0] dispatch_rdy_req, dispatch_rdy_gnt;
+    logic dispatch_en_any;
     logic [LBUF_SZ-1:0] dispatch_en;
 
     assign dispatch_vld     = (bay_vld & ~bay_kill) & ~bay_need;
     assign dispatch_rdy_req = ~lbuf_vld | lbuf_kill; // TODO: also reflect same-cycle frees due to "to-issue" (i.e. got CDB reservation)
+    assign dispatch_en_any  = dispatch_vld & |dispatch_rdy_req;
     assign dispatch_en      = {LBUF_SZ{dispatch_vld}} & dispatch_rdy_gnt;
     psel_gen #(
         .WIDTH  (LBUF_SZ),
@@ -220,7 +222,7 @@ module lod_ex(
                 // sq_idx          : i_regs[0].dat.sq_idx,
                 need_byte_mask  : i_byte_mask
             };
-        end else if (dispatch_en | bay_kill) begin
+        end else if (dispatch_en_any | bay_kill) begin
             // bay->lbuf logic
             bay_hdr_n.vld = 1'b0;
         end
