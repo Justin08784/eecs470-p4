@@ -103,33 +103,30 @@ module irq #(
     assign vld_scnt = rwin_ncpl_any ? rwin_ncpl_idx : 2;
 
     always_ff @(posedge clock) begin
-        if (flush) begin
-            cpl <= '1;
-
-        end else begin
-            for (int i = 0; i < 2; ++i) begin
+        for (int i = 0; i < 2; ++i) begin
+            if  (cen[i]) begin
                 int cur;
-                if (!cen[i])
-                    continue;
                 cur = cidx[i];
 
-                cpl  [cur]      <= 1;
-                state[cur].blk  <= cdat.data[i];
-                state[cur].md   <= cdat.insn_md[i];
+                cpl  [cur]          <= 1'b1;
+                state[cur].blk      <= cdat.data[i];
+                state[cur].md       <= cdat.insn_md[i];
             end
 
-            for (int i = 0; i < `MIN(wen_cnt, 2); ++i) begin
+            if (i < wen_cnt) begin
                 int cur;
                 cur = wr_idxs_n[i];
 
-                cpl  [cur]          <= 0;
+                cpl  [cur]          <= 1'b0;
                 state[cur].dw       <=  wdat[i].dw;
                 state[cur].off      <=  wdat[i].off;
                 state[cur].fmsk     <=  wdat[i].fmsk;
                 state[cur].is_end   <=  wdat[i].is_end;
             end
-
         end
+
+        if (reset | flush)
+            cpl <= '1;
     end
 
 
@@ -884,14 +881,12 @@ module dcf (
     );
 
     always_ff @(posedge clock) begin
+        iqq <= iqq_n;
+        idat<= idat_n;
+
         if (reset | flush) begin
-            iqq     <= '0;
-            idat    <= '0;
-
-        end else begin
-            iqq     <= iqq_n;
-            idat    <= idat_n;
-
+            iqq.vld <= '0;
+            idat.vld<= '0;
         end
 
     end

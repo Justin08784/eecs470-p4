@@ -1,23 +1,6 @@
 `include "sys_defs.svh"
 `include "dcache_block_direct.svh"
 
-
-function automatic AGE update_lru(
-    input AGE age,
-    input WAY way
-);
-    AGE rv;
-    rv = age;
-    foreach(rv[i, j]) begin
-        if (i == way)
-            rv[i][j] = i == j;
-        else if (j == way)
-            rv[i][j] = 1;
-    end
-    return rv;
-endfunction
-
-
 function automatic MEM_BLOCK apply_store(
     input MEM_SIZE      size,
     input ADDR          addr,
@@ -72,6 +55,7 @@ module fill_handler (
     // Metadata to consult
     input  CACHE_HEADER hdr,
     input  MSHR_ENTRY   mshr,
+    input  WAY[NUM_SETS-1:0]    lru_ways,
 
     /* orders */
     output logic        req,
@@ -87,57 +71,19 @@ module fill_handler (
     SID    sid;
     WAY    way;
 
-    logic [NUM_SETS-1:0] evict;
-    logic [NUM_SETS-1:0][ASSOC-1:0] free_gnt;
-    logic [NUM_SETS-1:0][ASSOC-1:0] lru;
-    logic [NUM_SETS-1:0][ASSOC-1:0] wmsks;
-    WAY   [NUM_SETS-1:0] ways;
-    generate
-    for (genvar s = 0; s < NUM_SETS; ++s) begin : gen_sets
-        psel_gen #(
-            .WIDTH(ASSOC),
-            .REQS(1)
-        ) free_way (
-            .req (~hdr.vld[s]),
-            .gnt (free_gnt[s])
-        );
-        /* this is unnecessary. lru is a superset
-        of this. see btb. */
-    end
-    endgenerate
-
-    always_comb begin
-        foreach (evict[s])
-            evict[s] = !(|free_gnt[s]);
-
-        foreach (lru[s, w])
-            lru[s][w] = &hdr.age[s][w];
-
-        foreach (wmsks[s]) begin
-            wmsks[s] = evict[s]
-                ? lru[s]        // evict a block
-                : free_gnt[s];  // free entry available
-        end
-
-        ways = '0;
-        foreach (ways[s]) begin
-            for (int w = 0; w < ASSOC; ++w) begin
-                if (wmsks[s][w])
-                    ways[s] = w;
-            end
-        end
-
-    end
+    logic[NUM_SETS-1:0] set_all_vld;
+    for (genvar s = 0; s < NUM_SETS; ++s)
+        assign set_all_vld[s] = &hdr.vld[s];
 
     always_comb begin
         req = mshr.status == S_FILL;
 
         sid = get_sid(mshr.addr);
-        way = ways[sid];
+        way = lru_ways[sid];
 
         op = OP_NONE;
         if (req) begin
-            op = evict[sid]
+            op = set_all_vld[sid] && hdr.dirty[sid][way]
                 ? OP_FILL_EVICT
                 : OP_FILL_NO_EVICT;
         end
@@ -417,16 +363,15 @@ module refill_engine (
     end
 
     always_ff @(posedge clock) begin
-        if (reset) begin
-            mshr <= '0;
-        end else if (flush && !mshr.wr_mem && mshr.mem_tag == 0) begin
+        mshr <= mshr_n;
+
+        if  (reset
+        ||  (flush && !mshr.wr_mem && mshr.mem_tag == 0)) begin
             /* FIXME: This seems rather hacky. During flush, clear a load request if it
             has not allocated mem_tag. This prevents the potentially spurious
             requests of ooo loads (e.g. oob addresses) from persisting in the dcache--
             dcache would get stuck requesting the bad address continuously. */
-            mshr <= '0;
-        end else begin
-            mshr <= mshr_n;
+            mshr.status <= S_IDLE;
         end
     end
 
@@ -459,6 +404,26 @@ module dcache_block (
     output dcache2sq sq_out
 );
     CACHE_HEADER hdr, hdr_n;
+
+    WAY [NUM_SETS-1:0]  lru_ways;
+    WAY acc_way;
+    AGE [NUM_SETS-1:0]  acc_age_n;
+
+    generate
+    for (genvar s = 0; s < NUM_SETS; ++s) begin
+        lru_man #(.SETW(ASSOC)) lru_seti (
+            .vld    (hdr.vld[s]),
+            .age    (hdr.age[s]),
+            .lru_way(lru_ways[s]),
+
+            .msk_en (1'b0), // unused
+            .msk_way('0),   // unused
+
+            .acc_way(acc_way),
+            .age_n  (acc_age_n[s])
+        );
+    end
+    endgenerate
 
     logic   [NUM_SETS-1:0]        wen;
     WAY     [NUM_SETS-1:0]  rway, wway;
@@ -555,11 +520,12 @@ module dcache_block (
 
     // header manager
     always_comb begin
-        SID tmp_sid;
-        WAY tmp_way;
         hdr_n = hdr;
         foreach (gnt[reqr]) begin
             if ( gnt[reqr]) begin
+                SID tmp_sid;
+                WAY tmp_way;
+
                 case (reqr)
                 REQR_FILL: begin
                     tmp_sid = w_snds[REQR_FILL].sid;
@@ -568,14 +534,16 @@ module dcache_block (
                     hdr_n.dirty [tmp_sid][tmp_way]  = mshr.wr_mem;
                     hdr_n.tag   [tmp_sid][tmp_way]  = get_tag(mshr.addr);
 
-                    hdr_n.age   [tmp_sid] = update_lru(hdr.age[tmp_sid], tmp_way);
+                    acc_way = tmp_way;
+                    hdr_n.age   [tmp_sid] = acc_age_n[tmp_sid];
                 end
                 REQR_LOAD: begin
                     // TODO: LRU update (and victim update)
                     tmp_sid = r_snds[REQR_LOAD].sid;
                     tmp_way = r_snds[REQR_LOAD].way;
 
-                    hdr_n.age   [tmp_sid] = update_lru(hdr.age[tmp_sid], tmp_way);
+                    acc_way = tmp_way;
+                    hdr_n.age   [tmp_sid] = acc_age_n[tmp_sid];
                 end
                 REQR_STOR: begin
                     // TODO: LRU update
@@ -583,7 +551,8 @@ module dcache_block (
                     tmp_way = w_snds[REQR_STOR].way;
                     hdr_n.dirty [tmp_sid][tmp_way] = 1;
 
-                    hdr_n.age   [tmp_sid] = update_lru(hdr.age[tmp_sid], tmp_way);
+                    acc_way = tmp_way;
+                    hdr_n.age   [tmp_sid] = acc_age_n[tmp_sid];
                 end
                 default:;
                 endcase
@@ -596,6 +565,7 @@ module dcache_block (
     fill_handler dec_fill0 (
         .hdr        (hdr),
         .mshr       (mshr),
+        .lru_ways   (lru_ways),
 
         .req        (req        [REQR_FILL]),
         .r_snd      (r_snds     [REQR_FILL]),
@@ -638,10 +608,10 @@ module dcache_block (
     );
 
     always_ff @(posedge clock) begin
+        hdr <= hdr_n;
+
         if (reset)
-            hdr <= '0;
-        else
-            hdr <= hdr_n;
+            hdr.vld <= '0;
     end
 
   
