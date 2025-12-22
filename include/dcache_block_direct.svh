@@ -57,10 +57,11 @@ typedef enum logic [1:0] {
 typedef struct packed {
     MSHR_STATUS status;
     logic       wr_mem;
-    MEM_TAG     miss_tag;
+    MEM_TAG     mem_tag;
     ADDR        addr;
     MEM_BLOCK   mem_data;
     MEM_SIZE    mem_size;
+    // MEM_TAG     lbuf_idx;
 } MSHR_ENTRY;
 
 typedef struct packed {
@@ -112,20 +113,21 @@ typedef enum logic {
 } ST_QUERY_STATUS;
 
 typedef struct packed {
-    logic       en;
-    MEM_TAG     tag;
-    MEM_BLOCK   blk;
+    logic           en;
+    LBUF_IDX        lbuf_idx;
+    DATA_BLOCK      dat;
 } LDB; // load data bus (wakeup insns in load bay/buffer)
 
 typedef struct packed {
-    logic   vld;
-    ADDR    addr;
+    logic           vld;
+    LBUF_IDX        lbuf_idx;
+    ADDR            addr;
+
+    logic           dispatch_rdy;
 } ld2dcache;
 typedef struct packed {
-    MEM_TAG         tag; //not currently in use
-    MEM_BLOCK       dat;
     LD_QUERY_STATUS status;
-    LDB             ldb; //not currently in use
+    LDB             ldb;
 } dcache2ld;
 
 typedef struct packed {
