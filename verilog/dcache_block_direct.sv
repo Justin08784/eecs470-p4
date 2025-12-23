@@ -28,6 +28,7 @@ endfunction
 
 typedef struct packed {
     logic       vld;
+    TAG         tag;
     SID         sid;
     WAY         way;
 } READ_SND;
@@ -37,6 +38,7 @@ typedef struct packed {
 
 typedef struct packed {
     logic       vld;
+    TAG         tag;
     SID         sid;
     WAY         way;
     MEM_BLOCK   dat;
@@ -69,9 +71,10 @@ module fill_handler (
     input  logic        gnt,
     input  READ_RCV     r_rcv
 );
-    OP_TAG op;
-    SID    sid;
-    WAY    way;
+    OP_TAG  op;
+    TAG     tag, victim_tag;
+    SID     sid;
+    WAY     way;
 
     logic[NUM_SETS-1:0][ASSOC-1:0] lru_and_needs_evict; // is lru AND needs evict
     logic[NUM_SETS-1:0] lru_needs_evict;                // the lru way needs evict
@@ -82,8 +85,10 @@ module fill_handler (
     always_comb begin
         req = mshr.status == S_FILL;
 
+        tag = get_tag(mshr.addr);
         sid = get_sid(mshr.addr);
         way = lru_ways[sid];
+        victim_tag  = hdr.tag[sid][way];
 
         op =!req                ? OP_NONE :
             lru_needs_evict[sid]? OP_FILL_EVICT : OP_FILL_NO_EVICT;
@@ -93,12 +98,14 @@ module fill_handler (
         OP_FILL_EVICT: begin
             r_snd = '{
                 vld : 1,
+                tag : victim_tag,
                 sid : sid,
                 way : way
             };
 
             w_snd = '{
                 vld : 1,
+                tag : tag,
                 sid : sid,
                 way : way,
                 dat : mshr.mem_data
@@ -108,7 +115,7 @@ module fill_handler (
                 op     : op,
                 en     : 1,
                 wr_mem : 1,
-                addr   : {hdr.tag[sid][way], sid, 3'b000},
+                addr   : {victim_tag, sid, 3'b000},
                 mem_data : r_rcv.dat,
                 mem_size : DOUBLE
             };
@@ -117,6 +124,7 @@ module fill_handler (
         OP_FILL_NO_EVICT: begin
             w_snd = '{
                 vld : 1,
+                tag : tag,
                 sid : sid,
                 way : way,
                 dat : mshr.mem_data
@@ -165,6 +173,7 @@ module load_handler (
     always_comb begin
         r_snd   = '{
             vld     : 1'b0,     // overriden below
+            tag     : loc.tag,
             sid     : loc.sid,
             way     : loc.way
         };
@@ -237,11 +246,13 @@ module stor_handler (
     always_comb begin
         r_snd = '{
             vld     : 1'b0,     // overriden below
+            tag     : loc.tag,
             sid     : loc.sid,
             way     : loc.way
         };
         w_snd = '{
             vld     : 1'b0,     // overriden below
+            tag     : loc.tag,
             sid     : loc.sid,
             way     : loc.way,
             dat     : apply_store(sq_in.size, sq_in.addr, sq_in.dat, r_rcv.dat)
@@ -404,6 +415,18 @@ module dcache_block (
     output dcache2sq sq_out
 );
     CACHE_HEADER hdr, hdr_n;
+    struct packed {
+        logic       en;
+        TAG         tag;
+        SID         sid;
+        WAY         way;
+        MEM_BLOCK   dat;
+    } w, w_n;   // flopped
+    struct packed {
+        TAG         tag;
+        SID         sid;
+        WAY         way;
+    } r;        // combinational
 
     logic [NUM_SETS-1:0][ASSOC-1:0] lruvs;
     WAY [NUM_SETS-1:0]  lru_ways;
@@ -418,8 +441,8 @@ module dcache_block (
             .lruv   (lruvs[s]),
             .lru_way(lru_ways[s]),
 
-            .msk_en (1'b0), // unused
-            .msk_way('0),   // unused
+            .msk_en (w.en),
+            .msk_way(w.way),
 
             .acc_way(acc_way),
             .age_n  (acc_age_n[s])
@@ -427,12 +450,15 @@ module dcache_block (
     end
     endgenerate
 
-    logic   [NUM_SETS-1:0]        wen;
-    WAY     [NUM_SETS-1:0]  rway, wway;
-    MEM_BLOCK[NUM_SETS-1:0] rdat, wdat;
-    SID     rsid, wsid;
+
+    logic[NUM_SETS-1:0]     wens;
+    MEM_BLOCK[NUM_SETS-1:0] rdats;
     logic   [NUM_SETS-1:0][ASSOC-1:0][$bits(MEM_BLOCK)-1:0] dbg_memDP;
 
+    always_comb begin
+        wens        = '0;
+        wens[w.sid] = w.en;
+    end
     generate
     for (genvar s = 0; s < NUM_SETS; ++s) begin : gen_sets
         memDP #(
@@ -445,11 +471,11 @@ module dcache_block (
             .clock,
             .reset,
             .re   (1'b1),
-            .raddr(rway[s]),
-            .rdata(rdat[s]),
-            .we   (wen [s]),
-            .waddr(wway[s]),
-            .wdata(wdat[s])
+            .raddr(r.way),
+            .rdata(rdats[s]),
+            .we   (wens [s]),
+            .waddr(w.way),
+            .wdata(w.dat)
         );
     end
     endgenerate
@@ -485,24 +511,23 @@ module dcache_block (
         end
     end
 
-    always_comb begin
-        rway    = '0;
-        wen     = '0;
-        wway    = '0;
-        wdat    = '0;
+    assign w_n = '{
+        en  : w_snds[gnt_reqr].vld,
+        tag : w_snds[gnt_reqr].tag,
+        sid : w_snds[gnt_reqr].sid,
+        way : w_snds[gnt_reqr].way,
+        dat : w_snds[gnt_reqr].dat
+    };
 
-        r_rcvs      = '0;
-        rsid        = r_snds[gnt_reqr].sid;
-        rway[rsid]  = r_snds[gnt_reqr].way;
-        r_rcvs[gnt_reqr].dat = rdat[rsid];
+    assign r = '{
+        tag : r_snds[gnt_reqr].tag,
+        sid : r_snds[gnt_reqr].sid,
+        way : r_snds[gnt_reqr].way
+    };
 
-        wsid        = w_snds[gnt_reqr].sid;
-        wen[wsid]   = w_snds[gnt_reqr].vld;
-        wway[wsid]  = w_snds[gnt_reqr].way;
-        wdat[wsid]  = w_snds[gnt_reqr].dat;
-    end
-
-
+    always_comb
+        r_rcvs[gnt_reqr].dat =
+            w.en & ({r.tag, r.sid} == {w.tag, w.sid}) ? w.dat : rdats[r.sid];
 
 
     // Resource managers
@@ -617,9 +642,12 @@ module dcache_block (
 
     always_ff @(posedge clock) begin
         hdr <= hdr_n;
+        w   <= w_n;
 
-        if (reset)
+        if (reset) begin
             hdr.vld <= '0;
+            w.en    <= 1'b0;
+        end
     end
 
   
