@@ -107,6 +107,7 @@ module free_list #(parameter
         .NUM_WPORTS(N),
         .FLUSH_MODE(FIFO_FLUSH_SNAP_HEAD),
         .ENABLE_INTR_FWD(`FALSE),
+        .RESET_SETS_STATE(`TRUE),
         .RESET_STATE(RESET_STATE)
     ) lst (
         .clock,

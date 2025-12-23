@@ -38,6 +38,7 @@ module fifo #(
     If free list mode is disabled, flush behaves the same as reset.
     */
     parameter int INSTANCE_ID=-1,
+    parameter logic RESET_SETS_STATE=`FALSE,
     parameter FIFO_STATE RESET_STATE='{default:0},
     type PTR = `IDX_TYPE(DEPTH)
 ) (
@@ -129,19 +130,18 @@ module fifo #(
     end
 
     always_ff @(posedge clock) begin
-        if (reset) begin
-            state   <= RESET_STATE.state;
-        end else begin
-            for (int i = 0; i < DEPTH; ++i)
-                bmask[i] <= bmask[i] & ~clmsk;
+        for (int i = 0; i < DEPTH; ++i)
+            bmask[i] <= bmask[i] & ~clmsk;
 
-            for (int unsigned i = 0; i < NUM_WPORTS; ++i) begin
-                if (i >= wr_en_cnt) // suppresses oob index warning
-                    continue;
-                state[wr_idxs_n[i]] <= wr_data[i];
-                bmask[wr_idxs_n[i]] <= wr_bmask[i];
-            end
+        for (int unsigned i = 0; i < NUM_WPORTS; ++i) begin
+            if (i >= wr_en_cnt) // suppresses oob index warning
+                continue;
+            state[wr_idxs_n[i]] <= wr_data[i];
+            bmask[wr_idxs_n[i]] <= wr_bmask[i];
         end
+
+        if (reset && RESET_SETS_STATE)
+            state <= RESET_STATE.state;
     end
 
 `ifdef FORMAL
