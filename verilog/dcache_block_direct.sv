@@ -85,7 +85,7 @@ module fill_handler (
         sid = get_sid(mshr.addr);
         way = lru_ways[sid];
 
-        op =!req                ? op :
+        op =!req                ? OP_NONE :
             lru_needs_evict[sid]? OP_FILL_EVICT : OP_FILL_NO_EVICT;
 
         {r_snd, w_snd, mshr_snd} = '0;
