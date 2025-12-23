@@ -29,7 +29,7 @@ module lod_ex(
     output  logic       i_rdy,  // ready to accept from regs.o_dat.lod?
     input   logic       i_vld,  // insns to accept from regs.o_dat.lod
     input   LOD_REGS    i_regs, // insn metadata/operands
-    input   BMASK       i_bmask,
+    input   BMASK       i_msk,
     
     // input   sq2execute                  sq_in,
     // output  execute2sq                  sq_out,
@@ -41,11 +41,13 @@ module lod_ex(
 
     /* Early CDB arbitration */
     output  logic           cdb_req,
+    output  BMASK           ctag_msks,
     output  PHYS_REG_IDX    ctag_ts,
     input   logic           cdb_gnt,
 
     /* BACKEND */
     output  logic           o_cands_vld,
+    output  BMASK           o_cands_msk,
     output  CPL_CAND        o_cands
 );
     initial begin
@@ -85,7 +87,7 @@ module lod_ex(
 
         .i_vld  (i_vld),
         .i_rdy  (i_rdy),
-        .i_msk  (i_bmask),
+        .i_msk  (i_msk),
         .i_dat  (i_bay_dat),
 
         .o_vld  (bay_vld),
@@ -185,10 +187,13 @@ module lod_ex(
 
     assign cdb_req = |lbuf2cdb_arb_req;
     always_comb begin
-        ctag_ts = '0;
+        ctag_msks   = '0;
+        ctag_ts     = '0;
         for (int i = 0; i < LBUF_SZ; ++i) begin
-            if (lbuf2cdb_arb_gnt[i])
-                ctag_ts = lbuf[i].t;
+            if (lbuf2cdb_arb_gnt[i]) begin
+                ctag_msks   = lbuf_hdr[i].msk;
+                ctag_ts     = lbuf[i].t;
+            end
         end
     end
 
@@ -351,6 +356,7 @@ module lod_ex(
     );
 
     logic       cands1_vld;
+    BMASK       cands1_msk;
     CPL_CAND    cands1_dat;
     flop #(
         .FLUSH_MODE (SKID_FLUSH_MASK),
@@ -366,11 +372,12 @@ module lod_ex(
         .i_dat  (cands02cands1_dat),
 
         .o_vld  (cands1_vld),
-        .o_msk  (),
+        .o_msk  (cands1_msk),
         .o_dat  (cands1_dat)
     );
 
     assign o_cands_vld = cands1_vld;
+    assign o_cands_msk = cands1_msk;
     assign o_cands = '{
         t       : cands1_dat.t,
         rob_idx : cands1_dat.rob_idx,

@@ -30,7 +30,7 @@ module mult #(
 
     input DATA rs1, rs2,
     input MUL_FUNC func,
-    input BMASK         i_bmask,
+    input BMASK         i_msk,
     input PHYS_REG_IDX  i_t,
     input ROB_IDX       i_rob_idx,
 
@@ -38,9 +38,11 @@ module mult #(
     output logic i_rdy,
     input  logic o_rdy,
     output logic o_vld, // replacement for done
+    output BMASK o_msk,
 
     // lines for early CDB arbitration
     output logic cdb_req,
+    output BMASK        ctag_msk,
     output PHYS_REG_IDX ctag_t,
     input  logic cdb_gnt,
 
@@ -75,18 +77,19 @@ module mult #(
     // instantiate an array of mult_stage modules
     // this uses concatenation syntax for internal wiring, see lab 2 slides
     logic   [MUL_STAGES:0] vlds;
-    BMASK   [MUL_STAGES-1:0] msks;
+    BMASK   [MUL_STAGES:0] msks;
     logic   [MUL_STAGES:0] rdys;
     MUL_PKT [MUL_STAGES:0] pkts;
 
     always_comb begin
         vlds[0] = i_vld;
-        msks[0] = i_bmask;
+        msks[0] = i_msk;
         i_rdy   = rdys[0];
         pkts[0] = i_pkt;
 
         o_vld               = vlds[MUL_STAGES];
-        rdys[MUL_STAGES]   = o_rdy;
+        o_msk               = msks[MUL_STAGES];
+        rdys[MUL_STAGES]    = o_rdy;
         o_pkt               = pkts[MUL_STAGES];
     end
 
@@ -131,6 +134,7 @@ module mult #(
                 .o_msk(msks[i+1]),
                 .o_dat(pkts[i+1])
             );
+            assign ctag_msk=msks[i+1];
             assign ctag_t = pkts[i+1].t;
 
         end else if (i == MUL_STAGES-3) begin
@@ -186,7 +190,7 @@ module mult #(
                 .i_dat(pkts[i]),
 
                 .o_vld(vlds[i+1]),
-                .o_msk(),
+                .o_msk(msks[i+1]),
                 .o_dat(pkts[i+1])
             );
 

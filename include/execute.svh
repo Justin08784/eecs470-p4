@@ -43,8 +43,8 @@ typedef struct packed {
     PHYS_REG_IDX    t1;
     DATA            opb;
 
-    LSQ_IDX         lq_idx;
-    LSQ_IDX         sq_idx;
+    // LSQ_IDX         lq_idx;
+    // LSQ_IDX         sq_idx;
     ROB_IDX         rob_idx;
     MEM_SIZE        mem_size;
     logic           rd_unsigned;
@@ -59,7 +59,7 @@ typedef struct packed {
     PHYS_REG_IDX    t2;
     DATA            opb;
 
-    LSQ_IDX         sq_idx;
+    // LSQ_IDX         sq_idx;
     ROB_IDX         rob_idx;
     MEM_SIZE        mem_size;
 } ID_STR_VIEW;

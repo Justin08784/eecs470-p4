@@ -65,15 +65,18 @@ endmodule // alu
 module alu_ex(
     /* FRONTEND */
     input   logic [NUM_FU_ALU-1:0]      i_vld,
+    input   BMASK [NUM_FU_ALU-1:0]      i_msk,
     input   ALU_REGS [NUM_FU_ALU-1:0]   i_regs,
         // insn metadata/operands
 
     /* BACKEND */
     output logic    [NUM_FU_ALU-1:0]    o_cands_vld,
+    output BMASK    [NUM_FU_ALU-1:0]    o_cands_msk,
     output CPL_CAND [NUM_FU_ALU-1:0]    o_cands
 );
     // execute
     assign o_cands_vld = i_vld;
+    assign o_cands_msk = i_msk;
     generate
         DATA        [NUM_FU_ALU-1:0] tmp_res;
         for (genvar i = 0; i < NUM_FU_ALU; ++i) begin : gen_alus
@@ -109,15 +112,17 @@ module mul_ex(
         // insns to accept from regs.o_dat.mul
     input  MUL_REGS [NUM_FU_MUL-1:0]  i_regs,
         // insn metadata/operands
-    input  BMASK    [NUM_FU_MUL-1:0]  i_bmask,
+    input  BMASK    [NUM_FU_MUL-1:0]  i_msk,
 
     /* Early CDB arbitration */
-    output logic [NUM_FU_MUL-1:0]     cdb_req,
-    output PHYS_REG_IDX [NUM_FU_MUL-1:0] ctag_ts,
-    input  logic [NUM_FU_MUL-1:0]     cdb_gnt,
+    output logic [NUM_FU_MUL-1:0]       cdb_req,
+    output BMASK [NUM_FU_MUL-1:0]       ctag_msks,
+    output PHYS_REG_IDX [NUM_FU_MUL-1:0]ctag_ts,
+    input  logic [NUM_FU_MUL-1:0]       cdb_gnt,
 
     /* BACKEND */
     output logic    [NUM_FU_MUL-1:0]  o_cands_vld,
+    output BMASK    [NUM_FU_MUL-1:0]  o_cands_msk,
     output CPL_CAND [NUM_FU_MUL-1:0]  o_cands
 );
     // execute
@@ -140,16 +145,18 @@ module mul_ex(
                 .rs1    (i_regs[i].rs1),
                 .rs2    (i_regs[i].rs2),
                 .func   (i_regs[i].func),
-                .i_bmask(i_bmask[i]),
+                .i_msk  (i_msk[i]),
                 .i_t    (i_regs[i].t),
                 .i_rob_idx(i_regs[i].rob_idx),
 
                 .cdb_req(cdb_req[i]),
+                .ctag_msk(ctag_msks[i]),
                 .ctag_t (ctag_ts[i]),
                 .cdb_gnt(cdb_gnt[i]),
 
                 // Output (directly to cdat_out)
                 .o_vld  (o_cands_vld[i]),
+                .o_msk  (o_cands_msk[i]),
                 .o_t    (tmp_t[i]),
                 .o_rob_idx(tmp_rob_idx[i]),
                 .result (tmp_res[i])
@@ -194,6 +201,7 @@ endmodule // bru
 module bru_ex(
     /* FRONTEND */
     input  logic        i_vld,
+    input  BMASK        i_msk,
     input  BRU_REGS     i_reg,
     input  btq2execute  btq_in,
         // insn metadata/operands
@@ -201,6 +209,7 @@ module bru_ex(
     /* BACKEND */
     output execute2complete_bru cbru_out,
     output logic                o_cand_vld,
+    output BMASK                o_cand_msk,
     output CPL_CAND             o_cand
 );
     initial begin
@@ -245,6 +254,7 @@ module bru_ex(
     assign tmp_take = !i_reg.cond_branch || cond_take;
 
     assign o_cand_vld = i_vld;
+    assign o_cand_msk = i_msk;
     assign o_cand = '{
         t       : i_reg.t,
         rob_idx : i_reg.rob_idx,
@@ -487,8 +497,8 @@ module stage_ex_p4 (
                 opb         : `RV32_signext_Iimm(tmp_inst),
 
                 // >> FIXME
-                sq_idx      : '0,
-                lq_idx      : '0,
+                // sq_idx      : '0,
+                // lq_idx      : '0,
                 // << FIXME
 
                 rob_idx     : rs_in.fu_dat_lod[i].rob_idx,
@@ -523,7 +533,7 @@ module stage_ex_p4 (
                 opb     : `RV32_signext_Simm(rs_in.fu_dat_str[i].inst),
 
                 // >> FIXME
-                sq_idx  : '0,
+                // sq_idx  : '0,
                 // << FIXME
 
                 rob_idx : rs_in.fu_dat_str[i].rob_idx,
@@ -868,10 +878,12 @@ module stage_ex_p4 (
     // Else if a longer-latency insn, this is in the middle of execution.
 
     `BY_FU(logic)   cands_vld;
+    `BY_FU(BMASK)   cands_msk;
     `BY_FU(CPL_CAND)cands;
     logic [NUM_FU_TOTAL-1:0]    cands_flat_vldv;
     CPL_CAND [NUM_FU_TOTAL-1:0] cands_flat;
     assign cands_vld.str    = '0;
+    assign cands_msk.str    = '0;
     assign cands.str        = '0; // alu, mul, lod set by respective *_ex's
     assign cands_flat_vldv  = cands_vld;
     assign cands_flat       = cands;
@@ -905,14 +917,18 @@ module stage_ex_p4 (
 
     alu_ex alu_ex0 (
         .i_vld      (regs.o_vld.alu),
+        .i_msk      (regs.o_msk.alu),
         .i_regs     (regs.o_dat.alu),
 
         .o_cands_vld(cands_vld.alu),
+        .o_cands_msk(cands_msk.alu),
         .o_cands    (cands.alu)
     );
 
-    `BY_FU(PHYS_REG_IDX) ctag_ts; // FIXME: do we need selective flush this?
-    PHYS_REG_IDX [NUM_FU_TOTAL-1:0] ctag_ts_flat;
+    `BY_FU(BMASK)       ctag_msks;
+    `BY_FU(PHYS_REG_IDX)ctag_ts; // FIXME: do we need selective flush this?
+    BMASK       [NUM_FU_TOTAL-1:0] ctag_msks_flat;
+    PHYS_REG_IDX[NUM_FU_TOTAL-1:0] ctag_ts_flat;
 
     mul_ex mul_ex0 (
         .clock,
@@ -921,15 +937,17 @@ module stage_ex_p4 (
         .clmsk,
 
         .i_vld      (regs.o_vld.mul),
-        .i_bmask    (regs.o_msk.mul),
+        .i_msk      (regs.o_msk.mul),
         .i_regs     (regs.o_dat.mul),
         .i_rdy      (ex.i_rdy.mul),
 
         .cdb_req    (cdb_req.mul),
+        .ctag_msks  (ctag_msks.mul),
         .ctag_ts    (ctag_ts.mul),
         .cdb_gnt    (cdb_gnt.mul),
 
         .o_cands_vld(cands_vld.mul),
+        .o_cands_msk(cands_msk.mul),
         .o_cands    (cands.mul)
     );
 
@@ -945,35 +963,39 @@ module stage_ex_p4 (
         .i_vld      (regs.o_vld.lod),
         .i_rdy      (ex.i_rdy.lod),
         .i_regs     (regs.o_dat.lod),
-        .i_bmask    (regs.o_msk.lod),
+        .i_msk      (regs.o_msk.lod),
 
         .dcache_in  (dcache_in),
         .dcache_out (dcache_out),
 
         .cdb_req    (cdb_req.lod),
+        .ctag_msks  (ctag_msks.lod),
         .ctag_ts    (ctag_ts.lod),
         .cdb_gnt    (cdb_gnt.lod),
 
         .o_cands_vld(cands_vld.lod),
+        .o_cands_msk(cands_msk.lod),
         .o_cands    (cands.lod)
     );
 
-    execute2complete_bru cbru_out_n;
+    execute2complete_bru cbru_out_prekill_n;
     bru_ex bru_ex0 (
         .i_vld      (regs.o_vld.bru),
+        .i_msk      (regs.o_msk.bru),
         .i_reg      (regs.o_dat.bru),
         .btq_in     (btq_in),
 
-        .cbru_out   (cbru_out_n),
+        .cbru_out   (cbru_out_prekill_n),
         .o_cand_vld (cands_vld.bru),
+        .o_cand_msk (cands_msk.bru),
         .o_cand     (cands.bru)
     );
 
     /* >> ======== STAGE 4/?: CDB data/tag broadcast ======== >> */
     // Tag broadcast occurs with CDB arbitration
     // Data broadcast is the final stage of the execute pipeline.
-    execute2complete_tag ctag_out_n;
-    execute2complete_dat cdat_out_n;
+    execute2complete_tag ctag_out_prekill_n;
+    execute2complete_dat cdat_out_prekill_n;
     assign rs_out = '{
         fu_cdb_gnt_alu  : cdb_gnt.alu,
         fu_cdb_gnt_bru  : cdb_gnt.bru,
@@ -985,19 +1007,24 @@ module stage_ex_p4 (
         fu_rdy_bru      : iss.i_rdy.bru
     };
 
-    assign ctag_ts_flat = ctag_ts;
-    for (genvar i = 0; i < NUM_FU_ALU; ++i)
-        assign ctag_ts.alu[i] = rs_in.fu_dat_alu[i].t;
-    for (genvar i = 0; i < NUM_FU_BRU; ++i)
-        assign ctag_ts.bru[i] = rs_in.fu_dat_bru[i].t;
+    assign ctag_msks_flat   = ctag_msks;
+    assign ctag_ts_flat     = ctag_ts;
+    for (genvar i = 0; i < NUM_FU_ALU; ++i) begin
+        assign ctag_msks.alu[i] = rs_in.fu_dat_alu[i].bmask;
+        assign ctag_ts.alu[i]   = rs_in.fu_dat_alu[i].t;
+    end
+    for (genvar i = 0; i < NUM_FU_BRU; ++i) begin
+        assign ctag_msks.bru[i] = rs_in.fu_dat_bru[i].bmask;
+        assign ctag_ts.bru[i]   = rs_in.fu_dat_bru[i].t;
+    end
 
     logic [N-1:0][NUM_FU_TOTAL-1:0] cdb2fu_tag_sel, cdb2fu_dat_sel;
     assign cdb2fu_tag_sel = cdb2fu_gbus;
     for (genvar c = 0; c < N; ++c) begin
         assign cdb2fu_dat_sel[c] = cdb2fu_gbus_shr[1][c] & cands_flat_vldv;
 
-        assign ctag_out_n.en[c] = |cdb2fu_gbus[c];
-        assign cdat_out_n.en[c] = |cdb2fu_dat_sel[c];
+        assign ctag_out_prekill_n.en[c] = |cdb2fu_gbus[c];
+        assign cdat_out_prekill_n.en[c] = |cdb2fu_dat_sel[c];
 
         // cdb2fu assign V2:
         /* NOTE: This V2 assign follows the same principles as ffs or the tag-locate
@@ -1008,13 +1035,16 @@ module stage_ex_p4 (
         the critical path of V2 is much improved. */
         always_comb begin
             for (int f = 0; f < NUM_FU_TOTAL; ++f) begin
-                if (cdb2fu_tag_sel[c][f])
-                    ctag_out_n.ts[c]        = ctag_ts_flat[f];
+                if (cdb2fu_tag_sel[c][f]) begin
+                    ctag_out_prekill_n.msk[c]       = ctag_msks_flat[f];
+                    ctag_out_prekill_n.ts[c]        = ctag_ts_flat[f];
+                end
 
                 if (cdb2fu_dat_sel[c][f]) begin
-                    cdat_out_n.ts[c]        = cands_flat[f].t;
-                    cdat_out_n.rob_idxs[c]  = cands_flat[f].rob_idx;
-                    cdat_out_n.data[c]      = cands_flat[f].data;
+                    cdat_out_prekill_n.msk[c]       = cands_msk[f];
+                    cdat_out_prekill_n.ts[c]        = cands_flat[f].t;
+                    cdat_out_prekill_n.rob_idxs[c]  = cands_flat[f].rob_idx;
+                    cdat_out_prekill_n.data[c]      = cands_flat[f].data;
                 end
             end
         end
@@ -1022,17 +1052,41 @@ module stage_ex_p4 (
         // cdb2fu assign V1:
         // foreach(cdb2fu_gbus_shr[_, c, f]) begin
         //     if (cdb2fu_gbus[c][f]) begin
-        //         ctag_out_n.en[c]  |= 1;
-        //         ctag_out_n.ts[c]  |= ctag_ts_flat[f];
+        //         ctag_out_prekill_n.en[c]  |= 1;
+        //         ctag_out_prekill_n.ts[c]  |= ctag_ts_flat[f];
         //     end
 
         //     if (cdb2fu_gbus_shr[1][c][f]) begin
-        //         cdat_out_n.en[c]        |= cands_flat[f].vld;
-        //         cdat_out_n.ts[c]        |= cands_flat[f].t;
-        //         cdat_out_n.rob_idxs[c]  |= cands_flat[f].rob_idx;
-        //         cdat_out_n.data[c]      |= cands_flat[f].data;
+        //         cdat_out_prekill_n.en[c]        |= cands_flat[f].vld;
+        //         cdat_out_prekill_n.ts[c]        |= cands_flat[f].t;
+        //         cdat_out_prekill_n.rob_idxs[c]  |= cands_flat[f].rob_idx;
+        //         cdat_out_prekill_n.data[c]      |= cands_flat[f].data;
         //     end
         // end
+    end
+
+
+    // completion bus flops
+    execute2complete_bru cbru_out_prekill;
+    execute2complete_tag ctag_out_prekill;
+    execute2complete_dat cdat_out_prekill;
+    assign cbru_out = cbru_out_prekill;
+        /*
+        Q: Why is cbru_out equal to cbru_out_prekill?
+        A:
+            1) At most one branch is completing (since NUM_FU_BRU == 1), and
+            2) a branch never depends on itself
+        ...so a branch completion can never kill itself.
+        */
+    always_comb begin
+        ctag_out = ctag_out_prekill;
+        for (int c = 0; c < N; ++c)
+            ctag_out.en[c] = ctag_out_prekill.en[c] & ~(flush & |(ctag_out_prekill.msk[c] & clmsk));
+    end
+    always_comb begin
+        cdat_out = cdat_out_prekill;
+        for (int c = 0; c < N; ++c)
+            cdat_out.en[c] = cdat_out_prekill.en[c] & ~(flush & |(cdat_out_prekill.msk[c] & clmsk));
     end
 
     always_ff @(posedge clock) begin
@@ -1042,20 +1096,20 @@ module stage_ex_p4 (
             cdb2fu_gbus_shr[i+1] <= cdb2fu_gbus_shr[i];
             cdb_gnt_shr[i+1]     <= cdb_gnt_shr[i];
         end
-        ctag_out <= ctag_out_n;
-        cdat_out <= cdat_out_n;
-        cbru_out <= cbru_out_n;
-        btq_out  <= btq_out_n;
+        ctag_out_prekill    <= ctag_out_prekill_n;
+        cdat_out_prekill    <= cdat_out_prekill_n;
+        cbru_out_prekill    <= cbru_out_prekill_n;
+        btq_out             <= btq_out_n;
 
         if (reset) begin
-            cdb2fu_gbus_shr <= '0;
-            cdb_gnt_shr     <= '0;
-            ctag_out.en     <= '0;
-            cdat_out.en     <= '0;
+            cdb2fu_gbus_shr         <= '0;
+            cdb_gnt_shr             <= '0;
+            ctag_out_prekill.en     <= '0;
+            cdat_out_prekill.en     <= '0;
 
-            cbru_out.en     <= '0;
-            cbru_out.clmsk  <= '0;
-            cbru_out.flush  <= 0;
+            cbru_out_prekill.en     <= '0;
+            cbru_out_prekill.clmsk  <= '0;
+            cbru_out_prekill.flush  <= 1'b0;
         end
     end
 

@@ -127,8 +127,10 @@ parameter PHYS_REG_SZ_R10K  = (32 + ROB_SZ);
 
 // worry about these later
 parameter DCACHE_LINES  = 32;
-parameter LSQ_SZ        = 12;
-parameter SQ_RET_BUF_SZ = 4;
+// parameter LSQ_SZ        = 12;
+// parameter SQ_RET_BUF_SZ = 4;
+parameter LQ_SZ         = 16;
+parameter SQ_SZ         = 16;
 
 
 // ================
@@ -143,7 +145,9 @@ typedef `IDX_TYPE(PHYS_REG_SZ_R10K) PHYS_REG_IDX;
     (the alternative is to pipe around 'is valid src_reg' bit signals everywhere). */
 typedef `IDX_TYPE(BTQ_SZ) BTQ_IDX;
 typedef `IDX_TYPE(ROB_SZ) ROB_IDX;
-typedef `IDX_TYPE(LSQ_SZ) LSQ_IDX;
+typedef `IDX_TYPE(LQ_SZ)  LQ_IDX;
+typedef `IDX_TYPE(SQ_SZ)  SQ_IDX;
+// typedef `IDX_TYPE(LSQ_SZ) LSQ_IDX;
 typedef `IDX_TYPE(GHR_BUF_SZ) GHR_IDX;
 
 typedef `IDX_TYPE(LBUF_SZ) LBUF_IDX;
@@ -745,6 +749,18 @@ typedef struct packed {
 } rob2retire;
 
 
+typedef struct packed {
+    `CNT_TYPE(N)    rdy_scnt;
+    SQ_IDX          sq_idxs_n;
+} sq2dispatch;
+
+typedef struct packed {
+    `CNT_TYPE(N)        vld_scnt; // debug only
+        // From: retire (ROB)
+        // - number of valid retire lines
+} sq2retire;
+
+
 // ================
 // Owner: RS
 // ================
@@ -916,12 +932,14 @@ typedef struct packed {
 // tag completion bus (i.e. early wakeup bus)
 typedef struct packed {
     logic           [N-1:0] en;
+    BMASK           [N-1:0] msk;
     PHYS_REG_IDX    [N-1:0] ts;
 } execute2complete_tag;
 
 // data completion bus (i.e. CDB)
 typedef struct packed {
     logic           [N-1:0] en;
+    BMASK           [N-1:0] msk;
     PHYS_REG_IDX    [N-1:0] ts;
         // - From: EX
     ROB_IDX         [N-1:0] rob_idxs;
@@ -981,6 +999,7 @@ typedef struct packed {
 // I/O: Retire
 typedef struct packed {
     `CNT_TYPE(N)            en_cnt;
+    // `CNT_TYPE(N)            sq_en_cnt;
     PHYS_REG_IDX [N-1:0]    t_old;
     logic        [N-1:0]    halt;
     logic        [N-1:0]    illegal;
