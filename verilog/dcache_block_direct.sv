@@ -473,9 +473,14 @@ module dcache_block (
         gnt_reqr= '0;
         gnt     = '0;
         for (int reqr = 0; reqr < NUM_REQR; ++reqr) begin
-            if (req[reqr]) begin
+            if (req[reqr])
                 gnt_reqr = reqr;
-                gnt[reqr]= 1'b1;
+        end
+
+        for (int reqr = 0; reqr < NUM_REQR; ++reqr) begin
+            if (req[NUM_REQR-1 - reqr]) begin
+                gnt[NUM_REQR-1 - reqr]= 1'b1;
+                break;
             end
         end
     end
