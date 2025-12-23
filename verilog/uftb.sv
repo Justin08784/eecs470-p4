@@ -10,6 +10,7 @@ module lru_man #(
     input   logic msk_en,
     input   `IDX_TYPE(SETW) msk_way,
 
+    output  logic [SETW-1:0]lruv,
     output  `IDX_TYPE(SETW) lru_way,
     output  logic [SETW-1:0][SETW-1:0] age_n
 );
@@ -23,7 +24,6 @@ age[i][j]
 
     logic [SETW-1:0][SETW-1:0] vage, nvage; // valid age, ~(valid age)
     logic [SETW-1:0][SETW-1:0] ot, ot_masked;
-    logic [SETW-1:0] lruv;
     generate
     for (genvar i = 0; i < SETW; ++i)
         assign vage[i] = vld[i] ? age[i] : '1; // empty lines are treated as "oldest" (all 1s)

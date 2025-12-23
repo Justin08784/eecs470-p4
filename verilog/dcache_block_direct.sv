@@ -55,6 +55,8 @@ module fill_handler (
     // Metadata to consult
     input  CACHE_HEADER hdr,
     input  MSHR_ENTRY   mshr,
+
+    input  logic[NUM_SETS-1:0][ASSOC-1:0] lruvs, // lru vectors
     input  WAY[NUM_SETS-1:0]    lru_ways,
 
     /* orders */
@@ -71,9 +73,11 @@ module fill_handler (
     SID    sid;
     WAY    way;
 
-    logic[NUM_SETS-1:0] set_all_vld;
+    logic[NUM_SETS-1:0][ASSOC-1:0] lru_and_needs_evict; // is lru AND needs evict
+    logic[NUM_SETS-1:0] lru_needs_evict;                // the lru way needs evict
+    assign lru_and_needs_evict = lruvs & (hdr.vld & hdr.dirty);
     for (genvar s = 0; s < NUM_SETS; ++s)
-        assign set_all_vld[s] = &hdr.vld[s];
+        assign lru_needs_evict[s] = |lru_and_needs_evict[s];
 
     always_comb begin
         req = mshr.status == S_FILL;
@@ -81,12 +85,8 @@ module fill_handler (
         sid = get_sid(mshr.addr);
         way = lru_ways[sid];
 
-        op = OP_NONE;
-        if (req) begin
-            op = set_all_vld[sid] && hdr.dirty[sid][way]
-                ? OP_FILL_EVICT
-                : OP_FILL_NO_EVICT;
-        end
+        op =!req                ? op :
+            lru_needs_evict[sid]? OP_FILL_EVICT : OP_FILL_NO_EVICT;
 
         {r_snd, w_snd, mshr_snd} = '0;
         case (op)
@@ -405,6 +405,7 @@ module dcache_block (
 );
     CACHE_HEADER hdr, hdr_n;
 
+    logic [NUM_SETS-1:0][ASSOC-1:0] lruvs;
     WAY [NUM_SETS-1:0]  lru_ways;
     WAY acc_way;
     AGE [NUM_SETS-1:0]  acc_age_n;
@@ -414,6 +415,7 @@ module dcache_block (
         lru_man #(.SETW(ASSOC)) lru_seti (
             .vld    (hdr.vld[s]),
             .age    (hdr.age[s]),
+            .lruv   (lruvs[s]),
             .lru_way(lru_ways[s]),
 
             .msk_en (1'b0), // unused
@@ -565,6 +567,7 @@ module dcache_block (
     fill_handler dec_fill0 (
         .hdr        (hdr),
         .mshr       (mshr),
+        .lruvs      (lruvs),
         .lru_ways   (lru_ways),
 
         .req        (req        [REQR_FILL]),

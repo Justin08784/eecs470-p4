@@ -104,28 +104,30 @@ module irq #(
 
     always_ff @(posedge clock) begin
         for (int i = 0; i < 2; ++i) begin
-            if  (cen[i]) begin
-                int cur;
-                cur = cidx[i];
+            int cur;
+            if (!cen[i])
+                continue;
+            cur = cidx[i];
 
-                cpl  [cur]          <= 1'b1;
-                state[cur].blk      <= cdat.data[i];
-                state[cur].md       <= cdat.insn_md[i];
-            end
-
-            if (i < wen_cnt) begin
-                int cur;
-                cur = wr_idxs_n[i];
-
-                cpl  [cur]          <= 1'b0;
-                state[cur].dw       <=  wdat[i].dw;
-                state[cur].off      <=  wdat[i].off;
-                state[cur].fmsk     <=  wdat[i].fmsk;
-                state[cur].is_end   <=  wdat[i].is_end;
-            end
+            cpl  [cur]      <= 1;
+            state[cur].blk  <= cdat.data[i];
+            state[cur].md   <= cdat.insn_md[i];
         end
 
-        if (reset | flush)
+        for (int i = 0; i < 2; ++i) begin
+            int cur;
+            if (i >= wen_cnt)
+                continue;
+            cur = wr_idxs_n[i];
+
+            cpl  [cur]          <= 0;
+            state[cur].dw       <=  wdat[i].dw;
+            state[cur].off      <=  wdat[i].off;
+            state[cur].fmsk     <=  wdat[i].fmsk;
+            state[cur].is_end   <=  wdat[i].is_end;
+        end
+
+        if (flush)
             cpl <= '1;
     end
 
