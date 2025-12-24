@@ -850,6 +850,7 @@ typedef struct packed {
     INST            inst;
     // IDEA: carry the imm (decode it in stage_id) instead of inst
 
+    logic           has_dst;
     PHYS_REG_IDX    t;
     PHYS_REG_IDX    t1;
     PHYS_REG_IDX    t2;
@@ -960,6 +961,7 @@ typedef struct packed {
     logic   [NUM_FU_BRU-1:0] en;
     logic   [NUM_FU_BRU-1:0] take;
     WADDR   [NUM_FU_BRU-1:0] tgt;
+    ROB_IDX [NUM_FU_BRU-1:0] rob_idx;
     BTQ_IDX [NUM_FU_BRU-1:0] btq_idx;
 
     BMASK       clmsk; // OR of all b1hots of resolving branches

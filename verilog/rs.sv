@@ -424,6 +424,7 @@ module rs #(parameter
                 PC          : d_in.dat[i].PC,
                 inst        : d_in.dat[i].inst,
 
+                has_dst     : d_in.dat[i].has_dst,
                 t           : d_in.dat[i].t,
                 t1          : d_in.dat[i].t1,
                 t2          : d_in.dat[i].t2,

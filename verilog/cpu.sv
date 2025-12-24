@@ -259,6 +259,7 @@ module cpu (
         .d_in       (dispatch_2_rob),
         .d_out      (rob_2_dispatch),
 
+        .cbru_in    (ex_2_cbru),
         .cdat_in    (ex_2_cdat)
     );
 

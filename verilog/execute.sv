@@ -275,6 +275,12 @@ module bru_ex(
     };
 `endif
 
+    /*
+    Rob completion paths (i.e. how do we mark our rob entry has complete?):
+    1. Dest-less (t == `ZERO_PHYS_REG) : via cbru_out slot
+    2. Has dst   (t != `ZERO_PHYS_REG) : via cbru_out slot AND a cdat_out (cdb) slot
+        - In that cycle, there will be two identical completions to the ROB, which is inelegant but not incorrect.
+    */
     logic mispred;
     WADDR flush_fb_base;
     logic [3:0] flush_fb_off;
@@ -283,6 +289,7 @@ module bru_ex(
         en      : i_vld,
         take    : tmp_take,
         tgt     : addr2w(tmp_res),
+        rob_idx : i_reg.rob_idx,
         btq_idx : i_reg.btq_idx,
 
 `ifdef DEBUG
@@ -565,6 +572,7 @@ module stage_ex_p4 (
                 bytag   : rs_in.bytag_bru[i],
                 b1hot   : rs_in.fu_dat_bru[i].b1hot,
 
+                has_dst : rs_in.fu_dat_bru[i].has_dst,
                 t       : rs_in.fu_dat_bru[i].t,
                 t1      : rs_in.fu_dat_bru[i].t1,
                 t2      : rs_in.fu_dat_bru[i].t2,
@@ -734,6 +742,7 @@ module stage_ex_p4 (
                 func        : iss.o_dat.bru[i].inst.b.funct3,
                 cond_branch : iss.o_dat.bru[i].cond_branch,
 
+                has_dst     : iss.o_dat.bru[i].has_dst,
                 t           : iss.o_dat.bru[i].t,
                 rob_idx     : iss.o_dat.bru[i].rob_idx,
                 btq_idx     : iss.o_dat.bru[i].btq_idx
@@ -900,7 +909,10 @@ module stage_ex_p4 (
     // cdb_req.mul set by mul_ex
     // cdb_req.lod set by lod_ex
     assign cdb_req.str = '0;
-    assign cdb_req.bru = rs_in.fu_vld_bru;
+        logic [NUM_FU_BRU-1:0] rs_in_fu_has_dst_bru;
+        for (genvar f = 0; f < NUM_FU_BRU; ++f)
+            assign rs_in_fu_has_dst_bru[f] = rs_in.fu_dat_bru[f].has_dst;
+    assign cdb_req.bru = rs_in.fu_vld_bru & rs_in_fu_has_dst_bru; // a dest-less branch does not contend for CDB (it simply uses the FU's cbru_out slot)
     `BY_FU(logic) cdb_gnt;
 
     psel_gen #(
@@ -998,7 +1010,7 @@ module stage_ex_p4 (
     execute2complete_dat cdat_out_prekill_n;
     assign rs_out = '{
         fu_cdb_gnt_alu  : cdb_gnt.alu,
-        fu_cdb_gnt_bru  : cdb_gnt.bru,
+        fu_cdb_gnt_bru  : cdb_gnt.bru | ~rs_in_fu_has_dst_bru, // a dest-less branch can always ROB-complete (via the FU's cbru_out slot)
 
         fu_rdy_alu      : iss.i_rdy.alu,
         fu_rdy_mul      : iss.i_rdy.mul,
@@ -1121,6 +1133,7 @@ module stage_ex_p4 (
 `ifdef FORMAL
     always_ff @(posedge clock) begin
         if (!reset) begin
+            // FIXME: better to enforce this in rob.sv, where we can check duplicate dest tags over all in-flight insns
             if (ctag_out.en[0] && ctag_out.en[1]
                 && ctag_out.ts[0] == ctag_out.ts[1]
                 && ctag_out.ts[0] != '0) begin

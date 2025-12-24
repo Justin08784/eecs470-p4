@@ -68,6 +68,7 @@ typedef struct packed {
     BYPASS_TAG      bytag;
     BMASK           b1hot;
 
+    logic           has_dst;
     PHYS_REG_IDX    t;
     PHYS_REG_IDX    t1;
     PHYS_REG_IDX    t2;
@@ -138,6 +139,7 @@ typedef struct packed {
     logic           cond_branch;
     logic   [2:0]   func;       // Which branch condition to check
 
+    logic           has_dst;
     PHYS_REG_IDX    t;
     ROB_IDX         rob_idx;
     BTQ_IDX         btq_idx;

@@ -23,6 +23,7 @@ module rob #(
     input  RETIRE_PKT r_in,
 
     // complete (write)
+    input  execute2complete_bru cbru_in,
     input  execute2complete_dat cdat_in,
 
     // dispatch (write)
@@ -116,6 +117,14 @@ module rob #(
             $error("ROB underflow!");
 `endif
         // handle complete (ins)
+        for (int i = 0; i < NUM_FU_BRU; ++i) begin
+            int cur_idx;
+            cur_idx = cbru_in.rob_idx[i];
+
+            if (cbru_in.en[i])
+                state[cur_idx].cpl <= 1'b1;
+        end
+
         for (int unsigned i = 0, int cur_idx = 0; i < NUM_CPORTS; ++i) begin
             cur_idx = cdat_in.rob_idxs[i];
 
@@ -181,6 +190,15 @@ module rob #(
                 r_out.illegal[i]
             );
         end
+
+        $display("completions: bru: {en: %b, idx: %2d}, cdat[0]: {en: %b, idx: %2d}, cdat[1]: {en: %b, idx: %2d}",
+            cbru_in.en[0],
+            cbru_in.rob_idx[0],
+            cdat_in.en[0],
+            cdat_in.rob_idxs[0],
+            cdat_in.en[1],
+            cdat_in.rob_idxs[1]
+        );
 
         rob_vld = '0;
         for (int cnt = 0; cnt < used; ++cnt)
