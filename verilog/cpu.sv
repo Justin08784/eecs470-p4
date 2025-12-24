@@ -350,6 +350,9 @@ module cpu (
         .dbg_file   (dbg_prf.file),
 `endif
         .clock,
+`ifdef FORMAL
+        .reset      (reset),
+`endif
         /* 
         Here each X_BY_FU type is coerced into a flat X array type
         This convenience is why we opt to avoid wrapping these I/Os into

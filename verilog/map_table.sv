@@ -56,7 +56,7 @@ module map_table #(parameter
             */
             d_out.t1s[i] = entries_n[i][d_in.src1s[i]];
             d_out.t2s[i] = entries_n[i][d_in.src2s[i]];
-            if (d_in.dsts[i] != `ZERO_REG) begin
+            if (d_in.dsts[i] != `ZERO_REG) begin // do not rename zero register
                 d_out.ts_old[i] = entries_n[i][d_in.dsts[i]];
                 entries_n[i + 1][d_in.dsts[i]] = d_in.ts[i];
             end

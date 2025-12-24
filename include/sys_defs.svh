@@ -230,6 +230,7 @@ typedef enum logic [2:0] {
 // the zero register
 // In RISC-V, any read of this register returns zero and any writes are thrown away
 `define ZERO_REG 5'd0
+`define ZERO_PHYS_REG {$bits(PHYS_REG_IDX){1'b0}}
 
 // Basic NOP instruction. Allows pipline registers to clearly be reset with
 // an instruction that does nothing instead of Zero which is really an ADDI x0, x0, 0

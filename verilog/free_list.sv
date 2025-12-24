@@ -90,7 +90,7 @@ module free_list #(parameter
 
         // pack all returning pregs to lowest indices
         for (int unsigned i = 0; i < r_in.en_cnt; ++i) begin
-            if (r_in.t_old[i] != `ZERO_REG) begin
+            if (r_in.t_old[i] != `ZERO_PHYS_REG) begin
                 told_packed[free_cnt] = r_in.t_old[i];
                 ++free_cnt;
             end

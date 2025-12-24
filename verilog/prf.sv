@@ -10,6 +10,9 @@ module prf #(
     output logic [DEPTH-1:0][WIDTH-1:0] dbg_file,
 `endif
     input clock, //reset, flush, // QUESTION: do we need reset? or should we force write to happen before read at the same addr?
+`ifdef FORMAL
+    input reset,
+`endif
 
     // complete (write)
     input execute2complete_dat cdat_in,
@@ -50,25 +53,19 @@ module prf #(
         for (int i = 0; i < NUM_RPORTS; i++) begin
             
             // TODO: enable should be more granular–– per t1/t2. Some insns only need to read 1 value.
-            if (s_t1s[i] == `ZERO_REG || !s_en1s[i]) begin
-                s_v1s[i] = '0;
-            end else if (cdat_in.en[0] && (cdat_in.ts[0] == s_t1s[i])) begin
+            if      (cdat_in.en[0] && (cdat_in.ts[0] == s_t1s[i]))
                 s_v1s[i] = cdat_in.data[0]; // internal forwarding
-            end else if (cdat_in.en[1] && (cdat_in.ts[1] == s_t1s[i])) begin
+            else if (cdat_in.en[1] && (cdat_in.ts[1] == s_t1s[i]))
                 s_v1s[i] = cdat_in.data[1]; // internal forwarding
-            end else begin
+            else
                 s_v1s[i] = file[s_t1s[i]];
-            end
 
-            if (s_t2s[i] == `ZERO_REG || !s_en2s[i]) begin
-                s_v2s[i] = '0;
-            end else if (cdat_in.en[0] && (cdat_in.ts[0] == s_t2s[i])) begin
+            if      (cdat_in.en[0] && (cdat_in.ts[0] == s_t2s[i]))
                 s_v2s[i] = cdat_in.data[0]; // internal forwarding
-            end else if (cdat_in.en[1] && (cdat_in.ts[1] == s_t2s[i])) begin
+            else if (cdat_in.en[1] && (cdat_in.ts[1] == s_t2s[i]))
                 s_v2s[i] = cdat_in.data[1]; // internal forwarding 
-            end else begin
+            else
                 s_v2s[i] = file[s_t2s[i]];
-            end
             
         end
     end
@@ -76,9 +73,11 @@ module prf #(
     // Write port
     always_ff @(posedge clock) begin
         foreach (cdat_in.en[i]) begin
-            if (cdat_in.en[i] && (cdat_in.ts[i] != `ZERO_REG))
+            if (cdat_in.en[i])
                 file[cdat_in.ts[i]] <= cdat_in.data[i];
         end
+
+        file[`ZERO_PHYS_REG] <= '0; // pin zero reg to 0
     end
 
 
@@ -87,6 +86,20 @@ module prf #(
     task print_prf;
         $display("TODO: impl print_prf");
     endtask
+`endif
+
+`ifdef FORMAL
+    always_ff @(posedge clock) begin
+        for (int c = 0; c < N; ++c)
+            assert(reset | ~cdat_in.en[c] | ~(cdat_in.ts[c] == `ZERO_PHYS_REG & cdat_in.data[c] != '0)) else $fatal;
+        /*
+        cdat broadcast invariant: a write to the zero register must never write a nonzero value
+
+        Important because PRF bypass and CDB bypass both forward the writer's value to the reader
+        if tags match **even if** the destination tag is 0. Pinning `ZERO_PHYS_REG to 0 is insufficient
+        because on cdat tag match data will be supplied via the cdat bypass.
+        */
+    end
 `endif
 
 endmodule

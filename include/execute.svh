@@ -163,7 +163,7 @@ function automatic MUL_REGS mul_snoop(
 );
     MUL_REGS rv = v;
     foreach (cdat.en[n]) begin
-        if (!cdat.en[n] || cdat.ts[n] == '0)
+        if (!cdat.en[n])
             continue;
         if (rv.t1 == cdat.ts[n])
             rv.rs1 = cdat.data[n];
@@ -179,7 +179,7 @@ function automatic LOD_REGS lod_snoop(
 );
     LOD_REGS rv = v;
     foreach (cdat.en[n]) begin
-        if (!cdat.en[n] || cdat.ts[n] == '0)
+        if (!cdat.en[n])
             continue;
         if (rv.dat.t1 == cdat.ts[n])
             rv.rs1 = cdat.data[n];
@@ -193,7 +193,7 @@ function automatic STR_REGS str_snoop(
 );
     STR_REGS rv = v;
     foreach (cdat.en[n]) begin
-        if (!cdat.en[n] || cdat.ts[n] == '0)
+        if (!cdat.en[n])
             continue;
         if (rv.dat.t1 == cdat.ts[n])
             rv.rs1 = cdat.data[n];

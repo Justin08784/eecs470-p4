@@ -1018,6 +1018,10 @@ module stage_ex_p4 (
         assign ctag_ts.bru[i]   = rs_in.fu_dat_bru[i].t;
     end
 
+    logic [NUM_FU_TOTAL-1:0] cands_flat_has_dst;
+    for (genvar f = 0; f < NUM_FU_TOTAL; ++f)
+        assign cands_flat_has_dst[f] = cands_flat[f].t != `ZERO_PHYS_REG;
+
     logic [N-1:0][NUM_FU_TOTAL-1:0] cdb2fu_tag_sel, cdb2fu_dat_sel;
     assign cdb2fu_tag_sel = cdb2fu_gbus;
     for (genvar c = 0; c < N; ++c) begin
@@ -1044,7 +1048,8 @@ module stage_ex_p4 (
                     cdat_out_prekill_n.msk[c]       = cands_msk[f];
                     cdat_out_prekill_n.ts[c]        = cands_flat[f].t;
                     cdat_out_prekill_n.rob_idxs[c]  = cands_flat[f].rob_idx;
-                    cdat_out_prekill_n.data[c]      = cands_flat[f].data;
+                    cdat_out_prekill_n.data[c]      = cands_flat[f].data & {$bits(DATA){cands_flat_has_dst[f]}};
+                        // ^ force wb's to zero register to write 0 (invariant checked in prf.sv FORMAL)
                 end
             end
         end

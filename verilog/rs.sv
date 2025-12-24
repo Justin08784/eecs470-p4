@@ -110,13 +110,13 @@ module rs_part #(
         for (genvar rs = 0; rs < PART_SZ; ++rs) begin
             assign to_t1_rdy_per_cpl[n][rs] =
                 ctag_in.en[n]
-                & entries[rs].dat.t1 == ctag_in.ts[n]
-                & ctag_in.ts[n] != '0;
+                & entries[rs].dat.t1 == ctag_in.ts[n];
+                // & ctag_in.ts[n] != '0;
 
             assign to_t2_rdy_per_cpl[n][rs] =
                 ctag_in.en[n]
-                & entries[rs].dat.t2 == ctag_in.ts[n]
-                & ctag_in.ts[n] != '0;
+                & entries[rs].dat.t2 == ctag_in.ts[n];
+                // & ctag_in.ts[n] != '0;
 
         end
     end
@@ -714,8 +714,8 @@ module rs_part_load #(
         for (genvar rs = 0; rs < PART_SZ; ++rs) begin
             assign to_t1_rdy_per_cpl[n][rs] =
                 ctag_in.en[n]
-                & entries[rs].dat.t1 == ctag_in.ts[n]
-                & ctag_in.ts[n] != '0;
+                & entries[rs].dat.t1 == ctag_in.ts[n];
+                // & ctag_in.ts[n] != '0;
 
         end
     end
