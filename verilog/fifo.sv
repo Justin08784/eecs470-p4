@@ -184,3 +184,124 @@ module fifo #(
 `endif
 
 endmodule
+
+
+// fifo implemented using barrel-shift
+// (only FIFO_FLUSH_RESET mode supported)
+module fifo_barrel #(
+    parameter int DEPTH =16,
+    parameter int WIDTH =128,
+    parameter int RPORTS=8,
+    parameter int WPORTS=8
+) (
+    input   logic   clock,
+    input   logic   reset,
+    input   logic   flush,
+
+    output  logic   [$clog2(RPORTS+1)-1:0]  rvld_cnt,
+    input   logic   [$clog2(RPORTS+1)-1:0]  rrdy_cnt,
+    // output  logic   [0:RPORTS-1]            rvld,   // used
+    // input   logic   [0:RPORTS-1]            rrdy,
+    output  logic   [0:RPORTS-1][0:WIDTH-1] rdat,
+
+    input   logic   [$clog2(WPORTS+1)-1:0]  wvld_cnt,
+    output  logic   [$clog2(WPORTS+1)-1:0]  wrdy_cnt,
+    // input   logic   [0:WPORTS-1]            wvld,
+    // output  logic   [0:WPORTS-1]            wrdy,   // free
+    input   logic   [0:WPORTS-1][0:WIDTH-1] wdat
+
+);
+
+    initial begin
+        // assert  (DEPTH  == 32)  else $fatal;
+        // assert  (WIDTH  == 128) else $fatal;
+        // assert  (RPORTS == 8)   else $fatal;
+        // assert  (WPORTS == 8)   else $fatal;
+
+        // wire is_pow2 = (n != 0) && ((n & (n-1)) == 0);
+        // These should all be powers of 2
+        assert  ((DEPTH != 0)   & ((DEPTH   & (DEPTH-1))    == 0)) else $fatal;
+        // assert  ((WIDTH != 0)   & ((WIDTH   & (WIDTH-1))    == 0)) else $fatal;
+        assert  ((RPORTS != 0)  & ((RPORTS  & (RPORTS-1))   == 0)) else $fatal;
+        assert  ((WPORTS != 0)  & ((WPORTS  & (WPORTS-1))   == 0)) else $fatal;
+
+        assert  (RPORTS <= DEPTH) else $fatal;
+        assert  (WPORTS <= DEPTH) else $fatal;
+
+    end
+    logic [$clog2(DEPTH)-1:0]   head, head_n, tail, tail_n;
+    logic [$clog2(DEPTH+1)-1:0] used, used_n, free;
+    logic [DEPTH-1:0][WIDTH-1:0]state, state_n;
+
+    assign free     = DEPTH - used;
+    assign rvld_cnt = used < RPORTS ? used : RPORTS;
+    assign wrdy_cnt = free < WPORTS ? free : WPORTS;
+
+    logic[2*DEPTH-1:0][WIDTH-1:0] state_dd; // double depth
+    logic[WIDTH-1:0][2*DEPTH-1:0] state_ddT;// double depth transpose
+    assign state_dd = {state, state};
+    for (genvar w = 0; w < WIDTH; ++w)
+        for (genvar d = 0; d < 2*DEPTH; ++d)
+            assign state_ddT[w][d] = state_dd[d][w];
+    logic[WIDTH-1:0][DEPTH-1:0] state_rotrT;
+    for (genvar w = 0; w < WIDTH; ++w)
+        assign state_rotrT[w] = state_ddT[w] >> head;
+    logic[DEPTH-1:0][WIDTH-1:0] state_rotr;
+    for (genvar d = 0; d < DEPTH; ++d)
+        for (genvar w = 0; w < WIDTH; ++w)
+            assign state_rotr[d][w] = state_rotrT[w][d];
+    assign rdat = state_rotr[RPORTS-1:0];
+
+    logic   [$clog2(RPORTS+1)-1:0]  ren_cnt;
+    logic   [$clog2(WPORTS+1)-1:0]  wen_cnt;
+    assign ren_cnt = rrdy_cnt < used ? rrdy_cnt : used;
+    assign wen_cnt = free < wvld_cnt ? free : wvld_cnt;
+
+    localparam DIFF         = DEPTH - WPORTS;
+    localparam DIFF_WIDTHS  = (DEPTH - WPORTS) * WIDTH;
+    logic[2*DEPTH-1:0][WIDTH-1:0] wdat_dd;
+    logic[WIDTH-1:0][2*DEPTH-1:0] wdat_ddT; // double depth transpose
+    assign wdat_dd = {{DIFF_WIDTHS{1'bx}}, wdat, {DIFF_WIDTHS{1'bx}}, wdat};
+    for (genvar w = 0; w < WIDTH; ++w)
+        for (genvar d = 0; d < 2*DEPTH; ++d)
+            assign wdat_ddT[w][d] = wdat_dd[d][w];
+    logic[WIDTH-1:0][2*DEPTH-1:0] wdat_rotl_ddT;
+    logic[WIDTH-1:0][DEPTH-1:0] wdat_rotl_T;
+    for (genvar w = 0; w < WIDTH; ++w) begin
+        assign wdat_rotl_ddT[w] = wdat_ddT[w] << tail;
+        assign wdat_rotl_T[w]   = wdat_rotl_ddT[w][2*DEPTH-1:DEPTH];
+    end
+    logic[DEPTH-1:0][WIDTH-1:0] wdat_rotl;
+    for (genvar d = 0; d < DEPTH; ++d)
+        for (genvar w = 0; w < WIDTH; ++w)
+            assign wdat_rotl[d][w] = wdat_rotl_T[w][d];
+
+    logic[WPORTS-1:0] wen;
+    logic[2*DEPTH-1:0] wmsk_rotl_dd;
+    for (genvar i = 0; i < WPORTS; ++i)
+        assign wen[i] = i < wen_cnt;
+    assign wmsk_rotl_dd = {{DIFF{1'b0}}, wen, {DIFF{1'b0}}, wen} << tail;
+    logic[DEPTH-1:0] wmsk_rotl;
+    assign wmsk_rotl = wmsk_rotl_dd[2*DEPTH-1:DEPTH];
+
+    assign head_n = head + ren_cnt;
+    assign tail_n = tail + wen_cnt;
+    assign used_n = (used + wen_cnt) - ren_cnt;
+    for (genvar i = 0; i < DEPTH; ++i)
+        assign state_n[i] = wmsk_rotl[i] ? wdat_rotl[i] : state[i];
+
+    always_ff @(posedge clock) begin
+        state   <= state_n;
+        head    <= head_n;
+        tail    <= tail_n;
+        used    <= used_n;
+
+        if (reset | flush) begin
+            head <= '0;
+            tail <= '0;
+            used <= '0;
+        end
+
+    end
+
+endmodule
