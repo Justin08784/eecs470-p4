@@ -433,31 +433,49 @@ module align (
     `CNT_TYPE(4)    a2_a1_ren_cnt;
     ALIGN1_RES[3:0] a1_a2_rdat;
 
-    fifo #(
+    // fifo #(
+    //     .DEPTH(8),
+    //     .WIDTH($bits(ALIGN1_RES)),
+    //     .NUM_RPORTS(4),
+    //     .NUM_WPORTS(4),
+    //     .FLUSH_MODE(FIFO_FLUSH_RESET),
+    //     .ENABLE_INTR_FWD(`FALSE),
+    //     .INSTANCE_ID(72)
+    // ) align1_res (
+    //     .clock      (clock),
+    //     .reset      (reset),
+    //     .flush      (flush),
+
+    //     // >> unused inputs
+    //     .flush_snap ('0),
+    //     .clmsk      ('0),
+    //     .wr_bmask   ('0),
+    //     // << unused inputs
+
+    //     .wr_en_cnt  (align1_res_wen_cnt),
+    //     .wr_data    (align1_res_wdat),
+    //     .rd_en_cnt  (a2_a1_ren_cnt),
+    //     .rd_data    (a1_a2_rdat),
+    //     .free_scnt  (align1_res_free_scnt),
+    //     .used_scnt  (a1_a2_used_scnt)
+    // );
+
+    fifo_barrel #(
         .DEPTH(8),
         .WIDTH($bits(ALIGN1_RES)),
-        .NUM_RPORTS(4),
-        .NUM_WPORTS(4),
-        .FLUSH_MODE(FIFO_FLUSH_RESET),
-        .ENABLE_INTR_FWD(`FALSE),
-        .INSTANCE_ID(72)
+        .RPORTS(4),
+        .WPORTS(4)
     ) align1_res (
         .clock      (clock),
         .reset      (reset),
         .flush      (flush),
 
-        // >> unused inputs
-        .flush_snap ('0),
-        .clmsk      ('0),
-        .wr_bmask   ('0),
-        // << unused inputs
-
-        .wr_en_cnt  (align1_res_wen_cnt),
-        .wr_data    (align1_res_wdat),
-        .rd_en_cnt  (a2_a1_ren_cnt),
-        .rd_data    (a1_a2_rdat),
-        .free_scnt  (align1_res_free_scnt),
-        .used_scnt  (a1_a2_used_scnt)
+        .wvld_cnt   (align1_res_wen_cnt),
+        .wdat       (align1_res_wdat),
+        .rrdy_cnt   (a2_a1_ren_cnt),
+        .rdat       (a1_a2_rdat),
+        .wrdy_cnt   (align1_res_free_scnt),
+        .rvld_cnt   (a1_a2_used_scnt)
     );
 
     // align 2
@@ -916,8 +934,6 @@ module dcf (
     assign base_n[1] = rrb2expander_dat[0].base_n;
     assign base_n[2] = rrb2expander_dat[1].base_n;
 
-    FB_OFF[NUM_FTQ-1:0] words_left_m1; // index: (ftq). element: `IDX_TYPE(NUM_W)
-
     assign off_n[0][0] = cur.off;
     assign off_n[1][0] = 0;
     for (genvar w = 1; w <= NUM_W; ++w) begin
@@ -925,8 +941,8 @@ module dcf (
         assign off_n[1][w] = w;
     end
 
-    assign words_left_m1[0] = rrb2expander_dat[0].off - cur.off; // words left minus 1 e.g. 0 for 1 left
-    assign words_left_m1[1] = rrb2expander_dat[1].off;
+    FB_OFF words_left_m1; // words left minus 1, clamped at 4 e.g. 0 for 1 left (ftq 0 only)
+    assign words_left_m1 = `MIN(4, rrb2expander_dat[0].off - cur.off);
 
     for (genvar e = 0; e < NUM_FTQ; ++e) begin
         logic ftq_entry_vld;
@@ -1009,8 +1025,8 @@ module dcf (
     logic[NUM_W:0]      sel_bot5;
     FB_OFF[NUM_W:0]     off_n_comp;
     logic[NUM_W:0]      after_end_comp;
-    assign sel_bot4 = ~( 4'b1110    << words_left_m1[0]);
-    assign sel_bot5 = ~(5'b11110    << words_left_m1[0]);
+    assign sel_bot4 = ~( 4'b1110    << words_left_m1);
+    assign sel_bot5 = ~(5'b11110    << words_left_m1);
 
     BTQ_CAND[NUM_W-1:0] sel_bot4_btq_cand_msk;
     FB_OFF[NUM_W:0]     sel_bot5_off_n_msk;
@@ -1019,15 +1035,24 @@ module dcf (
     for (genvar w = 0; w <= NUM_W; ++w)
         assign sel_bot5_off_n_msk[w] = {$bits(FB_OFF){sel_bot5[w]}};
 
-    assign vld_comp     = ({vld   [1][2:0], 1'b0} << words_left_m1[0]) | vld[0];
-    assign is_end_comp  = ({is_end[1][2:0], 1'b0} << words_left_m1[0]) | is_end[0];
+    logic[4:0][$clog2(4*$bits(BTQ_CAND)+1)-1:0] btq_cand_shift_rom;
+    logic[4:0][$clog2(4*$bits(FB_OFF)+1)-1:0]   fb_off_shift_rom;
+    for (genvar s = 0; s <= 4; ++s) begin
+        assign btq_cand_shift_rom[s]= s * $bits(BTQ_CAND);
+        assign fb_off_shift_rom[s]  = s * $bits(FB_OFF);
+    end
+
+    assign vld_comp     = ({vld   [1][2:0], 1'b0} << words_left_m1) | vld[0];
+    assign is_end_comp  = ({is_end[1][2:0], 1'b0} << words_left_m1) | is_end[0];
     assign cands_comp   =
-        ({raw_cands[1][2:0], {$bits(BTQ_CAND){1'b0}}}   << (words_left_m1[0]*$bits(BTQ_CAND)))
+        // ({raw_cands[1][2:0], {$bits(BTQ_CAND){1'b0}}}   << (words_left_m1*$bits(BTQ_CAND)))
+        ({raw_cands[1][2:0], {$bits(BTQ_CAND){1'b0}}}   << btq_cand_shift_rom[words_left_m1])
     |   (raw_cands[0]   & sel_bot4_btq_cand_msk);
     assign off_n_comp   =
-        ({off_n[1][3:0], {$bits(FB_OFF){1'b0}}}         << (words_left_m1[0]*$bits(FB_OFF)))
+        // ({off_n[1][3:0], {$bits(FB_OFF){1'b0}}}         << (words_left_m1*$bits(FB_OFF)))
+        ({off_n[1][3:0], {$bits(FB_OFF){1'b0}}}         << fb_off_shift_rom[words_left_m1])
     |   (off_n[0]       & sel_bot5_off_n_msk);
-    assign after_end_comp = ({after_end[1][3:0], 1'b0}  << words_left_m1[0])
+    assign after_end_comp = ({after_end[1][3:0], 1'b0}  << words_left_m1)
     |   (after_end[0]   & sel_bot5);
 
     // logic[NUM_FTQ-1:0][NUM_W-1:0] rrb_prefix;
@@ -1049,8 +1074,9 @@ module dcf (
     //     assign ren_cnts[w] = ren_cnts[w-1] + en_end_comp[w-1];
     assign expander2rrb_ren_cnt = $countones(en_end_comp);
 
+`ifdef DEBUG
     always_ff @(posedge clock) begin
-        if (!reset) begin
+        if (!rese) begin
             $display("-- expander --");
             for (int e = 0; e < 2; ++e)
                 if (e < rrb2expander_used_scnt)
@@ -1058,7 +1084,7 @@ module dcf (
                 else
                     $display("fb[%1d]:", e);
             $display("cur: base = %x, off: %1d", cur.base, cur.off);
-            $display("words_left_m1: [%2d, %2d]", words_left_m1[0], words_left_m1[1]);
+            $display("words_left_m1: %2d", words_left_m1);
             $display("sel_bot4:  %4b", sel_bot4);
             $display("sel_bot5: %5b", sel_bot5);
 
@@ -1076,36 +1102,55 @@ module dcf (
             
         end
     end
+`endif
 
     `CNT_TYPE(4) align2expander_ren_cnt;
     `CNT_TYPE(4) expander2align_used_scnt; // FIXME: unused
     BTQ_CAND[3:0] expander2align_dat;
 
-    fifo #(
+    // fifo #(
+    //     .DEPTH(8),
+    //     .WIDTH($bits(BTQ_CAND)),
+    //     .NUM_RPORTS(4),
+    //     .NUM_WPORTS(4),
+    //     .FLUSH_MODE(FIFO_FLUSH_RESET),
+    //     .ENABLE_INTR_FWD(`FALSE),
+    //     .INSTANCE_ID(72)
+    // ) expander (
+    //     .clock,
+    //     .reset,
+    //     .flush,
+
+    //     // >> unused inputs
+    //     .flush_snap ('0),
+    //     .clmsk      ('0),
+    //     .wr_bmask   ('0),
+    //     // << unused inputs
+
+    //     .wr_en_cnt  (en_cnt),
+    //     .wr_data    (cands_comp),
+    //     .rd_en_cnt  (align2expander_ren_cnt),
+    //     .rd_data    (expander2align_dat),
+    //     .free_scnt  (free_scnt),
+    //     .used_scnt  (expander2align_used_scnt)
+    // );
+
+    fifo_barrel #(
         .DEPTH(8),
         .WIDTH($bits(BTQ_CAND)),
-        .NUM_RPORTS(4),
-        .NUM_WPORTS(4),
-        .FLUSH_MODE(FIFO_FLUSH_RESET),
-        .ENABLE_INTR_FWD(`FALSE),
-        .INSTANCE_ID(72)
+        .RPORTS(4),
+        .WPORTS(4)
     ) expander (
         .clock,
         .reset,
         .flush,
 
-        // >> unused inputs
-        .flush_snap ('0),
-        .clmsk      ('0),
-        .wr_bmask   ('0),
-        // << unused inputs
-
-        .wr_en_cnt  (en_cnt),
-        .wr_data    (cands_comp),
-        .rd_en_cnt  (align2expander_ren_cnt),
-        .rd_data    (expander2align_dat),
-        .free_scnt  (free_scnt),
-        .used_scnt  (expander2align_used_scnt)
+        .wvld_cnt   (en_cnt),
+        .wdat       (cands_comp),
+        .rrdy_cnt   (align2expander_ren_cnt),
+        .rdat       (expander2align_dat),
+        .wrdy_cnt   (free_scnt),
+        .rvld_cnt   (expander2align_used_scnt)
     );
 
     always_ff @(posedge clock) begin
@@ -1152,31 +1197,57 @@ module dcf (
 
     `CNT_TYPE(N) used_scnt;
     assign d_out.wen_cnt = `MIN(used_scnt, d_in.rdy_scnt);
-    fifo #(
+    // fifo #(
+    //     .DEPTH(4*N),
+    //     .WIDTH($bits(IF_ID_PKT)),
+    //     .NUM_RPORTS(N),
+    //     .NUM_WPORTS(4),
+    //     .FLUSH_MODE(FIFO_FLUSH_RESET),
+    //     .ENABLE_INTR_FWD(`FALSE),
+    //     .INSTANCE_ID(48)
+    // ) insn_buf (
+    //     .clock,
+    //     .reset,
+    //     .flush,
+
+    //     // >> unused inputs
+    //     .flush_snap ('0),
+    //     .clmsk      ('0),
+    //     .wr_bmask   ('0),
+    //     // << unused inputs
+
+    //     .wr_en_cnt  (align2ibuf_wen_cnt),
+    //     .wr_data    (align2ibuf_dat),
+    //     .rd_en_cnt  (d_out.wen_cnt),
+    //     .rd_data    (d_out.dat),
+    //     .free_scnt  (ibuf2align_rdy_scnt),
+    //     .used_scnt  (used_scnt)
+    // );
+
+    fifo_barrel #(
         .DEPTH(4*N),
         .WIDTH($bits(IF_ID_PKT)),
-        .NUM_RPORTS(N),
-        .NUM_WPORTS(4),
-        .FLUSH_MODE(FIFO_FLUSH_RESET),
-        .ENABLE_INTR_FWD(`FALSE),
-        .INSTANCE_ID(48)
+        .RPORTS(N),
+        .WPORTS(4)
     ) insn_buf (
         .clock,
         .reset,
         .flush,
 
-        // >> unused inputs
-        .flush_snap ('0),
-        .clmsk      ('0),
-        .wr_bmask   ('0),
-        // << unused inputs
+        // .rvld_cnt   (),
+        // .rrdy_cnt   (),
+        // .rdat       (),
 
-        .wr_en_cnt  (align2ibuf_wen_cnt),
-        .wr_data    (align2ibuf_dat),
-        .rd_en_cnt  (d_out.wen_cnt),
-        .rd_data    (d_out.dat),
-        .free_scnt  (ibuf2align_rdy_scnt),
-        .used_scnt  (used_scnt)
+        // .wvld_cnt,
+        // .wrdy_cnt,
+        // .wdat
+
+        .wvld_cnt   (align2ibuf_wen_cnt),
+        .wdat       (align2ibuf_dat),
+        .rrdy_cnt   (d_out.wen_cnt),
+        .rdat       (d_out.dat),
+        .wrdy_cnt   (ibuf2align_rdy_scnt),
+        .rvld_cnt   (used_scnt)
     );
 
     always_ff @(posedge clock) begin
