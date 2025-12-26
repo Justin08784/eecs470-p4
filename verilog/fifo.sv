@@ -1,16 +1,16 @@
 `include "sys_defs.svh"
 
 module fifo #(
-    parameter int DEPTH=ROB_SZ,            // num elements
-    parameter int WIDTH=$bits(PHYS_REG_IDX),// num bits per element
+    parameter int DEPTH=8,            // num elements
+    parameter int WIDTH=57,// num bits per element
     type FIFO_STATE = struct packed {
         logic [DEPTH-1:0][WIDTH-1:0]state;
         `IDX_TYPE(DEPTH) head, tail;
         `CNT_TYPE(DEPTH) used;
     },
     parameter int FLUSH_MODE=FIFO_FLUSH_RESET,
-    parameter int NUM_RPORTS=N, // also cap for used_scnt
-    parameter int NUM_WPORTS=N, // also cap for free_scnt
+    parameter int NUM_RPORTS=4, // also cap for used_scnt
+    parameter int NUM_WPORTS=4, // also cap for free_scnt
 
     /* UPDATE: Prevew has been made the default mode! The consumer may read as
     many as they wish from rd_data. If they consume some rd_data they are obliged to
@@ -186,13 +186,62 @@ module fifo #(
 endmodule
 
 
-// fifo implemented using barrel-shift
+// module data_shift #(
+//     parameter int   DEPTH   =1,
+//     parameter int   WIDTH   =1,
+//     parameter logic LEFT    =1'b1
+// ) (
+//     input   logic[DEPTH-1:0][WIDTH-1:0] din,
+//     input   logic[$clog2(DEPTH)-1:0]    delta,
+//     output  logic[DEPTH-1:0][WIDTH-1:0] dout
+// );
+//     typedef logic[DEPTH-1:0][$clog2((DEPTH-1)*WIDTH+1)-1:0] SHIFT_ROM_ARRAY;
+//     function automatic SHIFT_ROM_ARRAY gen_shift_rom();
+//         SHIFT_ROM_ARRAY rv;
+//         for (int unsigned i = 0; i < DEPTH; ++i)
+//             rv[i] = i * WIDTH;
+//         return rv;
+//     endfunction
+
+//     localparam SHIFT_ROM_ARRAY shift_rom = gen_shift_rom();
+//     assign dout = LEFT
+//         ? din << shift_rom[delta]
+//         : din >> shift_rom[delta];
+
+// endmodule
+
+// module data_rotate #(
+//     parameter int   DEPTH   =1,
+//     parameter int   WIDTH   =1,
+//     parameter logic LEFT    =1'b1
+// ) (
+//     input   logic[DEPTH-1:0][WIDTH-1:0] din,
+//     input   logic[$clog2(DEPTH)-1:0]    delta,
+//     output  logic[DEPTH-1:0][WIDTH-1:0] dout
+// );
+//     typedef logic[DEPTH-1:0][$clog2((DEPTH-1)*WIDTH+1)-1:0] SHIFT_ROM_ARRAY;
+//     function automatic SHIFT_ROM_ARRAY gen_shift_rom();
+//         SHIFT_ROM_ARRAY rv;
+//         for (int unsigned i = 0; i < DEPTH; ++i)
+//             rv[i] = i * WIDTH;
+//         return rv;
+//     endfunction
+
+//     localparam SHIFT_ROM_ARRAY shift_rom = gen_shift_rom();
+//     logic[2*DEPTH-1:0][WIDTH-1:0] lshf;
+//     assign lshf = {din, din} << shift_rom[delta];
+//     assign dout = LEFT
+//         ? lshf[2*DEPTH-1:DEPTH]
+//         : {din, din} >> shift_rom[delta];
+
+// endmodule
+
 // (only FIFO_FLUSH_RESET mode supported)
 module fifo_barrel #(
-    parameter int DEPTH =16,
-    parameter int WIDTH =128,
-    parameter int RPORTS=8,
-    parameter int WPORTS=8
+    parameter int DEPTH =8,
+    parameter int WIDTH =57,
+    parameter int RPORTS=4,
+    parameter int WPORTS=4
 ) (
     input   logic   clock,
     input   logic   reset,
@@ -213,12 +262,6 @@ module fifo_barrel #(
 );
 
     initial begin
-        // assert  (DEPTH  == 32)  else $fatal;
-        // assert  (WIDTH  == 128) else $fatal;
-        // assert  (RPORTS == 8)   else $fatal;
-        // assert  (WPORTS == 8)   else $fatal;
-
-        // wire is_pow2 = (n != 0) && ((n & (n-1)) == 0);
         // These should all be powers of 2
         assert  ((DEPTH != 0)   & ((DEPTH   & (DEPTH-1))    == 0)) else $fatal;
         // assert  ((WIDTH != 0)   & ((WIDTH   & (WIDTH-1))    == 0)) else $fatal;
@@ -229,6 +272,20 @@ module fifo_barrel #(
         assert  (WPORTS <= DEPTH) else $fatal;
 
     end
+    typedef logic [DEPTH-1:0][$clog2((DEPTH-1)*WIDTH+1)-1:0] shift_rom_t;
+    function automatic shift_rom_t gen_shift_rom();
+        shift_rom_t rv;
+        for (int unsigned i = 0; i < DEPTH; ++i)
+            rv[i] = i * WIDTH;
+        return rv;
+    endfunction
+    shift_rom_t shift_rom = gen_shift_rom();
+    // initial begin
+    //     $display("shift_rom");
+    //     for (int i = 0; i < DEPTH; ++i)
+    //         $display("[%1d]: %d", i, shift_rom[i]);
+    // end
+
     logic [$clog2(DEPTH)-1:0]   head, head_n, tail, tail_n;
     logic [$clog2(DEPTH+1)-1:0] used, used_n, free;
     logic [DEPTH-1:0][WIDTH-1:0]state, state_n;
@@ -237,19 +294,11 @@ module fifo_barrel #(
     assign rvld_cnt = used < RPORTS ? used : RPORTS;
     assign wrdy_cnt = free < WPORTS ? free : WPORTS;
 
-    logic[2*DEPTH-1:0][WIDTH-1:0] state_dd; // double depth
-    logic[WIDTH-1:0][2*DEPTH-1:0] state_ddT;// double depth transpose
-    assign state_dd = {state, state};
-    for (genvar w = 0; w < WIDTH; ++w)
-        for (genvar d = 0; d < 2*DEPTH; ++d)
-            assign state_ddT[w][d] = state_dd[d][w];
-    logic[WIDTH-1:0][DEPTH-1:0] state_rotrT;
-    for (genvar w = 0; w < WIDTH; ++w)
-        assign state_rotrT[w] = state_ddT[w] >> head;
     logic[DEPTH-1:0][WIDTH-1:0] state_rotr;
-    for (genvar d = 0; d < DEPTH; ++d)
-        for (genvar w = 0; w < WIDTH; ++w)
-            assign state_rotr[d][w] = state_rotrT[w][d];
+    logic[2*DEPTH-1:0][WIDTH-1:0] state_dd;
+
+    assign state_dd = {state, state};
+    assign state_rotr= state_dd >> shift_rom[head];
     assign rdat = state_rotr[RPORTS-1:0];
 
     logic   [$clog2(RPORTS+1)-1:0]  ren_cnt;
@@ -259,22 +308,12 @@ module fifo_barrel #(
 
     localparam DIFF         = DEPTH - WPORTS;
     localparam DIFF_WIDTHS  = (DEPTH - WPORTS) * WIDTH;
-    logic[2*DEPTH-1:0][WIDTH-1:0] wdat_dd;
+    logic[DEPTH-1:0][WIDTH-1:0] wdat_rotl;
+    logic[2*DEPTH-1:0][WIDTH-1:0] wdat_dd, wdat_rotl_dd;
     logic[WIDTH-1:0][2*DEPTH-1:0] wdat_ddT; // double depth transpose
     assign wdat_dd = {{DIFF_WIDTHS{1'bx}}, wdat, {DIFF_WIDTHS{1'bx}}, wdat};
-    for (genvar w = 0; w < WIDTH; ++w)
-        for (genvar d = 0; d < 2*DEPTH; ++d)
-            assign wdat_ddT[w][d] = wdat_dd[d][w];
-    logic[WIDTH-1:0][2*DEPTH-1:0] wdat_rotl_ddT;
-    logic[WIDTH-1:0][DEPTH-1:0] wdat_rotl_T;
-    for (genvar w = 0; w < WIDTH; ++w) begin
-        assign wdat_rotl_ddT[w] = wdat_ddT[w] << tail;
-        assign wdat_rotl_T[w]   = wdat_rotl_ddT[w][2*DEPTH-1:DEPTH];
-    end
-    logic[DEPTH-1:0][WIDTH-1:0] wdat_rotl;
-    for (genvar d = 0; d < DEPTH; ++d)
-        for (genvar w = 0; w < WIDTH; ++w)
-            assign wdat_rotl[d][w] = wdat_rotl_T[w][d];
+    assign wdat_rotl_dd = wdat_dd << shift_rom[tail];
+    assign wdat_rotl = wdat_rotl_dd[2*DEPTH-1:DEPTH];
 
     logic[WPORTS-1:0] wen;
     logic[2*DEPTH-1:0] wmsk_rotl_dd;
