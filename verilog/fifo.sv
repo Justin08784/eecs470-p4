@@ -185,57 +185,6 @@ module fifo #(
 
 endmodule
 
-
-// module data_shift #(
-//     parameter int   DEPTH   =1,
-//     parameter int   WIDTH   =1,
-//     parameter logic LEFT    =1'b1
-// ) (
-//     input   logic[DEPTH-1:0][WIDTH-1:0] din,
-//     input   logic[$clog2(DEPTH)-1:0]    delta,
-//     output  logic[DEPTH-1:0][WIDTH-1:0] dout
-// );
-//     typedef logic[DEPTH-1:0][$clog2((DEPTH-1)*WIDTH+1)-1:0] SHIFT_ROM_ARRAY;
-//     function automatic SHIFT_ROM_ARRAY gen_shift_rom();
-//         SHIFT_ROM_ARRAY rv;
-//         for (int unsigned i = 0; i < DEPTH; ++i)
-//             rv[i] = i * WIDTH;
-//         return rv;
-//     endfunction
-
-//     localparam SHIFT_ROM_ARRAY shift_rom = gen_shift_rom();
-//     assign dout = LEFT
-//         ? din << shift_rom[delta]
-//         : din >> shift_rom[delta];
-
-// endmodule
-
-// module data_rotate #(
-//     parameter int   DEPTH   =1,
-//     parameter int   WIDTH   =1,
-//     parameter logic LEFT    =1'b1
-// ) (
-//     input   logic[DEPTH-1:0][WIDTH-1:0] din,
-//     input   logic[$clog2(DEPTH)-1:0]    delta,
-//     output  logic[DEPTH-1:0][WIDTH-1:0] dout
-// );
-//     typedef logic[DEPTH-1:0][$clog2((DEPTH-1)*WIDTH+1)-1:0] SHIFT_ROM_ARRAY;
-//     function automatic SHIFT_ROM_ARRAY gen_shift_rom();
-//         SHIFT_ROM_ARRAY rv;
-//         for (int unsigned i = 0; i < DEPTH; ++i)
-//             rv[i] = i * WIDTH;
-//         return rv;
-//     endfunction
-
-//     localparam SHIFT_ROM_ARRAY shift_rom = gen_shift_rom();
-//     logic[2*DEPTH-1:0][WIDTH-1:0] lshf;
-//     assign lshf = {din, din} << shift_rom[delta];
-//     assign dout = LEFT
-//         ? lshf[2*DEPTH-1:DEPTH]
-//         : {din, din} >> shift_rom[delta];
-
-// endmodule
-
 // (only FIFO_FLUSH_RESET mode supported)
 module fifo_barrel #(
     parameter int DEPTH =8,
@@ -279,7 +228,7 @@ module fifo_barrel #(
             rv[i] = i * WIDTH;
         return rv;
     endfunction
-    shift_rom_t shift_rom = gen_shift_rom();
+    shift_rom_t shift_rom = gen_shift_rom(); // FIXME: if you make this a localparam area blows up for some reason????
     // initial begin
     //     $display("shift_rom");
     //     for (int i = 0; i < DEPTH; ++i)
@@ -310,7 +259,6 @@ module fifo_barrel #(
     localparam DIFF_WIDTHS  = (DEPTH - WPORTS) * WIDTH;
     logic[DEPTH-1:0][WIDTH-1:0] wdat_rotl;
     logic[2*DEPTH-1:0][WIDTH-1:0] wdat_dd, wdat_rotl_dd;
-    logic[WIDTH-1:0][2*DEPTH-1:0] wdat_ddT; // double depth transpose
     assign wdat_dd = {{DIFF_WIDTHS{1'bx}}, wdat, {DIFF_WIDTHS{1'bx}}, wdat};
     assign wdat_rotl_dd = wdat_dd << shift_rom[tail];
     assign wdat_rotl = wdat_rotl_dd[2*DEPTH-1:DEPTH];

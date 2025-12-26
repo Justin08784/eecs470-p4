@@ -38,6 +38,16 @@ module ring_ctr #(
     output  `CNT_TYPE(RPORTS) used_scnt,
     output  `CNT_TYPE(WPORTS) free_scnt
 );
+    localparam int max_port_cnt = `MAX(RPORTS, WPORTS);
+    typedef logic [max_port_cnt:0][$clog2(max_port_cnt*$bits(PTR)+1)-1:0] shift_rom_t;
+    function automatic shift_rom_t gen_shift_rom();
+        shift_rom_t rv;
+        for (int unsigned i = 0; i <= max_port_cnt; ++i)
+            rv[i] = i * $bits(PTR);
+        return rv;
+    endfunction
+    shift_rom_t shift_rom = gen_shift_rom();
+
     PTR [RPORTS:0]      rd_win;
     PTR [RPORTS-1:0]    rd_nex;
     PTR [WPORTS:0]      wr_win;
@@ -120,13 +130,15 @@ module ring_ctr #(
                 // used <= used + distance(flush_snap, head) + wr_en_cnt;
                 used <= used + `UCAST_LEN(distance(flush_snap, head) + wr_en_cnt, DEPTH); // or DEPTH+WPORTS?
                 rd_win <= flush_win;
-                wr_win <= wr_full[wr_en_cnt +: WPORTS+1];
+                // wr_win <= wr_full[wr_en_cnt +: WPORTS+1];
+                wr_win <= wr_full >> shift_rom[wr_en_cnt];
             end
 
             FIFO_FLUSH_SNAP_TAIL: begin
                 // used <= used - distance(flush_snap, tail) - rd_en_cnt;
                 used <= used - `UCAST_LEN(distance(flush_snap, tail) + rd_en_cnt, DEPTH); // or DEPTH+RPORTS?
-                rd_win <= rd_full[rd_en_cnt +: RPORTS+1];
+                // rd_win <= rd_full[rd_en_cnt +: RPORTS+1];
+                rd_win <= rd_full >> shift_rom[rd_en_cnt];
                 wr_win <= flush_win;
             end
 
@@ -143,8 +155,10 @@ module ring_ctr #(
                 /* realistically the "WPORTS" safety margin is not necessary
                 if we don't have internal forwarding */
 
-            rd_win <= rd_full[rd_en_cnt +: RPORTS+1];
-            wr_win <= wr_full[wr_en_cnt +: WPORTS+1];
+            // rd_win <= rd_full[rd_en_cnt +: RPORTS+1];
+            // wr_win <= wr_full[wr_en_cnt +: WPORTS+1];
+            rd_win <= rd_full >> shift_rom[rd_en_cnt];
+            wr_win <= wr_full >> shift_rom[wr_en_cnt];
         end
 
         if (reset) begin
