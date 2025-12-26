@@ -98,29 +98,11 @@ module irq #(
         .free_scnt
     );
 
-    // logic [1:0] rwin_cpl;
-    // logic       rwin_ncpl_any;
-    // `IDX_TYPE(2)rwin_ncpl_idx;
-    // generate
     assign vld[0] = (0 < used_scnt) & cpl[rd_idxs_n[0]];
     assign vld[1] = (1 < used_scnt) & cpl[rd_idxs_n[1]] & vld[0];
-    for (genvar i = 0; i < 2; ++i) begin
-        // assign vld[i]       = (i < used_scnt) & cpl[rd_idxs_n[i]];
-        // assign rwin_cpl[i]  = (i < used_scnt) & cpl[rd_idxs_n[i]];
-        assign rdat[i]      = state[rd_idxs_n[i]];
-    end
-    // endgenerate
-    // ffs #(
-    //     .VECW(2)
-    // ) ff_ncpl (
-    //     .i_vec(~rwin_cpl),
-    //     .o_vld(rwin_ncpl_any),
-    //     .o_idx(rwin_ncpl_idx)
-    // );
-
+    for (genvar i = 0; i < 2; ++i)
+        assign rdat[i] = state[rd_idxs_n[i]];
     assign rdy_scnt = free_scnt;
-
-    // assign vld_scnt = rwin_ncpl_any ? rwin_ncpl_idx : 2;
 
     always_ff @(posedge clock) begin
         for (int i = 0; i < 2; ++i) begin
@@ -191,12 +173,9 @@ endmodule
 
 // combinational align
 module align (
-// `ifdef FORMAL
     input   clock,
     input   reset,
     input   flush,
-// `endif
-    // read (re-read buffer)
     // input   `CNT_TYPE(4)    expander_in_vld_scnt, // do we even need this?
     input   BTQ_CAND[3:0]   expander_in_dat,
     output  `CNT_TYPE(4)    expander_out_ren_cnt,
@@ -230,6 +209,7 @@ module align (
         assert (NUM_FTQ == 2)   else $fatal;
     end
 
+    // align 1
     /*
     raw: not aligned
     bal: block aligned (compaction WITHIN blocks)
@@ -239,7 +219,7 @@ module align (
     WADDR [NUM_W-1:0] raw_pc;
     BRANCH_MD [NUM_W-1:0] raw_md;
     struct packed {
-        logic [NUM_W-1:0] brch, fmsk, irq_vld, is_end, indw_last, irq_top_vld, irq_bot_vld;
+        logic [NUM_W-1:0] fmsk, indw_last, irq_vld, irq_top_vld, irq_bot_vld;
         ALIGN1_RES[NUM_W-1:0] dat;
     } raw, bal, wal;
     
@@ -269,10 +249,8 @@ module align (
             assign raw_off  [flat_idx]  = cur.off[w];
             assign raw_pc   [flat_idx]  = {cur.dw, w[0]};
             assign raw_md   [flat_idx]  = cur.md[w];
-            assign raw.brch [flat_idx]  = cur.md[w].brch;
             assign raw.fmsk [flat_idx]  = cur.fmsk[w];
             assign raw.irq_vld[flat_idx]= irq_in_vld[b];
-            assign raw.is_end[flat_idx] = cur.is_end[w];
             assign raw.dat[flat_idx]    = '{
                 md      : cur.md[w],
                 f_dat   : '{
@@ -289,7 +267,6 @@ module align (
     assign raw.irq_bot_vld = {2'b0, raw.irq_vld[1:0]};
     endgenerate
 
-    generate
     assign shl = '{
         blk : {raw.irq_vld[1] & ~raw.fmsk[2], raw.irq_vld[0] & ~raw.fmsk[0]},
         mid : raw.irq_vld[0] & |(~raw.fmsk[1:0])
@@ -304,10 +281,8 @@ module align (
         localparam hi = W_PER_DW*(b+1) - 1;
 
         // full shift controls (cannot permit duplicates)
-        assign bal.brch     [hi:lo] = raw.brch      [hi:lo] >> shl.blk[b];
         assign bal.fmsk     [hi:lo] = raw.fmsk      [hi:lo] >> shl.blk[b];
         assign bal.irq_vld  [hi:lo] = raw.irq_vld   [hi:lo] >> shl.blk[b];
-        assign bal.is_end   [hi:lo] = raw.is_end    [hi:lo] >> shl.blk[b];
         assign bal.indw_last[hi:lo] = raw.indw_last [hi:lo] >> shl.blk[b];
         assign bal.irq_top_vld[hi:lo]   = raw.irq_top_vld[hi:lo] >> shl.blk[b];
         assign bal.irq_bot_vld[hi:lo]   = raw.irq_bot_vld[hi:lo] >> shl.blk[b];
@@ -318,18 +293,14 @@ module align (
     end
 
     // word_align
-    assign wal.brch     [0]     = bal.brch      [0];
     assign wal.fmsk     [0]     = bal.fmsk      [0];
     assign wal.irq_vld  [0]     = bal.irq_vld   [0];
-    assign wal.is_end   [0]     = bal.is_end    [0];
     assign wal.indw_last[0]     = bal.indw_last [0];
     assign wal.irq_top_vld[0]   = bal.irq_top_vld[0];
     assign wal.irq_bot_vld[0]   = bal.irq_bot_vld[0];
 
-    assign wal.brch     [3:1]   = bal.brch      [3:1]   >> shl.mid;
     assign wal.fmsk     [3:1]   = bal.fmsk      [3:1]   >> shl.mid;
     assign wal.irq_vld  [3:1]   = bal.irq_vld   [3:1]   >> shl.mid;
-    assign wal.is_end   [3:1]   = bal.is_end    [3:1]   >> shl.mid;
     assign wal.indw_last[3:1]   = bal.indw_last [3:1]   >> shl.mid;
     assign wal.irq_top_vld[3:1] = bal.irq_top_vld[3:1]  >> shl.mid;
     assign wal.irq_bot_vld[3:1] = bal.irq_bot_vld[3:1]  >> shl.mid;
@@ -338,11 +309,6 @@ module align (
     assign wal.dat      [3]     = bal.dat[3];
     assign wal.dat      [1]     = shl.mid ? bal.dat[2] : bal.dat[1];
     assign wal.dat      [2]     = shl.mid ? bal.dat[3] : bal.dat[2];
-
-    // typedef struct packed {
-    //     `CNT_TYPE(NUM_W) wr_ibuf, wr_btq;
-    //     `CNT_TYPE(2) rd_irq;
-    // } RESO;
 
     `CNT_TYPE(4)    align1_res_free_scnt;
     `CNT_TYPE(4)    align1_res_wen_cnt;
@@ -367,67 +333,6 @@ module align (
     assign align1_res_wen_cnt   = $countones(wal_en & wal.fmsk);
     assign align1_res_wdat      = wal.dat;
     assign irq_out_ren_cnt      = $countones(raw_en & raw.indw_last);
-
-    // struct packed {
-    //     logic   [NUM_W-1:0] req, gnt, rng;
-    //     RESO    [NUM_W-1:0] req_res;
-    //     RESO    gnt_res;
-    //     struct packed {
-    //         logic wr_ibuf, wr_btq, rd_irq;
-    //     } [NUM_W-1:0] sat;
-    // } ctl;
-
-    // assign ctl.req = wal.irq_vld & wal.fmsk & wal.indw_last;
-    //     /* ^^ Q: indw_last guard, why? A: do not allow partial cache line consumption */
-    // for (genvar w = 0; w < NUM_W; ++w) begin
-    //     localparam sz = `CNT_SIZE(w+1);
-    //     assign ctl.req_res[w].wr_ibuf   [sz-1:0] = sz'($countones(wal.fmsk[w:0]));
-    //     assign ctl.req_res[w].wr_btq    [sz-1:0] = sz'($countones(wal.brch[w:0]));
-    //     // assign ctl.req_res[w].rd_rrb    [sz-1:0] = sz'($countones(wal.is_end[w:0]));
-    //     assign ctl.req_res[w].rd_irq             = unsigned'(sz'($countones(wal.indw_last[w:0])));
-    //         // FIXME FIXME ^^ if we dont do unsigned' the rd_irq goes to 3 sometimes wtf
-
-    //     if (sz < `CNT_SIZE(NUM_W)) begin
-    //         assign ctl.req_res[w].wr_ibuf  [`CNT_SIZE(NUM_W)-1:sz] = '0;
-    //         assign ctl.req_res[w].wr_btq   [`CNT_SIZE(NUM_W)-1:sz] = '0;
-    //         // assign ctl.req_res[w].rd_rrb   [`CNT_SIZE(NUM_W)-1:sz] = '0;
-    //     end
-    // end
-
-    // assign ctl.gnt_res.wr_ibuf  = ibuf_in_rdy_scnt;
-    // assign ctl.gnt_res.wr_btq   = btq_in.rdy_scnt;
-    // assign ctl.gnt_res.rd_rrb   = 2;
-        /* pc_gen guarantees that an ftq entry arrives in rrb BEFORE or SIMULTANEOUSLY WITH
-        the earliest associated cache line request. However, the rrb exposes
-        at most 2 FTQ entries to the aligner. */
-    // localparam rrb_sz = `CNT_SIZE(2);
-    // localparam btq_sz = `CNT_SIZE(N);
-    // assign ctl.rng = ctl.req & ctl.gnt; // rng = request and grant
-    // for (genvar w = 0; w < NUM_W; ++w) begin
-    //     localparam sz = `CNT_SIZE(w+1);
-    //     assign ctl.sat[w].wr_ibuf   = ctl.req_res[w].wr_ibuf[sz-1:0] <= ctl.gnt_res.wr_ibuf;
-    //     assign ctl.sat[w].wr_btq    = ctl.req_res[w].wr_btq [sz-1:0] <= ctl.gnt_res.wr_btq[btq_sz-1:0];
-    //     // assign ctl.sat[w].rd_rrb    = ctl.req_res[w].rd_rrb [sz-1:0] <= ctl.gnt_res.rd_rrb[rrb_sz-1:0];
-    //     assign ctl.sat[w].rd_irq    = 1;
-    //     assign ctl.gnt[w] = &ctl.sat[w];
-    // end
-    endgenerate
-
-    // logic iss_any;
-    // `IDX_TYPE(NUM_W) iss_idx;
-    // assign iss_any = |ctl.rng;
-    // always_comb begin
-    //     iss_idx = 0;
-    //     for (int w = 0; w < NUM_W; ++w) begin
-    //         if (ctl.rng[w])
-    //             iss_idx = w; // find highest set
-    //     end
-    // end
-
-    // assign ibuf_out_wen_cnt     = !iss_any ? 0 : ctl.req_res[iss_idx].wr_ibuf;
-    // assign btq_out.wen_cnt      = !iss_any ? 0 : ctl.req_res[iss_idx].wr_btq;
-    // assign irq_out_ren_cnt      = !iss_any ? 0 : ctl.req_res[iss_idx].rd_irq;
-    // assign expander_out_ren_cnt = !iss_any ? 0 : ctl.req_res[iss_idx].wr_ibuf;
 
     `CNT_TYPE(4)    a1_a2_used_scnt;
     `CNT_TYPE(4)    a2_a1_ren_cnt;
@@ -480,54 +385,27 @@ module align (
 
     // align 2
 
-    // assign ibuf_out_dat = wal.f_dat;
     logic [NUM_W-1:0] a1_a2_vld, a1_a2_brch;
     for (genvar w = 0; w < NUM_W; ++w) begin
         assign a1_a2_vld[w] = w < a1_a2_used_scnt;
         assign a1_a2_brch[w]= a1_a2_rdat[w].md.brch;
     end
 
-
-    // logic [NUM_W-1:0] rrb_prefix;
-    // assign rrb_prefix = (rrb_prefix | (raw.fmsk & raw.is_end)) << 1;
-
-    generate
-// `ifdef FORMAL
-//     BRANCH_MD [NUM_W-1:0] uftb_md;
-// `endif
-    BTQ_CAND[NUM_W-1:0] btq_wr, btq_wr_comp;
-    // struct packed {
-    //     logic   [NUM_W-1:0]        is_tail;
-    //     WADDR   [NUM_W-1:0]        PC;
-    //     logic   [NUM_W-1:0][3:0]   off;
-    //     logic   [NUM_W-1:0]        pred;
-    //     WADDR   [NUM_W-1:0]        pred_tgt;
-    //     logic   [NUM_W-1:0]        always_take;
-    //     FTB_MD1 [NUM_W-1:0]        md;
-
-    //     logic   [NUM_W-1:0]        hit;
-    //     logic   [NUM_W-1:0]        hit_slot;
-    //     logic   [NUM_W-1:0]        slot_idx;
-    //     logic   [NUM_W-1:0][1:0]   in_ghr;
-    //     // logic   [NUM_W-1:0][GHR_LEN-1:0] hash; // gshare hash index
-    //     GHR_IDX [NUM_W-1:0] ghr_base;
-    // } btq_wr_cand, btq_wr_comp;
-
+`ifdef FORMAL
+    BRANCH_MD [NUM_W-1:0] uftb_md;
     for (genvar w = 0; w < NUM_W; ++w) begin
-        // assign btq_wr_cand.PC[w] = raw_pc[w];
-        // assign btq_wr_cand.md[w] = raw_md[w];
-
-// `ifdef FORMAL
-//         assign uftb_md[w] = '{
-//             brch:   r.hit & (ve0 | ve1), // uftb only identifies slot-occupying branches as branches
-//             cond:   ve0 | (ve1 & r.md.cond),
-//             call:   r.md.call,
-//             ret :   r.md.ret,
-//             jalr:   r.md.jalr
-//         };
-// `endif
+        FTB_MD1 uftb_md1;
+        assign uftb_md1 = btq_wr[w].md;
+        assign uftb_md[w] = '{
+            brch:   btq_wr[w].hit & btq_wr[w].hit_slot,
+            cond:   uftb_md1.cond,
+            call:   uftb_md1.call,
+            ret :   uftb_md1.ret,
+            jalr:   uftb_md1.jalr
+        };
     end
-    endgenerate
+`endif
+    BTQ_CAND[NUM_W-1:0] btq_wr, btq_wr_comp;
 
     `CNT_TYPE(NUM_W) brch_lim_cnt;
     logic [NUM_W:0][`CNT_SIZE(N)-1:0] brch_prefix_cnt;
@@ -582,82 +460,75 @@ module align (
     assign btq_out.wen_cnt      = brch_prefix_cnt[a2_a1_ren_cnt];
 
 
-// `ifdef FORMAL
-//     /* uftb_no_false_positive:
-//     - 1. if not fetching, don't care
-//     - 2. if icache predecode asserts "is not branch", then uftb must not assert "is branch"
-//     - 2. if both icache predecode and uftb asserts "is branch", then all the branch metadata
-//     fields should match exactly
+`ifdef FORMAL
+    /* uftb_no_false_positive:
+    - 1. if not fetching, don't care
+    - 2. if icache predecode asserts "is not branch", then uftb must not assert "is branch"
+    - 2. if both icache predecode and uftb asserts "is branch", then all the branch metadata
+    fields should match exactly
 
-//     We expect this property to hold because the uftb does not skimp bits on its tag. However,
-//     if we DO skimp bits, then some non-branch insns may be misidentified as branches,
-//     and potentially cause the ghr to halt (BPU would shift predictions for non-branches
-//     into the GHR, and they would never be resolved because non-branches do not get
-//     allocated to the BTQ).
-//     */
-//     logic [NUM_W-1:0] uftb_no_false_positive;
-//     always_comb begin
-//         for (int w = 0; w < NUM_W; ++w) begin
-//             logic vld;
-//             vld = raw.irq_vld[w] & raw.fmsk[w];
+    We expect this property to hold because the uftb does not skimp bits on its tag. However,
+    if we DO skimp bits, then some non-branch insns may be misidentified as branches,
+    and potentially cause the ghr to halt (BPU would shift predictions for non-branches
+    into the GHR, and they would never be resolved because non-branches do not get
+    allocated to the BTQ).
+    */
+    logic [NUM_W-1:0] uftb_no_false_positive;
+    always_comb begin
+        for (int w = 0; w < NUM_W; ++w) begin
+            logic vld;
+            vld = w < a1_a2_used_scnt;
 
-//             if (~vld)
-//                 uftb_no_false_positive[w] = 1;
-//             else if (vld & ~raw_md[w].brch)
-//                 uftb_no_false_positive[w] = ~uftb_md[w].brch;
-//             else if (vld & raw_md[w].brch & ~uftb_md[w].brch)
-//                 uftb_no_false_positive[w] = 1;
-//             else if (vld & raw_md[w].brch & uftb_md[w].brch) begin
-//                 uftb_no_false_positive[w] =
-//                     (raw_md[w].cond == uftb_md[w].cond)
-//                 &   (
-//                         (~raw_md[w].cond)
-//                     |   (
-//                             (raw_md[w].call == uftb_md[w].call)
-//                         &   (raw_md[w].ret  == uftb_md[w].ret)
-//                         &   (raw_md[w].jalr == uftb_md[w].jalr)
-//                         )
-//                     );
-//             end
-//         end
-//     end
+            if (~vld)
+                uftb_no_false_positive[w] = 1;
+            else if (vld & ~a1_a2_rdat[w].md.brch)
+                uftb_no_false_positive[w] = ~uftb_md[w].brch;
+            else if (vld & a1_a2_rdat[w].md.brch & ~uftb_md[w].brch)
+                uftb_no_false_positive[w] = 1;
+            else if (vld & a1_a2_rdat[w].md.brch & uftb_md[w].brch) begin
+                uftb_no_false_positive[w] =
+                    (a1_a2_rdat[w].md.cond == uftb_md[w].cond)
+                &   (
+                        (~a1_a2_rdat[w].md.cond)
+                    |   (
+                            (a1_a2_rdat[w].md.call == uftb_md[w].call)
+                        &   (a1_a2_rdat[w].md.ret  == uftb_md[w].ret)
+                        &   (a1_a2_rdat[w].md.jalr == uftb_md[w].jalr)
+                        )
+                    );
+            end
+        end
+    end
 
-//     task error_uftb_no_false_positive;
-//         $display("uftb_no_false_positive: %b", uftb_no_false_positive);
-//         for (int w = 0; w < NUM_W; ++w)
-//             $display("fmsk: %b, raw_pc: %d, aw: {brch: %b, cond: %b, call: %b, ret: %b, jalr: %b} uftb_md: {brch: %b, cond: %b, call: %b, ret: %b, jalr: %b}",
-//                 raw.fmsk[w],
-//                 raw_pc[w],
-//                 raw_md[w].brch,
-//                 raw_md[w].cond,
-//                 raw_md[w].call,
-//                 raw_md[w].ret,
-//                 raw_md[w].jalr,
+    task error_uftb_no_false_positive;
+        $display("uftb_no_false_positive: %b", uftb_no_false_positive);
+        for (int w = 0; w < NUM_W; ++w)
+            $display("fmsk: %b, raw_pc: %d, aw: {brch: %b, cond: %b, call: %b, ret: %b, jalr: %b} uftb_md: {brch: %b, cond: %b, call: %b, ret: %b, jalr: %b}",
+                raw.fmsk[w],
+                raw_pc[w],
+                raw_md[w].brch,
+                raw_md[w].cond,
+                raw_md[w].call,
+                raw_md[w].ret,
+                raw_md[w].jalr,
 
-//                 uftb_md[w].brch,
-//                 uftb_md[w].cond,
-//                 uftb_md[w].call,
-//                 uftb_md[w].ret,
-//                 uftb_md[w].jalr
-//             );
-//     endtask
+                uftb_md[w].brch,
+                uftb_md[w].cond,
+                uftb_md[w].call,
+                uftb_md[w].ret,
+                uftb_md[w].jalr
+            );
+    endtask
 
-//     property p_uftb_no_false_positive;
-//         @(posedge clock)
-//             disable iff (reset)
-//             &uftb_no_false_positive;
-//     endproperty
+    property p_uftb_no_false_positive;
+        @(posedge clock)
+            disable iff (reset)
+            &uftb_no_false_positive;
+    endproperty
 
-//     Uftb_No_False_Positive: assert property(p_uftb_no_false_positive)
-//         else error_uftb_no_false_positive();
-// `endif
-
-// always_ff @(posedge clock) begin
-//     if (!reset) begin
-//         $display("ctl.req, gnt, rng: %b %b %b", ctl.req, ctl.gnt, ctl.rng);
-//     end
-// end
-
+    Uftb_No_False_Positive: assert property(p_uftb_no_false_positive)
+        else error_uftb_no_false_positive();
+`endif
 
 `ifdef DEBUG
     task print_align;
@@ -979,7 +850,17 @@ module dcf (
                 pred        : !r.ft && is_end[e][w],
                 pred_tgt    : r.base_n,
                 always_take : !r.ft && is_end[e][w] ? r.always_take : 0,
+`ifdef FORMAL
+                md          : '{
+                    // brch:   r.hit & (ve0 | ve1),
+                    cond:   ve0 | (ve1 & r.md.cond),
+                    call:   r.md.call,
+                    ret :   r.md.ret,
+                    jalr:   r.md.jalr
+                },
+`else
                 md          : 'x,   // TODO: fill by aligner
+`endif
                     // TODO: fix RAS if pred ret but not ret (likewise for call)
 
                 hit         : r.hit,
@@ -1055,10 +936,6 @@ module dcf (
     assign after_end_comp = ({after_end[1][3:0], 1'b0}  << words_left_m1)
     |   (after_end[0]   & sel_bot5);
 
-    // logic[NUM_FTQ-1:0][NUM_W-1:0] rrb_prefix;
-    // for (genvar e = 0; e < NUM_FTQ; ++e)
-    //     assign rrb_prefix[e] = (rrb_prefix[e] | is_end[e]) << 1;
-
     `CNT_TYPE(4) en_cnt, free_scnt;
     logic [NUM_W-1:0] free, en_comp;
     for (genvar w = 0; w < NUM_W; ++w)
@@ -1068,10 +945,6 @@ module dcf (
 
     logic [NUM_W-1:0] en_end_comp;
     assign en_end_comp = en_comp & is_end_comp;
-    // logic [NUM_W:0][$clog2(NUM_W+1)-1:0] ren_cnts;
-    // assign ren_cnts[0] = '0;
-    // for (genvar w = 1; w < NUM_W; ++w)
-    //     assign ren_cnts[w] = ren_cnts[w-1] + en_end_comp[w-1];
     assign expander2rrb_ren_cnt = $countones(en_end_comp);
 
 `ifdef DEBUG
@@ -1174,11 +1047,10 @@ module dcf (
     `CNT_TYPE(4)    ibuf2align_rdy_scnt;
 
     align align0 (
-// `ifdef FORMAL
         .clock          (clock),
         .reset          (reset),
         .flush          (cbru_in.flush),
-// `endif
+
         .expander_in_dat     (expander2align_dat),
         .expander_out_ren_cnt(align2expander_ren_cnt),
 
