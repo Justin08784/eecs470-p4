@@ -144,6 +144,7 @@ typedef struct packed {
 it as is typical for dbg structs. */
 typedef struct packed {
     CACHE_HEADER hdr;
+    logic working;
     logic [NUM_SETS-1:0][ASSOC-1:0][$bits(MEM_BLOCK)-1:0] memDP;
 } DBG_dcache;
 

@@ -99,6 +99,29 @@ module alu_ex(
     endgenerate
 endmodule
 
+module str_ex (
+    /* FRONTEND */
+    input   logic [NUM_FU_STR-1:0]      i_vld,
+    input   BMASK [NUM_FU_STR-1:0]      i_msk,
+    input   STR_REGS [NUM_FU_STR-1:0]   i_regs,
+        // insn metadata/operands
+
+    /* BACKEND */
+    output execute2complete_str         cstr_out
+);
+    assign cstr_out.en = i_vld;
+    assign cstr_out.msk= i_msk;
+    for (genvar i = 0; i < NUM_FU_STR; ++i) begin
+        assign cstr_out.dat[i] = '{
+            rob_idx : i_regs[i].dat.rob_idx,
+            sq_idx  : i_regs[i].dat.sq_idx,
+            dst     : i_regs[i].rs1 + i_regs[i].dat.opb,
+            size    : i_regs[i].dat.mem_size,
+            dat     : i_regs[i].rs2
+        };
+    end
+endmodule
+
 module mul_ex(
     input clock,
     input reset,
@@ -373,7 +396,8 @@ module stage_ex_p4 (
 
     output  execute2complete_bru cbru_out,
     output  execute2complete_tag ctag_out,
-    output  execute2complete_dat cdat_out
+    output  execute2complete_dat cdat_out,
+    output  execute2complete_str cstr_out
 
 );
     // local convenience variables
@@ -534,20 +558,27 @@ module stage_ex_p4 (
         end
 
         for (genvar i = 0; i < NUM_FU_STR; ++i) begin : gen_str_sbufs
+            INST tmp_inst;
+            always_comb begin
+                tmp_inst        = '0;
+                tmp_inst.s.off  = rs_in.fu_dat_str[i].off_11_5;
+                tmp_inst.s.set  = rs_in.fu_dat_str[i].off_4_0;
+            end
+
             assign iss.i_dat.str[i] = '{
+                bytag   : rs_in.bytag_str[i],
+
                 t1      : rs_in.fu_dat_str[i].t1,
                 t2      : rs_in.fu_dat_str[i].t2,
-                opb     : `RV32_signext_Simm(rs_in.fu_dat_str[i].inst),
+                opb     : `RV32_signext_Simm(tmp_inst),
 
-                // >> FIXME
-                // sq_idx  : '0,
-                // << FIXME
-
+                sq_idx  : rs_in.fu_dat_str[i].sq_idx,
                 rob_idx : rs_in.fu_dat_str[i].rob_idx,
-                mem_size: MEM_SIZE'(rs_in.fu_dat_str[i].inst.r.funct3[1:0])
+                mem_size: MEM_SIZE'(rs_in.fu_dat_str[i].funct3[1:0])
             };
 
-            ppln_skid #(
+            assign iss.i_rdy.str[i] = 1'b1;
+            flop #(
                 .WIDTH($bits(ID_STR_VIEW))
             ) sbuf_str (
                 .clock (clock),
@@ -556,12 +587,10 @@ module stage_ex_p4 (
                 .clmsk,
 
                 .i_vld (rs_in.fu_en_str[i]),
-                .i_rdy (iss.i_rdy.str[i]),
                 .i_msk (rs_in.fu_dat_str[i].bmask),
                 .i_dat (iss.i_dat.str[i]),
 
                 .o_vld (iss.o_vld.str[i]),
-                .o_rdy (regs.i_rdy.str[i]),
                 .o_msk (iss.o_msk.str[i]),
                 .o_dat (iss.o_dat.str[i])
             );
@@ -712,6 +741,7 @@ module stage_ex_p4 (
         end
         foreach (iss.o_vld.str[i]) begin
             regs.i_dat.str[i] = '{
+                bytag   : iss.o_dat.str[i].bytag,
                 rs1 : prf_in.v1s.str[i],
                 rs2 : prf_in.v2s.str[i],
                 dat : iss.o_dat.str[i]
@@ -831,10 +861,10 @@ module stage_ex_p4 (
             assign regs.o_dat.lod[i] = lod_snoop(raw_dat, cdat_out);
         end
 
+        assign regs.i_rdy.str = '1;
         for (genvar i = 0; i < NUM_FU_STR; ++i) begin : gen_str_rbufs
             STR_REGS raw;
-            skid #(
-                .ENABLE_SNOOP(`TRUE),
+            flop #(
                 .WIDTH($bits(STR_REGS))
             ) rbuf_str (
                 .clock (clock),
@@ -842,15 +872,11 @@ module stage_ex_p4 (
                 .flush (flush),
                 .clmsk,
 
-                .i_snoop(regs.o_dat.str[i]),
-
                 .i_vld (iss.o_vld.str[i]),
-                .i_rdy (regs.i_rdy.str[i]),
                 .i_msk (iss.o_msk.str[i]),
                 .i_dat (regs.i_dat.str[i]),
 
                 .o_vld (regs.o_vld.str[i]),
-                .o_rdy (ex.i_rdy.str[i]),
                 .o_msk (regs.o_msk.str[i]),
                 .o_dat (raw)
             );
@@ -990,6 +1016,15 @@ module stage_ex_p4 (
         .o_cands    (cands.lod)
     );
 
+    execute2complete_str cstr_out_prekill_n;
+    str_ex str_ex0 (
+        .i_vld      (regs.o_vld.str),
+        .i_msk      (regs.o_msk.str),
+        .i_regs     (regs.o_dat.str),
+
+        .cstr_out   (cstr_out_prekill_n)
+    );
+
     execute2complete_bru cbru_out_prekill_n;
     bru_ex bru_ex0 (
         .i_vld      (regs.o_vld.bru),
@@ -1087,6 +1122,7 @@ module stage_ex_p4 (
     execute2complete_bru cbru_out_prekill;
     execute2complete_tag ctag_out_prekill;
     execute2complete_dat cdat_out_prekill;
+    execute2complete_str cstr_out_prekill;
     assign cbru_out = cbru_out_prekill;
         /*
         Q: Why is cbru_out equal to cbru_out_prekill?
@@ -1105,6 +1141,11 @@ module stage_ex_p4 (
         for (int c = 0; c < N; ++c)
             cdat_out.en[c] = cdat_out_prekill.en[c] & ~(flush & |(cdat_out_prekill.msk[c] & clmsk));
     end
+    always_comb begin
+        cstr_out = cstr_out_prekill;
+        for (int c = 0; c < N; ++c)
+            cstr_out.en[c] = cstr_out_prekill.en[c] & ~(flush & |(cstr_out_prekill.msk[c] & clmsk));
+    end
 
     always_ff @(posedge clock) begin
         cdb2fu_gbus_shr[0]  <= cdb2fu_gbus;
@@ -1116,13 +1157,16 @@ module stage_ex_p4 (
         ctag_out_prekill    <= ctag_out_prekill_n;
         cdat_out_prekill    <= cdat_out_prekill_n;
         cbru_out_prekill    <= cbru_out_prekill_n;
+        cstr_out_prekill    <= cstr_out_prekill_n;
         btq_out             <= btq_out_n;
 
         if (reset) begin
             cdb2fu_gbus_shr         <= '0;
             cdb_gnt_shr             <= '0;
+            // FIXME: dont we need to zero out ctag ... msks as well?
             ctag_out_prekill.en     <= '0;
             cdat_out_prekill.en     <= '0;
+            cstr_out_prekill.en     <= '0;
 
             cbru_out_prekill.en     <= '0;
             cbru_out_prekill.clmsk  <= '0;
@@ -1180,6 +1224,18 @@ module stage_ex_p4 (
             );
         end
 
+        for (int i = 0; i < NUM_FU_STR; ++i) begin
+            $display("str_iss[%0d]: rdy: %b, vld: %b, t1: %2d, t2: %2d, rob_idx: %2d",
+                i,
+                iss.i_rdy.str[i],
+                iss.o_vld.str[i],
+                iss.o_dat.str[i].t1,
+                iss.o_dat.str[i].t2,
+                iss.o_dat.str[i].rob_idx
+            );
+        end
+
+
         for (int i = 0; i < NUM_FU_ALU; ++i) begin
             $display("regs.o_dat.alu[%0d]: bsy: %b, rs1: 0x%x, opb: 0x%x t: %2d, rob_idx: %2d",
                 i,
@@ -1199,6 +1255,16 @@ module stage_ex_p4 (
                 regs.o_dat.mul[i].rs2,
                 regs.o_dat.mul[i].t,
                 regs.o_dat.mul[i].rob_idx
+            );
+        end
+
+        for (int i = 0; i < NUM_FU_STR; ++i) begin
+            $display("regs.o_dat.str[%0d]: bsy: %b, rs1: 0x%x, rs2: 0x%x, rob_idx: %2d",
+                i,
+                regs.o_vld.str[i],
+                regs.o_dat.str[i].rs1,
+                regs.o_dat.str[i].rs2,
+                regs.o_dat.str[i].dat.rob_idx
             );
         end
         $display("$> bru_ex");

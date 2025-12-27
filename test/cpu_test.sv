@@ -32,16 +32,18 @@ import "DPI-C" function string decode_inst(int inst);
 
 
 parameter int TB_MAX_CYCLES = 50000000;
-// parameter int TB_MAX_CYCLES = 400;
+// parameter int TB_MAX_CYCLES = 50000;
+// parameter int TB_MAX_CYCLES = 500;
 // parameter int TB_MAX_CYCLES = 1000;
 // parameter int TB_MAX_CYCLES = 160100;
 
 
 // Debug cycle limits, both inclusive
-localparam int DBG_CYCLE_MIN = 300;
+localparam int DBG_CYCLE_MIN = 0;
+// localparam int DBG_CYCLE_MIN = 300;
 // localparam int DBG_CYCLE_MIN = 250;
-// localparam int DBG_CYCLE_MAX = TB_MAX_CYCLES;
-localparam int DBG_CYCLE_MAX = 500;
+localparam int DBG_CYCLE_MAX = TB_MAX_CYCLES;
+// localparam int DBG_CYCLE_MAX = 500;
 
 /*
 - unsure about correctness of call/ret checking; make sure to
@@ -138,6 +140,7 @@ module testbench;
     ADDR [N-1:0] PC_reg;
     EXCEPTION_CODE error_status = NO_ERROR;
 
+    logic           sq_used_any;
     DBG_dcache      dbg_dcache;
 
     // assign proc2mem_command = '0;
@@ -168,6 +171,7 @@ module testbench;
         .proc2mem_size              (proc2mem_size),
 `endif
 
+        .sq_used_any                (sq_used_any),
         .dbg_dcache                 (dbg_dcache),
 // << TODO: memory stubbed
 
@@ -279,11 +283,16 @@ module testbench;
     } ROB_DEBUG_ENTRY;
     ROB_DEBUG_ENTRY rob_debug[int];
 
+    // int lol;
+    logic must_halt_asap;
+
     always @(negedge clock) begin
         if (reset) begin
             // Count the number of cycles and number of instructions committed
             clock_count = 0;
             instr_count = 0;
+
+            // lol = 50;
         end else begin
             print_en = (DBG_CYCLE_MIN <= clock_count-1) && (clock_count-1 <= DBG_CYCLE_MAX);
             /* Provided delay <revert if necessary> */
@@ -321,7 +330,13 @@ module testbench;
 `endif
 
             // stop the processor
-            if (error_status != NO_ERROR || clock_count > TB_MAX_CYCLES) begin
+            must_halt_asap =
+                error_status == ILLEGAL_INST
+            |   clock_count > TB_MAX_CYCLES
+            |   (error_status == HALTED_ON_WFI & ~sq_used_any & ~dbg_dcache.working); // wait for SQ and dcache to drain first
+
+            // if (error_status != NO_ERROR || clock_count > TB_MAX_CYCLES) begin
+            if (must_halt_asap) begin
 
                 $display("  %16t : Processor Finished", $realtime);
 
@@ -493,7 +508,7 @@ module testbench;
     task show_final_mem_and_status;
         input EXCEPTION_CODE final_status;
         int showing_data;
-        // QUERY_CACHE_RES cache_res;
+        QUERY_CACHE_RES cache_res;
         begin
             MEM_BLOCK blk, cache_blk, mem_blk;
             $fdisplay(out_fileno, "\nFinal memory state and exit status:\n");
@@ -501,14 +516,14 @@ module testbench;
             $fdisplay(out_fileno, "@@@");
             showing_data = 0;
             for (int k = 0; k <= `MEM_64BIT_LINES - 1; k = k+1) begin
-                // cache_res = _query_cache(
-                //     dbg_dcache.hdr,
-                //     dbg_dcache.memDP,
-                //     k
-                // );
+                cache_res = _query_cache(
+                    dbg_dcache.hdr,
+                    dbg_dcache.memDP,
+                    k
+                );
                 mem_blk = memory.unified_memory[k];
-                // blk     = cache_res.vdm ? cache_res.blk : mem_blk;
-                blk     = mem_blk;
+                blk     = cache_res.vdm ? cache_res.blk : mem_blk;
+                // blk     = mem_blk;
                 if (blk != 0) begin
                     $fdisplay(out_fileno, "@@@ mem[%5d] = %x : %0d", k*8, blk, blk);
                     showing_data = 1;
@@ -574,8 +589,8 @@ module testbench;
         verisimpleV.fetch0.irq0.print_irq;
         // verisimpleV.fetch0.print_fetch();
         verisimpleV.bpu0.ftq0.print_ftq();
-        // verisimpleV.fetch0.align0.print_align();
-        verisimpleV.bpu0.ghr0.print_ghr;
+        verisimpleV.fetch0.align0.print_align();
+        // verisimpleV.bpu0.ghr0.print_ghr;
         // verisimpleV.bpu0.gshare0.print_gshare;
 
     endtask
@@ -625,11 +640,12 @@ module testbench;
         // print_rob();
         // print_map_table();
         // print_prf();
-        // print_rs();
+        print_rs();
         // print_bman();
         // print_dispatch();
-        // print_execute();
+        print_execute();
         print_dcache();
+        verisimpleV.sq0.print_sq();
         // print_retire();
         // $display("  | << CYCLE: %3d (t: %3d)", clock_count-1, $time);
 

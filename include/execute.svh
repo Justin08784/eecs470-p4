@@ -51,6 +51,7 @@ typedef struct packed {
 } ID_LOD_VIEW;
 
 typedef struct packed {
+    BYPASS_TAG      bytag;
     // alu_func   = ALU_ADD;
     // opa_select = OPA_IS_RS1
     // opb_select = OPB_IS_S_IMM
@@ -59,7 +60,7 @@ typedef struct packed {
     PHYS_REG_IDX    t2;
     DATA            opb;
 
-    // LSQ_IDX         sq_idx;
+    SQ_IDX          sq_idx;
     ROB_IDX         rob_idx;
     MEM_SIZE        mem_size;
 } ID_STR_VIEW;
@@ -120,6 +121,7 @@ typedef struct packed {
 } LOD_REGS;
 
 typedef struct packed {
+    BYPASS_TAG bytag;
     DATA rs1;
     DATA rs2;
     ID_STR_VIEW dat;
@@ -194,14 +196,10 @@ function automatic STR_REGS str_snoop(
     input execute2complete_dat cdat
 );
     STR_REGS rv = v;
-    foreach (cdat.en[n]) begin
-        if (!cdat.en[n])
-            continue;
-        if (rv.dat.t1 == cdat.ts[n])
-            rv.rs1 = cdat.data[n];
-        if (rv.dat.t2 == cdat.ts[n])
-            rv.rs2 = cdat.data[n];
-    end
+    if (rv.bytag.bypass1)
+        rv.rs1 = cdat.data[rv.bytag.cdb_idx1];
+    if (rv.bytag.bypass2)
+        rv.rs2 = cdat.data[rv.bytag.cdb_idx2];
     return rv;
 endfunction
 

@@ -23,6 +23,8 @@
 `define UCAST_LEN(n, max) ($clog2(max+1)'(unsigned'(n)))
 `define UCAST_FIT(n) (($clog2(n+1))'(unsigned'(n)))    // cast fit unsigned
 
+`define is_pow2(n) (((n) != 0) && (((n) & ((n)-1)) == 0))
+
 
 // ================
 // Compil. Controls
@@ -106,7 +108,7 @@ parameter FREE_LIST_SZ  = ROB_SZ;
 parameter RS_ALU_SZ     = 8;
 parameter RS_MUL_SZ     = 8;
 parameter RS_LOD_SZ     = 4;
-parameter RS_STOR_SZ    = 4;
+parameter RS_STR_SZ     = 4;
 parameter RS_BRU_SZ     = 4;
 
 // execute
@@ -631,6 +633,7 @@ typedef struct packed {
     logic           t1_rdy;
     logic           t2_rdy;
     // commit
+    SQ_IDX          sq_idx;
     ROB_IDX         rob_idx;
 } COMMIT_RS_PKT; // purely combinational
 
@@ -675,6 +678,7 @@ typedef struct packed {
     logic [N-1:0] snap_en;
     BMASK [N-1:0] b1hot_n;
     ROB_IDX [N-1:0] rob_tail;
+    SQ_IDX[N-1:0] sq_tail;
 } comm2snap_bus;
 
 typedef struct packed {
@@ -752,8 +756,12 @@ typedef struct packed {
 
 typedef struct packed {
     `CNT_TYPE(N)    rdy_scnt;
-    SQ_IDX          sq_idxs_n;
+    SQ_IDX[N-1:0]   sq_idxs_n;
 } sq2dispatch;
+
+typedef struct packed {
+    `CNT_TYPE(N)    wen_cnt;
+} dispatch2sq;
 
 typedef struct packed {
     `CNT_TYPE(N)        vld_scnt; // debug only
@@ -835,8 +843,18 @@ typedef struct packed {
     WADDR           PC;
     INST            inst;
 `endif
-    /* FIXME: stubbed */
-    logic _dummy;
+    BMASK           bmask;
+
+    logic[6:0]      off_11_5;
+    logic[4:0]      off_4_0;
+    PHYS_REG_IDX    t1;
+    PHYS_REG_IDX    t2;
+    logic           t1_rdy;
+    logic           t2_rdy;
+    logic[2:0]      funct3;
+
+    SQ_IDX          sq_idx;
+    ROB_IDX         rob_idx;
 } RS_STOR_PAYLOAD;
 
 typedef struct packed {
@@ -886,12 +904,14 @@ typedef struct packed {
 
     RS_ALU_PAYLOAD [NUM_FU_ALU-1:0] fu_dat_alu;
     RS_MUL_PAYLOAD [NUM_FU_MUL-1:0] fu_dat_mul;
-    RS_ALU_PAYLOAD [NUM_FU_STR-1:0] fu_dat_str;
+    RS_STOR_PAYLOAD[NUM_FU_STR-1:0] fu_dat_str;
     RS_LOAD_PAYLOAD[NUM_FU_LOD-1:0] fu_dat_lod;
     RS_BRU_PAYLOAD [NUM_FU_BRU-1:0] fu_dat_bru;
 
     BYPASS_TAG [NUM_FU_ALU-1:0] bytag_alu;
     BYPASS_TAG [NUM_FU_BRU-1:0] bytag_bru;
+    BYPASS_TAG [NUM_FU_STR-1:0] bytag_str;
+    // FIXME: str can also use bypass tag
 } rs2execute;
 
 
@@ -979,6 +999,19 @@ typedef struct packed {
         store the metadata of the mispredicted branch in index 0 of the above arrays)
         - the number of set bits in clmsk should equal the number of set bits in en */
 } execute2complete_bru;
+
+typedef struct packed {
+    logic [NUM_FU_STR-1:0] en;
+    BMASK [NUM_FU_STR-1:0] msk;
+    struct packed {
+        ROB_IDX     rob_idx;
+
+        SQ_IDX      sq_idx;
+        ADDR        dst;
+        MEM_SIZE    size;
+        DATA_BLOCK  dat;
+    } [NUM_FU_STR-1:0] dat;
+} execute2complete_str;
 
 
 // ================

@@ -24,6 +24,7 @@ module rob #(
 
     // complete (write)
     input  execute2complete_bru cbru_in,
+    input  execute2complete_str cstr_in,
     input  execute2complete_dat cdat_in,
 
     // dispatch (write)
@@ -122,6 +123,14 @@ module rob #(
             cur_idx = cbru_in.rob_idx[i];
 
             if (cbru_in.en[i])
+                state[cur_idx].cpl <= 1'b1;
+        end
+
+        for (int i = 0; i < NUM_FU_STR; ++i) begin
+            int cur_idx;
+            cur_idx = cstr_in.dat[i].rob_idx;
+
+            if (cstr_in.en[i])
                 state[cur_idx].cpl <= 1'b1;
         end
 

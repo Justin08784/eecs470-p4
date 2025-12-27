@@ -948,33 +948,33 @@ module dcf (
     assign expander2rrb_ren_cnt = $countones(en_end_comp);
 
 `ifdef DEBUG
-    always_ff @(posedge clock) begin
-        if (!reset) begin
-            $display("-- expander --");
-            for (int e = 0; e < 2; ++e)
-                if (e < rrb2expander_used_scnt)
-                    $display("fb[%1d]: base_n = %4d, off = %2d", e, rrb2expander_dat[e].base_n, rrb2expander_dat[e].off);
-                else
-                    $display("fb[%1d]:", e);
-            $display("cur: base = %x, off: %1d", cur.base, cur.off);
-            $display("words_left_m1: %2d", words_left_m1);
-            $display("sel_bot4:  %4b", sel_bot4);
-            $display("sel_bot5: %5b", sel_bot5);
+    // always_ff @(posedge clock) begin
+    //     if (!reset) begin
+    //         $display("-- expander --");
+    //         for (int e = 0; e < 2; ++e)
+    //             if (e < rrb2expander_used_scnt)
+    //                 $display("fb[%1d]: base_n = %4d, off = %2d", e, rrb2expander_dat[e].base_n, rrb2expander_dat[e].off);
+    //             else
+    //                 $display("fb[%1d]:", e);
+    //         $display("cur: base = %x, off: %1d", cur.base, cur.off);
+    //         $display("words_left_m1: %2d", words_left_m1);
+    //         $display("sel_bot4:  %4b", sel_bot4);
+    //         $display("sel_bot5: %5b", sel_bot5);
 
-            $display("vld_comp: %b, free: %b, en_comp: %b", vld_comp, free, en_comp);
-            // $display("is_end: [%b, %b], is_end_comp: %b", is_end[0], is_end[1], is_end_comp);
-            $display("en_cnt: %1d, expander2rrb_ren_cnt: %1d", en_cnt, expander2rrb_ren_cnt);
-            // $display("after_end: [%b, %b]", after_end[0], after_end[1]);
-            // for (int e = 0; e < 2; ++e)
-            //     $display("off_n[%1d]: [%2d, %2d, %2d, %2d, %2d]",
-            //         e, off_n[e][0],off_n[e][1],off_n[e][2],off_n[e][3],off_n[e][4]
-            //     );
-            $display("off_n_comp: [%2d, %2d, %2d, %2d, %2d]",
-                off_n_comp[0],off_n_comp[1],off_n_comp[2],off_n_comp[3],off_n_comp[4]
-            );
+    //         $display("vld_comp: %b, free: %b, en_comp: %b", vld_comp, free, en_comp);
+    //         // $display("is_end: [%b, %b], is_end_comp: %b", is_end[0], is_end[1], is_end_comp);
+    //         $display("en_cnt: %1d, expander2rrb_ren_cnt: %1d", en_cnt, expander2rrb_ren_cnt);
+    //         // $display("after_end: [%b, %b]", after_end[0], after_end[1]);
+    //         // for (int e = 0; e < 2; ++e)
+    //         //     $display("off_n[%1d]: [%2d, %2d, %2d, %2d, %2d]",
+    //         //         e, off_n[e][0],off_n[e][1],off_n[e][2],off_n[e][3],off_n[e][4]
+    //         //     );
+    //         $display("off_n_comp: [%2d, %2d, %2d, %2d, %2d]",
+    //             off_n_comp[0],off_n_comp[1],off_n_comp[2],off_n_comp[3],off_n_comp[4]
+    //         );
             
-        end
-    end
+    //     end
+    // end
 `endif
 
     `CNT_TYPE(4) align2expander_ren_cnt;

@@ -31,6 +31,10 @@ module dispatch #(parameter
     input   free_list2dispatch free_in,
     output  dispatch2free_list free_out,
 
+    // store queue
+    input   sq2dispatch sq_in,
+    output  dispatch2sq sq_out,
+
     // cdb (completions)
     input   execute2complete_tag ctag_in,
 
@@ -207,6 +211,20 @@ module dispatch #(parameter
     );
 
     /* >> ==== 2. Commit Stage ==== >> */
+    logic [N-1:0] comm_is_store;
+    logic [N:0][`CNT_SIZE(N)-1:0] store_prefix_cnt;
+    `CNT_TYPE(N) store_lim_cnt;
+    for (genvar n = 0; n < N; ++n)
+        assign comm_is_store[n] = commit_in[n].fu_idx == FU_STR;
+    compactor #(
+        .REQW(N),
+        .GNTW(N)
+    ) comp_store (
+        .req        (comm_is_store),
+        .lim_cnt    (sq_in.rdy_scnt),
+        .prefix_cnt (store_prefix_cnt),
+        .gnt_cnt    (store_lim_cnt)
+    );
 
     logic [N-1:0] comm_is_brch;
     // handle rs output 
@@ -222,6 +240,7 @@ module dispatch #(parameter
         foreach (en_by_fu[f, n]) begin
             en_by_fu[f][n] = (n < rename_vld_scnt)
                 && (n < rob_in.rdy_scnt)
+                && (n < store_lim_cnt)
                 && commit_in[n].fu_idx == f
                 && rs_in.rdy_sbus[f][n];
         end
@@ -270,6 +289,7 @@ module dispatch #(parameter
                 t1_rdy      : '0,
                 t2_rdy      : '0,
                 // commit
+                sq_idx      : sq_in.sq_idxs_n[store_prefix_cnt[i]],
                 rob_idx     : '0
             };
 
@@ -296,8 +316,11 @@ module dispatch #(parameter
                 /* Q: Why +1?
                 A: Checkpoint the tail AFTER us. The mispredicted branch still retires.
                 */
+            comm_snap_out_n.sq_tail[i]= sq_in.sq_idxs_n[store_prefix_cnt[i]];
         end
     end
+
+    assign sq_out.wen_cnt = store_prefix_cnt[commit_en_cnt];
 
     // handle rob output 
     always_comb begin

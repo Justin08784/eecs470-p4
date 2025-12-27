@@ -31,6 +31,11 @@ typedef struct packed {
 typedef struct packed {
     logic busy;
     logic issd;
+    RS_STOR_PAYLOAD dat;
+} RS_STOR_ENTRY;
+typedef struct packed {
+    logic busy;
+    logic issd;
     RS_BRU_PAYLOAD dat;
 } RS_BRU_ENTRY;
 
@@ -441,6 +446,31 @@ module rs #(parameter
         end
     end
 
+    RS_STOR_PAYLOAD [N-1:0] tmp_dat_str;
+    always_comb begin
+        foreach (d_in.dat[i]) begin
+            tmp_dat_str[i] = '{
+`ifdef DEBUG
+                id          : d_in.dat[i].id,
+                PC          : d_in.dat[i].PC,
+                inst        : d_in.dat[i].inst,
+`endif
+                bmask       : d_in.dat[i].bmask,
+
+                off_11_5    : d_in.dat[i].inst.s.off,
+                off_4_0     : d_in.dat[i].inst.s.set,
+                t1          : d_in.dat[i].t1,
+                t2          : d_in.dat[i].t2,
+                t1_rdy      : d_in.dat[i].t1_rdy,
+                t2_rdy      : d_in.dat[i].t2_rdy,
+                funct3      : d_in.dat[i].inst.s.funct3,
+
+                sq_idx      : d_in.dat[i].sq_idx,
+                rob_idx     : d_in.dat[i].rob_idx
+            };
+        end
+    end
+
     rs_part #(
         .FU         (FU_ALU),
         .PAYLOAD    (RS_ALU_PAYLOAD),
@@ -523,6 +553,40 @@ module rs #(parameter
     );
 
     rs_part #(
+        .FU         (FU_STR),
+        .PAYLOAD    (RS_STOR_PAYLOAD),
+        .ENTRY      (RS_STOR_ENTRY),
+        .PART_SZ    (RS_STR_SZ),
+        .NUM_FU     (NUM_FU_STR),
+        .ISS_CDB_ARB(`TRUE) // yes actually, but doesn't need CDB
+    ) rs_str (
+        .clock          (clock),
+        .reset          (reset),
+        .flush          (flush),
+        .clmsk          (clmsk),
+
+        .d_in_en        (d_in.en[FU_STR]),
+        .d_in_dat       (tmp_dat_str),
+        .d_out_rdy_sbus (d_out.rdy_sbus[FU_STR]),
+
+        .ex_in_fu_rdy       (ex_in.fu_rdy_str),
+        .ex_in_fu_cdb_gnt   ({NUM_FU_STR{1'b1}}),
+
+        .ex_out_fu_vld  (),
+        .ex_out_fu_en   (ex_out.fu_en_str),
+        .ex_out_fu_dat  (ex_out.fu_dat_str),
+        .ex_out_bytag   (ex_out.bytag_str),
+
+        .ctag_in        (ctag_in)
+    );
+
+    // // default rdy_sbus for partitions not yet defined
+    // assign d_out.rdy_sbus[FU_STR] = '0;
+
+    // assign ex_out.fu_en_str = '0;
+    // assign ex_out.fu_dat_str= '0;
+
+    rs_part #(
         .FU         (FU_BRU),
         .PAYLOAD    (RS_BRU_PAYLOAD),
         .ENTRY      (RS_BRU_ENTRY),
@@ -549,12 +613,6 @@ module rs #(parameter
 
         .ctag_in(ctag_in)
     );
-
-    // default rdy_sbus for partitions not yet defined
-    assign d_out.rdy_sbus[FU_STR] = '0;
-
-    assign ex_out.fu_en_str = '0;
-    assign ex_out.fu_dat_str= '0;
 
 `ifdef DEBUG
     task automatic print_rs_alu(input RS_ALU_ENTRY [RS_ALU_SZ-1:0] entries);
@@ -607,6 +665,20 @@ module rs #(parameter
         end
     endtask
 
+    task automatic print_rs_str(input RS_STOR_ENTRY [RS_STR_SZ-1:0] entries);
+        for (int i = 0; i < RS_STR_SZ; ++i) begin
+            if (!entries[i].busy) begin
+                $display("rs_str[%2d]:", i);
+                continue;
+            end
+            $display("rs_str[%2d]: inst: %x",
+                i, 
+
+                entries[i].dat.inst
+            );
+        end
+    endtask
+
     task automatic print_rs_bru(input RS_BRU_ENTRY [RS_BRU_SZ-1:0] entries);
         for (int i = 0; i < RS_BRU_SZ; ++i) begin
             if (!entries[i].busy) begin
@@ -644,6 +716,8 @@ module rs #(parameter
         print_rs_mul(rs_mul.entries);
         $display("      >> RS_BRU");
         print_rs_bru(rs_bru.entries);
+        $display("      >> RS_STR");
+        print_rs_str(rs_str.entries);
 
         $display("  | << RS <<");
 

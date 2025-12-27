@@ -29,6 +29,7 @@ module cpu (
     output MEM_BLOCK    proc2mem_data,    // Data sent to memory
     output MEM_SIZE     proc2mem_size,    // Data size sent to memory
 
+    output logic        sq_used_any,
     output DBG_dcache   dbg_dcache,
 // << TODO: memory stubbed
     output COMMIT_PKT commit
@@ -55,7 +56,6 @@ module cpu (
     dcache2ld   dcache_2_ld;
     sq2dcache   sq_2_dcache;
     dcache2sq   dcache_2_sq;
-    assign sq_2_dcache = '0; // FIXME: store queue stubbed
     dcache_block dcache (
         .dbg                    (dbg_dcache),
 
@@ -147,6 +147,8 @@ module cpu (
     dispatch2rob dispatch_2_rob;
     dispatch2free_list dispatch_2_fl;
     free_list2dispatch fl_2_dispatch;
+    sq2dispatch sq_2_dispatch;
+    dispatch2sq dispatch_2_sq;
     dispatch2map_table dispatch_2_map;
     map_table2dispatch map_2_dispatch;
     execute2complete_tag ex_2_ctag;
@@ -169,6 +171,8 @@ module cpu (
         .rob_out    (dispatch_2_rob),
         .free_in    (fl_2_dispatch),
         .free_out   (dispatch_2_fl),
+        .sq_in      (sq_2_dispatch),
+        .sq_out     (dispatch_2_sq),
         .map_in     (map_2_dispatch),
         .map_out    (dispatch_2_map),
         .bman_in    (bman_2_rnme),
@@ -179,6 +183,26 @@ module cpu (
         .ctag_in    (ex_2_ctag)
     );
 
+    execute2complete_str ex_2_cstr;
+    `CNT_TYPE(N) retire2sq_r_en_cnt;
+    sq #(.SQ_SZ(SQ_SZ), .N(N)) sq0 (
+        .used_any   (sq_used_any),
+
+        .clock      (clock),
+        .reset      (reset),
+        .flush      (flush),
+        .clmsk      (clmsk),
+
+        .dcache_out (sq_2_dcache),
+        .dcache_in  (dcache_2_sq),
+
+        .r_in_en_cnt(retire2sq_r_en_cnt),
+
+        .cstr_in    (ex_2_cstr),
+        .snap_in    (comm_2_snap),
+        .d_out      (sq_2_dispatch),
+        .d_in       (dispatch_2_sq)
+    );
 
     /* >> ==== Branch manager ==== >> */
     branch_manager bman (
@@ -198,6 +222,7 @@ module cpu (
 
     retire retire0 (
         .rob_in (rob_2_retire),
+        .sq_out_r_en_cnt(retire2sq_r_en_cnt),
 
         .retire_exec
     );
@@ -260,6 +285,7 @@ module cpu (
         .d_out      (rob_2_dispatch),
 
         .cbru_in    (ex_2_cbru),
+        .cstr_in    (ex_2_cstr),
         .cdat_in    (ex_2_cdat)
     );
 
@@ -283,7 +309,8 @@ module cpu (
 
         .ctag_out   (ex_2_ctag),
         .cbru_out   (ex_2_cbru),
-        .cdat_out   (ex_2_cdat)
+        .cdat_out   (ex_2_cdat),
+        .cstr_out   (ex_2_cstr)
     );
 
 

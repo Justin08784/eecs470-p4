@@ -320,6 +320,7 @@ CPU_SOURCES = verilog/cpu.sv \
 			verilog/ghr_chk.sv \
 			verilog/gshare.sv \
 			verilog/lod_ex.sv \
+			verilog/lsq.sv \
 			verilog/map_table.sv \
 			verilog/memDP.sv \
 			verilog/mult.sv \

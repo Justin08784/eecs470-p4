@@ -653,6 +653,7 @@ module dcache_block (
   
     assign dbg = '{
         hdr     : hdr,
+        working : mshr.status != S_IDLE | w.en,
         memDP   : dbg_memDP
     };
 
