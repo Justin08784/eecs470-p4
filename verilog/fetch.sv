@@ -949,7 +949,7 @@ module dcf (
 
 `ifdef DEBUG
     always_ff @(posedge clock) begin
-        if (!rese) begin
+        if (!reset) begin
             $display("-- expander --");
             for (int e = 0; e < 2; ++e)
                 if (e < rrb2expander_used_scnt)

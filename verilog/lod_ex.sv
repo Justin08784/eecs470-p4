@@ -393,149 +393,147 @@ module lod_ex(
     end
 
 `ifdef DEBUG
-    always_ff @(posedge clock) begin
-        if (!reset && print_en) begin
-            $display("\n[%0t] <<< lod_ex DEBUG >>>", $time);
-            $display("  flush: %b", flush);
-            $display("  i_vld = %b | i_rdy = %b", i_vld, i_rdy);
-            $display("  dispatch_lbuf_en   = %b", dispatch_lbuf_en);
-            $display("  cdb_req = %b | cdb_gnt = %b", cdb_req, cdb_gnt);
-            $display("  lbuf2cdb_arb_gnt= %b", lbuf2cdb_arb_gnt);
-            $display("  ctag_ts     = %2d", ctag_ts);
+task print_lod_ex();
+    $display("\n[%0t] <<< lod_ex DEBUG >>>", $time);
+    $display("  flush: %b", flush);
+    $display("  i_vld = %b | i_rdy = %b", i_vld, i_rdy);
+    $display("  dispatch_lbuf_en   = %b", dispatch_lbuf_en);
+    $display("  cdb_req = %b | cdb_gnt = %b", cdb_req, cdb_gnt);
+    $display("  lbuf2cdb_arb_gnt= %b", lbuf2cdb_arb_gnt);
+    $display("  ctag_ts     = %2d", ctag_ts);
 
-            $display("  -- BAY STATE --");
-            // for (int i = 0; i < NUM_FU_LOD; ++i) begin
-            //     if (!bay_hdr[i].vld) begin
-            //         $display("bay[%2d]: ", i);
-            //         continue;
-            //     end
-            //     $display("bay[%2d]: vld=%b rob_idx=%3d t=%2d addr=0x%08x size=%s unsign=%b nbm=%b raw=%h",
-            //         i,
-            //         bay_hdr[i].vld,
-            //         bay[i].rob_idx,
-            //         bay[i].t,
-            //         bay[i].addr,
-            //         dbg_mem_size(bay[i].mem_size),
-            //         bay[i].rd_unsigned,
-            //         bay[i].need_byte_mask,
-            //         bay[i].raw
-            //     );
-            // end
-            if (!i_vld)
-                $display("i_bay_dat:");
-            else
-                $display("i_bay_dat: vld=%b rob_idx=%3d t=%2d addr=0x%08x size=%s unsign=%b nbm=%b",
-                    i_vld,
-                    i_bay_dat.rob_idx,
-                    i_bay_dat.t,
-                    i_bay_dat.addr,
-                    dbg_mem_size(i_bay_dat.mem_size),
-                    i_bay_dat.rd_unsigned,
-                    i_bay_dat.need_byte_mask
-                );
+    $display("  -- BAY STATE --");
+    // for (int i = 0; i < NUM_FU_LOD; ++i) begin
+    //     if (!bay_hdr[i].vld) begin
+    //         $display("bay[%2d]: ", i);
+    //         continue;
+    //     end
+    //     $display("bay[%2d]: vld=%b rob_idx=%3d t=%2d addr=0x%08x size=%s unsign=%b nbm=%b raw=%h",
+    //         i,
+    //         bay_hdr[i].vld,
+    //         bay[i].rob_idx,
+    //         bay[i].t,
+    //         bay[i].addr,
+    //         dbg_mem_size(bay[i].mem_size),
+    //         bay[i].rd_unsigned,
+    //         bay[i].need_byte_mask,
+    //         bay[i].raw
+    //     );
+    // end
+    if (!i_vld)
+        $display("i_bay_dat:");
+    else
+        $display("i_bay_dat: vld=%b rob_idx=%3d t=%2d addr=0x%08x size=%s unsign=%b nbm=%b",
+            i_vld,
+            i_bay_dat.rob_idx,
+            i_bay_dat.t,
+            i_bay_dat.addr,
+            dbg_mem_size(i_bay_dat.mem_size),
+            i_bay_dat.rd_unsigned,
+            i_bay_dat.need_byte_mask
+        );
 
-            if (!bay_vld)
-                $display("bay: ");
-            else
-                $display("bay_dat  : vld=%b rob_idx=%3d t=%2d addr=0x%08x size=%s unsign=%b nbm=%b",
-                    bay_vld,
-                    bay_dat.rob_idx,
-                    bay_dat.t,
-                    bay_dat.addr,
-                    dbg_mem_size(bay_dat.mem_size),
-                    bay_dat.rd_unsigned,
-                    bay_dat.need_byte_mask
-                );
+    if (!bay_vld)
+        $display("bay: ");
+    else
+        $display("bay_dat  : vld=%b rob_idx=%3d t=%2d addr=0x%08x size=%s unsign=%b nbm=%b",
+            bay_vld,
+            bay_dat.rob_idx,
+            bay_dat.t,
+            bay_dat.addr,
+            dbg_mem_size(bay_dat.mem_size),
+            bay_dat.rd_unsigned,
+            bay_dat.need_byte_mask
+        );
 
-            $display("dcache_out: vld: %b, lbuf_idx: %1d, addr: 0x%x, dispatch_rdy: %b",
-                dcache_out.vld,
-                dcache_out.lbuf_idx,
-                dcache_out.addr,
-                dcache_out.dispatch_rdy
-            );
-            $display("dcache_in : status: %s, ldb: {en: %b, lbuf_idx: %1d, dat: 0x%x}",
-                dbg_ld_status(dcache_in.status),
-                dcache_in.ldb.en,
-                dcache_in.ldb.lbuf_idx,
-                dcache_in.ldb.dat
-            );
+    $display("dcache_out: vld: %b, lbuf_idx: %1d, addr: 0x%x, dispatch_rdy: %b",
+        dcache_out.vld,
+        dcache_out.lbuf_idx,
+        dcache_out.addr,
+        dcache_out.dispatch_rdy
+    );
+    $display("dcache_in : status: %s, ldb: {en: %b, lbuf_idx: %1d, dat: 0x%x}",
+        dbg_ld_status(dcache_in.status),
+        dcache_in.ldb.en,
+        dcache_in.ldb.lbuf_idx,
+        dcache_in.ldb.dat
+    );
 
-            // for (int i = 0; i < NUM_FU_LOD; ++i) begin
-            //     $display("sq_in[%1d]: qry_req=%b, byte_en=%b, raw=%x",
-            //         i,
-            //         qry_req[i],
-            //         sq_in.forward_byte_en[i],
-            //         sq_in.forward_data[i],
-            //     );
-            // end
+    // for (int i = 0; i < NUM_FU_LOD; ++i) begin
+    //     $display("sq_in[%1d]: qry_req=%b, byte_en=%b, raw=%x",
+    //         i,
+    //         qry_req[i],
+    //         sq_in.forward_byte_en[i],
+    //         sq_in.forward_data[i],
+    //     );
+    // end
 
 
-            // for (int i = 0; i < NUM_FU_LOD; ++i)
-            //     $display("dispatch_lbuf_en_bay2buf[%1d]: %b", i, dispatch_lbuf_en_bay2buf[i]);
-            $display("dispatch_lbuf_en: %b", dispatch_lbuf_en);
-            $display("dispatch_rdy_req: %b", dispatch_rdy_req);
-            $display("dispatch_rdy_gnt: %b", dispatch_rdy_gnt);
+    // for (int i = 0; i < NUM_FU_LOD; ++i)
+    //     $display("dispatch_lbuf_en_bay2buf[%1d]: %b", i, dispatch_lbuf_en_bay2buf[i]);
+    $display("dispatch_lbuf_en: %b", dispatch_lbuf_en);
+    $display("dispatch_rdy_req: %b", dispatch_rdy_req);
+    $display("dispatch_rdy_gnt: %b", dispatch_rdy_gnt);
 
-            $display("  -- LBUF STATE --");
-            for (int i = 0; i < LBUF_SZ; ++i) begin
-                if (!lbuf_hdr[i].vld) begin
-                    $display("lbuf[%2d]: ", i);
-                    continue;
-                end
-                $display("lbuf[%2d]: vld=%b rob_idx=%3d t=%2d iw_off=%2b size=%s unsign=%b raw=%h, nbm=%b",
-                    i,
-                    lbuf_hdr[i].vld,
-                    lbuf[i].rob_idx,
-                    lbuf[i].t,
-                    lbuf[i].iw_off,
-                    dbg_mem_size(lbuf[i].mem_size),
-                    lbuf[i].rd_unsigned,
-                    lbuf[i].raw,
-                    lbuf[i].need_byte_mask
-                );
-            end
-            $display("lbuf_vld: %b, lbuf_kill: %b, lbuf2cdb_arb_gnt: %b", lbuf_vld, lbuf_kill, lbuf2cdb_arb_gnt);
-
-            $display("  -- COMPLETION (CDB OUT) --");
-            $display("t=%2d, rob_idx=%2d, data=%x",
-                o_cands.t,
-                o_cands.rob_idx,
-                o_cands.data
-            );
-
-            $display("cands_shr[0]: t=%2d, rob_idx=%2d, dat=%x",
-                cands02cands1_dat.t,
-                cands02cands1_dat.rob_idx,
-                cands02cands1_dat.data
-            );
-
-            $display("cands_shr[1]: t=%2d, rob_idx=%2d, dat=%x",
-                cands1_dat.t,
-                cands1_dat.rob_idx,
-                cands1_dat.data
-            );
-
-            // for (int i = 0; i < 2; ++i) begin
-            //     $display("cands_shr_n[%1d]: t=%2d, rob_idx=%2d, dat=%x",
-            //         i,
-            //         cands_shr_n[i].t,
-            //         cands_shr_n[i].rob_idx,
-            //         cands_shr_n[i].data
-            //     );
-            // end
-            
-            // for (int i = 0; i < 2; ++i) begin
-            //     $display("cands_shr[%1d]: t=%2d, rob_idx=%2d, dat=%x",
-            //         i,
-            //         cands_shr[i].t,
-            //         cands_shr[i].rob_idx,
-            //         cands_shr[i].data
-            //     );
-            // end
-
-            $display(">>> END DEBUG <<<\n");
+    $display("  -- LBUF STATE --");
+    for (int i = 0; i < LBUF_SZ; ++i) begin
+        if (!lbuf_hdr[i].vld) begin
+            $display("lbuf[%2d]: ", i);
+            continue;
         end
+        $display("lbuf[%2d]: vld=%b rob_idx=%3d t=%2d iw_off=%2b size=%s unsign=%b raw=%h, nbm=%b",
+            i,
+            lbuf_hdr[i].vld,
+            lbuf[i].rob_idx,
+            lbuf[i].t,
+            lbuf[i].iw_off,
+            dbg_mem_size(lbuf[i].mem_size),
+            lbuf[i].rd_unsigned,
+            lbuf[i].raw,
+            lbuf[i].need_byte_mask
+        );
     end
+    $display("lbuf_vld: %b, lbuf_kill: %b, lbuf2cdb_arb_gnt: %b", lbuf_vld, lbuf_kill, lbuf2cdb_arb_gnt);
+
+    $display("  -- COMPLETION (CDB OUT) --");
+    $display("t=%2d, rob_idx=%2d, data=%x",
+        o_cands.t,
+        o_cands.rob_idx,
+        o_cands.data
+    );
+
+    $display("cands_shr[0]: t=%2d, rob_idx=%2d, dat=%x",
+        cands02cands1_dat.t,
+        cands02cands1_dat.rob_idx,
+        cands02cands1_dat.data
+    );
+
+    $display("cands_shr[1]: t=%2d, rob_idx=%2d, dat=%x",
+        cands1_dat.t,
+        cands1_dat.rob_idx,
+        cands1_dat.data
+    );
+
+    // for (int i = 0; i < 2; ++i) begin
+    //     $display("cands_shr_n[%1d]: t=%2d, rob_idx=%2d, dat=%x",
+    //         i,
+    //         cands_shr_n[i].t,
+    //         cands_shr_n[i].rob_idx,
+    //         cands_shr_n[i].data
+    //     );
+    // end
+    
+    // for (int i = 0; i < 2; ++i) begin
+    //     $display("cands_shr[%1d]: t=%2d, rob_idx=%2d, dat=%x",
+    //         i,
+    //         cands_shr[i].t,
+    //         cands_shr[i].rob_idx,
+    //         cands_shr[i].data
+    //     );
+    // end
+
+    $display(">>> END DEBUG <<<\n");
+endtask
 `endif
 
 
