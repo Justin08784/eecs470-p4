@@ -228,7 +228,7 @@ module fifo_barrel #(
             rv[i] = i * WIDTH;
         return rv;
     endfunction
-    shift_rom_t shift_rom = gen_shift_rom(); // FIXME: if you make this a localparam area blows up for some reason????
+    localparam shift_rom_t shift_rom = gen_shift_rom();
     // initial begin
     //     $display("shift_rom");
     //     for (int i = 0; i < DEPTH; ++i)

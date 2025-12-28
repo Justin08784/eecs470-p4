@@ -46,7 +46,7 @@ module ring_ctr #(
             rv[i] = i * $bits(PTR);
         return rv;
     endfunction
-    shift_rom_t shift_rom = gen_shift_rom();
+    localparam shift_rom_t shift_rom = gen_shift_rom();
 
     PTR [RPORTS:0]      rd_win;
     PTR [RPORTS-1:0]    rd_nex;
