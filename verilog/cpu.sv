@@ -8,7 +8,6 @@ module cpu (
     output fetch2mem f2mem,
     input  mem2fetch mem2f,
 
-// >> TODO: memory stubbed
     input  MEM_TAG      mem2proc_transaction_tag, // Memory tag for current transaction
     input  MEM_BLOCK    mem2proc_data,            // Data coming back from memory
         /*
@@ -29,9 +28,7 @@ module cpu (
     output MEM_BLOCK    proc2mem_data,    // Data sent to memory
     output MEM_SIZE     proc2mem_size,    // Data size sent to memory
 
-    output logic        sq_used_any,
     output DBG_dcache   dbg_dcache,
-// << TODO: memory stubbed
     output COMMIT_PKT commit
 );
     /* Global controls*/
@@ -52,11 +49,13 @@ module cpu (
     //     dbg_dcache = '0;
     // end
 
+    logic dcache_any_pending;
     ld2dcache   ld_2_dcache;
     dcache2ld   dcache_2_ld;
     sq2dcache   sq_2_dcache;
     dcache2sq   dcache_2_sq;
     dcache_block dcache (
+        .any_pending            (dcache_any_pending),
         .dbg                    (dbg_dcache),
 
         .clock                  (clock),
@@ -183,10 +182,14 @@ module cpu (
         .ctag_in    (ex_2_ctag)
     );
 
+    logic sq_any_pending_wrmems;
     execute2complete_str ex_2_cstr;
-    `CNT_TYPE(N) retire2sq_r_en_cnt;
-    sq #(.SQ_SZ(SQ_SZ), .N(N)) sq0 (
-        .used_any   (sq_used_any),
+    RETIRE_PKT  retire_exec;
+    sq #(
+        .SQ_SZ  (SQ_SZ),
+        .N      (N)
+    ) sq0 (
+        .any_pending_wrmems (sq_any_pending_wrmems),
 
         .clock      (clock),
         .reset      (reset),
@@ -196,7 +199,7 @@ module cpu (
         .dcache_out (sq_2_dcache),
         .dcache_in  (dcache_2_sq),
 
-        .r_in_en_cnt(retire2sq_r_en_cnt),
+        .r_in_en_cnt(retire_exec.sq_en_cnt),
 
         .cstr_in    (ex_2_cstr),
         .snap_in    (comm_2_snap),
@@ -218,13 +221,11 @@ module cpu (
 
     /* >> ==== Retire ==== >> */
     rob2retire  rob_2_retire;
-    RETIRE_PKT  retire_exec;
 
     retire retire0 (
-        .rob_in (rob_2_retire),
-        .sq_out_r_en_cnt(retire2sq_r_en_cnt),
+        .rob_in     (rob_2_retire),
 
-        .retire_exec
+        .retire_exec(retire_exec)
     );
 
 
@@ -400,11 +401,49 @@ module cpu (
 
     /* >> ==== Pipeline outputs ==== >> */
     // Output committed instructions to the testbench for counting
-    assign commit = '{
-        wen_cnt : retire_exec.en_cnt,
-        halt    : retire_exec.halt,
-        illegal : retire_exec.illegal
+    COMMIT_PKT commit_n;
+    assign commit_n = '{
+        wen_cnt                 : retire_exec.en_cnt,
+        halt                    : retire_exec.halt,
+        illegal                 : retire_exec.illegal,
+        dcache_any_pending      : dcache_any_pending,
+        sq_any_pending_wrmems   : sq_any_pending_wrmems
     };
+`ifndef SYNTH
+    COMMIT_INTERNAL commit_internal, commit_internal_n;
+    assign commit_internal_n = '{
+        tag     : rob_2_retire.tag,
+        dst     : rob_2_retire.dst,
+        t_old   : rob_2_retire.t_old,
+
+        rob_retire_idxs : rob0.rtre_idxs_n
+    };
+`endif
+
+    // TERM_CONTROL term_control_n;
+    // logic [N-1:0] ret_en_msk;
+    // for (genvar i = 0; i < N; ++i)
+    //     assign ret_en_msk[i] = i < retire_exec.en_cnt;
+    // assign term_control_n = '{
+    //     retired_halt            : term_control.retired_halt | |(ret_en_msk & retire_exec.halt),
+    //     retired_illegal         : term_control.retired_halt | |(ret_en_msk & retire_exec.illegal),
+    //     dcache_any_pending      : dcache_any_pending,
+    //     sq_any_pending_wrmems   : sq_any_pending_wrmems
+    // };
+    always_ff @(posedge clock) begin
+        commit <= commit_n;
+        if (reset)
+            commit <= '0;
+
+`ifndef SYNTH
+        commit_internal <= commit_internal_n;
+        if (reset)
+            commit_internal <= '0;
+        // term_control<= term_control_n;
+        // if (reset)
+        //     term_control <= '0;
+`endif
+    end
 
 `ifdef FORMAL
     /* >> ==== Multi-module formal ==== >> */

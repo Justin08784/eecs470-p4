@@ -71,13 +71,6 @@ typedef struct packed {
     AGE     [NUM_SETS-1:0]            age;
 } CACHE_HEADER;
 
-
-typedef struct packed {
-    CACHE_HEADER hdr;
-    logic [NUM_CACHE_LINES-1:0][$bits(MEM_BLOCK)-1:0]
-        state;
-} DBG_cache;
-
 function automatic ADDR w_align(input ADDR addr);
     return {addr[31:2], 2'b00};
 endfunction
@@ -144,7 +137,6 @@ typedef struct packed {
 it as is typical for dbg structs. */
 typedef struct packed {
     CACHE_HEADER hdr;
-    logic working;
     logic [NUM_SETS-1:0][ASSOC-1:0][$bits(MEM_BLOCK)-1:0] memDP;
 } DBG_dcache;
 

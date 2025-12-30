@@ -136,12 +136,9 @@ module testbench;
     MEM_TAG     mem2proc_data_tag;
     MEM_SIZE    proc2mem_size;
 
-    COMMIT_PKT commit;
-    ADDR [N-1:0] PC_reg;
-    EXCEPTION_CODE error_status = NO_ERROR;
-
-    logic           sq_used_any;
+    EXCEPTION_CODE  error_status = NO_ERROR;
     DBG_dcache      dbg_dcache;
+    COMMIT_PKT      commit;
 
     // assign proc2mem_command = '0;
     // assign proc2mem_addr    = '0;
@@ -158,7 +155,6 @@ module testbench;
         .f2mem  (f2mem),
         .mem2f  (mem2f),
 
-// >> TODO: memory stubbed
         .mem2proc_transaction_tag   (mem2proc_transaction_tag),
         .mem2proc_data              (mem2proc_data),
         .mem2proc_data_tag          (mem2proc_data_tag),
@@ -171,11 +167,9 @@ module testbench;
         .proc2mem_size              (proc2mem_size),
 `endif
 
-        .sq_used_any                (sq_used_any),
+        // .term_control               (term_control),
         .dbg_dcache                 (dbg_dcache),
-// << TODO: memory stubbed
-
-        .commit(commit)
+        .commit                     (commit)
     );
 
 
@@ -283,9 +277,6 @@ module testbench;
     } ROB_DEBUG_ENTRY;
     ROB_DEBUG_ENTRY rob_debug[int];
 
-    // int lol;
-    logic must_halt_asap;
-
     always @(negedge clock) begin
         if (reset) begin
             // Count the number of cycles and number of instructions committed
@@ -294,6 +285,9 @@ module testbench;
 
             // lol = 50;
         end else begin
+            logic observed_empty_sq_after_ret_halt;
+            logic must_stop_asap;
+
             print_en = (DBG_CYCLE_MIN <= clock_count-1) && (clock_count-1 <= DBG_CYCLE_MAX);
             /* Provided delay <revert if necessary> */
             // #2; // wait a short time to avoid a clock edge
@@ -308,7 +302,8 @@ module testbench;
 `ifdef DEBUG
             print_custom_data();
 `endif
-            output_reg_writeback_and_maybe_halt();
+            if (error_status == NO_ERROR)
+                output_reg_writeback_and_maybe_halt();
 
 `ifndef SYNTH
             // Add new dispatches to rob
@@ -330,13 +325,14 @@ module testbench;
 `endif
 
             // stop the processor
-            must_halt_asap =
+            observed_empty_sq_after_ret_halt = (error_status == HALTED_ON_WFI & ~commit.sq_any_pending_wrmems);
+            must_stop_asap =
                 error_status == ILLEGAL_INST
             |   clock_count > TB_MAX_CYCLES
-            |   (error_status == HALTED_ON_WFI & ~sq_used_any & ~dbg_dcache.working); // wait for SQ and dcache to drain first
+            |   (observed_empty_sq_after_ret_halt & ~commit.dcache_any_pending); // wait for SQ and dcache to drain first
 
             // if (error_status != NO_ERROR || clock_count > TB_MAX_CYCLES) begin
-            if (must_halt_asap) begin
+            if (must_stop_asap) begin
 
                 $display("  %16t : Processor Finished", $realtime);
 
@@ -386,18 +382,18 @@ module testbench;
             illegal = commit.illegal[n];
 
 `ifndef SYNTH
-            cur_idx = verisimpleV.rob0.rtre_idxs_n[n];
+            cur_idx = verisimpleV.commit_internal.rob_retire_idxs[n];
 `ifdef DEBUG
             id      = rob_debug[cur_idx].id;
 `endif
             pc      = rob_debug[cur_idx].NPC - 4;
             block   = memory.unified_memory[pc[31:3]];
             inst    = block.word_level[pc[2]];
-            reg_idx = verisimpleV.rob_2_retire.dst[n];
-            tag     = verisimpleV.rob_2_retire.tag[n];
-            t_old   = verisimpleV.rob_2_retire.t_old[n];
+            reg_idx = verisimpleV.commit_internal.dst[n];
+            tag     = verisimpleV.commit_internal.tag[n];
+            t_old   = verisimpleV.commit_internal.t_old[n];
             data    = verisimpleV.prf0.file[
-                verisimpleV.rob_2_retire.tag[n]
+                verisimpleV.commit_internal.tag[n]
             ];
             // print the committed instructions to the writeback output file
             if (reg_idx == `ZERO_REG) begin

@@ -185,110 +185,110 @@ module fifo #(
 
 endmodule
 
-// (only FIFO_FLUSH_RESET mode supported)
-module fifo_barrel #(
-    parameter int DEPTH =8,
-    parameter int WIDTH =57,
-    parameter int RPORTS=4,
-    parameter int WPORTS=4
-) (
-    input   logic   clock,
-    input   logic   reset,
-    input   logic   flush,
+// // (only FIFO_FLUSH_RESET mode supported)
+// module fifo_barrel #(
+//     parameter int DEPTH =8,
+//     parameter int WIDTH =57,
+//     parameter int RPORTS=4,
+//     parameter int WPORTS=4
+// ) (
+//     input   logic   clock,
+//     input   logic   reset,
+//     input   logic   flush,
 
-    output  logic   [$clog2(RPORTS+1)-1:0]  rvld_cnt,
-    input   logic   [$clog2(RPORTS+1)-1:0]  rrdy_cnt,
-    // output  logic   [0:RPORTS-1]            rvld,   // used
-    // input   logic   [0:RPORTS-1]            rrdy,
-    output  logic   [0:RPORTS-1][0:WIDTH-1] rdat,
+//     output  logic   [$clog2(RPORTS+1)-1:0]  rvld_cnt,
+//     input   logic   [$clog2(RPORTS+1)-1:0]  rrdy_cnt,
+//     // output  logic   [0:RPORTS-1]            rvld,   // used
+//     // input   logic   [0:RPORTS-1]            rrdy,
+//     output  logic   [0:RPORTS-1][0:WIDTH-1] rdat,
 
-    input   logic   [$clog2(WPORTS+1)-1:0]  wvld_cnt,
-    output  logic   [$clog2(WPORTS+1)-1:0]  wrdy_cnt,
-    // input   logic   [0:WPORTS-1]            wvld,
-    // output  logic   [0:WPORTS-1]            wrdy,   // free
-    input   logic   [0:WPORTS-1][0:WIDTH-1] wdat
+//     input   logic   [$clog2(WPORTS+1)-1:0]  wvld_cnt,
+//     output  logic   [$clog2(WPORTS+1)-1:0]  wrdy_cnt,
+//     // input   logic   [0:WPORTS-1]            wvld,
+//     // output  logic   [0:WPORTS-1]            wrdy,   // free
+//     input   logic   [0:WPORTS-1][0:WIDTH-1] wdat
 
-);
+// );
 
-    initial begin
-        // These should all be powers of 2
-        assert  ((DEPTH != 0)   & ((DEPTH   & (DEPTH-1))    == 0)) else $fatal;
-        // assert  ((WIDTH != 0)   & ((WIDTH   & (WIDTH-1))    == 0)) else $fatal;
-        assert  ((RPORTS != 0)  & ((RPORTS  & (RPORTS-1))   == 0)) else $fatal;
-        assert  ((WPORTS != 0)  & ((WPORTS  & (WPORTS-1))   == 0)) else $fatal;
+//     initial begin
+//         // These should all be powers of 2
+//         assert  ((DEPTH != 0)   & ((DEPTH   & (DEPTH-1))    == 0)) else $fatal;
+//         // assert  ((WIDTH != 0)   & ((WIDTH   & (WIDTH-1))    == 0)) else $fatal;
+//         assert  ((RPORTS != 0)  & ((RPORTS  & (RPORTS-1))   == 0)) else $fatal;
+//         assert  ((WPORTS != 0)  & ((WPORTS  & (WPORTS-1))   == 0)) else $fatal;
 
-        assert  (RPORTS <= DEPTH) else $fatal;
-        assert  (WPORTS <= DEPTH) else $fatal;
+//         assert  (RPORTS <= DEPTH) else $fatal;
+//         assert  (WPORTS <= DEPTH) else $fatal;
 
-    end
-    typedef logic [DEPTH-1:0][$clog2((DEPTH-1)*WIDTH+1)-1:0] shift_rom_t;
-    function automatic shift_rom_t gen_shift_rom();
-        shift_rom_t rv;
-        for (int unsigned i = 0; i < DEPTH; ++i)
-            rv[i] = i * WIDTH;
-        return rv;
-    endfunction
-    localparam shift_rom_t shift_rom = gen_shift_rom();
-    // initial begin
-    //     $display("shift_rom");
-    //     for (int i = 0; i < DEPTH; ++i)
-    //         $display("[%1d]: %d", i, shift_rom[i]);
-    // end
+//     end
+//     typedef logic [DEPTH-1:0][$clog2((DEPTH-1)*WIDTH+1)-1:0] shift_rom_t;
+//     function automatic shift_rom_t gen_shift_rom();
+//         shift_rom_t rv;
+//         for (int unsigned i = 0; i < DEPTH; ++i)
+//             rv[i] = i * WIDTH;
+//         return rv;
+//     endfunction
+//     localparam shift_rom_t shift_rom = gen_shift_rom();
+//     // initial begin
+//     //     $display("shift_rom");
+//     //     for (int i = 0; i < DEPTH; ++i)
+//     //         $display("[%1d]: %d", i, shift_rom[i]);
+//     // end
 
-    logic [$clog2(DEPTH)-1:0]   head, head_n, tail, tail_n;
-    logic [$clog2(DEPTH+1)-1:0] used, used_n, free;
-    logic [DEPTH-1:0][WIDTH-1:0]state, state_n;
+//     logic [$clog2(DEPTH)-1:0]   head, head_n, tail, tail_n;
+//     logic [$clog2(DEPTH+1)-1:0] used, used_n, free;
+//     logic [DEPTH-1:0][WIDTH-1:0]state, state_n;
 
-    assign free     = DEPTH - used;
-    assign rvld_cnt = used < RPORTS ? used : RPORTS;
-    assign wrdy_cnt = free < WPORTS ? free : WPORTS;
+//     assign free     = DEPTH - used;
+//     assign rvld_cnt = used < RPORTS ? used : RPORTS;
+//     assign wrdy_cnt = free < WPORTS ? free : WPORTS;
 
-    logic[DEPTH-1:0][WIDTH-1:0] state_rotr;
-    logic[2*DEPTH-1:0][WIDTH-1:0] state_dd;
+//     logic[DEPTH-1:0][WIDTH-1:0] state_rotr;
+//     logic[2*DEPTH-1:0][WIDTH-1:0] state_dd;
 
-    assign state_dd = {state, state};
-    assign state_rotr= state_dd >> shift_rom[head];
-    assign rdat = state_rotr[RPORTS-1:0];
+//     assign state_dd = {state, state};
+//     assign state_rotr= state_dd >> shift_rom[head];
+//     assign rdat = state_rotr[RPORTS-1:0];
 
-    logic   [$clog2(RPORTS+1)-1:0]  ren_cnt;
-    logic   [$clog2(WPORTS+1)-1:0]  wen_cnt;
-    assign ren_cnt = rrdy_cnt < used ? rrdy_cnt : used;
-    assign wen_cnt = free < wvld_cnt ? free : wvld_cnt;
+//     logic   [$clog2(RPORTS+1)-1:0]  ren_cnt;
+//     logic   [$clog2(WPORTS+1)-1:0]  wen_cnt;
+//     assign ren_cnt = rrdy_cnt < used ? rrdy_cnt : used;
+//     assign wen_cnt = free < wvld_cnt ? free : wvld_cnt;
 
-    localparam DIFF         = DEPTH - WPORTS;
-    localparam DIFF_WIDTHS  = (DEPTH - WPORTS) * WIDTH;
-    logic[DEPTH-1:0][WIDTH-1:0] wdat_rotl;
-    logic[2*DEPTH-1:0][WIDTH-1:0] wdat_dd, wdat_rotl_dd;
-    assign wdat_dd = {{DIFF_WIDTHS{1'bx}}, wdat, {DIFF_WIDTHS{1'bx}}, wdat};
-    assign wdat_rotl_dd = wdat_dd << shift_rom[tail];
-    assign wdat_rotl = wdat_rotl_dd[2*DEPTH-1:DEPTH];
+//     localparam DIFF         = DEPTH - WPORTS;
+//     localparam DIFF_WIDTHS  = (DEPTH - WPORTS) * WIDTH;
+//     logic[DEPTH-1:0][WIDTH-1:0] wdat_rotl;
+//     logic[2*DEPTH-1:0][WIDTH-1:0] wdat_dd, wdat_rotl_dd;
+//     assign wdat_dd = {{DIFF_WIDTHS{1'bx}}, wdat, {DIFF_WIDTHS{1'bx}}, wdat};
+//     assign wdat_rotl_dd = wdat_dd << shift_rom[tail];
+//     assign wdat_rotl = wdat_rotl_dd[2*DEPTH-1:DEPTH];
 
-    logic[WPORTS-1:0] wen;
-    logic[2*DEPTH-1:0] wmsk_rotl_dd;
-    for (genvar i = 0; i < WPORTS; ++i)
-        assign wen[i] = i < wen_cnt;
-    assign wmsk_rotl_dd = {{DIFF{1'b0}}, wen, {DIFF{1'b0}}, wen} << tail;
-    logic[DEPTH-1:0] wmsk_rotl;
-    assign wmsk_rotl = wmsk_rotl_dd[2*DEPTH-1:DEPTH];
+//     logic[WPORTS-1:0] wen;
+//     logic[2*DEPTH-1:0] wmsk_rotl_dd;
+//     for (genvar i = 0; i < WPORTS; ++i)
+//         assign wen[i] = i < wen_cnt;
+//     assign wmsk_rotl_dd = {{DIFF{1'b0}}, wen, {DIFF{1'b0}}, wen} << tail;
+//     logic[DEPTH-1:0] wmsk_rotl;
+//     assign wmsk_rotl = wmsk_rotl_dd[2*DEPTH-1:DEPTH];
 
-    assign head_n = head + ren_cnt;
-    assign tail_n = tail + wen_cnt;
-    assign used_n = (used + wen_cnt) - ren_cnt;
-    for (genvar i = 0; i < DEPTH; ++i)
-        assign state_n[i] = wmsk_rotl[i] ? wdat_rotl[i] : state[i];
+//     assign head_n = head + ren_cnt;
+//     assign tail_n = tail + wen_cnt;
+//     assign used_n = (used + wen_cnt) - ren_cnt;
+//     for (genvar i = 0; i < DEPTH; ++i)
+//         assign state_n[i] = wmsk_rotl[i] ? wdat_rotl[i] : state[i];
 
-    always_ff @(posedge clock) begin
-        state   <= state_n;
-        head    <= head_n;
-        tail    <= tail_n;
-        used    <= used_n;
+//     always_ff @(posedge clock) begin
+//         state   <= state_n;
+//         head    <= head_n;
+//         tail    <= tail_n;
+//         used    <= used_n;
 
-        if (reset | flush) begin
-            head <= '0;
-            tail <= '0;
-            used <= '0;
-        end
+//         if (reset | flush) begin
+//             head <= '0;
+//             tail <= '0;
+//             used <= '0;
+//         end
 
-    end
+//     end
 
-endmodule
+// endmodule

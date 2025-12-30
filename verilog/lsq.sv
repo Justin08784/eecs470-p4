@@ -15,7 +15,7 @@ module sq #(
     parameter SQ_SZ =SQ_SZ, // num elements
     parameter N     =N
 ) (
-    output  logic           used_any, // used by testbench to determine when to stop
+    output  logic           any_pending_wrmems,
 
     input   logic           clock,
     input   logic           reset,
@@ -51,6 +51,7 @@ module sq #(
     `IDX_TYPE(SQ_SZ)    head, tail, snap;
     `CNT_TYPE(SQ_SZ)    used, free, retired, retired_n; // retired := retired but not wrmem'd. used = retired + "completed but not retired" + "dispatched but not completed"
     logic wrmem_en;
+    assign any_pending_wrmems = retired != 0 || r_in_en_cnt != 0;
 
     logic [1:0][`IDX_SIZE(SQ_SZ)-1:0] wrmem_idxs_n;
     logic [DPORTS:0][`IDX_SIZE(SQ_SZ)-1:0] d_idxs_n;
@@ -77,7 +78,7 @@ module sq #(
 
         .used       (used),
         .free       (free),
-        .used_scnt  (used_any),
+        .used_scnt  (),
         .free_scnt  (d_out.rdy_scnt)
     );
 

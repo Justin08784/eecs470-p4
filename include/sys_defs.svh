@@ -1030,12 +1030,26 @@ typedef struct packed {
     `CNT_TYPE(N)    wen_cnt;
     logic   [N-1:0] halt;
     logic   [N-1:0] illegal;
+
+    // following: used by testbench to determine when to stop
+    logic dcache_any_pending;   // any pending operation in dcache?
+    logic sq_any_pending_wrmems;// any stores "retired but not yet written to memory"?
 } COMMIT_PKT;
+
+`ifndef SYNTH
+typedef struct packed {
+    PHYS_REG_IDX[N-1:0] tag;
+    REG_IDX     [N-1:0] dst;
+    PHYS_REG_IDX[N-1:0] t_old;
+
+    ROB_IDX     [N:0]   rob_retire_idxs;
+} COMMIT_INTERNAL;
+`endif
 
 // I/O: Retire
 typedef struct packed {
     `CNT_TYPE(N)            en_cnt;
-    // `CNT_TYPE(N)            sq_en_cnt;
+    `CNT_TYPE(N)            sq_en_cnt; // number of stores retired
     PHYS_REG_IDX [N-1:0]    t_old;
     logic        [N-1:0]    halt;
     logic        [N-1:0]    illegal;

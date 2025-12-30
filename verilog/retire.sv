@@ -16,7 +16,6 @@ typedef enum logic [2:0] {
 
 module retire (
     input  rob2retire rob_in,
-    output `CNT_TYPE(N) sq_out_r_en_cnt, // number of stored retired
 
     output RETIRE_PKT retire_exec
 );
@@ -40,10 +39,11 @@ module retire (
 
     // general retire
     `CNT_TYPE(N) retire_en_cnt;
+    `CNT_TYPE(N) sq_ret_en_cnt;
 
     always_comb begin
         retire_en_cnt   = 0;
-        sq_out_r_en_cnt = 0;
+        sq_ret_en_cnt   = 0;
 
         for (int i = 0; i < rob_in.vld_scnt; ++i) begin
             if (!rob_in.cpl[i])
@@ -58,7 +58,7 @@ module retire (
                 ++retire_en_cnt;
             end
             RET_STR: begin
-                ++sq_out_r_en_cnt;
+                ++sq_ret_en_cnt;
                 ++retire_en_cnt;
             end
             endcase
@@ -67,7 +67,8 @@ module retire (
 
     assign retire_exec = '{
         // only the count *may* be adjusted
-        en_cnt  : retire_en_cnt,
+        en_cnt      : retire_en_cnt,
+        sq_en_cnt   : sq_ret_en_cnt,
 
         // the rest of the fields stay the same
         t_old   : rob_in.t_old,

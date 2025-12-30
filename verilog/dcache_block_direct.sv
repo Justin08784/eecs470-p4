@@ -391,6 +391,7 @@ endmodule
 
 
 module dcache_block (
+    output logic    any_pending,
     output DBG_dcache dbg,
 
     input logic clock,
@@ -651,9 +652,9 @@ module dcache_block (
     end
 
   
+    assign any_pending = w.en | mshr.status != S_IDLE;
     assign dbg = '{
         hdr     : hdr,
-        working : mshr.status != S_IDLE | w.en,
         memDP   : dbg_memDP
     };
 
