@@ -134,7 +134,7 @@ module sq #(
     assign wrmem_en = dcache_in.status == ST_SUCC; // TODO: with a nonblocking cache, this condition may no longer hold (and a dependent load may miss the value)
 
     // retire
-    assign retired_n = (retired - wrmem_en) + (flush ? 1'b0 : r_in_en_cnt);
+    assign retired_n = (retired - wrmem_en) + r_in_en_cnt;
 
     // complete, dispatch
     always_comb begin
