@@ -1,8 +1,7 @@
+`include "dcache_block_direct.svh"
 `include "sys_defs.svh"
 
 typedef struct packed {
-    logic       pol;    // polarity
-    logic       cpl;    // completed? (data + address)
     // logic       ret;    // retired?
     // DWADDR      dst;
     ADDR        dst;    // alternative: DWADDR + MEM_BLOCK
@@ -10,6 +9,21 @@ typedef struct packed {
     // logic[3:0]  write_byte_mask;
     DATA_BLOCK  dat;
 } SQ_ENTRY;
+
+// h<=t
+// 0, 0
+// 0, 1 // impossible
+// 1, 0 // impossible
+// 1, 1
+
+// t> h
+// 0, 0 // impossible
+// 0, 1 
+// 1, 0
+// 1, 1 // impossible
+
+// h <= x
+// x <  t
 
 /* Store queue */
 module sq #(
@@ -49,6 +63,11 @@ module sq #(
     localparam RPORTS = N;          // retire ports (in-order) <merely a pointer bump>
     // localparam WRMEM_PORTS = 1;  // write mem ports (in-order) <when we actually write to memory>
 
+    struct packed {
+        logic[SQ_SZ-1:0]used;
+        logic[SQ_SZ-1:0]pol;    // wrap polarity (msb of dsq index)
+        logic[SQ_SZ-1:0]cpl;    // completed? (data + address)
+    } hdr, hdr_n;
     SQ_ENTRY [SQ_SZ-1:0]state, state_n;
     `IDX_TYPE(DSQ_SZ)   head, tail, snap;
     `CNT_TYPE(SQ_SZ)    used, free, retired, retired_n; // retired := retired but not wrmem'd. used = retired + "completed but not retired" + "dispatched but not completed"
@@ -136,28 +155,63 @@ module sq #(
     // retire
     assign retired_n = (retired - wrmem_en) + r_in_en_cnt;
 
-    // complete, dispatch
+    logic opp_pol; // head -> tail span wraps?
+    logic [SQ_SZ-1:0] geh, ltt, anded, orred, snap_used;
+    assign opp_pol = head[`IDX_SIZE(DSQ_SZ)-1] ^ snap[`IDX_SIZE(DSQ_SZ)-1];
+    for (genvar i = 0; i < SQ_SZ; ++i) begin
+        assign geh[i] = i >= head[`IDX_SIZE(SQ_SZ)-1:0];
+        assign ltt[i] = i <  snap[`IDX_SIZE(SQ_SZ)-1:0];
+    end
+    assign anded = geh & ltt; // [h, t)
+    assign orred = geh | ltt; // [0, t) U [h, DEPTH)
+    assign snap_used = opp_pol ? orred : anded;
+
     always_comb begin
+        hdr_n   = hdr;
         state_n = state;
+
+        // complete (flush)
+        if (flush)
+            hdr_n.used = snap_used;
+
+        // retired
+        if (wrmem_en) begin
+            int unsigned sq_idx;
+            sq_idx = wrmem_idxs_n[0][`IDX_SIZE(SQ_SZ)-1:0];
+
+            hdr_n.used[sq_idx]  = 1'b0;
+        end
+
+        // complete (cstr)
         for (int i = 0; i < CPORTS; ++i) begin
             if (cstr_in.en[i]) begin
                 int unsigned sq_idx;
                 sq_idx = cstr_in.dat[i].dsq_idx[`IDX_SIZE(SQ_SZ)-1:0];
 
-                state_n[sq_idx].cpl = 1'b1;
+                hdr_n.cpl[sq_idx]   = 1'b1;
+
                 state_n[sq_idx].dst = cstr_in.dat[i].dst;
                 state_n[sq_idx].size= cstr_in.dat[i].size;
                 state_n[sq_idx].dat = cstr_in.dat[i].dat;
             end
         end
 
+        // dispatch
+        for (int i = 0; i < DPORTS; ++i) begin
+            if (i < d_in.wen_cnt & ~flush) begin
+                int unsigned sq_idx;
+                sq_idx = d_idxs_n[i][`IDX_SIZE(SQ_SZ)-1:0];
+
+                hdr_n.used[sq_idx]  = 1'b1;
+            end
+        end
         for (int i = 0; i < DPORTS; ++i) begin
             if (i < d_in.wen_cnt) begin
                 int unsigned sq_idx;
                 sq_idx = d_idxs_n[i][`IDX_SIZE(SQ_SZ)-1:0];
 
-                state_n[sq_idx].pol = d_idxs_n[i][`IDX_SIZE(DSQ_SZ)-1];
-                state_n[sq_idx].cpl = 1'b0;
+                hdr_n.pol[sq_idx]   = d_idxs_n[i][`IDX_SIZE(DSQ_SZ)-1];
+                hdr_n.cpl[sq_idx]   = 1'b0;
             end
         end
     end
@@ -172,11 +226,14 @@ module sq #(
         end
 `endif
 
+        hdr     <= hdr_n;
         state   <= state_n;
         retired <= retired_n;
 
-        if (reset)
+        if (reset) begin
+            hdr.used<= '0;
             retired <= '0;
+        end
     end
 
 `ifdef DEBUG
@@ -212,14 +269,18 @@ module sq #(
 
         for (int i = 0; i < SQ_SZ; ++i) begin
             if (!sq_vld[i]) begin
-                $display("SQ[%2d]:", i);
+                $display("SQ[%2d]: {used: %b",
+                    i,
+                    hdr.used[i]
+                );
                 continue;
             end
 
-            $display("SQ[%2d]: pol: %b, cpl: %b, dst: %x, size: %1d, dat: %x",
+            $display("SQ[%2d]: {used: %b, pol: %b, cpl: %b}, dst: %x, size: %1d, dat: %x",
                 i,
-                state[i].pol,
-                state[i].cpl,
+                hdr.used[i],
+                hdr.pol[i],
+                hdr.cpl[i],
                 state[i].dst,
                 state[i].size,
                 state[i].dat
