@@ -411,6 +411,7 @@ module rs #(parameter
                 t           : d_in.dat[i].t,
                 t1          : d_in.dat[i].t1,
                 t1_rdy      : d_in.dat[i].t1_rdy,
+                dsq_idx     : d_in.dat[i].dsq_idx,
                 rob_idx     : d_in.dat[i].rob_idx
             };
         end

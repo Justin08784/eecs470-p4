@@ -6,7 +6,7 @@ typedef struct packed {
     // DWADDR      dst;
     ADDR        dst;    // alternative: DWADDR + MEM_BLOCK
     MEM_SIZE    size;
-    // logic[3:0]  write_byte_mask;
+    logic[3:0]  byte_mask;
     DATA_BLOCK  dat;
 } SQ_ENTRY;
 
@@ -48,6 +48,10 @@ module sq #(
     // complete (write)
     input   execute2complete_str cstr_in,
 
+    // execute (load query & response)
+    input   ld2sq           ld_in,
+    output  sq2ld           ld_out,
+
     // dispatch
         // alloc snapshot
     input   comm2snap_bus   snap_in,
@@ -55,6 +59,23 @@ module sq #(
     output  sq2dispatch     d_out,
     input   dispatch2sq     d_in
 );
+    function automatic logic [SQ_SZ-1:0] compute_range_mask(
+        input `IDX_TYPE(DSQ_SZ) head,
+        input `IDX_TYPE(DSQ_SZ) tail
+    );
+        logic opp_pol; // head -> tail span wraps?
+        logic [SQ_SZ-1:0] geh, ltt, anded, orred, used;
+        opp_pol = head[`IDX_SIZE(DSQ_SZ)-1] ^ tail[`IDX_SIZE(DSQ_SZ)-1];
+        for (int i = 0; i < SQ_SZ; ++i) begin
+            geh[i] = i >= head[`IDX_SIZE(SQ_SZ)-1:0];
+            ltt[i] = i <  tail[`IDX_SIZE(SQ_SZ)-1:0];
+        end
+        anded= geh & ltt; // [h, t)
+        orred= geh | ltt; // [0, t) U [h, DEPTH)
+        used = opp_pol ? orred : anded;
+        return used;
+    endfunction
+
     initial begin
         assert(`is_pow2(SQ_SZ)) else $fatal;
     end
@@ -65,7 +86,7 @@ module sq #(
 
     struct packed {
         logic[SQ_SZ-1:0]used;
-        logic[SQ_SZ-1:0]pol;    // wrap polarity (msb of dsq index)
+        // logic[SQ_SZ-1:0]pol;    // wrap polarity (msb of dsq index)
         logic[SQ_SZ-1:0]cpl;    // completed? (data + address)
     } hdr, hdr_n;
     SQ_ENTRY [SQ_SZ-1:0]state, state_n;
@@ -155,16 +176,8 @@ module sq #(
     // retire
     assign retired_n = (retired - wrmem_en) + r_in_en_cnt;
 
-    logic opp_pol; // head -> tail span wraps?
-    logic [SQ_SZ-1:0] geh, ltt, anded, orred, snap_used;
-    assign opp_pol = head[`IDX_SIZE(DSQ_SZ)-1] ^ snap[`IDX_SIZE(DSQ_SZ)-1];
-    for (genvar i = 0; i < SQ_SZ; ++i) begin
-        assign geh[i] = i >= head[`IDX_SIZE(SQ_SZ)-1:0];
-        assign ltt[i] = i <  snap[`IDX_SIZE(SQ_SZ)-1:0];
-    end
-    assign anded = geh & ltt; // [h, t)
-    assign orred = geh | ltt; // [0, t) U [h, DEPTH)
-    assign snap_used = opp_pol ? orred : anded;
+    logic [SQ_SZ-1:0]snap_used;
+    assign snap_used = compute_range_mask(head, snap);
 
     always_comb begin
         hdr_n   = hdr;
@@ -192,6 +205,7 @@ module sq #(
 
                 state_n[sq_idx].dst = cstr_in.dat[i].dst;
                 state_n[sq_idx].size= cstr_in.dat[i].size;
+                state_n[sq_idx].byte_mask = compute_byte_mask(cstr_in.dat[i].dst, cstr_in.dat[i].size);
                 state_n[sq_idx].dat = cstr_in.dat[i].dat;
             end
         end
@@ -210,7 +224,7 @@ module sq #(
                 int unsigned sq_idx;
                 sq_idx = d_idxs_n[i][`IDX_SIZE(SQ_SZ)-1:0];
 
-                hdr_n.pol[sq_idx]   = d_idxs_n[i][`IDX_SIZE(DSQ_SZ)-1];
+                // hdr_n.pol[sq_idx]   = d_idxs_n[i][`IDX_SIZE(DSQ_SZ)-1];
                 hdr_n.cpl[sq_idx]   = 1'b0;
             end
         end
@@ -234,6 +248,78 @@ module sq #(
             hdr.used<= '0;
             retired <= '0;
         end
+    end
+
+
+    // load query & response
+    WADDR query_word;
+    SQ_IDX ld_in_sq_idx;
+    logic[SQ_SZ-1:0] ncpl;
+    logic[SQ_SZ-1:0] vld_older;
+    logic[SQ_SZ-1:0] match_word;
+    logic[3:0][SQ_SZ-1:0] byte_mask_table_T;
+    logic[3:0][SQ_SZ-1:0] ok_table_T, ok_table_rotr_T, ok_youngest_sel_rotr_T, ok_youngest_sel_T;
+    // logic[SQ_SZ-1:0][3:0] ok_table_rotr, ok_youngest_sel_rotr, ok_youngest_sel;
+    // logic[SQ_SZ-1:0][3:0] ok_youngest_sel;
+
+    assign query_word   = addr2w(ld_in.addr);
+    assign ld_in_sq_idx = ld_in.dsq_idx[`IDX_SIZE(SQ_SZ)-1:0];
+
+    assign vld_older    = compute_range_mask(head, ld_in.dsq_idx);
+    for (genvar i = 0; i < SQ_SZ; ++i) begin
+        assign ncpl[i]      = ~hdr.cpl[i];
+        assign match_word[i]= query_word == addr2w(state[i].dst);
+    end
+
+    for (genvar j = 0; j < 4; ++j) begin
+        for (genvar i = 0; i < SQ_SZ; ++i) begin
+            assign byte_mask_table_T[j][i] = state[i].byte_mask[j];
+            // assign ok_table_rotr[i][j] = ok_table_rotr_T[j][i];
+        end
+        assign ok_table_T[j]        = vld_older & match_word & byte_mask_table_T[j];
+        assign ok_table_rotr_T[j]   = {ok_table_T[j], ok_table_T[j]} >> ld_in_sq_idx;
+
+        assign ld_out.has_byte_mask[j] = |ok_table_T[j];
+    end
+    assign ld_out.any_older_ncpl_store = |(vld_older & ncpl);
+
+    for (genvar j = 0; j < 4; ++j) begin
+        always_comb begin
+            ok_youngest_sel_rotr_T[j] = '0;
+            for (int i = 1; i < SQ_SZ; ++i) begin
+                if (ok_table_rotr_T[j][i]) begin
+                    ok_youngest_sel_rotr_T[j][i] = 1'b1;
+                    break;
+                end
+            end
+        end
+    end
+
+    for (genvar j = 0; j < 4; ++j) begin
+        logic [DSQ_SZ-1:0] ok_youngest_sel_ddTj;
+        assign ok_youngest_sel_ddTj = {ok_youngest_sel_rotr_T[j], ok_youngest_sel_rotr_T[j]} << ld_in_sq_idx;
+        assign ok_youngest_sel_T[j] = ok_youngest_sel_ddTj[DSQ_SZ-1:SQ_SZ];
+        // for (genvar i = 0; i < SQ_SZ; ++i) begin
+        //     assign ok_youngest_sel[i][j] = ok_youngest_sel_T[j][i];
+        // end
+    end
+
+    LDB ldb, ldb_n;
+    assign ld_out.ldb = ldb;
+    assign ldb_n.en         = ld_in.dispatch_en; // FIXME: can actually disable if no forwardable bytes (but not incorrect either way)
+    assign ldb_n.vld_byte_mask  = ld_out.has_byte_mask;
+    assign ldb_n.lbuf_idx   = ld_in.lbuf_idx;
+    for (genvar j = 0; j < 4; ++j) begin
+        always_comb begin
+            for (int i = 0; i < SQ_SZ; ++i)
+                if (ok_youngest_sel_T[j][i])
+                    ldb_n.dat[j] = state[i].dat.byte_level[j];
+        end
+    end
+    always_ff @(posedge clock) begin
+        ldb <= ldb_n;
+        if (reset)
+            ldb.en <= '0;
     end
 
 `ifdef DEBUG
@@ -276,13 +362,14 @@ module sq #(
                 continue;
             end
 
-            $display("SQ[%2d]: {used: %b, pol: %b, cpl: %b}, dst: %x, size: %1d, dat: %x",
+            $display("SQ[%2d]: {used: %b, cpl: %b}, dst: %x, size: %1d, byte_mask: %b, dat: %x",
                 i,
                 hdr.used[i],
-                hdr.pol[i],
+                // hdr.pol[i],
                 hdr.cpl[i],
                 state[i].dst,
                 state[i].size,
+                state[i].byte_mask,
                 state[i].dat
             );
         end

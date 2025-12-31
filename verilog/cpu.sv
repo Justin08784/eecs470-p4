@@ -184,6 +184,8 @@ module cpu (
 
     logic sq_any_pending_wrmems;
     execute2complete_str ex_2_cstr;
+    sq2ld sq_2_ld;
+    ld2sq ld_2_sq;
     RETIRE_PKT  retire_exec;
     sq #(
         .SQ_SZ  (SQ_SZ),
@@ -202,6 +204,8 @@ module cpu (
         .r_in_en_cnt(retire_exec.sq_en_cnt),
 
         .cstr_in    (ex_2_cstr),
+        .ld_in      (ld_2_sq),
+        .ld_out     (sq_2_ld),
         .snap_in    (comm_2_snap),
         .d_out      (sq_2_dispatch),
         .d_in       (dispatch_2_sq)
@@ -307,6 +311,9 @@ module cpu (
 
         .btq_in     (btq_2_ex),
         .btq_out    (ex_2_btq),
+
+        .sq_in      (sq_2_ld),
+        .sq_out     (ld_2_sq),
 
         .ctag_out   (ex_2_ctag),
         .cbru_out   (ex_2_cbru),

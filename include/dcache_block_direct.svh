@@ -105,18 +105,18 @@ typedef enum logic {
     ST_FAIL // inverse of above, must retry
 } ST_QUERY_STATUS;
 
-typedef struct packed {
-    logic           en;
-    LBUF_IDX        lbuf_idx;
-    DATA_BLOCK      dat;
-} LDB; // load data bus (wakeup insns in load bay/buffer)
+// typedef struct packed {
+//     logic           en;
+//     LBUF_IDX        lbuf_idx;
+//     DATA_BLOCK      dat;
+// } LDB; // load data bus (wakeup insns in load bay/buffer)
 
 typedef struct packed {
     logic           vld;
     LBUF_IDX        lbuf_idx;
     ADDR            addr;
 
-    logic           dispatch_rdy;
+    logic           dispatch_en;
 } ld2dcache;
 typedef struct packed {
     LD_QUERY_STATUS status;

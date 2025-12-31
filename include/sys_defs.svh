@@ -210,6 +210,24 @@ typedef enum logic [1:0] {
     MEM_STORE= 2'h2
 } MEM_COMMAND;
 
+typedef union packed {
+    logic [3:0]      byte_level;
+    logic [1:0][1:0] half_level;
+} DATA_BYTE_MASK;
+
+function automatic DATA_BYTE_MASK compute_byte_mask(
+    input ADDR      addr,
+    input MEM_SIZE  size
+);
+    DATA_BYTE_MASK rv;
+    rv = '0;
+    case (size)
+    BYTE: rv[addr[1:0]] = '1;
+    HALF: rv[addr[1]]   = '1;
+    WORD: rv            = '1;
+    endcase
+    return rv;
+endfunction
 
 parameter FU_IDX_NUM = 5;
 typedef enum logic [2:0] {
@@ -722,6 +740,10 @@ typedef struct packed {
         //   (i.e. may only be a strict subset of dispatching insns!)
 } dispatch2free_list;
 
+typedef struct packed {
+    `CNT_TYPE(N)    wen_cnt;
+} dispatch2sq;
+
 
 // ================
 // Owner: ROB
@@ -754,23 +776,6 @@ typedef struct packed {
     logic       [N-1:0] illegal;
         // - IMPORTANT: Set from lowest indices in program-order. NO GAPS!!!
 } rob2retire;
-
-
-typedef struct packed {
-    `CNT_TYPE(N)    rdy_scnt;
-    DSQ_IDX[N-1:0]  dsq_idxs_n;
-} sq2dispatch;
-
-typedef struct packed {
-    `CNT_TYPE(N)    wen_cnt;
-} dispatch2sq;
-
-typedef struct packed {
-    `CNT_TYPE(N)        vld_scnt; // debug only
-        // From: retire (ROB)
-        // - number of valid retire lines
-} sq2retire;
-
 
 // ================
 // Owner: RS
@@ -836,6 +841,7 @@ typedef struct packed {
     PHYS_REG_IDX    t;
     PHYS_REG_IDX    t1;
     logic           t1_rdy;
+    DSQ_IDX         dsq_idx; // load position (dsq tail at time of load dispatch)
     ROB_IDX         rob_idx;
 } RS_LOAD_PAYLOAD;
 
@@ -1090,6 +1096,51 @@ typedef struct packed{
     `BY_FU(DATA)    v1s;
     `BY_FU(DATA)    v2s;
 } prf2execute;
+
+// ================
+// Owner: Load unit
+// ================
+typedef struct packed {
+    // logic           vld;
+    DSQ_IDX         dsq_idx;
+    LBUF_IDX        lbuf_idx;
+    ADDR            addr;
+    MEM_SIZE        size;
+
+    // logic           dispatch_rdy;
+    logic           dispatch_en;
+} ld2sq;
+
+// ================
+// Owner: Store queue
+// ================
+
+typedef struct packed {
+    logic           en;
+    logic[3:0]      vld_byte_mask;
+    LBUF_IDX        lbuf_idx;
+    DATA_BLOCK      dat;
+} LDB; // load data bus (wakeup insns in load bay/buffer)
+
+typedef struct packed {
+    `CNT_TYPE(N)    rdy_scnt;
+    DSQ_IDX[N-1:0]  dsq_idxs_n;
+} sq2dispatch;
+
+typedef struct packed {
+    logic[3:0]  has_byte_mask;
+    logic       any_older_ncpl_store;
+
+    LDB         ldb;
+} sq2ld;
+
+typedef struct packed {
+    `CNT_TYPE(N)        vld_scnt; // debug only
+        // From: retire (ROB)
+        // - number of valid retire lines
+} sq2retire;
+
+
 
 `ifdef DEBUG
 `include "debug.svh"

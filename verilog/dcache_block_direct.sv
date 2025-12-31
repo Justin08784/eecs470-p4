@@ -196,7 +196,8 @@ module load_handler (
 
     LDB ldb, ldb_n;
     assign ldb_n = '{
-        en      : gnt && op == OP_LOAD_HIT && ld_in.dispatch_rdy,
+        en      : ld_in.dispatch_en,
+        vld_byte_mask : '1,  // NOTE: always all 1s (only really useful for sq)
         lbuf_idx: ld_in.lbuf_idx,
         dat     : r_rcv.dat.word_level[ld_in.addr[2]]
     };
@@ -680,11 +681,11 @@ module dcache_block (
             mem_out_data
         );
 
-        $display("ld_in: vld: %b, lbuf_idx: %1d, addr: 0x%x, dispatch_rdy: %b",
+        $display("ld_in: vld: %b, lbuf_idx: %1d, addr: 0x%x, dispatch_en: %b",
             ld_in.vld,
             ld_in.lbuf_idx,
             ld_in.addr,
-            ld_in.dispatch_rdy
+            ld_in.dispatch_en
         );
         $display("ld_ot: status: %s, ldb: {en: %b, lbuf_idx: %1d, dat: 0x%x}",
             dbg_ld_status(ld_out.status),

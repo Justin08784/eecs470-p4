@@ -36,6 +36,8 @@ module lod_ex(
     // output  execute2lq                  lq_out,
     // output  executeLD2sq                ld_sq_out,
 
+    input   sq2ld       sq_in,
+    output  ld2sq       sq_out,
     input   dcache2ld   dcache_in,
     output  ld2dcache   dcache_out,
 
@@ -67,7 +69,7 @@ module lod_ex(
         MEM_SIZE        mem_size;
 
         // readiness
-        // LSQ_IDX         sq_idx; // TODO: reenable
+        DSQ_IDX         dsq_idx;
         logic [3:0]     need_byte_mask;
     } QUERY_BAY_ENTRY;
 
@@ -126,22 +128,10 @@ module lod_ex(
     end
 
     /* In -> Bay */
-    typedef union packed {
-        logic [3:0]      byte_level;
-        logic [1:0][1:0] half_level;
-    } DATA_BYTE_MASK;
-
     ADDR            i_addr;
     DATA_BYTE_MASK  i_byte_mask;
     assign i_addr   = i_regs.rs1 + i_regs.dat.opb; // load address computation
-    always_comb begin
-        i_byte_mask = '0;
-        case (i_regs.dat.mem_size)
-        BYTE: i_byte_mask[i_addr[1:0]]  = '1;
-        HALF: i_byte_mask[i_addr[1]]    = '1;
-        WORD: i_byte_mask               = '1;
-        endcase
-    end
+    assign i_byte_mask  = compute_byte_mask(i_addr, i_regs.dat.mem_size);
 
     /* Bay -> Lbuf ("dispatch") */
     // FIXME: Change lbuf to a compressible ring buffer to avoid crossbar
@@ -166,11 +156,21 @@ module lod_ex(
                 dispatch_rdy_idx = i;
         end
     end
+
+    logic sq_satisfies_bay;
+    assign sq_satisfies_bay = ~|(bay_need & ~sq_in.has_byte_mask);
     assign dispatch_en      =
         bay_vld
-    &   (~bay_need | dcache_hit)
+    &   ~sq_in.any_older_ncpl_store // RAW hazard
+    &   (sq_satisfies_bay | dcache_hit)
     &   |dispatch_rdy_req;
-    assign dispatch_lbuf_en = {LBUF_SZ{bay_vld & (~bay_need | dcache_hit)}} & dispatch_rdy_gnt;
+    assign dispatch_lbuf_en =
+        {LBUF_SZ{
+            bay_vld
+        &   ~sq_in.any_older_ncpl_store
+        &   (sq_satisfies_bay | dcache_hit)
+        }}
+    &   dispatch_rdy_gnt;
 
     /* Lbuf -> CDB shr */
     logic [LBUF_SZ-1:0] lbuf2cdb_arb_req; // request to request for cdb slot
@@ -205,7 +205,16 @@ module lod_ex(
         lbuf_idx    : dispatch_rdy_idx,
         addr        : bay_dat.addr,
 
-        dispatch_rdy: |dispatch_rdy_req
+        dispatch_en : dispatch_en & ~sq_satisfies_bay
+    };
+
+    assign sq_out = '{
+        dsq_idx     : bay_dat.dsq_idx,
+        lbuf_idx    : dispatch_rdy_idx,
+        addr        : bay_dat.addr,
+        size        : bay_dat.mem_size,
+
+        dispatch_en : dispatch_en
     };
 
     // i_regs->bay logic
@@ -215,7 +224,7 @@ module lod_ex(
         rd_unsigned     : i_regs.dat.rd_unsigned,
         addr            : i_addr,
         mem_size        : i_regs.dat.mem_size,
-        // sq_idx          : i_regs[0].dat.sq_idx,
+        dsq_idx         : i_regs.dat.dsq_idx,
         need_byte_mask  : i_byte_mask
     };
 
@@ -253,12 +262,26 @@ module lod_ex(
 
 
     always_comb begin
+        DATA_BLOCK coal_dat; // coal(esced)
+
         lbuf_hdr_n  = lbuf_hdr;
         lbuf_n      = lbuf;
 
-        if (dcache_in.ldb.en) begin
+        if (dcache_in.ldb.en)
+            coal_dat = dcache_in.ldb.dat;
+
+        if (sq_in.ldb.en)
+            coal_dat = bytewise_override(coal_dat, sq_in.ldb.dat, {4{sq_in.ldb.en}} & sq_in.ldb.vld_byte_mask);
+
+        if (dcache_in.ldb.en | sq_in.ldb.en) begin
+            /* TODO/FIXME:
+            In this blocking dcache design, a load is dispatched iff all of its
+            byte can be satisfied (1. by SQ alone or 2. by SQ and dcache). And so
+            need_byte_mask will go to 0 immediately. This will change with a nonblocking
+            dcache design, where a load may dispatch to the buffer only partially
+            satisfied (and wait for the rest from dcache ldb broadcast). */
             lbuf_n[dcache_in.ldb.lbuf_idx].need_byte_mask &= '0;
-            lbuf_n[dcache_in.ldb.lbuf_idx].raw = dcache_in.ldb.dat;
+            lbuf_n[dcache_in.ldb.lbuf_idx].raw = coal_dat;
         end
 
         for (int i = 0; i < LBUF_SZ; ++i) begin
@@ -392,6 +415,30 @@ module lod_ex(
             lbuf_hdr<= '0;
     end
 
+`ifdef FORMAL
+    logic either_ldb_en;
+    LBUF_IDX ldb_tgt;
+    logic[3:0] coal_byte_mask;
+    assign either_ldb_en = dcache_in.ldb.en | sq_in.ldb.en;
+    assign ldb_tgt = dcache_in.ldb.en ? dcache_in.ldb.lbuf_idx : sq_in.ldb.lbuf_idx;
+    assign coal_byte_mask =
+        {4{dcache_in.ldb.en}}   & dcache_in.ldb.vld_byte_mask
+    |   {4{sq_in.ldb.en}}       & sq_in.ldb.vld_byte_mask;
+    always_ff @(posedge clock) begin
+        // Invariant 1: dcache and sq, if both enabled, broadcast to the same load buffer index
+        assert(reset | ~(dcache_in.ldb.en & sq_in.ldb.en) | (dcache_in.ldb.lbuf_idx == sq_in.ldb.lbuf_idx)) else $fatal;
+
+        // Invariant 2: ldb target (load buffer entry) must be valid
+        assert(reset | ~either_ldb_en | lbuf_hdr[ldb_tgt].vld) else $fatal;
+
+        // Invariant 3: the coalesced result of the dcache + sq ldb's will fully satisfy the target load
+        // (we do not yet allow loads to dispatch only partially satisfied)
+        assert(reset | ~either_ldb_en | ~|(lbuf[ldb_tgt].need_byte_mask & ~coal_byte_mask));
+
+        assert(reset | ~sq_in.ldb.en);
+    end
+`endif
+
 `ifdef DEBUG
 task print_lod_ex();
     $display("\n[%0t] <<< lod_ex DEBUG >>>", $time);
@@ -446,11 +493,11 @@ task print_lod_ex();
             bay_dat.need_byte_mask
         );
 
-    $display("dcache_out: vld: %b, lbuf_idx: %1d, addr: 0x%x, dispatch_rdy: %b",
+    $display("dcache_out: vld: %b, lbuf_idx: %1d, addr: 0x%x, dispatch_en: %b",
         dcache_out.vld,
         dcache_out.lbuf_idx,
         dcache_out.addr,
-        dcache_out.dispatch_rdy
+        dcache_out.dispatch_en
     );
     $display("dcache_in : status: %s, ldb: {en: %b, lbuf_idx: %1d, dat: 0x%x}",
         dbg_ld_status(dcache_in.status),

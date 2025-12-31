@@ -394,6 +394,9 @@ module stage_ex_p4 (
     input   btq2execute btq_in,
     output  execute2btq btq_out,
 
+    input   sq2ld       sq_in,
+    output  ld2sq       sq_out,
+
     output  execute2complete_bru cbru_out,
     output  execute2complete_tag ctag_out,
     output  execute2complete_dat cdat_out,
@@ -532,6 +535,7 @@ module stage_ex_p4 (
                 // lq_idx      : '0,
                 // << FIXME
 
+                dsq_idx     : rs_in.fu_dat_lod[i].dsq_idx,
                 rob_idx     : rs_in.fu_dat_lod[i].rob_idx,
                 mem_size    : MEM_SIZE'(rs_in.fu_dat_lod[i].funct3[1:0]),
                 rd_unsigned : rs_in.fu_dat_lod[i].funct3[2]
@@ -1003,6 +1007,8 @@ module stage_ex_p4 (
         .i_regs     (regs.o_dat.lod),
         .i_msk      (regs.o_msk.lod),
 
+        .sq_in      (sq_in),
+        .sq_out     (sq_out),
         .dcache_in  (dcache_in),
         .dcache_out (dcache_out),
 
