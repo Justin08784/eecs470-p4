@@ -1,28 +1,44 @@
 `include "sys_defs.svh"
 `include "dcache_block_direct.svh"
 
+// function automatic MEM_BLOCK apply_store(
+//     input MEM_SIZE      size,
+//     input ADDR          addr,
+//     input DATA_BLOCK    wdat,
+//     input MEM_BLOCK     prew
+// );
+//     MEM_BLOCK posw;
+//     DW_ACCESS acc;
+//     acc = '{
+//         byte_off : idw_byte(addr),
+//         half_off : idw_half(addr),
+//         word_off : idw_word(addr)
+//     };
+
+//     posw = prew;
+//     case (size)
+//     BYTE  : posw.byte_level[acc.byte_off] = wdat.byte_level[0];
+//     HALF  : posw.half_level[acc.half_off] = wdat.half_level[0];
+//     WORD  : posw.word_level[acc.word_off] = wdat.word_level;
+//     default:;
+//     endcase
+
+//     return posw;
+// endfunction
+
 function automatic MEM_BLOCK apply_store(
-    input MEM_SIZE      size,
+    input logic[3:0]    byte_mask,
     input ADDR          addr,
     input DATA_BLOCK    wdat,
     input MEM_BLOCK     prew
 );
     MEM_BLOCK posw;
-    DW_ACCESS acc;
-    acc = '{
-        byte_off : idw_byte(addr),
-        half_off : idw_half(addr),
-        word_off : idw_word(addr)
-    };
-
+    logic word_off;
+    DATA_BLOCK dst_word;
     posw = prew;
-    case (size)
-    BYTE  : posw.byte_level[acc.byte_off] = wdat.byte_level[0];
-    HALF  : posw.half_level[acc.half_off] = wdat.half_level[0];
-    WORD  : posw.word_level[acc.word_off] = wdat.word_level;
-    default:;
-    endcase
-
+    word_off = idw_word(addr);
+    dst_word = prew.word_level[word_off];
+    posw.word_level[word_off] = bytewise_override(dst_word, wdat, byte_mask);
     return posw;
 endfunction
 
@@ -256,7 +272,7 @@ module stor_handler (
             tag     : loc.tag,
             sid     : loc.sid,
             way     : loc.way,
-            dat     : apply_store(sq_in.size, sq_in.addr, sq_in.dat, r_rcv.dat)
+            dat     : apply_store(sq_in.has_byte_mask, sq_in.addr, sq_in.dat, r_rcv.dat)
         };
 
         mshr_snd = '{

@@ -222,10 +222,25 @@ function automatic DATA_BYTE_MASK compute_byte_mask(
     DATA_BYTE_MASK rv;
     rv = '0;
     case (size)
-    BYTE: rv[addr[1:0]] = '1;
-    HALF: rv[addr[1]]   = '1;
-    WORD: rv            = '1;
+    BYTE: rv.byte_level[addr[1:0]]  = '1;
+    HALF: rv.half_level[addr[1]]    = '1;
+    WORD: rv                        = '1;
     endcase
+    return rv;
+endfunction
+
+function automatic DATA_BLOCK bytewise_override(
+    input DATA_BLOCK  dst,
+    input DATA_BLOCK  src,
+    input logic [3:0] src_byte_mask
+);
+    DATA_BLOCK rv;
+    rv = dst;
+    foreach (src.byte_level[b]) begin
+        if (!src_byte_mask[b])
+            continue;
+        rv.byte_level[b] = src.byte_level[b];
+    end
     return rv;
 endfunction
 

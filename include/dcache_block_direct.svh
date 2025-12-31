@@ -127,6 +127,7 @@ typedef struct packed {
     logic       vld;
     ADDR        addr;
     MEM_SIZE    size;
+    logic[3:0]  has_byte_mask;
     DATA_BLOCK  dat;
 } sq2dcache;
 typedef struct packed {

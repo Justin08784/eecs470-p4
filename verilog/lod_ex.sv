@@ -1,21 +1,6 @@
 `include "sys_defs.svh"
 `include "execute.svh"
 
-function automatic DATA_BLOCK bytewise_override(
-    input DATA_BLOCK  dst,
-    input DATA_BLOCK  src,
-    input logic [3:0] src_byte_mask
-);
-    DATA_BLOCK rv;
-    rv = dst;
-    foreach (src.byte_level[b]) begin
-        if (!src_byte_mask[b])
-            continue;
-        rv.byte_level[b] = src.byte_level[b];
-    end
-    return rv;
-endfunction
-
 module lod_ex(
 `ifdef DEBUG
     input               print_en,
@@ -435,7 +420,7 @@ module lod_ex(
         // (we do not yet allow loads to dispatch only partially satisfied)
         assert(reset | ~either_ldb_en | ~|(lbuf[ldb_tgt].need_byte_mask & ~coal_byte_mask));
 
-        assert(reset | ~sq_in.ldb.en);
+        // assert(reset | ~sq_in.ldb.en);
     end
 `endif
 
@@ -492,6 +477,22 @@ task print_lod_ex();
             bay_dat.rd_unsigned,
             bay_dat.need_byte_mask
         );
+    $display("sq_in : has_byte_mask: %b, any_older_ncpl_store: %b, ldb: {en: %b, vld_byte_mask: %b, lbuf_idx: %b, dat: %x}",
+        sq_in.has_byte_mask,
+        sq_in.any_older_ncpl_store,
+        sq_in.ldb.en,
+        sq_in.ldb.vld_byte_mask,
+        sq_in.ldb.lbuf_idx,
+        sq_in.ldb.dat
+    );
+
+    $display("sq_out: dsq_idx: %2d, lbuf_idx: %1d, addr: %x, size: %d, dispatch_en: %b",
+        sq_out.dsq_idx,
+        sq_out.lbuf_idx,
+        sq_out.addr,
+        sq_out.size,
+        sq_out.dispatch_en
+    );
 
     $display("dcache_out: vld: %b, lbuf_idx: %1d, addr: 0x%x, dispatch_en: %b",
         dcache_out.vld,

@@ -169,6 +169,7 @@ module sq #(
         vld : retired != 0,
         addr: wrmem_cand.dst,
         size: wrmem_cand.size,
+        has_byte_mask: wrmem_cand.byte_mask,
         dat : wrmem_cand.dat
     };
     assign wrmem_en = dcache_in.status == ST_SUCC; // TODO: with a nonblocking cache, this condition may no longer hold (and a dependent load may miss the value)
@@ -206,7 +207,7 @@ module sq #(
                 state_n[sq_idx].dst = cstr_in.dat[i].dst;
                 state_n[sq_idx].size= cstr_in.dat[i].size;
                 state_n[sq_idx].byte_mask = compute_byte_mask(cstr_in.dat[i].dst, cstr_in.dat[i].size);
-                state_n[sq_idx].dat = cstr_in.dat[i].dat;
+                state_n[sq_idx].dat = cstr_in.dat[i].dat << {cstr_in.dat[i].dst[1:0], 3'b000};
             end
         end
 
@@ -286,7 +287,7 @@ module sq #(
     for (genvar j = 0; j < 4; ++j) begin
         always_comb begin
             ok_youngest_sel_rotr_T[j] = '0;
-            for (int i = 1; i < SQ_SZ; ++i) begin
+            for (int i = SQ_SZ-1; i >= 1; --i) begin
                 if (ok_table_rotr_T[j][i]) begin
                     ok_youngest_sel_rotr_T[j][i] = 1'b1;
                     break;
@@ -313,7 +314,7 @@ module sq #(
         always_comb begin
             for (int i = 0; i < SQ_SZ; ++i)
                 if (ok_youngest_sel_T[j][i])
-                    ldb_n.dat[j] = state[i].dat.byte_level[j];
+                    ldb_n.dat.byte_level[j] = state[i].dat.byte_level[j];
         end
     end
     always_ff @(posedge clock) begin
@@ -327,6 +328,35 @@ module sq #(
         logic [SQ_SZ-1:0] sq_vld;
 
         $display("  | >> SQ >>");
+        $display("ld_in : dsq_idx: %2d, lbuf_idx: %1d, addr: %x, size: %d, dispatch_en: %b",
+            ld_in.dsq_idx,
+            ld_in.lbuf_idx,
+            ld_in.addr,
+            ld_in.size,
+            ld_in.dispatch_en
+        );
+
+        $display("ld_out: has_byte_mask: %b, any_older_ncpl_store: %b, ldb: {en: %b, vld_byte_mask: %b, lbuf_idx: %b, dat: %x}",
+            ld_out.has_byte_mask,
+            ld_out.any_older_ncpl_store,
+            ld_out.ldb.en,
+            ld_out.ldb.vld_byte_mask,
+            ld_out.ldb.lbuf_idx,
+            ld_out.ldb.dat
+        );
+        $display("query_word:   %x", query_word);
+        $display("vld_older:    %b", vld_older);
+        $display("match_word:   %b", match_word);
+        for (int i = 0; i < 4; ++i)
+            $display("byte_mask_table_T[%1d]: %b", i, byte_mask_table_T[i]);
+        for (int i = 0; i < 4; ++i)
+            $display("ok_table_T[%1d]:        %b", i, ok_table_T[i]);
+        for (int i = 0; i < 4; ++i)
+            $display("ok_table_rotr_T[%1d]:   %b", i, ok_table_rotr_T[i]);
+        for (int i = 0; i < 4; ++i)
+            $display("ok_youngest_sel_T[%1d]: %b", i, ok_youngest_sel_T[i]);
+
+
         for (int i = 0; i < N; ++i) begin
             $display("snap_in[%1d]: en: %b, b1hot_n: %b, rob_tail: %2d",
                 i,
