@@ -133,6 +133,7 @@ parameter DCACHE_LINES  = 32;
 // parameter SQ_RET_BUF_SZ = 4;
 parameter LQ_SZ         = 16;
 parameter SQ_SZ         = 16;
+parameter DSQ_SZ        = 2*SQ_SZ;
 
 
 // ================
@@ -149,6 +150,7 @@ typedef `IDX_TYPE(BTQ_SZ) BTQ_IDX;
 typedef `IDX_TYPE(ROB_SZ) ROB_IDX;
 typedef `IDX_TYPE(LQ_SZ)  LQ_IDX;
 typedef `IDX_TYPE(SQ_SZ)  SQ_IDX;
+typedef `IDX_TYPE(DSQ_SZ) DSQ_IDX; // double depth sq
 // typedef `IDX_TYPE(LSQ_SZ) LSQ_IDX;
 typedef `IDX_TYPE(GHR_BUF_SZ) GHR_IDX;
 
@@ -633,7 +635,7 @@ typedef struct packed {
     logic           t1_rdy;
     logic           t2_rdy;
     // commit
-    SQ_IDX          sq_idx;
+    DSQ_IDX         dsq_idx;
     ROB_IDX         rob_idx;
 } COMMIT_RS_PKT; // purely combinational
 
@@ -678,7 +680,7 @@ typedef struct packed {
     logic [N-1:0] snap_en;
     BMASK [N-1:0] b1hot_n;
     ROB_IDX [N-1:0] rob_tail;
-    SQ_IDX[N-1:0] sq_tail;
+    DSQ_IDX [N-1:0] dsq_tail;
 } comm2snap_bus;
 
 typedef struct packed {
@@ -756,7 +758,7 @@ typedef struct packed {
 
 typedef struct packed {
     `CNT_TYPE(N)    rdy_scnt;
-    SQ_IDX[N-1:0]   sq_idxs_n;
+    DSQ_IDX[N-1:0]  dsq_idxs_n;
 } sq2dispatch;
 
 typedef struct packed {
@@ -853,7 +855,7 @@ typedef struct packed {
     logic           t2_rdy;
     logic[2:0]      funct3;
 
-    SQ_IDX          sq_idx;
+    DSQ_IDX         dsq_idx;
     ROB_IDX         rob_idx;
 } RS_STOR_PAYLOAD;
 
@@ -1006,7 +1008,7 @@ typedef struct packed {
     struct packed {
         ROB_IDX     rob_idx;
 
-        SQ_IDX      sq_idx;
+        DSQ_IDX     dsq_idx;
         ADDR        dst;
         MEM_SIZE    size;
         DATA_BLOCK  dat;

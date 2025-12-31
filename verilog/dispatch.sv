@@ -289,7 +289,7 @@ module dispatch #(parameter
                 t1_rdy      : '0,
                 t2_rdy      : '0,
                 // commit
-                sq_idx      : sq_in.sq_idxs_n[store_prefix_cnt[i]],
+                dsq_idx     : sq_in.dsq_idxs_n[store_prefix_cnt[i]],
                 rob_idx     : '0
             };
 
@@ -316,7 +316,7 @@ module dispatch #(parameter
                 /* Q: Why +1?
                 A: Checkpoint the tail AFTER us. The mispredicted branch still retires.
                 */
-            comm_snap_out_n.sq_tail[i]= sq_in.sq_idxs_n[store_prefix_cnt[i]];
+            comm_snap_out_n.dsq_tail[i]= sq_in.dsq_idxs_n[store_prefix_cnt[i]];
         end
     end
 

@@ -330,6 +330,12 @@ module testbench;
                 error_status == ILLEGAL_INST
             |   clock_count > TB_MAX_CYCLES
             |   (observed_empty_sq_after_ret_halt & ~commit.dcache_any_pending); // wait for SQ and dcache to drain first
+            // $display("error_status: %h, clock_count: %d, sq_any_pending_wrmems: %b, dcache_any_pending: %b",
+            //     error_status,
+            //     clock_count,
+            //     commit.sq_any_pending_wrmems,
+            //     commit.dcache_any_pending
+            // );
 
             // if (error_status != NO_ERROR || clock_count > TB_MAX_CYCLES) begin
             if (must_stop_asap) begin

@@ -1,6 +1,7 @@
 `include "sys_defs.svh"
 
 typedef struct packed {
+    logic       pol;    // polarity
     logic       cpl;    // completed? (data + address)
     // logic       ret;    // retired?
     // DWADDR      dst;
@@ -13,6 +14,7 @@ typedef struct packed {
 /* Store queue */
 module sq #(
     parameter SQ_SZ =SQ_SZ, // num elements
+    parameter DSQ_SZ=2*SQ_SZ,
     parameter N     =N
 ) (
     output  logic           any_pending_wrmems,
@@ -48,14 +50,14 @@ module sq #(
     // localparam WRMEM_PORTS = 1;  // write mem ports (in-order) <when we actually write to memory>
 
     SQ_ENTRY [SQ_SZ-1:0]state, state_n;
-    `IDX_TYPE(SQ_SZ)    head, tail, snap;
+    `IDX_TYPE(DSQ_SZ)   head, tail, snap;
     `CNT_TYPE(SQ_SZ)    used, free, retired, retired_n; // retired := retired but not wrmem'd. used = retired + "completed but not retired" + "dispatched but not completed"
     logic wrmem_en;
     assign any_pending_wrmems = retired != 0 || r_in_en_cnt != 0;
 
-    logic [1:0][`IDX_SIZE(SQ_SZ)-1:0] wrmem_idxs_n;
-    logic [DPORTS:0][`IDX_SIZE(SQ_SZ)-1:0] d_idxs_n;
-    assign d_out.sq_idxs_n = d_idxs_n[DPORTS-1:0];
+    logic [1:0][`IDX_SIZE(DSQ_SZ)-1:0] wrmem_idxs_n;
+    logic [DPORTS:0][`IDX_SIZE(DSQ_SZ)-1:0] d_idxs_n;
+    assign d_out.dsq_idxs_n = d_idxs_n[DPORTS-1:0];
 
     ring_ctr #(
         .DEPTH      (SQ_SZ),
@@ -63,6 +65,31 @@ module sq #(
         .WPORTS     (DPORTS),
         .FLUSH_MODE (FIFO_FLUSH_SNAP_TAIL)
     ) ring_ctr0 (
+        .clock      (clock),
+        .reset      (reset),
+        .flush      (flush),
+        .flush_snap (snap[`IDX_SIZE(SQ_SZ)-1:0]),
+
+        .rd_en_cnt  (wrmem_en),
+        .wr_en_cnt  (d_in.wen_cnt),
+
+        .head       (),
+        .tail       (),
+        .rd_idxs_n  (),
+        .wr_idxs_n  (),
+
+        .used       (used),
+        .free       (free),
+        .used_scnt  (),
+        .free_scnt  (d_out.rdy_scnt)
+    );
+
+    ring_ctr #(
+        .DEPTH      (DSQ_SZ),
+        .RPORTS     (1),
+        .WPORTS     (DPORTS),
+        .FLUSH_MODE (FIFO_FLUSH_SNAP_TAIL)
+    ) ring_ctr1 (
         .clock      (clock),
         .reset      (reset),
         .flush      (flush),
@@ -76,15 +103,15 @@ module sq #(
         .rd_idxs_n  (wrmem_idxs_n),
         .wr_idxs_n  (d_idxs_n),
 
-        .used       (used),
-        .free       (free),
+        .used       (),
+        .free       (),
         .used_scnt  (),
-        .free_scnt  (d_out.rdy_scnt)
+        .free_scnt  ()
     );
 
     general_snaps #(
-        .WIDTH      (`IDX_SIZE(SQ_SZ))
-    ) sq_tails (
+        .WIDTH      (`IDX_SIZE(DSQ_SZ))
+    ) dsq_tails (
         .clock      (clock),
 
         .rmsk       (clmsk),
@@ -92,19 +119,19 @@ module sq #(
 
         .wen        (snap_in.snap_en),
         .wmsk       (snap_in.b1hot_n),
-        .wdat       (snap_in.sq_tail)
+        .wdat       (snap_in.dsq_tail)
     );
 
     // wrmem
     SQ_ENTRY wrmem_cand;
-    assign wrmem_cand = state[wrmem_idxs_n[0]];
+    assign wrmem_cand = state[wrmem_idxs_n[0][`IDX_SIZE(SQ_SZ)-1:0]];
     assign dcache_out = '{
         vld : retired != 0,
         addr: wrmem_cand.dst,
         size: wrmem_cand.size,
         dat : wrmem_cand.dat
     };
-    assign wrmem_en = dcache_in.status == ST_SUCC; // FIXME: "only in mshr" counts as success. But there is no mshr forwarding, so a load to that address may miss it.
+    assign wrmem_en = dcache_in.status == ST_SUCC; // TODO: with a nonblocking cache, this condition may no longer hold (and a dependent load may miss the value)
 
     // retire
     assign retired_n = (retired - wrmem_en) + (flush ? 1'b0 : r_in_en_cnt);
@@ -115,7 +142,7 @@ module sq #(
         for (int i = 0; i < CPORTS; ++i) begin
             if (cstr_in.en[i]) begin
                 int unsigned sq_idx;
-                sq_idx = cstr_in.dat[i].sq_idx;
+                sq_idx = cstr_in.dat[i].dsq_idx[`IDX_SIZE(SQ_SZ)-1:0];
 
                 state_n[sq_idx].cpl = 1'b1;
                 state_n[sq_idx].dst = cstr_in.dat[i].dst;
@@ -125,8 +152,13 @@ module sq #(
         end
 
         for (int i = 0; i < DPORTS; ++i) begin
-            if (i < d_in.wen_cnt)
-                state_n[d_idxs_n[i]].cpl    = 1'b0;
+            if (i < d_in.wen_cnt) begin
+                int unsigned sq_idx;
+                sq_idx = d_idxs_n[i][`IDX_SIZE(SQ_SZ)-1:0];
+
+                state_n[sq_idx].pol = d_idxs_n[i][`IDX_SIZE(DSQ_SZ)-1];
+                state_n[sq_idx].cpl = 1'b0;
+            end
         end
     end
 
@@ -161,6 +193,7 @@ module sq #(
             );
         end
 
+        $display("d_out.rdy_scnt: %2d", d_out.rdy_scnt);
         $display("d_in.wen_cnt: %1d, retired: %2d", d_in.wen_cnt, retired);
 
         $display("head: %d, tail: %d, used: %d, free: %d", wrmem_idxs_n[0], d_idxs_n[0], used, free);
@@ -168,7 +201,7 @@ module sq #(
         $display("rd_en_cnt: %2d, wr_en_cnt: %2d", wrmem_en, d_in.wen_cnt);
         $display("cstr_in: en: %b, sq_idx: %d, size: %d, dst: %x, dat: %x",
             cstr_in.en[0],
-            cstr_in.dat[0].sq_idx,
+            cstr_in.dat[0].dsq_idx,
             cstr_in.dat[0].size,
             cstr_in.dat[0].dst,
             cstr_in.dat[0].dat
@@ -183,8 +216,9 @@ module sq #(
                 continue;
             end
 
-            $display("SQ[%2d]: cpl: %b, dst: %x, size: %1d, dat: %x",
+            $display("SQ[%2d]: pol: %b, cpl: %b, dst: %x, size: %1d, dat: %x",
                 i,
+                state[i].pol,
                 state[i].cpl,
                 state[i].dst,
                 state[i].size,

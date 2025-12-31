@@ -60,7 +60,7 @@ typedef struct packed {
     PHYS_REG_IDX    t2;
     DATA            opb;
 
-    SQ_IDX          sq_idx;
+    DSQ_IDX         dsq_idx;
     ROB_IDX         rob_idx;
     MEM_SIZE        mem_size;
 } ID_STR_VIEW;

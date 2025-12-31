@@ -465,7 +465,7 @@ module rs #(parameter
                 t2_rdy      : d_in.dat[i].t2_rdy,
                 funct3      : d_in.dat[i].inst.s.funct3,
 
-                sq_idx      : d_in.dat[i].sq_idx,
+                dsq_idx     : d_in.dat[i].dsq_idx,
                 rob_idx     : d_in.dat[i].rob_idx
             };
         end
@@ -671,10 +671,12 @@ module rs #(parameter
                 $display("rs_str[%2d]:", i);
                 continue;
             end
-            $display("rs_str[%2d]: inst: %x",
+            $display("rs_str[%2d]: {iss:%b, bmask: %b} inst: %x, dsq_idx: %2d",
                 i, 
-
-                entries[i].dat.inst
+                entries[i].issd,
+                entries[i].dat.bmask,
+                entries[i].dat.inst,
+                entries[i].dat.dsq_idx
             );
         end
     endtask

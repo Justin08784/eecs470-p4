@@ -114,7 +114,7 @@ module str_ex (
     for (genvar i = 0; i < NUM_FU_STR; ++i) begin
         assign cstr_out.dat[i] = '{
             rob_idx : i_regs[i].dat.rob_idx,
-            sq_idx  : i_regs[i].dat.sq_idx,
+            dsq_idx : i_regs[i].dat.dsq_idx,
             dst     : i_regs[i].rs1 + i_regs[i].dat.opb,
             size    : i_regs[i].dat.mem_size,
             dat     : i_regs[i].rs2
@@ -572,7 +572,7 @@ module stage_ex_p4 (
                 t2      : rs_in.fu_dat_str[i].t2,
                 opb     : `RV32_signext_Simm(tmp_inst),
 
-                sq_idx  : rs_in.fu_dat_str[i].sq_idx,
+                dsq_idx : rs_in.fu_dat_str[i].dsq_idx,
                 rob_idx : rs_in.fu_dat_str[i].rob_idx,
                 mem_size: MEM_SIZE'(rs_in.fu_dat_str[i].funct3[1:0])
             };

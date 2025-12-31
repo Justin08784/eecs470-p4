@@ -376,12 +376,19 @@ module refill_engine (
     always_ff @(posedge clock) begin
         mshr <= mshr_n;
 
-        if  (reset
-        ||  (flush && !mshr.wr_mem && mshr.mem_tag == 0)) begin
-            /* FIXME: This seems rather hacky. During flush, clear a load request if it
+        if (reset) begin
+        // ||  (flush && !mshr.wr_mem && mshr.mem_tag == 0)) begin
+            /*
+            FIXME: This seems rather hacky. During flush, clear a load request if it
             has not allocated mem_tag. This prevents the potentially spurious
             requests of ooo loads (e.g. oob addresses) from persisting in the dcache--
-            dcache would get stuck requesting the bad address continuously. */
+            dcache would get stuck requesting the bad address continuously.
+
+            FIXME: This was disabled temporarily because–– for the meantime––
+            we will not allow loads to complete in the presence of uncompleted loads
+            (speculative load execution). May be needed later.
+            */
+
             mshr.status <= S_IDLE;
         end
     end
@@ -707,6 +714,30 @@ module dcache_block (
             dbg_mem_size(mshr.mem_size)
         );
         $display("}");
+
+        $display("");
+        $display("mshr_n: {");
+        $display("  status: %s\n  wr_mem: %b\n  mem_tag: %2d\n  addr: 0x%x\n  mem_data: 0x%x\n  mem_size: %s",
+            dbg_mshr_status(dec_refill.mshr_n.status),
+            dec_refill.mshr_n.wr_mem,
+            dec_refill.mshr_n.mem_tag,
+            dec_refill.mshr_n.addr,
+            dec_refill.mshr_n.mem_data,
+            dbg_mem_size(dec_refill.mshr_n.mem_size)
+        );
+        $display("}");
+
+        $display("gnt: %b, gnt_reqr: %d", gnt, gnt_reqr);
+        $display("mshr_snds[gnt_reqr]: en: %b, op: %d, wr_mem: %b, addr: %x, mem_data: %d, mem_size: %d",
+            mshr_snds[gnt_reqr].en,
+            mshr_snds[gnt_reqr].op,
+            mshr_snds[gnt_reqr].wr_mem,
+            mshr_snds[gnt_reqr].addr,
+            mshr_snds[gnt_reqr].mem_data,
+            mshr_snds[gnt_reqr].mem_size
+        );
+        // .mshr_out               (mshr),
+        // .snd_in                 (mshr_snds[gnt_reqr]),
 
         $display("");
         $display("gnt: %b", gnt);
