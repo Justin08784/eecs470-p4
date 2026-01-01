@@ -48,6 +48,10 @@ module sq #(
     // complete (write)
     input   execute2complete_str cstr_in,
 
+    // issue (load only: sq RAW hazard query)
+    input   rs2sq           rs_in,
+    output  sq2rs           rs_out,
+
     // execute (load query & response)
     input   ld2sq           ld_in,
     output  sq2ld           ld_out,
@@ -305,9 +309,10 @@ module sq #(
         // end
     end
 
-    LDB ldb, ldb_n;
-    assign ld_out.ldb = ldb;
-    assign ldb_n.en         = ld_in.dispatch_en; // FIXME: can actually disable if no forwardable bytes (but not incorrect either way)
+    // logic ldb_vld;
+    LDB ldb_n;
+    // assign ld_out.ldb = ldb;
+    // assign ldb_n.en         = ld_in.dispatch_en; // FIXME: can actually disable if no forwardable bytes (but not incorrect either way)
     assign ldb_n.vld_byte_mask  = ld_out.has_byte_mask;
     assign ldb_n.lbuf_idx   = ld_in.lbuf_idx;
     for (genvar j = 0; j < 4; ++j) begin
@@ -317,10 +322,29 @@ module sq #(
                     ldb_n.dat.byte_level[j] = state[i].dat.byte_level[j];
         end
     end
-    always_ff @(posedge clock) begin
-        ldb <= ldb_n;
-        if (reset)
-            ldb.en <= '0;
+    flop #(
+        .WIDTH($bits(LDB))
+    ) ldb_flop (
+        .clock  (clock),
+        .reset  (reset),
+        .flush  (flush),
+        .clmsk  (clmsk),
+
+        .i_vld  (ld_in.dispatch_en),
+        .i_msk  (ld_in.msk),
+        .i_dat  (ldb_n),
+
+        .o_vld  (ld_out.ldb_vld),
+        .o_msk  (),
+        .o_dat  (ld_out.ldb)
+    );
+
+    // issue
+    // sq2rs rs_out_n;
+    for (genvar i = 0; i < RS_LOD_SZ; ++i) begin
+        logic[SQ_SZ-1:0] cur_vld_older;
+        assign cur_vld_older = compute_range_mask(head, rs_in.dsq_idx[i]);
+        assign rs_out.any_older_ncpl_store[i] = |(cur_vld_older & ncpl);
     end
 
 `ifdef DEBUG
@@ -336,10 +360,10 @@ module sq #(
             ld_in.dispatch_en
         );
 
-        $display("ld_out: has_byte_mask: %b, any_older_ncpl_store: %b, ldb: {en: %b, vld_byte_mask: %b, lbuf_idx: %b, dat: %x}",
+        $display("ld_out: has_byte_mask: %b, any_older_ncpl_store: %b, ldb: {vld: %b, vld_byte_mask: %b, lbuf_idx: %1d, dat: %x}",
             ld_out.has_byte_mask,
             ld_out.any_older_ncpl_store,
-            ld_out.ldb.en,
+            ld_out.ldb_vld,
             ld_out.ldb.vld_byte_mask,
             ld_out.ldb.lbuf_idx,
             ld_out.ldb.dat

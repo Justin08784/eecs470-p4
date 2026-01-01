@@ -937,6 +937,11 @@ typedef struct packed {
     // FIXME: str can also use bypass tag
 } rs2execute;
 
+typedef struct packed {
+    // logic   [RS_LOD_SZ-1:0] vld;
+    DSQ_IDX [RS_LOD_SZ-1:0] dsq_idx;
+} rs2sq;
+
 
 // ================
 // Owner: Execute
@@ -1124,6 +1129,7 @@ typedef struct packed {
 
     // logic           dispatch_rdy;
     logic           dispatch_en;
+    BMASK           msk;
 } ld2sq;
 
 // ================
@@ -1131,7 +1137,7 @@ typedef struct packed {
 // ================
 
 typedef struct packed {
-    logic           en;
+    // logic           en;
     logic[3:0]      vld_byte_mask;
     LBUF_IDX        lbuf_idx;
     DATA_BLOCK      dat;
@@ -1143,9 +1149,15 @@ typedef struct packed {
 } sq2dispatch;
 
 typedef struct packed {
+    // logic   [RS_LOD_SZ-1:0] vld;
+    logic   [RS_LOD_SZ-1:0] any_older_ncpl_store;
+} sq2rs;
+
+typedef struct packed {
     logic[3:0]  has_byte_mask;
     logic       any_older_ncpl_store;
 
+    logic       ldb_vld;
     LDB         ldb;
 } sq2ld;
 

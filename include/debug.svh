@@ -8,7 +8,7 @@
 function print_ID_RENAME_PKT(input ID_RENAME_PKT x);
     $display("ID_RENAME_PKT: id=%3d PC=%h fu_idx=%2d inst=%h opa_select=%1d opb_select=%1d alu_func=%1d cond_branch=%b halt=%b illegal=%b csr_op=%b btq_idx=%2d ",
         x.id,
-        x.PC,
+        x.PC << 2,
         x.fu_idx,
         x.inst,
         x.opa_select,
@@ -26,7 +26,7 @@ function print_commit_rs_pkt(input COMMIT_RS_PKT x);
     $display("COMMIT_RS_PKT: {bmask: %b} id=%3d PC=%h fu_idx=%2d inst=%h opa_select=%1d opb_select=%1d alu_func=%1d cond_branch=%b halt=%b illegal=%b csr_op=%b btq_idx=%2d b1hot=%b",
         x.bmask,
         x.id,
-        x.PC,
+        x.PC << 2,
         x.fu_idx,
         x.inst,
         x.opa_select,

@@ -56,6 +56,7 @@ typedef enum logic [1:0] {
 
 typedef struct packed {
     MSHR_STATUS status;
+    BMASK       msk;
     logic       wr_mem;
     MEM_TAG     mem_tag;
     ADDR        addr;
@@ -113,6 +114,7 @@ typedef enum logic {
 
 typedef struct packed {
     logic           vld;
+    BMASK           msk;
     LBUF_IDX        lbuf_idx;
     ADDR            addr;
 
@@ -120,6 +122,8 @@ typedef struct packed {
 } ld2dcache;
 typedef struct packed {
     LD_QUERY_STATUS status;
+
+    logic           ldb_vld;
     LDB             ldb;
 } dcache2ld;
 

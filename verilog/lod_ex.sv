@@ -187,6 +187,8 @@ module lod_ex(
     // only let the query ask dcache... *1*
     assign dcache_out = '{
         vld         : bay_vld & bay_need,
+        // vld         : bay_vld & bay_need & ~sq_in.any_older_ncpl_store,
+        msk         : bay_msk,
         lbuf_idx    : dispatch_rdy_idx,
         addr        : bay_dat.addr,
 
@@ -199,7 +201,8 @@ module lod_ex(
         addr        : bay_dat.addr,
         size        : bay_dat.mem_size,
 
-        dispatch_en : dispatch_en
+        dispatch_en : dispatch_en,
+        msk         : bay_msk
     };
 
     // i_regs->bay logic
@@ -252,13 +255,19 @@ module lod_ex(
         lbuf_hdr_n  = lbuf_hdr;
         lbuf_n      = lbuf;
 
-        if (dcache_in.ldb.en)
+        // TODO: note to self. Moving this was a bug fix! since msk was not cleared, we had spurious kills
+        for (int i = 0; i < LBUF_SZ; ++i) begin
+            if ((lbuf2cdb_arb_gnt[i] & cdb_gnt) | lbuf_kill[i])
+                lbuf_hdr_n[i].vld = 1'b0;
+        end
+
+        if (dcache_in.ldb_vld)
             coal_dat = dcache_in.ldb.dat;
 
-        if (sq_in.ldb.en)
-            coal_dat = bytewise_override(coal_dat, sq_in.ldb.dat, {4{sq_in.ldb.en}} & sq_in.ldb.vld_byte_mask);
+        if (sq_in.ldb_vld)
+            coal_dat = bytewise_override(coal_dat, sq_in.ldb.dat, {4{sq_in.ldb_vld}} & sq_in.ldb.vld_byte_mask);
 
-        if (dcache_in.ldb.en | sq_in.ldb.en) begin
+        if (dcache_in.ldb_vld | sq_in.ldb_vld) begin
             /* TODO/FIXME:
             In this blocking dcache design, a load is dispatched iff all of its
             byte can be satisfied (1. by SQ alone or 2. by SQ and dcache). And so
@@ -295,11 +304,6 @@ module lod_ex(
                     need_byte_mask  : bay_dat.need_byte_mask
                 };
             end
-        end
-
-        for (int i = 0; i < LBUF_SZ; ++i) begin
-            if ((lbuf2cdb_arb_gnt[i] & cdb_gnt) | lbuf_kill[i])
-                lbuf_hdr_n[i].vld = 1'b0;
         end
 
     end
@@ -404,14 +408,14 @@ module lod_ex(
     logic either_ldb_en;
     LBUF_IDX ldb_tgt;
     logic[3:0] coal_byte_mask;
-    assign either_ldb_en = dcache_in.ldb.en | sq_in.ldb.en;
-    assign ldb_tgt = dcache_in.ldb.en ? dcache_in.ldb.lbuf_idx : sq_in.ldb.lbuf_idx;
+    assign either_ldb_en = dcache_in.ldb_vld | sq_in.ldb_vld;
+    assign ldb_tgt = dcache_in.ldb_vld ? dcache_in.ldb.lbuf_idx : sq_in.ldb.lbuf_idx;
     assign coal_byte_mask =
-        {4{dcache_in.ldb.en}}   & dcache_in.ldb.vld_byte_mask
-    |   {4{sq_in.ldb.en}}       & sq_in.ldb.vld_byte_mask;
+        {4{dcache_in.ldb_vld}}   & dcache_in.ldb.vld_byte_mask
+    |   {4{sq_in.ldb_vld}}       & sq_in.ldb.vld_byte_mask;
     always_ff @(posedge clock) begin
         // Invariant 1: dcache and sq, if both enabled, broadcast to the same load buffer index
-        assert(reset | ~(dcache_in.ldb.en & sq_in.ldb.en) | (dcache_in.ldb.lbuf_idx == sq_in.ldb.lbuf_idx)) else $fatal;
+        assert(reset | ~(dcache_in.ldb_vld & sq_in.ldb_vld) | (dcache_in.ldb.lbuf_idx == sq_in.ldb.lbuf_idx)) else $fatal;
 
         // Invariant 2: ldb target (load buffer entry) must be valid
         assert(reset | ~either_ldb_en | lbuf_hdr[ldb_tgt].vld) else $fatal;
@@ -420,14 +424,14 @@ module lod_ex(
         // (we do not yet allow loads to dispatch only partially satisfied)
         assert(reset | ~either_ldb_en | ~|(lbuf[ldb_tgt].need_byte_mask & ~coal_byte_mask));
 
-        // assert(reset | ~sq_in.ldb.en);
+        // assert(reset | ~sq_in.ldb_vld);
     end
 `endif
 
 `ifdef DEBUG
 task print_lod_ex();
     $display("\n[%0t] <<< lod_ex DEBUG >>>", $time);
-    $display("  flush: %b", flush);
+    $display("  flush: %b, clmsk: %b", flush, clmsk);
     $display("  i_vld = %b | i_rdy = %b", i_vld, i_rdy);
     $display("  dispatch_lbuf_en   = %b", dispatch_lbuf_en);
     $display("  cdb_req = %b | cdb_gnt = %b", cdb_req, cdb_gnt);
@@ -455,8 +459,9 @@ task print_lod_ex();
     if (!i_vld)
         $display("i_bay_dat:");
     else
-        $display("i_bay_dat: vld=%b rob_idx=%3d t=%2d addr=0x%08x size=%s unsign=%b nbm=%b",
+        $display("i_bay_dat: vld=%b msk=%b rob_idx=%3d t=%2d addr=0x%08x size=%s unsign=%b nbm=%b",
             i_vld,
+            i_msk,
             i_bay_dat.rob_idx,
             i_bay_dat.t,
             i_bay_dat.addr,
@@ -468,8 +473,9 @@ task print_lod_ex();
     if (!bay_vld)
         $display("bay: ");
     else
-        $display("bay_dat  : vld=%b rob_idx=%3d t=%2d addr=0x%08x size=%s unsign=%b nbm=%b",
+        $display("bay_dat  : vld=%b msk=%b rob_idx=%3d t=%2d addr=0x%08x size=%s unsign=%b nbm=%b",
             bay_vld,
+            bay_msk,
             bay_dat.rob_idx,
             bay_dat.t,
             bay_dat.addr,
@@ -477,10 +483,10 @@ task print_lod_ex();
             bay_dat.rd_unsigned,
             bay_dat.need_byte_mask
         );
-    $display("sq_in : has_byte_mask: %b, any_older_ncpl_store: %b, ldb: {en: %b, vld_byte_mask: %b, lbuf_idx: %b, dat: %x}",
+    $display("sq_in : has_byte_mask: %b, any_older_ncpl_store: %b, ldb: {en: %b, vld_byte_mask: %b, lbuf_idx: %1d, dat: %x}",
         sq_in.has_byte_mask,
         sq_in.any_older_ncpl_store,
-        sq_in.ldb.en,
+        sq_in.ldb_vld,
         sq_in.ldb.vld_byte_mask,
         sq_in.ldb.lbuf_idx,
         sq_in.ldb.dat
@@ -502,7 +508,7 @@ task print_lod_ex();
     );
     $display("dcache_in : status: %s, ldb: {en: %b, lbuf_idx: %1d, dat: 0x%x}",
         dbg_ld_status(dcache_in.status),
-        dcache_in.ldb.en,
+        dcache_in.ldb_vld,
         dcache_in.ldb.lbuf_idx,
         dcache_in.ldb.dat
     );

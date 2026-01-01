@@ -61,6 +61,7 @@ typedef struct packed {
 } WRIT_SND;
 typedef struct packed {
     logic       en;
+    BMASK       msk;
     OP_TAG      op;
 
     logic       wr_mem;
@@ -70,6 +71,9 @@ typedef struct packed {
 } MSHR_SND;
 
 module fill_handler (
+    input  logic        flush,
+    input  BMASK        clmsk,
+
     // Metadata to consult
     input  CACHE_HEADER hdr,
     input  MSHR_ENTRY   mshr,
@@ -99,7 +103,7 @@ module fill_handler (
         assign lru_needs_evict[s] = |lru_and_needs_evict[s];
 
     always_comb begin
-        req = mshr.status == S_FILL;
+        req = mshr.status == S_FILL & ~(flush & |(mshr.msk & clmsk));
 
         tag = get_tag(mshr.addr);
         sid = get_sid(mshr.addr);
@@ -130,6 +134,7 @@ module fill_handler (
             mshr_snd = '{
                 op     : op,
                 en     : 1,
+                msk    : 'x, // don't care
                 wr_mem : 1,
                 addr   : {victim_tag, sid, 3'b000},
                 mem_data : r_rcv.dat,
@@ -158,6 +163,8 @@ endmodule;
 module load_handler (
     input  logic        clock,
     input  logic        reset,
+    input  logic        flush,
+    input  BMASK        clmsk,
 
     // Load (w/ load FU)
     input  ld2dcache    ld_in,
@@ -197,6 +204,7 @@ module load_handler (
         mshr_snd= '{
             op      : op,
             en      : 1'b0,     // overriden below
+            msk     : ld_in.msk,
             wr_mem  : 0,
             addr    : dw_align(ld_in.addr),
             mem_data: '0,
@@ -210,23 +218,48 @@ module load_handler (
         endcase
     end
 
+    logic ldb_vld;
     LDB ldb, ldb_n;
     assign ldb_n = '{
-        en      : ld_in.dispatch_en,
-        vld_byte_mask : '1,  // NOTE: always all 1s (only really useful for sq)
-        lbuf_idx: ld_in.lbuf_idx,
-        dat     : r_rcv.dat.word_level[ld_in.addr[2]]
+        vld_byte_mask   : '1,  // NOTE: always all 1s (only really useful for sq)
+        lbuf_idx        : ld_in.lbuf_idx,
+        dat             : r_rcv.dat.word_level[ld_in.addr[2]]
     };
-    always_ff @(posedge clock) begin
-        ldb <= ldb_n;
-        if (reset)
-            ldb.en <= 1'b0;
-    end
+    flop #(
+        .WIDTH($bits(LDB))
+    ) ldb_flop (
+        .clock  (clock),
+        .reset  (reset),
+        .flush  (flush),
+        .clmsk  (clmsk),
+
+        .i_vld  (ld_in.dispatch_en),
+        .i_msk  (ld_in.msk),
+        .i_dat  (ldb_n),
+
+        .o_vld  (ldb_vld),
+        .o_msk  (),
+        .o_dat  (ldb)
+    );
+
+    logic addr_in_bounds;
+    assign addr_in_bounds = ld_in.addr < `MEM_SIZE_IN_BYTES;
 
     assign ld_out = '{
         // tag     : '0,
         // dat     : r_rcv.dat, // FIXME: load FU will need to do the byte manip on the load!
-        status  : (gnt && op == OP_LOAD_HIT) ? LD_SUCC : LD_FAIL,
+        status  : addr_in_bounds
+            ? (gnt && op == OP_LOAD_HIT) ? LD_SUCC : LD_FAIL
+            : req ? LD_SUCC : LD_FAIL,
+                /* Marking OOB loads as "successful":
+                Unlike stores (which wrmem only after retirement), loads can execute while
+                on a wrong (branch) path, and so they can have wacky OOB addresses
+                (e.g. 0x1000c which is out of bounds).
+                
+                Since mem.sv ignores OOB requests, this wrong path load is never satisfied,
+                and so the load unit can stall forever.
+                */
+        ldb_vld : ldb_vld,
         ldb     : ldb
     };
 
@@ -278,6 +311,7 @@ module stor_handler (
         mshr_snd = '{
             op       : op,
             en       : 1'b0,    // overriden below
+            msk      : '0,      // store has retired; no unresolved branch dependencies
             wr_mem   : 0,
             addr     : dw_align(sq_in.addr),
             mem_data : '0,
@@ -308,6 +342,7 @@ module refill_engine (
     input reset,
     input clock,
     input flush,
+    input BMASK clmsk,
     // expose mshr state
     output MSHR_ENTRY   mshr_out,
 
@@ -337,6 +372,7 @@ module refill_engine (
             {OP_STOR_MISS, `TRUE}: begin
                 mshr_n = '{
                     status   : S_NTAG,
+                    msk      : snd_in.msk,
                     wr_mem   : snd_in.wr_mem,
                     mem_tag  : '0,
                     addr     : snd_in.addr,
@@ -373,6 +409,7 @@ module refill_engine (
             {OP_FILL_EVICT, `TRUE}: begin
                 mshr_n = '{
                     status   : S_NTAG,
+                    msk      : '0,
                     wr_mem   : snd_in.wr_mem,
                     mem_tag  : '0,
                     addr     : snd_in.addr,
@@ -393,7 +430,8 @@ module refill_engine (
     always_ff @(posedge clock) begin
         mshr <= mshr_n;
 
-        if (reset) begin
+        if (reset
+        |  (flush & |(mshr.msk & clmsk))) begin
         // ||  (flush && !mshr.wr_mem && mshr.mem_tag == 0)) begin
             /*
             FIXME: This seems rather hacky. During flush, clear a load request if it
@@ -421,6 +459,7 @@ module dcache_block (
     input logic clock,
     input logic reset,
     input logic flush,
+    input BMASK clmsk,
 
     // input from memory
     input  MEM_TAG       mem_in_transaction_tag,
@@ -562,6 +601,7 @@ module dcache_block (
         .reset                  (reset),
         .clock                  (clock),
         .flush                  (flush),
+        .clmsk                  (clmsk),
 
         .mshr_out               (mshr),
         .snd_in                 (mshr_snds[gnt_reqr]),
@@ -620,6 +660,9 @@ module dcache_block (
 
     // Request managers (for resource use intent)
     fill_handler dec_fill0 (
+        .flush      (flush),
+        .clmsk      (clmsk),
+
         .hdr        (hdr),
         .mshr       (mshr),
         .lruvs      (lruvs),
@@ -637,6 +680,8 @@ module dcache_block (
     load_handler dec_load0 (
         .clock      (clock),
         .reset      (reset),
+        .flush      (flush),
+        .clmsk      (clmsk),
 
         .ld_in      (ld_in),
         .ld_out     (ld_out),
@@ -703,9 +748,9 @@ module dcache_block (
             ld_in.addr,
             ld_in.dispatch_en
         );
-        $display("ld_ot: status: %s, ldb: {en: %b, lbuf_idx: %1d, dat: 0x%x}",
+        $display("ld_ot: status: %s, ldb: {vld: %b, lbuf_idx: %1d, dat: 0x%x}",
             dbg_ld_status(ld_out.status),
-            ld_out.ldb.en,
+            ld_out.ldb_vld,
             ld_out.ldb.lbuf_idx,
             ld_out.ldb.dat
         );

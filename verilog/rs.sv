@@ -26,6 +26,7 @@ typedef struct packed {
 typedef struct packed {
     logic busy;
     logic issd;
+    logic any_older_ncpl_store;
     RS_LOAD_PAYLOAD dat;
 } RS_LOAD_ENTRY;
 typedef struct packed {
@@ -339,6 +340,10 @@ module rs #(parameter
     input  dispatch2rs  d_in,
     output rs2dispatch  d_out,
 
+    // issue (load only: sq RAW hazard query)
+    input   sq2rs       sq_in,
+    output  rs2sq       sq_out,
+
     // issue
     input  execute2rs   ex_in,
     output rs2execute   ex_out,
@@ -545,6 +550,11 @@ module rs #(parameter
         .d_in_dat           (tmp_dat_lod),
         .d_out_rdy_sbus     (d_out.rdy_sbus[FU_LOD]),
 
+        // .sq_in_vld          (sq_in.vld),
+        .sq_in_any_older_ncpl_store(sq_in.any_older_ncpl_store),
+        // .sq_out_vld         (sq_out.vld),
+        .sq_out_dsq_idx     (sq_out.dsq_idx),
+
         .ex_in_fu_rdy       (ex_in.fu_rdy_lod),
 
         .ex_out_fu_en       (ex_out.fu_en_lod),
@@ -627,7 +637,7 @@ module rs #(parameter
 
                 entries[i].issd, 
                 entries[i].dat.bmask, 
-                entries[i].dat.PC,
+                entries[i].dat.PC << 2,
                 entries[i].dat.id, 
                 entries[i].dat.inst,
 
@@ -652,7 +662,7 @@ module rs #(parameter
 
                 entries[i].issd, 
                 entries[i].dat.bmask, 
-                entries[i].dat.PC,
+                entries[i].dat.PC << 2,
                 entries[i].dat.id, 
                 entries[i].dat.inst,
 
@@ -666,18 +676,53 @@ module rs #(parameter
         end
     endtask
 
+    task automatic print_rs_lod(input RS_LOAD_ENTRY [RS_LOD_SZ-1:0] entries);
+        $display("raw_out: %2d, %2d, %2d, %2d... %b",
+            sq_out.dsq_idx[3],
+            sq_out.dsq_idx[2],
+            sq_out.dsq_idx[1],
+            sq_out.dsq_idx[0],
+            sq_in.any_older_ncpl_store
+        );
+
+        for (int i = 0; i < RS_LOD_SZ; ++i) begin
+            if (!entries[i].busy) begin
+                $display("rs_lod[%2d]:", i);
+                continue;
+            end
+            $display("rs_lod[%2d]: {iss:%b, bmask: %b, raw: %b} pc: %x, inst: %x, t=%2d, t1=%2d%c, dsq_idx: %2d, rob_idx=%2d",
+                i, 
+                entries[i].issd,
+                entries[i].dat.bmask,
+                entries[i].any_older_ncpl_store,
+                entries[i].dat.PC << 2,
+                entries[i].dat.inst,
+                entries[i].dat.t,
+                entries[i].dat.t1,
+                entries[i].dat.t1_rdy ? "+" : " ",
+                entries[i].dat.dsq_idx,
+                entries[i].dat.rob_idx
+            );
+        end
+    endtask
+
     task automatic print_rs_str(input RS_STOR_ENTRY [RS_STR_SZ-1:0] entries);
         for (int i = 0; i < RS_STR_SZ; ++i) begin
             if (!entries[i].busy) begin
                 $display("rs_str[%2d]:", i);
                 continue;
             end
-            $display("rs_str[%2d]: {iss:%b, bmask: %b} inst: %x, dsq_idx: %2d",
+            $display("rs_str[%2d]: {iss:%b, bmask: %b} inst: %x, t1=%2d%c, t2=%2d%c, dsq_idx: %2d, rob_idx=%2d",
                 i, 
                 entries[i].issd,
                 entries[i].dat.bmask,
                 entries[i].dat.inst,
-                entries[i].dat.dsq_idx
+                entries[i].dat.t1,
+                entries[i].dat.t1_rdy ? "+" : " ",
+                entries[i].dat.t2,
+                entries[i].dat.t2_rdy ? "+" : " ",
+                entries[i].dat.dsq_idx,
+                entries[i].dat.rob_idx
             );
         end
     endtask
@@ -693,7 +738,7 @@ module rs #(parameter
 
                 entries[i].issd, 
                 entries[i].dat.bmask, 
-                entries[i].dat.PC,
+                entries[i].dat.PC << 2,
                 entries[i].dat.id, 
                 entries[i].dat.inst,
 
@@ -719,6 +764,8 @@ module rs #(parameter
         print_rs_mul(rs_mul.entries);
         $display("      >> RS_BRU");
         print_rs_bru(rs_bru.entries);
+        $display("      >> RS_LOD");
+        print_rs_lod(rs_lod.entries);
         $display("      >> RS_STR");
         print_rs_str(rs_str.entries);
 
@@ -747,6 +794,12 @@ module rs_part_load #(
     input  PAYLOAD  [N-1:0]     d_in_dat,
 
     output logic    [N-1:0]     d_out_rdy_sbus,
+
+    // issue (load only: sq RAW hazard query)
+    // input   logic   [PART_SZ-1:0]   sq_in_vld,
+    input   logic   [PART_SZ-1:0]   sq_in_any_older_ncpl_store,
+    // output  logic   [PART_SZ-1:0]   sq_out_vld,
+    output  DSQ_IDX [PART_SZ-1:0]   sq_out_dsq_idx,
 
     // issue
     input  logic   [NUM_FU-1:0] ex_in_fu_rdy,
@@ -810,11 +863,17 @@ module rs_part_load #(
     for (genvar rs = 0; rs < PART_SZ; ++rs)
         assign kill[rs] = flush & |(entries[rs].dat.bmask & clmsk);
 
+    // SECTION: Issue (raw hazard query)
+    // assign sq_out_vld = busy_vec & ~issd_vec & ~kill;
+    for (genvar rs = 0; rs < PART_SZ; ++rs)
+        assign sq_out_dsq_idx[rs] = entries[rs].dat.dsq_idx;
+
     // SECTION: Issue 
     // operand readiness
     logic [PART_SZ-1:0] can_issue;
     for (genvar rs = 0; rs < PART_SZ; ++rs) begin
         assign can_issue[rs] = busy_vec[rs]
+            & ~entries[rs].any_older_ncpl_store
             & ~kill[rs]
             & ~entries[rs].issd // ms1 test: remove "!" from entries[rs].issd (caught)
             & (entries[rs].dat.t1_rdy | to_t1_rdy[rs]);// [ADDRESSED] ms1 test: remove "|| to_t1_rdy[rs]" (not caught) 
@@ -899,6 +958,10 @@ module rs_part_load #(
             entries[rs].dat.t1_rdy <= entries[rs].dat.t1_rdy | to_t1_rdy[rs];
             entries[rs].dat.bmask  <= entries[rs].dat.bmask & ~clmsk; // any resolved (pred/mispred) clear its b1hot
 
+            // issue: raw hazard query
+            if (busy_vec[rs])
+                entries[rs].any_older_ncpl_store <= sq_in_any_older_ncpl_store[rs];
+
             // issuing
             if (to_issue[rs])
                 entries[rs].issd <= 1;
@@ -913,6 +976,7 @@ module rs_part_load #(
                         continue;
                     entries[rs].busy    <= 1;
                     entries[rs].issd    <= 0;
+                    entries[rs].any_older_ncpl_store <= 1'b1;
                     entries[rs].dat     <= d_in_dat[n];
                 end
             end

@@ -61,6 +61,7 @@ module cpu (
         .clock                  (clock),
         .reset                  (reset),
         .flush                  (flush),
+        .clmsk                  (clmsk),
 
         .mem_in_transaction_tag (mem2proc_transaction_tag),
         .mem_in_data            (mem2proc_data),
@@ -183,6 +184,8 @@ module cpu (
     );
 
     logic sq_any_pending_wrmems;
+    sq2rs sq_2_rs;
+    rs2sq rs_2_sq;
     execute2complete_str ex_2_cstr;
     sq2ld sq_2_ld;
     ld2sq ld_2_sq;
@@ -204,6 +207,8 @@ module cpu (
         .r_in_en_cnt(retire_exec.sq_en_cnt),
 
         .cstr_in    (ex_2_cstr),
+        .rs_in      (rs_2_sq),
+        .rs_out     (sq_2_rs),
         .ld_in      (ld_2_sq),
         .ld_out     (sq_2_ld),
         .snap_in    (comm_2_snap),
@@ -267,6 +272,8 @@ module cpu (
  
         .d_in   (dispatch_2_rs),
         .d_out  (rs_2_dispatch),
+        .sq_in  (sq_2_rs),
+        .sq_out (rs_2_sq),
         .ex_in  (ex_2_rs),
         .ex_out (rs_2_ex),
         .ctag_in(ex_2_ctag)
