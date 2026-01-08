@@ -1293,7 +1293,7 @@ module stage_ex_p4 (
         // );
 
         $display("\ncdb_req: alu:{%b} mul:{%b} lod:{%b} str:{%b}", cdb_req.alu, cdb_req.mul, cdb_req.lod, cdb_req.str);
-        $display("\nctag_ts: alu:{%b} mul:{%b} lod:{%b} str:{%b}", ctag_ts.alu, ctag_ts.mul, ctag_ts.lod, ctag_ts.str);
+        $display("\nctag_ts: alu:{%2d, %2d} mul:{%2d} lod:{%2d} str:{%2d}", ctag_ts.alu[1], ctag_ts.alu[0], ctag_ts.mul, ctag_ts.lod, ctag_ts.str);
         // $display("ctag_ts: alu:{%2d, %2d} mul:{%2d, %2d}",
         //     ctag_ts.alu[1], ctag_ts.alu[0], ctag_ts.mul[1], ctag_ts.mul[0]);
         $display("cdb_gnt: alu:{%b} mul:{%b}", cdb_gnt.alu, cdb_gnt.mul);

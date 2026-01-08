@@ -755,7 +755,7 @@ module dcache_block (
             ld_out.ldb.dat
         );
 
-        $display("sq_in: vld: %b, addr: 0x%x, size: %s, dat: %1d",
+        $display("sq_in: vld: %b, addr: 0x%x, size: %s, dat: %x",
             sq_in.vld,
             sq_in.addr,
             dbg_mem_size(sq_in.size),

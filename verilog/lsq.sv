@@ -43,7 +43,8 @@ module sq #(
     input   dcache2sq       dcache_in,
 
     // retire
-    input   `CNT_TYPE(N)    r_in_en_cnt,
+    input   RETIRE_PKT      r_in,
+    // input   `CNT_TYPE(N)    r_in_en_cnt,
 
     // complete (write)
     input   execute2complete_str cstr_in,
@@ -89,6 +90,7 @@ module sq #(
     // localparam WRMEM_PORTS = 1;  // write mem ports (in-order) <when we actually write to memory>
 
     struct packed {
+        logic halt; // halt or illegal observed. freeze further retires
         logic[SQ_SZ-1:0]used;
         // logic[SQ_SZ-1:0]pol;    // wrap polarity (msb of dsq index)
         logic[SQ_SZ-1:0]cpl;    // completed? (data + address)
@@ -96,8 +98,11 @@ module sq #(
     SQ_ENTRY [SQ_SZ-1:0]state, state_n;
     `IDX_TYPE(DSQ_SZ)   head, tail, snap;
     `CNT_TYPE(SQ_SZ)    used, free, retired, retired_n; // retired := retired but not wrmem'd. used = retired + "completed but not retired" + "dispatched but not completed"
+
+    `CNT_TYPE(N) halt_guarded_ret_en_cnt;
+    assign halt_guarded_ret_en_cnt = hdr.halt ? 0 : r_in.sq_en_cnt;
     logic wrmem_en;
-    assign any_pending_wrmems = retired != 0 || r_in_en_cnt != 0;
+    assign any_pending_wrmems = retired != 0 || halt_guarded_ret_en_cnt != 0;
 
     logic [1:0][`IDX_SIZE(DSQ_SZ)-1:0] wrmem_idxs_n;
     logic [DPORTS:0][`IDX_SIZE(DSQ_SZ)-1:0] d_idxs_n;
@@ -179,7 +184,10 @@ module sq #(
     assign wrmem_en = dcache_in.status == ST_SUCC; // TODO: with a nonblocking cache, this condition may no longer hold (and a dependent load may miss the value)
 
     // retire
-    assign retired_n = (retired - wrmem_en) + r_in_en_cnt;
+    assign retired_n = (retired - wrmem_en) + halt_guarded_ret_en_cnt;
+    logic [N-1:0] ret_is_vld_halt;
+    for (genvar i = 0; i < N; ++i)
+        assign ret_is_vld_halt[i] = i < r_in.en_cnt & (r_in.halt[i] | r_in.illegal[i]);
 
     logic [SQ_SZ-1:0]snap_used;
     assign snap_used = compute_range_mask(head, snap);
@@ -187,6 +195,8 @@ module sq #(
     always_comb begin
         hdr_n   = hdr;
         state_n = state;
+
+        hdr_n.halt = hdr.halt | |ret_is_vld_halt;
 
         // complete (flush)
         if (flush)
@@ -240,7 +250,7 @@ module sq #(
         if (~reset) begin
             if (d_in.wen_cnt > free)
                 $error("SQ overflow!");
-            if (r_in_en_cnt > used)
+            if (halt_guarded_ret_en_cnt > used)
                 $error("SQ underflow!");
         end
 `endif
@@ -250,6 +260,7 @@ module sq #(
         retired <= retired_n;
 
         if (reset) begin
+            hdr.halt<= 1'b0;
             hdr.used<= '0;
             retired <= '0;
         end
@@ -352,6 +363,7 @@ module sq #(
         logic [SQ_SZ-1:0] sq_vld;
 
         $display("  | >> SQ >>");
+        $display("hdr.halt: %b", hdr.halt);
         $display("ld_in : dsq_idx: %2d, lbuf_idx: %1d, addr: %x, size: %d, dispatch_en: %b",
             ld_in.dsq_idx,
             ld_in.lbuf_idx,

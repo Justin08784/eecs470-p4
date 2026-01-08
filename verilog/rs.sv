@@ -690,12 +690,13 @@ module rs #(parameter
                 $display("rs_lod[%2d]:", i);
                 continue;
             end
-            $display("rs_lod[%2d]: {iss:%b, bmask: %b, raw: %b} pc: %x, inst: %x, t=%2d, t1=%2d%c, dsq_idx: %2d, rob_idx=%2d",
+            $display("rs_lod[%2d]: {iss:%b, bmask: %b, raw: %b} pc: %x, id=%3d (%x), t=%2d, t1=%2d%c, dsq_idx: %2d, rob_idx=%2d",
                 i, 
                 entries[i].issd,
                 entries[i].dat.bmask,
                 entries[i].any_older_ncpl_store,
                 entries[i].dat.PC << 2,
+                entries[i].dat.id,
                 entries[i].dat.inst,
                 entries[i].dat.t,
                 entries[i].dat.t1,
@@ -712,10 +713,12 @@ module rs #(parameter
                 $display("rs_str[%2d]:", i);
                 continue;
             end
-            $display("rs_str[%2d]: {iss:%b, bmask: %b} inst: %x, t1=%2d%c, t2=%2d%c, dsq_idx: %2d, rob_idx=%2d",
+            $display("rs_str[%2d]: {iss:%b, bmask: %b} pc: %x, id=%3d (%x), t1=%2d%c, t2=%2d%c, dsq_idx: %2d, rob_idx=%2d",
                 i, 
                 entries[i].issd,
                 entries[i].dat.bmask,
+                entries[i].dat.PC << 2,
+                entries[i].dat.id,
                 entries[i].dat.inst,
                 entries[i].dat.t1,
                 entries[i].dat.t1_rdy ? "+" : " ",

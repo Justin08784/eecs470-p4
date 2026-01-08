@@ -204,7 +204,8 @@ module cpu (
         .dcache_out (sq_2_dcache),
         .dcache_in  (dcache_2_sq),
 
-        .r_in_en_cnt(retire_exec.sq_en_cnt),
+        .r_in       (retire_exec),
+        // .r_in_en_cnt(retire_exec.sq_en_cnt),
 
         .cstr_in    (ex_2_cstr),
         .rs_in      (rs_2_sq),

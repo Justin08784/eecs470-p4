@@ -316,7 +316,10 @@ module dispatch #(parameter
                 /* Q: Why +1?
                 A: Checkpoint the tail AFTER us. The mispredicted branch still retires.
                 */
-            comm_snap_out_n.dsq_tail[i]= sq_in.dsq_idxs_n[store_prefix_cnt[i]];
+
+            // FIXME: unsure which is right:
+            comm_snap_out_n.dsq_tail[i]= sq_in.dsq_idxs_n[store_prefix_cnt[i] + comm_is_store[i]];
+            // comm_snap_out_n.dsq_tail[i]= sq_in.dsq_idxs_n[store_prefix_cnt[i]];
         end
     end
 
