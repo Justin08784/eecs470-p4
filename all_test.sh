@@ -20,40 +20,40 @@ TESTS=(
     fib-nomem
 
     # contains mem ops
-    # btest1
-    # btest2
-    # 2store_1evi
-    # copy_long
-    # copy
+    btest1
+    btest2
+    2store_1evi
+    copy_long
+    copy
     # crt
-    # evens_long
-    # evens
-    # fib_long
-    # fib_rec
-    # fib
-    # haha
-    # hw4q4a
-    # hw4q4c
-    # insertion
-    # mult_orig
-    # no_hazard
-    # parallel
-    # sampler
-    # saxpy
-    # test4
-    # test5
-    # test6
-    # test7
-    # test8
+    evens_long
+    evens
+    fib_long
+    fib_rec
+    fib
+    haha
+    hw4q4a
+    hw4q4c
+    insertion
+    mult_orig
+    no_hazard
+    parallel
+    sampler
+    saxpy
+    test4
+    test5
+    test6
+    test7
+    test8
     # alexnet
     # backtrack
-    # basic_malloc
+    basic_malloc
     # bfs
     # dft
-    # fc_forward
+    fc_forward
     # graph
-    # insertionsort
-    # matrix_mult_rec
+    insertionsort
+    matrix_mult_rec
     # mergesort
     # omegalul
     # outer_product
@@ -67,7 +67,7 @@ EXTS=(
     out
 )
 
-rm -rf build
+# rm -rf build
 
 # Build all tests
 make ${TESTS[@]/%/.out}
