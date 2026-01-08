@@ -181,7 +181,7 @@ module align (
     output  `CNT_TYPE(4)    expander_out_ren_cnt,
 
     // read (icache response queue)
-    input   logic[0:1]      irq_in_vld,
+    input   logic[1:0]      irq_in_vld,
     input   ICACHE_RESPONSE[1:0] irq_in_dat,
     output  `CNT_TYPE(2)    irq_out_ren_cnt,
 
@@ -268,8 +268,8 @@ module align (
     endgenerate
 
     assign shl = '{
-        blk : {raw.irq_vld[1] & ~raw.fmsk[2], raw.irq_vld[0] & ~raw.fmsk[0]},
-        mid : raw.irq_vld[0] & |(~raw.fmsk[1:0])
+        blk : {raw.irq_vld[2] & ~raw.fmsk[2], raw.irq_vld[0] & ~raw.fmsk[0]},
+        mid : |(raw.irq_vld[1:0] & ~raw.fmsk[1:0])
             /* since each cache line contains at least 1 valid word,
             the cross (mid) shift is at most 1 
             
@@ -501,16 +501,15 @@ module align (
     end
 
     task error_uftb_no_false_positive;
-        $display("uftb_no_false_positive: %b", uftb_no_false_positive);
+        $display("a1_a2_used_scnt: %d, uftb_no_false_positive: %b", a1_a2_used_scnt, uftb_no_false_positive);
         for (int w = 0; w < NUM_W; ++w)
-            $display("fmsk: %b, raw_pc: %d, aw: {brch: %b, cond: %b, call: %b, ret: %b, jalr: %b} uftb_md: {brch: %b, cond: %b, call: %b, ret: %b, jalr: %b}",
-                raw.fmsk[w],
-                raw_pc[w],
-                raw_md[w].brch,
-                raw_md[w].cond,
-                raw_md[w].call,
-                raw_md[w].ret,
-                raw_md[w].jalr,
+            $display("raw_pc: %d, aw: {brch: %b, cond: %b, call: %b, ret: %b, jalr: %b} uftb_md: {brch: %b, cond: %b, call: %b, ret: %b, jalr: %b}",
+                a1_a2_rdat[w].f_dat.PC,
+                a1_a2_rdat[w].md.brch,
+                a1_a2_rdat[w].md.cond,
+                a1_a2_rdat[w].md.call,
+                a1_a2_rdat[w].md.ret,
+                a1_a2_rdat[w].md.jalr,
 
                 uftb_md[w].brch,
                 uftb_md[w].cond,
@@ -518,16 +517,21 @@ module align (
                 uftb_md[w].ret,
                 uftb_md[w].jalr
             );
+        $fatal;
     endtask
 
-    property p_uftb_no_false_positive;
-        @(posedge clock)
-            disable iff (reset)
-            &uftb_no_false_positive;
-    endproperty
+    always_ff @(posedge clock) begin
+        assert(reset | &uftb_no_false_positive) else error_uftb_no_false_positive;
+    end
 
-    Uftb_No_False_Positive: assert property(p_uftb_no_false_positive)
-        else error_uftb_no_false_positive();
+    // property p_uftb_no_false_positive;
+    //     @(posedge clock)
+    //         disable iff (reset)
+    //         &uftb_no_false_positive;
+    // endproperty
+
+    // Uftb_No_False_Positive: assert property(p_uftb_no_false_positive)
+    //     else error_uftb_no_false_positive();
 `endif
 
 `ifdef DEBUG
@@ -550,6 +554,16 @@ module align (
 
         // end
         $display("-- ALIGN 1 --");
+        $display("irq_in_vld: %b, raw_pc [%d, %d], raw.irq_vld: %b",
+            irq_in_vld,
+            raw_pc[0],
+            raw_pc[1],
+            raw.irq_vld
+        );
+        $display("wal.irq_{top_vld: %b, bot_vld: %b}",
+            wal.irq_top_vld,
+            wal.irq_bot_vld
+        );
         $display("raw.fmsk: %b, raw.indw_last: %b", raw.fmsk, raw.indw_last);
         $display("wal.fmsk: %b, wal.indw_last: %b", wal.fmsk, wal.indw_last);
         $display("shl.blk[0]: %b, shl.blk[1]: %b, shl.mid: %b",
