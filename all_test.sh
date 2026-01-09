@@ -46,20 +46,20 @@ TESTS=(
     test7
     test8
     # alexnet
-    # backtrack
+    backtrack
     basic_malloc
-    # bfs
+    bfs
     # dft
     fc_forward
-    # graph
+    graph
     insertionsort
     matrix_mult_rec
-    # mergesort
-    # omegalul
+    mergesort
+    omegalul
     # outer_product
     # priority_queue
-    # quicksort
-    # sort_search
+    quicksort
+    sort_search
 )
 
 EXTS=(

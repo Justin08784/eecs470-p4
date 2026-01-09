@@ -812,6 +812,7 @@ module dcf (
 
     WADDR[NUM_FTQ:0]                base_n; // index: (ftq).
     FB_OFF[NUM_FTQ-1:0][NUM_W:0]    off_n;  // index: (ftq, word)
+    logic[NUM_FTQ-1:0][NUM_W:0]     novf;   // index: (ftq, word) def. novf[e][w] := compute of off_n[e][w] does "not overflow (novf)" FB_OFF
     logic[NUM_FTQ-1:0][NUM_W-1:0]   vld;    // index: (ftq, word)
     logic[NUM_FTQ-1:0][NUM_W-1:0]   is_end; // index: (ftq, word)
     logic[NUM_FTQ-1:0][NUM_W:0]     after_end;
@@ -821,9 +822,20 @@ module dcf (
 
     assign off_n[0][0] = cur.off;
     assign off_n[1][0] = 0;
+    assign novf[0][0]  = 1'b1;
+    assign novf[1]     = '1;
+    localparam FB_OFF MAX_FB_OFF = '1;
     for (genvar w = 1; w <= NUM_W; ++w) begin
         assign off_n[0][w] = cur.off + `UCAST_FIT(w);
         assign off_n[1][w] = w;
+        assign novf[0][w]  = cur.off <= (MAX_FB_OFF - w);
+    end
+    initial begin
+        assert(NUM_W <= MAX_FB_OFF) else $fatal;
+        /* This ensures:
+        - novf[1][w] is true for all 0≤w≤NUM_W
+        - FB_OFF - w (used to compute novf[0][w]) does not underflow for all 0≤w≤NUM_W
+        */
     end
 
     FB_OFF words_left_m1; // words left minus 1, clamped at 4 e.g. 0 for 1 left (ftq 0 only)
@@ -834,7 +846,7 @@ module dcf (
         assign ftq_entry_vld = e < rrb2expander_used_scnt;
 
         for (genvar w = 0; w < NUM_W; ++w) begin
-            assign vld[e][w]    = ftq_entry_vld & (off_n[e][w] <= rrb2expander_dat[e].off);
+            assign vld[e][w]    = ftq_entry_vld & novf[e][w] & (off_n[e][w] <= rrb2expander_dat[e].off);
             assign is_end[e][w] = rrb2expander_dat[e].off == off_n[e][w];
         end
         assign after_end[e] = (after_end[e] | is_end[e]) << 1;
@@ -962,33 +974,36 @@ module dcf (
     assign expander2rrb_ren_cnt = $countones(en_end_comp);
 
 `ifdef DEBUG
-    // always_ff @(posedge clock) begin
-    //     if (!reset) begin
-    //         $display("-- expander --");
-    //         for (int e = 0; e < 2; ++e)
-    //             if (e < rrb2expander_used_scnt)
-    //                 $display("fb[%1d]: base_n = %4d, off = %2d", e, rrb2expander_dat[e].base_n, rrb2expander_dat[e].off);
-    //             else
-    //                 $display("fb[%1d]:", e);
-    //         $display("cur: base = %x, off: %1d", cur.base, cur.off);
-    //         $display("words_left_m1: %2d", words_left_m1);
-    //         $display("sel_bot4:  %4b", sel_bot4);
-    //         $display("sel_bot5: %5b", sel_bot5);
+    task print_expander;
+        $display("-- expander --");
+        for (int e = 0; e < 2; ++e)
+            if (e < rrb2expander_used_scnt)
+                $display("fb[%1d]: base_n = %4d, off = %2d", e, rrb2expander_dat[e].base_n, rrb2expander_dat[e].off);
+            else
+                $display("fb[%1d]:", e);
+        $display("cur: base = %x, off: %1d", cur.base, cur.off);
+        $display("words_left_m1: %2d", words_left_m1);
+        $display("sel_bot4:  %4b", sel_bot4);
+        $display("sel_bot5: %5b", sel_bot5);
 
-    //         $display("vld_comp: %b, free: %b, en_comp: %b", vld_comp, free, en_comp);
-    //         // $display("is_end: [%b, %b], is_end_comp: %b", is_end[0], is_end[1], is_end_comp);
-    //         $display("en_cnt: %1d, expander2rrb_ren_cnt: %1d", en_cnt, expander2rrb_ren_cnt);
-    //         // $display("after_end: [%b, %b]", after_end[0], after_end[1]);
-    //         // for (int e = 0; e < 2; ++e)
-    //         //     $display("off_n[%1d]: [%2d, %2d, %2d, %2d, %2d]",
-    //         //         e, off_n[e][0],off_n[e][1],off_n[e][2],off_n[e][3],off_n[e][4]
-    //         //     );
-    //         $display("off_n_comp: [%2d, %2d, %2d, %2d, %2d]",
-    //             off_n_comp[0],off_n_comp[1],off_n_comp[2],off_n_comp[3],off_n_comp[4]
-    //         );
-            
-    //     end
-    // end
+        $display("vld: [%b, %b]", vld[0], vld[1]);
+
+        $display("vld_comp: %b, free: %b, en_comp: %b", vld_comp, free, en_comp);
+        // $display("is_end: [%b, %b], is_end_comp: %b", is_end[0], is_end[1], is_end_comp);
+        $display("en_cnt: %1d, expander2rrb_ren_cnt: %1d", en_cnt, expander2rrb_ren_cnt);
+        // $display("after_end: [%b, %b]", after_end[0], after_end[1]);
+        // for (int e = 0; e < 2; ++e)
+        //     $display("off_n[%1d]: [%2d, %2d, %2d, %2d, %2d]",
+        //         e, off_n[e][0],off_n[e][1],off_n[e][2],off_n[e][3],off_n[e][4]
+        //     );
+        $display("md: [%b, %b, %b, %b]",
+            cands_comp[0].md,cands_comp[1].md,cands_comp[2].md,cands_comp[3].md
+        );
+        $display("off_n_comp: [%2d, %2d, %2d, %2d, %2d]",
+            off_n_comp[0],off_n_comp[1],off_n_comp[2],off_n_comp[3],off_n_comp[4]
+        );
+    endtask
+        
 `endif
 
     `CNT_TYPE(4) align2expander_ren_cnt;
