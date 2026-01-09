@@ -445,6 +445,7 @@ module refill_engine (
             */
 
             mshr.status <= S_IDLE;
+            mshr.msk    <= '0;
         end
     end
 
@@ -767,8 +768,9 @@ module dcache_block (
 
         $display("");
         $display("mshr: {");
-        $display("  status: %s\n  wr_mem: %b\n  mem_tag: %2d\n  addr: 0x%x\n  mem_data: 0x%x\n  mem_size: %s",
+        $display("  status: %s\n  msk: %b\n  wr_mem: %b\n  mem_tag: %2d\n  addr: 0x%x\n  mem_data: 0x%x\n  mem_size: %s",
             dbg_mshr_status(mshr.status),
+            mshr.msk,
             mshr.wr_mem,
             mshr.mem_tag,
             mshr.addr,
@@ -779,8 +781,9 @@ module dcache_block (
 
         $display("");
         $display("mshr_n: {");
-        $display("  status: %s\n  wr_mem: %b\n  mem_tag: %2d\n  addr: 0x%x\n  mem_data: 0x%x\n  mem_size: %s",
+        $display("  status: %s\n  msk: %b\n  wr_mem: %b\n  mem_tag: %2d\n  addr: 0x%x\n  mem_data: 0x%x\n  mem_size: %s",
             dbg_mshr_status(dec_refill.mshr_n.status),
+            dec_refill.mshr_n.msk,
             dec_refill.mshr_n.wr_mem,
             dec_refill.mshr_n.mem_tag,
             dec_refill.mshr_n.addr,
