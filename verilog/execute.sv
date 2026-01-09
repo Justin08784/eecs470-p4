@@ -920,11 +920,13 @@ module stage_ex_p4 (
     `BY_FU(BMASK)   cands_msk;
     `BY_FU(CPL_CAND)cands;
     logic [NUM_FU_TOTAL-1:0]    cands_flat_vldv;
+    BMASK[NUM_FU_TOTAL-1:0]     cands_flat_mskv;
     CPL_CAND [NUM_FU_TOTAL-1:0] cands_flat;
     assign cands_vld.str    = '0;
     assign cands_msk.str    = '0;
     assign cands.str        = '0; // alu, mul, lod set by respective *_ex's
     assign cands_flat_vldv  = cands_vld;
+    assign cands_flat_mskv  = cands_msk;
     assign cands_flat       = cands;
 
     /*
@@ -1098,7 +1100,7 @@ module stage_ex_p4 (
                 end
 
                 if (cdb2fu_dat_sel[c][f]) begin
-                    cdat_out_prekill_n.msk[c]       = cands_msk[f];
+                    cdat_out_prekill_n.msk[c]       = cands_flat_mskv[f];
                     cdat_out_prekill_n.ts[c]        = cands_flat[f].t;
                     cdat_out_prekill_n.rob_idxs[c]  = cands_flat[f].rob_idx;
                     cdat_out_prekill_n.data[c]      = cands_flat[f].data & {$bits(DATA){cands_flat_has_dst[f]}};
@@ -1204,10 +1206,11 @@ module stage_ex_p4 (
         $display("  %3d | >> EXECUTE", $time);
 
         for (int i = 0; i < NUM_FU_ALU; ++i) begin
-            $display("alu_iss[%0d]: rdy: %b, vld: %b, t: %2d, t1: %2d, t2: %2d, rob_idx: %2d, inst: 0x%x, PC: 0x%x",
+            $display("alu_iss[%0d]: rdy: %b, vld: %b, msk: %b, t: %2d, t1: %2d, t2: %2d, rob_idx: %2d, inst: 0x%x, PC: 0x%x",
                 i,
                 iss.i_rdy.alu[i],
                 iss.o_vld.alu[i],
+                iss.o_msk.alu[i],
                 iss.o_dat.alu[i].t,
                 iss.o_dat.alu[i].t1,
                 iss.o_dat.alu[i].t2,
@@ -1218,10 +1221,11 @@ module stage_ex_p4 (
         end
 
         for (int i = 0; i < NUM_FU_MUL; ++i) begin
-            $display("mul_iss[%0d]: rdy: %b, vld: %b, t: %2d, t1: %2d, t2: %2d, rob_idx: %2d, func: 0x%x",
+            $display("mul_iss[%0d]: rdy: %b, vld: %b, msk: %b, t: %2d, t1: %2d, t2: %2d, rob_idx: %2d, func: 0x%x",
                 i,
                 iss.i_rdy.mul[i],
                 iss.o_vld.mul[i],
+                iss.o_msk.mul[i],
                 iss.o_dat.mul[i].t,
                 iss.o_dat.mul[i].t1,
                 iss.o_dat.mul[i].t2,
@@ -1231,10 +1235,11 @@ module stage_ex_p4 (
         end
 
         for (int i = 0; i < NUM_FU_STR; ++i) begin
-            $display("str_iss[%0d]: rdy: %b, vld: %b, t1: %2d, t2: %2d, rob_idx: %2d",
+            $display("str_iss[%0d]: rdy: %b, vld: %b, msk: %b, t1: %2d, t2: %2d, rob_idx: %2d",
                 i,
                 iss.i_rdy.str[i],
                 iss.o_vld.str[i],
+                iss.o_msk.str[i],
                 iss.o_dat.str[i].t1,
                 iss.o_dat.str[i].t2,
                 iss.o_dat.str[i].rob_idx
@@ -1243,9 +1248,10 @@ module stage_ex_p4 (
 
 
         for (int i = 0; i < NUM_FU_ALU; ++i) begin
-            $display("regs.o_dat.alu[%0d]: bsy: %b, rs1: 0x%x, opb: 0x%x t: %2d, rob_idx: %2d",
+            $display("regs.o_dat.alu[%0d]: vld: %b, msk: %b, rs1: 0x%x, opb: 0x%x t: %2d, rob_idx: %2d",
                 i,
                 regs.o_vld.alu[i],
+                regs.o_msk.alu[i],
                 regs.o_dat.alu[i].opa,
                 regs.o_dat.alu[i].opb,
                 regs.o_dat.alu[i].t,
@@ -1254,9 +1260,10 @@ module stage_ex_p4 (
         end
 
         for (int i = 0; i < NUM_FU_MUL; ++i) begin
-            $display("regs.o_dat.mul[%0d]: bsy: %b, rs1: 0x%x, rs2: 0x%x t: %2d, rob_idx: %2d",
+            $display("regs.o_dat.mul[%0d]: vld: %b, msk: %b, rs1: 0x%x, rs2: 0x%x t: %2d, rob_idx: %2d",
                 i,
                 regs.o_vld.mul[i],
+                regs.o_msk.mul[i],
                 regs.o_dat.mul[i].rs1,
                 regs.o_dat.mul[i].rs2,
                 regs.o_dat.mul[i].t,
@@ -1265,9 +1272,10 @@ module stage_ex_p4 (
         end
 
         for (int i = 0; i < NUM_FU_STR; ++i) begin
-            $display("regs.o_dat.str[%0d]: bsy: %b, rs1: 0x%x, rs2: 0x%x, rob_idx: %2d",
+            $display("regs.o_dat.str[%0d]: vld: %b, msk: %b, rs1: 0x%x, rs2: 0x%x, rob_idx: %2d",
                 i,
                 regs.o_vld.str[i],
+                regs.o_msk.str[i],
                 regs.o_dat.str[i].rs1,
                 regs.o_dat.str[i].rs2,
                 regs.o_dat.str[i].dat.rob_idx
@@ -1324,9 +1332,12 @@ module stage_ex_p4 (
                 ctag_out.ts[i],
             );
         end
+        $display("flush: %b, clmsk: %b", flush, clmsk);
         for (int i = 0; i < N; ++i) begin
-            $display("cdat_out[%0d]: en: %b,  ts: %2d, rob_idxs: %2d, data: %x",
+            $display("cdat_out[%0d]: prekill: {en: %b, msk: %b}, en: %b,  ts: %2d, rob_idxs: %2d, data: %x",
                 i,
+                cdat_out_prekill.en[i],
+                cdat_out_prekill.msk[i],
                 cdat_out.en[i],
                 cdat_out.ts[i],
                 cdat_out.rob_idxs[i],
