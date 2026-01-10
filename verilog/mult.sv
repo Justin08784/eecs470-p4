@@ -209,6 +209,23 @@ module mult #(
         o_rob_idx   = o_pkt.rob_idx;
     end
 
+    task print_mult;
+        $display("  %3d | >> mul%1d >>", $time, ID);
+        for (int unsigned i = 0; i < MUL_STAGES+1; ++i) begin
+            $display("– {vld: %b, msk: %b}sum: %x, mplier: %x, mcand: %x, func: %0d, tag: %2d, rob_idx: %2d",
+                vlds[i],
+                msks[i],
+                pkts[i].sum,
+                pkts[i].mplier,
+                pkts[i].mcand,
+                pkts[i].func,
+                pkts[i].t,
+                pkts[i].rob_idx
+            );
+        end
+        $display("  %3d | << mul%1d <<", $time, ID);
+    endtask
+
     // `ifdef DEBUG
     // always_ff @(posedge clock) begin
     //     if (!reset && ID == 0) begin
@@ -274,6 +291,7 @@ module mult_stage #(
         O_NONE: begin
             assign i_rdy = o_rdy;
             assign o_vld = i_vld;
+            assign o_msk = i_msk;
             assign o_dat = tmp_dat;
         end
 
