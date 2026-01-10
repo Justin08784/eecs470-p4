@@ -1,13 +1,18 @@
 `include "sys_defs.svh"
 
 module fifo #(
-    parameter int DEPTH=8,            // num elements
-    parameter int WIDTH=57,// num bits per element
+    parameter int DEPTH=8,      // num elements
+    parameter int WIDTH=57,     // num bits per element
+
+    type PTR    = `PTR_TYPE (DEPTH),
+    type DPTR   = `PTR_TYPE (2*DEPTH),
+    type CNT    = `CNT_TYPE (DEPTH),
     type FIFO_STATE = struct packed {
         logic [DEPTH-1:0][WIDTH-1:0]state;
-        `IDX_TYPE(DEPTH) head, tail;
-        `CNT_TYPE(DEPTH) used;
+        DPTR    head, tail;
+        CNT     used;
     },
+
     parameter int FLUSH_MODE=FIFO_FLUSH_RESET,
     parameter int NUM_RPORTS=4, // also cap for used_scnt
     parameter int NUM_WPORTS=4, // also cap for free_scnt
@@ -37,28 +42,27 @@ module fifo #(
     /*
     If free list mode is disabled, flush behaves the same as reset.
     */
-    parameter int INSTANCE_ID=-1,
+    parameter int INSTANCE_ID       =-1,
     parameter logic RESET_SETS_STATE=`FALSE,
-    parameter FIFO_STATE RESET_STATE='{default:0},
-    type PTR = `IDX_TYPE(DEPTH)
+    parameter FIFO_STATE RESET_STATE='{default:0}
 ) (
     input                                           clock, 
     input                                           reset,
     input                                           flush,
-    input   PTR                                     flush_snap,
+    input   DPTR                                    flush_snap,
     input   BMASK                                   clmsk,
 
     input   `CNT_TYPE(NUM_WPORTS)                   wr_en_cnt,
     input   logic   [NUM_WPORTS-1:0][WIDTH-1:0]     wr_data,
     input   BMASK   [NUM_WPORTS-1:0]                wr_bmask,
-    output  PTR                                     tail,
-    output  PTR     [NUM_WPORTS:0]                  wr_idxs_n,
+    output  DPTR                                    tail,
+    output  DPTR    [NUM_WPORTS:0]                  wr_idxs_n,
 
     input   `CNT_TYPE(NUM_RPORTS)                   rd_en_cnt,
     output  logic   [NUM_RPORTS-1:0][WIDTH-1:0]     rd_data,
     output  BMASK   [NUM_RPORTS-1:0]                rd_bmask,
-    output  PTR                                     head,
-    output  PTR     [NUM_RPORTS:0]                  rd_idxs_n,
+    output  DPTR                                    head,
+    output  DPTR    [NUM_RPORTS:0]                  rd_idxs_n,
 
     output  logic                                   empty,
     output  logic                                   full,
@@ -84,23 +88,23 @@ module fifo #(
             used : RESET_STATE.used
         })
     ) ring_ctr0 (
-        .clock,
-        .reset,
-        .flush,
-        .flush_snap,
+        .clock      (clock),
+        .reset      (reset),
+        .flush      (flush),
+        .flush_snap (flush_snap),
 
-        .rd_en_cnt,
-        .wr_en_cnt,
+        .rd_en_cnt  (rd_en_cnt),
+        .wr_en_cnt  (wr_en_cnt),
 
-        .head,
-        .tail,
-        .rd_idxs_n,
-        .wr_idxs_n,
+        .head       (head),
+        .tail       (tail),
+        .rd_idxs_n  (rd_idxs_n),
+        .wr_idxs_n  (wr_idxs_n),
 
-        .used,
-        .free,
-        .used_scnt(), // DO NOT wire. Will compute this ourselves.
-        .free_scnt
+        .used       (used),
+        .free       (free),
+        .used_scnt  (), // DO NOT wire. Will compute this ourselves.
+        .free_scnt  (free_scnt)
 
     );
 
@@ -117,14 +121,14 @@ module fifo #(
 
         for (int unsigned i = 0; i < NUM_RPORTS; ++i) begin
             if (i >= used_scnt) begin
-                rd_data[i] = '0;
+                rd_data[i]  = '0;
                 rd_bmask[i] = '0;
             end else if (fwd_dat[i] && (i - used) < wr_en_cnt) begin // fwding logic
-                rd_data[i] = wr_data[i - used];
+                rd_data[i]  = wr_data[i - used];
                 rd_bmask[i] = wr_bmask[i - used]; // does this need ~clmsk?
             end else begin
-                rd_data[i] = state[rd_idxs_n[i]];
-                rd_bmask[i] = bmask[rd_idxs_n[i]] & ~clmsk;
+                rd_data[i]  = state[PTR'(rd_idxs_n[i])];
+                rd_bmask[i] = bmask[PTR'(rd_idxs_n[i])] & ~clmsk;
             end
         end
     end
@@ -136,8 +140,8 @@ module fifo #(
         for (int unsigned i = 0; i < NUM_WPORTS; ++i) begin
             if (i >= wr_en_cnt) // suppresses oob index warning
                 continue;
-            state[wr_idxs_n[i]] <= wr_data[i];
-            bmask[wr_idxs_n[i]] <= wr_bmask[i];
+            state[PTR'(wr_idxs_n[i])] <= wr_data[i];
+            bmask[PTR'(wr_idxs_n[i])] <= wr_bmask[i];
         end
 
         if (reset && RESET_SETS_STATE)
