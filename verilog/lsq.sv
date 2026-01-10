@@ -117,15 +117,15 @@ module sq #(
         .clock      (clock),
         .reset      (reset),
         .flush      (flush),
-        .flush_snap (snap[`IDX_SIZE(SQ_SZ)-1:0]),
+        .flush_snap (snap),
 
         .rd_en_cnt  (wrmem_en),
         .wr_en_cnt  (d_in.wen_cnt),
 
-        .head       (),
-        .tail       (),
-        .rd_idxs_n  (),
-        .wr_idxs_n  (),
+        .head       (head),
+        .tail       (tail),
+        .rd_idxs_n  (wrmem_idxs_n),
+        .wr_idxs_n  (d_idxs_n),
 
         .used       (used),
         .free       (free),
@@ -133,30 +133,30 @@ module sq #(
         .free_scnt  (d_out.rdy_scnt)
     );
 
-    ring_ctr #(
-        .DEPTH      (DSQ_SZ),
-        .RPORTS     (1),
-        .WPORTS     (DPORTS),
-        .FLUSH_MODE (FIFO_FLUSH_SNAP_TAIL)
-    ) ring_ctr1 (
-        .clock      (clock),
-        .reset      (reset),
-        .flush      (flush),
-        .flush_snap (snap),
+    // ring_ctr #(
+    //     .DEPTH      (DSQ_SZ),
+    //     .RPORTS     (1),
+    //     .WPORTS     (DPORTS),
+    //     .FLUSH_MODE (FIFO_FLUSH_SNAP_TAIL)
+    // ) ring_ctr1 (
+    //     .clock      (clock),
+    //     .reset      (reset),
+    //     .flush      (flush),
+    //     .flush_snap (snap),
 
-        .rd_en_cnt  (wrmem_en),
-        .wr_en_cnt  (d_in.wen_cnt),
+    //     .rd_en_cnt  (wrmem_en),
+    //     .wr_en_cnt  (d_in.wen_cnt),
 
-        .head       (head), // NOTE: debug only
-        .tail       (tail), // NOTE: debug only
-        .rd_idxs_n  (wrmem_idxs_n),
-        .wr_idxs_n  (d_idxs_n),
+    //     .head       (head), // NOTE: debug only
+    //     .tail       (tail), // NOTE: debug only
+    //     .rd_idxs_n  (wrmem_idxs_n),
+    //     .wr_idxs_n  (d_idxs_n),
 
-        .used       (),
-        .free       (),
-        .used_scnt  (),
-        .free_scnt  ()
-    );
+    //     .used       (),
+    //     .free       (),
+    //     .used_scnt  (),
+    //     .free_scnt  ()
+    // );
 
     general_snaps #(
         .WIDTH      (`IDX_SIZE(DSQ_SZ))
@@ -364,11 +364,11 @@ module sq #(
 
         $display("  | >> SQ >>");
         $display("hdr.halt: %b", hdr.halt);
-        $display("ld_in : dsq_idx: %2d, lbuf_idx: %1d, addr: %x, size: %d, dispatch_en: %b",
+        $display("ld_in : dsq_idx: %2d, lbuf_idx: %1d, addr: %x, size: %s, dispatch_en: %b",
             ld_in.dsq_idx,
             ld_in.lbuf_idx,
             ld_in.addr,
-            ld_in.size,
+            dbg_mem_size(ld_in.size),
             ld_in.dispatch_en
         );
 
@@ -394,11 +394,11 @@ module sq #(
 
 
         for (int i = 0; i < N; ++i) begin
-            $display("snap_in[%1d]: en: %b, b1hot_n: %b, rob_tail: %2d",
+            $display("snap_in[%1d]: en: %b, b1hot_n: %b, rob_dtail: %2d",
                 i,
                 snap_in.snap_en[i],
                 snap_in.b1hot_n[i],
-                snap_in.rob_tail[i]
+                snap_in.rob_dtail[i]
             );
         end
 
@@ -408,10 +408,10 @@ module sq #(
         $display("head: %d, tail: %d, used: %d, free: %d", wrmem_idxs_n[0], d_idxs_n[0], used, free);
         $display("flush: %b, flush_snap: %2d, clmsk: %b", flush, snap, clmsk);
         $display("rd_en_cnt: %2d, wr_en_cnt: %2d", wrmem_en, d_in.wen_cnt);
-        $display("cstr_in: en: %b, sq_idx: %d, size: %d, dst: %x, dat: %x",
+        $display("cstr_in: en: %b, sq_idx: %d, size: %s, dst: %x, dat: %x",
             cstr_in.en[0],
             cstr_in.dat[0].dsq_idx,
-            cstr_in.dat[0].size,
+            dbg_mem_size(cstr_in.dat[0].size),
             cstr_in.dat[0].dst,
             cstr_in.dat[0].dat
         );
@@ -428,13 +428,13 @@ module sq #(
                 continue;
             end
 
-            $display("SQ[%2d]: {used: %b, cpl: %b}, dst: %x, size: %1d, byte_mask: %b, dat: %x",
+            $display("SQ[%2d]: {used: %b, cpl: %b}, dst: %x, size: %s, byte_mask: %b, dat: %x",
                 i,
                 hdr.used[i],
                 // hdr.pol[i],
                 hdr.cpl[i],
                 state[i].dst,
-                state[i].size,
+                dbg_mem_size(state[i].size),
                 state[i].byte_mask,
                 state[i].dat
             );

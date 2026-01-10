@@ -6,7 +6,7 @@
 // OPTIONAL: Print our your data here
 // It will go to the $program.log file
 function print_ID_RENAME_PKT(input ID_RENAME_PKT x);
-    $display("ID_RENAME_PKT: id=%3d PC=%h fu_idx=%2d inst=%h opa_select=%1d opb_select=%1d alu_func=%1d cond_branch=%b halt=%b illegal=%b csr_op=%b btq_idx=%2d ",
+    $display("ID_RENAME_PKT: id=%3d PC=%h fu_idx=%2d inst=%h opa_select=%1d opb_select=%1d alu_func=%1d cond_branch=%b halt=%b illegal=%b csr_op=%b btq_didx=%2d ",
         x.id,
         x.PC << 2,
         x.fu_idx,
@@ -18,7 +18,7 @@ function print_ID_RENAME_PKT(input ID_RENAME_PKT x);
         x.halt,
         x.illegal,
         x.csr_op,
-        x.btq_idx
+        x.btq_didx
     );
 endfunction
 

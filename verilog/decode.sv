@@ -302,7 +302,7 @@ module stage_id (
                 illegal     : tmp[i].illegal,
                 csr_op      : tmp[i].csr_op,
                 ras_snap    : f_in.dat[i].ras_snap,
-                btq_idx     : f_in.dat[i].btq_idx
+                btq_didx    : f_in.dat[i].btq_didx
             };
         end
 
@@ -399,7 +399,8 @@ module stage_id (
         //     used_scnt,
         //     free_scnt
         // );
-        $display("f_in:  {f_en_cnt: %d, PC: [%x, %x], inst: [%x, %x]}",
+        $display("f_in:  rdy_scnt: %d, {f_en_cnt: %d, PC: [%x, %x], inst: [%x, %x]}",
+            f_out.rdy_scnt,
             f_in.wen_cnt,
             f_in.wen_cnt > 0 ? f_in.dat[0].PC : 0,
             f_in.wen_cnt > 1 ? f_in.dat[1].PC : 0,
@@ -407,7 +408,8 @@ module stage_id (
             f_in.wen_cnt > 1 ? f_in.dat[1].inst : 0,
         );
 
-        $display("d_out: {d_en_cnt: %d, PC: [%x, %x], inst: [%x, %x]}",
+        $display("d_out: vld_scnt: %d, {d_en_cnt: %d, PC: [%x, %x], inst: [%x, %x]}",
+            d_out.vld_scnt,
             d_in.ren_cnt,
             d_out.dat[0].PC, 
             d_out.dat[1].PC,

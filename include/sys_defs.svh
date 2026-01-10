@@ -20,6 +20,9 @@
 `define IDX_TYPE(len) logic [$clog2(len)-1:0]   // smallest bit-vector to index an array of length len
 `define IDX_SIZE(len) ($clog2(len))             // ...and number of bits in that type
 
+`define PTR_TYPE(len) `IDX_TYPE(len)
+`define PTR_SIZE(len) `IDX_SIZE(len)
+
 `define UCAST_LEN(n, max) ($clog2(max+1)'(unsigned'(n)))
 `define UCAST_FIT(n) (($clog2(n+1))'(unsigned'(n)))    // cast fit unsigned
 
@@ -155,6 +158,9 @@ typedef `IDX_TYPE(DSQ_SZ) DSQ_IDX; // double depth sq
 typedef `IDX_TYPE(GHR_BUF_SZ) GHR_IDX;
 
 typedef `IDX_TYPE(LBUF_SZ) LBUF_IDX;
+
+typedef `PTR_TYPE(2*BTQ_SZ) BTQ_DIDX;
+typedef `PTR_TYPE(2*ROB_SZ) ROB_DIDX;
 
 // superscalar-width convenience types
 typedef `CNT_TYPE(N) N_CNT;
@@ -491,7 +497,7 @@ typedef struct packed {
     WADDR PC;
 
     RAS_SNAP ras_snap;
-    BTQ_IDX btq_idx;
+    BTQ_DIDX btq_didx;
 } IF_ID_PKT;
 
 // I/O: fetch
@@ -548,7 +554,7 @@ typedef struct packed {
 // I/O: BTQ
 typedef struct packed {
     `CNT_TYPE(N)    rdy_scnt;
-    BTQ_IDX [N-1:0] btq_idxs_n;
+    BTQ_DIDX[N-1:0] btq_didxs_n;
 } btq2fetch;
 
 typedef struct packed {
@@ -590,7 +596,7 @@ typedef struct packed {
     logic           illegal;    // Is this instruction illegal?
     logic           csr_op;     // Is this a CSR operation? (we only used this as a cheap way to get return code)
     RAS_SNAP        ras_snap;
-    BTQ_IDX         btq_idx;
+    BTQ_DIDX        btq_didx;
 } ID_RENAME_PKT;
 
 // I/O: Decode
@@ -702,8 +708,8 @@ typedef struct packed {
 `ifdef DEBUG
     BTQ_IDX [N-1:0] btq_idx;
 `endif
-    BTQ_IDX [N-1:0] btq_tail;
-    logic [N-1:0][`IDX_SIZE(ROB_SZ)-1:0] fl_head;
+    BTQ_DIDX[N-1:0] btq_dtail;
+    logic [N-1:0][`IDX_SIZE(2*ROB_SZ)-1:0] fl_dhead;
     RAS_SNAP [N-1:0] ras_snap;
     PHYS_REG_IDX [N-1:0][NUM_ARCH_REG-1:0] mts;
     // mt checkpoints are handled locally
@@ -712,7 +718,7 @@ typedef struct packed {
 typedef struct packed {
     logic [N-1:0] snap_en;
     BMASK [N-1:0] b1hot_n;
-    ROB_IDX [N-1:0] rob_tail;
+    ROB_DIDX[N-1:0] rob_dtail;
     DSQ_IDX [N-1:0] dsq_tail;
 } comm2snap_bus;
 
@@ -769,7 +775,7 @@ typedef struct packed {
     `CNT_TYPE(N)    rdy_scnt;
         // From: ROB
         // saturating counter for number of free rob entries
-    ROB_IDX [N:0]   rob_idxs_n;
+    ROB_DIDX[N:0]   rob_didxs_n;
         // To: dispatch
         // rob idxs of entries that can be allocated this cycle
 } rob2dispatch;
@@ -1109,7 +1115,7 @@ typedef struct packed {
         // From: Free list
         // - newly allocated pregs
 
-    logic [N:0][`IDX_SIZE(ROB_SZ)-1:0] fl_heads_n;
+    logic [N:0][`PTR_SIZE(2*ROB_SZ)-1:0] fl_dheads_n;
 } free_list2dispatch;
 
 typedef struct packed{

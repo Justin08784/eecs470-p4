@@ -143,7 +143,7 @@ module dispatch #(parameter
             halt        : d_in.dat[i].halt,
             illegal     : d_in.dat[i].illegal,
             csr_op      : d_in.dat[i].csr_op,
-            btq_idx     : d_in.dat[i].btq_idx,
+            btq_idx     : BTQ_IDX'(d_in.dat[i].btq_didx),
 
             // alloc
             t           : map_out.ts[i],
@@ -159,19 +159,16 @@ module dispatch #(parameter
 
     assign rnme_snap_out_n.mts = map_in.mts;
     for (genvar i = 0; i < N; ++i) begin
-        `CNT_TYPE(BTQ_SZ) btq_carry;
-        assign btq_carry = d_in.dat[i].btq_idx + `UCAST_FIT(1);
-
         assign rnme_snap_out_n.snap_en[i] = rnme_is_brch[i] && (i < rename_en_cnt);
         assign rnme_snap_out_n.b1hot_n[i] = bman_in.b1hot_n[rnme_snap_prefix_cnt[i]]; // only valid if snap_en
-        assign rnme_snap_out_n.fl_head[i] = free_in.fl_heads_n[free_prefix_cnt[i] + has_dst[i]];
+        assign rnme_snap_out_n.fl_dhead[i]= free_in.fl_dheads_n[free_prefix_cnt[i] + has_dst[i]];
             // Q: Why "+ has_dst[i]"? A: Remember, we want to snapshot the free_list
             // head immediately AFTER the branch. The next free_list head is incremented IFF we consume a preg.
 
-        assign rnme_snap_out_n.btq_tail[i]= btq_carry >= `UCAST_FIT(BTQ_SZ) ? 0 : btq_carry;
+        assign rnme_snap_out_n.btq_dtail[i]= d_in.dat[i].btq_didx + `UCAST_FIT(1);
         assign rnme_snap_out_n.ras_snap[i]= d_in.dat[i].ras_snap;
 `ifdef DEBUG
-        assign rnme_snap_out_n.btq_idx[i] = d_in.dat[i].btq_idx;
+        assign rnme_snap_out_n.btq_idx[i] = BTQ_IDX'(d_in.dat[i].btq_didx);
 `endif
     end
 
@@ -293,7 +290,7 @@ module dispatch #(parameter
                 rob_idx     : '0
             };
 
-            rs_out.dat[i].rob_idx = rob_in.rob_idxs_n[i];
+            rs_out.dat[i].rob_idx = ROB_IDX'(rob_in.rob_didxs_n[i]);
 
             // tag readiness check
             rd_src1s[i] = commit_in[i].opa_select == OPA_IS_RS1
@@ -312,7 +309,7 @@ module dispatch #(parameter
 
             comm_snap_out_n.snap_en[i]= comm_is_brch[i] && (i < commit_en_cnt);
             comm_snap_out_n.b1hot_n[i]= commit_in[i].b1hot; // only valid if snap_en
-            comm_snap_out_n.rob_tail[i]=rob_in.rob_idxs_n[i + 1];
+            comm_snap_out_n.rob_dtail[i]=rob_in.rob_didxs_n[i + 1];
                 /* Q: Why +1?
                 A: Checkpoint the tail AFTER us. The mispredicted branch still retires.
                 */
@@ -362,6 +359,16 @@ module dispatch #(parameter
 `ifdef DEBUG
     task print_dispatch;
         $display("  %3d | >> Dispatch >>", $time);
+        $display("d_in.vld_scnt: %d, free_lim_cnt: %d, rename_rdy_scnt: %d, rnme_snap_lim_cnt: %d",
+        d_in.vld_scnt,     free_lim_cnt,
+        rename_rdy_scnt,   rnme_snap_lim_cnt
+        );
+
+        $display("rename_vld_scnt: %d, rob_in.rdy_scnt: %d, store_lim_cnt: %d",
+        rename_vld_scnt,
+        rob_in.rdy_scnt,
+        store_lim_cnt
+        );
         // $display("r_in.btq_rdy_scnt: %d",   btq_in.btq_rdy_scnt);
         // $display("btq_in.btq_rdy_scnt: %d",   btq_in.btq_rdy_scnt);
         $display("BMAN: bmask: %b (alloc: %2d)", bman_in.bmask_n[0], $countones(bman_in.bmask_n[0]));
@@ -384,16 +391,16 @@ module dispatch #(parameter
         end
 
         for (int i = 0; i < N+1; ++i) begin
-            $display("free_in.fl_heads_n[%2d]: %2d", i, free_in.fl_heads_n[i]);
+            $display("free_in.fl_dheads_n[%2d]: %2d", i, free_in.fl_dheads_n[i]);
         end
 
         for (int i = 0; i < N; ++i) begin
-            $display("rnme_snap_out_n[%2d]: en: %b, b1hot_n: %b, fl_head: %2d, btq_tail: %2d",
+            $display("rnme_snap_out_n[%2d]: en: %b, b1hot_n: %b, fl_dhead: %2d, btq_dtail: %2d",
                 i,
                 rnme_snap_out_n.snap_en[i],
                 rnme_snap_out_n.b1hot_n[i],
-                rnme_snap_out_n.fl_head[i],
-                rnme_snap_out_n.btq_tail[i]
+                rnme_snap_out_n.fl_dhead[i],
+                rnme_snap_out_n.btq_dtail[i]
             );
         end
         $display("  %3d | << Dispatch <<", $time);

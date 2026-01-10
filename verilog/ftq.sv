@@ -4,6 +4,7 @@
 module ftq #(
     parameter FTQ_SZ = FTQ_SZ,
     type PTR = `IDX_TYPE(FTQ_SZ),
+    type DPTR= `IDX_TYPE(2*FTQ_SZ),
     type CNT = `CNT_TYPE(FTQ_SZ)
 ) (
     input   clock,
@@ -24,47 +25,44 @@ module ftq #(
     output  FTQ_ENTRY[1:0]  rdat,
     input   `CNT_TYPE(2)    ren_cnt
 );
-    PTR head, tail;
+    DPTR head, tail;
     FTQ_ENTRY [FTQ_SZ-1:0] state;
-    PTR [2:0] rd_idxs_n;
+    DPTR [2:0] rd_idxs_n;
     CNT used;
 
     ring_ctr #(
-        .DEPTH(FTQ_SZ),
-        .RPORTS(2),
-        .WPORTS(1),
-        .FLUSH_MODE(FIFO_FLUSH_RESET)
+        .DEPTH      (FTQ_SZ),
+        .RPORTS     (2),
+        .WPORTS     (1),
+        .FLUSH_MODE (FIFO_FLUSH_RESET)
     ) ring_ctr0 (
-        .clock,
-        .reset,
-        .flush,
+        .clock      (clock),
+        .reset      (reset),
+        .flush      (flush),
         .flush_snap ('0),
 
         .rd_en_cnt  (ren_cnt),
         .wr_en_cnt  (wen),
 
-        .head,
-        .tail,
+        .head       (head),
+        .tail       (tail),
 
-        .rd_idxs_n,
+        .rd_idxs_n  (rd_idxs_n),
         .wr_idxs_n  (),
 
-        .used,
+        .used       (used),
         .free       (),
         .used_scnt  (vld_scnt),
         .free_scnt  ()
     );
 
-    generate
     assign rdy = used != FTQ_SZ;
-    for (genvar i = 0; i < 2; ++i) begin
-        assign rdat[i] = state[rd_idxs_n[i]];
-    end
-    endgenerate
+    for (genvar i = 0; i < 2; ++i)
+        assign rdat[i] = state[PTR'(rd_idxs_n[i])];
 
     always_ff @(posedge clock) begin
         if (wen)
-            state[tail] <= wdat;
+            state[PTR'(tail)] <= wdat;
     end
 
 

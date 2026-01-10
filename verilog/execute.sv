@@ -1293,6 +1293,8 @@ module stage_ex_p4 (
         // $display("func: %d, t: %2d, rob_idx: %2d, btq_idx");
         $display("$< bru_ex");
 
+        mul_ex0.gen_mults[0].mult_0.print_mult;
+
         // $display("c_out: rdy_alu:{%b} rdy_mult:{%b} rdy_store:{%b} rdy_load:{%b}",
         //     rs_out.fu_rdy_alu,
         //     rs_out.fu_rdy_mul,

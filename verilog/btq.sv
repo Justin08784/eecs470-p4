@@ -65,13 +65,17 @@ module btq #(
     localparam NUM_RPORTS = N; // retire ports (in-order)
     localparam NUM_CPORTS = NUM_FU_BRU; // complete ports (*OUT-OF-ORDER*)
 
-    BTQ_ENTRY [BTQ_SZ-1:0]      state;
-    `IDX_TYPE(BTQ_SZ)       head, tail, snap;
-    `CNT_TYPE(BTQ_SZ)       used, free;
+    typedef `PTR_TYPE(BTQ_SZ)   PTR;
+    typedef `PTR_TYPE(2*BTQ_SZ) DPTR;
+    typedef `CNT_TYPE(BTQ_SZ)   CNT;
+
+    BTQ_ENTRY[BTQ_SZ-1:0] state;
+    DPTR    head, tail, snap;
+    CNT     used, free;
     `CNT_TYPE(NUM_RPORTS)   btq_vld_scnt, rd_en_cnt;
 
-    logic [NUM_RPORTS:0][`IDX_SIZE(BTQ_SZ)-1:0] r_idxs_n;
-    logic [NUM_FPORTS:0][`IDX_SIZE(BTQ_SZ)-1:0] f_idxs_n;
+    DPTR[NUM_RPORTS:0]  r_idxs_n;
+    DPTR[NUM_FPORTS:0]  f_idxs_n;
 
 `ifdef DEBUG
     int num_branches_retired;
@@ -81,41 +85,41 @@ module btq #(
 `endif
 
     ring_ctr #(
-        .DEPTH(BTQ_SZ),
-        .RPORTS(NUM_RPORTS),
-        .WPORTS(NUM_FPORTS),
-        .FLUSH_MODE(FIFO_FLUSH_SNAP_TAIL)
+        .DEPTH      (BTQ_SZ),
+        .RPORTS     (NUM_RPORTS),
+        .WPORTS     (NUM_FPORTS),
+        .FLUSH_MODE (FIFO_FLUSH_SNAP_TAIL)
     ) ring_ctr0 (
-        .clock,
-        .reset,
-        .flush,
+        .clock      (clock),
+        .reset      (reset),
+        .flush      (flush),
         .flush_snap (snap),
 
         .rd_en_cnt  (rd_en_cnt),
         .wr_en_cnt  (f_in.wen_cnt),
 
-        .head,
-        .tail,
+        .head       (head),
+        .tail       (tail),
         .rd_idxs_n  (r_idxs_n),
         .wr_idxs_n  (f_idxs_n),
 
-        .used,
-        .free,
-        .used_scnt(btq_vld_scnt),
-        .free_scnt(f_out.rdy_scnt)
+        .used       (used),
+        .free       (free),
+        .used_scnt  (btq_vld_scnt),
+        .free_scnt  (f_out.rdy_scnt)
     );
 
     general_snaps #(
-        .WIDTH(`IDX_SIZE(BTQ_SZ))
+        .WIDTH($bits(DPTR))
     ) btq_tails (
-        .clock,
+        .clock  (clock),
 
         .rmsk   (clmsk),
         .rdat   (snap),
 
         .wen    (snap_in.snap_en),
         .wmsk   (snap_in.b1hot_n),
-        .wdat   (snap_in.btq_tail)
+        .wdat   (snap_in.btq_dtail)
     );
 
     logic puq_empty;
@@ -127,7 +131,7 @@ module btq #(
     logic       [NUM_RPORTS-1:0] rcpl;
     generate
     for (genvar i = 0; i < NUM_RPORTS; ++i) begin
-        assign rdat[i] = state[r_idxs_n[i]];
+        assign rdat[i] = state[PTR'(r_idxs_n[i])];
         assign rcpl[i] = (i < btq_vld_scnt) & rdat[i].rslv;
     end
     endgenerate
@@ -208,12 +212,12 @@ module btq #(
         bpu_out.uen   = !puq_empty & bpu_in.urdy;
             /* GHR has only 1 barrel shift port (rd_ghist), and flush takes
             precedence over retire-time BPU updates */
-        f_out.btq_idxs_n= f_idxs_n;
+        f_out.btq_didxs_n= f_idxs_n;
 
         // handle reads (execute)
         for (int i = 0; i < NUM_FU_BRU; ++i) begin
             BTQ_ENTRY cur;
-            cur = state[ex_in.btq_ridx[i]];
+            cur = state[PTR'(ex_in.btq_ridx[i])];
             ex_out.is_tail  [i] = cur.is_tail;
             ex_out.pred     [i] = cur.take;
             ex_out.pred_tgt [i] = cur.tgt;
@@ -222,14 +226,14 @@ module btq #(
         end
     end
 
-    localparam PUQ_SZ = 3;
+    localparam PUQ_SZ = 4;
     fifo #(
-        .DEPTH(PUQ_SZ),
-        .WIDTH($bits(BPU_UPD_PKT)),
-        .NUM_RPORTS(1),
-        .NUM_WPORTS(NUM_RPORTS),
+        .DEPTH          (PUQ_SZ),
+        .WIDTH          ($bits(BPU_UPD_PKT)),
+        .NUM_RPORTS     (1),
+        .NUM_WPORTS     (NUM_RPORTS),
         .ENABLE_INTR_FWD(`FALSE),
-        .INSTANCE_ID(200)
+        .INSTANCE_ID    (200)
     ) puq ( // predictor update queue
         .clock      (clock),
         .reset      (reset),
@@ -257,7 +261,8 @@ module btq #(
             $error("BTQ underflow!");
 
         // handle complete (ins)
-        for (int i = 0, int idx = 0; i < NUM_CPORTS; ++i) begin
+        for (int i = 0; i < NUM_CPORTS; ++i) begin
+            PTR idx;
             idx = cbru_in.btq_idx[i];
             if (!cbru_in.en[i])
                 continue;
@@ -276,12 +281,13 @@ module btq #(
         for (int i = 0; i < N; ++i) begin
             if (!snap_in.snap_en[i])
                 continue;
-            state[snap_in.btq_idx[i]].b1hot <= snap_in.b1hot_n[i];
+            state[PTR'(snap_in.btq_idx[i])].b1hot <= snap_in.b1hot_n[i];
         end
 `endif
 
         // handle fetch (ins)
-        for (int i = 0, int idx = 0; i < NUM_FPORTS; ++i) begin
+        for (int i = 0; i < NUM_FPORTS; ++i) begin
+            PTR idx;
             idx = f_idxs_n[i];
             if (i >= f_in.wen_cnt)
                 continue;
@@ -389,7 +395,7 @@ module btq #(
 
         $display("");
         for (int i = 0; i < BMASK_LEN; ++i) begin
-            `IDX_TYPE(BTQ_SZ) tail;
+            DPTR tail;
             tail = btq_tails.snaps[i];
             $display("btq_tail[%8b]: %2d", 1 << i, tail);
         end

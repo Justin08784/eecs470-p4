@@ -426,13 +426,11 @@ module cpu (
     };
 `ifndef SYNTH
     COMMIT_INTERNAL commit_internal, commit_internal_n;
-    assign commit_internal_n = '{
-        tag     : rob_2_retire.tag,
-        dst     : rob_2_retire.dst,
-        t_old   : rob_2_retire.t_old,
-
-        rob_retire_idxs : rob0.rtre_idxs_n
-    };
+    assign commit_internal_n.tag     = rob_2_retire.tag;
+    assign commit_internal_n.dst     = rob_2_retire.dst;
+    assign commit_internal_n.t_old   = rob_2_retire.t_old;
+    for (genvar n = 0; n < N; ++n)
+        assign commit_internal_n.rob_retire_idxs[n] = rob0.rtre_idxs_n[n];
 `endif
 
     // TERM_CONTROL term_control_n;

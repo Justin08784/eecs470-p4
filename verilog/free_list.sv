@@ -28,21 +28,21 @@ module free_list #(parameter
 );
     typedef struct packed {
         logic [DEPTH-1:0][WIDTH-1:0]    state;
-        `IDX_TYPE(DEPTH)    head, tail;
+        `PTR_TYPE(2*DEPTH)  head, tail; // dptr's
         `CNT_TYPE(DEPTH)    used;
     } FIFO_STATE;
 
-    function automatic FIFO_STATE gen_reset_state();
+    function automatic FIFO_STATE gen_reset_state;
         logic [DEPTH-1:0][WIDTH-1:0] state;
         logic [WIDTH-1:0] start = 32;
         for (int unsigned i = 0; i < $unsigned(DEPTH); ++i) begin
             state[i] = start + i;
         end
         return '{
-            head:0,
-            tail:0,
-            state:state,
-            used:DEPTH
+            head    : 0,
+            tail    : DEPTH,
+            state   : state,
+            used    : DEPTH
         };
     endfunction
     localparam FIFO_STATE RESET_STATE = gen_reset_state();
@@ -98,22 +98,22 @@ module free_list #(parameter
     end
    
 
-    `IDX_TYPE(DEPTH) snap;
+    `IDX_TYPE(2*DEPTH) snap;
     fifo #(
-        .INSTANCE_ID(0),
-        .DEPTH(DEPTH),
-        .WIDTH(WIDTH),
-        .NUM_RPORTS(N),
-        .NUM_WPORTS(N),
-        .FLUSH_MODE(FIFO_FLUSH_SNAP_HEAD),
-        .ENABLE_INTR_FWD(`FALSE),
-        .RESET_SETS_STATE(`TRUE),
-        .RESET_STATE(RESET_STATE)
+        .INSTANCE_ID        (0),
+        .DEPTH              (DEPTH),
+        .WIDTH              (WIDTH),
+        .NUM_RPORTS         (N),
+        .NUM_WPORTS         (N),
+        .FLUSH_MODE         (FIFO_FLUSH_SNAP_HEAD),
+        .ENABLE_INTR_FWD    (`FALSE),
+        .RESET_SETS_STATE   (`TRUE),
+        .RESET_STATE        (RESET_STATE)
     ) lst (
-        .clock,
-        .reset,
-        .flush,
-        .flush_snap(snap),
+        .clock      (clock),
+        .reset      (reset),
+        .flush      (flush),
+        .flush_snap (snap),
 
         // >> unused inputs
         .clmsk      ('0),
@@ -125,23 +125,23 @@ module free_list #(parameter
 
         .rd_en_cnt  (d_in.ren_cnt),
         .rd_data    (d_out.ts),
-        .rd_idxs_n  (d_out.fl_heads_n),
+        .rd_idxs_n  (d_out.fl_dheads_n),
 
         .free_scnt  (), // do we need this? how would even retire return more pregs than in existence?
         .used_scnt  (d_out.vld_scnt)
     );
 
     general_snaps #(
-        .WIDTH(`IDX_SIZE(ROB_SZ))
+        .WIDTH(`PTR_SIZE(2*ROB_SZ))
     ) fl_heads0 (
-        .clock,
+        .clock  (clock),
 
         .rmsk   (clmsk),
         .rdat   (snap),
 
         .wen    (snap_in.snap_en),
         .wmsk   (snap_in.b1hot_n),
-        .wdat   (snap_in.fl_head)
+        .wdat   (snap_in.fl_dhead)
     );
 
     // flop returning free pregs for better timing
@@ -171,10 +171,11 @@ module free_list #(parameter
         used = lst.used;
 
         $display("  | >> FL >>");
-        $display("head: %d, tail: %d, used: %d",
+        $display("head: %d, tail: %d, used: %d, snap: %d",
         lst.head,
         lst.tail,
-        lst.used
+        lst.used,
+        snap
         );
 
         fl_vld = '0;

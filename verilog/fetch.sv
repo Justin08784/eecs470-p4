@@ -44,8 +44,9 @@ typedef struct packed {
 
 // icache response queue
 module irq #(
-    parameter DEPTH=IRQ_SZ,
-    type PTR=`IDX_TYPE(DEPTH)
+    parameter DEPTH =IRQ_SZ,
+    type PTR    =`IDX_TYPE(DEPTH),
+    type DPTR   =`IDX_TYPE(2*DEPTH)
 ) (
     input   clock,
     input   reset,
@@ -67,7 +68,8 @@ module irq #(
     input   `CNT_TYPE(2)    ren_cnt,
     output  ICACHE_RESPONSE [1:0]   rdat
 );
-    PTR [2:0]   rd_idxs_n;
+    DPTR [2:0]  rd_didxs_n, wr_didxs_n;
+    PTR [2:0]   rd_idxs_n;//,  wr_idxs_n;
     `CNT_TYPE(2)used_scnt;
     `CNT_TYPE(2)free_scnt;
 
@@ -75,33 +77,36 @@ module irq #(
     ICACHE_RESPONSE [DEPTH-1:0] state;
 
     ring_ctr #(
-        .DEPTH(DEPTH),
-        .RPORTS(2),
-        .WPORTS(2),
-        .FLUSH_MODE(FIFO_FLUSH_RESET)
+        .DEPTH      (DEPTH),
+        .RPORTS     (2),
+        .WPORTS     (2),
+        .FLUSH_MODE (FIFO_FLUSH_RESET)
     ) ring_ctr0 (
-        .clock,
-        .reset,
-        .flush,
+        .clock      (clock),
+        .reset      (reset),
+        .flush      (flush),
 
         .rd_en_cnt  (ren_cnt),
         .wr_en_cnt  (wen_cnt),
 
         .head       (),
         .tail       (),
-        .rd_idxs_n,
-        .wr_idxs_n,
+        .rd_idxs_n  (rd_didxs_n),
+        .wr_idxs_n  (wr_didxs_n),
 
         .used       (),
         .free       (),
-        .used_scnt,
-        .free_scnt
+        .used_scnt  (used_scnt),
+        .free_scnt  (free_scnt)
     );
 
     assign vld[0] = (0 < used_scnt) & cpl[rd_idxs_n[0]];
     assign vld[1] = (1 < used_scnt) & cpl[rd_idxs_n[1]] & vld[0];
-    for (genvar i = 0; i < 2; ++i)
-        assign rdat[i] = state[rd_idxs_n[i]];
+    for (genvar i = 0; i < 2; ++i) begin
+        assign rdat[i]      = state[rd_idxs_n[i]];
+        assign rd_idxs_n[i] = rd_didxs_n[i];
+        assign wr_idxs_n[i] = wr_didxs_n[i];
+    end
     assign rdy_scnt = free_scnt;
 
     always_ff @(posedge clock) begin
@@ -136,6 +141,7 @@ module irq #(
 
 `ifdef DEBUG
     task print_irq;
+        logic[IRQ_SZ-1:0]irq_vld;
         $display(">> IRQ");
         $display("vld: %b, rdy_scnt: %d", vld, rdy_scnt);
         $display("ren_cnt: %d, wen_cnt: %d", ren_cnt, wen_cnt);
@@ -147,7 +153,25 @@ module irq #(
             wr_idxs_n[1],
             wr_idxs_n[2]
         );
+        irq_vld = '0;
+        for (int cnt = 0; cnt < ring_ctr0.used; ++cnt)
+            irq_vld[(ring_ctr0.head + cnt) % IRQ_SZ] = 1'b1;
         for (int i = 0; i < IRQ_SZ; ++i) begin
+            if      (~irq_vld[i])
+                $display("irq[%d]:", i);
+            else if (~cpl[i])
+            $display("irq[%d]: cpl: %b, dw: %d, off: [%d, %d], pc: (%d, %d), fmsk: %b, is_end: %b",
+                i,
+                cpl[i],
+                state[i].dw,
+                state[i].off[0],
+                state[i].off[1],
+                {state[i].dw, 1'b0},
+                {state[i].dw, 1'b1},
+                state[i].fmsk,
+                state[i].is_end
+            );
+            else
             $display("irq[%d]: cpl: %b, dw: %d, off: [%d, %d], pc: (%d, %d), fmsk: %b, is_end: %b, blk: [%x, %x], md: [%b, %b]",
                 i,
                 cpl[i],
@@ -256,7 +280,7 @@ module align (
                 f_dat   : '{
                     PC      : raw_pc[flat_idx],
                     inst    : cur.blk.word_level[w],
-                    btq_idx : 'x,// TODO: fill in align 2
+                    btq_didx: 'x,// TODO: fill in align 2
                     // btq_idx : btq_in.btq_idxs_n[brch_prefix_cnt[flat_idx]],
                     ras_snap: '0 // FIXME
                 }
@@ -450,8 +474,8 @@ module align (
 
     always_comb begin
         for (int w = 0; w < NUM_W; ++w) begin
-            ibuf_out_dat[w] = a1_a2_rdat[w].f_dat;
-            ibuf_out_dat[w].btq_idx = btq_in.btq_idxs_n[brch_prefix_cnt[w]];
+            ibuf_out_dat[w]         = a1_a2_rdat[w].f_dat;
+            ibuf_out_dat[w].btq_didx= btq_in.btq_didxs_n[brch_prefix_cnt[w]];
         end
     end
     assign a2_a1_ren_cnt        = `MIN(`MIN(a1_a2_used_scnt, ibuf_in_rdy_scnt), brch_lim_cnt);
@@ -573,12 +597,12 @@ module align (
         );
         for (int w = 0; w < 4; ++w) begin
             if (w < align1_res_wen_cnt)
-                $display("align1_res[%1d]: md = %b, f_dat = {PC = %4d, inst = %x, btq_idx = %x}",
+                $display("align1_res[%1d]: md = %b, f_dat = {PC = %4d, inst = %x, btq_didx = %x}",
                     w,
                     align1_res_wdat[w].md,
                     align1_res_wdat[w].f_dat.PC,
                     align1_res_wdat[w].f_dat.inst,
-                    align1_res_wdat[w].f_dat.btq_idx
+                    align1_res_wdat[w].f_dat.btq_didx
                 );
             else
                 $display("align1_res[%1d]:", w);

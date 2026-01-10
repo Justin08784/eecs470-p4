@@ -35,52 +35,57 @@ module rob #(
     localparam NUM_DPORTS = N; // dispatch ports (in-order)
     localparam NUM_RPORTS = N; // retire ports (in-order)
     localparam NUM_CPORTS = N; // complete ports (*OUT-OF-ORDER*)
+
+    typedef `PTR_TYPE(ROB_SZ)   PTR;
+    typedef `PTR_TYPE(2*ROB_SZ) DPTR;
+    typedef `CNT_TYPE(ROB_SZ)   CNT;
+
     `CNT_TYPE(NUM_DPORTS) free_scnt;
     `CNT_TYPE(NUM_RPORTS) used_scnt;
 
     ROB_ENTRY [ROB_SZ-1:0]  state;
-    `IDX_TYPE(ROB_SZ) head, tail, snap;
-    `CNT_TYPE(ROB_SZ) used, free;
+    DPTR    head, tail, snap;
+    CNT     used, free;
 
-    logic [NUM_RPORTS:0][`IDX_SIZE(ROB_SZ)-1:0] rtre_idxs_n;
-    logic [NUM_DPORTS:0][`IDX_SIZE(ROB_SZ)-1:0] comm_idxs_n;
+    DPTR[NUM_RPORTS:0]  rtre_idxs_n;
+    DPTR[NUM_DPORTS:0]  comm_idxs_n;
 
     ring_ctr #(
-        .DEPTH(ROB_SZ),
-        .RPORTS(NUM_RPORTS),
-        .WPORTS(NUM_DPORTS),
-        .FLUSH_MODE(FIFO_FLUSH_SNAP_TAIL)
+        .DEPTH      (ROB_SZ),
+        .RPORTS     (NUM_RPORTS),
+        .WPORTS     (NUM_DPORTS),
+        .FLUSH_MODE (FIFO_FLUSH_SNAP_TAIL)
     ) ring_ctr0 (
-        .clock,
-        .reset,
-        .flush,
+        .clock      (clock),
+        .reset      (reset),
+        .flush      (flush),
         .flush_snap (snap),
 
         .rd_en_cnt  (r_in.en_cnt),
         .wr_en_cnt  (d_in.wen_cnt),
 
-        .head,
-        .tail,
-        .rd_idxs_n    (rtre_idxs_n),
-        .wr_idxs_n    (comm_idxs_n),
+        .head       (head),
+        .tail       (tail),
+        .rd_idxs_n  (rtre_idxs_n),
+        .wr_idxs_n  (comm_idxs_n),
 
-        .used,
-        .free,
-        .used_scnt,
-        .free_scnt
+        .used       (used),
+        .free       (free),
+        .used_scnt  (used_scnt),
+        .free_scnt  (free_scnt)
     );
 
     general_snaps #(
-        .WIDTH(`IDX_SIZE(ROB_SZ))
+        .WIDTH($bits(DPTR))
     ) rob_tails (
-        .clock,
+        .clock  (clock),
 
         .rmsk   (clmsk),
         .rdat   (snap),
 
         .wen    (snap_in.snap_en),
         .wmsk   (snap_in.b1hot_n),
-        .wdat   (snap_in.rob_tail)
+        .wdat   (snap_in.rob_dtail)
     );
 
     always_comb begin
@@ -89,7 +94,7 @@ module rob #(
         r_out.vld_scnt = used_scnt;
         for (int i = 0; i < used_scnt; ++i) begin
             ROB_ENTRY cur;
-            cur = state[rtre_idxs_n[i]];
+            cur = state[PTR'(rtre_idxs_n[i])];
             /* preview mode–– just display all valid entries in read window even
             if not all will get retired this cycle */
 `ifndef SYNTH
@@ -106,7 +111,7 @@ module rob #(
         // handle dispatch (outs)
         d_out = '{
             rdy_scnt    : free_scnt,
-            rob_idxs_n  : comm_idxs_n
+            rob_didxs_n : comm_idxs_n
         };
     end
 
@@ -119,7 +124,7 @@ module rob #(
 `endif
         // handle complete (ins)
         for (int i = 0; i < NUM_FU_BRU; ++i) begin
-            int cur_idx;
+            PTR cur_idx;
             cur_idx = cbru_in.rob_idx[i];
 
             if (cbru_in.en[i])
@@ -127,14 +132,15 @@ module rob #(
         end
 
         for (int i = 0; i < NUM_FU_STR; ++i) begin
-            int cur_idx;
+            PTR cur_idx;
             cur_idx = cstr_in.dat[i].rob_idx;
 
             if (cstr_in.en[i])
                 state[cur_idx].cpl <= 1'b1;
         end
 
-        for (int unsigned i = 0, int cur_idx = 0; i < NUM_CPORTS; ++i) begin
+        for (int unsigned i = 0; i < NUM_CPORTS; ++i) begin
+            PTR cur_idx;
             cur_idx = cdat_in.rob_idxs[i];
 
             if (cdat_in.en[i])
@@ -142,7 +148,8 @@ module rob #(
         end
 
         // handle dispatch (ins)
-        for (int unsigned i = 0, int cur_idx = 0; i < NUM_DPORTS; ++i) begin
+        for (int unsigned i = 0; i < NUM_DPORTS; ++i) begin
+            PTR cur_idx;
             if (i >= d_in.wen_cnt)
                 continue;
             cur_idx = comm_idxs_n[i];
@@ -168,11 +175,11 @@ module rob #(
 
         $display("  | >> ROB >>");
         for (int i = 0; i < N; ++i) begin
-            $display("snap_in[%1d]: en: %b, b1hot_n: %b, rob_tail: %2d",
+            $display("snap_in[%1d]: en: %b, b1hot_n: %b, rob_dtail: %2d",
                 i,
                 snap_in.snap_en[i],
                 snap_in.b1hot_n[i],
-                snap_in.rob_tail[i]
+                snap_in.rob_dtail[i]
             );
         end
         // $display("fl: en_cnt: %d, [%2d, %2d] fldup: %b",

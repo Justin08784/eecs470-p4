@@ -45,19 +45,19 @@ TESTS=(
     test6
     test7
     test8
-    # alexnet
+    alexnet
     backtrack
     basic_malloc
     bfs
-    # dft
+    dft
     fc_forward
     graph
     insertionsort
     matrix_mult_rec
     mergesort
     omegalul
-    # outer_product
-    # priority_queue
+    outer_product
+    priority_queue
     quicksort
     sort_search
 )
