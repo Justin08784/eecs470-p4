@@ -149,6 +149,8 @@ module cpu (
     free_list2dispatch fl_2_dispatch;
     sq2dispatch sq_2_dispatch;
     dispatch2sq dispatch_2_sq;
+    lq2dispatch lq_2_dispatch;
+    dispatch2lq dispatch_2_lq;
     dispatch2map_table dispatch_2_map;
     map_table2dispatch map_2_dispatch;
     execute2complete_tag ex_2_ctag;
@@ -173,6 +175,8 @@ module cpu (
         .free_out   (dispatch_2_fl),
         .sq_in      (sq_2_dispatch),
         .sq_out     (dispatch_2_sq),
+        .lq_in      (lq_2_dispatch),
+        .lq_out     (dispatch_2_lq),
         .map_in     (map_2_dispatch),
         .map_out    (dispatch_2_map),
         .bman_in    (bman_2_rnme),
@@ -215,6 +219,24 @@ module cpu (
         .snap_in    (comm_2_snap),
         .d_out      (sq_2_dispatch),
         .d_in       (dispatch_2_sq)
+    );
+
+    lq #(
+        .LQ_SZ  (LQ_SZ),
+        .N      (N)
+    ) lq0 (
+        .clock  (clock),
+        .reset  (reset),
+        .flush  (flush),
+        .clmsk  (clmsk),
+        
+        .r_in   (retire_exec),
+
+        .snap_in(comm_2_snap),
+        
+        .d_out  (lq_2_dispatch),
+        .d_in   (dispatch_2_lq)
+
     );
 
     /* >> ==== Branch manager ==== >> */

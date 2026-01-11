@@ -136,6 +136,7 @@ parameter DCACHE_LINES  = 32;
 // parameter SQ_RET_BUF_SZ = 4;
 parameter LQ_SZ         = 16;
 parameter SQ_SZ         = 16;
+parameter DLQ_SZ        = 2*LQ_SZ;
 parameter DSQ_SZ        = 2*SQ_SZ;
 
 
@@ -159,6 +160,7 @@ typedef `IDX_TYPE(GHR_BUF_SZ) GHR_IDX;
 
 typedef `IDX_TYPE(LBUF_SZ) LBUF_IDX;
 
+typedef `PTR_TYPE(2*LQ_SZ)  LQ_DIDX;
 typedef `PTR_TYPE(2*BTQ_SZ) BTQ_DIDX;
 typedef `PTR_TYPE(2*ROB_SZ) ROB_DIDX;
 
@@ -720,6 +722,7 @@ typedef struct packed {
     BMASK [N-1:0] b1hot_n;
     ROB_DIDX[N-1:0] rob_dtail;
     DSQ_IDX [N-1:0] dsq_tail;
+    LQ_DIDX [N-1:0] lq_dtail;
 } comm2snap_bus;
 
 typedef struct packed {
@@ -765,6 +768,9 @@ typedef struct packed {
     `CNT_TYPE(N)    wen_cnt;
 } dispatch2sq;
 
+typedef struct packed {
+    `CNT_TYPE(N)    wen_cnt;
+} dispatch2lq;
 
 // ================
 // Owner: ROB
@@ -1084,6 +1090,7 @@ typedef struct packed {
 typedef struct packed {
     `CNT_TYPE(N)            en_cnt;
     `CNT_TYPE(N)            sq_en_cnt; // number of stores retired
+    `CNT_TYPE(N)            lq_en_cnt; // number of loads retired
     PHYS_REG_IDX [N-1:0]    t_old;
     logic        [N-1:0]    halt;
     logic        [N-1:0]    illegal;
@@ -1172,6 +1179,14 @@ typedef struct packed {
         // From: retire (ROB)
         // - number of valid retire lines
 } sq2retire;
+
+// ================
+// Owner: Load queue
+// ================
+typedef struct packed {
+    `CNT_TYPE(N)    rdy_scnt;
+    LQ_DIDX[N:0]    lq_didxs_n;
+} lq2dispatch;
 
 
 

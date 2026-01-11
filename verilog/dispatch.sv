@@ -35,6 +35,10 @@ module dispatch #(parameter
     input   sq2dispatch sq_in,
     output  dispatch2sq sq_out,
 
+    // load queue
+    input   lq2dispatch lq_in,
+    output  dispatch2lq lq_out,
+
     // cdb (completions)
     input   execute2complete_tag ctag_in,
 
@@ -208,11 +212,13 @@ module dispatch #(parameter
     );
 
     /* >> ==== 2. Commit Stage ==== >> */
-    logic [N-1:0] comm_is_store;
-    logic [N:0][`CNT_SIZE(N)-1:0] store_prefix_cnt;
-    `CNT_TYPE(N) store_lim_cnt;
-    for (genvar n = 0; n < N; ++n)
+    logic [N-1:0] comm_is_store, comm_is_load;
+    logic [N:0][`CNT_SIZE(N)-1:0] store_prefix_cnt, load_prefix_cnt;
+    `CNT_TYPE(N) store_lim_cnt, load_lim_cnt;
+    for (genvar n = 0; n < N; ++n) begin
         assign comm_is_store[n] = commit_in[n].fu_idx == FU_STR;
+        assign comm_is_load[n]  = commit_in[n].fu_idx == FU_LOD;
+    end
     compactor #(
         .REQW(N),
         .GNTW(N)
@@ -221,6 +227,16 @@ module dispatch #(parameter
         .lim_cnt    (sq_in.rdy_scnt),
         .prefix_cnt (store_prefix_cnt),
         .gnt_cnt    (store_lim_cnt)
+    );
+
+    compactor #(
+        .REQW(N),
+        .GNTW(N)
+    ) comp_load (
+        .req        (comm_is_load),
+        .lim_cnt    (lq_in.rdy_scnt),
+        .prefix_cnt (load_prefix_cnt),
+        .gnt_cnt    (load_lim_cnt)
     );
 
     logic [N-1:0] comm_is_brch;
@@ -235,11 +251,13 @@ module dispatch #(parameter
             comm_is_brch[n] = commit_in[n].fu_idx == FU_BRU;
 
         foreach (en_by_fu[f, n]) begin
-            en_by_fu[f][n] = (n < rename_vld_scnt)
-                && (n < rob_in.rdy_scnt)
-                && (n < store_lim_cnt)
-                && commit_in[n].fu_idx == f
-                && rs_in.rdy_sbus[f][n];
+            en_by_fu[f][n] =
+                    (n < rename_vld_scnt)
+                &&  (n < rob_in.rdy_scnt)
+                &&  (n < store_lim_cnt)
+                &&  (n < load_lim_cnt)
+                &&  commit_in[n].fu_idx == f
+                &&  rs_in.rdy_sbus[f][n];
         end
 
         commit_en   = '0;
@@ -314,13 +332,29 @@ module dispatch #(parameter
                 A: Checkpoint the tail AFTER us. The mispredicted branch still retires.
                 */
 
-            // FIXME: unsure which is right:
-            comm_snap_out_n.dsq_tail[i]= sq_in.dsq_idxs_n[store_prefix_cnt[i] + comm_is_store[i]];
-            // comm_snap_out_n.dsq_tail[i]= sq_in.dsq_idxs_n[store_prefix_cnt[i]];
+            comm_snap_out_n.dsq_tail[i]= sq_in.dsq_idxs_n[store_prefix_cnt[i]];
+            comm_snap_out_n.lq_dtail[i]= lq_in.lq_didxs_n[load_prefix_cnt[i]];
+            // comm_snap_out_n.dsq_tail[i]= sq_in.dsq_idxs_n[store_prefix_cnt[i] + comm_is_store[i]];
+                /* [unsure about this...]
+                Q: Why no "+ comm_is_store[i]" (c.f. "+ has_dst[i]" when computing fl_dhead)?
+                A:
+                In all FIFO structures, *if* the flushing branch is present at some index i, then
+                we must rewind to (i + 1) % fifo_size.
+
+                Case 1: btq, rob
+                Every branch is in these structures. Hence "+ 1".
+
+                Case 2: free list
+                A branch is in the free list iff it has a destination. Hence "+ has_dst[i]"
+
+                Case 3: sq, lq
+                Branches are never loads or stores. Hence no "+"
+                */
         end
     end
 
     assign sq_out.wen_cnt = store_prefix_cnt[commit_en_cnt];
+    assign lq_out.wen_cnt = load_prefix_cnt[commit_en_cnt];
 
     // handle rob output 
     always_comb begin

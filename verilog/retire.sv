@@ -40,10 +40,12 @@ module retire (
     // general retire
     `CNT_TYPE(N) retire_en_cnt;
     `CNT_TYPE(N) sq_ret_en_cnt;
+    `CNT_TYPE(N) lq_ret_en_cnt;
 
     always_comb begin
         retire_en_cnt   = 0;
         sq_ret_en_cnt   = 0;
+        lq_ret_en_cnt   = 0;
 
         for (int i = 0; i < rob_in.vld_scnt; ++i) begin
             if (!rob_in.cpl[i])
@@ -53,15 +55,13 @@ module retire (
             RET_GEN,
             RET_HLT,
             RET_ILL,
-            RET_LOD,
-            RET_BRU: begin
-                ++retire_en_cnt;
-            end
-            RET_STR: begin
-                ++sq_ret_en_cnt;
-                ++retire_en_cnt;
-            end
+            RET_BRU:;
+
+            RET_STR: ++sq_ret_en_cnt;
+            RET_LOD: ++lq_ret_en_cnt;
             endcase
+
+            ++retire_en_cnt;
         end
     end
 
@@ -69,6 +69,7 @@ module retire (
         // only the count *may* be adjusted
         en_cnt      : retire_en_cnt,
         sq_en_cnt   : sq_ret_en_cnt,
+        lq_en_cnt   : lq_ret_en_cnt,
 
         // the rest of the fields stay the same
         t_old   : rob_in.t_old,

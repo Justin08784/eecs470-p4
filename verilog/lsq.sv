@@ -28,7 +28,6 @@ typedef struct packed {
 /* Store queue */
 module sq #(
     parameter SQ_SZ =SQ_SZ, // num elements
-    parameter DSQ_SZ=2*SQ_SZ,
     parameter N     =N
 ) (
     output  logic           any_pending_wrmems,
@@ -64,6 +63,7 @@ module sq #(
     output  sq2dispatch     d_out,
     input   dispatch2sq     d_in
 );
+    localparam DSQ_SZ=2*SQ_SZ;
     function automatic logic [SQ_SZ-1:0] compute_range_mask(
         input `IDX_TYPE(DSQ_SZ) head,
         input `IDX_TYPE(DSQ_SZ) tail
@@ -445,5 +445,68 @@ module sq #(
 
 `endif
 
+
+endmodule
+
+module lq #(
+    parameter LQ_SZ =LQ_SZ,
+    parameter N     =N
+) (
+    input   logic           clock,
+    input   logic           reset,
+    input   logic           flush,
+    input   BMASK           clmsk,
+
+    // retire
+    input   RETIRE_PKT      r_in,
+
+    // dispatch
+        // alloc snapshot
+    input   comm2snap_bus   snap_in,
+        // alloc entry
+    output  lq2dispatch     d_out,
+    input   dispatch2lq     d_in
+
+);
+    localparam DLQ_SZ=2*LQ_SZ;
+    `PTR_TYPE(DLQ_SZ)   snap;
+
+    ring_ctr #(
+        .DEPTH      (LQ_SZ),
+        .RPORTS     (N),
+        .WPORTS     (N),
+        .FLUSH_MODE (FIFO_FLUSH_SNAP_TAIL)
+    ) ring_ctr0 (
+        .clock      (clock),
+        .reset      (reset),
+        .flush      (flush),
+        .flush_snap (snap),
+
+        .rd_en_cnt  (r_in.lq_en_cnt),
+        .wr_en_cnt  (d_in.wen_cnt),
+
+        .head       (),
+        .tail       (),
+        .rd_idxs_n  (),
+        .wr_idxs_n  (d_out.lq_didxs_n),
+
+        .used       (),
+        .free       (),
+        .used_scnt  (),
+        .free_scnt  (d_out.rdy_scnt)
+    );
+
+    general_snaps #(
+        .WIDTH      (`PTR_SIZE(DLQ_SZ))
+    ) lq_dtails (
+        .clock      (clock),
+
+        .rmsk       (clmsk),
+        .rdat       (snap),
+
+        .wen        (snap_in.snap_en),
+        .wmsk       (snap_in.b1hot_n),
+        .wdat       (snap_in.lq_dtail)
+    );
 
 endmodule
