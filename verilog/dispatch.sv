@@ -305,6 +305,7 @@ module dispatch #(parameter
                 t2_rdy      : '0,
                 // commit
                 dsq_idx     : sq_in.dsq_idxs_n[store_prefix_cnt[i]],
+                lq_idx      : lq_in.lq_didxs_n[load_prefix_cnt[i]],
                 rob_idx     : '0
             };
 

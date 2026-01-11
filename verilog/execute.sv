@@ -107,10 +107,19 @@ module str_ex (
         // insn metadata/operands
 
     /* BACKEND */
+    output  SMASK[NUM_FU_STR-1:0]       cpl_s1hots,
     output execute2complete_str         cstr_out
 );
     assign cstr_out.en = i_vld;
     assign cstr_out.msk= i_msk;
+    // assign cstr_out.cpl_smask = 'x; // ignored (only set on broadcast)
+    always_comb begin
+        cpl_s1hots = '0;
+        for (int i = 0; i < NUM_FU_STR; ++i)
+            if (i_vld[i])
+                cpl_s1hots[i][SQ_IDX'(i_regs[i].dat.dsq_idx)] = 1'b1;
+    end
+
     for (genvar i = 0; i < NUM_FU_STR; ++i) begin
         assign cstr_out.dat[i] = '{
             rob_idx : i_regs[i].dat.rob_idx,
@@ -400,14 +409,17 @@ module stage_ex_p4 (
     output  execute2complete_bru cbru_out,
     output  execute2complete_tag ctag_out,
     output  execute2complete_dat cdat_out,
-    output  execute2complete_str cstr_out
+    output  execute2complete_str cstr_out,
+    output  execute2complete_lod clod_out
 
 );
     // local convenience variables
     logic flush;
     BMASK clmsk;
+    SMASK cpl_smask;
     assign flush = cbru_out.flush;
     assign clmsk = cbru_out.clmsk;
+    assign cpl_smask = cstr_out.cpl_smask; 
 
     /* >> ======== STAGE 1: Issue Staging ======== >> */
     // (where just-issued insns wait for 1 cycle)
@@ -536,6 +548,7 @@ module stage_ex_p4 (
                 // << FIXME
 
                 dsq_idx     : rs_in.fu_dat_lod[i].dsq_idx,
+                lq_idx      : rs_in.fu_dat_lod[i].lq_idx,
                 rob_idx     : rs_in.fu_dat_lod[i].rob_idx,
                 mem_size    : MEM_SIZE'(rs_in.fu_dat_lod[i].funct3[1:0]),
                 rd_unsigned : rs_in.fu_dat_lod[i].funct3[2]
@@ -995,6 +1008,8 @@ module stage_ex_p4 (
         .o_cands    (cands.mul)
     );
 
+    execute2complete_lod clod_out_prekill_n;
+    LMASK[NUM_FU_LOD-1:0]cpl_l1hot_prekill_n;
     lod_ex lod_ex0 (
 `ifdef DEBUG
         .print_en   (1'b1),
@@ -1003,6 +1018,7 @@ module stage_ex_p4 (
         .reset      (reset),
         .flush      (flush),
         .clmsk      (clmsk),
+        .cpl_smask  (cpl_smask),
 
         .i_vld      (regs.o_vld.lod),
         .i_rdy      (ex.i_rdy.lod),
@@ -1013,6 +1029,9 @@ module stage_ex_p4 (
         .sq_out     (sq_out),
         .dcache_in  (dcache_in),
         .dcache_out (dcache_out),
+
+        .cpl_l1hot (cpl_l1hot_prekill_n),
+        .clod_out   (clod_out_prekill_n),
 
         .cdb_req    (cdb_req.lod),
         .ctag_msks  (ctag_msks.lod),
@@ -1025,11 +1044,13 @@ module stage_ex_p4 (
     );
 
     execute2complete_str cstr_out_prekill_n;
+    SMASK[NUM_FU_STR-1:0]cpl_s1hots_prekill_n;
     str_ex str_ex0 (
         .i_vld      (regs.o_vld.str),
         .i_msk      (regs.o_msk.str),
         .i_regs     (regs.o_dat.str),
 
+        .cpl_s1hots (cpl_s1hots_prekill_n),
         .cstr_out   (cstr_out_prekill_n)
     );
 
@@ -1131,6 +1152,9 @@ module stage_ex_p4 (
     execute2complete_tag ctag_out_prekill;
     execute2complete_dat cdat_out_prekill;
     execute2complete_str cstr_out_prekill;
+    SMASK[NUM_FU_STR-1:0]cpl_s1hots_prekill;
+    execute2complete_lod clod_out_prekill;
+    SMASK[NUM_FU_STR-1:0]cpl_l1hot_prekill;
     assign cbru_out = cbru_out_prekill;
         /*
         Q: Why is cbru_out equal to cbru_out_prekill?
@@ -1151,8 +1175,21 @@ module stage_ex_p4 (
     end
     always_comb begin
         cstr_out = cstr_out_prekill;
-        for (int c = 0; c < N; ++c)
+        cstr_out.cpl_smask = '0;
+        for (int c = 0; c < NUM_FU_STR; ++c) begin
             cstr_out.en[c] = cstr_out_prekill.en[c] & ~(flush & |(cstr_out_prekill.msk[c] & clmsk));
+            if (cstr_out.en[c])
+                cstr_out.cpl_smask |= cpl_s1hots_prekill[c];
+        end
+    end
+    always_comb begin
+        clod_out = clod_out_prekill;
+        clod_out.cpl_lmask = '0;
+        for (int c = 0; c < NUM_FU_LOD; ++c) begin
+            clod_out.en[c] = clod_out_prekill.en[c] & ~(flush & |(clod_out_prekill.msk[c] & clmsk));
+            if (clod_out.en[c])
+                clod_out.cpl_lmask |= cpl_l1hot_prekill[c];
+        end
     end
 
     always_ff @(posedge clock) begin
@@ -1166,6 +1203,7 @@ module stage_ex_p4 (
         cdat_out_prekill    <= cdat_out_prekill_n;
         cbru_out_prekill    <= cbru_out_prekill_n;
         cstr_out_prekill    <= cstr_out_prekill_n;
+        cpl_s1hots_prekill  <= cpl_s1hots_prekill_n;
         btq_out             <= btq_out_n;
 
         if (reset) begin
@@ -1175,6 +1213,7 @@ module stage_ex_p4 (
             ctag_out_prekill.en     <= '0;
             cdat_out_prekill.en     <= '0;
             cstr_out_prekill.en     <= '0;
+            clod_out_prekill.en     <= '0;
 
             cbru_out_prekill.en     <= '0;
             cbru_out_prekill.clmsk  <= '0;
@@ -1204,6 +1243,7 @@ module stage_ex_p4 (
 `ifdef DEBUG
     task print_execute();
         $display("  %3d | >> EXECUTE", $time);
+        $display("cstr_out:cpl_smask: %b,", cstr_out.cpl_smask);
 
         for (int i = 0; i < NUM_FU_ALU; ++i) begin
             $display("alu_iss[%0d]: rdy: %b, vld: %b, msk: %b, t: %2d, t1: %2d, t2: %2d, rob_idx: %2d, inst: 0x%x, PC: 0x%x",

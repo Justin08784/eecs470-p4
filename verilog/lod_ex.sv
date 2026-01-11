@@ -9,6 +9,7 @@ module lod_ex(
     input               reset,
     input               flush,
     input   BMASK       clmsk,
+    input   SMASK       cpl_smask,
 
     /* FRONTEND */
     output  logic       i_rdy,  // ready to accept from regs.o_dat.lod?
@@ -26,6 +27,9 @@ module lod_ex(
     input   dcache2ld   dcache_in,
     output  ld2dcache   dcache_out,
 
+    output  LMASK                   cpl_l1hot,
+    output  execute2complete_lod    clod_out,
+
     /* Early CDB arbitration */
     output  logic           cdb_req,
     output  BMASK           ctag_msks,
@@ -39,6 +43,7 @@ module lod_ex(
 );
     initial begin
         assert(NUM_FU_LOD == 1) else $fatal("lod_ex impl hardcoded to NUM_FU_LOD == 1");
+        assert(LBUF_SZ >= LQ_SZ)else $fatal;
     end
 
     typedef struct packed {
@@ -55,6 +60,7 @@ module lod_ex(
 
         // readiness
         DSQ_IDX         dsq_idx;
+        LQ_IDX          lq_idx;
         logic [3:0]     need_byte_mask;
     } QUERY_BAY_ENTRY;
 
@@ -64,6 +70,16 @@ module lod_ex(
     logic           dispatch_en;
     logic           bay_need;
 
+    // always prioritize replays over new loads 
+    logic           bay_ingress_rdy;
+    logic           replay2bay_vld;
+    BMASK           replay2bay_msk;
+    QUERY_BAY_ENTRY replay2bay_dat;
+    logic           bay2replay_rdy;
+
+    assign i_rdy            = bay_ingress_rdy & ~replay2bay_vld;
+    assign bay2replay_rdy   = bay_ingress_rdy;
+
     ppln_skid #(
         .WIDTH($bits(QUERY_BAY_ENTRY))
     ) query_bay (
@@ -72,10 +88,10 @@ module lod_ex(
         .flush  (flush),
         .clmsk  (clmsk),
 
-        .i_vld  (i_vld),
-        .i_rdy  (i_rdy),
-        .i_msk  (i_msk),
-        .i_dat  (i_bay_dat),
+        .i_vld  (replay2bay_vld | i_vld),
+        .i_rdy  (bay_ingress_rdy),
+        .i_msk  (replay2bay_vld ? replay2bay_msk : i_msk),
+        .i_dat  (replay2bay_vld ? replay2bay_dat : i_bay_dat),
 
         .o_vld  (bay_vld),
         .o_rdy  (dispatch_en),
@@ -88,13 +104,21 @@ module lod_ex(
         PHYS_REG_IDX    t;
         ROB_IDX         rob_idx;
 
+        // replay control
+        SMASK           older_ncpl_store_mask;
+        logic           replay; // load-order violation i.e. completed before an older matching store?
+
         // byte access information
         logic           rd_unsigned;
+        ADDR            addr; // TODO: dont use ADDR anywhere; they are unnecessarily **expensive** (we cannot index that much memory)
         logic [1:0]     iw_off;
         MEM_SIZE        mem_size;
         DATA_BLOCK      raw;
 
+        DSQ_IDX         dsq_idx;
+        LQ_IDX          lq_idx;
         logic[3:0]      need_byte_mask;
+        logic           satisfied;
     } LOAD_BUFFER_ENTRY;
 
     struct packed {
@@ -105,11 +129,16 @@ module lod_ex(
     logic             [LBUF_SZ-1:0] lbuf_vld;
     logic             [LBUF_SZ-1:0] lbuf_kill;
     logic             [LBUF_SZ-1:0] lbuf_need;
+    logic             [LBUF_SZ-1:0] lbuf_any_older_ncpl_store;
+    logic             [LBUF_SZ-1:0] lbuf_replay;
 
     for (genvar i = 0; i < LBUF_SZ; ++i) begin
         assign lbuf_vld[i] = lbuf_hdr[i].vld;
         assign lbuf_kill[i]= flush & |(lbuf_hdr[i].msk & clmsk);
-        assign lbuf_need[i]= |(lbuf[i].need_byte_mask);
+        // assign lbuf_need[i]= |(lbuf[i].need_byte_mask);
+        assign lbuf_need[i]= ~lbuf[i].satisfied;
+        assign lbuf_any_older_ncpl_store[i] = |lbuf[i].older_ncpl_store_mask;
+        assign lbuf_replay[i] = lbuf[i].replay;
     end
 
     /* In -> Bay */
@@ -146,22 +175,30 @@ module lod_ex(
     assign sq_satisfies_bay = ~|(bay_need & ~sq_in.has_byte_mask);
     assign dispatch_en      =
         bay_vld
-    &   ~sq_in.any_older_ncpl_store // RAW hazard
+    // &   ~sq_in.any_older_ncpl_store // RAW hazard
     &   (sq_satisfies_bay | dcache_hit)
     &   |dispatch_rdy_req;
     assign dispatch_lbuf_en =
         {LBUF_SZ{
             bay_vld
-        &   ~sq_in.any_older_ncpl_store
+        // &   ~sq_in.any_older_ncpl_store
         &   (sq_satisfies_bay | dcache_hit)
         }}
     &   dispatch_rdy_gnt;
+
+    assign clod_out.en  = dispatch_en;
+    assign clod_out.msk = bay_msk;
+    always_comb begin
+        cpl_l1hot = '0;
+        if (dispatch_en)
+            cpl_l1hot[bay_dat.lq_idx] = 1'b1;
+    end
 
     /* Lbuf -> CDB shr */
     logic [LBUF_SZ-1:0] lbuf2cdb_arb_req; // request to request for cdb slot
     logic [LBUF_SZ-1:0] lbuf2cdb_arb_gnt; // grant   to request for cdb slot
     // cdb_gnt = did the chosen lbuf requestor actually get a cdb slot
-    assign lbuf2cdb_arb_req = (lbuf_vld & ~lbuf_kill) & ~lbuf_need;
+    assign lbuf2cdb_arb_req = (lbuf_vld & ~lbuf_kill) & ~lbuf_need & ~lbuf_any_older_ncpl_store & ~lbuf_replay;
     psel_gen #(
         .WIDTH  (LBUF_SZ),
         .REQS   (1)
@@ -176,11 +213,69 @@ module lod_ex(
         ctag_ts     = '0;
         for (int i = 0; i < LBUF_SZ; ++i) begin
             if (lbuf2cdb_arb_gnt[i]) begin
-                ctag_msks   = lbuf_hdr[i].msk;
+                ctag_msks   = lbuf_hdr[i].msk & ~clmsk;
                 ctag_ts     = lbuf[i].t;
             end
         end
     end
+
+    logic [LBUF_SZ-1:0] lbuf2replay_arb_req;
+    logic [LBUF_SZ-1:0] lbuf2replay_arb_gnt;
+    logic           lbuf2replay_vld, replay2lbuf_rdy;
+    BMASK           lbuf2replay_msk;
+    QUERY_BAY_ENTRY lbuf2replay_dat;
+    assign lbuf2replay_arb_req  = (lbuf_vld & ~lbuf_kill) & lbuf_replay; 
+    assign lbuf2replay_vld      = |lbuf2replay_arb_req;
+
+    psel_gen #(
+        .WIDTH  (LBUF_SZ),
+        .REQS   (1)
+    ) replay_arb_sel (
+        .req    (lbuf2replay_arb_req),
+        .gnt    (lbuf2replay_arb_gnt)
+    );
+
+    always_comb begin
+        for (int i = 0; i < LBUF_SZ; ++i) begin
+            LOAD_BUFFER_ENTRY cur;
+            cur = lbuf[i];
+
+            if (lbuf2replay_arb_gnt[i]) begin
+                lbuf2replay_msk = lbuf_hdr[i].msk & ~clmsk;
+                lbuf2replay_dat = {
+                    t               : cur.t,
+                    rob_idx         : cur.rob_idx,
+
+                    rd_unsigned     : cur.rd_unsigned,
+                    addr            : cur.addr,
+                    mem_size        : cur.mem_size,
+
+                    dsq_idx         : cur.dsq_idx,
+                    lq_idx          : cur.lq_idx,
+                    need_byte_mask  : cur.need_byte_mask
+                };
+            end
+        end
+    end
+
+    ppln_skid #(
+        .WIDTH($bits(QUERY_BAY_ENTRY))
+    ) replay_buf (
+        .clock  (clock),
+        .reset  (reset),
+        .flush  (flush),
+        .clmsk  (clmsk),
+
+        .i_vld  (lbuf2replay_vld),
+        .i_rdy  (replay2lbuf_rdy),
+        .i_msk  (lbuf2replay_msk),
+        .i_dat  (lbuf2replay_dat),
+
+        .o_vld  (replay2bay_vld),
+        .o_rdy  (bay2replay_rdy),
+        .o_msk  (replay2bay_msk),
+        .o_dat  (replay2bay_dat)
+    );
 
 
     /* Query + forward handling */
@@ -213,6 +308,7 @@ module lod_ex(
         addr            : i_addr,
         mem_size        : i_regs.dat.mem_size,
         dsq_idx         : i_regs.dat.dsq_idx,
+        lq_idx          : i_regs.dat.lq_idx,
         need_byte_mask  : i_byte_mask
     };
 
@@ -257,8 +353,9 @@ module lod_ex(
 
         // TODO: note to self. Moving this was a bug fix! since msk was not cleared, we had spurious kills
         for (int i = 0; i < LBUF_SZ; ++i) begin
-            if ((lbuf2cdb_arb_gnt[i] & cdb_gnt) | lbuf_kill[i])
+            if ((lbuf2cdb_arb_gnt[i] & cdb_gnt) | (lbuf2replay_arb_gnt[i] & replay2lbuf_rdy) | lbuf_kill[i])
                 lbuf_hdr_n[i].vld = 1'b0;
+            lbuf_hdr_n[i].msk = lbuf_hdr[i].msk & ~clmsk;
         end
 
         if (dcache_in.ldb_vld)
@@ -274,11 +371,15 @@ module lod_ex(
             need_byte_mask will go to 0 immediately. This will change with a nonblocking
             dcache design, where a load may dispatch to the buffer only partially
             satisfied (and wait for the rest from dcache ldb broadcast). */
-            lbuf_n[dcache_in.ldb.lbuf_idx].need_byte_mask &= '0;
+            // lbuf_n[dcache_in.ldb.lbuf_idx].need_byte_mask &= '0;
             lbuf_n[dcache_in.ldb.lbuf_idx].raw = coal_dat;
+            lbuf_n[dcache_in.ldb.lbuf_idx].satisfied = 1'b1;
         end
 
         for (int i = 0; i < LBUF_SZ; ++i) begin
+            lbuf_n[i].older_ncpl_store_mask = lbuf[i].older_ncpl_store_mask     & ~cpl_smask;
+            lbuf_n[i].replay                |=|(lbuf[i].older_ncpl_store_mask   & cpl_smask);
+
             if (dispatch_lbuf_en[i]) begin
                 logic [1:0] iw_off;
 
@@ -297,11 +398,20 @@ module lod_ex(
                 lbuf_n[i] = '{
                     t           : bay_dat.t,
                     rob_idx     : bay_dat.rob_idx,
+
+                    older_ncpl_store_mask   : sq_in.older_ncpl_store_mask,
+                    replay                  : |(sq_in.older_ncpl_store_mask & cpl_smask),
+
                     rd_unsigned : bay_dat.rd_unsigned,
+                    addr        : bay_dat.addr,
                     iw_off      : iw_off,
                     mem_size    : bay_dat.mem_size,
                     raw         : '0,
-                    need_byte_mask  : bay_dat.need_byte_mask
+
+                    dsq_idx         : bay_dat.dsq_idx,
+                    lq_idx          : bay_dat.lq_idx,
+                    need_byte_mask  : bay_dat.need_byte_mask,
+                    satisfied       : 1'b0
                 };
             end
         end
@@ -341,7 +451,7 @@ module lod_ex(
                 lbuf2cands0_dat.rob_idx = tmp.rob_idx;
                 lbuf2cands0_dat.data    = blk;
 
-                lbuf2cands0_msk         = lbuf_hdr[i].msk;
+                lbuf2cands0_msk         = lbuf_hdr[i].msk & ~clmsk;
             end
         end
     end
@@ -530,43 +640,75 @@ task print_lod_ex();
     $display("dispatch_rdy_gnt: %b", dispatch_rdy_gnt);
 
     $display("  -- LBUF STATE --");
+    $display("flush: %b, clmsk: %b", flush, clmsk);
     for (int i = 0; i < LBUF_SZ; ++i) begin
         if (!lbuf_hdr[i].vld) begin
             $display("lbuf[%2d]: ", i);
             continue;
         end
-        $display("lbuf[%2d]: vld=%b rob_idx=%3d t=%2d iw_off=%2b size=%s unsign=%b raw=%h, nbm=%b",
+        $display("lbuf[%2d]: msk=%b, rob_idx=%3d t=%2d iw_off=%2b size=%s unsign=%b raw=%h, nbm=%b, {older_stores: %b, replay: %b}",
             i,
-            lbuf_hdr[i].vld,
+            // lbuf_hdr[i].vld,
+            lbuf_hdr[i].msk,
             lbuf[i].rob_idx,
             lbuf[i].t,
             lbuf[i].iw_off,
             dbg_mem_size(lbuf[i].mem_size),
             lbuf[i].rd_unsigned,
             lbuf[i].raw,
-            lbuf[i].need_byte_mask
+            lbuf[i].need_byte_mask,
+            lbuf[i].older_ncpl_store_mask,
+            lbuf[i].replay
         );
     end
     $display("lbuf_vld: %b, lbuf_kill: %b, lbuf2cdb_arb_gnt: %b", lbuf_vld, lbuf_kill, lbuf2cdb_arb_gnt);
 
     $display("  -- COMPLETION (CDB OUT) --");
-    $display("t=%2d, rob_idx=%2d, data=%x",
-        o_cands.t,
-        o_cands.rob_idx,
-        o_cands.data
-    );
+    if (cands02cands1_vld)
+        $display("cands_shr[0]: rob_idx=%2d, t=%2d, dat=%x",
+            cands02cands1_dat.rob_idx,
+            cands02cands1_dat.t,
+            cands02cands1_dat.data
+        );
+    else
+        $display("cands_shr[0]:");
 
-    $display("cands_shr[0]: t=%2d, rob_idx=%2d, dat=%x",
-        cands02cands1_dat.t,
-        cands02cands1_dat.rob_idx,
-        cands02cands1_dat.data
-    );
+    if (cands1_vld)
+        $display("cands_shr[1]: rob_idx=%2d, t=%2d, dat=%x",
+            cands1_dat.rob_idx,
+            cands1_dat.t,
+            cands1_dat.data
+        );
+    else
+        $display("cands_shr[1]:");
 
-    $display("cands_shr[1]: t=%2d, rob_idx=%2d, dat=%x",
-        cands1_dat.t,
-        cands1_dat.rob_idx,
-        cands1_dat.data
-    );
+    
+    if (replay2bay_vld)
+        $display("replay_buf: msk: %b, rob_idx=%2d, t=%2d",
+            replay2bay_msk,
+            replay2bay_dat.rob_idx,
+            replay2bay_dat.t
+        );
+    else
+        $display("replay_buf:");
+    //     $display("bay[%2d]: vld=%b rob_idx=%3d t=%2d addr=0x%08x size=%s unsign=%b nbm=%b raw=%h",
+    //         i,
+    //         bay_hdr[i].vld,
+    //         bay[i].rob_idx,
+    //         bay[i].t,
+    //         bay[i].addr,
+    //         dbg_mem_size(bay[i].mem_size),
+    //         bay[i].rd_unsigned,
+    //         bay[i].need_byte_mask,
+    //         bay[i].raw
+    //     );
+
+    // $display("t=%2d, rob_idx=%2d, data=%x",
+    //     o_cands.t,
+    //     o_cands.rob_idx,
+    //     o_cands.data
+    // );
+
 
     // for (int i = 0; i < 2; ++i) begin
     //     $display("cands_shr_n[%1d]: t=%2d, rob_idx=%2d, dat=%x",

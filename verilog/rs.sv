@@ -417,6 +417,7 @@ module rs #(parameter
                 t1          : d_in.dat[i].t1,
                 t1_rdy      : d_in.dat[i].t1_rdy,
                 dsq_idx     : d_in.dat[i].dsq_idx,
+                lq_idx      : d_in.dat[i].lq_idx,
                 rob_idx     : d_in.dat[i].rob_idx
             };
         end
@@ -876,7 +877,7 @@ module rs_part_load #(
     logic [PART_SZ-1:0] can_issue;
     for (genvar rs = 0; rs < PART_SZ; ++rs) begin
         assign can_issue[rs] = busy_vec[rs]
-            & ~entries[rs].any_older_ncpl_store
+            // & ~entries[rs].any_older_ncpl_store
             & ~kill[rs]
             & ~entries[rs].issd // ms1 test: remove "!" from entries[rs].issd (caught)
             & (entries[rs].dat.t1_rdy | to_t1_rdy[rs]);// [ADDRESSED] ms1 test: remove "|| to_t1_rdy[rs]" (not caught) 

@@ -211,12 +211,11 @@ module sq #(
         end
 
         // complete (cstr)
+        hdr_n.cpl |= cstr_in.cpl_smask;
         for (int i = 0; i < CPORTS; ++i) begin
             if (cstr_in.en[i]) begin
                 int unsigned sq_idx;
                 sq_idx = cstr_in.dat[i].dsq_idx[`IDX_SIZE(SQ_SZ)-1:0];
-
-                hdr_n.cpl[sq_idx]   = 1'b1;
 
                 state_n[sq_idx].dst = cstr_in.dat[i].dst;
                 state_n[sq_idx].size= cstr_in.dat[i].size;
@@ -270,7 +269,7 @@ module sq #(
     // load query & response
     WADDR query_word;
     SQ_IDX ld_in_sq_idx;
-    logic[SQ_SZ-1:0] ncpl;
+    logic[SQ_SZ-1:0] cpl, ncpl;
     logic[SQ_SZ-1:0] vld_older;
     logic[SQ_SZ-1:0] match_word;
     logic[3:0][SQ_SZ-1:0] byte_mask_table_T;
@@ -283,21 +282,23 @@ module sq #(
 
     assign vld_older    = compute_range_mask(head, ld_in.dsq_idx);
     for (genvar i = 0; i < SQ_SZ; ++i) begin
-        assign ncpl[i]      = ~hdr.cpl[i];
+        assign cpl[i]       = hdr.cpl[i];
         assign match_word[i]= query_word == addr2w(state[i].dst);
     end
+    assign ncpl = ~cpl;
 
     for (genvar j = 0; j < 4; ++j) begin
         for (genvar i = 0; i < SQ_SZ; ++i) begin
             assign byte_mask_table_T[j][i] = state[i].byte_mask[j];
             // assign ok_table_rotr[i][j] = ok_table_rotr_T[j][i];
         end
-        assign ok_table_T[j]        = vld_older & match_word & byte_mask_table_T[j];
+        assign ok_table_T[j]        = vld_older & cpl & match_word & byte_mask_table_T[j];
         assign ok_table_rotr_T[j]   = {ok_table_T[j], ok_table_T[j]} >> ld_in_sq_idx;
 
         assign ld_out.has_byte_mask[j] = |ok_table_T[j];
     end
     assign ld_out.any_older_ncpl_store = |(vld_older & ncpl);
+    assign ld_out.older_ncpl_store_mask= vld_older & ncpl;
 
     for (genvar j = 0; j < 4; ++j) begin
         always_comb begin
@@ -460,6 +461,9 @@ module lq #(
     // retire
     input   RETIRE_PKT      r_in,
 
+    // complete
+    input   execute2complete_lod    clod_in,
+
     // dispatch
         // alloc snapshot
     input   comm2snap_bus   snap_in,
@@ -469,7 +473,28 @@ module lq #(
 
 );
     localparam DLQ_SZ=2*LQ_SZ;
-    `PTR_TYPE(DLQ_SZ)   snap;
+    `PTR_TYPE(DLQ_SZ)   head, tail, snap;
+    logic [N:0][`IDX_SIZE(DLQ_SZ)-1:0] d_didxs_n, r_didxs_n;
+    struct packed {
+        logic[LQ_SZ-1:0]used, cpl;
+    } hdr, hdr_n;
+
+    function automatic logic [LQ_SZ-1:0] compute_range_mask(
+        input `IDX_TYPE(DLQ_SZ) head,
+        input `IDX_TYPE(DLQ_SZ) tail
+    );
+        logic opp_pol; // head -> tail span wraps?
+        logic [LQ_SZ-1:0] geh, ltt, anded, orred, used;
+        opp_pol = head[`IDX_SIZE(DLQ_SZ)-1] ^ tail[`IDX_SIZE(DLQ_SZ)-1];
+        for (int i = 0; i < LQ_SZ; ++i) begin
+            geh[i] = i >= head[`IDX_SIZE(LQ_SZ)-1:0];
+            ltt[i] = i <  tail[`IDX_SIZE(LQ_SZ)-1:0];
+        end
+        anded= geh & ltt; // [h, t)
+        orred= geh | ltt; // [0, t) U [h, DEPTH)
+        used = opp_pol ? orred : anded;
+        return used;
+    endfunction
 
     ring_ctr #(
         .DEPTH      (LQ_SZ),
@@ -485,16 +510,17 @@ module lq #(
         .rd_en_cnt  (r_in.lq_en_cnt),
         .wr_en_cnt  (d_in.wen_cnt),
 
-        .head       (),
-        .tail       (),
-        .rd_idxs_n  (),
-        .wr_idxs_n  (d_out.lq_didxs_n),
+        .head       (head),
+        .tail       (tail),
+        .rd_idxs_n  (r_didxs_n),
+        .wr_idxs_n  (d_didxs_n),
 
         .used       (),
         .free       (),
         .used_scnt  (),
         .free_scnt  (d_out.rdy_scnt)
     );
+    assign d_out.lq_didxs_n = d_didxs_n;
 
     general_snaps #(
         .WIDTH      (`PTR_SIZE(DLQ_SZ))
@@ -508,5 +534,22 @@ module lq #(
         .wmsk       (snap_in.b1hot_n),
         .wdat       (snap_in.lq_dtail)
     );
+
+    logic[LQ_SZ-1:0]snap_used;
+    assign snap_used = compute_range_mask(head, snap); 
+    always_comb begin
+        hdr_n = hdr;
+
+        if (flush)
+            hdr_n.used = snap_used;
+
+        hdr_n.cpl |= clod_in.cpl_lmask;
+    end
+
+    always_ff @(posedge clock) begin
+        hdr <= hdr_n;
+        if (reset)
+            hdr.used <= '0;
+    end
 
 endmodule

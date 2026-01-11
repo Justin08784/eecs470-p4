@@ -221,6 +221,7 @@ module cpu (
         .d_in       (dispatch_2_sq)
     );
 
+    execute2complete_lod ex_2_clod;
     lq #(
         .LQ_SZ  (LQ_SZ),
         .N      (N)
@@ -232,6 +233,7 @@ module cpu (
         
         .r_in   (retire_exec),
 
+        .clod_in(ex_2_clod),
         .snap_in(comm_2_snap),
         
         .d_out  (lq_2_dispatch),
@@ -348,7 +350,8 @@ module cpu (
         .ctag_out   (ex_2_ctag),
         .cbru_out   (ex_2_cbru),
         .cdat_out   (ex_2_cdat),
-        .cstr_out   (ex_2_cstr)
+        .cstr_out   (ex_2_cstr),
+        .clod_out   (ex_2_clod)
     );
 
 

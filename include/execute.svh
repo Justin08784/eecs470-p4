@@ -45,6 +45,7 @@ typedef struct packed {
 
     // LSQ_IDX         lq_idx;
     DSQ_IDX         dsq_idx;
+    LQ_IDX          lq_idx;
     ROB_IDX         rob_idx;
     MEM_SIZE        mem_size;
     logic           rd_unsigned;

@@ -123,7 +123,7 @@ parameter NUM_FU_STR    = 1;
 parameter NUM_FU_BRU    = 1;
 parameter NUM_FU_TOTAL  = NUM_FU_ALU + NUM_FU_MUL + NUM_FU_LOD + NUM_FU_STR + NUM_FU_BRU;
     // per-FU config
-parameter LBUF_SZ       = 4;
+parameter LBUF_SZ       = 16;
 parameter MUL_STAGES    = 16;// number of mult stages (2, 4) (you likely don't need 8)
     // Justin: funny enough we need at least 8 or else multiply is on critical path
 
@@ -176,6 +176,8 @@ typedef logic [13:0] WADDR; // word index
 typedef logic [12:0] DWADDR;// double-word (dw) index
 
 typedef logic [BMASK_LEN-1:0] BMASK;
+typedef logic [SQ_SZ-1:0]     SMASK; // store mask (for older_ncpl_store tracking)
+typedef logic [LQ_SZ-1:0]     LMASK; // load mask (for older_ncpl_store tracking)
 
 // address conversion functions
     // addr <-> double-word
@@ -677,6 +679,7 @@ typedef struct packed {
     logic           t2_rdy;
     // commit
     DSQ_IDX         dsq_idx;
+    LQ_IDX          lq_idx;
     ROB_IDX         rob_idx;
 } COMMIT_RS_PKT; // purely combinational
 
@@ -869,6 +872,7 @@ typedef struct packed {
     PHYS_REG_IDX    t1;
     logic           t1_rdy;
     DSQ_IDX         dsq_idx; // load position (dsq tail at time of load dispatch)
+    LQ_IDX          lq_idx;
     ROB_IDX         rob_idx;
 } RS_LOAD_PAYLOAD;
 
@@ -1043,6 +1047,7 @@ typedef struct packed {
 typedef struct packed {
     logic [NUM_FU_STR-1:0] en;
     BMASK [NUM_FU_STR-1:0] msk;
+    SMASK cpl_smask;
     struct packed {
         ROB_IDX     rob_idx;
 
@@ -1053,6 +1058,11 @@ typedef struct packed {
     } [NUM_FU_STR-1:0] dat;
 } execute2complete_str;
 
+typedef struct packed {
+    logic [NUM_FU_LOD-1:0] en;
+    BMASK [NUM_FU_LOD-1:0] msk;
+    LMASK cpl_lmask;
+} execute2complete_lod;
 
 // ================
 // Owner: Retire
@@ -1169,6 +1179,7 @@ typedef struct packed {
 typedef struct packed {
     logic[3:0]  has_byte_mask;
     logic       any_older_ncpl_store;
+    logic[SQ_SZ-1:0] older_ncpl_store_mask;
 
     logic       ldb_vld;
     LDB         ldb;
